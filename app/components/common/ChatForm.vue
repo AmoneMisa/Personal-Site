@@ -3,22 +3,30 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref } from "vue";
 import CustomInput from "~/components/common/CustomInput.vue";
 import CustomButton from "~/components/common/CustomButton.vue";
 
+type SessionStatus = "active" | "awaiting_username" | "moved_to_telegram" | "closed";
+
 type ChatSession = {
   id: number;
-  status: "active" | "awaiting_username" | "moved_to_telegram" | "closed";
+  status: SessionStatus;
   tgUsername?: string | null;
 };
 
 type ChatMessage = {
   id?: number;
+  localId?: string;
   sender: "client" | "owner";
   text: string;
   createdAt: string;
+  pending?: boolean;
 };
 
 const props = withDefaults(
-    defineProps<{ titleKey?: string }>(),
-    { titleKey: "chat.title" }
+    defineProps<{
+      titleKey?: string;
+    }>(),
+    {
+      titleKey: "chat.title",
+    }
 );
 
 const { public: publicConfig } = useRuntimeConfig();
@@ -30,24 +38,26 @@ const isSending = ref(false);
 const hasUnread = ref(false);
 
 const session = ref<ChatSession | null>(null);
+
 const messages = ref<ChatMessage[]>([]);
 const messageText = ref("");
 
 const socket = ref<WebSocket | null>(null);
 const socketConnected = ref(false);
-const chatListRef = ref<HTMLElement | null>(null);
 
+const chatListRef = ref<HTMLElement | null>(null);
 const clientId = ref<string>("");
 
-const channelStep = ref<"choose" | "telegram_username" | "chat">("choose");
-const tgUsername = ref("");
+const flowMode = computed<"choose" | "telegram" | "site" | "closed">(() => {
+  const s = session.value;
+  if (!s) return "choose";
+  if (s.status === "active") return "site";
+  if (s.status === "awaiting_username") return "telegram";
+  return "closed";
+});
 
 const canSend = computed(() => {
-  if (!session.value) return false;
-  if (session.value.status === "closed") return false;
-  if (session.value.status === "moved_to_telegram") return false;
-  if (channelStep.value !== "chat") return false;
-  return !isSending.value && !!messageText.value.trim();
+  return flowMode.value === "site" && !isSending.value && !!messageText.value.trim();
 });
 
 function ensureClientId() {
@@ -75,7 +85,24 @@ async function scrollChatToBottom(smooth = true) {
   el.scrollTo({ top: el.scrollHeight, behavior: smooth ? "smooth" : "auto" });
 }
 
-function pushSystem(text: string) {
+function openChat() {
+  isOpen.value = true;
+  hasUnread.value = false;
+  connectSocket();
+  loadHistory();
+}
+
+function closeChat() {
+  isOpen.value = false;
+  disconnectSocket();
+}
+
+function toggleChat() {
+  if (isOpen.value) closeChat();
+  else openChat();
+}
+
+function pushSystemOwnerText(text: string) {
   messages.value.push({
     sender: "owner",
     text,
@@ -83,34 +110,12 @@ function pushSystem(text: string) {
   });
 }
 
-async function startSession() {
-  const res = await fetch(`${apiBase.value}/chat/start`, {
-    method: "POST",
-    headers: { "X-Client-Id": clientId.value },
-    credentials: "include",
-  });
-  const data = await res.json();
-  if (!data?.ok) return;
+function ensureIntroIfNeeded() {
+  if (session.value) return;
 
-  session.value = data.session as ChatSession;
-
-  if (session.value.status === "moved_to_telegram") {
-    channelStep.value = "choose";
-    pushSystem((useI18n().t as any)("chat.system.telegram_done"));
-    return;
-  }
-
-  if (session.value.status === "closed") {
-    channelStep.value = "choose";
-    pushSystem((useI18n().t as any)("chat.system.session_closed"));
-    return;
-  }
-
-  if (!messages.value.length) {
-    channelStep.value = "choose";
-    pushSystem((useI18n().t as any)("chat.system.choose_channel"));
-  } else {
-    channelStep.value = "chat";
+  const hasAny = messages.value.length > 0;
+  if (!hasAny) {
+    pushSystemOwnerText("Привет! Где вам удобнее общаться с разработчиком?");
   }
 }
 
@@ -123,9 +128,32 @@ async function loadHistory() {
       credentials: "include",
     });
     const data = await res.json();
+
     if (data?.ok) {
       session.value = data.session ?? null;
       messages.value = (data.messages ?? []) as ChatMessage[];
+
+      ensureIntroIfNeeded();
+
+      if (!session.value) {
+        await scrollChatToBottom(false);
+        return;
+      }
+
+      if (session.value.status === "awaiting_username") {
+        if (!messages.value.some((m) => m.sender === "owner" && m.text.includes("@"))) {
+          pushSystemOwnerText("Введите ваш никнейм в Telegram через @ — чтобы разработчик смог написать вам напрямую.");
+        }
+      }
+
+      if (session.value.status === "moved_to_telegram") {
+        pushSystemOwnerText(`Спасибо. Разработчик свяжется с вами как можно скорее с ника @WhitesLove`);
+      }
+
+      if (session.value.status === "closed") {
+        pushSystemOwnerText("Диалог закрыт. Вы можете начать новый в любой момент.");
+      }
+
       await scrollChatToBottom(false);
     }
   } finally {
@@ -133,83 +161,193 @@ async function loadHistory() {
   }
 }
 
-async function chooseSite() {
-  channelStep.value = "chat";
-  await fetch(`${apiBase.value}/chat/set-channel`, {
+async function startNewSession() {
+  const res = await fetch(`${apiBase.value}/chat/start`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
       "X-Client-Id": clientId.value,
     },
-    body: JSON.stringify({ channel: "site" }),
+    body: JSON.stringify({}),
     credentials: "include",
   });
-  pushSystem((useI18n().t as any)("chat.input.placeholder"));
+  const data = await res.json();
+  if (!data?.ok) return;
+
+  session.value = data.session as ChatSession;
+  messages.value = [];
+
+  pushSystemOwnerText("Привет! Где вам удобнее общаться с разработчиком?");
+  await scrollChatToBottom(false);
+}
+
+async function chooseSite() {
+  const res = await fetch(`${apiBase.value}/chat/start`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "X-Client-Id": clientId.value,
+    },
+    body: JSON.stringify({}),
+    credentials: "include",
+  });
+  const data = await res.json();
+  if (!data?.ok) return;
+
+  session.value = data.session as ChatSession;
+
+  pushSystemOwnerText("Ок! Напишите сообщение — я передам его разработчику.");
   await scrollChatToBottom();
 }
 
 async function chooseTelegram() {
-  channelStep.value = "telegram_username";
-  pushSystem((useI18n().t as any)("chat.system.enter_tg"));
-  await scrollChatToBottom();
-}
-
-async function submitTelegramUsername() {
-  const name = tgUsername.value.trim();
-  if (!/^@[A-Za-z0-9_]{5,32}$/.test(name)) return;
-
-  await fetch(`${apiBase.value}/chat/set-channel`, {
+  const res = await fetch(`${apiBase.value}/chat/start`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
       "X-Client-Id": clientId.value,
     },
-    body: JSON.stringify({ channel: "telegram", tgUsername: name }),
+    body: JSON.stringify({}),
     credentials: "include",
   });
+  const data = await res.json();
+  if (!data?.ok) return;
 
-  pushSystem((useI18n().t as any)("chat.system.telegram_done"));
-  session.value = session.value ? { ...session.value, status: "moved_to_telegram", tgUsername: name } : null;
-  channelStep.value = "choose";
+  session.value = data.session as ChatSession;
+
+  session.value.status = "awaiting_username";
+  pushSystemOwnerText("Введите ваш никнейм в Telegram через @ — чтобы разработчик смог написать вам напрямую.");
   await scrollChatToBottom();
 }
 
-async function closeSessionFromSite() {
-  await fetch(`${apiBase.value}/chat/close`, {
-    method: "POST",
-    headers: { "X-Client-Id": clientId.value },
-    credentials: "include",
-  });
-
-  pushSystem((useI18n().t as any)("chat.system.session_closed"));
-  if (session.value) session.value = { ...session.value, status: "closed" };
-  channelStep.value = "choose";
-  await scrollChatToBottom();
+function isValidTgUsername(v: string) {
+  return /^@[A-Za-z0-9_]{5,32}$/.test(v.trim());
 }
 
-async function sendMessage() {
-  const text = messageText.value.trim();
-  if (!text || !session.value) return;
+async function submitTelegramUsername() {
+  const tg = messageText.value.trim();
+  if (!isValidTgUsername(tg)) {
+    pushSystemOwnerText("Никнейм должен быть в формате @username (5–32 символа).");
+    await scrollChatToBottom();
+    return;
+  }
+
+  if (!session.value) {
+    await chooseTelegram();
+  }
 
   isSending.value = true;
   try {
-    const form = new FormData();
-    form.append("text", text);
-
-    const res = await fetch(`${apiBase.value}/chat/send`, {
+    const res = await fetch(`${apiBase.value}/chat/set-channel`, {
       method: "POST",
-      headers: { "X-Client-Id": clientId.value },
-      body: form,
+      headers: {
+        "Content-Type": "application/json",
+        "X-Client-Id": clientId.value,
+      },
+      body: JSON.stringify({ channel: "telegram", tgUsername: tg }),
       credentials: "include",
     });
-
     const data = await res.json();
     if (!data?.ok) return;
 
     messageText.value = "";
+
+    session.value = data.session as ChatSession;
+
+    pushSystemOwnerText(`Спасибо. Разработчик свяжется с вами как можно скорее с ника @WhitesLove`);
     await scrollChatToBottom();
   } finally {
     isSending.value = false;
+  }
+}
+
+function makeLocalId() {
+  return (crypto?.randomUUID?.() ?? `${Date.now()}_${Math.random().toString(16).slice(2)}`);
+}
+
+function markDeliveredByLocalId(localId?: string) {
+  if (!localId) return;
+  const m = messages.value.find((x) => x.localId === localId);
+  if (m) m.pending = false;
+}
+
+function hasSameRecentMessage(sender: "client" | "owner", text: string, createdAtIso: string) {
+  const last = [...messages.value].reverse().find((m) => m.sender === sender && m.text === text);
+  if (!last) return false;
+  const a = new Date(last.createdAt).getTime();
+  const b = new Date(createdAtIso).getTime();
+  return Math.abs(a - b) < 3000;
+}
+
+async function sendSiteMessage() {
+  const text = messageText.value.trim();
+  if (!text) return;
+
+  if (!session.value || session.value.status !== "active") {
+    await chooseSite();
+  }
+
+  const localId = makeLocalId();
+  const optimistic: ChatMessage = {
+    localId,
+    sender: "client",
+    text,
+    createdAt: new Date().toISOString(),
+    pending: true,
+  };
+  messages.value.push(optimistic);
+  await scrollChatToBottom();
+
+  isSending.value = true;
+  try {
+    const res = await fetch(`${apiBase.value}/chat/send`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Client-Id": clientId.value,
+      },
+      body: JSON.stringify({ text, clientMsgId: localId }),
+      credentials: "include",
+    });
+    const data = await res.json();
+    if (!data?.ok) return;
+
+    messageText.value = "";
+    markDeliveredByLocalId(localId);
+  } finally {
+    isSending.value = false;
+  }
+}
+
+async function closeSessionFromSite() {
+  if (!session.value) return;
+
+  const res = await fetch(`${apiBase.value}/chat/close`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "X-Client-Id": clientId.value,
+    },
+    body: JSON.stringify({ reason: "closed_by_client" }),
+    credentials: "include",
+  });
+
+  const data = await res.json();
+  if (!data?.ok) return;
+
+  session.value = data.session as ChatSession;
+  pushSystemOwnerText("Диалог закрыт. Вы можете начать новый в любой момент.");
+  await scrollChatToBottom();
+}
+
+function onEnter() {
+  if (flowMode.value === "telegram") {
+    submitTelegramUsername();
+    return;
+  }
+  if (flowMode.value === "site") {
+    sendSiteMessage();
+    return;
   }
 }
 
@@ -221,85 +359,83 @@ function connectSocket() {
 
   const url = `${originWs}/chat-ws?clientId=${encodeURIComponent(clientId.value)}`;
 
-  try { socket.value?.close(); } catch {}
+  try {
+    socket.value?.close();
+  } catch {}
 
   socketConnected.value = false;
   socket.value = new WebSocket(url);
 
-  socket.value.onopen = () => { socketConnected.value = true; };
+  socket.value.onopen = () => {
+    socketConnected.value = true;
+  };
 
   socket.value.onmessage = async (ev) => {
     let payload: any;
-    try { payload = JSON.parse(ev.data); } catch { return; }
+    try {
+      payload = JSON.parse(ev.data);
+    } catch {
+      return;
+    }
 
     if (payload?.type === "message") {
-      const sid = Number(payload.sessionId || 0);
-      if (session.value?.id && sid && sid !== session.value.id) return;
+      const createdAt = payload.createdAt ?? new Date().toISOString();
+      const text = payload.text ?? "";
+      const sender = payload.sender as "client" | "owner";
+
+      if (payload.clientMsgId) {
+        markDeliveredByLocalId(payload.clientMsgId);
+      }
+
+      if (!payload.clientMsgId && hasSameRecentMessage(sender, text, createdAt)) {
+        return;
+      }
 
       messages.value.push({
-        sender: payload.sender,
-        text: payload.text ?? "",
-        createdAt: payload.createdAt ?? new Date().toISOString(),
+        id: payload.id ?? undefined,
+        sender,
+        text,
+        createdAt,
       });
 
       if (!isOpen.value) hasUnread.value = true;
       await scrollChatToBottom();
+      return;
+    }
+
+    if (payload?.type === "session_update") {
+      session.value = payload.session as ChatSession;
+      await scrollChatToBottom();
+      return;
     }
 
     if (payload?.type === "session_closed") {
-      const sid = Number(payload.sessionId || 0);
-      if (session.value?.id && sid && sid !== session.value.id) return;
-
-      pushSystem((useI18n().t as any)("chat.system.session_closed"));
-      if (session.value) session.value = { ...session.value, status: "closed" };
-      channelStep.value = "choose";
+      session.value = payload.session as ChatSession;
+      pushSystemOwnerText("Диалог закрыт. Вы можете начать новый в любой момент.");
       await scrollChatToBottom();
+      return;
     }
   };
 
   socket.value.onclose = () => {
     socketConnected.value = false;
     if (!isOpen.value) return;
-    setTimeout(() => { if (isOpen.value) connectSocket(); }, 1200);
+    setTimeout(() => {
+      if (isOpen.value) connectSocket();
+    }, 1200);
   };
 
-  socket.value.onerror = () => { socketConnected.value = false; };
+  socket.value.onerror = () => {
+    socketConnected.value = false;
+  };
 }
 
 function disconnectSocket() {
-  try { socket.value?.close(); } catch {}
+  try {
+    socket.value?.close();
+  } catch {}
   socket.value = null;
   socketConnected.value = false;
-}
-
-async function openChat() {
-  isOpen.value = true;
-  hasUnread.value = false;
-
-  await loadHistory();
-  connectSocket();
-
-  if (!session.value || session.value.status === "closed") {
-    messages.value = [];
-    await startSession();
-  } else if (!messages.value.length) {
-    channelStep.value = "choose";
-    pushSystem((useI18n().t as any)("chat.system.choose_channel"));
-  } else {
-    channelStep.value = "chat";
-  }
-
-  await scrollChatToBottom(false);
-}
-
-function closeChat() {
-  isOpen.value = false;
-  disconnectSocket();
-}
-
-function toggleChat() {
-  if (isOpen.value) closeChat();
-  else openChat();
 }
 
 onMounted(() => {
@@ -327,24 +463,32 @@ onBeforeUnmount(() => {
             </div>
 
             <div class="floating-chat-header__status" :class="{ 'floating-chat-header__status_connected': socketConnected }">
-              <u-icon :name="socketConnected ? 'i-lucide-wifi' : 'i-lucide-wifi-off'" class="floating-chat-header__status-icon" />
+              <u-icon
+                  :name="socketConnected ? 'i-lucide-wifi' : 'i-lucide-wifi-off'"
+                  class="floating-chat-header__status-icon"
+              />
               <span>{{ socketConnected ? $t("chat.status.online") : $t("chat.status.connecting") }}</span>
             </div>
           </div>
 
-          <div class="floating-chat-header__controls">
+          <div class="floating-chat-header__actions">
             <u-button
+                v-if="session && (session.status === 'active' || session.status === 'awaiting_username')"
                 variant="ghost"
-                class="floating-chat-header__control"
+                class="floating-chat-header__action"
                 type="button"
                 @click="closeSessionFromSite"
-                :disabled="!session || session.status === 'closed'"
             >
-              <u-icon name="i-lucide-ban" class="floating-chat-header__control-icon" />
+              <u-icon name="i-lucide-ban" class="floating-chat-header__action-icon" />
             </u-button>
 
-            <u-button variant="ghost" class="floating-chat-header__control" type="button" @click="closeChat">
-              <u-icon name="i-lucide-x" class="floating-chat-header__control-icon" />
+            <u-button
+                variant="ghost"
+                class="floating-chat-header__close"
+                type="button"
+                @click="closeChat"
+            >
+              <u-icon name="i-lucide-x" class="floating-chat-header__close-icon" />
             </u-button>
           </div>
         </header>
@@ -356,63 +500,61 @@ onBeforeUnmount(() => {
 
           <div
               v-for="(m, idx) in messages"
-              :key="idx"
+              :key="m.id ?? m.localId ?? idx"
               class="floating-chat-message"
               :class="{
               'floating-chat-message_client': m.sender === 'client',
               'floating-chat-message_owner': m.sender === 'owner'
             }"
           >
-            <div class="floating-chat-message__bubble">
+            <div class="floating-chat-message__bubble" :class="{ 'floating-chat-message__bubble_pending': !!m.pending }">
               <div class="floating-chat-message__text">{{ m.text }}</div>
-              <div class="floating-chat-message__meta">{{ normalizeTime(m.createdAt) }}</div>
+              <div class="floating-chat-message__meta">
+                <span>{{ normalizeTime(m.createdAt) }}</span>
+                <span v-if="m.pending" class="floating-chat-message__pending">…</span>
+              </div>
             </div>
           </div>
         </div>
 
         <footer class="floating-chat-footer">
-          <div v-if="channelStep === 'choose'" class="floating-chat-actions">
-            <custom-button class="floating-chat-actions__button" :variant="'primary'" @click="chooseSite">
-              <span>{{ $t("chat.system.channel_site") }}</span>
-            </custom-button>
+          <div v-if="flowMode === 'choose'" class="floating-chat-choice">
+            <div class="floating-chat-choice__text">
+              Выберите, где удобнее общаться:
+            </div>
 
-            <custom-button class="floating-chat-actions__button" :variant="'secondary'" @click="chooseTelegram">
-              <span>{{ $t("chat.system.channel_telegram") }}</span>
-            </custom-button>
+            <div class="floating-chat-choice__actions">
+              <custom-button class="floating-chat-choice__button" :variant="'primary'" @click="chooseSite">
+                Остаться на сайте
+              </custom-button>
 
-            <custom-button
-                v-if="session && session.status === 'closed'"
-                class="floating-chat-actions__button"
-                :variant="'primary'"
-                @click="openChat"
-            >
-              <span>Начать новый диалог</span>
-            </custom-button>
+              <custom-button class="floating-chat-choice__button" :variant="'secondary'" @click="chooseTelegram">
+                Перейти в Telegram
+              </custom-button>
+            </div>
           </div>
 
-          <div v-else-if="channelStep === 'telegram_username'" class="floating-chat-telegram">
-            <custom-input
-                class="floating-chat-telegram__input"
-                :model-value="tgUsername"
-                placeholder="@username"
-                @update:modelValue="(v: string) => (tgUsername = v)"
-            />
-
-            <custom-button class="floating-chat-telegram__button" :variant="'primary'" @click="submitTelegramUsername">
-              <span>OK</span>
+          <div v-else-if="flowMode === 'closed'" class="floating-chat-closed">
+            <custom-button class="floating-chat-closed__button" :variant="'primary'" @click="startNewSession">
+              Начать новый диалог
             </custom-button>
           </div>
 
           <div v-else class="floating-chat-input">
-            <div class="floating-chat-input__row">
+            <div class="floating-chat-input__row" @keydown.enter.prevent="onEnter">
               <custom-input
                   class="floating-chat-input__text"
                   :model-value="messageText"
-                  :placeholder-key="'chat.input.placeholder'"
+                  :placeholder="flowMode === 'telegram' ? '@username' : $t('chat.input.placeholder')"
                   @update:modelValue="(v: string) => (messageText = v)"
               />
 
-              <custom-button class="floating-chat-input__send" :variant="'primary'" :disabled="!canSend" @click="sendMessage">
+              <custom-button
+                  class="floating-chat-input__send"
+                  :variant="'primary'"
+                  :disabled="flowMode === 'telegram' ? !messageText.trim() : !canSend"
+                  @click="flowMode === 'telegram' ? submitTelegramUsername() : sendSiteMessage()"
+              >
                 <u-icon name="i-lucide-send" class="floating-chat-input__send-icon" />
                 <span>{{ $t("chat.send") }}</span>
               </custom-button>
@@ -539,19 +681,30 @@ onBeforeUnmount(() => {
   opacity: 0.9;
 }
 
-.floating-chat-header__controls {
+.floating-chat-header__actions {
   display: inline-flex;
   align-items: center;
   gap: 8px;
 }
 
-.floating-chat-header__control {
+.floating-chat-header__action {
   width: 34px;
   height: 34px;
   border-radius: 12px;
 }
 
-.floating-chat-header__control-icon {
+.floating-chat-header__action-icon {
+  width: 18px;
+  height: 18px;
+}
+
+.floating-chat-header__close {
+  width: 34px;
+  height: 34px;
+  border-radius: 12px;
+}
+
+.floating-chat-header__close-icon {
   width: 18px;
   height: 18px;
 }
@@ -591,6 +744,10 @@ onBeforeUnmount(() => {
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
 }
 
+.floating-chat-message__bubble_pending {
+  opacity: 0.75;
+}
+
 .floating-chat-message_client .floating-chat-message__bubble {
   background: rgba(128, 90, 245, 0.16);
   border-color: rgba(205, 153, 255, 0.22);
@@ -614,32 +771,53 @@ onBeforeUnmount(() => {
 
 .floating-chat-message__meta {
   margin-top: 6px;
-  text-align: right;
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
   font-size: 11px;
   font-weight: 800;
   color: var(--ui-text-muted);
 }
 
+.floating-chat-message__pending {
+  opacity: 0.9;
+}
+
 .floating-chat-footer {
-  padding: 12px;
+  padding: 12px 12px 12px;
   border-top: 1px solid var(--ui-border);
 }
 
-.floating-chat-actions {
-  display: grid;
-  grid-template-columns: 1fr;
+.floating-chat-choice {
+  display: flex;
+  flex-direction: column;
   gap: 10px;
 }
 
-.floating-chat-actions__button {
+.floating-chat-choice__text {
+  font-size: 12px;
+  font-weight: 800;
+  color: var(--ui-text-muted);
+}
+
+.floating-chat-choice__actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.floating-chat-closed {
+  display: flex;
+}
+
+.floating-chat-closed__button {
   width: 100%;
 }
 
-.floating-chat-telegram {
-  display: grid;
-  grid-template-columns: 1fr 90px;
+.floating-chat-input {
+  display: flex;
+  flex-direction: column;
   gap: 10px;
-  align-items: end;
 }
 
 .floating-chat-input__row {
@@ -682,7 +860,7 @@ onBeforeUnmount(() => {
     grid-template-columns: 1fr;
   }
 
-  .floating-chat-telegram {
+  .floating-chat-choice__actions {
     grid-template-columns: 1fr;
   }
 }
