@@ -1,0 +1,24 @@
+{
+  "job": {
+    "type": "remote | local | mixed",
+    "field": "it | design | healthcare | education | service | ...",
+    "regulated": false,
+    "experienceLevel": "junior | middle | senior"
+  },
+  "languages": {
+    "ru": "native | fluent | intermediate | basic | none",
+    "en": "fluent | intermediate | basic | none",
+    "other": [
+      { "code": "de", "level": "basic" }
+    ]
+  },
+  "family": {
+    "status": "single | couple | couple_with_kids | single_parent",
+    "kidsCount": 0
+  },
+  "budget": {
+    "monthly": 2200,
+    "currency": "EUR",
+    "includesRent": true
+  }
+}

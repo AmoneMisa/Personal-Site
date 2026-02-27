@@ -1,4 +1,75 @@
 {
+  "quizzes": {
+    "countryFit": {
+      "tpTooltip": {
+        "aria": "Show city modifiers",
+        "title": "City modifiers",
+        "multiplier": "Budget multiplier",
+        "note": "Calculated from open city indices: Housing + Cost of living."
+      },
+      "title": "Which country suits you best?",
+      "headline": "Personalized country recommendation",
+      "description": "Answer a few questions and we’ll suggest countries and regions that best match your lifestyle, budget and preferences.",
+      "constraintsTitle": "Your situation",
+      "constraints": {
+        "job": {
+          "label": "Type of work",
+          "remote": "Remote",
+          "local": "Local",
+          "mixed": "Remote + local",
+          "hint": "Affects job availability, infrastructure and legal constraints."
+        },
+        "budget": {
+          "label": "Monthly budget (USD)",
+          "placeholder": "e.g. 2500",
+          "hint": "Includes rent, food and basic living expenses."
+        },
+        "languageRu": {
+          "label": "Russian language level",
+          "hint": "Used to estimate comfort in Russian-speaking environments."
+        },
+        "languageEn": {
+          "label": "English language level",
+          "hint": "Used to estimate comfort in international or English-speaking environments."
+        },
+        "family": {
+          "label": "Family status",
+          "single": "Single",
+          "couple": "Couple",
+          "coupleWithKids": "Couple with kids",
+          "singleParent": "Single parent",
+          "hint": "Affects housing and monthly cost estimation."
+        },
+        "kids": {
+          "label": "Number of children",
+          "placeholder": "0",
+          "hint": "Used for education and housing cost estimation."
+        }
+      },
+      "langLevels": {
+        "native": "Native",
+        "fluent": "Fluent",
+        "intermediate": "Intermediate",
+        "basic": "Basic",
+        "none": "None"
+      },
+      "resultsTitle": "Best matches",
+      "noResults": "No suitable countries found for the selected criteria.",
+      "cityBlockTitle": "Main city (open data)",
+      "medianBlockTitle": "Median (state / country)",
+      "loadingTeleport": "Loading city data…",
+      "tpUnavailable": "No open data available for this city yet.",
+      "tp": {
+        "note": "City indices are based on open data and may differ from real-life expenses.",
+        "housing": "Housing",
+        "costOfLiving": "Cost of living",
+        "safety": "Safety",
+        "internet": "Internet",
+        "commute": "Commute",
+        "tolerance": "Tolerance"
+      }
+    }
+  },
   "chat": {
     "title": "Chat with developer",
     "loading": "Loading messages…",
@@ -930,6 +1001,10 @@
       "twitterCard": "summary_large_image"
     },
     "pages": {
+      "countryFit": {
+        "title": "Country fit quiz",
+        "description": "Find out which country fits your lifestyle, budget and preferences best."
+      },
       "home": {
         "title": "WhitesLove — Online tools for daily tasks",
         "description": "Homepage of WhitesLove platform with practical online services for content, data, and documents.",
