@@ -1,23 +1,40 @@
 {
   "quizzes": {
-    "countryFit": {
-      "tpTooltip": {
-        "aria": "Show city modifiers",
-        "title": "City modifiers",
-        "multiplier": "Budget multiplier",
-        "note": "Calculated from open city indices: Housing + Cost of living."
+    "headline": "Quizzes",
+    "title": "Pick a quiz",
+    "subtitle": "Short quizzes to help you choose a country, lifestyle, and priorities.",
+    "searchPlaceHolder": "Search quizzes…",
+    "empty": {
+      "title": "Nothing found",
+      "text": "Try changing your search or pick another quiz."
+    },
+    "howTitle": "How it works",
+    "how": {
+      "step1": {
+        "title": "Choose a quiz",
+        "text": "Open the quiz that matches your goal."
       },
+      "step2": {
+        "title": "Answer questions",
+        "text": "Pick options — we build your preference profile."
+      },
+      "step3": {
+        "title": "Get results",
+        "text": "We compare your answers with data and show the best matches."
+      }
+    },
+    "countryFit": {
       "title": "Which country suits you best?",
-      "headline": "Personalized country recommendation",
-      "description": "Answer a few questions and we’ll suggest countries and regions that best match your lifestyle, budget and preferences.",
+      "headline": "Personalized country recommendations",
+      "description": "Answer a few questions — we’ll suggest countries and regions that best fit your preferences and constraints.",
       "constraintsTitle": "Your situation",
       "constraints": {
         "job": {
           "label": "Type of work",
           "remote": "Remote",
           "local": "Local",
-          "mixed": "Remote + local",
-          "hint": "Affects job availability, infrastructure and legal constraints."
+          "mixed": "Mixed",
+          "hint": "Affects job availability, infrastructure and comfort when relocating."
         },
         "budget": {
           "label": "Monthly budget (USD)",
@@ -25,12 +42,12 @@
           "hint": "Includes rent, food and basic living expenses."
         },
         "languageRu": {
-          "label": "Russian language level",
+          "label": "Russian level",
           "hint": "Used to estimate comfort in Russian-speaking environments."
         },
         "languageEn": {
-          "label": "English language level",
-          "hint": "Used to estimate comfort in international or English-speaking environments."
+          "label": "English level",
+          "hint": "Used to estimate comfort in international / English-friendly environments."
         },
         "family": {
           "label": "Family status",
@@ -43,7 +60,7 @@
         "kids": {
           "label": "Number of children",
           "placeholder": "0",
-          "hint": "Used for education and housing cost estimation."
+          "hint": "Used for monthly cost estimation (per child)."
         }
       },
       "langLevels": {
@@ -53,12 +70,12 @@
         "basic": "Basic",
         "none": "None"
       },
-      "resultsTitle": "Best matches",
-      "noResults": "No suitable countries found for the selected criteria.",
+      "resultsTitle": "Results",
+      "noResults": "No matches found for your current settings. Try increasing the budget or changing answers.",
       "cityBlockTitle": "Main city (open data)",
       "medianBlockTitle": "Median (state / country)",
       "loadingTeleport": "Loading city data…",
-      "tpUnavailable": "No open data available for this city yet.",
+      "tpUnavailable": "No open data available for this city.",
       "tp": {
         "note": "City indices are based on open data and may differ from real-life expenses.",
         "housing": "Housing",
@@ -67,6 +84,159 @@
         "internet": "Internet",
         "commute": "Commute",
         "tolerance": "Tolerance"
+      },
+      "tpTooltip": {
+        "aria": "Show city coefficients",
+        "title": "City coefficients",
+        "multiplier": "Budget multiplier",
+        "note": "Multiplier is calculated using the “Housing” and “Cost of living” indices."
+      },
+      "q1": {
+        "title": "Climate",
+        "desc": "What weather feels comfortable most of the year?",
+        "o1": "Warm / mild winter",
+        "o2": "Clear seasons",
+        "o3": "Cold / I like winter"
+      },
+      "q2": {
+        "title": "Heat and humidity",
+        "desc": "How well do you tolerate heat and humidity?",
+        "o1": "Heat is fine, humidity is fine",
+        "o2": "Moderate tolerance",
+        "o3": "Hard to tolerate"
+      },
+      "q3": {
+        "title": "Safety",
+        "desc": "How important is a high level of safety?",
+        "o1": "Very important",
+        "o2": "Somewhat important",
+        "o3": "Not critical"
+      },
+      "q4": {
+        "title": "Cost of living",
+        "desc": "What matters more: cheaper or more comfortable (but pricier)?",
+        "o1": "Cheaper",
+        "o2": "Balance",
+        "o3": "Comfort, even if expensive"
+      },
+      "q5": {
+        "title": "Size of the place",
+        "desc": "Do you prefer a large area or a compact one?",
+        "o1": "Large",
+        "o2": "Doesn’t matter",
+        "o3": "Compact"
+      },
+      "q6": {
+        "title": "Water nearby",
+        "desc": "How important is it to live near the sea/ocean/rivers?",
+        "o1": "Very important",
+        "o2": "Nice to have",
+        "o3": "Not important"
+      },
+      "q7": {
+        "title": "Mountains and forests",
+        "desc": "How important is nature (forests/mountains) nearby?",
+        "o1": "Very important",
+        "o2": "Somewhat important",
+        "o3": "Not important"
+      },
+      "q8": {
+        "title": "Transportation style",
+        "desc": "What type of mobility feels best for you?",
+        "o1": "Walk / public transport",
+        "o2": "Mixed",
+        "o3": "Car-focused"
+      },
+      "q9": {
+        "title": "Cities",
+        "desc": "What kind of cities do you enjoy most?",
+        "o1": "Tall megacities",
+        "o2": "Mid-sized cities",
+        "o3": "Small towns / suburbs"
+      },
+      "q10": {
+        "title": "Rules and bureaucracy",
+        "desc": "How okay are you with a structured, regulated environment?",
+        "o1": "I like order",
+        "o2": "Neutral",
+        "o3": "Prefer simpler"
+      },
+      "q11": {
+        "title": "Social support",
+        "desc": "How important are social guarantees and support systems?",
+        "o1": "Very important",
+        "o2": "Somewhat important",
+        "o3": "Not important"
+      },
+      "q12": {
+        "title": "International environment",
+        "desc": "Do you want a more international environment around you?",
+        "o1": "Yes, very much",
+        "o2": "Not critical",
+        "o3": "Prefer less"
+      },
+      "q13": {
+        "title": "Taxes",
+        "desc": "How important are low taxes?",
+        "o1": "Very important",
+        "o2": "Somewhat important",
+        "o3": "Not important"
+      },
+      "q14": {
+        "title": "Income growth",
+        "desc": "How important are opportunities for income/career growth?",
+        "o1": "Very important",
+        "o2": "Somewhat important",
+        "o3": "Not important"
+      },
+      "q15": {
+        "title": "Openness and freedom",
+        "desc": "How important is an open, liberal environment for you?",
+        "o1": "Very important",
+        "o2": "Somewhat important",
+        "o3": "Not important"
+      },
+      "q16": {
+        "title": "Cultural change",
+        "desc": "How easily do you adapt to a different culture?",
+        "o1": "Easy",
+        "o2": "Moderate",
+        "o3": "Hard"
+      },
+      "q17": {
+        "title": "Travel convenience",
+        "desc": "How important is it to travel to other countries easily?",
+        "o1": "Very important",
+        "o2": "Nice sometimes",
+        "o3": "Not important"
+      },
+      "q18": {
+        "title": "Healthcare quality",
+        "desc": "How important is strong and accessible healthcare?",
+        "o1": "Very important",
+        "o2": "Somewhat important",
+        "o3": "Not important"
+      },
+      "q19": {
+        "title": "Russian language around you",
+        "desc": "How important is it that Russian is common in daily life?",
+        "o1": "Important",
+        "o2": "Nice to have",
+        "o3": "Not important"
+      },
+      "q20": {
+        "title": "English language around you",
+        "desc": "How important is it to live comfortably in English?",
+        "o1": "Very important",
+        "o2": "Somewhat important",
+        "o3": "Not important"
+      },
+      "q21": {
+        "title": "Surroundings",
+        "desc": "What kind of surroundings do you prefer?",
+        "o1": "Sea/ocean/rivers",
+        "o2": "Forests/mountains/nature",
+        "o3": "Urban environment"
       }
     }
   },

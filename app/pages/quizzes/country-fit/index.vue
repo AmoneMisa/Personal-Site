@@ -250,53 +250,71 @@ watchEffect(() => {
                 {{ t(g.city.titleKey, g.city.fallbackName) || g.city.fallbackName }}
               </div>
 
-              <div
-                  v-if="tpCache[g.city.teleportSlug]"
-                  class="city-budget"
-                  tabindex="0"
-                  role="button"
-                  :aria-label="t('quizzes.countryFit.tpTooltip.aria')"
+              <div class="city-budget"
+                   tabindex="0"
+                   role="button"
+                   :aria-label="t('quizzes.countryFit.tpTooltip.aria')"
               >
-                <div class="text-muted mt-2">
+                <div class="text-muted mt-2 flex items-center gap-2">
     <span class="font-black">
       ~${{
-        Math.round(g.base.estimatedMonthlyUSD * budgetMultiplier(tpCache[g.city.teleportSlug]).mul)
-            .toLocaleString("en-US")
+        Math.round(
+            g.base.estimatedMonthlyUSD *
+            (g.city?.teleportSlug && tpCache[g.city.teleportSlug]
+                ? budgetMultiplier(tpCache[g.city.teleportSlug]).mul
+                : 1)
+        ).toLocaleString("en-US")
       }}
     </span>
-                  <span class="text-muted"> / month</span>
+                  <span class="text-muted">/ month</span>
 
                   <span class="hint-icon" aria-hidden="true">ⓘ</span>
                 </div>
 
-                <!-- Tooltip -->
+                <!-- Tooltip: рендерится всегда -->
                 <div class="tp-tooltip" role="tooltip">
-                  <div class="tp-tooltip__title">{{ t("quizzes.countryFit.tpTooltip.title") }}</div>
-
-                  <div class="tp-tooltip__row">
-                    <span class="tp-tooltip__label">🏠 {{ t("quizzes.countryFit.tp.housing") }}</span>
-                    <span class="tp-tooltip__value">
-        {{ getTpCat(tpCache[g.city.teleportSlug], "HOUSING")?.toFixed(1) ?? "—" }}/10
-      </span>
+                  <div class="tp-tooltip__title">
+                    {{ t("quizzes.countryFit.tpTooltip.title") }}
                   </div>
 
-                  <div class="tp-tooltip__row">
-                    <span class="tp-tooltip__label">🧾 {{ t("quizzes.countryFit.tp.costOfLiving") }}</span>
-                    <span class="tp-tooltip__value">
-        {{ getTpCat(tpCache[g.city.teleportSlug], "COST_OF_LIVING")?.toFixed(1) ?? "—" }}/10
-      </span>
-                  </div>
+                  <template v-if="g.city?.teleportSlug && tpLoading[g.city.teleportSlug]">
+                    <div class="text-muted text-sm">
+                      {{ t("quizzes.countryFit.loadingTeleport") }}
+                    </div>
+                  </template>
 
-                  <div class="tp-tooltip__row tp-tooltip__row_strong">
-                    <span class="tp-tooltip__label">{{ t("quizzes.countryFit.tpTooltip.multiplier") }}</span>
-                    <span class="tp-tooltip__value">
-        ×{{ budgetMultiplier(tpCache[g.city.teleportSlug]).mul.toFixed(2) }}
-      </span>
-                  </div>
+                  <template v-else-if="g.city?.teleportSlug && tpCache[g.city.teleportSlug]">
+                    <div class="tp-tooltip__row">
+                      <span class="tp-tooltip__label">🏠 {{ t("quizzes.countryFit.tp.housing") }}</span>
+                      <span class="tp-tooltip__value">
+          {{ getTpCat(tpCache[g.city.teleportSlug], "HOUSING")?.toFixed(1) ?? "—" }}/10
+        </span>
+                    </div>
 
-                  <div class="tp-tooltip__note text-muted">
-                    {{ t("quizzes.countryFit.tpTooltip.note") }}
-                  </div>
+                    <div class="tp-tooltip__row">
+                      <span class="tp-tooltip__label">🧾 {{ t("quizzes.countryFit.tp.costOfLiving") }}</span>
+                      <span class="tp-tooltip__value">
+          {{ getTpCat(tpCache[g.city.teleportSlug], "COST_OF_LIVING")?.toFixed(1) ?? "—" }}/10
+        </span>
+                    </div>
+
+                    <div class="tp-tooltip__row tp-tooltip__row_strong">
+                      <span class="tp-tooltip__label">{{ t("quizzes.countryFit.tpTooltip.multiplier") }}</span>
+                      <span class="tp-tooltip__value">
+          ×{{ budgetMultiplier(tpCache[g.city.teleportSlug]).mul.toFixed(2) }}
+        </span>
+                    </div>
+
+                    <div class="tp-tooltip__note text-muted">
+                      {{ t("quizzes.countryFit.tpTooltip.note") }}
+                    </div>
+                  </template>
+
+                  <template v-else>
+                    <div class="text-muted text-sm">
+                      {{ t("quizzes.countryFit.tpUnavailable") }}
+                    </div>
+                  </template>
                 </div>
               </div>
 
@@ -407,6 +425,82 @@ watchEffect(() => {
   outline: none;
 }
 
+.city-budget,
+.city-budget * {
+  overflow: visible;
+}
+
+.hint-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  font-size: 12px;
+  border-radius: 999px;
+  border: 1px solid var(--ui-border);
+  background: rgba(255,255,255,0.03);
+  color: var(--ui-text-muted);
+}
+
+.tp-tooltip {
+  position: absolute;
+  z-index: 9999;
+  left: 0;
+  top: calc(100% + 10px);
+  width: 300px;
+
+  padding: 12px;
+  border-radius: 14px;
+  border: 1px solid var(--ui-border);
+  background: rgba(15, 15, 18, 0.92);
+  box-shadow: 0 10px 30px rgba(0,0,0,0.35);
+
+  opacity: 0;
+  transform: translateY(-6px);
+  pointer-events: none;
+  transition: opacity 160ms ease, transform 160ms ease;
+}
+
+.city-budget:hover .tp-tooltip,
+.city-budget:focus-visible .tp-tooltip {
+  opacity: 1;
+  transform: translateY(0);
+  pointer-events: auto;
+}
+
+.tp-tooltip__title {
+  font-weight: 900;
+  margin-bottom: 8px;
+  font-size: 13px;
+}
+
+.tp-tooltip__row {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 6px 0;
+  font-size: 13px;
+}
+
+.tp-tooltip__row_strong {
+  border-top: 1px solid rgba(255,255,255,0.08);
+  margin-top: 6px;
+  padding-top: 10px;
+  font-weight: 900;
+}
+
+.tp-tooltip__label,
+.tp-tooltip__value {
+  color: rgba(255,255,255,0.92);
+}
+
+.tp-tooltip__note {
+  margin-top: 8px;
+  font-size: 12px;
+  line-height: 1.25;
+}
+
 .hint-icon {
   display: inline-flex;
   align-items: center;
@@ -439,13 +533,6 @@ watchEffect(() => {
   transform: translateY(-6px);
   pointer-events: none;
   transition: opacity 160ms ease, transform 160ms ease;
-}
-
-.city-budget:hover .tp-tooltip,
-.city-budget:focus-visible .tp-tooltip {
-  opacity: 1;
-  transform: translateY(0);
-  pointer-events: auto;
 }
 
 .tp-tooltip__title {
