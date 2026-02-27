@@ -194,7 +194,7 @@ export function expandEntitiesWithRegions(list: CountryEntity[]): CountryEntity[
         }
     }
 
-    return expanded.filter(e => e.key !== "countries.usa");
+    return expanded;
 }
 
 function groupKey(key: string) {
@@ -204,6 +204,7 @@ function groupKey(key: string) {
 export type MatchGroup = {
     base: MatchResult;         // штат/страна без города
     city?: MatchResult;        // вариант с городом (Teleport)
+    variants?: MatchResult[];        // вариант с городом (Teleport)
 };
 
 export function matchCountries(
@@ -267,34 +268,78 @@ export function matchCountries(
     }
 
     // ---- группировка base + city в одну карточку ----
+    function isUsVariant(key: string) {
+        return key === "countries.usa" || key.startsWith("countries.usa.");
+    }
+
+    function baseKeyForResult(key: string) {
+        // сводим ".city" к базовому
+        if (key.endsWith(".city")) return key.slice(0, -5);
+
+        // все usa.* группируем под countries.usa
+        if (key.startsWith("countries.usa.")) return "countries.usa";
+
+        return key;
+    }
+
+    function isCityKey(key: string) {
+        return key.endsWith(".city");
+    }
+
     const map = new Map<string, MatchGroup>();
 
     for (const r of temp) {
-        const gk = groupKey(r.key);
-        const isCity = r.key.endsWith(".city");
+        const gk = baseKeyForResult(r.key);
 
         const existing = map.get(gk);
 
-        if (!existing) {
-            map.set(gk, isCity ? {base: {...r, key: gk}, city: r} : {base: r});
+        // --- США: base = countries.usa, а все штаты -> variants ---
+        if (gk === "countries.usa") {
+            if (!existing) {
+                // base положим как саму USA (если она есть), иначе создадим заглушку и потом заменим
+                map.set(gk, { base: r.key === "countries.usa" ? r : { ...r, key: "countries.usa" }, variants: [] });
+            }
+
+            const g = map.get(gk)!;
+
+            if (r.key === "countries.usa") {
+                g.base = r;
+                continue;
+            }
+
+            // сюда попадут states и state.city
+            // мы хотим variants только для базового штата (без .city),
+            // а city оставим для конкретного штата уже в UI (или можно тоже хранить отдельно)
+            if (!isCityKey(r.key)) {
+                (g.variants ||= []).push(r);
+            }
+
+            // можно дополнительно: если хочешь лучший city-результат США — держи его тут:
+            // if (isCityKey(r.key) && (!g.city || r.score > g.city.score)) g.city = r;
+
             continue;
         }
 
-        if (isCity) {
-            existing.city = r;
-        } else {
-            existing.base = r;
+        // --- все остальные страны: старая логика base + city ---
+        if (!existing) {
+            map.set(gk, isCityKey(r.key) ? { base: { ...r, key: gk }, city: r } : { base: r });
+            continue;
         }
+
+        if (isCityKey(r.key)) existing.city = r;
+        else existing.base = r;
     }
 
-    // скор группы: берём лучший (обычно city может стать лучше после Teleport, но пока равен base)
+// постобработка: сортируем варианты штатов внутри США и режем до N
     const groups = Array.from(map.values()).map(g => {
-        // на случай, если база “случайно” не попала, но city попал:
-        if (!g.base && g.city) g.base = g.city;
+        if (g.base?.key === "countries.usa" && g.variants?.length) {
+            g.variants.sort((a, b) => b.score - a.score);
+            g.variants = g.variants.slice(0, 6); // например топ-6 штатов
+        }
         return g;
     });
 
-    // сортировка по лучшему score (base/city)
+// сортировка групп по score
     groups.sort((a, b) => {
         const as = Math.max(a.base.score, a.city?.score ?? -Infinity);
         const bs = Math.max(b.base.score, b.city?.score ?? -Infinity);
