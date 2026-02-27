@@ -1,5 +1,6 @@
 import type { AxisKey } from "./countryFit";
 import { usRegions } from "./usStates";
+import type {CountryIndicesBundle} from "~/types/indices";
 
 export type LangLevel = 0 | 1 | 2 | 3; // 0..3
 export type Vector = Partial<Record<AxisKey, number>>;
@@ -11,11 +12,17 @@ export type MonthlyUSD = {
 };
 
 export type CountryEntity = {
+    codes?: {
+        wb?: string; // iso2 для WorldBank: "de", "us", "ro"
+        oecd?: string; // если понадобится
+    };
     key: string;              // "countries.germany" или "countries.usa"
     titleKey: string;
     fallbackName: string;
     teleportSlug?: string;
     vector: Vector;
+
+    indices?: CountryIndicesBundle;
 
     languages: {
         english: LangLevel; // насколько реально жить на английском

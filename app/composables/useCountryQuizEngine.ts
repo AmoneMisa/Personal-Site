@@ -1,10 +1,13 @@
 import type {AxisKey, QuizConfig, Effects} from "~/utils/quizzes/country/countryFit";
 import type {CountryEntity, Vector} from "~/utils/quizzes/country/countries";
 import {countries} from "~/utils/quizzes/country/countries";
+import type {CountryIndicesBundle} from "~/types/indices";
 
 export type LanguageLevel = "native" | "fluent" | "intermediate" | "basic" | "none";
 export type JobType = "remote" | "local" | "mixed";
 export type FamilyStatus = "single" | "couple" | "couple_with_kids" | "single_parent";
+
+const toW33 = (v10: number) => ((v10 - 5) / 5) * 3;
 
 export type UserProfile = {
     job: {
@@ -207,6 +210,7 @@ export function matchCountries(
     quiz: QuizConfig,
     answers: AnswerMap,
     user: UserProfile,
+    indicesMap: Record<string, CountryIndicesBundle | null>,
     limit = 10
 ): MatchGroup[] {
     const pref = buildPreferenceProfile(quiz, answers);
@@ -228,7 +232,23 @@ export function matchCountries(
         const lang = languagePenalty(user, e);
         const work = workPenalty(user, e);
 
-        const final = base * sparsityPenalty - (lang.penalty + work.penalty) * 0.05;
+        const bundle = indicesMap[e.key];
+        const indices = bundle?.normalized;
+        let final = base * sparsityPenalty - (lang.penalty + work.penalty) * 0.05;
+
+        if (indices?.income != null && (pref.income_growth_need ?? 0) > 0) {
+            const w = toW33(indices.income); // -3..+3
+            // pref.income_growth_need у тебя тоже -30..30, поэтому нормализуем до 0..1
+            const importance = clamp((pref.income_growth_need ?? 0) / 30, 0, 1);
+            final += w * importance * 0.5; // 0.5 — коэффициент влияния (подкрутишь)
+        }
+
+// qualityOfLife: если важнее качество
+        if (indices?.qualityOfLife != null && (pref.quality_high_need ?? 0) > 0) {
+            const w = toW33(indices.qualityOfLife); // -3..+3
+            const importance = clamp((pref.quality_high_need ?? 0) / 30, 0, 1);
+            final += w * importance * 0.5;
+        }
 
         const why = [
             ...lang.notes.slice(0, 2),
