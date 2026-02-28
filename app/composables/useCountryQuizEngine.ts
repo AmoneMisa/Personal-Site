@@ -296,7 +296,6 @@ export function matchCountries(
         // --- США: base = countries.usa, а все штаты -> variants ---
         if (gk === "countries.usa") {
             if (!existing) {
-                // base положим как саму USA (если она есть), иначе создадим заглушку и потом заменим
                 map.set(gk, { base: r.key === "countries.usa" ? r : { ...r, key: "countries.usa" }, variants: [] });
             }
 
@@ -320,7 +319,6 @@ export function matchCountries(
             continue;
         }
 
-        // --- все остальные страны: старая логика base + city ---
         if (!existing) {
             map.set(gk, isCityKey(r.key) ? { base: { ...r, key: gk }, city: r } : { base: r });
             continue;
@@ -330,11 +328,10 @@ export function matchCountries(
         else existing.base = r;
     }
 
-// постобработка: сортируем варианты штатов внутри США и режем до N
     const groups = Array.from(map.values()).map(g => {
         if (g.base?.key === "countries.usa" && g.variants?.length) {
             g.variants.sort((a, b) => b.score - a.score);
-            g.variants = g.variants.slice(0, 6); // например топ-6 штатов
+            g.variants = g.variants.slice(0, 6);
         }
         return g;
     });

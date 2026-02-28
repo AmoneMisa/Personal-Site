@@ -90,7 +90,22 @@ const results = computed(() =>
     matchCountries(countryFitQuiz, answers.value, user.value, indicesMap.value, 12)
 );
 
-// когда меняются результаты — подкачиваем индексы только для реально попавших карточек
+const resultsAll = computed(() =>
+    matchCountries(countryFitQuiz, answers.value, user.value, indicesMap.value, 999)
+);
+
+const usaGroup = computed(() =>
+    resultsAll.value.find(g => g.base.key === "countries.usa")
+);
+
+const bestUsState = computed(() => {
+  const variants = usaGroup.value?.variants ?? [];
+  return variants.length ? variants[0] : null;
+});
+
+const filteredResults = computed(() =>
+    results.value.filter(g => g.base.key !== "countries.usa")
+);
 watchEffect(() => {
   const keys: string[] = [];
   for (const g of results.value) {
@@ -98,6 +113,11 @@ watchEffect(() => {
     if (g.city) keys.push(g.city.key);
   }
   ensureIndices(keys);
+});
+
+watchEffect(() => {
+  const k = bestUsState.value?.key;
+  if (k) ensureIndices([k]);
 });
 </script>
 
@@ -262,7 +282,7 @@ watchEffect(() => {
         <div
             v-for="g in results"
             :key="g.base.key"
-            class="p-4 rounded-xl border border-[var(--ui-border)] bg-[rgba(255,255,255,0.03)]"
+            class="p-4 rounded-xl border border-[var(--ui-border)] bg-[rgba(255,255,255,0.03)] result-card"
         >
           <div class="font-black">
             {{ t(g.base.titleKey, g.base.fallbackName) || g.base.fallbackName }}
@@ -281,17 +301,39 @@ watchEffect(() => {
               • {{ g.base.why.join(" • ") }}
             </div>
 
-            <!-- optional: показать индексы, если пришли -->
-            <div class="text-muted mt-2 text-sm" v-if="indicesMap[g.base.key]?.normalized">
-              <span v-if="indicesMap[g.base.key]?.normalized.income != null">
-                💰 {{ t("quizzes.countryFit.indices.income") }}: {{ indicesMap[g.base.key]!.normalized.income!.toFixed(1) }}/10
-              </span>
-              <span v-if="indicesMap[g.base.key]?.normalized.qualityOfLife != null" class="ml-3">
-                ✨ {{ t("quizzes.countryFit.indices.quality") }}: {{ indicesMap[g.base.key]!.normalized.qualityOfLife!.toFixed(1) }}/10
-              </span>
-              <span v-if="indicesMap[g.base.key]?.normalized.safety != null" class="ml-3">
-                🛡 {{ t("quizzes.countryFit.indices.safety") }}: {{ indicesMap[g.base.key]!.normalized.safety!.toFixed(1) }}/10
-              </span>
+            <!-- Hover indices -->
+            <div class="indices-hover mt-3"
+                v-if="indicesMap[g.base.key]?.normalized"
+            >
+              <div class="indices-hover__panel" role="tooltip">
+                <div class="indices-hover__title">
+                  {{ t("quizzes.countryFit.indices.title") }}
+                </div>
+
+                <div class="indices-hover__row" v-if="indicesMap[g.base.key]?.normalized.income != null">
+                  <span>💰 {{ t("quizzes.countryFit.indices.income") }}</span>
+                  <span class="indices-hover__val">{{ indicesMap[g.base.key]!.normalized.income!.toFixed(1) }}/10</span>
+                </div>
+
+                <div class="indices-hover__row" v-if="indicesMap[g.base.key]?.normalized.education != null">
+                  <span>🎓 {{ t("quizzes.countryFit.indices.education") }}</span>
+                  <span class="indices-hover__val">{{ indicesMap[g.base.key]!.normalized.education!.toFixed(1) }}/10</span>
+                </div>
+
+                <div class="indices-hover__row" v-if="indicesMap[g.base.key]?.normalized.qualityOfLife != null">
+                  <span>✨ {{ t("quizzes.countryFit.indices.quality") }}</span>
+                  <span class="indices-hover__val">{{ indicesMap[g.base.key]!.normalized.qualityOfLife!.toFixed(1) }}/10</span>
+                </div>
+
+                <div class="indices-hover__row" v-if="indicesMap[g.base.key]?.normalized.safety != null">
+                  <span>🛡 {{ t("quizzes.countryFit.indices.safety") }}</span>
+                  <span class="indices-hover__val">{{ indicesMap[g.base.key]!.normalized.safety!.toFixed(1) }}/10</span>
+                </div>
+
+                <div class="indices-hover__meta text-muted" v-if="indicesMap[g.base.key]?.updatedAtISO">
+                  {{ t("quizzes.countryFit.indices.updated") }}: {{ indicesMap[g.base.key]!.updatedAtISO.slice(0, 10) }}
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -299,6 +341,46 @@ watchEffect(() => {
 
       <div v-else class="text-muted">
         {{ t("quizzes.countryFit.noResults") }}
+      </div>
+    </div>
+    <!-- Best US state -->
+    <div v-if="bestUsState" class="mb-6 p-4 rounded-xl border border-[var(--ui-border)] bg-[rgba(255,255,255,0.04)]">
+      <div class="flex items-center justify-between gap-3">
+        <div class="font-black text-lg">
+          🇺🇸 {{ t("quizzes.countryFit.bestUsStateTitle") }}
+        </div>
+        <div class="text-xs text-muted">
+          {{ t("quizzes.countryFit.bestUsStateHint") }}
+        </div>
+      </div>
+
+      <div class="mt-3 rounded-xl border border-[var(--ui-border)] bg-[rgba(255,255,255,0.02)] p-3">
+        <div class="font-black">
+          {{ t(bestUsState.titleKey, bestUsState.fallbackName) || bestUsState.fallbackName }}
+        </div>
+
+        <div class="text-muted mt-2">
+          ~${{ Math.round(bestUsState.estimatedMonthlyUSD).toLocaleString("en-US") }} / month
+        </div>
+
+        <div class="text-muted mt-2" v-if="bestUsState.why.length">
+          • {{ bestUsState.why.join(" • ") }}
+        </div>
+
+        <div class="text-muted mt-2 text-sm" v-if="indicesMap[bestUsState.key]?.normalized">
+      <span v-if="indicesMap[bestUsState.key]?.normalized.income != null">
+        💰 {{ t("quizzes.countryFit.indices.income") }}:
+        {{ indicesMap[bestUsState.key]!.normalized.income!.toFixed(1) }}/10
+      </span>
+          <span v-if="indicesMap[bestUsState.key]?.normalized.qualityOfLife != null" class="ml-3">
+        ✨ {{ t("quizzes.countryFit.indices.quality") }}:
+        {{ indicesMap[bestUsState.key]!.normalized.qualityOfLife!.toFixed(1) }}/10
+      </span>
+          <span v-if="indicesMap[bestUsState.key]?.normalized.safety != null" class="ml-3">
+        🛡 {{ t("quizzes.countryFit.indices.safety") }}:
+        {{ indicesMap[bestUsState.key]!.normalized.safety!.toFixed(1) }}/10
+      </span>
+        </div>
       </div>
     </div>
   </u-container>
@@ -317,6 +399,70 @@ watchEffect(() => {
 }
 
 .field__hint {
+  font-size: 12px;
+  line-height: 1.25;
+}
+
+.result-card {
+  position: relative;
+}
+
+.indices-hover {
+  position: relative;
+  display: inline-block;
+}
+
+/* панель скрыта по умолчанию */
+.indices-hover__panel {
+  position: absolute;
+  z-index: 60;
+  left: 0;
+  top: calc(100% + 10px);
+  width: 280px;
+
+  padding: 12px;
+  border-radius: 14px;
+  border: 1px solid var(--ui-border);
+  background: rgba(15, 15, 18, 0.92);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+
+  opacity: 0;
+  transform: translateY(-6px);
+  pointer-events: none;
+  transition: opacity 160ms ease, transform 160ms ease;
+}
+
+/* показываем при ховере карточки + при фокусе внутри (доступность) */
+.result-card:hover .indices-hover__panel,
+.result-card:focus-within .indices-hover__panel {
+  opacity: 1;
+  transform: translateY(0);
+  pointer-events: auto;
+}
+
+.indices-hover__title {
+  font-weight: 900;
+  margin-bottom: 8px;
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.92);
+}
+
+.indices-hover__row {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 6px 0;
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.92);
+}
+
+.indices-hover__val {
+  font-variant-numeric: tabular-nums;
+  font-weight: 900;
+}
+
+.indices-hover__meta {
+  margin-top: 10px;
   font-size: 12px;
   line-height: 1.25;
 }

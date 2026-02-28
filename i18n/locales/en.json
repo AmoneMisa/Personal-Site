@@ -24,6 +24,15 @@
       }
     },
     "countryFit": {
+      "loadingIndices": "Loading indices…",
+      "indices": {
+        "title": "Indices",
+        "updated": "Updated",
+        "income": "Income potential",
+        "education": "Education",
+        "quality": "Quality of life",
+        "safety": "Safety"
+      },
       "title": "Which country suits you best?",
       "headline": "Personalized country recommendations",
       "description": "Answer a few questions — we’ll suggest countries and regions that best fit your preferences and constraints.",
