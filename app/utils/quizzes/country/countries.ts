@@ -167,121 +167,85 @@ export const countries: CountryEntity[] = [
     // =========================
     // EU 27
     // =========================
-    EU("countries.austria", "Austria", "high", {single: 2600, couple: 3900, perKid: 700}, {
+    EU("countries.austria", "Austria", "high", {single: 1485, couple: 2225, perKid: 370}, {
         climate_seasons: 3,
         safety_need: 3
     }, numbeo(199.8, 123.2, 71.5, 78.9, 71.3, 9.9, 23.2, 20.4, 76.6)),
-    EU("countries.belgium", "Belgium", "high", {
-        single: 2500,
-        couple: 3800,
-        perKid: 700
-    }, {climate_seasons: 3}, numbeo(175.2, 127.5, 50.8, 76.4, 68.6, 6.1, 32.7, 46.8, 86.5)),
-    EU("countries.bulgaria", "Bulgaria", "mid", {single: 1500, couple: 2300, perKid: 450}, {
+    EU("countries.belgium", "Belgium", "high", {single: 1415, couple: 2125, perKid: 355}, {climate_seasons: 3}, numbeo(175.2, 127.5, 50.8, 76.4, 68.6, 6.1, 32.7, 46.8, 86.5)),
+    EU("countries.bulgaria", "Bulgaria", "mid", {single: 670, couple: 1005, perKid: 165}, {
         climate_seasons: 2,
         cost_low_need: 2
     }, numbeo(148.3, 85.9, 64.5, 58.3, 41.6, 8.4, 28.8, 62.6, 81.2)),
-    EU("countries.croatia", "Croatia", "mid", {single: 1700, couple: 2600, perKid: 500}, {
+    EU("countries.croatia", "Croatia", "mid", {single: 1035, couple: 1550, perKid: 260}, {
         climate_warm: 2,
         nature_water: 3
     }, numbeo(176.6, 88.7, 75.7, 65.1, 52.4, 12.8, 25.0, 31.8, 87.1)),
-    EU("countries.cyprus", "Cyprus", "mid", {single: 1800, couple: 2700, perKid: 500}, {
+    EU("countries.cyprus", "Cyprus", "mid", {single: 1305, couple: 1960, perKid: 325}, {
         climate_warm: 3,
         geo_island: 3,
         nature_water: 3
     }, numbeo(159.6, 90.5, 66.7, 56.7, 58.8, 8.1, 25.1, 55.3, 92.3)),
-    EU("countries.czechia", "Czechia", "mid", {
-        single: 1900,
-        couple: 2900,
-        perKid: 550
-    }, {climate_seasons: 3}, numbeo(175.3, 94.0, 73.6, 76.0, 53.0, 13.2, 28.7, 33.7, 77.7)),
-    EU("countries.denmark", "Denmark", "very_high", {single: 3200, couple: 4800, perKid: 900}, {
+    EU("countries.czechia", "Czechia", "mid", {single: 1215, couple: 1820, perKid: 305}, {climate_seasons: 3}, numbeo(175.3, 94.0, 73.6, 76.0, 53.0, 13.2, 28.7, 33.7, 77.7)),
+    EU("countries.denmark", "Denmark", "very_high", {single: 1450, couple: 2170, perKid: 360}, {
         climate_cold: 2,
         safety_need: 3
     }, numbeo(212.2, 150.6, 73.8, 77.2, 78.9, 6.1, 27.5, 22.7, 81.2)),
-    EU("countries.estonia", "Estonia", "mid", {single: 2000, couple: 3000, perKid: 550}, {
+    EU("countries.estonia", "Estonia", "mid", {single: 1020, couple: 1525, perKid: 255}, {
         climate_cold: 2,
         society_international: 2
     }, numbeo(190.7, 90.3, 76.8, 75.2, 59.7, 10.5, 20.9, 16.1, 71.2)),
-    EU("countries.finland", "Finland", "very_high", {single: 3000, couple: 4500, perKid: 850}, {
+    EU("countries.finland", "Finland", "very_high", {single: 1160, couple: 1745, perKid: 290}, {
         climate_cold: 3,
         safety_need: 3
     }, numbeo(204.4, 132.6, 73.5, 77.6, 69.0, 7.2, 25.0, 11.8, 54.4)),
-    EU("countries.france", "France", "high", {single: 2700, couple: 4100, perKid: 800}, {
+    EU("countries.france", "France", "high", {single: 1195, couple: 1795, perKid: 300}, {
         climate_seasons: 3,
         metro_megacity: 2
     }, numbeo(169.8, 121.5, 44.2, 77.0, 67.7, 8.6, 34.4, 43.5, 89.6)),
-    EU("countries.germany", "Germany", "high", {single: 2600, couple: 4000, perKid: 750}, {
+    EU("countries.germany", "Germany", "high", {single: 1390, couple: 2085, perKid: 350}, {
         climate_seasons: 3,
         stability_need: 3
     }, numbeo(196.3, 142.0, 61.6, 72.4, 68.7, 7.9, 28.8, 28.2, 82.9)),
-    EU("countries.greece", "Greece", "mid", {single: 1800, couple: 2700, perKid: 500}, {
+    EU("countries.greece", "Greece", "mid", {single: 895, couple: 1340, perKid: 225}, {
         climate_warm: 3,
         nature_water: 3
     }, numbeo(140.8, 65.4, 53.8, 58.9, 54.0, 12.5, 32.3, 49.2, 93.0)),
-    EU("countries.hungary", "Hungary", "mid", {
-        single: 1700,
-        couple: 2600,
-        perKid: 500
-    }, {climate_seasons: 3}, numbeo(147.6, 80.3, 66.5, 54.2, 46.9, 12.8, 35.4, 46.2, 79.8)),
-    EU("countries.ireland", "Ireland", "very_high", {
-        single: 3300,
-        couple: 5000,
-        perKid: 950
-    }, {climate_seasons: 2}, numbeo(167.7, 119.0, 51.0, 51.2, 70.6, 6.9, 37.3, 34.7, 89.5)),
-    EU("countries.italy", "Italy", "high", {single: 2400, couple: 3600, perKid: 700}, {
+    EU("countries.hungary", "Hungary", "mid", {single: 800, couple: 1200, perKid: 200}, {climate_seasons: 3}, numbeo(147.6, 80.3, 66.5, 54.2, 46.9, 12.8, 35.4, 46.2, 79.8)),
+    EU("countries.ireland", "Ireland", "very_high", {single: 2140, couple: 3205, perKid: 535}, {climate_seasons: 2}, numbeo(167.7, 119.0, 51.0, 51.2, 70.6, 6.9, 37.3, 34.7, 89.5)),
+    EU("countries.italy", "Italy", "high", {single: 1130, couple: 1690, perKid: 280}, {
         climate_warm: 2,
         nature_water: 2
     }, numbeo(152.9, 91.4, 52.7, 64.9, 61.4, 8.3, 32.0, 53.1, 89.8)),
-    EU("countries.latvia", "Latvia", "mid", {
-        single: 1900,
-        couple: 2800,
-        perKid: 550
-    }, {climate_cold: 2}, numbeo(167.3, 79.1, 63.7, 63.6, 52.3, 8.9, 27.6, 29.1, 76.8)),
-    EU("countries.lithuania", "Lithuania", "mid", {
-        single: 1900,
-        couple: 2800,
-        perKid: 550
-    }, {climate_cold: 2}, numbeo(178.2, 89.7, 66.8, 75.4, 51.2, 11.2, 22.8, 25.2, 69.9)),
-    EU("countries.luxembourg", "Luxembourg", "very_high", {
-        single: 3500,
-        couple: 5200,
-        perKid: 1000
-    }, {safety_need: 3}, numbeo(211.9, 167.0, 66.8, 74.2, 78.0, 9.4, 26.4, 22.7, 82.6)),
-    EU("countries.malta", "Malta", "high", {single: 2400, couple: 3600, perKid: 700}, {
+    EU("countries.latvia", "Latvia", "mid", {single: 835, couple: 1255, perKid: 210}, {climate_cold: 2}, numbeo(167.3, 79.1, 63.7, 63.6, 52.3, 8.9, 27.6, 29.1, 76.8)),
+    EU("countries.lithuania", "Lithuania", "mid", {single: 890, couple: 1340, perKid: 225}, {climate_cold: 2}, numbeo(178.2, 89.7, 66.8, 75.4, 51.2, 11.2, 22.8, 25.2, 69.9)),
+    EU("countries.luxembourg", "Luxembourg", "very_high", {single: 2270, couple: 3400, perKid: 565}, {safety_need: 3}, numbeo(211.9, 167.0, 66.8, 74.2, 78.0, 9.4, 26.4, 22.7, 82.6)),
+    EU("countries.malta", "Malta", "high", {single: 1375, couple: 2065, perKid: 345}, {
         climate_warm: 3,
         geo_island: 3
     }, numbeo(135.3, 83.9, 57.0, 53.3, 56.8, 10.6, 27.9, 75.7, 97.8)),
-    EU("countries.netherlands", "Netherlands", "very_high", {
-        single: 3200,
-        couple: 4800,
-        perKid: 900
-    }, {transport_public: 3, metro_midcity: 3}, numbeo(213.6, 136.6, 74.5, 81.5, 73.4, 7.5, 22.3, 20.9, 86.9)),
-    EU("countries.poland", "Poland", "mid", {single: 1900, couple: 2900, perKid: 550}, {
+    EU("countries.netherlands", "Netherlands", "very_high", {single: 1970, couple: 2955, perKid: 490}, {transport_public: 3, metro_midcity: 3}, numbeo(213.6, 136.6, 74.5, 81.5, 73.4, 7.5, 22.3, 20.9, 86.9)),
+    EU("countries.poland", "Poland", "mid", {single: 1110, couple: 1665, perKid: 280}, {
         climate_seasons: 3,
         cost_low_need: 2
     }, numbeo(156.1, 99.8, 71.3, 57.9, 47.3, 10.2, 32.0, 55.5, 75.7)),
-    EU("countries.portugal", "Portugal", "mid", {single: 1900, couple: 2900, perKid: 550}, {
+    EU("countries.portugal", "Portugal", "mid", {single: 1185, couple: 1780, perKid: 295}, {
         climate_warm: 3,
         nature_water: 3
     }, numbeo(169.5, 68.7, 67.0, 72.0, 48.8, 13.9, 28.5, 29.9, 97.8)),
-    EU("countries.romania", "Romania", "mid", {single: 1600, couple: 2400, perKid: 450}, {
+    EU("countries.romania", "Romania", "mid", {single: 695, couple: 1040, perKid: 175}, {
         climate_seasons: 3,
         cost_low_need: 2
     }, numbeo(143.0, 78.6, 67.2, 56.5, 40.6, 10.5, 33.2, 58.4, 76.3)),
-    EU("countries.slovakia", "Slovakia", "mid", {
-        single: 1900,
-        couple: 2800,
-        perKid: 550
-    }, {climate_seasons: 3}, numbeo(158.6, 80.1, 68.9, 58.2, 49.6, 12.6, 27.5, 36.8, 73.9)),
-    EU("countries.slovenia", "Slovenia", "high", {single: 2200, couple: 3300, perKid: 650}, {
+    EU("countries.slovakia", "Slovakia", "mid", {single: 1045, couple: 1570, perKid: 260}, {climate_seasons: 3}, numbeo(158.6, 80.1, 68.9, 58.2, 49.6, 12.6, 27.5, 36.8, 73.9)),
+    EU("countries.slovenia", "Slovenia", "high", {single: 1205, couple: 1805, perKid: 300}, {
         climate_seasons: 3,
         nature_mountains_forest: 3
     }, numbeo(181.5, 89.9, 75.5, 66.2, 54.1, 12.5, 25.1, 22.7, 80.6)),
-    EU("countries.spain", "Spain", "high", {single: 2300, couple: 3500, perKid: 650}, {
+    EU("countries.spain", "Spain", "high", {single: 1160, couple: 1735, perKid: 290}, {
         climate_warm: 3,
         nature_water: 2
     }, numbeo(185.8, 108.0, 62.4, 77.2, 51.6, 8.5, 26.5, 35.3, 92.8)),
-    EU("countries.sweden", "Sweden", "very_high", {single: 3000, couple: 4500, perKid: 850}, {
+    EU("countries.sweden", "Sweden", "very_high", {single: 1240, couple: 1860, perKid: 310}, {
         climate_cold: 2,
         safety_need: 3
     }, numbeo(189.3, 136.9, 52.1, 68.3, 68.0, 7.6, 28.8, 17.6, 65.0)),
@@ -293,7 +257,7 @@ export const countries: CountryEntity[] = [
         "countries.russia",
         "Russia",
         "mid",
-        {single: 1200, couple: 1900, perKid: 350},
+        {single: 610, couple: 915, perKid: 150},
         {lang_ru_need: 3, climate_cold: 3, country_large: 3, geo_continent: 3, cost_low_need: 3},
         {english: 1, russian: 3, noLocalLanguagePenalty: 3},
         {remoteFriendly: 2, localWithoutLocalLanguage: 2},
@@ -303,7 +267,7 @@ export const countries: CountryEntity[] = [
         "countries.ukraine",
         "Ukraine",
         "low",
-        {single: 900, couple: 1500, perKid: 300},
+        {single: 420, couple: 630, perKid: 105},
         {climate_seasons: 3, country_compact: 2, cost_low_need: 3},
         {english: 1, russian: 2, noLocalLanguagePenalty: 2},
         {remoteFriendly: 2, localWithoutLocalLanguage: 1},
@@ -313,7 +277,7 @@ export const countries: CountryEntity[] = [
         "countries.belarus",
         "Belarus",
         "low",
-        {single: 900, couple: 1500, perKid: 300},
+        {single: 450, couple: 675, perKid: 115},
         {climate_seasons: 3, cost_low_need: 3},
         {english: 0, russian: 3, noLocalLanguagePenalty: 3},
         {remoteFriendly: 2, localWithoutLocalLanguage: 2},
@@ -324,7 +288,7 @@ export const countries: CountryEntity[] = [
         "countries.uk",
         "United Kingdom",
         "very_high",
-        {single: 3200, couple: 4800, perKid: 900},
+        {single: 1725, couple: 2590, perKid: 430},
         {lang_en_need: 3, transport_public: 3, stability_need: 3, quality_high_need: 3, society_international: 3},
         {english: 3, russian: 1, noLocalLanguagePenalty: 2},
         {remoteFriendly: 3, localWithoutLocalLanguage: 2},
@@ -349,7 +313,7 @@ export const countries: CountryEntity[] = [
         },
         languages: {english: 3, russian: 1, noLocalLanguagePenalty: 2},
         indices: numbeo(186.0, 151.6, 50.8, 67.0, 68.8, 3.5, 33.8, 37.2, 75.8),
-        costUSD: {tier: "high", monthly: {single: 2800, couple: 4200, perKid: 900}},
+        costUSD: {tier: "mid", monthly: {single: 1935, couple: 2905, perKid: 485}},
         work: {remoteFriendly: 3, localWithoutLocalLanguage: 2},
         regions: usRegions.flatMap(r => {
             const tier = US_STATE_COST_GROUPS[r.code] ?? "low";
@@ -384,7 +348,7 @@ export const countries: CountryEntity[] = [
         "countries.canada",
         "Canada",
         "high",
-        {single: 2800, couple: 4200, perKid: 800},
+        {single: 1660, couple: 2490, perKid: 415},
         {
             climate_cold: 3,
             climate_seasons: 2,
@@ -414,7 +378,7 @@ export const countries: CountryEntity[] = [
         "countries.brazil",
         "Brazil",
         "mid",
-        {single: 1400, couple: 2200, perKid: 450},
+        {single: 485, couple: 725, perKid: 120},
         {climate_warm: 3, climate_heat_ok: 3, nature_diversity_need: 3, society_open: 3, culture_change_ok: 3}, // <- твой vector как был
         {english: 1, russian: 0, noLocalLanguagePenalty: 1},
         {remoteFriendly: 2, localWithoutLocalLanguage: 0},
@@ -424,7 +388,7 @@ export const countries: CountryEntity[] = [
         "countries.argentina",
         "Argentina",
         "mid",
-        {single: 1400, couple: 2200, perKid: 450},
+        {single: 625, couple: 940, perKid: 155},
         {climate_seasons: 2, culture_change_ok: 3},
         {english: 1, russian: 0, noLocalLanguagePenalty: 1},
         {remoteFriendly: 2, localWithoutLocalLanguage: 0},
@@ -434,7 +398,7 @@ export const countries: CountryEntity[] = [
         "countries.peru",
         "Peru",
         "low",
-        {single: 1100, couple: 1800, perKid: 350},
+        {single: 500, couple: 750, perKid: 125},
         {climate_warm: 2, nature_mountains_forest: 3},
         {english: 1, russian: 0, noLocalLanguagePenalty: 1},
         {remoteFriendly: 2, localWithoutLocalLanguage: 0},
@@ -444,7 +408,7 @@ export const countries: CountryEntity[] = [
         "countries.chile",
         "Chile",
         "mid",
-        {single: 1800, couple: 2700, perKid: 550},
+        {single: 700, couple: 1050, perKid: 175},
         {climate_seasons: 2, nature_mountains_forest: 3, safety_need: 2},
         {english: 1, russian: 0, noLocalLanguagePenalty: 1},
         {remoteFriendly: 2, localWithoutLocalLanguage: 0},
@@ -456,7 +420,7 @@ export const countries: CountryEntity[] = [
         "countries.china",
         "China",
         "mid",
-        {single: 1600, couple: 2400, perKid: 500},
+        {single: 400, couple: 600, perKid: 100},
         {
             city_vertical: 3,
             metro_megacity: 3,
@@ -473,7 +437,7 @@ export const countries: CountryEntity[] = [
         "countries.south_korea",
         "South Korea",
         "high",
-        {single: 2400, couple: 3600, perKid: 700},
+        {single: 790, couple: 1185, perKid: 200},
         {city_vertical: 3, transport_public: 3, safety_need: 3, rules_ok: 3, culture_change_ok: 3},
         {english: 1, russian: 0, noLocalLanguagePenalty: 0},
         {remoteFriendly: 2, localWithoutLocalLanguage: 0},
@@ -484,7 +448,7 @@ export const countries: CountryEntity[] = [
         "countries.uzbekistan",
         "Uzbekistan",
         "low",
-        {single: 900, couple: 1500, perKid: 300},
+        {single: 450, couple: 680, perKid: 115},
         {cost_low_need: 3, climate_warm: 2},
         {english: 0, russian: 2, noLocalLanguagePenalty: 2},
         {remoteFriendly: 2, localWithoutLocalLanguage: 1},
@@ -504,7 +468,7 @@ export const countries: CountryEntity[] = [
         "countries.kazakhstan",
         "Kazakhstan",
         "low",
-        {single: 1000, couple: 1700, perKid: 320},
+        {single: 485, couple: 725, perKid: 120},
         {climate_cold: 2, cost_low_need: 3, country_large: 2},
         {english: 0, russian: 2, noLocalLanguagePenalty: 2},
         {remoteFriendly: 2, localWithoutLocalLanguage: 1},
@@ -535,7 +499,7 @@ export const countries: CountryEntity[] = [
         "countries.turkey",
         "Turkey",
         "mid",
-        {single: 1400, couple: 2200, perKid: 450},
+        {single: 615, couple: 920, perKid: 155},
         {climate_warm: 3, nature_water: 2, culture_change_ok: 2},
         {english: 1, russian: 1, noLocalLanguagePenalty: 1},
         {remoteFriendly: 2, localWithoutLocalLanguage: 0},
@@ -545,7 +509,7 @@ export const countries: CountryEntity[] = [
         "countries.egypt",
         "Egypt",
         "low",
-        {single: 1100, couple: 1800, perKid: 350},
+        {single: 200, couple: 305, perKid: 50},
         {climate_warm: 3, climate_heat_ok: 3, nature_water: 2},
         {english: 1, russian: 1, noLocalLanguagePenalty: 1},
         {remoteFriendly: 2, localWithoutLocalLanguage: 0},
@@ -573,7 +537,7 @@ export const countries: CountryEntity[] = [
         "countries.israel",
         "Israel",
         "very_high",
-        {single: 3500, couple: 5200, perKid: 1000},
+        {single: 1650, couple: 2475, perKid: 410},
         {quality_high_need: 3, safety_need: 2, society_international: 2},
         {english: 2, russian: 2, noLocalLanguagePenalty: 1},
         {remoteFriendly: 3, localWithoutLocalLanguage: 1},
@@ -583,7 +547,7 @@ export const countries: CountryEntity[] = [
         "countries.jordan",
         "Jordan",
         "mid",
-        {single: 1500, couple: 2400, perKid: 450},
+        {single: 485, couple: 730, perKid: 120},
         {climate_warm: 2, rules_ok: 2},
         {english: 1, russian: 0, noLocalLanguagePenalty: 1},
         {remoteFriendly: 2, localWithoutLocalLanguage: 0},
@@ -593,7 +557,7 @@ export const countries: CountryEntity[] = [
         "countries.india",
         "India",
         "low",
-        {single: 1000, couple: 1700, perKid: 320},
+        {single: 200, couple: 300, perKid: 50},
         {climate_warm: 3, cost_low_need: 3, culture_change_ok: 3},
         {english: 2, russian: 0, noLocalLanguagePenalty: 1},
         {remoteFriendly: 2, localWithoutLocalLanguage: 1},
@@ -603,7 +567,7 @@ export const countries: CountryEntity[] = [
         "countries.thailand",
         "Thailand",
         "mid",
-        {single: 1500, couple: 2400, perKid: 450},
+        {single: 530, couple: 795, perKid: 130},
         {climate_warm: 3, climate_heat_ok: 3, nature_water: 3, culture_change_ok: 3, society_open: 3},
         {english: 2, russian: 1, noLocalLanguagePenalty: 1},
         {remoteFriendly: 2, localWithoutLocalLanguage: 0},
@@ -613,7 +577,7 @@ export const countries: CountryEntity[] = [
         "countries.oman",
         "Oman",
         "mid",
-        {single: 1700, couple: 2635, perKid: 459},
+        {single: 760, couple: 1145, perKid: 190},
         {
             climate_cold: -3,
             climate_heat_ok: 3,
@@ -639,7 +603,7 @@ export const countries: CountryEntity[] = [
         "countries.switzerland",
         "Switzerland",
         "very_high",
-        {single: 3400, couple: 5270, perKid: 918},
+        {single: 2485, couple: 3725, perKid: 620},
         {
             climate_seasons: 3,
             cost_low_need: -2,
@@ -688,7 +652,7 @@ export const countries: CountryEntity[] = [
         "countries.norway",
         "Norway",
         "very_high",
-        {single: 3400, couple: 5270, perKid: 918},
+        {single: 1740, couple: 2610, perKid: 435},
         {
             climate_cold: 3,
             climate_cold_ok: 2,
@@ -714,7 +678,7 @@ export const countries: CountryEntity[] = [
         "countries.australia",
         "Australia",
         "high",
-        {single: 2600, couple: 4030, perKid: 702},
+        {single: 1745, couple: 2615, perKid: 435},
         {
             climate_cold: -2,
             climate_heat_ok: 2,
@@ -741,7 +705,7 @@ export const countries: CountryEntity[] = [
         "countries.new_zealand",
         "New Zealand",
         "high",
-        {single: 2600, couple: 4030, perKid: 702},
+        {single: 1495, couple: 2240, perKid: 375},
         {
             climate_seasons: 3,
             cost_low_need: 0,
@@ -764,7 +728,7 @@ export const countries: CountryEntity[] = [
         "countries.japan",
         "Japan",
         "mid",
-        {single: 1700, couple: 2635, perKid: 459},
+        {single: 735, couple: 1105, perKid: 185},
         {
             climate_seasons: 3,
             cost_low_need: 1,
@@ -787,7 +751,7 @@ export const countries: CountryEntity[] = [
         "countries.qatar",
         "Qatar",
         "mid",
-        {single: 1700, couple: 2635, perKid: 459},
+        {single: 1450, couple: 2175, perKid: 365},
         {
             climate_cold: -3,
             climate_heat_ok: 3,
@@ -814,7 +778,7 @@ export const countries: CountryEntity[] = [
         "countries.saudi_arabia",
         "Saudi Arabia",
         "mid",
-        {single: 1700, couple: 2635, perKid: 459},
+        {single: 790, couple: 1185, perKid: 200},
         {
             climate_cold: -3,
             climate_heat_ok: 3,
@@ -841,7 +805,7 @@ export const countries: CountryEntity[] = [
         "countries.kuwait",
         "Kuwait",
         "mid",
-        {single: 1700, couple: 2635, perKid: 459},
+        {single: 855, couple: 1280, perKid: 215},
         {
             climate_cold: -3,
             climate_heat_ok: 3,
@@ -868,7 +832,7 @@ export const countries: CountryEntity[] = [
         "countries.singapore",
         "Singapore",
         "very_high",
-        {single: 3400, couple: 5270, perKid: 918},
+        {single: 2520, couple: 3780, perKid: 630},
         {
             city_vertical: 3,
             climate_cold: -3,
@@ -897,7 +861,7 @@ export const countries: CountryEntity[] = [
         "countries.taiwan",
         "Taiwan",
         "mid",
-        {single: 1700, couple: 2635, perKid: 459},
+        {single: 645, couple: 970, perKid: 160},
         {
             climate_cold: -2,
             climate_heat_ok: 2,
@@ -922,7 +886,7 @@ export const countries: CountryEntity[] = [
         "countries.puerto_rico",
         "Puerto Rico",
         "high",
-        {single: 2600, couple: 4030, perKid: 702},
+        {single: 1250, couple: 1875, perKid: 310},
         {
             climate_cold: -3,
             climate_heat_ok: 3,
@@ -947,7 +911,7 @@ export const countries: CountryEntity[] = [
         "countries.south_africa",
         "South Africa",
         "low",
-        {single: 1100, couple: 1705, perKid: 297},
+        {single: 760, couple: 1145, perKid: 190},
         {
             climate_cold: -2,
             climate_heat_ok: 2,
@@ -973,7 +937,7 @@ export const countries: CountryEntity[] = [
         "countries.uruguay",
         "Uruguay",
         "mid",
-        {single: 1700, couple: 2635, perKid: 459},
+        {single: 920, couple: 1380, perKid: 230},
         {
             climate_seasons: 3,
             cost_low_need: 0,
@@ -997,7 +961,7 @@ export const countries: CountryEntity[] = [
         "countries.bosnia_and_herzegovina",
         "Bosnia And Herzegovina",
         "low",
-        {single: 1100, couple: 1705, perKid: 297},
+        {single: 600, couple: 900, perKid: 150},
         {
             climate_seasons: 3,
             cost_low_need: 2,
@@ -1021,7 +985,7 @@ export const countries: CountryEntity[] = [
         "countries.malaysia",
         "Malaysia",
         "low",
-        {single: 1100, couple: 1705, perKid: 297},
+        {single: 470, couple: 710, perKid: 120},
         {
             climate_cold: -3,
             climate_heat_ok: 3,
@@ -1046,7 +1010,7 @@ export const countries: CountryEntity[] = [
         "countries.hong_kong",
         "Hong Kong (China)",
         "very_high",
-        {single: 3400, couple: 5270, perKid: 918},
+        {single: 2155, couple: 3230, perKid: 540},
         {
             city_vertical: 3,
             climate_cold: -2,
@@ -1075,7 +1039,7 @@ export const countries: CountryEntity[] = [
         "countries.ecuador",
         "Ecuador",
         "low",
-        {single: 1100, couple: 1705, perKid: 297},
+        {single: 475, couple: 710, perKid: 120},
         {
             climate_cold: -2,
             climate_heat_ok: 2,
@@ -1101,7 +1065,7 @@ export const countries: CountryEntity[] = [
         "countries.serbia",
         "Serbia",
         "mid",
-        {single: 1700, couple: 2635, perKid: 459},
+        {single: 760, couple: 1140, perKid: 190},
         {
             climate_seasons: 3,
             cost_low_need: 1,
@@ -1125,7 +1089,7 @@ export const countries: CountryEntity[] = [
         "countries.costa_rica",
         "Costa Rica",
         "mid",
-        {single: 1700, couple: 2635, perKid: 459},
+        {single: 1045, couple: 1565, perKid: 260},
         {
             climate_cold: -3,
             climate_heat_ok: 3,
@@ -1151,7 +1115,7 @@ export const countries: CountryEntity[] = [
         "countries.georgia",
         "Georgia",
         "low",
-        {single: 1100, couple: 1705, perKid: 297},
+        {single: 545, couple: 820, perKid: 135},
         {
             climate_seasons: 3,
             cost_low_need: 2,
@@ -1175,7 +1139,7 @@ export const countries: CountryEntity[] = [
         "countries.mexico",
         "Mexico",
         "mid",
-        {single: 1700, couple: 2635, perKid: 459},
+        {single: 800, couple: 1195, perKid: 200},
         {
             climate_cold: -2,
             climate_heat_ok: 2,
@@ -1201,7 +1165,7 @@ export const countries: CountryEntity[] = [
         "countries.north_macedonia",
         "North Macedonia",
         "low",
-        {single: 1100, couple: 1705, perKid: 297},
+        {single: 560, couple: 845, perKid: 140},
         {
             climate_seasons: 3,
             cost_low_need: 2,
@@ -1225,7 +1189,7 @@ export const countries: CountryEntity[] = [
         "countries.armenia",
         "Armenia",
         "mid",
-        {single: 1700, couple: 2635, perKid: 459},
+        {single: 680, couple: 1015, perKid: 170},
         {
             climate_seasons: 3,
             cost_low_need: 1,
@@ -1249,7 +1213,7 @@ export const countries: CountryEntity[] = [
         "countries.panama",
         "Panama",
         "mid",
-        {single: 1700, couple: 2635, perKid: 459},
+        {single: 1125, couple: 1685, perKid: 280},
         {
             climate_cold: -3,
             climate_heat_ok: 3,
@@ -1275,7 +1239,7 @@ export const countries: CountryEntity[] = [
         "countries.tunisia",
         "Tunisia",
         "low",
-        {single: 1100, couple: 1705, perKid: 297},
+        {single: 310, couple: 460, perKid: 75},
         {
             climate_cold: -3,
             climate_heat_ok: 3,
@@ -1301,7 +1265,7 @@ export const countries: CountryEntity[] = [
         "countries.morocco",
         "Morocco",
         "low",
-        {single: 1100, couple: 1705, perKid: 297},
+        {single: 390, couple: 590, perKid: 100},
         {
             climate_cold: -2,
             climate_heat_ok: 2,
@@ -1327,7 +1291,7 @@ export const countries: CountryEntity[] = [
         "countries.azerbaijan",
         "Azerbaijan",
         "low",
-        {single: 1100, couple: 1705, perKid: 297},
+        {single: 420, couple: 630, perKid: 105},
         {
             climate_seasons: 3,
             cost_low_need: 2,
@@ -1351,7 +1315,7 @@ export const countries: CountryEntity[] = [
         "countries.colombia",
         "Colombia",
         "low",
-        {single: 1100, couple: 1705, perKid: 297},
+        {single: 595, couple: 890, perKid: 150},
         {
             climate_cold: -2,
             climate_heat_ok: 2,
@@ -1377,7 +1341,7 @@ export const countries: CountryEntity[] = [
         "countries.albania",
         "Albania",
         "mid",
-        {single: 1700, couple: 2635, perKid: 459},
+        {single: 685, couple: 1025, perKid: 170},
         {
             climate_seasons: 3,
             cost_low_need: 0,
@@ -1401,7 +1365,7 @@ export const countries: CountryEntity[] = [
         "countries.kenya",
         "Kenya",
         "low",
-        {single: 1100, couple: 1705, perKid: 297},
+        {single: 325, couple: 485, perKid: 80},
         {
             climate_cold: -2,
             climate_heat_ok: 2,
@@ -1427,7 +1391,7 @@ export const countries: CountryEntity[] = [
         "countries.pakistan",
         "Pakistan",
         "low",
-        {single: 1100, couple: 1705, perKid: 297},
+        {single: 255, couple: 380, perKid: 65},
         {
             climate_cold: -2,
             climate_heat_ok: 2,
@@ -1453,7 +1417,7 @@ export const countries: CountryEntity[] = [
         "countries.lebanon",
         "Lebanon",
         "mid",
-        {single: 1700, couple: 2635, perKid: 459},
+        {single: 720, couple: 1080, perKid: 180},
         {
             climate_cold: -2,
             climate_heat_ok: 2,
@@ -1479,7 +1443,7 @@ export const countries: CountryEntity[] = [
         "countries.vietnam",
         "Vietnam",
         "mid",
-        {single: 1700, couple: 2635, perKid: 459},
+        {single: 425, couple: 640, perKid: 105},
         {
             climate_cold: -3,
             climate_heat_ok: 3,
@@ -1504,7 +1468,7 @@ export const countries: CountryEntity[] = [
         "countries.indonesia",
         "Indonesia",
         "mid",
-        {single: 1700, couple: 2635, perKid: 459},
+        {single: 340, couple: 510, perKid: 85},
         {
             climate_cold: -3,
             climate_heat_ok: 3,
@@ -1530,7 +1494,7 @@ export const countries: CountryEntity[] = [
         "countries.iran",
         "Iran",
         "low",
-        {single: 1100, couple: 1705, perKid: 297},
+        {single: 260, couple: 385, perKid: 65},
         {
             climate_seasons: 3,
             cost_low_need: 3,
@@ -1554,7 +1518,7 @@ export const countries: CountryEntity[] = [
         "countries.philippines",
         "Philippines",
         "low",
-        {single: 1100, couple: 1705, perKid: 297},
+        {single: 440, couple: 665, perKid: 110},
         {
             climate_cold: -3,
             climate_heat_ok: 3,
@@ -1579,7 +1543,7 @@ export const countries: CountryEntity[] = [
         "countries.venezuela",
         "Venezuela",
         "low",
-        {single: 1100, couple: 1705, perKid: 297},
+        {single: 430, couple: 645, perKid: 105},
         {
             climate_cold: -3,
             climate_heat_ok: 3,
@@ -1605,7 +1569,7 @@ export const countries: CountryEntity[] = [
         "countries.bangladesh",
         "Bangladesh",
         "low",
-        {single: 1100, couple: 1705, perKid: 297},
+        {single: 155, couple: 230, perKid: 40},
         {
             climate_cold: -3,
             climate_heat_ok: 3,
@@ -1631,7 +1595,7 @@ export const countries: CountryEntity[] = [
         "countries.sri_lanka",
         "Sri Lanka",
         "mid",
-        {single: 1700, couple: 2635, perKid: 459},
+        {single: 335, couple: 500, perKid: 85},
         {
             climate_cold: -3,
             climate_heat_ok: 3,
@@ -1656,7 +1620,7 @@ export const countries: CountryEntity[] = [
         "countries.nigeria",
         "Nigeria",
         "mid",
-        {single: 1700, couple: 2635, perKid: 459},
+        {single: 710, couple: 1065, perKid: 175},
         {
             climate_cold: -3,
             climate_heat_ok: 3,
@@ -1980,7 +1944,7 @@ export const countries: CountryEntity[] = [
         "countries.dominican_republic",
         "Dominican Republic",
         "mid",
-        {single: 1760, couple: 2640, perKid: 440},
+        {single: 650, couple: 975, perKid: 165},
         {climate_warm: 3, climate_heat_ok: 2, nature_water: 3, society_open: 2, cost_low_need: 1},
         {english: 1, russian: 0, noLocalLanguagePenalty: 1},
         {remoteFriendly: 1, localWithoutLocalLanguage: 0},
@@ -2147,7 +2111,7 @@ export const countries: CountryEntity[] = [
         "countries.zimbabwe",
         "Zimbabwe",
         "mid",
-        {single: 1720, couple: 2580, perKid: 430},
+        {single: 510, couple: 765, perKid: 125},
         {
             climate_warm: 2,
             climate_heat_ok: 2,
@@ -2217,7 +2181,7 @@ export const countries: CountryEntity[] = [
         "countries.bahrain",
         "Bahrain",
         "mid",
-        {single: 1950, couple: 2925, perKid: 488},
+        {single: 930, couple: 1395, perKid: 230},
         {
             geo_island: 2,
             climate_warm: 3,
@@ -2298,7 +2262,7 @@ export const countries: CountryEntity[] = [
         "countries.nepal",
         "Nepal",
         "low",
-        {single: 1450, couple: 2175, perKid: 363},
+        {single: 165, couple: 245, perKid: 40},
         {nature_mountains_forest: 3, climate_seasons: 2, cost_low_need: 2, rules_ok: -1, stability_need: -1},
         {english: 1, russian: 0, noLocalLanguagePenalty: 1},
         {remoteFriendly: 1, localWithoutLocalLanguage: 0},
@@ -2338,7 +2302,7 @@ export const countries: CountryEntity[] = [
         "countries.iran",
         "Iran",
         "low",
-        {single: 1460, couple: 2190, perKid: 365},
+        {single: 260, couple: 385, perKid: 65},
         {climate_seasons: 2, cost_low_need: 2, rules_ok: -2, stability_need: -2, society_private: 1},
         {english: 1, russian: 0, noLocalLanguagePenalty: 0},
         {remoteFriendly: 1, localWithoutLocalLanguage: 0},
@@ -2348,7 +2312,7 @@ export const countries: CountryEntity[] = [
         "countries.iraq",
         "Iraq",
         "low",
-        {single: 1570, couple: 2355, perKid: 393},
+        {single: 445, couple: 670, perKid: 110},
         {climate_warm: 3, climate_heat_ok: 2, cost_low_need: 2, rules_ok: -2, stability_need: -3, safety_need: -2},
         {english: 1, russian: 0, noLocalLanguagePenalty: 0},
         {remoteFriendly: 1, localWithoutLocalLanguage: 0},
@@ -2368,7 +2332,7 @@ export const countries: CountryEntity[] = [
         "countries.moldova",
         "Moldova",
         "mid",
-        {single: 1720, couple: 2580, perKid: 430},
+        {single: 725, couple: 1085, perKid: 180},
         {climate_seasons: 3, cost_low_need: 1, geo_continent: 3, rules_ok: -1, stability_need: -1},
         {english: 1, russian: 2, noLocalLanguagePenalty: 2},
         {remoteFriendly: 2, localWithoutLocalLanguage: 1},
@@ -2388,7 +2352,7 @@ export const countries: CountryEntity[] = [
         "countries.kosovo",
         "Kosovo (Disputed Territory)",
         "low",
-        {single: 1580, couple: 2370, perKid: 395},
+        {single: 480, couple: 720, perKid: 120},
         {climate_seasons: 2, cost_low_need: 2, geo_continent: 3, rules_ok: -1, stability_need: -1},
         {english: 1, russian: 0, noLocalLanguagePenalty: 1},
         {remoteFriendly: 1, localWithoutLocalLanguage: 0},
