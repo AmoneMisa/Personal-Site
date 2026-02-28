@@ -154,7 +154,7 @@ function hasAnyIndex(b: IndicesBundle | undefined) {
             ]"
           />
           <div class="field__hint text-muted">
-            {{ t("quizzes.countryFit.constraints.job.hint") }}
+            {{ t('quizzes.countryFit.constraints.job.hint') }}
           </div>
         </div>
 
@@ -168,7 +168,7 @@ function hasAnyIndex(b: IndicesBundle | undefined) {
               :placeholder="t('quizzes.countryFit.constraints.budget.placeholder')"
           />
           <div class="field__hint text-muted">
-            {{ t("quizzes.countryFit.constraints.budget.hint") }}
+            {{ t('quizzes.countryFit.constraints.budget.hint') }}
           </div>
         </div>
 
@@ -187,7 +187,7 @@ function hasAnyIndex(b: IndicesBundle | undefined) {
             ]"
           />
           <div class="field__hint text-muted">
-            {{ t("quizzes.countryFit.constraints.languageRu.hint") }}
+            {{ t('quizzes.countryFit.constraints.languageRu.hint') }}
           </div>
         </div>
 
@@ -205,7 +205,7 @@ function hasAnyIndex(b: IndicesBundle | undefined) {
             ]"
           />
           <div class="field__hint text-muted">
-            {{ t("quizzes.countryFit.constraints.languageEn.hint") }}
+            {{ t('quizzes.countryFit.constraints.languageEn.hint') }}
           </div>
         </div>
 
@@ -223,7 +223,7 @@ function hasAnyIndex(b: IndicesBundle | undefined) {
             ]"
           />
           <div class="field__hint text-muted">
-            {{ t("quizzes.countryFit.constraints.family.hint") }}
+            {{ t('quizzes.countryFit.constraints.family.hint') }}
           </div>
         </div>
 
@@ -238,7 +238,7 @@ function hasAnyIndex(b: IndicesBundle | undefined) {
               :placeholder="t('quizzes.countryFit.constraints.kids.placeholder')"
           />
           <div class="field__hint text-muted">
-            {{ t("quizzes.countryFit.constraints.kids.hint") }}
+            {{ t('quizzes.countryFit.constraints.kids.hint') }}
           </div>
         </div>
       </div>
@@ -282,13 +282,16 @@ function hasAnyIndex(b: IndicesBundle | undefined) {
         </div>
       </div>
 
-      <!-- Best US state (ALWAYS ABOVE OTHER CARDS) -->
+      <!-- Best US state -->
       <div
           v-if="bestUsState"
           class="mb-6 p-4 rounded-xl border border-[var(--ui-border)] bg-[rgba(255,255,255,0.04)] result-card"
       >
         <div class="flex items-center justify-between gap-3">
-          <div class="font-black text-lg">🇺🇸 {{ t("quizzes.countryFit.bestUsStateTitle") }}</div>
+          <div class="font-black text-lg flex items-center gap-2">
+            <Icon name="i-lucide-flag" class="i-icon" />
+            {{ t("quizzes.countryFit.bestUsStateTitle") }}
+          </div>
           <div class="text-xs text-muted">{{ t("quizzes.countryFit.bestUsStateHint") }}</div>
         </div>
 
@@ -320,39 +323,44 @@ function hasAnyIndex(b: IndicesBundle | undefined) {
             </div>
           </div>
 
-          <!-- Indices hover trigger -->
-          <div
-              v-if="hasAnyIndex(indicesMap[bestUsState.key])"
-              class="indices"
-          >
-            <button
-                type="button"
-                class="indices__trigger"
-                :aria-label="t('quizzes.countryFit.indices.aria')"
-            >
-              ⓘ {{ t("quizzes.countryFit.indices.title") }}
+          <div v-if="hasAnyIndex(indicesMap[bestUsState.key])" class="indices mt-3">
+            <button type="button" class="indices__trigger" :aria-label="t('quizzes.countryFit.indices.aria')">
+              <Icon name="i-lucide-info" class="i-icon" />
+              {{ t("quizzes.countryFit.indices.title") }}
             </button>
 
             <div class="indices__panel" role="tooltip">
               <div class="indices__title">{{ t("quizzes.countryFit.indices.title") }}</div>
 
               <div class="indices__row" v-if="indicesMap[bestUsState.key]?.normalized.income != null">
-                <span>💰 {{ t("quizzes.countryFit.indices.income") }}</span>
+                <span class="indices__k">
+                  <Icon name="i-lucide-dollar-sign" class="i-icon" />
+                  {{ t("quizzes.countryFit.indices.income") }}
+                </span>
                 <span class="indices__val">{{ indicesMap[bestUsState.key]!.normalized.income!.toFixed(1) }}/10</span>
               </div>
 
               <div class="indices__row" v-if="indicesMap[bestUsState.key]?.normalized.education != null">
-                <span>🎓 {{ t("quizzes.countryFit.indices.education") }}</span>
+                <span class="indices__k">
+                  <Icon name="i-lucide-graduation-cap" class="i-icon" />
+                  {{ t("quizzes.countryFit.indices.education") }}
+                </span>
                 <span class="indices__val">{{ indicesMap[bestUsState.key]!.normalized.education!.toFixed(1) }}/10</span>
               </div>
 
               <div class="indices__row" v-if="indicesMap[bestUsState.key]?.normalized.qualityOfLife != null">
-                <span>✨ {{ t("quizzes.countryFit.indices.quality") }}</span>
+                <span class="indices__k">
+                  <Icon name="i-lucide-sparkles" class="i-icon" />
+                  {{ t("quizzes.countryFit.indices.quality") }}
+                </span>
                 <span class="indices__val">{{ indicesMap[bestUsState.key]!.normalized.qualityOfLife!.toFixed(1) }}/10</span>
               </div>
 
               <div class="indices__row" v-if="indicesMap[bestUsState.key]?.normalized.safety != null">
-                <span>🛡 {{ t("quizzes.countryFit.indices.safety") }}</span>
+                <span class="indices__k">
+                  <Icon name="i-lucide-shield" class="i-icon" />
+                  {{ t("quizzes.countryFit.indices.safety") }}
+                </span>
                 <span class="indices__val">{{ indicesMap[bestUsState.key]!.normalized.safety!.toFixed(1) }}/10</span>
               </div>
 
@@ -402,39 +410,44 @@ function hasAnyIndex(b: IndicesBundle | undefined) {
               • {{ g.base.why.join(" • ") }}
             </div>
 
-            <!-- Indices hover trigger -->
-            <div
-                v-if="hasAnyIndex(indicesMap[g.base.key])"
-                class="indices mt-3"
-            >
-              <button
-                  type="button"
-                  class="indices__trigger"
-                  :aria-label="t('quizzes.countryFit.indices.aria')"
-              >
-                ⓘ {{ t("quizzes.countryFit.indices.title") }}
+            <div v-if="hasAnyIndex(indicesMap[g.base.key])" class="indices mt-3">
+              <button type="button" class="indices__trigger" :aria-label="t('quizzes.countryFit.indices.aria')">
+                <Icon name="i-lucide-info" class="i-icon" />
+                {{ t("quizzes.countryFit.indices.title") }}
               </button>
 
               <div class="indices__panel" role="tooltip">
                 <div class="indices__title">{{ t("quizzes.countryFit.indices.title") }}</div>
 
                 <div class="indices__row" v-if="indicesMap[g.base.key]?.normalized.income != null">
-                  <span>💰 {{ t("quizzes.countryFit.indices.income") }}</span>
+                  <span class="indices__k">
+                    <Icon name="i-lucide-dollar-sign" class="i-icon" />
+                    {{ t("quizzes.countryFit.indices.income") }}
+                  </span>
                   <span class="indices__val">{{ indicesMap[g.base.key]!.normalized.income!.toFixed(1) }}/10</span>
                 </div>
 
                 <div class="indices__row" v-if="indicesMap[g.base.key]?.normalized.education != null">
-                  <span>🎓 {{ t("quizzes.countryFit.indices.education") }}</span>
+                  <span class="indices__k">
+                    <Icon name="i-lucide-graduation-cap" class="i-icon" />
+                    {{ t("quizzes.countryFit.indices.education") }}
+                  </span>
                   <span class="indices__val">{{ indicesMap[g.base.key]!.normalized.education!.toFixed(1) }}/10</span>
                 </div>
 
                 <div class="indices__row" v-if="indicesMap[g.base.key]?.normalized.qualityOfLife != null">
-                  <span>✨ {{ t("quizzes.countryFit.indices.quality") }}</span>
+                  <span class="indices__k">
+                    <Icon name="i-lucide-sparkles" class="i-icon" />
+                    {{ t("quizzes.countryFit.indices.quality") }}
+                  </span>
                   <span class="indices__val">{{ indicesMap[g.base.key]!.normalized.qualityOfLife!.toFixed(1) }}/10</span>
                 </div>
 
                 <div class="indices__row" v-if="indicesMap[g.base.key]?.normalized.safety != null">
-                  <span>🛡 {{ t("quizzes.countryFit.indices.safety") }}</span>
+                  <span class="indices__k">
+                    <Icon name="i-lucide-shield" class="i-icon" />
+                    {{ t("quizzes.countryFit.indices.safety") }}
+                  </span>
                   <span class="indices__val">{{ indicesMap[g.base.key]!.normalized.safety!.toFixed(1) }}/10</span>
                 </div>
 
@@ -495,8 +508,12 @@ function hasAnyIndex(b: IndicesBundle | undefined) {
   font-variant-numeric: tabular-nums;
 }
 
-/* -------- Indices hover -------- */
+.i-icon {
+  width: 16px;
+  height: 16px;
+}
 
+/* -------- Indices hover -------- */
 .indices {
   position: relative;
   display: inline-block;
@@ -526,7 +543,7 @@ function hasAnyIndex(b: IndicesBundle | undefined) {
   z-index: 70;
   left: 0;
   top: calc(100% + 10px);
-  width: 300px;
+  width: 320px;
 
   padding: 12px;
   border-radius: 14px;
@@ -540,7 +557,6 @@ function hasAnyIndex(b: IndicesBundle | undefined) {
   transition: opacity 160ms ease, transform 160ms ease;
 }
 
-/* строго на hover/focus триггера */
 .indices:hover .indices__panel,
 .indices:focus-within .indices__panel {
   opacity: 1;
@@ -562,6 +578,12 @@ function hasAnyIndex(b: IndicesBundle | undefined) {
   padding: 6px 0;
   font-size: 13px;
   color: rgba(255, 255, 255, 0.92);
+}
+
+.indices__k {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .indices__val {
