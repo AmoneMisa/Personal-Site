@@ -9,6 +9,12 @@ type IndicesNormalized = {
   air?: number | null;
   inequality?: number | null;
   health?: number | null;
+  transportPublic?: number | null;
+  transportCar?: number | null;
+  remoteWork?: number | null;
+  commuteTime?: number | null;
+  societyInternational?: number | null;
+  langBarrier?: number | null;
 };
 
 type IndicesBundle = {
@@ -42,21 +48,76 @@ const props = withDefaults(defineProps<{
 
 const emit = defineEmits<{ (e: "remove", key: string): void }>();
 
-const { t } = useI18n();
+const {t} = useI18n();
 
 function fmt100(v: number | null | undefined) {
   if (typeof v !== "number") return "—";
   return `${Math.round(v)}/100`;
 }
 
+function fmtIndex10(v: number) {
+  if (v === 0) return t("common.noData");
+  return `${v.toFixed(1)}/10`;
+}
+
 function hasAnyIndex(b: IndicesBundle | undefined) {
   const n = b?.normalized;
   if (!n) return false;
-  return [
-    n.income, n.education, n.qualityOfLife, n.safety,
-    n.internet, n.unemployment, n.air, n.inequality, n.health
-  ].some((x) => typeof x === "number");
+  return Object.values(n).some((x) => typeof x === "number" && Number.isFinite(x));
 }
+
+type IndexKey = keyof IndicesNormalized;
+
+type IndexDef = {
+  key: IndexKey;
+  icon: string;
+  tKey: string;
+};
+
+const INDEX_DEFS: IndexDef[] = [
+  {key: "income", icon: "i-lucide-dollar-sign", tKey: "quizzes.countryFit.indices.income"},
+  {key: "education", icon: "i-lucide-graduation-cap", tKey: "quizzes.countryFit.indices.education"},
+  {key: "qualityOfLife", icon: "i-lucide-sparkles", tKey: "quizzes.countryFit.indices.quality"},
+  {key: "safety", icon: "i-lucide-shield", tKey: "quizzes.countryFit.indices.safety"},
+
+  {key: "internet", icon: "i-lucide-wifi", tKey: "quizzes.countryFit.indices.internet"},
+  {key: "unemployment", icon: "i-lucide-briefcase", tKey: "quizzes.countryFit.indices.unemployment"},
+  {key: "air", icon: "i-lucide-wind", tKey: "quizzes.countryFit.indices.air"},
+  {key: "inequality", icon: "i-lucide-scale", tKey: "quizzes.countryFit.indices.inequality"},
+  {key: "health", icon: "i-lucide-heart-pulse", tKey: "quizzes.countryFit.indices.health"},
+
+  {key: "transportPublic", icon: "i-lucide-train-front", tKey: "quizzes.countryFit.indices.transportPublic"},
+  {key: "transportCar", icon: "i-lucide-car", tKey: "quizzes.countryFit.indices.transportCar"},
+  {key: "remoteWork", icon: "i-lucide-laptop", tKey: "quizzes.countryFit.indices.remoteWork"},
+  {key: "commuteTime", icon: "i-lucide-timer", tKey: "quizzes.countryFit.indices.commuteTime"},
+  {key: "societyInternational", icon: "i-lucide-globe", tKey: "quizzes.countryFit.indices.societyInternational"},
+  {key: "langBarrier", icon: "i-lucide-languages", tKey: "quizzes.countryFit.indices.langBarrier"},
+];
+
+function isNum(v: unknown): v is number {
+  return typeof v === "number" && Number.isFinite(v);
+}
+
+const availableIndices = computed(() => {
+  const n = props.indices?.normalized;
+  if (!n) return [];
+
+  return INDEX_DEFS
+      .map(def => ({def, value: n[def.key]}))
+      .filter(x => isNum(x.value));
+});
+
+const indexColumns = computed(() => {
+  const items = availableIndices.value;
+
+  // правило: "если больше 4-х в столбик" -> делим на 2 или 3 столбика
+  // max 4 строки на колонку => колонки = ceil(count / 4), но не больше 3
+  const cols = Math.min(3, Math.max(1, Math.ceil(items.length / 4)));
+
+  const out: Array<typeof items> = Array.from({length: cols}, () => []);
+  for (let i = 0; i < items.length; i++) out[i % cols].push(items[i]);
+  return out;
+});
 </script>
 
 <template>
@@ -72,7 +133,7 @@ function hasAnyIndex(b: IndicesBundle | undefined) {
           class="chip"
           @click="emit('remove', item.key)"
       >
-        <Icon name="i-lucide-x" class="i-icon" />
+        <Icon name="i-lucide-x" class="i-icon"/>
         {{ t("common.remove") }}
       </button>
     </div>
@@ -98,31 +159,20 @@ function hasAnyIndex(b: IndicesBundle | undefined) {
 
     <div v-if="hasAnyIndex(indices)" class="indices mt-3">
       <button type="button" class="indices__trigger" :aria-label="t('quizzes.countryFit.indices.aria')">
-        <Icon name="i-lucide-info" class="i-icon" />
+        <Icon name="i-lucide-info" class="i-icon"/>
         {{ t("quizzes.countryFit.indices.title") }}
       </button>
 
       <div class="indices__panel" role="tooltip">
         <div class="indices__title">{{ t("quizzes.countryFit.indices.title") }}</div>
-
-        <div class="indices__row" v-if="indices?.normalized.income != null">
-          <span class="indices__k"><Icon name="i-lucide-dollar-sign" class="i-icon" />{{ t("quizzes.countryFit.indices.income") }}</span>
-          <span class="indices__val">{{ indices!.normalized.income!.toFixed(1) }}/10</span>
-        </div>
-
-        <div class="indices__row" v-if="indices?.normalized.education != null">
-          <span class="indices__k"><Icon name="i-lucide-graduation-cap" class="i-icon" />{{ t("quizzes.countryFit.indices.education") }}</span>
-          <span class="indices__val">{{ indices!.normalized.education!.toFixed(1) }}/10</span>
-        </div>
-
-        <div class="indices__row" v-if="indices?.normalized.qualityOfLife != null">
-          <span class="indices__k"><Icon name="i-lucide-sparkles" class="i-icon" />{{ t("quizzes.countryFit.indices.quality") }}</span>
-          <span class="indices__val">{{ indices!.normalized.qualityOfLife!.toFixed(1) }}/10</span>
-        </div>
-
-        <div class="indices__row" v-if="indices?.normalized.safety != null">
-          <span class="indices__k"><Icon name="i-lucide-shield" class="i-icon" />{{ t("quizzes.countryFit.indices.safety") }}</span>
-          <span class="indices__val">{{ indices!.normalized.safety!.toFixed(1) }}/10</span>
+        <div class="indices__col" v-for="(col, ci) in indexColumns" :key="ci">
+          <div class="indices__row" v-for="x in col" :key="String(x.def.key)">
+            <span class="indices__k">
+              <Icon :name="x.def.icon" class="i-icon"/>
+              {{ t(x.def.tKey) }}
+            </span>
+            <span class="indices__val">{{ fmtIndex10(x.value) }}</span>
+          </div>
         </div>
 
         <div class="indices__meta text-muted" v-if="indices?.updatedAtISO">
@@ -256,5 +306,26 @@ function hasAnyIndex(b: IndicesBundle | undefined) {
   background: rgba(255, 255, 255, 0.03);
   color: var(--ui-text-muted);
   line-height: 1;
+}
+
+.indices__grid {
+  display: grid;
+  gap: 10px;
+}
+
+.indices__grid.cols-1 {
+  grid-template-columns: 1fr;
+}
+
+.indices__grid.cols-2 {
+  grid-template-columns: 1fr 1fr;
+}
+
+.indices__grid.cols-3 {
+  grid-template-columns: 1fr 1fr 1fr;
+}
+
+.indices__col {
+  min-width: 0;
 }
 </style>

@@ -1,7 +1,8 @@
 {
   "common": {
     "add": "Add",
-    "remove": "Remove"
+    "remove": "Remove",
+    "noData": "No Data"
   },
   "quizzes": {
     "headline": "Quizzes",
