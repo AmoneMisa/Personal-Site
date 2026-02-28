@@ -29,6 +29,13 @@
       }
     },
     "countryFit": {
+      "compareTitle": "Сравнение",
+      "manualUsaCompareTitle": "Штаты для сравнения",
+      "manualCountriesCompareTitle": "Страны для сравнения",
+      "addUsaStatePlaceholder": "Выбери штат",
+      "addCountryPlaceholder": "Выбери страну",
+      "manualUsaEmpty": "Выбери штаты, которые хочешь сравнить.",
+      "manualCountriesEmpty": "Выбери страны, которые хочешь сравнить.",
       "bestUsStateTitle": "Лучший штат США под твой профиль",
       "bestUsStateHint": "По ответам, бюджету и индексам",
       "loadingIndices": "Загружаем индексы…",

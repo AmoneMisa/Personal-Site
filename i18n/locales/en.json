@@ -28,6 +28,13 @@
       }
     },
     "countryFit": {
+      "compareTitle": "Comparison",
+      "manualUsaCompareTitle": "States to compare",
+      "manualCountriesCompareTitle": "Countries to compare",
+      "addUsaStatePlaceholder": "Select a state",
+      "addCountryPlaceholder": "Select a country",
+      "manualUsaEmpty": "Select states you want to compare.",
+      "manualCountriesEmpty": "Select countries you want to compare.",
       "usaCompareTitle": "Compare USA states",
       "loadingIndices": "Loading indices…",
       "bestUsStateTitle": "Best US state for your profile",
