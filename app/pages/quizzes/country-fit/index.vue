@@ -1,9 +1,10 @@
 <script setup lang="ts">
 import PageHeader from "~/components/common/PageHeader.vue";
-import { countryFitQuiz } from "~/utils/quizzes/country/countryFit";
-import { matchCountries, type UserProfile } from "~/composables/useCountryQuizEngine";
+import {countryFitQuiz} from "~/utils/quizzes/country/countryFit";
+import {matchCountries, type UserProfile} from "~/composables/useCountryQuizEngine";
 import {usRegions} from "~/utils/quizzes/country/usStates";
 import {countries} from "~/utils/quizzes/country/countries";
+import CountryFitCard from "~/components/quizzes/CountryFitCard.vue";
 
 type IndicesNormalized = {
   income: number | null;
@@ -27,13 +28,10 @@ type IndicesBundle = {
 
 type BundlesResponse = { items: IndicesBundle[] };
 
-const { t } = useI18n();
+const {t} = useI18n();
 const route = useRoute();
 const router = useRouter();
 
-// --------------------
-// URL helpers
-// --------------------
 function encodeProfileToParam(profile: any) {
   const json = JSON.stringify(profile);
   return btoa(unescape(encodeURIComponent(json)))
@@ -59,9 +57,6 @@ function toCsvParam(list: string[]) {
   return Array.from(new Set(list.map(x => x.trim()).filter(Boolean))).join(",");
 }
 
-// --------------------
-// State from query
-// --------------------
 const selectedUSAStates = ref<string[]>([]);
 const selectedCountries = ref<string[]>([]);
 const LS_KEYS = {
@@ -96,9 +91,6 @@ watch(() => route.query.selectedCountries, (v) => {
   const list = parseCsvParam(v);
   if (list.length) selectedCountries.value = list;
 });
-// --------------------
-// Main state
-// --------------------
 useSeoMeta({
   title: () => t("seo.pages.countryFit.title"),
   description: () => t("seo.pages.countryFit.description"),
@@ -107,10 +99,10 @@ useSeoMeta({
 const answers = ref<Record<string, string>>({});
 
 const user = ref<UserProfile>({
-  job: { type: "remote" },
-  languages: { ru: "native", en: "intermediate" },
-  family: { status: "single", kidsCount: 0 },
-  budget: { monthlyUSD: 2500, includesRent: true },
+  job: {type: "remote"},
+  languages: {ru: "native", en: "intermediate"},
+  family: {status: "single", kidsCount: 0},
+  budget: {monthlyUSD: 2500, includesRent: true},
 });
 
 const appliedFromUrl = ref(false);
@@ -131,11 +123,10 @@ onMounted(() => {
     return;
   }
 
-  // если URL пустой — берём из LS
   const savedUser = lsGet<UserProfile | null>(LS_KEYS.user, null);
   if (savedUser) user.value = savedUser;
 
-  const savedAnswers = lsGet<Record<string,string> | null>(LS_KEYS.answers, null);
+  const savedAnswers = lsGet<Record<string, string> | null>(LS_KEYS.answers, null);
   if (savedAnswers) answers.value = savedAnswers;
 
   appliedFromUrl.value = true;
@@ -145,6 +136,7 @@ onMounted(() => {
 // Update query (throttled)
 // --------------------
 let qTimer: any = null;
+
 function scheduleQueryUpdate() {
   if (!appliedFromUrl.value) return;
   clearTimeout(qTimer);
@@ -154,17 +146,17 @@ function scheduleQueryUpdate() {
         ...route.query,
         selectedUSAStates: toCsvParam(selectedUSAStates.value) || undefined,
         selectedCountries: toCsvParam(selectedCountries.value) || undefined,
-        profile: encodeProfileToParam({ user: user.value, answers: answers.value }),
+        profile: encodeProfileToParam({user: user.value, answers: answers.value}),
       },
     });
   }, 250);
 }
 
-watch(user, scheduleQueryUpdate, { deep: true });
-watch(answers, scheduleQueryUpdate, { deep: true });
-watch(answers, (v) => lsSet(LS_KEYS.answers, v), { deep: true });
-watch(selectedUSAStates, scheduleQueryUpdate, { deep: true });
-watch(selectedCountries, scheduleQueryUpdate, { deep: true });
+watch(user, scheduleQueryUpdate, {deep: true});
+watch(answers, scheduleQueryUpdate, {deep: true});
+watch(answers, (v) => lsSet(LS_KEYS.answers, v), {deep: true});
+watch(selectedUSAStates, scheduleQueryUpdate, {deep: true});
+watch(selectedCountries, scheduleQueryUpdate, {deep: true});
 
 // --------------------
 // Indices cache
@@ -178,7 +170,7 @@ const pending = new Set<string>();
 async function fetchBundles(keys: string[]) {
   const res = await $fetch<BundlesResponse>("/api/indices/bundles", {
     method: "POST",
-    body: { keys, includeRaw: false },
+    body: {keys, includeRaw: false},
   });
 
   for (const b of res.items ?? []) {
@@ -227,37 +219,10 @@ const resultsAll = computed(() =>
 );
 
 const usaGroup = computed(() => resultsAll.value.find((g) => g.base.key === "countries.usa"));
-
-const bestUsState = computed(() => {
-  const variants = usaGroup.value?.variants ?? [];
-  return variants.length ? variants[0] : null;
-});
-
 const filteredResults = computed(() => results.value.filter((g) => g.base.key !== "countries.usa"));
-
-// --- pick 6 states: top6 + pinned from URL ---
 const topUsaStates = computed(() => (usaGroup.value?.variants ?? []).slice(0, 4));
+const usaStatesForCompare = computed(() => topUsaStates.value);
 
-const pinnedUsaStates = computed(() => {
-  const all = usaGroup.value?.variants ?? [];
-  const map = new Map(all.map(v => [stateCodeFromKey(v.key), v]));
-  return selectedUSAStates.value.map(code => map.get(code)).filter(Boolean) as any[];
-});
-
-const usaStatesForCompare = computed(() => {
-  const out: any[] = [];
-  const seen = new Set<string>();
-
-  for (const r of pinnedUsaStates.value) {
-    if (!seen.has(r.key)) { out.push(r); seen.add(r.key); }
-  }
-  for (const r of topUsaStates.value) {
-    if (!seen.has(r.key)) { out.push(r); seen.add(r.key); }
-  }
-  return out.slice(0, 4);
-});
-
-// ensure indices for visible cards + usa compare list
 watchEffect(() => {
   const keys: string[] = [];
 
@@ -266,20 +231,14 @@ watchEffect(() => {
     if (g.city) keys.push(g.city.key);
   }
 
-  if (bestUsState.value?.key) keys.push(bestUsState.value.key);
-
   for (const s of usaStatesForCompare.value) keys.push(s.key);
 
-  // pinned countries (если ты хочешь их принудительно догружать для сравнения)
+  for (const k of selectedUSAStates.value) keys.push(k);
+
   for (const k of selectedCountries.value) keys.push(k);
 
   ensureIndices(keys);
 });
-
-function stateCodeFromKey(key: string) {
-  const p = String(key).split(".");
-  return p[0] === "countries" && p[1] === "usa" ? (p[2] ?? "") : "";
-}
 
 // --------------------
 // UI helpers
@@ -298,7 +257,8 @@ function lsGet<T>(key: string, fallback: T): T {
 function lsSet(key: string, value: any) {
   try {
     localStorage.setItem(key, JSON.stringify(value));
-  } catch {}
+  } catch {
+  }
 }
 
 function fmt100(v: number | null | undefined) {
@@ -337,21 +297,22 @@ function addUsaStateToCompare() {
   const code = String(addUsaState.value || "").toLowerCase().trim();
   if (!code) return;
 
+  const key = `countries.usa.${code}`;
+
   const set = new Set(selectedUSAStates.value);
-  set.add(code);
+  set.add(key);
   selectedUSAStates.value = Array.from(set);
 
   addUsaState.value = "";
 }
 
-function removeUsaState(code: string) {
-  const c = String(code || "").toLowerCase().trim();
+function removeUsaState(key: string) {
+  const k = String(key || "").trim();
   const set = new Set(selectedUSAStates.value);
-  set.delete(c);
+  set.delete(k);
   selectedUSAStates.value = Array.from(set);
 }
 
-// добавить страну (ключ "countries.romania")
 function addCountryToCompare() {
   const key = String(addCountry.value || "").trim();
   if (!key) return;
@@ -369,9 +330,9 @@ function removeCountry(key: string) {
   selectedCountries.value = Array.from(set);
 }
 
-watch(selectedUSAStates, (v) => lsSet(LS_KEYS.selectedUSAStates, v), { deep: true });
-watch(selectedCountries, (v) => lsSet(LS_KEYS.selectedCountries, v), { deep: true });
-watch(user, (v) => lsSet(LS_KEYS.user, v), { deep: true });
+watch(selectedUSAStates, (v) => lsSet(LS_KEYS.selectedUSAStates, v), {deep: true});
+watch(selectedCountries, (v) => lsSet(LS_KEYS.selectedCountries, v), {deep: true});
+watch(user, (v) => lsSet(LS_KEYS.user, v), {deep: true});
 </script>
 
 <template>
@@ -530,488 +491,115 @@ watch(user, (v) => lsSet(LS_KEYS.user, v), { deep: true });
           {{ t("quizzes.countryFit.loadingIndices") }}
         </div>
       </div>
+
+      <!-- Compare block -->
       <div class="p-4 rounded-xl border border-[var(--ui-border)] mb-8 bg-[rgba(255,255,255,0.03)]">
-        <div class="font-black mb-3">{{ t("quizzes.countryFit.compareTitle") || "Сравнение" }}</div>
+        <div class="font-black mb-3">
+          {{ t("quizzes.countryFit.compareTitle") }}
+        </div>
 
-        <!-- Compare block -->
-        <div class="p-4 rounded-xl border border-[var(--ui-border)] mb-8 bg-[rgba(255,255,255,0.03)]">
-          <div class="font-black mb-3">
-            {{ t("quizzes.countryFit.compareTitle") || "Сравнение" }}
+        <!-- USA: add + selected cards -->
+        <div class="mb-8">
+          <div class="font-black text-lg mb-3 flex items-center gap-2">
+            <Icon name="i-lucide-flag" class="i-icon"/>
+            {{ t("quizzes.countryFit.manualUsaCompareTitle") }}
           </div>
 
-          <!-- USA: add + selected cards -->
-          <div class="mb-8">
-            <div class="font-black text-lg mb-3 flex items-center gap-2">
-              <Icon name="i-lucide-flag" class="i-icon" />
-              {{ t("quizzes.countryFit.manualUsaCompareTitle") || "Штаты для сравнения" }}
-            </div>
-
-            <!-- add USA state -->
-            <div class="flex flex-col md:flex-row gap-2">
-              <u-select
-                  v-model="addUsaState"
-                  :items="usaStateItems"
-                  :placeholder="t('quizzes.countryFit.addUsaStatePlaceholder') || 'Выбери штат'"
-              />
-              <u-button :disabled="!addUsaState" @click="addUsaStateToCompare">
-                {{ t("common.add") || "Добавить" }}
-              </u-button>
-            </div>
-
-            <!-- selected USA states cards -->
-            <div v-if="selectedUSAStates.length" class="mt-4 grid grid-cols-1 md:grid-cols-2 gap-3">
-              <div
-                  v-for="s in (usaGroup?.variants ?? []).filter(v => selectedUSAStates.includes(stateCodeFromKey(v.key)))"
-                  :key="s.key"
-                  class="p-4 rounded-xl border border-[var(--ui-border)] bg-[rgba(255,255,255,0.03)] result-card"
-              >
-                <div class="flex items-start justify-between gap-3">
-                  <div class="font-black">
-                    {{ t(s.titleKey, s.fallbackName) || s.fallbackName }}
-                  </div>
-
-                  <button
-                      type="button"
-                      class="chip"
-                      @click="removeUsaState(stateCodeFromKey(s.key))"
-                  >
-                    <Icon name="i-lucide-x" class="i-icon" />
-                    {{ t("common.remove") || "Убрать" }}
-                  </button>
-                </div>
-
-                <div class="text-muted mt-2">
-                  ~${{ Math.round(s.estimatedMonthlyUSD).toLocaleString("en-US") }} / month
-                </div>
-
-                <div class="ratings mt-3">
-                  <div class="rating">
-                    <div class="rating__label">{{ t("quizzes.countryFit.rating.match") }}</div>
-                    <div class="rating__val">{{ fmt100(s.match100) }}</div>
-                  </div>
-                  <div class="rating">
-                    <div class="rating__label">{{ t("quizzes.countryFit.rating.live") }}</div>
-                    <div class="rating__val">{{ fmt100(s.live100) }}</div>
-                  </div>
-                </div>
-
-                <div v-if="hasAnyIndex(indicesMap[s.key])" class="indices mt-3">
-                  <button type="button" class="indices__trigger" :aria-label="t('quizzes.countryFit.indices.aria')">
-                    <Icon name="i-lucide-info" class="i-icon" />
-                    {{ t("quizzes.countryFit.indices.title") }}
-                  </button>
-
-                  <div class="indices__panel" role="tooltip">
-                    <div class="indices__title">{{ t("quizzes.countryFit.indices.title") }}</div>
-
-                    <div class="indices__row" v-if="indicesMap[s.key]?.normalized.income != null">
-                      <span class="indices__k"><Icon name="i-lucide-dollar-sign" class="i-icon" />{{ t("quizzes.countryFit.indices.income") }}</span>
-                      <span class="indices__val">{{ indicesMap[s.key]!.normalized.income!.toFixed(1) }}/10</span>
-                    </div>
-
-                    <div class="indices__row" v-if="indicesMap[s.key]?.normalized.education != null">
-                      <span class="indices__k"><Icon name="i-lucide-graduation-cap" class="i-icon" />{{ t("quizzes.countryFit.indices.education") }}</span>
-                      <span class="indices__val">{{ indicesMap[s.key]!.normalized.education!.toFixed(1) }}/10</span>
-                    </div>
-
-                    <div class="indices__row" v-if="indicesMap[s.key]?.normalized.qualityOfLife != null">
-                      <span class="indices__k"><Icon name="i-lucide-sparkles" class="i-icon" />{{ t("quizzes.countryFit.indices.quality") }}</span>
-                      <span class="indices__val">{{ indicesMap[s.key]!.normalized.qualityOfLife!.toFixed(1) }}/10</span>
-                    </div>
-
-                    <div class="indices__row" v-if="indicesMap[s.key]?.normalized.safety != null">
-                      <span class="indices__k"><Icon name="i-lucide-shield" class="i-icon" />{{ t("quizzes.countryFit.indices.safety") }}</span>
-                      <span class="indices__val">{{ indicesMap[s.key]!.normalized.safety!.toFixed(1) }}/10</span>
-                    </div>
-
-                    <div class="indices__meta text-muted" v-if="indicesMap[s.key]?.updatedAtISO">
-                      {{ t("quizzes.countryFit.indices.updated") }}: {{ indicesMap[s.key]!.updatedAtISO.slice(0, 10) }}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div v-else class="text-muted mt-3">
-              {{ t("quizzes.countryFit.manualUsaEmpty") || "Выбери штаты, которые хочешь сравнить." }}
-            </div>
+          <!-- add USA state -->
+          <div class="flex flex-col md:flex-row gap-2">
+            <u-select
+                v-model="addUsaState"
+                :items="usaStateItems"
+                :placeholder="t('quizzes.countryFit.addUsaStatePlaceholder')"
+            />
+            <u-button :disabled="!addUsaState" @click="addUsaStateToCompare">
+              {{ t("common.add") }}
+            </u-button>
           </div>
 
-          <!-- Countries: add + selected cards -->
-          <div>
-            <div class="font-black text-lg mb-3 flex items-center gap-2">
-              <Icon name="i-lucide-globe" class="i-icon" />
-              {{ t("quizzes.countryFit.manualCountriesCompareTitle") || "Страны для сравнения" }}
-            </div>
+          <div v-if="selectedUSAStates.length" class="mt-4 grid grid-cols-1 md:grid-cols-2 gap-3">
+            <country-fit-card
+                v-for="s in (usaGroup?.variants ?? []).filter(v => selectedUSAStates.includes(v.key))"
+                :key="s.key"
+                :item="s"
+                :indices="indicesMap[s.key]"
+                :removable="true"
+                @remove="removeUsaState"
+            />
+          </div>
 
-            <!-- add country -->
-            <div class="flex flex-col md:flex-row gap-2">
-              <u-select
-                  v-model="addCountry"
-                  :items="countryItems"
-                  :placeholder="t('quizzes.countryFit.addCountryPlaceholder') || 'Выбери страну'"
-              />
-              <u-button :disabled="!addCountry" @click="addCountryToCompare">
-                {{ t("common.add") || "Добавить" }}
-              </u-button>
-            </div>
+          <div v-else class="text-muted mt-3">
+            {{ t("quizzes.countryFit.manualUsaEmpty") }}
+          </div>
+        </div>
 
-            <!-- selected countries cards -->
-            <div v-if="selectedCountries.length" class="mt-4 grid grid-cols-1 md:grid-cols-2 gap-3">
-              <div
-                  v-for="c in selectedCountries
-          .map(k => resultsAll.find(g => g.base.key === k)?.base)
-          .filter(Boolean)"
-                  :key="c!.key"
-                  class="p-4 rounded-xl border border-[var(--ui-border)] bg-[rgba(255,255,255,0.03)] result-card"
-              >
-                <div class="flex items-start justify-between gap-3">
-                  <div class="font-black">
-                    {{ t(c!.titleKey, c!.fallbackName) || c!.fallbackName }}
-                  </div>
+        <!-- Countries: add + selected cards -->
+        <div>
+          <div class="font-black text-lg mb-3 flex items-center gap-2">
+            <Icon name="i-lucide-globe" class="i-icon"/>
+            {{ t("quizzes.countryFit.manualCountriesCompareTitle") }}
+          </div>
 
-                  <button type="button" class="chip" @click="removeCountry(c!.key)">
-                    <Icon name="i-lucide-x" class="i-icon" />
-                    {{ t("common.remove") || "Убрать" }}
-                  </button>
-                </div>
+          <!-- add country -->
+          <div class="flex flex-col md:flex-row gap-2">
+            <u-select
+                v-model="addCountry"
+                :items="countryItems"
+                :placeholder="t('quizzes.countryFit.addCountryPlaceholder') || 'Выбери страну'"
+            />
+            <u-button :disabled="!addCountry" @click="addCountryToCompare">
+              {{ t("common.add") }}
+            </u-button>
+          </div>
 
-                <div class="text-muted mt-2">
-                  ~${{ Math.round(c!.estimatedMonthlyUSD).toLocaleString("en-US") }} / month
-                </div>
+          <div v-if="selectedCountries.length" class="mt-4 grid grid-cols-1 md:grid-cols-2 gap-3">
+            <country-fit-card
+                v-for="c in selectedCountries.map(k => resultsAll.find(g => g.base.key === k)?.base).filter(Boolean)"
+                :key="c!.key"
+                :item="c!"
+                :indices="indicesMap[c!.key]"
+                :removable="true"
+                :showWhy="true"
+                @remove="removeCountry"
+            />
+          </div>
 
-                <div class="text-muted mt-2" v-if="c!.why?.length">
-                  • {{ c!.why.join(" • ") }}
-                </div>
-
-                <div class="ratings mt-3">
-                  <div class="rating">
-                    <div class="rating__label">{{ t("quizzes.countryFit.rating.match") }}</div>
-                    <div class="rating__val">{{ fmt100(c!.match100) }}</div>
-                  </div>
-                  <div class="rating">
-                    <div class="rating__label">{{ t("quizzes.countryFit.rating.live") }}</div>
-                    <div class="rating__val">{{ fmt100(c!.live100) }}</div>
-                  </div>
-                </div>
-
-                <div v-if="hasAnyIndex(indicesMap[c!.key])" class="indices mt-3">
-                  <button type="button" class="indices__trigger" :aria-label="t('quizzes.countryFit.indices.aria')">
-                    <Icon name="i-lucide-info" class="i-icon" />
-                    {{ t("quizzes.countryFit.indices.title") }}
-                  </button>
-
-                  <div class="indices__panel" role="tooltip">
-                    <div class="indices__title">{{ t("quizzes.countryFit.indices.title") }}</div>
-
-                    <div class="indices__row" v-if="indicesMap[c!.key]?.normalized.income != null">
-                      <span class="indices__k"><Icon name="i-lucide-dollar-sign" class="i-icon" />{{ t("quizzes.countryFit.indices.income") }}</span>
-                      <span class="indices__val">{{ indicesMap[c!.key]!.normalized.income!.toFixed(1) }}/10</span>
-                    </div>
-
-                    <div class="indices__row" v-if="indicesMap[c!.key]?.normalized.education != null">
-                      <span class="indices__k"><Icon name="i-lucide-graduation-cap" class="i-icon" />{{ t("quizzes.countryFit.indices.education") }}</span>
-                      <span class="indices__val">{{ indicesMap[c!.key]!.normalized.education!.toFixed(1) }}/10</span>
-                    </div>
-
-                    <div class="indices__row" v-if="indicesMap[c!.key]?.normalized.qualityOfLife != null">
-                      <span class="indices__k"><Icon name="i-lucide-sparkles" class="i-icon" />{{ t("quizzes.countryFit.indices.quality") }}</span>
-                      <span class="indices__val">{{ indicesMap[c!.key]!.normalized.qualityOfLife!.toFixed(1) }}/10</span>
-                    </div>
-
-                    <div class="indices__row" v-if="indicesMap[c!.key]?.normalized.safety != null">
-                      <span class="indices__k"><Icon name="i-lucide-shield" class="i-icon" />{{ t("quizzes.countryFit.indices.safety") }}</span>
-                      <span class="indices__val">{{ indicesMap[c!.key]!.normalized.safety!.toFixed(1) }}/10</span>
-                    </div>
-
-                    <div class="indices__meta text-muted" v-if="indicesMap[c!.key]?.updatedAtISO">
-                      {{ t("quizzes.countryFit.indices.updated") }}: {{ indicesMap[c!.key]!.updatedAtISO.slice(0, 10) }}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div v-else class="text-muted mt-3">
-              {{ t("quizzes.countryFit.manualCountriesEmpty") }}
-            </div>
+          <div v-else class="text-muted mt-3">
+            {{ t("quizzes.countryFit.manualCountriesEmpty") }}
           </div>
         </div>
       </div>
 
-      <!-- Best US state -->
-      <div
-          v-if="bestUsState"
-          class="mb-6 p-4 rounded-xl border border-[var(--ui-border)] bg-[rgba(255,255,255,0.04)] result-card"
-      >
-        <div class="flex items-center justify-between gap-3">
-          <div class="font-black text-lg flex items-center gap-2">
-            <Icon name="i-lucide-flag" class="i-icon" />
-            {{ t("quizzes.countryFit.bestUsStateTitle") }}
-          </div>
-          <div class="text-xs text-muted">{{ t("quizzes.countryFit.bestUsStateHint") }}</div>
-        </div>
-
-        <div class="mt-3 rounded-xl border border-[var(--ui-border)] bg-[rgba(255,255,255,0.02)] p-3">
-          <div class="flex items-start justify-between gap-3">
-            <div>
-              <div class="font-black">
-                {{ t(bestUsState.titleKey, bestUsState.fallbackName) || bestUsState.fallbackName }}
-              </div>
-
-              <div class="text-muted mt-2">
-                ~${{ Math.round(bestUsState.estimatedMonthlyUSD).toLocaleString("en-US") }} / month
-              </div>
-
-              <div class="text-muted mt-2" v-if="bestUsState.why.length">
-                • {{ bestUsState.why.join(" • ") }}
-              </div>
-            </div>
-
-            <div class="ratings">
-              <div class="rating">
-                <div class="rating__label">{{ t("quizzes.countryFit.rating.match") }}</div>
-                <div class="rating__val">{{ fmt100(bestUsState.match100) }}</div>
-              </div>
-              <div class="rating">
-                <div class="rating__label">{{ t("quizzes.countryFit.rating.live") }}</div>
-                <div class="rating__val">{{ fmt100(bestUsState.live100) }}</div>
-              </div>
-            </div>
-          </div>
-
-          <div v-if="hasAnyIndex(indicesMap[bestUsState.key])" class="indices mt-3">
-            <button type="button" class="indices__trigger" :aria-label="t('quizzes.countryFit.indices.aria')">
-              <Icon name="i-lucide-info" class="i-icon" />
-              {{ t("quizzes.countryFit.indices.title") }}
-            </button>
-
-            <div class="indices__panel" role="tooltip">
-              <div class="indices__title">{{ t("quizzes.countryFit.indices.title") }}</div>
-
-              <div class="indices__row" v-if="indicesMap[bestUsState.key]?.normalized.income != null">
-                <span class="indices__k">
-                  <Icon name="i-lucide-dollar-sign" class="i-icon" />
-                  {{ t("quizzes.countryFit.indices.income") }}
-                </span>
-                <span class="indices__val">{{ indicesMap[bestUsState.key]!.normalized.income!.toFixed(1) }}/10</span>
-              </div>
-
-              <div class="indices__row" v-if="indicesMap[bestUsState.key]?.normalized.education != null">
-                <span class="indices__k">
-                  <Icon name="i-lucide-graduation-cap" class="i-icon" />
-                  {{ t("quizzes.countryFit.indices.education") }}
-                </span>
-                <span class="indices__val">{{ indicesMap[bestUsState.key]!.normalized.education!.toFixed(1) }}/10</span>
-              </div>
-
-              <div class="indices__row" v-if="indicesMap[bestUsState.key]?.normalized.qualityOfLife != null">
-                <span class="indices__k">
-                  <Icon name="i-lucide-sparkles" class="i-icon" />
-                  {{ t("quizzes.countryFit.indices.quality") }}
-                </span>
-                <span class="indices__val">{{ indicesMap[bestUsState.key]!.normalized.qualityOfLife!.toFixed(1) }}/10</span>
-              </div>
-
-              <div class="indices__row" v-if="indicesMap[bestUsState.key]?.normalized.safety != null">
-                <span class="indices__k">
-                  <Icon name="i-lucide-shield" class="i-icon" />
-                  {{ t("quizzes.countryFit.indices.safety") }}
-                </span>
-                <span class="indices__val">{{ indicesMap[bestUsState.key]!.normalized.safety!.toFixed(1) }}/10</span>
-              </div>
-
-              <div class="indices__meta text-muted" v-if="indicesMap[bestUsState.key]?.updatedAtISO">
-                {{ t("quizzes.countryFit.indices.updated") }}:
-                {{ indicesMap[bestUsState.key]!.updatedAtISO.slice(0, 10) }}
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-      <!-- Compare 6 USA states -->
       <div v-if="usaStatesForCompare.length" class="mb-6">
         <div class="font-black text-lg mb-3 flex items-center gap-2">
-          <Icon name="i-lucide-flag" class="i-icon" />
+          <Icon name="i-lucide-flag" class="i-icon"/>
           {{ t("quizzes.countryFit.usaCompareTitle") }}
         </div>
 
         <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
-          <div
+          <country-fit-card
               v-for="s in usaStatesForCompare"
               :key="s.key"
-              class="p-4 rounded-xl border border-[var(--ui-border)] bg-[rgba(255,255,255,0.03)] result-card"
-          >
-            <div class="flex items-start justify-between gap-3">
-              <div class="font-black">
-                {{ t(s.titleKey, s.fallbackName) || s.fallbackName }}
-              </div>
-            </div>
-
-            <div class="text-muted mt-2">
-              ~${{ Math.round(s.estimatedMonthlyUSD).toLocaleString("en-US") }} / month
-            </div>
-
-            <div class="ratings mt-3">
-              <div class="rating">
-                <div class="rating__label">{{ t("quizzes.countryFit.rating.match") }}</div>
-                <div class="rating__val">{{ fmt100(s.match100) }}</div>
-              </div>
-              <div class="rating">
-                <div class="rating__label">{{ t("quizzes.countryFit.rating.live") }}</div>
-                <div class="rating__val">{{ fmt100(s.live100) }}</div>
-              </div>
-            </div>
-
-            <div v-if="hasAnyIndex(indicesMap[s.key])" class="indices mt-3">
-              <button type="button" class="indices__trigger" :aria-label="t('quizzes.countryFit.indices.aria')">
-                <Icon name="i-lucide-info" class="i-icon" />
-                {{ t("quizzes.countryFit.indices.title") }}
-              </button>
-
-              <div class="indices__panel" role="tooltip">
-                <div class="indices__title">{{ t("quizzes.countryFit.indices.title") }}</div>
-
-                <div class="indices__row" v-if="indicesMap[s.key]?.normalized.income != null">
-                  <span class="indices__k"><Icon name="i-lucide-dollar-sign" class="i-icon" />{{ t("quizzes.countryFit.indices.income") }}</span>
-                  <span class="indices__val">{{ indicesMap[s.key]!.normalized.income!.toFixed(1) }}/10</span>
-                </div>
-
-                <div class="indices__row" v-if="indicesMap[s.key]?.normalized.education != null">
-                  <span class="indices__k"><Icon name="i-lucide-graduation-cap" class="i-icon" />{{ t("quizzes.countryFit.indices.education") }}</span>
-                  <span class="indices__val">{{ indicesMap[s.key]!.normalized.education!.toFixed(1) }}/10</span>
-                </div>
-
-                <div class="indices__row" v-if="indicesMap[s.key]?.normalized.qualityOfLife != null">
-                  <span class="indices__k"><Icon name="i-lucide-sparkles" class="i-icon" />{{ t("quizzes.countryFit.indices.quality") }}</span>
-                  <span class="indices__val">{{ indicesMap[s.key]!.normalized.qualityOfLife!.toFixed(1) }}/10</span>
-                </div>
-
-                <div class="indices__row" v-if="indicesMap[s.key]?.normalized.safety != null">
-                  <span class="indices__k"><Icon name="i-lucide-shield" class="i-icon" />{{ t("quizzes.countryFit.indices.safety") }}</span>
-                  <span class="indices__val">{{ indicesMap[s.key]!.normalized.safety!.toFixed(1) }}/10</span>
-                </div>
-
-                <div class="indices__row" v-if="indicesMap[s.key]?.normalized.internet != null">
-                  <span class="indices__k"><Icon name="i-lucide-wifi" class="i-icon" />{{ t("quizzes.countryFit.indices.internet") }}</span>
-                  <span class="indices__val">{{ indicesMap[s.key]!.normalized.internet!.toFixed(1) }}/10</span>
-                </div>
-
-                <div class="indices__row" v-if="indicesMap[s.key]?.normalized.unemployment != null">
-                  <span class="indices__k"><Icon name="i-lucide-briefcase" class="i-icon" />{{ t("quizzes.countryFit.indices.unemployment") }}</span>
-                  <span class="indices__val">{{ indicesMap[s.key]!.normalized.unemployment!.toFixed(1) }}/10</span>
-                </div>
-
-                <div class="indices__row" v-if="indicesMap[s.key]?.normalized.air != null">
-                  <span class="indices__k"><Icon name="i-lucide-wind" class="i-icon" />{{ t("quizzes.countryFit.indices.air") }}</span>
-                  <span class="indices__val">{{ indicesMap[s.key]!.normalized.air!.toFixed(1) }}/10</span>
-                </div>
-
-                <div class="indices__row" v-if="indicesMap[s.key]?.normalized.inequality != null">
-                  <span class="indices__k"><Icon name="i-lucide-scale" class="i-icon" />{{ t("quizzes.countryFit.indices.inequality") }}</span>
-                  <span class="indices__val">{{ indicesMap[s.key]!.normalized.inequality!.toFixed(1) }}/10</span>
-                </div>
-
-                <div class="indices__row" v-if="indicesMap[s.key]?.normalized.health != null">
-                  <span class="indices__k"><Icon name="i-lucide-heart-pulse" class="i-icon" />{{ t("quizzes.countryFit.indices.health") }}</span>
-                  <span class="indices__val">{{ indicesMap[s.key]!.normalized.health!.toFixed(1) }}/10</span>
-                </div>
-
-                <div class="indices__meta text-muted" v-if="indicesMap[s.key]?.updatedAtISO">
-                  {{ t("quizzes.countryFit.indices.updated") }}: {{ indicesMap[s.key]!.updatedAtISO.slice(0, 10) }}
-                </div>
-              </div>
-            </div>
-          </div>
+              :item="s"
+              :indices="indicesMap[s.key]"
+              :show-ratings="true"
+              :show-why="false"
+              :removable="false"
+          />
         </div>
       </div>
 
       <!-- Countries -->
       <div v-if="filteredResults.length" class="grid grid-cols-1 md:grid-cols-2 gap-3">
-        <div
+        <country-fit-card
             v-for="g in filteredResults"
             :key="g.base.key"
-            class="p-4 rounded-xl border border-[var(--ui-border)] bg-[rgba(255,255,255,0.03)] result-card"
-        >
-          <div class="flex items-start justify-between gap-3">
-            <div class="font-black">
-              {{ t(g.base.titleKey, g.base.fallbackName) || g.base.fallbackName }}
-            </div>
-
-            <div class="ratings">
-              <div class="rating">
-                <div class="rating__label">{{ t("quizzes.countryFit.rating.match") }}</div>
-                <div class="rating__val">{{ fmt100(g.base.match100) }}</div>
-              </div>
-              <div class="rating">
-                <div class="rating__label">{{ t("quizzes.countryFit.rating.live") }}</div>
-                <div class="rating__val">{{ fmt100(g.base.live100) }}</div>
-              </div>
-            </div>
-          </div>
-
-          <div class="mt-3 rounded-xl border border-[var(--ui-border)] bg-[rgba(255,255,255,0.02)] p-3">
-            <div class="font-black text-sm">
-              {{ t("quizzes.countryFit.medianBlockTitle") }}
-            </div>
-
-            <div class="text-muted mt-2">
-              ~${{ Math.round(g.base.estimatedMonthlyUSD).toLocaleString("en-US") }} / month
-            </div>
-
-            <div class="text-muted mt-2" v-if="g.base.why.length">
-              • {{ g.base.why.join(" • ") }}
-            </div>
-
-            <div v-if="hasAnyIndex(indicesMap[g.base.key])" class="indices mt-3">
-              <button type="button" class="indices__trigger" :aria-label="t('quizzes.countryFit.indices.aria')">
-                <Icon name="i-lucide-info" class="i-icon" />
-                {{ t("quizzes.countryFit.indices.title") }}
-              </button>
-
-              <div class="indices__panel" role="tooltip">
-                <div class="indices__title">{{ t("quizzes.countryFit.indices.title") }}</div>
-
-                <div class="indices__row" v-if="indicesMap[g.base.key]?.normalized.income != null">
-                  <span class="indices__k">
-                    <Icon name="i-lucide-dollar-sign" class="i-icon" />
-                    {{ t("quizzes.countryFit.indices.income") }}
-                  </span>
-                  <span class="indices__val">{{ indicesMap[g.base.key]!.normalized.income!.toFixed(1) }}/10</span>
-                </div>
-
-                <div class="indices__row" v-if="indicesMap[g.base.key]?.normalized.education != null">
-                  <span class="indices__k">
-                    <Icon name="i-lucide-graduation-cap" class="i-icon" />
-                    {{ t("quizzes.countryFit.indices.education") }}
-                  </span>
-                  <span class="indices__val">{{ indicesMap[g.base.key]!.normalized.education!.toFixed(1) }}/10</span>
-                </div>
-
-                <div class="indices__row" v-if="indicesMap[g.base.key]?.normalized.qualityOfLife != null">
-                  <span class="indices__k">
-                    <Icon name="i-lucide-sparkles" class="i-icon" />
-                    {{ t("quizzes.countryFit.indices.quality") }}
-                  </span>
-                  <span class="indices__val">{{ indicesMap[g.base.key]!.normalized.qualityOfLife!.toFixed(1) }}/10</span>
-                </div>
-
-                <div class="indices__row" v-if="indicesMap[g.base.key]?.normalized.safety != null">
-                  <span class="indices__k">
-                    <Icon name="i-lucide-shield" class="i-icon" />
-                    {{ t("quizzes.countryFit.indices.safety") }}
-                  </span>
-                  <span class="indices__val">{{ indicesMap[g.base.key]!.normalized.safety!.toFixed(1) }}/10</span>
-                </div>
-
-                <div class="indices__meta text-muted" v-if="indicesMap[g.base.key]?.updatedAtISO">
-                  {{ t("quizzes.countryFit.indices.updated") }}:
-                  {{ indicesMap[g.base.key]!.updatedAtISO.slice(0, 10) }}
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
+            :item="g.base"
+            :indices="indicesMap[g.base.key]"
+            :show-ratings="true"
+            :show-why="true"
+            :removable="false"
+        />
       </div>
 
       <div v-else class="text-muted">
@@ -1038,128 +626,8 @@ watch(user, (v) => lsSet(LS_KEYS.user, v), { deep: true });
   line-height: 1.25;
 }
 
-.result-card {
-  position: relative;
-}
-
-.ratings {
-  display: grid;
-  gap: 6px;
-  text-align: right;
-}
-
-.rating__label {
-  font-size: 11px;
-  color: rgba(255, 255, 255, 0.55);
-  line-height: 1;
-}
-
-.rating__val {
-  font-weight: 900;
-  font-size: 13px;
-  color: rgba(255, 255, 255, 0.92);
-  font-variant-numeric: tabular-nums;
-}
-
 .i-icon {
   width: 16px;
   height: 16px;
-}
-
-/* -------- Indices hover -------- */
-.indices {
-  position: relative;
-  display: inline-block;
-}
-
-.indices__trigger {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 12px;
-  padding: 6px 10px;
-  border-radius: 999px;
-  border: 1px solid var(--ui-border);
-  background: rgba(255, 255, 255, 0.03);
-  color: var(--ui-text-muted);
-  line-height: 1;
-  cursor: default;
-}
-
-.indices__trigger:focus-visible {
-  outline: 2px solid rgba(128, 90, 245, 0.55);
-  outline-offset: 2px;
-}
-
-.indices__panel {
-  position: absolute;
-  z-index: 70;
-  left: 0;
-  top: calc(100% + 10px);
-  width: 320px;
-
-  padding: 12px;
-  border-radius: 14px;
-  border: 1px solid var(--ui-border);
-  background: rgba(15, 15, 18, 0.92);
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
-
-  opacity: 0;
-  transform: translateY(-6px);
-  pointer-events: none;
-  transition: opacity 160ms ease, transform 160ms ease;
-}
-
-.indices:hover .indices__panel,
-.indices:focus-within .indices__panel {
-  opacity: 1;
-  transform: translateY(0);
-  pointer-events: auto;
-}
-
-.indices__title {
-  font-weight: 900;
-  margin-bottom: 8px;
-  font-size: 13px;
-  color: rgba(255, 255, 255, 0.92);
-}
-
-.indices__row {
-  display: flex;
-  justify-content: space-between;
-  gap: 10px;
-  padding: 6px 0;
-  font-size: 13px;
-  color: rgba(255, 255, 255, 0.92);
-}
-
-.indices__k {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.indices__val {
-  font-variant-numeric: tabular-nums;
-  font-weight: 900;
-}
-
-.indices__meta {
-  margin-top: 10px;
-  font-size: 12px;
-  line-height: 1.25;
-}
-
-.chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 12px;
-  padding: 6px 10px;
-  border-radius: 999px;
-  border: 1px solid var(--ui-border);
-  background: rgba(255, 255, 255, 0.03);
-  color: var(--ui-text-muted);
-  line-height: 1;
 }
 </style>

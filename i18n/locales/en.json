@@ -1,7 +1,7 @@
 {
   "common": {
-    "pin": "Pin",
-    "pinned": "Pinned"
+    "add": "Add",
+    "remove": "Remove"
   },
   "quizzes": {
     "headline": "Quizzes",

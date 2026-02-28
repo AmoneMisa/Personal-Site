@@ -1,7 +1,7 @@
 {
   "common": {
-    "pin": "Закрепить",
-    "pinned": "Закреплено"
+    "add": "Добавить",
+    "remove": "Убрать"
   },
   "quizzes": {
     "usaCompareTitle": "Сравнение штатов США",
