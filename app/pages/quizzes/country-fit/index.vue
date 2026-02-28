@@ -2,7 +2,6 @@
 import PageHeader from "~/components/common/PageHeader.vue";
 import {countryFitQuiz} from "~/utils/quizzes/country/countryFit";
 import {matchCountries, type UserProfile} from "~/composables/useCountryQuizEngine";
-import {usRegions} from "~/utils/quizzes/country/usStates";
 import {countries} from "~/utils/quizzes/country/countries";
 import CountryFitCard from "~/components/quizzes/CountryFitCard.vue";
 
@@ -11,7 +10,6 @@ type IndicesNormalized = {
   education: number | null;
   qualityOfLife: number | null;
   safety: number | null;
-
   internet?: number | null;
   unemployment?: number | null;
   air?: number | null;
@@ -199,17 +197,6 @@ async function ensureIndices(keys: string[]) {
   }
 }
 
-// --------------------
-// Results
-// --------------------
-const results = computed(() =>
-    matchCountries(countryFitQuiz, answers.value, user.value, indicesMap.value, 12, {
-      selectedUSAStates: selectedUSAStates.value,
-      selectedCountries: selectedCountries.value,
-      usaVariantsLimit: 6,
-    })
-);
-
 const resultsAll = computed(() =>
     matchCountries(countryFitQuiz, answers.value, user.value, indicesMap.value, 999, {
       selectedUSAStates: selectedUSAStates.value,
@@ -219,7 +206,16 @@ const resultsAll = computed(() =>
 );
 
 const usaGroup = computed(() => resultsAll.value.find((g) => g.base.key === "countries.usa"));
-const filteredResults = computed(() => results.value.filter((g) => g.base.key !== "countries.usa"));
+const results = computed(() =>
+    matchCountries(countryFitQuiz, answers.value, user.value, indicesMap.value, 12, {
+      selectedCountries: selectedCountries.value,
+      usaVariantsLimit: 6,
+    })
+);
+
+const filteredResults = computed(() =>
+    results.value.filter((g) => g.base.key !== "countries.usa").slice(0, 12)
+);
 const topUsaStates = computed(() => (usaGroup.value?.variants ?? []).slice(0, 4));
 const usaStatesForCompare = computed(() => topUsaStates.value);
 
@@ -261,22 +257,10 @@ function lsSet(key: string, value: any) {
   }
 }
 
-function fmt100(v: number | null | undefined) {
-  if (typeof v !== "number") return "—";
-  return `${Math.round(v)}/100`;
-}
-
-function hasAnyIndex(b: IndicesBundle | undefined) {
-  const n = b?.normalized;
-  if (!n) return false;
-  return [n.income, n.education, n.qualityOfLife, n.safety, n.internet, n.unemployment, n.air, n.inequality, n.health]
-      .some((x) => typeof x === "number");
-}
-
 const usaStateItems = computed(() =>
-    usRegions.map(r => ({
-      label: t(r.titleKey, r.fallbackName) || r.fallbackName,
-      value: r.code, // важно: code ("ny"), а не key
+    (usaGroup.value?.variants ?? []).map(v => ({
+      label: t(v.titleKey, v.fallbackName) || v.fallbackName,
+      value: v.key,
     }))
 );
 
@@ -294,10 +278,8 @@ const addUsaState = ref<string>("");
 const addCountry = ref<string>("");
 
 function addUsaStateToCompare() {
-  const code = String(addUsaState.value || "").toLowerCase().trim();
-  if (!code) return;
-
-  const key = `countries.usa.${code}`;
+  const key = String(addUsaState.value || "").trim();
+  if (!key) return;
 
   const set = new Set(selectedUSAStates.value);
   set.add(key);

@@ -1,7 +1,7 @@
-import type { AxisKey, QuizConfig, Effects } from "~/utils/quizzes/country/countryFit";
-import type { CountryEntity, Vector } from "~/utils/quizzes/country/countries";
-import { countries } from "~/utils/quizzes/country/countries";
-import type { CountryIndicesBundle } from "~/types/indices";
+import type {AxisKey, Effects, QuizConfig} from "~/utils/quizzes/country/countryFit";
+import type {CountryEntity, Vector} from "~/utils/quizzes/country/countries";
+import {countries} from "~/utils/quizzes/country/countries";
+import type {CountryIndicesBundle} from "~/types/indices";
 import {usStateVectorOverrides} from "~/composables/usStateVectorOverrides";
 
 export type LanguageLevel = "native" | "fluent" | "intermediate" | "basic" | "none";
@@ -37,20 +37,40 @@ export type MatchGroup = {
 };
 
 export type MatchOptions = {
-    selectedUSAStates?: string[];   // ["al","ca"] -> will pin countries.usa.al etc.
-    selectedCountries?: string[];   // ["countries.japan", ...] -> pin cards into output
-    usaVariantsLimit?: number;      // default 6
+    selectedUSAStates?: string[];
+    selectedCountries?: string[];
+    usaVariantsLimit?: number;
 };
+
+function normalizeUsStateKey(s: string) {
+    const v = String(s || "").trim().toLowerCase();
+    if (!v) return "";
+    if (v.startsWith("countries.usa.")) return v;
+    return `countries.usa.${v}`;
+}
+
+function pinUsStateKeys(selectedUSAStates?: string[]) {
+    const out = new Set<string>();
+    for (const s of selectedUSAStates ?? []) {
+        const key = normalizeUsStateKey(s);
+        if (key) out.add(key);
+    }
+    return out;
+}
 
 const clamp = (v: number, min: number, max: number) => Math.max(min, Math.min(max, v));
 
 const levelToNum = (lvl: LanguageLevel): 0 | 1 | 2 | 3 => {
     switch (lvl) {
-        case "none": return 0;
-        case "basic": return 1;
-        case "intermediate": return 2;
+        case "none":
+            return 0;
+        case "basic":
+            return 1;
+        case "intermediate":
+            return 2;
         case "fluent":
-        case "native": return 3;
+        case "native":
+            return 3;
     }
 };
 
@@ -107,7 +127,7 @@ function vectorDistance(preferences: Record<AxisKey, number>, v: Vector): { dist
         used++;
     }
 
-    return { distance: dist, used };
+    return {distance: dist, used};
 }
 
 function matchFromDistance(distance: number, used: number) {
@@ -140,7 +160,7 @@ function languagePenalty(user: UserProfile, entity: CountryEntity): { penalty: n
         notes.push("Русский встречается достаточно часто");
     }
 
-    return { penalty, notes };
+    return {penalty, notes};
 }
 
 function workPenalty(user: UserProfile, entity: CountryEntity): { penalty: number; notes: string[] } {
@@ -163,7 +183,7 @@ function workPenalty(user: UserProfile, entity: CountryEntity): { penalty: numbe
         }
     }
 
-    return { penalty, notes };
+    return {penalty, notes};
 }
 
 export function expandEntitiesWithRegions(list: CountryEntity[]): CountryEntity[] {
@@ -180,10 +200,10 @@ export function expandEntitiesWithRegions(list: CountryEntity[]): CountryEntity[
                     titleKey: r.titleKey,
                     fallbackName: r.fallbackName,
                     teleportSlug: r.teleportSlug ?? c.teleportSlug,
-                    vector: { ...c.vector, ...(r.override?.vector ?? {}), ...(usStateVectorOverrides[r.key] ?? {}) },
-                    languages: { ...c.languages, ...(r.override?.languages ?? {}) },
+                    vector: {...c.vector, ...(r.override?.vector ?? {}), ...(usStateVectorOverrides[r.key] ?? {})},
+                    languages: {...c.languages, ...(r.override?.languages ?? {})},
                     costUSD: r.override?.costUSD ? r.override.costUSD : c.costUSD,
-                    work: { ...c.work, ...(r.override?.work ?? {}) },
+                    work: {...c.work, ...(r.override?.work ?? {})},
                     regions: undefined,
                 };
                 expanded.push(merged);
@@ -215,22 +235,22 @@ function liveScore100(user: UserProfile, pref: Record<AxisKey, number>, indices?
 
     if (indices?.income != null) {
         const w = importance01(pref.income_growth_need);
-        if (w > 0) parts.push({ w, v: indices.income / 10 });
+        if (w > 0) parts.push({w, v: indices.income / 10});
     }
 
     if (indices?.qualityOfLife != null) {
         const w = importance01(pref.quality_high_need);
-        if (w > 0) parts.push({ w, v: indices.qualityOfLife / 10 });
+        if (w > 0) parts.push({w, v: indices.qualityOfLife / 10});
     }
 
     if (indices?.safety != null) {
         const w = importance01(pref.safety_need);
-        if (w > 0) parts.push({ w, v: indices.safety / 10 });
+        if (w > 0) parts.push({w, v: indices.safety / 10});
     }
 
     if (user.job.type === "remote" && indices?.internet != null) {
         // not preference-based (no axis), but job constraint-based.
-        parts.push({ w: 0.5, v: indices.internet / 10 });
+        parts.push({w: 0.5, v: indices.internet / 10});
     }
 
     if (!parts.length) return 50; // neutral if nothing known
@@ -248,22 +268,15 @@ function baseKeyForResult(key: string) {
     if (key.startsWith("countries.usa.")) return "countries.usa";
     return key;
 }
+
 function isCityKey(key: string) {
     return key.endsWith(".city");
 }
+
 function isUsStateVariantKey(key: string) {
     // countries.usa.xx (NOT .city)
     const parts = key.split(".");
     return parts.length === 3 && parts[0] === "countries" && parts[1] === "usa";
-}
-function pinUsStateKeys(selectedUSAStates?: string[]) {
-    const out = new Set<string>();
-    for (const s of selectedUSAStates ?? []) {
-        const code = String(s || "").toLowerCase().trim();
-        if (!code) continue;
-        out.add(`countries.usa.${code}`);
-    }
-    return out;
 }
 
 export function matchCountries(
@@ -287,12 +300,11 @@ export function matchCountries(
 
         if (user.budget.monthlyUSD < needed) continue;
 
-        const { distance, used } = vectorDistance(pref, e.vector);
+        const {distance, used} = vectorDistance(pref, e.vector);
         const match100 = matchFromDistance(distance, used);
 
-        // keep your base scoring logic (internal sort score):
         const base01 = used > 0 ? (1 / (1 + (distance / used))) : 0.2;
-        const sparsityPenalty = used < 12 ? 0.85 : 1;
+        const sparsityPenalty = used < quiz.axes.length ? 0.85 : 1;
 
         const lang = languagePenalty(user, e);
         const work = workPenalty(user, e);
@@ -302,12 +314,10 @@ export function matchCountries(
 
         let score = base01 * sparsityPenalty - (lang.penalty + work.penalty) * 0.05;
 
-        // live100 is separate and based on indices + importance
         const live100 = liveScore100(user, pref, indices);
 
         const why = [...lang.notes.slice(0, 2), ...work.notes.slice(0, 1)].filter(Boolean);
 
-        // small nudge so pinned countries appear even if not top by score
         if (selectedCountrySet.has(e.key)) score += 0.0001;
 
         temp.push({
@@ -323,17 +333,15 @@ export function matchCountries(
         });
     }
 
-    // ---- grouping ----
     const map = new Map<string, MatchGroup>();
 
     for (const r of temp) {
         const gk = baseKeyForResult(r.key);
         const existing = map.get(gk);
 
-        // USA group: base = countries.usa, variants = states
         if (gk === "countries.usa") {
             if (!existing) {
-                map.set(gk, { base: r.key === "countries.usa" ? r : { ...r, key: "countries.usa" }, variants: [] });
+                map.set(gk, {base: r.key === "countries.usa" ? r : {...r, key: "countries.usa"}, variants: []});
             }
             const g = map.get(gk)!;
 
@@ -349,7 +357,7 @@ export function matchCountries(
         }
 
         if (!existing) {
-            map.set(gk, isCityKey(r.key) ? { base: { ...r, key: gk }, city: r } : { base: r });
+            map.set(gk, isCityKey(r.key) ? {base: {...r, key: gk}, city: r} : {base: r});
             continue;
         }
 
