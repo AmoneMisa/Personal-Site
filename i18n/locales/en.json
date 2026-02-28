@@ -25,13 +25,20 @@
     },
     "countryFit": {
       "loadingIndices": "Loading indices…",
+      "bestUsStateTitle": "Best US state for your profile",
+      "bestUsStateHint": "Based on your answers and budget",
+      "rating": {
+        "match": "Preference match",
+        "live": "Living rating"
+      },
       "indices": {
-        "title": "Indices",
-        "updated": "Updated",
-        "income": "Income potential",
+        "aria": "Show country indices",
+        "title": "Country indices",
+        "income": "Income",
         "education": "Education",
         "quality": "Quality of life",
-        "safety": "Safety"
+        "safety": "Safety",
+        "updated": "Updated"
       },
       "title": "Which country suits you best?",
       "headline": "Personalized country recommendations",
