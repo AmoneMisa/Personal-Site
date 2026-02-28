@@ -73,7 +73,7 @@ function hasAnyIndex(b: IndicesBundle | undefined) {
           @click="emit('remove', item.key)"
       >
         <Icon name="i-lucide-x" class="i-icon" />
-        {{ removeText || t("common.remove") || "Remove" }}
+        {{ t("common.remove") }}
       </button>
     </div>
 

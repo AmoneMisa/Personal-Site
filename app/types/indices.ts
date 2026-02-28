@@ -28,10 +28,15 @@ export type CountryIndicesNormalized = {
     education?: number | null;
     qualityOfLife?: number | null;
     safety?: number | null;
-
     internet?: number | null;
     unemployment?: number | null;
     air?: number | null;
     inequality?: number | null;
     health?: number | null;
+    transportPublic?: number | null;
+    transportCar?: number | null;
+    remoteWork?: number | null;
+    commuteTime?: number | null;
+    societyInternational?: number | null;
+    langBarrier?: number | null;
 };

@@ -49,15 +49,6 @@ function normalizeUsStateKey(s: string) {
     return `countries.usa.${v}`;
 }
 
-function pinUsStateKeys(selectedUSAStates?: string[]) {
-    const out = new Set<string>();
-    for (const s of selectedUSAStates ?? []) {
-        const key = normalizeUsStateKey(s);
-        if (key) out.add(key);
-    }
-    return out;
-}
-
 const clamp = (v: number, min: number, max: number) => Math.max(min, Math.min(max, v));
 
 const levelToNum = (lvl: LanguageLevel): 0 | 1 | 2 | 3 => {
@@ -214,55 +205,118 @@ export function expandEntitiesWithRegions(list: CountryEntity[]): CountryEntity[
     return expanded;
 }
 
-// ---------------------
-// score helpers
-// ---------------------
 const to100 = (v01: number) => Math.round(clamp(v01, 0, 1) * 100);
 
-function importance01(prefVal: number | undefined) {
-    // pref is -30..30. We treat only positive as "important"
-    return clamp((prefVal ?? 0) / 30, 0, 1);
+function isValidIndex(v: unknown): v is number {
+    return typeof v === "number" && Number.isFinite(v) && v > 0 && v <= 10;
 }
 
-function liveScore100(user: UserProfile, pref: Record<AxisKey, number>, indices?: CountryIndicesBundle["normalized"]) {
-    // Base = average of available weighted indices
-    // We only use indices where we have a clear, non-invented mapping:
-    // income_growth_need -> income
-    // quality_high_need  -> qualityOfLife
-    // safety_need        -> safety
-    // remote job         -> internet
+function applySigned01(value01: number, sign: number) {
+    return sign >= 0 ? value01 : (1 - value01);
+}
+
+function addPart(
+    parts: Array<{ w: number; v: number }>,
+    prefVal: number | undefined,
+    value01: number | null | undefined,
+    weightMul = 1
+) {
+    if (value01 == null) return;
+
+    const w = importanceAbs01(prefVal) * weightMul;
+    if (w <= 0) return;
+
+    const sign = preferenceSign(prefVal);
+    if (!sign) return;
+
+    parts.push({w, v: applySigned01(value01, sign)});
+}
+
+function importanceAbs01(prefVal: number | undefined) {
+    return clamp(Math.abs(prefVal ?? 0) / 30, 0, 1);
+}
+
+function preferenceSign(prefVal: number | undefined) {
+    const v = prefVal ?? 0;
+    return v === 0 ? 0 : v > 0 ? 1 : -1;
+}
+
+function liveScore100(
+    user: UserProfile,
+    pref: Record<AxisKey, number>,
+    indices?: CountryIndicesBundle["normalized"]
+) {
     const parts: Array<{ w: number; v: number }> = [];
 
-    if (indices?.income != null) {
-        const w = importance01(pref.income_growth_need);
-        if (w > 0) parts.push({w, v: indices.income / 10});
+    if (isValidIndex(indices?.income)) {
+        addPart(parts, pref.income_growth_need, indices!.income / 10);
     }
 
-    if (indices?.qualityOfLife != null) {
-        const w = importance01(pref.quality_high_need);
-        if (w > 0) parts.push({w, v: indices.qualityOfLife / 10});
+    if (isValidIndex(indices?.qualityOfLife)) {
+        addPart(parts, pref.quality_high_need, indices!.qualityOfLife / 10);
     }
 
-    if (indices?.safety != null) {
-        const w = importance01(pref.safety_need);
-        if (w > 0) parts.push({w, v: indices.safety / 10});
+    if (isValidIndex(indices?.safety)) {
+        addPart(parts, pref.safety_need, indices!.safety / 10);
     }
 
-    if (user.job.type === "remote" && indices?.internet != null) {
-        // not preference-based (no axis), but job constraint-based.
-        parts.push({w: 0.5, v: indices.internet / 10});
+    // transport
+    if (isValidIndex(indices?.transportPublic)) {
+        addPart(parts, pref.transport_public, indices!.transportPublic / 10);
+    }
+    if (isValidIndex(indices?.transportCar)) {
+        addPart(parts, pref.transport_car, indices!.transportCar / 10);
     }
 
-    if (!parts.length) return 50; // neutral if nothing known
+    // remote (job-type aware)
+    if (isValidIndex(indices?.remoteWork)) {
+        let syntheticPref = 0;
+        if (user.job.type === "remote") syntheticPref = +30;
+        else if (user.job.type === "local") syntheticPref = -30;
+        else syntheticPref = +10;
+
+        syntheticPref += (pref.worklife_need ?? 0) * 0.3;
+        addPart(parts, syntheticPref, indices!.remoteWork / 10, 0.6);
+    }
+
+    // commute (higher = better, as per your backend normalization)
+    if (isValidIndex(indices?.commuteTime)) {
+        const prefVal = Math.max(pref.travel_easy ?? 0, pref.worklife_need ?? 0);
+        addPart(parts, prefVal, indices!.commuteTime / 10, 0.8);
+    }
+
+    // society
+    if (isValidIndex(indices?.societyInternational)) {
+        addPart(parts, pref.society_international, indices!.societyInternational / 10);
+    }
+
+    // lang barrier -> comfort model (ONLY this one)
+    if (isValidIndex(indices?.langBarrier)) {
+        const barrier01 = indices!.langBarrier / 10;
+
+        const en = levelToNum(user.languages.en); // 0..3
+        const enStrong01 = en >= 3 ? 1 : en === 2 ? 0.6 : en === 1 ? 0.3 : 0.1;
+
+        const comfort01 = clamp(1 - barrier01 * (1 - enStrong01), 0, 1);
+
+        const weakMul = en <= 1 ? 1.0 : en === 2 ? 0.8 : 0.5;
+        addPart(parts, pref.lang_barrier_tolerance, comfort01, 0.9 * weakMul);
+    }
+
+    // internet as infra
+    if (isValidIndex(indices?.internet)) {
+        const mul = user.job.type === "remote" ? 0.6 : 0.25;
+        const prefVal = (pref.worklife_need ?? 0) + (pref.travel_easy ?? 0);
+        addPart(parts, prefVal, indices!.internet / 10, mul);
+    }
+
+    if (!parts.length) return 50;
 
     const sumW = parts.reduce((a, p) => a + p.w, 0);
     const sumWV = parts.reduce((a, p) => a + p.w * p.v, 0);
     return to100(sumWV / (sumW || 1));
 }
 
-// ---------------------
-// grouping helpers
-// ---------------------
 function baseKeyForResult(key: string) {
     if (key.endsWith(".city")) return key.slice(0, -5);
     if (key.startsWith("countries.usa.")) return "countries.usa";
@@ -274,7 +328,6 @@ function isCityKey(key: string) {
 }
 
 function isUsStateVariantKey(key: string) {
-    // countries.usa.xx (NOT .city)
     const parts = key.split(".");
     return parts.length === 3 && parts[0] === "countries" && parts[1] === "usa";
 }
@@ -292,13 +345,17 @@ export function matchCountries(
 
     const temp: MatchResult[] = [];
     const selectedCountrySet = new Set((opts.selectedCountries ?? []).filter(Boolean));
-    const pinnedUsStates = pinUsStateKeys(opts.selectedUSAStates);
+    const pinnedUsStates = new Set((opts.selectedUSAStates ?? []).map(normalizeUsStateKey).filter(Boolean));
     const usaVariantsLimit = opts.usaVariantsLimit ?? 6;
 
     for (const e of expanded) {
         const needed = calcNeededMonthlyUSD(e, user);
 
-        if (user.budget.monthlyUSD < needed) continue;
+        const forced =
+            selectedCountrySet.has(e.key) ||
+            pinnedUsStates.has(e.key);
+
+        if (!forced && user.budget.monthlyUSD < needed) continue;
 
         const {distance, used} = vectorDistance(pref, e.vector);
         const match100 = matchFromDistance(distance, used);
