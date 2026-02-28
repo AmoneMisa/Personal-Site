@@ -21,6 +21,7 @@ export type CountryIndicesBundle = {
     }>;
 
     normalized: CountryIndicesNormalized;
+    numbeo: any
 };
 
 export type CountryIndicesNormalized = {

@@ -600,7 +600,7 @@ watch(user, (v) => lsSet(LS_KEYS.user, v), {deep: true});
 .field__label {
   font-weight: 900;
   font-size: 13px;
-  color: rgba(255, 255, 255, 0.92);
+  color: var(--text-white);
 }
 
 .field__hint {

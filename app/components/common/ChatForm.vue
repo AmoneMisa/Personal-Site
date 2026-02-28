@@ -640,7 +640,6 @@ onBeforeUnmount(() => {
 
 .light .floating-chat-toggle {
   background: rgba(255, 255, 255, 0.82);
-  color: var(--color-white);
 }
 
 .floating-chat-header {

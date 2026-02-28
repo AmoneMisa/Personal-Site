@@ -5,7 +5,6 @@
     "noData": "Нет данных"
   },
   "quizzes": {
-    "usaCompareTitle": "Сравнение штатов США",
     "headline": "Опросники",
     "title": "Выбери опрос",
     "subtitle": "Небольшие опросы, которые помогут подобрать страну, стиль жизни и приоритеты.",
@@ -30,6 +29,7 @@
       }
     },
     "countryFit": {
+      "usaCompareTitle": "Сравнение штатов США",
       "compareTitle": "Сравнение",
       "manualUsaCompareTitle": "Штаты для сравнения",
       "manualCountriesCompareTitle": "Страны для сравнения",

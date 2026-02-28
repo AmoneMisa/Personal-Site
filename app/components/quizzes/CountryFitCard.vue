@@ -196,14 +196,14 @@ const indexColumns = computed(() => {
 
 .rating__label {
   font-size: 11px;
-  color: rgba(255, 255, 255, 0.55);
+  color: var(--text-white);
   line-height: 1;
 }
 
 .rating__val {
   font-weight: 900;
   font-size: 13px;
-  color: rgba(255, 255, 255, 0.92);
+  color: var(--text-white);
   font-variant-numeric: tabular-nums;
 }
 
