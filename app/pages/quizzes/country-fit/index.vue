@@ -41,13 +41,10 @@ const user = ref<UserProfile>({
 const indicesMap = ref<Record<string, IndicesBundle | undefined>>({});
 const indicesLoading = ref(false);
 
-// чтобы не долбить один и тот же key 10 раз
 const loaded = new Set<string>();
 const pending = new Set<string>();
 
 async function fetchBundles(keys: string[]) {
-  // backend: POST /indices/bundles
-  // frontend: POST /api/indices/bundles (proxy)
   const res = await $fetch<BundlesResponse>("/api/indices/bundles", {
     method: "POST",
     body: { keys, includeRaw: false },
@@ -58,24 +55,20 @@ async function fetchBundles(keys: string[]) {
     loaded.add(b.key);
   }
 
-  // если бэк вернул не все ключи (или пусто) — всё равно помечаем как “видели”
   for (const k of keys) loaded.add(k);
 }
 
 async function ensureIndices(keys: string[]) {
   const uniq = Array.from(new Set(keys)).filter(Boolean);
-
   const toLoad = uniq.filter((k) => !loaded.has(k) && !pending.has(k));
   if (!toLoad.length) return;
 
   toLoad.forEach((k) => pending.add(k));
-
   indicesLoading.value = true;
+
   try {
     await fetchBundles(toLoad);
   } catch (e) {
-    // не падаем — матчинг будет просто без индексов
-    // можно потом подключить toast/логгер
     console.error("Failed to fetch indices bundles:", e);
   } finally {
     toLoad.forEach((k) => pending.delete(k));
@@ -94,18 +87,15 @@ const resultsAll = computed(() =>
     matchCountries(countryFitQuiz, answers.value, user.value, indicesMap.value, 999)
 );
 
-const usaGroup = computed(() =>
-    resultsAll.value.find(g => g.base.key === "countries.usa")
-);
+const usaGroup = computed(() => resultsAll.value.find((g) => g.base.key === "countries.usa"));
 
 const bestUsState = computed(() => {
   const variants = usaGroup.value?.variants ?? [];
   return variants.length ? variants[0] : null;
 });
 
-const filteredResults = computed(() =>
-    results.value.filter(g => g.base.key !== "countries.usa")
-);
+const filteredResults = computed(() => results.value.filter((g) => g.base.key !== "countries.usa"));
+
 watchEffect(() => {
   const keys: string[] = [];
   for (const g of results.value) {
@@ -119,6 +109,20 @@ watchEffect(() => {
   const k = bestUsState.value?.key;
   if (k) ensureIndices([k]);
 });
+
+// ----------------------------------------------------
+// helpers
+// ----------------------------------------------------
+function fmt100(v: number | null | undefined) {
+  if (typeof v !== "number") return "—";
+  return `${Math.round(v)}/100`;
+}
+
+function hasAnyIndex(b: IndicesBundle | undefined) {
+  const n = b?.normalized;
+  if (!n) return false;
+  return [n.income, n.education, n.qualityOfLife, n.safety].some((x) => typeof x === "number");
+}
 </script>
 
 <template>
@@ -278,14 +282,111 @@ watchEffect(() => {
         </div>
       </div>
 
-      <div v-if="results.length" class="grid grid-cols-1 md:grid-cols-2 gap-3">
+      <!-- Best US state (ALWAYS ABOVE OTHER CARDS) -->
+      <div
+          v-if="bestUsState"
+          class="mb-6 p-4 rounded-xl border border-[var(--ui-border)] bg-[rgba(255,255,255,0.04)] result-card"
+      >
+        <div class="flex items-center justify-between gap-3">
+          <div class="font-black text-lg">🇺🇸 {{ t("quizzes.countryFit.bestUsStateTitle") }}</div>
+          <div class="text-xs text-muted">{{ t("quizzes.countryFit.bestUsStateHint") }}</div>
+        </div>
+
+        <div class="mt-3 rounded-xl border border-[var(--ui-border)] bg-[rgba(255,255,255,0.02)] p-3">
+          <div class="flex items-start justify-between gap-3">
+            <div>
+              <div class="font-black">
+                {{ t(bestUsState.titleKey, bestUsState.fallbackName) || bestUsState.fallbackName }}
+              </div>
+
+              <div class="text-muted mt-2">
+                ~${{ Math.round(bestUsState.estimatedMonthlyUSD).toLocaleString("en-US") }} / month
+              </div>
+
+              <div class="text-muted mt-2" v-if="bestUsState.why.length">
+                • {{ bestUsState.why.join(" • ") }}
+              </div>
+            </div>
+
+            <div class="ratings">
+              <div class="rating">
+                <div class="rating__label">{{ t("quizzes.countryFit.rating.match") }}</div>
+                <div class="rating__val">{{ fmt100(bestUsState.match100) }}</div>
+              </div>
+              <div class="rating">
+                <div class="rating__label">{{ t("quizzes.countryFit.rating.live") }}</div>
+                <div class="rating__val">{{ fmt100(bestUsState.live100) }}</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Indices hover trigger -->
+          <div
+              v-if="hasAnyIndex(indicesMap[bestUsState.key])"
+              class="indices"
+          >
+            <button
+                type="button"
+                class="indices__trigger"
+                :aria-label="t('quizzes.countryFit.indices.aria')"
+            >
+              ⓘ {{ t("quizzes.countryFit.indices.title") }}
+            </button>
+
+            <div class="indices__panel" role="tooltip">
+              <div class="indices__title">{{ t("quizzes.countryFit.indices.title") }}</div>
+
+              <div class="indices__row" v-if="indicesMap[bestUsState.key]?.normalized.income != null">
+                <span>💰 {{ t("quizzes.countryFit.indices.income") }}</span>
+                <span class="indices__val">{{ indicesMap[bestUsState.key]!.normalized.income!.toFixed(1) }}/10</span>
+              </div>
+
+              <div class="indices__row" v-if="indicesMap[bestUsState.key]?.normalized.education != null">
+                <span>🎓 {{ t("quizzes.countryFit.indices.education") }}</span>
+                <span class="indices__val">{{ indicesMap[bestUsState.key]!.normalized.education!.toFixed(1) }}/10</span>
+              </div>
+
+              <div class="indices__row" v-if="indicesMap[bestUsState.key]?.normalized.qualityOfLife != null">
+                <span>✨ {{ t("quizzes.countryFit.indices.quality") }}</span>
+                <span class="indices__val">{{ indicesMap[bestUsState.key]!.normalized.qualityOfLife!.toFixed(1) }}/10</span>
+              </div>
+
+              <div class="indices__row" v-if="indicesMap[bestUsState.key]?.normalized.safety != null">
+                <span>🛡 {{ t("quizzes.countryFit.indices.safety") }}</span>
+                <span class="indices__val">{{ indicesMap[bestUsState.key]!.normalized.safety!.toFixed(1) }}/10</span>
+              </div>
+
+              <div class="indices__meta text-muted" v-if="indicesMap[bestUsState.key]?.updatedAtISO">
+                {{ t("quizzes.countryFit.indices.updated") }}:
+                {{ indicesMap[bestUsState.key]!.updatedAtISO.slice(0, 10) }}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Countries -->
+      <div v-if="filteredResults.length" class="grid grid-cols-1 md:grid-cols-2 gap-3">
         <div
-            v-for="g in results"
+            v-for="g in filteredResults"
             :key="g.base.key"
             class="p-4 rounded-xl border border-[var(--ui-border)] bg-[rgba(255,255,255,0.03)] result-card"
         >
-          <div class="font-black">
-            {{ t(g.base.titleKey, g.base.fallbackName) || g.base.fallbackName }}
+          <div class="flex items-start justify-between gap-3">
+            <div class="font-black">
+              {{ t(g.base.titleKey, g.base.fallbackName) || g.base.fallbackName }}
+            </div>
+
+            <div class="ratings">
+              <div class="rating">
+                <div class="rating__label">{{ t("quizzes.countryFit.rating.match") }}</div>
+                <div class="rating__val">{{ fmt100(g.base.match100) }}</div>
+              </div>
+              <div class="rating">
+                <div class="rating__label">{{ t("quizzes.countryFit.rating.live") }}</div>
+                <div class="rating__val">{{ fmt100(g.base.live100) }}</div>
+              </div>
+            </div>
           </div>
 
           <div class="mt-3 rounded-xl border border-[var(--ui-border)] bg-[rgba(255,255,255,0.02)] p-3">
@@ -301,37 +402,45 @@ watchEffect(() => {
               • {{ g.base.why.join(" • ") }}
             </div>
 
-            <!-- Hover indices -->
-            <div class="indices-hover mt-3"
-                v-if="indicesMap[g.base.key]?.normalized"
+            <!-- Indices hover trigger -->
+            <div
+                v-if="hasAnyIndex(indicesMap[g.base.key])"
+                class="indices mt-3"
             >
-              <div class="indices-hover__panel" role="tooltip">
-                <div class="indices-hover__title">
-                  {{ t("quizzes.countryFit.indices.title") }}
-                </div>
+              <button
+                  type="button"
+                  class="indices__trigger"
+                  :aria-label="t('quizzes.countryFit.indices.aria')"
+              >
+                ⓘ {{ t("quizzes.countryFit.indices.title") }}
+              </button>
 
-                <div class="indices-hover__row" v-if="indicesMap[g.base.key]?.normalized.income != null">
+              <div class="indices__panel" role="tooltip">
+                <div class="indices__title">{{ t("quizzes.countryFit.indices.title") }}</div>
+
+                <div class="indices__row" v-if="indicesMap[g.base.key]?.normalized.income != null">
                   <span>💰 {{ t("quizzes.countryFit.indices.income") }}</span>
-                  <span class="indices-hover__val">{{ indicesMap[g.base.key]!.normalized.income!.toFixed(1) }}/10</span>
+                  <span class="indices__val">{{ indicesMap[g.base.key]!.normalized.income!.toFixed(1) }}/10</span>
                 </div>
 
-                <div class="indices-hover__row" v-if="indicesMap[g.base.key]?.normalized.education != null">
+                <div class="indices__row" v-if="indicesMap[g.base.key]?.normalized.education != null">
                   <span>🎓 {{ t("quizzes.countryFit.indices.education") }}</span>
-                  <span class="indices-hover__val">{{ indicesMap[g.base.key]!.normalized.education!.toFixed(1) }}/10</span>
+                  <span class="indices__val">{{ indicesMap[g.base.key]!.normalized.education!.toFixed(1) }}/10</span>
                 </div>
 
-                <div class="indices-hover__row" v-if="indicesMap[g.base.key]?.normalized.qualityOfLife != null">
+                <div class="indices__row" v-if="indicesMap[g.base.key]?.normalized.qualityOfLife != null">
                   <span>✨ {{ t("quizzes.countryFit.indices.quality") }}</span>
-                  <span class="indices-hover__val">{{ indicesMap[g.base.key]!.normalized.qualityOfLife!.toFixed(1) }}/10</span>
+                  <span class="indices__val">{{ indicesMap[g.base.key]!.normalized.qualityOfLife!.toFixed(1) }}/10</span>
                 </div>
 
-                <div class="indices-hover__row" v-if="indicesMap[g.base.key]?.normalized.safety != null">
+                <div class="indices__row" v-if="indicesMap[g.base.key]?.normalized.safety != null">
                   <span>🛡 {{ t("quizzes.countryFit.indices.safety") }}</span>
-                  <span class="indices-hover__val">{{ indicesMap[g.base.key]!.normalized.safety!.toFixed(1) }}/10</span>
+                  <span class="indices__val">{{ indicesMap[g.base.key]!.normalized.safety!.toFixed(1) }}/10</span>
                 </div>
 
-                <div class="indices-hover__meta text-muted" v-if="indicesMap[g.base.key]?.updatedAtISO">
-                  {{ t("quizzes.countryFit.indices.updated") }}: {{ indicesMap[g.base.key]!.updatedAtISO.slice(0, 10) }}
+                <div class="indices__meta text-muted" v-if="indicesMap[g.base.key]?.updatedAtISO">
+                  {{ t("quizzes.countryFit.indices.updated") }}:
+                  {{ indicesMap[g.base.key]!.updatedAtISO.slice(0, 10) }}
                 </div>
               </div>
             </div>
@@ -341,46 +450,6 @@ watchEffect(() => {
 
       <div v-else class="text-muted">
         {{ t("quizzes.countryFit.noResults") }}
-      </div>
-    </div>
-    <!-- Best US state -->
-    <div v-if="bestUsState" class="mb-6 p-4 rounded-xl border border-[var(--ui-border)] bg-[rgba(255,255,255,0.04)]">
-      <div class="flex items-center justify-between gap-3">
-        <div class="font-black text-lg">
-          🇺🇸 {{ t("quizzes.countryFit.bestUsStateTitle") }}
-        </div>
-        <div class="text-xs text-muted">
-          {{ t("quizzes.countryFit.bestUsStateHint") }}
-        </div>
-      </div>
-
-      <div class="mt-3 rounded-xl border border-[var(--ui-border)] bg-[rgba(255,255,255,0.02)] p-3">
-        <div class="font-black">
-          {{ t(bestUsState.titleKey, bestUsState.fallbackName) || bestUsState.fallbackName }}
-        </div>
-
-        <div class="text-muted mt-2">
-          ~${{ Math.round(bestUsState.estimatedMonthlyUSD).toLocaleString("en-US") }} / month
-        </div>
-
-        <div class="text-muted mt-2" v-if="bestUsState.why.length">
-          • {{ bestUsState.why.join(" • ") }}
-        </div>
-
-        <div class="text-muted mt-2 text-sm" v-if="indicesMap[bestUsState.key]?.normalized">
-      <span v-if="indicesMap[bestUsState.key]?.normalized.income != null">
-        💰 {{ t("quizzes.countryFit.indices.income") }}:
-        {{ indicesMap[bestUsState.key]!.normalized.income!.toFixed(1) }}/10
-      </span>
-          <span v-if="indicesMap[bestUsState.key]?.normalized.qualityOfLife != null" class="ml-3">
-        ✨ {{ t("quizzes.countryFit.indices.quality") }}:
-        {{ indicesMap[bestUsState.key]!.normalized.qualityOfLife!.toFixed(1) }}/10
-      </span>
-          <span v-if="indicesMap[bestUsState.key]?.normalized.safety != null" class="ml-3">
-        🛡 {{ t("quizzes.countryFit.indices.safety") }}:
-        {{ indicesMap[bestUsState.key]!.normalized.safety!.toFixed(1) }}/10
-      </span>
-        </div>
       </div>
     </div>
   </u-container>
@@ -407,18 +476,57 @@ watchEffect(() => {
   position: relative;
 }
 
-.indices-hover {
+.ratings {
+  display: grid;
+  gap: 6px;
+  text-align: right;
+}
+
+.rating__label {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.55);
+  line-height: 1;
+}
+
+.rating__val {
+  font-weight: 900;
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.92);
+  font-variant-numeric: tabular-nums;
+}
+
+/* -------- Indices hover -------- */
+
+.indices {
   position: relative;
   display: inline-block;
 }
 
-/* панель скрыта по умолчанию */
-.indices-hover__panel {
+.indices__trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--ui-border);
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--ui-text-muted);
+  line-height: 1;
+  cursor: default;
+}
+
+.indices__trigger:focus-visible {
+  outline: 2px solid rgba(128, 90, 245, 0.55);
+  outline-offset: 2px;
+}
+
+.indices__panel {
   position: absolute;
-  z-index: 60;
+  z-index: 70;
   left: 0;
   top: calc(100% + 10px);
-  width: 280px;
+  width: 300px;
 
   padding: 12px;
   border-radius: 14px;
@@ -432,22 +540,22 @@ watchEffect(() => {
   transition: opacity 160ms ease, transform 160ms ease;
 }
 
-/* показываем при ховере карточки + при фокусе внутри (доступность) */
-.result-card:hover .indices-hover__panel,
-.result-card:focus-within .indices-hover__panel {
+/* строго на hover/focus триггера */
+.indices:hover .indices__panel,
+.indices:focus-within .indices__panel {
   opacity: 1;
   transform: translateY(0);
   pointer-events: auto;
 }
 
-.indices-hover__title {
+.indices__title {
   font-weight: 900;
   margin-bottom: 8px;
   font-size: 13px;
   color: rgba(255, 255, 255, 0.92);
 }
 
-.indices-hover__row {
+.indices__row {
   display: flex;
   justify-content: space-between;
   gap: 10px;
@@ -456,12 +564,12 @@ watchEffect(() => {
   color: rgba(255, 255, 255, 0.92);
 }
 
-.indices-hover__val {
+.indices__val {
   font-variant-numeric: tabular-nums;
   font-weight: 900;
 }
 
-.indices-hover__meta {
+.indices__meta {
   margin-top: 10px;
   font-size: 12px;
   line-height: 1.25;

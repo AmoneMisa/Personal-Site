@@ -1,19 +1,6 @@
-export type IndexSource = "worldbank" | "oecd";
-
 export type WBSeriesPoint = {
     date: string;          // "2022"
     value: number | null;  // может быть null
-};
-
-export type WBIndicatorResponse = {
-    indicator: { id: string; value: string };
-    country: { id: string; value: string };
-    countryiso3code: string;
-    date: string;
-    value: number | null;
-    unit: string;
-    obs_status: string;
-    decimal: number;
 };
 
 export type WBSeries = {
@@ -23,8 +10,6 @@ export type WBSeries = {
     latestValue: number | null;
     latestDate: string | null;
 };
-
-export type OECDDataResponse = any; // SDMX JSON сложный, парсим отдельно
 
 export type NormalizedIndices = {
     // 0..10 (или 0..100, но лучше 0..10)
@@ -43,5 +28,18 @@ export type CountryIndicesBundle = {
         oecd: Record<string, any>;           // datasetKey -> raw
     }>;
 
-    normalized: NormalizedIndices;
+    normalized: CountryIndicesNormalized;
+};
+
+export type CountryIndicesNormalized = {
+    income?: number | null;
+    education?: number | null;
+    qualityOfLife?: number | null;
+    safety?: number | null;
+
+    internet?: number | null;
+    unemployment?: number | null;
+    air?: number | null;
+    inequality?: number | null;
+    health?: number | null;
 };
