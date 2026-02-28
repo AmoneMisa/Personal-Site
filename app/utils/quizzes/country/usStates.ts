@@ -2,7 +2,7 @@ export type USRegion = {
     code: string;       // "ca"
     titleKey: string;   // "regions.usa.ca"
     fallbackName: string;
-    teleportSlug?: string; // главный город/агломерация Teleport
+    teleportSlug?: string;
 };
 
 export const usRegions: USRegion[] = [

@@ -8,6 +8,12 @@ type IndicesNormalized = {
   education: number | null;
   qualityOfLife: number | null;
   safety: number | null;
+
+  internet?: number | null;
+  unemployment?: number | null;
+  air?: number | null;
+  inequality?: number | null;
+  health?: number | null;
 };
 
 type IndicesBundle = {
@@ -20,7 +26,49 @@ type IndicesBundle = {
 type BundlesResponse = { items: IndicesBundle[] };
 
 const { t } = useI18n();
+const route = useRoute();
+const router = useRouter();
 
+// --------------------
+// URL helpers
+// --------------------
+function encodeProfileToParam(profile: any) {
+  const json = JSON.stringify(profile);
+  return btoa(unescape(encodeURIComponent(json)))
+      .replaceAll("+", "-")
+      .replaceAll("/", "_")
+      .replaceAll("=", "");
+}
+
+function decodeProfileFromParam(s: string) {
+  const padded = s + "===".slice((s.length + 3) % 4);
+  const b64 = padded.replaceAll("-", "+").replaceAll("_", "/");
+  const json = decodeURIComponent(escape(atob(b64)));
+  return JSON.parse(json);
+}
+
+function parseCsvParam(v: unknown): string[] {
+  if (!v) return [];
+  const s = Array.isArray(v) ? String(v[0] ?? "") : String(v);
+  return s.split(",").map(x => x.trim()).filter(Boolean);
+}
+
+function toCsvParam(list: string[]) {
+  return Array.from(new Set(list.map(x => x.trim()).filter(Boolean))).join(",");
+}
+
+// --------------------
+// State from query
+// --------------------
+const selectedUSAStates = ref<string[]>(parseCsvParam(route.query.selectedUSAStates));
+const selectedCountries = ref<string[]>(parseCsvParam(route.query.selectedCountries));
+
+watch(() => route.query.selectedUSAStates, (v) => (selectedUSAStates.value = parseCsvParam(v)));
+watch(() => route.query.selectedCountries, (v) => (selectedCountries.value = parseCsvParam(v)));
+
+// --------------------
+// Main state
+// --------------------
 useSeoMeta({
   title: () => t("seo.pages.countryFit.title"),
   description: () => t("seo.pages.countryFit.description"),
@@ -35,9 +83,52 @@ const user = ref<UserProfile>({
   budget: { monthlyUSD: 2500, includesRent: true },
 });
 
-// ----------------------------------------------------
-// Indices client cache (ONLY our backend API)
-// ----------------------------------------------------
+// --- apply profile from URL once ---
+const appliedFromUrl = ref(false);
+onMounted(() => {
+  const p = route.query.profile;
+  const s = Array.isArray(p) ? String(p[0] ?? "") : String(p ?? "");
+  if (!s) return;
+
+  try {
+    const decoded = decodeProfileFromParam(s);
+    // ожидаем { user, answers } или просто user
+    if (decoded?.user) user.value = decoded.user;
+    if (decoded?.answers) answers.value = decoded.answers;
+    else if (!decoded?.user && decoded?.job) user.value = decoded; // если это просто user
+    appliedFromUrl.value = true;
+  } catch (e) {
+    console.warn("Failed to decode profile from URL:", e);
+  }
+});
+
+// --------------------
+// Update query (throttled)
+// --------------------
+let qTimer: any = null;
+function scheduleQueryUpdate() {
+  if (!appliedFromUrl.value) return; // пока не применили URL (или не попытались) — не перетираем
+  clearTimeout(qTimer);
+  qTimer = setTimeout(() => {
+    router.replace({
+      query: {
+        ...route.query,
+        selectedUSAStates: toCsvParam(selectedUSAStates.value) || undefined,
+        selectedCountries: toCsvParam(selectedCountries.value) || undefined,
+        profile: encodeProfileToParam({ user: user.value, answers: answers.value }),
+      },
+    });
+  }, 250);
+}
+
+watch(user, scheduleQueryUpdate, { deep: true });
+watch(answers, scheduleQueryUpdate, { deep: true });
+watch(selectedUSAStates, scheduleQueryUpdate, { deep: true });
+watch(selectedCountries, scheduleQueryUpdate, { deep: true });
+
+// --------------------
+// Indices cache
+// --------------------
 const indicesMap = ref<Record<string, IndicesBundle | undefined>>({});
 const indicesLoading = ref(false);
 
@@ -76,9 +167,9 @@ async function ensureIndices(keys: string[]) {
   }
 }
 
-// ----------------------------------------------------
+// --------------------
 // Results
-// ----------------------------------------------------
+// --------------------
 const results = computed(() =>
     matchCountries(countryFitQuiz, answers.value, user.value, indicesMap.value, 12)
 );
@@ -96,23 +187,51 @@ const bestUsState = computed(() => {
 
 const filteredResults = computed(() => results.value.filter((g) => g.base.key !== "countries.usa"));
 
+// --- pick 6 states: top6 + pinned from URL ---
+const topUsaStates = computed(() => (usaGroup.value?.variants ?? []).slice(0, 6));
+
+const pinnedUsaStates = computed(() => {
+  const all = usaGroup.value?.variants ?? [];
+  const map = new Map(all.map(v => [v.key, v]));
+  return selectedUSAStates.value.map(k => map.get(k)).filter(Boolean) as any[];
+});
+
+// merge unique keeping order: pinned first, then top
+const usaStatesForCompare = computed(() => {
+  const out: any[] = [];
+  const seen = new Set<string>();
+
+  for (const r of pinnedUsaStates.value) {
+    if (!seen.has(r.key)) { out.push(r); seen.add(r.key); }
+  }
+  for (const r of topUsaStates.value) {
+    if (!seen.has(r.key)) { out.push(r); seen.add(r.key); }
+  }
+  return out.slice(0, 6);
+});
+
+// ensure indices for visible cards + usa compare list
 watchEffect(() => {
   const keys: string[] = [];
+
   for (const g of results.value) {
     keys.push(g.base.key);
     if (g.city) keys.push(g.city.key);
   }
+
+  if (bestUsState.value?.key) keys.push(bestUsState.value.key);
+
+  for (const s of usaStatesForCompare.value) keys.push(s.key);
+
+  // pinned countries (если ты хочешь их принудительно догружать для сравнения)
+  for (const k of selectedCountries.value) keys.push(k);
+
   ensureIndices(keys);
 });
 
-watchEffect(() => {
-  const k = bestUsState.value?.key;
-  if (k) ensureIndices([k]);
-});
-
-// ----------------------------------------------------
-// helpers
-// ----------------------------------------------------
+// --------------------
+// UI helpers
+// --------------------
 function fmt100(v: number | null | undefined) {
   if (typeof v !== "number") return "—";
   return `${Math.round(v)}/100`;
@@ -121,7 +240,15 @@ function fmt100(v: number | null | undefined) {
 function hasAnyIndex(b: IndicesBundle | undefined) {
   const n = b?.normalized;
   if (!n) return false;
-  return [n.income, n.education, n.qualityOfLife, n.safety].some((x) => typeof x === "number");
+  return [n.income, n.education, n.qualityOfLife, n.safety, n.internet, n.unemployment, n.air, n.inequality, n.health]
+      .some((x) => typeof x === "number");
+}
+
+function toggleUsaState(key: string) {
+  const set = new Set(selectedUSAStates.value);
+  if (set.has(key)) set.delete(key);
+  else set.add(key);
+  selectedUSAStates.value = Array.from(set);
 }
 </script>
 
@@ -372,6 +499,111 @@ function hasAnyIndex(b: IndicesBundle | undefined) {
           </div>
         </div>
       </div>
+      <!-- Compare 6 USA states -->
+      <div v-if="usaStatesForCompare.length" class="mb-6">
+        <div class="font-black text-lg mb-3 flex items-center gap-2">
+          <Icon name="i-lucide-flag" class="i-icon" />
+          {{ t("quizzes.countryFit.usaCompareTitle") }}
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <div
+              v-for="s in usaStatesForCompare"
+              :key="s.key"
+              class="p-4 rounded-xl border border-[var(--ui-border)] bg-[rgba(255,255,255,0.03)] result-card"
+          >
+            <div class="flex items-start justify-between gap-3">
+              <div class="font-black">
+                {{ t(s.titleKey, s.fallbackName) || s.fallbackName }}
+              </div>
+
+              <button
+                  type="button"
+                  class="chip"
+                  @click="toggleUsaState(s.key)"
+              >
+                <Icon name="i-lucide-pin" class="i-icon" />
+                {{ selectedUSAStates.includes(s.key) ? t("common.pinned") : t("common.pin") }}
+              </button>
+            </div>
+
+            <div class="text-muted mt-2">
+              ~${{ Math.round(s.estimatedMonthlyUSD).toLocaleString("en-US") }} / month
+            </div>
+
+            <div class="ratings mt-3">
+              <div class="rating">
+                <div class="rating__label">{{ t("quizzes.countryFit.rating.match") }}</div>
+                <div class="rating__val">{{ fmt100(s.match100) }}</div>
+              </div>
+              <div class="rating">
+                <div class="rating__label">{{ t("quizzes.countryFit.rating.live") }}</div>
+                <div class="rating__val">{{ fmt100(s.live100) }}</div>
+              </div>
+            </div>
+
+            <div v-if="hasAnyIndex(indicesMap[s.key])" class="indices mt-3">
+              <button type="button" class="indices__trigger" :aria-label="t('quizzes.countryFit.indices.aria')">
+                <Icon name="i-lucide-info" class="i-icon" />
+                {{ t("quizzes.countryFit.indices.title") }}
+              </button>
+
+              <div class="indices__panel" role="tooltip">
+                <div class="indices__title">{{ t("quizzes.countryFit.indices.title") }}</div>
+
+                <div class="indices__row" v-if="indicesMap[s.key]?.normalized.income != null">
+                  <span class="indices__k"><Icon name="i-lucide-dollar-sign" class="i-icon" />{{ t("quizzes.countryFit.indices.income") }}</span>
+                  <span class="indices__val">{{ indicesMap[s.key]!.normalized.income!.toFixed(1) }}/10</span>
+                </div>
+
+                <div class="indices__row" v-if="indicesMap[s.key]?.normalized.education != null">
+                  <span class="indices__k"><Icon name="i-lucide-graduation-cap" class="i-icon" />{{ t("quizzes.countryFit.indices.education") }}</span>
+                  <span class="indices__val">{{ indicesMap[s.key]!.normalized.education!.toFixed(1) }}/10</span>
+                </div>
+
+                <div class="indices__row" v-if="indicesMap[s.key]?.normalized.qualityOfLife != null">
+                  <span class="indices__k"><Icon name="i-lucide-sparkles" class="i-icon" />{{ t("quizzes.countryFit.indices.quality") }}</span>
+                  <span class="indices__val">{{ indicesMap[s.key]!.normalized.qualityOfLife!.toFixed(1) }}/10</span>
+                </div>
+
+                <div class="indices__row" v-if="indicesMap[s.key]?.normalized.safety != null">
+                  <span class="indices__k"><Icon name="i-lucide-shield" class="i-icon" />{{ t("quizzes.countryFit.indices.safety") }}</span>
+                  <span class="indices__val">{{ indicesMap[s.key]!.normalized.safety!.toFixed(1) }}/10</span>
+                </div>
+
+                <div class="indices__row" v-if="indicesMap[s.key]?.normalized.internet != null">
+                  <span class="indices__k"><Icon name="i-lucide-wifi" class="i-icon" />{{ t("quizzes.countryFit.indices.internet") }}</span>
+                  <span class="indices__val">{{ indicesMap[s.key]!.normalized.internet!.toFixed(1) }}/10</span>
+                </div>
+
+                <div class="indices__row" v-if="indicesMap[s.key]?.normalized.unemployment != null">
+                  <span class="indices__k"><Icon name="i-lucide-briefcase" class="i-icon" />{{ t("quizzes.countryFit.indices.unemployment") }}</span>
+                  <span class="indices__val">{{ indicesMap[s.key]!.normalized.unemployment!.toFixed(1) }}/10</span>
+                </div>
+
+                <div class="indices__row" v-if="indicesMap[s.key]?.normalized.air != null">
+                  <span class="indices__k"><Icon name="i-lucide-wind" class="i-icon" />{{ t("quizzes.countryFit.indices.air") }}</span>
+                  <span class="indices__val">{{ indicesMap[s.key]!.normalized.air!.toFixed(1) }}/10</span>
+                </div>
+
+                <div class="indices__row" v-if="indicesMap[s.key]?.normalized.inequality != null">
+                  <span class="indices__k"><Icon name="i-lucide-scale" class="i-icon" />{{ t("quizzes.countryFit.indices.inequality") }}</span>
+                  <span class="indices__val">{{ indicesMap[s.key]!.normalized.inequality!.toFixed(1) }}/10</span>
+                </div>
+
+                <div class="indices__row" v-if="indicesMap[s.key]?.normalized.health != null">
+                  <span class="indices__k"><Icon name="i-lucide-heart-pulse" class="i-icon" />{{ t("quizzes.countryFit.indices.health") }}</span>
+                  <span class="indices__val">{{ indicesMap[s.key]!.normalized.health!.toFixed(1) }}/10</span>
+                </div>
+
+                <div class="indices__meta text-muted" v-if="indicesMap[s.key]?.updatedAtISO">
+                  {{ t("quizzes.countryFit.indices.updated") }}: {{ indicesMap[s.key]!.updatedAtISO.slice(0, 10) }}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
 
       <!-- Countries -->
       <div v-if="filteredResults.length" class="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -595,5 +827,18 @@ function hasAnyIndex(b: IndicesBundle | undefined) {
   margin-top: 10px;
   font-size: 12px;
   line-height: 1.25;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--ui-border);
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--ui-text-muted);
+  line-height: 1;
 }
 </style>

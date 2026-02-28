@@ -1,4 +1,8 @@
 {
+  "common": {
+    "pin": "Pin",
+    "pinned": "Pinned"
+  },
   "quizzes": {
     "headline": "Quizzes",
     "title": "Pick a quiz",
@@ -24,6 +28,7 @@
       }
     },
     "countryFit": {
+      "usaCompareTitle": "Compare USA states",
       "loadingIndices": "Loading indices…",
       "bestUsStateTitle": "Best US state for your profile",
       "bestUsStateHint": "Based on your answers and budget",
@@ -32,6 +37,11 @@
         "live": "Living rating"
       },
       "indices": {
+        "internet": "Internet access",
+        "unemployment": "Employment",
+        "air": "Air quality",
+        "inequality": "Equality",
+        "health": "Healthcare",
         "aria": "Show country indices",
         "title": "Country indices",
         "income": "Income",

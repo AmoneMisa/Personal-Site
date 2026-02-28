@@ -11,14 +11,6 @@ export type WBSeries = {
     latestDate: string | null;
 };
 
-export type NormalizedIndices = {
-    // 0..10 (или 0..100, но лучше 0..10)
-    income?: number;
-    education?: number;
-    safety?: number;
-    qualityOfLife?: number;
-};
-
 export type CountryIndicesBundle = {
     key: string; // countries.germany / countries.usa.ca / ...
     updatedAtISO: string;
