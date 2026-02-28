@@ -2,6 +2,8 @@
 import PageHeader from "~/components/common/PageHeader.vue";
 import { countryFitQuiz } from "~/utils/quizzes/country/countryFit";
 import { matchCountries, type UserProfile } from "~/composables/useCountryQuizEngine";
+import {usRegions} from "~/utils/quizzes/country/usStates";
+import {countries} from "~/utils/quizzes/country/countries";
 
 type IndicesNormalized = {
   income: number | null;
@@ -60,12 +62,35 @@ function toCsvParam(list: string[]) {
 // --------------------
 // State from query
 // --------------------
-const selectedUSAStates = ref<string[]>(parseCsvParam(route.query.selectedUSAStates));
-const selectedCountries = ref<string[]>(parseCsvParam(route.query.selectedCountries));
+const selectedUSAStates = ref<string[]>([]);
+const selectedCountries = ref<string[]>([]);
 
-watch(() => route.query.selectedUSAStates, (v) => (selectedUSAStates.value = parseCsvParam(v)));
-watch(() => route.query.selectedCountries, (v) => (selectedCountries.value = parseCsvParam(v)));
+// применяем из URL (если есть), иначе из LS
+function hydrateSelections() {
+  const fromUrlStates = parseCsvParam(route.query.selectedUSAStates);
+  const fromUrlCountries = parseCsvParam(route.query.selectedCountries);
 
+  if (fromUrlStates.length || fromUrlCountries.length) {
+    selectedUSAStates.value = fromUrlStates;
+    selectedCountries.value = fromUrlCountries;
+    return;
+  }
+
+  selectedUSAStates.value = lsGet<string[]>(LS_KEYS.selectedUSAStates, []);
+  selectedCountries.value = lsGet<string[]>(LS_KEYS.selectedCountries, []);
+}
+
+hydrateSelections();
+
+watch(() => route.query.selectedUSAStates, (v) => {
+  const list = parseCsvParam(v);
+  if (list.length) selectedUSAStates.value = list;
+});
+
+watch(() => route.query.selectedCountries, (v) => {
+  const list = parseCsvParam(v);
+  if (list.length) selectedCountries.value = list;
+});
 // --------------------
 // Main state
 // --------------------
@@ -88,18 +113,25 @@ const appliedFromUrl = ref(false);
 onMounted(() => {
   const p = route.query.profile;
   const s = Array.isArray(p) ? String(p[0] ?? "") : String(p ?? "");
-  if (!s) return;
 
-  try {
-    const decoded = decodeProfileFromParam(s);
-    // ожидаем { user, answers } или просто user
-    if (decoded?.user) user.value = decoded.user;
-    if (decoded?.answers) answers.value = decoded.answers;
-    else if (!decoded?.user && decoded?.job) user.value = decoded; // если это просто user
+  if (s) {
+    try {
+      const decoded = decodeProfileFromParam(s);
+      if (decoded?.user) user.value = decoded.user;
+      if (decoded?.answers) answers.value = decoded.answers;
+      else if (!decoded?.user && decoded?.job) user.value = decoded;
+    } catch (e) {
+      console.warn("Failed to decode profile from URL:", e);
+    }
     appliedFromUrl.value = true;
-  } catch (e) {
-    console.warn("Failed to decode profile from URL:", e);
+    return;
   }
+
+  // если URL пустой — берём из LS
+  const savedUser = lsGet<UserProfile | null>(LS_KEYS.user, null);
+  if (savedUser) user.value = savedUser;
+
+  appliedFromUrl.value = true;
 });
 
 // --------------------
@@ -171,11 +203,19 @@ async function ensureIndices(keys: string[]) {
 // Results
 // --------------------
 const results = computed(() =>
-    matchCountries(countryFitQuiz, answers.value, user.value, indicesMap.value, 12)
+    matchCountries(countryFitQuiz, answers.value, user.value, indicesMap.value, 12, {
+      selectedUSAStates: selectedUSAStates.value,
+      selectedCountries: selectedCountries.value,
+      usaVariantsLimit: 6,
+    })
 );
 
 const resultsAll = computed(() =>
-    matchCountries(countryFitQuiz, answers.value, user.value, indicesMap.value, 999)
+    matchCountries(countryFitQuiz, answers.value, user.value, indicesMap.value, 999, {
+      selectedUSAStates: selectedUSAStates.value,
+      selectedCountries: selectedCountries.value,
+      usaVariantsLimit: 999,
+    })
 );
 
 const usaGroup = computed(() => resultsAll.value.find((g) => g.base.key === "countries.usa"));
@@ -192,8 +232,8 @@ const topUsaStates = computed(() => (usaGroup.value?.variants ?? []).slice(0, 6)
 
 const pinnedUsaStates = computed(() => {
   const all = usaGroup.value?.variants ?? [];
-  const map = new Map(all.map(v => [v.key, v]));
-  return selectedUSAStates.value.map(k => map.get(k)).filter(Boolean) as any[];
+  const map = new Map(all.map(v => [stateCodeFromKey(v.key), v]));
+  return selectedUSAStates.value.map(code => map.get(code)).filter(Boolean) as any[];
 });
 
 // merge unique keeping order: pinned first, then top
@@ -229,9 +269,45 @@ watchEffect(() => {
   ensureIndices(keys);
 });
 
+function stateCodeFromKey(key: string) {
+  const p = String(key).split(".");
+  return p[0] === "countries" && p[1] === "usa" ? (p[2] ?? "") : "";
+}
+
+function toggleUsaState(key: string) {
+  const code = stateCodeFromKey(key);
+  if (!code) return;
+
+  const set = new Set(selectedUSAStates.value); // теперь тут будут "al", "ca"
+  if (set.has(code)) set.delete(code);
+  else set.add(code);
+  selectedUSAStates.value = Array.from(set);
+}
 // --------------------
 // UI helpers
 // --------------------
+const LS_KEYS = {
+  selectedUSAStates: "countryFit:selectedUSAStates",
+  selectedCountries: "countryFit:selectedCountries",
+  user: "countryFit:user",
+};
+
+function lsGet<T>(key: string, fallback: T): T {
+  try {
+    const raw = localStorage.getItem(key);
+    if (!raw) return fallback;
+    return JSON.parse(raw) as T;
+  } catch {
+    return fallback;
+  }
+}
+
+function lsSet(key: string, value: any) {
+  try {
+    localStorage.setItem(key, JSON.stringify(value));
+  } catch {}
+}
+
 function fmt100(v: number | null | undefined) {
   if (typeof v !== "number") return "—";
   return `${Math.round(v)}/100`;
@@ -244,12 +320,58 @@ function hasAnyIndex(b: IndicesBundle | undefined) {
       .some((x) => typeof x === "number");
 }
 
-function toggleUsaState(key: string) {
+const usaStateItems = computed(() =>
+    usRegions.map(r => ({
+      label: t(r.titleKey, r.fallbackName) || r.fallbackName,
+      value: r.code, // важно: code ("ny"), а не key
+    }))
+);
+
+const countryItems = computed(() => {
+  return countries
+      .filter((c: any) => !String(c.key).startsWith("countries.usa."))
+      .map((c: any) => ({
+        label: t(c.titleKey, c.fallbackName) || c.fallbackName,
+        value: c.key,
+      }))
+      .sort((a, b) => a.label.localeCompare(b.label));
+});
+
+const addUsaState = ref<string>("");
+const addCountry = ref<string>("");
+function addUsaStateToCompare() {
+  const code = String(addUsaState.value || "").toLowerCase().trim();
+  if (!code) return;
   const set = new Set(selectedUSAStates.value);
-  if (set.has(key)) set.delete(key);
-  else set.add(key);
+  set.add(code);
+  selectedUSAStates.value = Array.from(set);
+  addUsaState.value = "";
+}
+
+function removeUsaState(code: string) {
+  const set = new Set(selectedUSAStates.value);
+  set.delete(code);
   selectedUSAStates.value = Array.from(set);
 }
+
+function addCountryToCompare() {
+  const key = String(addCountry.value || "").trim();
+  if (!key) return;
+  const set = new Set(selectedCountries.value);
+  set.add(key);
+  selectedCountries.value = Array.from(set);
+  addCountry.value = "";
+}
+
+function removeCountry(key: string) {
+  const set = new Set(selectedCountries.value);
+  set.delete(key);
+  selectedCountries.value = Array.from(set);
+}
+
+watch(selectedUSAStates, (v) => lsSet(LS_KEYS.selectedUSAStates, v), { deep: true });
+watch(selectedCountries, (v) => lsSet(LS_KEYS.selectedCountries, v), { deep: true });
+watch(user, (v) => lsSet(LS_KEYS.user, v), { deep: true });
 </script>
 
 <template>
@@ -408,6 +530,57 @@ function toggleUsaState(key: string) {
           {{ t("quizzes.countryFit.loadingIndices") }}
         </div>
       </div>
+      <div class="p-4 rounded-xl border border-[var(--ui-border)] mb-8 bg-[rgba(255,255,255,0.03)]">
+        <div class="font-black mb-3">{{ t("quizzes.countryFit.compareTitle") || "Сравнение" }}</div>
+
+        <!-- USA states manual add -->
+        <div class="mb-4">
+          <div class="font-black text-sm mb-2">США: добавить штат</div>
+
+          <div class="flex flex-col md:flex-row gap-2">
+            <u-select v-model="addUsaState" :items="usaStateItems" placeholder="Выбери штат" />
+            <u-button :disabled="!addUsaState" @click="addUsaStateToCompare">Добавить</u-button>
+          </div>
+
+          <div v-if="selectedUSAStates.length" class="mt-3 flex flex-wrap gap-2">
+            <button
+                v-for="code in selectedUSAStates"
+                :key="code"
+                type="button"
+                class="chip"
+                @click="removeUsaState(code)"
+                :title="'Убрать ' + code.toUpperCase()"
+            >
+              <Icon name="i-lucide-x" class="i-icon" />
+              {{ code.toUpperCase() }}
+            </button>
+          </div>
+        </div>
+
+        <!-- Countries manual add -->
+        <div>
+          <div class="font-black text-sm mb-2">Добавить страну</div>
+
+          <div class="flex flex-col md:flex-row gap-2">
+            <u-select v-model="addCountry" :items="countryItems" placeholder="Выбери страну" />
+            <u-button :disabled="!addCountry" @click="addCountryToCompare">Добавить</u-button>
+          </div>
+
+          <div v-if="selectedCountries.length" class="mt-3 flex flex-wrap gap-2">
+            <button
+                v-for="k in selectedCountries"
+                :key="k"
+                type="button"
+                class="chip"
+                @click="removeCountry(k)"
+                :title="'Убрать ' + k"
+            >
+              <Icon name="i-lucide-x" class="i-icon" />
+              {{ k }}
+            </button>
+          </div>
+        </div>
+      </div>
 
       <!-- Best US state -->
       <div
@@ -523,7 +696,7 @@ function toggleUsaState(key: string) {
                   @click="toggleUsaState(s.key)"
               >
                 <Icon name="i-lucide-pin" class="i-icon" />
-                {{ selectedUSAStates.includes(s.key) ? t("common.pinned") : t("common.pin") }}
+                {{ selectedUSAStates.includes(stateCodeFromKey(s.key)) ? t("common.pinned") : t("common.pin") }}
               </button>
             </div>
 

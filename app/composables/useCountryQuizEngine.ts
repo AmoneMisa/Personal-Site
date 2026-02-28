@@ -2,6 +2,7 @@ import type { AxisKey, QuizConfig, Effects } from "~/utils/quizzes/country/count
 import type { CountryEntity, Vector } from "~/utils/quizzes/country/countries";
 import { countries } from "~/utils/quizzes/country/countries";
 import type { CountryIndicesBundle } from "~/types/indices";
+import {usStateVectorOverrides} from "~/composables/usStateVectorOverrides";
 
 export type LanguageLevel = "native" | "fluent" | "intermediate" | "basic" | "none";
 export type JobType = "remote" | "local" | "mixed";
@@ -179,7 +180,7 @@ export function expandEntitiesWithRegions(list: CountryEntity[]): CountryEntity[
                     titleKey: r.titleKey,
                     fallbackName: r.fallbackName,
                     teleportSlug: r.teleportSlug ?? c.teleportSlug,
-                    vector: { ...c.vector, ...(r.override?.vector ?? {}) },
+                    vector: { ...c.vector, ...(r.override?.vector ?? {}), ...(usStateVectorOverrides[r.key] ?? {}) },
                     languages: { ...c.languages, ...(r.override?.languages ?? {}) },
                     costUSD: r.override?.costUSD ? r.override.costUSD : c.costUSD,
                     work: { ...c.work, ...(r.override?.work ?? {}) },
