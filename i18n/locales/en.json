@@ -76,6 +76,15 @@
       "description": "Answer a few questions — we’ll suggest countries and regions that best fit your preferences and constraints.",
       "constraintsTitle": "Your situation",
       "constraints": {
+        "isShowUSA": {
+          "label": "Show USA states"
+        },
+        "isShowCountries": {
+          "label": "Show countries"
+        },
+        "showedCountriesCount": {
+          "label": "Count of countries for showing (up to 40)"
+        },
         "job": {
           "label": "Type of work",
           "remote": "Remote",
