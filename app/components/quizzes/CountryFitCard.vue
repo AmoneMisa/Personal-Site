@@ -207,19 +207,19 @@ function fmtPrice(v: number, fmt: PriceDef["fmt"]) {
   return fmt === "usd_m2" ? fmtUSDM2(v) : fmtUSD(v);
 }
 
-function hasAnyPrice(b: IndicesBundle | undefined) {
-  const p = b?.prices;
+function hasAnyPrice(item: Item | undefined) {
+  const p = item?.prices;
   if (!p) return false;
   return Object.values(p).some((x) => typeof x === "number" && Number.isFinite(x));
 }
 
 const availablePrices = computed(() => {
-  const p = props.indices?.prices;
+  const p = props.item?.prices;
   if (!p) return [];
 
   return PRICE_DEFS
-      .map(def => ({def, value: p[def.key]}))
-      .filter(x => isNum(x.value));
+      .map(def => ({ def, value: p[def.key] }))
+      .filter(x => typeof x.value === "number" && Number.isFinite(x.value));
 });
 
 const priceColumns = computed(() => {
@@ -285,16 +285,16 @@ const priceColumns = computed(() => {
             <span class="indices__val">{{ fmtIndex10(x.value) }}</span>
           </div>
         </div>
-        <div v-if="hasAnyPrice(indices)" class="indices__title mt-2">
+        <div v-if="hasAnyPrice(item)" class="indices__title mt-2">
           {{ t("quizzes.countryFit.prices.title") }}
         </div>
 
-        <div v-if="hasAnyPrice(indices)" class="indices__col" v-for="(col, ci) in priceColumns" :key="'p'+ci">
+        <div v-if="hasAnyPrice(item)" class="indices__col" v-for="(col, ci) in priceColumns" :key="'p'+ci">
           <div class="indices__row" v-for="x in col" :key="String(x.def.key)">
-    <span class="indices__k">
-      <Icon :name="x.def.icon" class="i-icon"/>
-      {{ t(x.def.labelKey) }}
-    </span>
+            <span class="indices__k">
+              <Icon :name="x.def.icon" class="i-icon"/>
+              {{ t(x.def.labelKey) }}
+            </span>
             <span class="indices__val">{{ fmtPrice(x.value, x.def.fmt) }}</span>
           </div>
         </div>
