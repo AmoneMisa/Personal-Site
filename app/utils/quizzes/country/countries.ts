@@ -1,5 +1,5 @@
 import type {AxisKey} from "./countryFit";
-import {usRegions} from "./usStates";
+import {type CostTier, type USRegion, usRegions} from "./usStates";
 import type {CountryIndicesBundle} from "~/types/indices";
 
 export type LangLevel = 0 | 1 | 2 | 3; // 0..3
@@ -45,6 +45,9 @@ export type CountryEntity = {
         titleKey: string;
         fallbackName: string;
         teleportSlug?: string;
+        tier?: CostTier;
+        monthly?: MonthlyUSD;
+        prices?: USRegion["prices"];
         override?: Partial<Pick<CountryEntity, "vector" | "languages" | "costUSD" | "work">>;
     }>;
 };
@@ -417,16 +420,23 @@ export const countries: CountryEntity[] = [
         costUSD: {tier: "mid", monthly: {single: 1935, couple: 2905, perKid: 485}},
         work: {remoteFriendly: 3, localWithoutLocalLanguage: 2},
         regions: usRegions.flatMap(r => {
-            const tier = US_STATE_COST_GROUPS[r.code] ?? "low";
+            const tier: CostTier = r.tier ?? US_STATE_COST_GROUPS[r.code] ?? "low";
+            const monthly: MonthlyUSD = r.monthly ?? usCost(tier).monthly;
+
+            const baseOverride = {
+                costUSD: { tier, monthly },
+                vector: {}
+            };
 
             const base = {
                 key: `countries.usa.${r.code}`,
                 titleKey: r.titleKey,
                 fallbackName: r.fallbackName,
-                override: {
-                    costUSD: usCost(tier),
-                    vector: {}
-                }
+                tier,
+                monthly,
+                prices: r.prices,
+
+                override: baseOverride
             };
 
             if (!r.teleportSlug) return [base];
@@ -436,10 +446,11 @@ export const countries: CountryEntity[] = [
                 titleKey: `regions.usa.${r.code}.mainCity`,
                 fallbackName: `${r.fallbackName} — Main city`,
                 teleportSlug: r.teleportSlug,
-                override: {
-                    costUSD: usCost(tier),
-                    vector: {}
-                }
+                tier,
+                monthly,
+                prices: r.prices,
+
+                override: baseOverride
             };
 
             return [base, city];
@@ -2511,19 +2522,6 @@ export const countries: CountryEntity[] = [
         {english: 0, russian: 0, noLocalLanguagePenalty: 0},
         {remoteFriendly: 0, localWithoutLocalLanguage: 0},
         numbeo(0, 6.2, 0, 0, 25.0, 0, 0, 0, 0)
-    ),
-    COUNTRY(
-        "countries.iran",
-        "Iran",
-        "low",
-        {single: 260, couple: 385, perKid: 65},
-        {climate_seasons: 2, cost_low_need: 3, rules_ok: -2, stability_need: -2, society_private: 1,
-            income_growth_need: -3,
-            quality_high_need: -3,
-},
-        {english: 1, russian: 0, noLocalLanguagePenalty: 0},
-        {remoteFriendly: 1, localWithoutLocalLanguage: 0},
-        numbeo(0, 30.3, 0, 0, 22.8, 17.2, 0, 0, 0)
     ),
     COUNTRY(
         "countries.iraq",

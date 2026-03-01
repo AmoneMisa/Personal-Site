@@ -241,6 +241,9 @@ function preferenceSign(prefVal: number | undefined) {
     return v === 0 ? 0 : v > 0 ? 1 : -1;
 }
 
+const idx01 = (v10: number) => clamp(v10 / 10, 0, 1);
+const badToGood01 = (v10: number) => clamp(1 - (v10 / 10), 0, 1); // 10 плохо -> 0 хорошо
+
 function liveScore100(
     user: UserProfile,
     pref: Record<AxisKey, number>,
@@ -266,6 +269,57 @@ function liveScore100(
     }
     if (isValidIndex(indices?.transportCar)) {
         addPart(parts, pref.transport_car, indices!.transportCar / 10);
+    }
+
+    // --- extra indices from numbeo bundle ---
+    if (isValidIndex(indices?.education)) {
+        const prefVal =
+            (pref.income_growth_need ?? 0) * 0.4 +
+            (pref.quality_high_need ?? 0) * 0.7 +
+            (pref.social_support_need ?? 0) * 0.3;
+
+        addPart(parts, prefVal, idx01(indices!.education!), 0.55);
+    }
+
+// unemployment (lower = better) -> invert
+    if (isValidIndex(indices?.unemployment)) {
+        const prefVal =
+            (pref.income_growth_need ?? 0) * 0.6 +
+            (pref.stability_need ?? 0) * 0.4;
+
+        addPart(parts, prefVal, badToGood01(indices!.unemployment!), 0.55);
+    }
+
+// air (higher = better) — предполагаем, что normalized уже "лучше воздух = больше"
+// если вдруг у тебя air наоборот (больше = хуже), просто замени idx01 -> badToGood01
+    if (isValidIndex(indices?.air)) {
+        const prefVal =
+            (pref.quality_high_need ?? 0) * 0.7 +
+            (pref.nature_water ?? 0) * 0.3 +
+            (pref.nature_mountains_forest ?? 0) * 0.3;
+
+        addPart(parts, prefVal, idx01(indices!.air!), 0.5);
+    }
+
+// inequality (lower = better) -> invert
+    if (isValidIndex(indices?.inequality)) {
+        const prefVal =
+            (pref.social_support_need ?? 0) * 0.7 +
+            (pref.rules_ok ?? 0) * 0.2 +
+            (pref.freedom_need ?? 0) * 0.2 +
+            (pref.stability_need ?? 0) * 0.2;
+
+        addPart(parts, prefVal, badToGood01(indices!.inequality!), 0.45);
+    }
+
+// health (higher = better)
+    if (isValidIndex(indices?.health)) {
+        const prefVal =
+            (pref.quality_high_need ?? 0) * 0.7 +
+            (pref.social_support_need ?? 0) * 0.5 +
+            (pref.stability_need ?? 0) * 0.3;
+
+        addPart(parts, prefVal, idx01(indices!.health!), 0.65);
     }
 
     // remote (job-type aware)

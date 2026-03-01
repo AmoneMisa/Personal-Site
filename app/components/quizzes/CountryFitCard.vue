@@ -17,10 +17,13 @@ type IndicesNormalized = {
   langBarrier?: number | null;
 };
 
+type Prices = Record<string, number | null | undefined>;
+
 type IndicesBundle = {
   key: string;
   updatedAtISO: string;
   normalized: IndicesNormalized;
+  prices?: Prices;
 };
 
 type Item = {
@@ -118,6 +121,113 @@ const indexColumns = computed(() => {
   for (let i = 0; i < items.length; i++) out[i % cols].push(items[i]);
   return out;
 });
+
+type PriceKey =
+    | "salaryNetMonthly"
+    | "salary_net_monthly"
+    | "averageNetMonthly"
+    | "rent1brCenter"
+    | "rent_1br_center"
+    | "apt1brCityCenter"
+    | "rent1brOutside"
+    | "rent_1br_outside"
+    | "apt1brOutsideCenter"
+    | "rent3brCenter"
+    | "rent_3br_center"
+    | "rent3brOutside"
+    | "rent_3br_outside"
+    | "utilities85"
+    | "utilities_85m2"
+    | "basic85m2"
+    | "mobilePlan"
+    | "mobile_plan"
+    | "internet60"
+    | "internet_60mbps"
+    | "internet60mbps"
+    | "sqmCenter"
+    | "buy_sqm_center"
+    | "sqmOutside"
+    | "buy_sqm_outside";
+
+type PriceDef = {
+  key: PriceKey;
+  icon: string;
+  labelKey: string;
+  fmt: "usd" | "usd_m2";
+};
+
+const PRICE_DEFS: PriceDef[] = [
+  {
+    key: "salaryNetMonthly",
+    icon: "i-lucide-wallet",
+    labelKey: "quizzes.countryFit.prices.salaryNetMonthly",
+    fmt: "usd"
+  },
+  {
+    key: "averageNetMonthly",
+    icon: "i-lucide-wallet",
+    labelKey: "quizzes.countryFit.prices.salaryNetMonthly",
+    fmt: "usd"
+  },
+  {key: "rent1brCenter", icon: "i-lucide-home", labelKey: "quizzes.countryFit.prices.rent1brCenter", fmt: "usd"},
+  {key: "apt1brCityCenter", icon: "i-lucide-home", labelKey: "quizzes.countryFit.prices.rent1brCenter", fmt: "usd"},
+  {
+    key: "rent1brOutside",
+    icon: "i-lucide-building-2",
+    labelKey: "quizzes.countryFit.prices.rent1brOutside",
+    fmt: "usd"
+  },
+  {
+    key: "apt1brOutsideCenter",
+    icon: "i-lucide-building-2",
+    labelKey: "quizzes.countryFit.prices.rent1brOutside",
+    fmt: "usd"
+  },
+  {key: "rent3brCenter", icon: "i-lucide-door-open", labelKey: "quizzes.countryFit.prices.rent3brCenter", fmt: "usd"},
+  {key: "rent3brOutside", icon: "i-lucide-warehouse", labelKey: "quizzes.countryFit.prices.rent3brOutside", fmt: "usd"},
+  {key: "utilities85", icon: "i-lucide-flame", labelKey: "quizzes.countryFit.prices.utilities85", fmt: "usd"},
+  {key: "basic85m2", icon: "i-lucide-flame", labelKey: "quizzes.countryFit.prices.utilities85", fmt: "usd"},
+  {key: "mobilePlan", icon: "i-lucide-smartphone", labelKey: "quizzes.countryFit.prices.mobilePlan", fmt: "usd"},
+  {key: "internet60", icon: "i-lucide-wifi", labelKey: "quizzes.countryFit.prices.internet60", fmt: "usd"},
+  {key: "sqmCenter", icon: "i-lucide-ruler", labelKey: "quizzes.countryFit.prices.sqmCenter", fmt: "usd_m2"},
+  {key: "sqmOutside", icon: "i-lucide-ruler", labelKey: "quizzes.countryFit.prices.sqmOutside", fmt: "usd_m2"},
+];
+
+function fmtUSD(v: number) {
+  return `$${Math.round(v).toLocaleString("en-US")}`;
+}
+
+function fmtUSDM2(v: number) {
+  return `$${Math.round(v).toLocaleString("en-US")} / m²`;
+}
+
+function fmtPrice(v: number, fmt: PriceDef["fmt"]) {
+  if (!Number.isFinite(v)) return "—";
+  return fmt === "usd_m2" ? fmtUSDM2(v) : fmtUSD(v);
+}
+
+function hasAnyPrice(b: IndicesBundle | undefined) {
+  const p = b?.prices;
+  if (!p) return false;
+  return Object.values(p).some((x) => typeof x === "number" && Number.isFinite(x));
+}
+
+const availablePrices = computed(() => {
+  const p = props.indices?.prices;
+  if (!p) return [];
+
+  return PRICE_DEFS
+      .map(def => ({def, value: p[def.key]}))
+      .filter(x => isNum(x.value));
+});
+
+const priceColumns = computed(() => {
+  const items = availablePrices.value;
+  const cols = Math.min(2, Math.max(1, Math.ceil(items.length / 4))); // цены лучше в 1–2 колонки
+  const out: Array<typeof items> = Array.from({length: cols}, () => []);
+  for (let i = 0; i < items.length; i++) out[i % cols].push(items[i]);
+  return out;
+});
 </script>
 
 <template>
@@ -174,7 +284,19 @@ const indexColumns = computed(() => {
             <span class="indices__val">{{ fmtIndex10(x.value) }}</span>
           </div>
         </div>
+        <div v-if="hasAnyPrice(indices)" class="indices__title mt-2">
+          {{ t("quizzes.countryFit.prices.title") }}
+        </div>
 
+        <div v-if="hasAnyPrice(indices)" class="indices__col" v-for="(col, ci) in priceColumns" :key="'p'+ci">
+          <div class="indices__row" v-for="x in col" :key="String(x.def.key)">
+    <span class="indices__k">
+      <Icon :name="x.def.icon" class="i-icon"/>
+      {{ t(x.def.labelKey) }}
+    </span>
+            <span class="indices__val">{{ fmtPrice(x.value, x.def.fmt) }}</span>
+          </div>
+        </div>
         <div class="indices__meta text-muted" v-if="indices?.updatedAtISO">
           {{ t("quizzes.countryFit.indices.updated") }}: {{ indices!.updatedAtISO.slice(0, 10) }}
         </div>
