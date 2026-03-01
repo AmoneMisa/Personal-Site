@@ -122,19 +122,22 @@ export const usRegions: USRegion[] = [
         }
     },
     {
-        code: "co", titleKey: "regions.usa.co", fallbackName: "Colorado", teleportSlug: "denver", tier: "high",
-        monthly: {
-            single: 2900,
-            couple: 4350,
-            perKid: 770,
+        code: "co", titleKey: "regions.usa.co", fallbackName: "Colorado", teleportSlug: "denver",
+        "tier": "mid",
+        "monthly": {
+            "single": 2907,
+            "couple": 4611,
+            "perKid": 2158
         },
-        prices: {
-            apt1brCityCenter: 1929.73,
-            apt1brOutsideCenter: 1587.94,
-            basic85m2: 192.7,
-            mobilePlan: 72.03,
-            internet60mbps: 75.0,
-            averageNetMonthly: 4464.38,
+        "prices": {
+            "salaryNetMonthly": 4464.38,
+            "rent1brCenter": 1923.11,
+            "rent1brOutside": 1582.63,
+            "rent3brCenter": 3033.44,
+            "rent3brOutside": 2581.54,
+            "utilities85": 194.28,
+            "mobilePlan": 72.47,
+            "internet60": 75
         }
     },
     {
@@ -145,18 +148,12 @@ export const usRegions: USRegion[] = [
             perKid: 2090,
         },
         prices: {
-            rent: {
-                apt1brCityCenter: 2030.06,
-                apt1brOutsideCenter: 1688.33,
-            },
-            utilities: {
-                basic85m2: 246.08,
-                mobilePlan: 62.61,
-                internet60mbps: 70.0,
-            },
-            salary: {
-                averageNetMonthly: 4107.58,
-            }
+            apt1brCityCenter: 2030.06,
+            apt1brOutsideCenter: 1688.33,
+            basic85m2: 246.08,
+            mobilePlan: 62.61,
+            internet60mbps: 70.0,
+            averageNetMonthly: 4107.58,
         }
     },
     {
