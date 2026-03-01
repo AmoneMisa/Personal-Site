@@ -4,6 +4,8 @@ import {countryFitQuiz} from "~/utils/quizzes/country/countryFit";
 import {matchCountries, type UserProfile} from "~/composables/useCountryQuizEngine";
 import {countries} from "~/utils/quizzes/country/countries";
 import CountryFitCard from "~/components/quizzes/CountryFitCard.vue";
+import CustomInput from "~/components/common/CustomInput.vue";
+import CustomCheckbox from "~/components/common/CustomCheckbox.vue";
 
 type IndicesNormalized = {
   income: number | null;
@@ -25,6 +27,10 @@ type IndicesBundle = {
 };
 
 type BundlesResponse = { items: IndicesBundle[] };
+
+const isShowUSA = ref(true);
+const isShowCountries = ref(true);
+const showedCountriesCount = ref(12);
 
 const {t} = useI18n();
 const route = useRoute();
@@ -207,16 +213,16 @@ const resultsAll = computed(() =>
 
 const usaGroup = computed(() => resultsAll.value.find((g) => g.base.key === "countries.usa"));
 const results = computed(() =>
-    matchCountries(countryFitQuiz, answers.value, user.value, indicesMap.value, 12, {
+    matchCountries(countryFitQuiz, answers.value, user.value, indicesMap.value, showedCountriesCount.value, {
       selectedCountries: selectedCountries.value,
-      usaVariantsLimit: 6,
+      usaVariantsLimit: 3,
     })
 );
 
 const filteredResults = computed(() =>
-    results.value.filter((g) => g.base.key !== "countries.usa").slice(0, 12)
+    results.value.filter((g) => g.base.key !== "countries.usa").slice(0, showedCountriesCount.value)
 );
-const topUsaStates = computed(() => (usaGroup.value?.variants ?? []).slice(0, 4));
+const topUsaStates = computed(() => (usaGroup.value?.variants ?? []).slice(0, 3));
 const usaStatesForCompare = computed(() => topUsaStates.value);
 
 watchEffect(() => {
@@ -331,8 +337,23 @@ watch(user, (v) => lsSet(LS_KEYS.user, v), {deep: true});
 
     <div class="p-4 rounded-xl border border-[var(--ui-border)] mb-8 bg-[rgba(255,255,255,0.03)]">
       <div class="font-black mb-3">{{ t("quizzes.countryFit.constraintsTitle") }}</div>
-
       <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div class="field">
+          <label class="field__label" for="cf_job">{{ t("quizzes.countryFit.constraints.isShowUSA.label") }}</label>
+          <custom-checkbox id="cf_isShowUSA" v-model="isShowUSA" label-key="quizzes.countryFit.constraints.isShowUSA.label"/>
+        </div>
+        <div class="field">
+          <label class="field__label" for="cf_job">{{ t("quizzes.countryFit.constraints.isShowCountries.label") }}</label>
+          <custom-checkbox id="cf_isShowCountries" v-model="isShowCountries" label-key="quizzes.countryFit.constraints.isShowCountries.label"
+          />
+        </div>
+        <div class="field">
+          <custom-input id="cf_showedCountriesCount" v-model.number="showedCountriesCount"
+                        type="number"
+                        :min="1"
+                        :max="40"
+                        label-key="quizzes.countryFit.constraints.showedCountriesCount.label"/>
+        </div>
         <!-- Job -->
         <div class="field">
           <label class="field__label" for="cf_job">{{ t("quizzes.countryFit.constraints.job.label") }}</label>
@@ -352,13 +373,11 @@ watch(user, (v) => lsSet(LS_KEYS.user, v), {deep: true});
 
         <!-- Budget -->
         <div class="field">
-          <label class="field__label" for="cf_budget">{{ t("quizzes.countryFit.constraints.budget.label") }}</label>
-          <u-input
-              id="cf_budget"
-              v-model.number="user.budget.monthlyUSD"
-              type="number"
-              :placeholder="t('quizzes.countryFit.constraints.budget.placeholder')"
-          />
+          <custom-input id="cf_budget" v-model.number="user.budget.monthlyUSD"
+                        type="number"
+                        :min="1"
+                        label-key="quizzes.countryFit.constraints.budget.label"
+                        placeholder-key="quizzes.countryFit.constraints.budget.placeholder"/>
           <div class="field__hint text-muted">
             {{ t('quizzes.countryFit.constraints.budget.hint') }}
           </div>
@@ -421,14 +440,11 @@ watch(user, (v) => lsSet(LS_KEYS.user, v), {deep: true});
 
         <!-- Kids -->
         <div class="field">
-          <label class="field__label" for="cf_kids">{{ t("quizzes.countryFit.constraints.kids.label") }}</label>
-          <u-input
-              id="cf_kids"
-              v-model.number="user.family.kidsCount"
-              type="number"
-              :min="0"
-              :placeholder="t('quizzes.countryFit.constraints.kids.placeholder')"
-          />
+          <custom-input id="cf_kids" v-model.number="user.family.kidsCount"
+                        type="number"
+                        :min="0"
+                        placeholder-key="quizzes.countryFit.constraints.kids.placeholder"
+                        label-key="quizzes.countryFit.constraints.kids.label"/>
           <div class="field__hint text-muted">
             {{ t('quizzes.countryFit.constraints.kids.hint') }}
           </div>
@@ -437,7 +453,7 @@ watch(user, (v) => lsSet(LS_KEYS.user, v), {deep: true});
     </div>
 
     <!-- Questions -->
-    <div class="space-y-6">
+    <div class="space-y-6 grid grid-cols-1 md:grid-cols-2 gap-2">
       <div
           v-for="q in [...countryFitQuiz.questions].sort((a, b) => a.order - b.order)"
           :key="q.id"
@@ -552,7 +568,7 @@ watch(user, (v) => lsSet(LS_KEYS.user, v), {deep: true});
         </div>
       </div>
 
-      <div v-if="usaStatesForCompare.length" class="mb-6">
+      <div v-if="usaStatesForCompare.length && isShowUSA" class="mb-6">
         <div class="font-black text-lg mb-3 flex items-center gap-2">
           <Icon name="i-lucide-flag" class="i-icon"/>
           {{ t("quizzes.countryFit.usaCompareTitle") }}
@@ -572,7 +588,11 @@ watch(user, (v) => lsSet(LS_KEYS.user, v), {deep: true});
       </div>
 
       <!-- Countries -->
-      <div v-if="filteredResults.length" class="grid grid-cols-1 md:grid-cols-3 gap-3">
+      <div class="font-black text-lg mb-3 flex items-center gap-2">
+        <Icon name="i-lucide-flag" class="i-icon"/>
+        {{ t("quizzes.countryFit.compareTitle") }}
+      </div>
+      <div v-if="filteredResults.length && isShowCountries" class="grid grid-cols-1 md:grid-cols-3 gap-3">
         <country-fit-card
             v-for="g in filteredResults"
             :key="g.base.key"

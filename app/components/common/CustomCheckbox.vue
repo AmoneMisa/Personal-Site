@@ -68,8 +68,8 @@ const id = `cb_${Math.random().toString(16).slice(2)}`
   display: inline-flex;
   align-items: center;
   gap: 10px;
-  padding: 8px 10px;
-  border-radius: 14px;
+  padding: 6px 8px;
+  border-radius: 6px;
   border: 1px solid var(--ui-border);
   background: rgba(255, 255, 255, 0.02);
   color: var(--ui-text);

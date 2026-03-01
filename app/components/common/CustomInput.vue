@@ -2,7 +2,7 @@
 type InputType = "text" | "search" | "email" | "password" | "number" | "url";
 
 type Props = {
-  modelValue?: string
+  modelValue?: string | number
   type?: InputType
   label?: string
   labelKey?: string
@@ -16,6 +16,8 @@ type Props = {
   autocomplete?: string
   inputmode?: "text" | "numeric" | "decimal" | "email" | "search" | "tel" | "url"
   clearable?: boolean
+  min?: number
+  max?: number
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -32,7 +34,9 @@ const props = withDefaults(defineProps<Props>(), {
   autocomplete: "off",
   inputmode: "text",
   clearable: true,
-  modelValue: ""
+  modelValue: "",
+  min: undefined,
+  max: undefined,
 })
 
 const emit = defineEmits<{
@@ -40,11 +44,63 @@ const emit = defineEmits<{
   (e: "clear"): void
 }>()
 
-const id = `in_${Math.random().toString(16).slice(2)}`
-const hasValue = computed(() => (props.modelValue || "").length > 0)
+const id = `in_${Math.random().toString(16).slice(2)}`;
+const hasValue = computed(() => (props.modelValue || "").length > 0);
 
 function onInput(e: Event) {
-  emit("update:modelValue", (e.target as HTMLInputElement).value)
+  const input = e.target as HTMLInputElement;
+  const value = input.value;
+
+  if (props.type !== "number") {
+    emit("update:modelValue", value);
+    return
+  }
+
+  const parsed = parseNumber(value);
+
+  if (parsed === null) {
+    emit("update:modelValue", "");
+    return;
+  }
+
+  const clamped = clamp(parsed);
+  emit("update:modelValue", clamped);
+}
+
+function onKeydown(e: KeyboardEvent) {
+  if (props.type !== "number") return
+
+  const allowed = [
+    "Backspace",
+    "Delete",
+    "ArrowLeft",
+    "ArrowRight",
+    "Tab",
+    "-",
+    ".",
+  ]
+
+  if (
+      allowed.includes(e.key) ||
+      (e.key >= "0" && e.key <= "9")
+  ) {
+    return
+  }
+
+  e.preventDefault()
+}
+
+function parseNumber(value: string): number | null {
+  if (value === "" || value === "-" || value === ".") return null;
+
+  const n = Number(value);
+  return Number.isFinite(n) ? n : null;
+}
+
+function clamp(n: number) {
+  if (props.min !== undefined && n < props.min) return props.min;
+  if (props.max !== undefined && n > props.max) return props.max;
+  return n;
 }
 
 function clear() {
@@ -74,10 +130,13 @@ function clear() {
           :autocomplete="autocomplete"
           :inputmode="inputmode"
           @input="onInput"
+          @keydown="onKeydown"
+          :min="type === 'number' ? min : undefined"
+          :max="type === 'number' ? max : undefined"
       />
 
       <button
-          v-if="clearable && !readonly && !disabled && hasValue"
+          v-if="clearable && !readonly && !disabled && hasValue && !(type === 'number')"
           class="uii__clear"
           type="button"
           @click="clear"
@@ -106,26 +165,30 @@ function clear() {
 
 .uii__label {
   font-weight: 900;
-  font-size: 12px;
-  color: var(--ui-text-muted);
+  font-size: 13px;
+  color: var(--text-white);
 }
 
 .uii__box {
   position: relative;
-  border-radius: 14px;
+  border-radius: 6px;
   border: 1px solid var(--ui-border);
   background: rgba(255, 255, 255, 0.02);
-  padding: 8px 10px;
+  padding: 3px 8px;
 }
 
 .uii__input {
   width: 100%;
-  font-size: 12px;
+  font-size: 13px;
   color: var(--ui-text);
   background: transparent;
   outline: none;
   border: 0;
   padding-right: 28px;
+
+  &[type="number"] {
+    padding-right: 0;
+  }
 }
 
 .uii__clear {
