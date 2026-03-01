@@ -50,6 +50,8 @@ export type CountryEntity = {
         prices?: USRegion["prices"];
         override?: Partial<Pick<CountryEntity, "vector" | "languages" | "costUSD" | "work">>;
     }>;
+
+    prices?: any;
 };
 
 const numbeo = (

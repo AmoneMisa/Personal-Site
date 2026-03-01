@@ -34,6 +34,7 @@ type Item = {
   why?: string[];
   match100?: number | null;
   live100?: number | null;
+  prices?: any;
 };
 
 const props = withDefaults(defineProps<{

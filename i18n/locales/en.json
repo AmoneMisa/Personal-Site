@@ -40,6 +40,19 @@
       "loadingIndices": "Loading indices…",
       "bestUsStateTitle": "Best US state for your profile",
       "bestUsStateHint": "Based on your answers and budget",
+      "prices": {
+        "title": "Prices & Living Costs",
+        "salaryNetMonthly": "Average net salary",
+        "rent1brCenter": "1-bedroom apartment rent (city center)",
+        "rent1brOutside": "1-bedroom apartment rent (outside center)",
+        "rent3brCenter": "3-bedroom apartment rent (city center)",
+        "rent3brOutside": "3-bedroom apartment rent (outside center)",
+        "utilities85": "Utilities (≈85 m² apartment)",
+        "mobilePlan": "Mobile phone plan",
+        "internet60": "Home internet",
+        "sqmCenter": "Apartment purchase price (city center, per m²)",
+        "sqmOutside": "Apartment purchase price (outside center, per m²)"
+      },
       "rating": {
         "match": "Preference match",
         "live": "Living rating"

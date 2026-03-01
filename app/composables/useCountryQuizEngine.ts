@@ -27,6 +27,7 @@ export type MatchResult = {
     estimatedMonthlyUSD: number;
     why: string[];
     teleportSlug?: string;
+    prices: any;
 };
 
 export type MatchGroup = {
@@ -194,6 +195,7 @@ export function expandEntitiesWithRegions(list: CountryEntity[]): CountryEntity[
                     vector: {...c.vector, ...(r.override?.vector ?? {}), ...(usStateVectorOverrides[r.key] ?? {})},
                     languages: {...c.languages, ...(r.override?.languages ?? {})},
                     costUSD: r.override?.costUSD ? r.override.costUSD : c.costUSD,
+                    prices: (r.override as any)?.prices ?? (c as any).prices,
                     work: {...c.work, ...(r.override?.work ?? {})},
                     regions: undefined,
                 };
@@ -441,6 +443,7 @@ export function matchCountries(
             estimatedMonthlyUSD: needed,
             why,
             teleportSlug: (e as any).teleportSlug,
+            prices: (e as any).prices
         });
     }
 
