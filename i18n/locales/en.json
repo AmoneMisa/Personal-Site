@@ -1,4 +1,9 @@
 {
+  "header": {
+    "button": {
+      "changeTheme": "Change theme"
+    }
+  },
   "common": {
     "add": "Add",
     "remove": "Remove",
