@@ -39,7 +39,7 @@ export default defineNuxtConfig({
         locales: [
             {code: 'en', language: 'en-US', name: 'English'},
             {code: 'ru', language: 'ru-RU', name: 'Русский'},
-            {code: 'kk', language: 'kk-KZ', name: 'Қазақша'}
+            // {code: 'kk', language: 'kk-KZ', name: 'Қазақша'}
         ],
         strategy: 'no_prefix',
         detectBrowserLanguage: {
@@ -52,7 +52,7 @@ export default defineNuxtConfig({
     },
     experimental: {appManifest: false},
     runtimeConfig: {
-        apiBase: 'http://localhost:8000', //http://backend:8000/** - prod
+        apiBase: 'http://backend:8000', //http://backend:8000/** - prod
         public: {
             apiBase: '/api'
         }
@@ -62,7 +62,7 @@ export default defineNuxtConfig({
             websocket: true
         },
         routeRules: {
-            '/api/**': {proxy: 'http://localhost:8000/**'} //http://backend:8000/** - prod
+            '/api/**': {proxy: 'http://backend:8000/**'} //http://backend:8000/** - prod
         }
     },
     icon: {
