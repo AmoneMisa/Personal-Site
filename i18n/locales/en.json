@@ -318,7 +318,10 @@
       "channel_telegram": "Switch to Telegram",
       "enter_tg": "Please enter your Telegram username starting with @ so the developer can contact you directly.",
       "telegram_done": "Thank you. The developer will contact you as soon as possible from @WhitesLove.",
-      "session_closed": "The conversation has been closed."
+      "session_closed": "The conversation has been closed. You can start a new one at any time.",
+      "site_started": "Alright! Write a message — I'll pass it on to the developer.",
+      "invalid_tg": "The username must be in @username format (5–32 characters).",
+      "new_dialog": "Start a new conversation"
     },
     "errors": {
       "empty": "Message cannot be empty",
