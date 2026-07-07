@@ -100,21 +100,22 @@ async function openTelegramShare() {
 
   copied.value = false;
 
-  const finalText = `@${TG_USERNAME}\n\n${message.value.trim()}`;
-  const encoded = encodeURIComponent(finalText);
-  const tgResolve = `tg://resolve?domain=${encodeURIComponent(TG_USERNAME)}&text=${encoded}`;
-  const tgWebChat = `https://t.me/${encodeURIComponent(TG_USERNAME)}?text=${encoded}`;
-  const tgProfile = `https://t.me/${encodeURIComponent(TG_USERNAME)}`;
-  const copiedOk = await copyToClipboard(finalText);
-  const openedResolve = await tryOpen(tgResolve);
-  if (openedResolve) return;
+  const text = message.value.trim();
+  const encoded = encodeURIComponent(text);
+  const profileUrl = `https://t.me/${encodeURIComponent(TG_USERNAME)}`;
 
-  const openedWebChat = await tryOpen(tgWebChat);
-  if (openedWebChat) return;
+  // Telegram ignores the `text` param when opening a user profile chat
+  // (tg://resolve?domain=…&text=… / t.me/<user>?text=…), so the message never
+  // gets prefilled that way. The share dialog is the only deep link that carries
+  // the text. The universal https link opens the native app on mobile and
+  // Telegram Web on desktop, and lets the user pick the developer as recipient.
+  const shareUrl = `https://t.me/share/url?url=${encodeURIComponent(profileUrl)}&text=${encoded}`;
 
-  await tryOpen(tgProfile);
+  // Copy first as a fallback in case the user dismisses the share sheet.
+  const copiedOk = await copyToClipboard(text);
 
-  if (!copiedOk) await copyToClipboard(finalText);
+  const opened = await tryOpen(shareUrl);
+  if (!opened && !copiedOk) await copyToClipboard(text);
 }
 
 </script>

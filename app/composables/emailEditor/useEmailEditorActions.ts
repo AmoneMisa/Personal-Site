@@ -1,7 +1,9 @@
-import { computed, watchEffect } from "vue";
+import { computed, watch, watchEffect } from "vue";
 import type { ReturnType } from "./useEmailEditorState";
 import { collectDiagnostics } from "~/utils/emailEditor/diagnostics/collectDiagnostics";
 import { inlineStyleToStyleTag } from "~/utils/emailEditor/transform/inlineStyleToStyleTag";
+import { extractVariablePaths } from "~/utils/emailEditor/fakeData/extractVariablePaths";
+import { defaultFakeValue } from "~/utils/emailEditor/fakeData/defaultFakeValue";
 
 export function useEmailEditorActions(state: ReturnType<typeof import("./useEmailEditorState")["useEmailEditorState"]>) {
     watchEffect(() => {
@@ -18,11 +20,55 @@ export function useEmailEditorActions(state: ReturnType<typeof import("./useEmai
         return state.diagnostics.value.find((d) => d.id === id) ?? null;
     });
 
+    // Variable paths detected in the current template (only while fake data is on).
+    const detectedVariablePaths = computed<string[]>(() => {
+        if (!state.fakeData.enabled) return [];
+        return extractVariablePaths(state.code.value, state.templateEngine.value);
+    });
+
+    // Seed newly detected paths with a friendly sample value (keep edited ones).
+    watch(
+        detectedVariablePaths,
+        (paths) => {
+            for (const p of paths) {
+                if (!Object.prototype.hasOwnProperty.call(state.fakeData.values, p)) {
+                    state.fakeData.values[p] = defaultFakeValue(p);
+                }
+            }
+        },
+        { immediate: true },
+    );
+
+    // Opening the window when the feature is switched on.
+    watch(
+        () => state.fakeData.enabled,
+        (on) => {
+            if (on) state.fakeData.open = true;
+        },
+    );
+
+    function setFakeValue(path: string, value: string) {
+        state.fakeData.values[path] = value;
+    }
+
+    function addFakePath(path: string) {
+        const key = String(path ?? "").trim();
+        if (!key) return;
+        if (!Object.prototype.hasOwnProperty.call(state.fakeData.values, key)) {
+            state.fakeData.values[key] = defaultFakeValue(key);
+        }
+    }
+
+    function removeFakePath(path: string) {
+        delete state.fakeData.values[path];
+    }
+
     function onToolbarAction(action: string) {
         if (action === "moveInlineStylesToStyleTag") return moveInlineStylesToStyleTag();
         if (action === "openInsertImage") return (state.modals.insertImage = true);
         if (action === "openInsertLink") return (state.modals.insertLink = true);
         if (action === "openInsertTemplate") return (state.modals.insertTemplate = true);
+        if (action === "openFakeData") return (state.fakeData.open = true);
     }
 
     function moveInlineStylesToStyleTag() {
@@ -106,6 +152,10 @@ export function useEmailEditorActions(state: ReturnType<typeof import("./useEmai
         applyColorFromPicker,
         closeColorPicker,
         activeDiagnostic,
+        detectedVariablePaths,
+        setFakeValue,
+        addFakePath,
+        removeFakePath,
     };
 }
 

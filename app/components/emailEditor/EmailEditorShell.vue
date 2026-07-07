@@ -10,6 +10,7 @@ import { useEmailEditorActions } from "~/composables/emailEditor/useEmailEditorA
 import InsertImageModal from "~/components/emailEditor/modals/InsertImageModal.vue";
 import InsertLinkModal from "~/components/emailEditor/modals/InsertLinkModal.vue";
 import InsertTemplateModal from "~/components/emailEditor/modals/InsertTemplateModal.vue";
+import FakeDataPanel from "~/components/emailEditor/modals/FakeDataPanel.vue";
 
 const { t } = useI18n();
 
@@ -31,8 +32,10 @@ const actions = useEmailEditorActions(state);
           :template-engine="state.templateEngine.value"
           :preview-client="state.previewClient.value"
           :is-busy="state.isBusy.value"
+          :fake-data-enabled="state.fakeData.enabled"
           @update:template-engine="state.templateEngine.value = $event"
           @update:preview-client="state.previewClient.value = $event"
+          @update:fake-data-enabled="state.fakeData.enabled = $event"
           @action="actions.onToolbarAction"
       />
 
@@ -42,6 +45,7 @@ const actions = useEmailEditorActions(state);
           :preview-client="state.previewClient.value"
           :diagnostics="state.diagnostics.value"
           :active-diagnostic-id="state.activeDiagnosticId.value"
+          :fake-data="state.fakeData"
           @update:code="state.code.value = $event"
           @jump-to-diagnostic="actions.jumpToDiagnostic"
           @select-diagnostic="state.activeDiagnosticId.value = $event"
@@ -63,6 +67,15 @@ const actions = useEmailEditorActions(state);
           v-model:open="state.modals.insertTemplate"
           :template-engine="state.templateEngine.value"
           @insert="actions.insertTemplate"
+      />
+
+      <fake-data-panel
+          v-model:open="state.fakeData.open"
+          :detected-paths="actions.detectedVariablePaths.value"
+          :values="state.fakeData.values"
+          @update:value="actions.setFakeValue($event.path, $event.value)"
+          @add="actions.addFakePath"
+          @remove="actions.removeFakePath"
       />
 
       <color-picker-popover

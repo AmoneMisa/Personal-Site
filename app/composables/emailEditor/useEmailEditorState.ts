@@ -37,6 +37,14 @@ export function useEmailEditorState() {
     preferHex: true,
   });
 
+  // Fake data: sample values for template variables, shown by variable path in a
+  // separate window and substituted into the preview when enabled.
+  const fakeData = reactive({
+    enabled: false,
+    open: false,
+    values: {} as Record<string, string>,
+  });
+
   return {
     code,
     templateEngine,
@@ -47,6 +55,7 @@ export function useEmailEditorState() {
     modals,
     monacoApi,
     colorPicker,
+    fakeData,
   };
 }
 

@@ -18,18 +18,18 @@ useSeoMeta({
 });
 
 type Mode = "media" | "data" | "document";
-type MediaTarget = "png" | "jpg" | "jpeg" | "webp";
-type DataTarget = "csv" | "json" | "xml" | "xlsx";
-type DocTarget = "docx" | "pdf";
+type MediaTarget = "png" | "jpg" | "jpeg" | "webp" | "gif" | "bmp" | "tiff" | "avif";
+type DataTarget = "csv" | "json" | "xml" | "xlsx" | "yaml" | "tsv";
+type DocTarget = "docx" | "pdf" | "txt" | "html" | "md" | "odt" | "rtf";
 
 const config = useRuntimeConfig();
 
 const mode = ref<Mode>("media");
 
 const targets = computed(() => {
-  if (mode.value === "media") return ["png", "jpeg", "jpg", "webp"] as MediaTarget[];
-  if (mode.value === "data") return ["csv", "json", "xml", "xlsx"] as DataTarget[];
-  return ["docx", "pdf"] as DocTarget[];
+  if (mode.value === "media") return ["png", "jpeg", "jpg", "webp", "gif", "bmp", "tiff", "avif"] as MediaTarget[];
+  if (mode.value === "data") return ["csv", "json", "xml", "xlsx", "yaml", "tsv"] as DataTarget[];
+  return ["pdf", "docx", "txt", "html", "md", "odt", "rtf"] as DocTarget[];
 });
 
 const target = ref<string>("webp");
@@ -42,9 +42,9 @@ watch(mode, (m) => {
 });
 
 const accept = computed(() => {
-  if (mode.value === "media") return ".png,.jpg,.jpeg,.webp";
-  if (mode.value === "data") return ".csv,.json,.xml";
-  return ".docx,.pdf";
+  if (mode.value === "media") return ".png,.jpg,.jpeg,.webp,.gif,.bmp,.tif,.tiff,.avif";
+  if (mode.value === "data") return ".csv,.json,.xml,.xlsx,.yaml,.yml,.tsv";
+  return ".docx,.pdf,.txt,.html,.htm,.md,.odt,.rtf";
 });
 
 const maxFiles = computed(() => (mode.value === "media" ? 20 : 1));
@@ -105,7 +105,7 @@ function addFiles(list: File[]) {
   files.value = combined;
 
   if (combined.length >= maxFiles.value && (files.value.length + list.length) > maxFiles.value) {
-    successMessage.value = `Взял первые ${maxFiles.value} файлов 🙂`;
+    successMessage.value = t("services.converter.messages.tookFirst", { count: maxFiles.value });
   }
 }
 
@@ -139,28 +139,28 @@ function validate(): boolean {
   clearMessages();
 
   if (!files.value.length) {
-    errorMessage.value = "Добавь файл(ы) для конвертации.";
+    errorMessage.value = t("services.converter.messages.noFiles");
     return false;
   }
 
   if (mode.value !== "media" && files.value.length !== 1) {
-    errorMessage.value = "В этом режиме можно загрузить только один файл.";
+    errorMessage.value = t("services.converter.messages.singleOnly");
     return false;
   }
 
   if (mode.value === "media" && files.value.length > 20) {
-    errorMessage.value = "Для изображений максимум 20 файлов.";
+    errorMessage.value = t("services.converter.messages.mediaMax");
     return false;
   }
 
   const allowed =
-      mode.value === "media" ? ["png", "jpg", "jpeg", "webp"]
-          : mode.value === "data" ? ["csv", "json", "xml"]
-              : ["docx", "pdf"];
+      mode.value === "media" ? ["png", "jpg", "jpeg", "webp", "gif", "bmp", "tif", "tiff", "avif"]
+          : mode.value === "data" ? ["csv", "json", "xml", "xlsx", "yaml", "yml", "tsv"]
+              : ["docx", "pdf", "txt", "html", "htm", "md", "odt", "rtf"];
 
   const bad = files.value.find(f => !allowed.includes(fileExt(f.name)));
   if (bad) {
-    errorMessage.value = `Неподдерживаемый файл: ${bad.name}`;
+    errorMessage.value = t("services.converter.messages.unsupported", { name: bad.name });
     return false;
   }
 
@@ -231,7 +231,7 @@ async function convert() {
         payload = await res.json();
       } catch {
       }
-      errorMessage.value = payload?.detail?.message || payload?.message || `Ошибка: ${res.status}`;
+      errorMessage.value = payload?.detail?.message || payload?.message || t("services.converter.messages.httpError", { status: res.status });
       return;
     }
 
@@ -247,9 +247,9 @@ async function convert() {
             : `${files.value[0].name.replace(/\.[^.]+$/, "")}.${normalizedTarget}`;
 
     downloadBlob(blob, serverName || fallback);
-    successMessage.value = "Готово! Файл скачался 👌";
+    successMessage.value = t("services.converter.messages.success");
   } catch (e: any) {
-    errorMessage.value = e?.message || "Не удалось выполнить конвертацию.";
+    errorMessage.value = e?.message || t("services.converter.messages.failed");
   } finally {
     isLoading.value = false;
   }
@@ -258,20 +258,20 @@ async function convert() {
 const modeCards = computed(() => ([
   {
     key: "media" as const,
-    title: "Изображения",
-    desc: "PNG/JPEG/WEBP → один формат. До 20 файлов, вернём zip.",
+    title: t("services.converter.modes.media.title"),
+    desc: t("services.converter.modes.media.desc"),
     icon: "i-lucide-image"
   },
   {
     key: "data" as const,
-    title: "Данные",
-    desc: "CSV/JSON/XML → CSV/JSON/XML/XLSX. По одному файлу.",
+    title: t("services.converter.modes.data.title"),
+    desc: t("services.converter.modes.data.desc"),
     icon: "i-lucide-database"
   },
   {
     key: "document" as const,
-    title: "Документы",
-    desc: "DOCX ↔ PDF (best effort для PDF→DOCX). По одному файлу.",
+    title: t("services.converter.modes.docs.title"),
+    desc: t("services.converter.modes.docs.desc"),
     icon: "i-lucide-file-text"
   },
 ]));

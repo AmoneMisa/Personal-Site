@@ -12,6 +12,7 @@ type Props = {
   previewClient: PreviewClient;
   diagnostics: DiagnosticItem[];
   activeDiagnosticId: string | null;
+  fakeData: { enabled: boolean; values: Record<string, string> };
 };
 
 const props = defineProps<Props>();
@@ -68,6 +69,7 @@ const emit = defineEmits<{
               :code="props.code"
               :template-engine="props.templateEngine"
               :preview-client="props.previewClient"
+              :fake-data="props.fakeData"
           />
         </div>
       </div>
