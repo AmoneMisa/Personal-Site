@@ -16,19 +16,21 @@ export async function bootstrapCommonSSR(nuxtApp: ReturnType<typeof useNuxtApp>,
         {query: {lang}}
     );
 
-    if (tr.data && Object.keys(tr.data).length) {
+    const hasTranslations = !!(tr.data && Object.keys(tr.data).length);
+
+    if (hasTranslations) {
         nuxtApp.$i18n.setLocaleMessage(lang, tr.data);
+
+        nuxtApp.runWithContext(() => {
+            const messages = useTranslationMessages();
+            messages.value = tr.data;
+        });
+
+        nuxtApp.runWithContext(() => {
+            const loaded = useTranslationsLoaded();
+            if (!loaded.value.includes(lang)) loaded.value.push(lang);
+        });
     }
-
-    nuxtApp.runWithContext(() => {
-        const messages = useTranslationMessages();
-        messages.value = tr.data;
-    });
-
-    nuxtApp.runWithContext(() => {
-        const loaded = useTranslationsLoaded();
-        loaded.value.push(lang);
-    });
 
     const [contacts, menu, footer] = await Promise.all([
         safeFetch(`${api}/contacts`),
