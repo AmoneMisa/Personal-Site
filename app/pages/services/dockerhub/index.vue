@@ -315,7 +315,7 @@ function chooseAdvancedTag(tag: string) {
                     </div>
                   </div>
 
-                  <div class="docker-search__field docker-search__field_small ui-pill-btn ui-pill-btn_animated">
+                  <div class="docker-search__field docker-search__field_small docker-search__field_sort ui-pill-btn ui-pill-btn_animated">
                     <div class="ui-pill-btn__inner">
                       <div class="docker-search__label">
                         {{ t("services.dockerSearch.simple.sort.label") }}
@@ -324,7 +324,7 @@ function chooseAdvancedTag(tag: string) {
                       <u-select
                           v-model="simpleSort"
                           :items="simpleSortOptions"
-                          :ui="{ base: 'w-fill-available p-0 bg-transparent rounded-none ring-0 border-0' }"
+                          :ui="{ base: 'min-w-0 p-0 bg-transparent rounded-none ring-0 border-0' }"
                           class="ui-locale"
                       />
                     </div>
@@ -479,7 +479,7 @@ function chooseAdvancedTag(tag: string) {
                       <u-select
                           v-model="variant"
                           :items="variantPresets.map(v => ({ label: t(v.labelKey), value: v.value }))"
-                          :ui="{ base: 'w-fill-available p-0 bg-transparent rounded-none ring-0 border-0' }"
+                          :ui="{ base: 'min-w-0 p-0 bg-transparent rounded-none ring-0 border-0' }"
                           class="ui-locale"
                       />
                     </div>
@@ -730,9 +730,25 @@ function chooseAdvancedTag(tag: string) {
   }
 }
 
+.docker-search__field_sort {
+  @media (min-width: 900px) {
+    max-width: none;
+  }
+}
+
 .docker-search__label {
   font-weight: 900;
   font-size: 13px;
+}
+
+.ui-pill-btn__inner .docker-search__label {
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
+.ui-pill-btn__inner :deep(.ui-locale) {
+  flex: 1 1 auto;
+  min-width: 0;
 }
 
 .docker-search__hint {

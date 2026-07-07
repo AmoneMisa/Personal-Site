@@ -29,6 +29,8 @@ const props = withDefaults(
     }
 );
 
+const { t } = useI18n();
+
 const { public: publicConfig } = useRuntimeConfig();
 const apiBase = computed(() => (publicConfig.apiBase || "").replace(/\/$/, ""));
 
@@ -44,6 +46,7 @@ const messageText = ref("");
 
 const socket = ref<WebSocket | null>(null);
 const socketConnected = ref(false);
+let shouldReconnect = true;
 
 const chatListRef = ref<HTMLElement | null>(null);
 const clientId = ref<string>("");
@@ -88,13 +91,12 @@ async function scrollChatToBottom(smooth = true) {
 function openChat() {
   isOpen.value = true;
   hasUnread.value = false;
-  connectSocket();
+  if (!socketConnected.value) connectSocket();
   loadHistory();
 }
 
 function closeChat() {
   isOpen.value = false;
-  disconnectSocket();
 }
 
 function toggleChat() {
@@ -115,7 +117,7 @@ function ensureIntroIfNeeded() {
 
   const hasAny = messages.value.length > 0;
   if (!hasAny) {
-    pushSystemOwnerText("Привет! Где вам удобнее общаться с разработчиком?");
+    pushSystemOwnerText(t("chat.system.choose_channel"));
   }
 }
 
@@ -142,16 +144,16 @@ async function loadHistory() {
 
       if (session.value.status === "awaiting_username") {
         if (!messages.value.some((m) => m.sender === "owner" && m.text.includes("@"))) {
-          pushSystemOwnerText("Введите ваш никнейм в Telegram через @ — чтобы разработчик смог написать вам напрямую.");
+          pushSystemOwnerText(t("chat.system.enter_tg"));
         }
       }
 
       if (session.value.status === "moved_to_telegram") {
-        pushSystemOwnerText(`Спасибо. Разработчик свяжется с вами как можно скорее с ника @WhitesLove`);
+        pushSystemOwnerText(t("chat.system.telegram_done"));
       }
 
       if (session.value.status === "closed") {
-        pushSystemOwnerText("Диалог закрыт. Вы можете начать новый в любой момент.");
+        pushSystemOwnerText(t("chat.system.session_closed"));
       }
 
       await scrollChatToBottom(false);
@@ -177,7 +179,7 @@ async function startNewSession() {
   session.value = data.session as ChatSession;
   messages.value = [];
 
-  pushSystemOwnerText("Привет! Где вам удобнее общаться с разработчиком?");
+  pushSystemOwnerText(t("chat.system.choose_channel"));
   await scrollChatToBottom(false);
 }
 
@@ -196,7 +198,7 @@ async function chooseSite() {
 
   session.value = data.session as ChatSession;
 
-  pushSystemOwnerText("Ок! Напишите сообщение — я передам его разработчику.");
+  pushSystemOwnerText(t("chat.system.site_started"));
   await scrollChatToBottom();
 }
 
@@ -216,7 +218,7 @@ async function chooseTelegram() {
   session.value = data.session as ChatSession;
 
   session.value.status = "awaiting_username";
-  pushSystemOwnerText("Введите ваш никнейм в Telegram через @ — чтобы разработчик смог написать вам напрямую.");
+  pushSystemOwnerText(t("chat.system.enter_tg"));
   await scrollChatToBottom();
 }
 
@@ -227,7 +229,7 @@ function isValidTgUsername(v: string) {
 async function submitTelegramUsername() {
   const tg = messageText.value.trim();
   if (!isValidTgUsername(tg)) {
-    pushSystemOwnerText("Никнейм должен быть в формате @username (5–32 символа).");
+    pushSystemOwnerText(t("chat.system.invalid_tg"));
     await scrollChatToBottom();
     return;
   }
@@ -254,7 +256,7 @@ async function submitTelegramUsername() {
 
     session.value = data.session as ChatSession;
 
-    pushSystemOwnerText(`Спасибо. Разработчик свяжется с вами как можно скорее с ника @WhitesLove`);
+    pushSystemOwnerText(t("chat.system.telegram_done"));
     await scrollChatToBottom();
   } finally {
     isSending.value = false;
@@ -336,7 +338,7 @@ async function closeSessionFromSite() {
   if (!data?.ok) return;
 
   session.value = data.session as ChatSession;
-  pushSystemOwnerText("Диалог закрыт. Вы можете начать новый в любой момент.");
+  pushSystemOwnerText(t("chat.system.session_closed"));
   await scrollChatToBottom();
 }
 
@@ -384,10 +386,16 @@ function connectSocket() {
       const sender = payload.sender as "client" | "owner";
 
       if (payload.clientMsgId) {
-        markDeliveredByLocalId(payload.clientMsgId);
+        const local = messages.value.find((x) => x.localId === payload.clientMsgId);
+        if (local) {
+          local.pending = false;
+          if (payload.id != null) local.id = payload.id;
+          await scrollChatToBottom();
+          return;
+        }
       }
 
-      if (!payload.clientMsgId && hasSameRecentMessage(sender, text, createdAt)) {
+      if (hasSameRecentMessage(sender, text, createdAt)) {
         return;
       }
 
@@ -411,7 +419,7 @@ function connectSocket() {
 
     if (payload?.type === "session_closed") {
       session.value = payload.session as ChatSession;
-      pushSystemOwnerText("Диалог закрыт. Вы можете начать новый в любой момент.");
+      pushSystemOwnerText(t("chat.system.session_closed"));
       await scrollChatToBottom();
       return;
     }
@@ -419,9 +427,9 @@ function connectSocket() {
 
   socket.value.onclose = () => {
     socketConnected.value = false;
-    if (!isOpen.value) return;
+    if (!shouldReconnect) return;
     setTimeout(() => {
-      if (isOpen.value) connectSocket();
+      if (shouldReconnect) connectSocket();
     }, 1200);
   };
 
@@ -440,9 +448,12 @@ function disconnectSocket() {
 
 onMounted(() => {
   clientId.value = ensureClientId();
+  shouldReconnect = true;
+  connectSocket();
 });
 
 onBeforeUnmount(() => {
+  shouldReconnect = false;
   disconnectSocket();
 });
 </script>
@@ -520,23 +531,23 @@ onBeforeUnmount(() => {
         <footer class="floating-chat-footer">
           <div v-if="flowMode === 'choose'" class="floating-chat-choice">
             <div class="floating-chat-choice__text">
-              Выберите, где удобнее общаться:
+              {{ $t("chat.system.choose_channel") }}
             </div>
 
             <div class="floating-chat-choice__actions">
               <custom-button class="floating-chat-choice__button" :variant="'primary'" @click="chooseSite">
-                Остаться на сайте
+                {{ $t("chat.system.channel_site") }}
               </custom-button>
 
               <custom-button class="floating-chat-choice__button" :variant="'secondary'" @click="chooseTelegram">
-                Перейти в Telegram
+                {{ $t("chat.system.channel_telegram") }}
               </custom-button>
             </div>
           </div>
 
           <div v-else-if="flowMode === 'closed'" class="floating-chat-closed">
             <custom-button class="floating-chat-closed__button" :variant="'primary'" @click="startNewSession">
-              Начать новый диалог
+              {{ $t("chat.system.new_dialog") }}
             </custom-button>
           </div>
 

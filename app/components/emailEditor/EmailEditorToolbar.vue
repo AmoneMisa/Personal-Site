@@ -1,25 +1,32 @@
 <script setup lang="ts">
+import CustomCheckbox from "~/components/common/CustomCheckbox.vue";
 import type { PreviewClient, TemplateEngine } from "~/utils/emailEditor/preview/clientProfiles";
 
 type ToolbarAction =
     | "moveInlineStylesToStyleTag"
     | "openInsertImage"
     | "openInsertLink"
-    | "openInsertTemplate";
+    | "openInsertTemplate"
+    | "openFakeData";
 
 const props = defineProps<{
   templateEngine: TemplateEngine;
   previewClient: PreviewClient;
   isBusy: boolean;
+  fakeDataEnabled: boolean;
 }>();
 
 const emit = defineEmits<{
   (e: "update:template-engine", v: TemplateEngine): void;
   (e: "update:preview-client", v: PreviewClient): void;
+  (e: "update:fake-data-enabled", v: boolean): void;
   (e: "action", a: ToolbarAction): void;
 }>();
 
 const { t } = useI18n();
+
+// Fake data only substitutes variables for template engines (not clean HTML).
+const fakeDataAvailable = computed(() => props.templateEngine !== "clean_html");
 
 const templateItems = computed(() => [
   { label: t("services.emailEditor.template.cleanHtml"), value: "clean_html" },
@@ -54,6 +61,28 @@ const previewItems = computed(() => [
           :model-value="props.previewClient"
           @update:model-value="emit('update:preview-client', $event as any)"
       />
+
+      <div class="email-editor-toolbar__fake" :class="{ 'email-editor-toolbar__fake_disabled': !fakeDataAvailable }">
+        <custom-checkbox
+            :model-value="props.fakeDataEnabled"
+            :label="t('services.emailEditor.fakeData.toggle')"
+            :disabled="props.isBusy || !fakeDataAvailable"
+            @update:model-value="emit('update:fake-data-enabled', $event)"
+        />
+
+        <button
+            v-if="props.fakeDataEnabled && fakeDataAvailable"
+            type="button"
+            class="ui-pill-btn email-editor-toolbar__button"
+            :disabled="props.isBusy"
+            @click="emit('action', 'openFakeData')"
+        >
+          <span class="ui-pill-btn__inner">
+            <u-icon name="i-lucide-database" />
+            {{ t("services.emailEditor.fakeData.edit") }}
+          </span>
+        </button>
+      </div>
     </div>
 
     <div class="email-editor-toolbar__right">
@@ -132,5 +161,15 @@ const previewItems = computed(() => [
 
 .email-editor-toolbar__button {
   white-space: nowrap;
+}
+
+.email-editor-toolbar__fake {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.email-editor-toolbar__fake_disabled {
+  opacity: 0.7;
 }
 </style>

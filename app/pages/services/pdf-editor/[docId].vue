@@ -67,6 +67,9 @@ const editor = reactive({
   size: 6, // brush width
   brushShape: "round" as BrushShape,
 
+  // full editor mode (select + edit any object: text, size, position, style, fonts)
+  fullMode: false,
+
   // text defaults
   textValue: "Hello!",
   textFont: "Helvetica",
@@ -77,6 +80,42 @@ const editor = reactive({
 
   // signature defaults
   signatureSize: 2.0,
+});
+
+// Common fonts available for the full-editor inspector.
+const FONT_FAMILIES = [
+  "Helvetica",
+  "Arial",
+  "Times New Roman",
+  "Courier New",
+  "Georgia",
+  "Verdana",
+  "Trebuchet MS",
+  "Tahoma",
+  "Roboto",
+  "Open Sans",
+];
+
+type TextAlign = "left" | "center" | "right" | "justify";
+
+// --- inspector state (bound to the currently selected object)
+const selected = reactive({
+  exists: false,
+  isText: false,
+  text: "",
+  fontFamily: "Helvetica",
+  fontSize: 32,
+  bold: false,
+  italic: false,
+  underline: false,
+  align: "left" as TextAlign,
+  color: "#000000",
+  opacity: 100, // 0..100
+  x: 0,
+  y: 0,
+  w: 0,
+  h: 0,
+  angle: 0,
 });
 
 // --- draft (per-page json)
@@ -132,7 +171,7 @@ function scheduleSaveDraft() {
 async function saveDraftNow() {
   if (!docId.value) return;
   try {
-    if (c) pageJson[page.value] = c.toJSON(["id", "tool", "opacityPct"]);
+    if (c) pageJson[page.value] = c.toJSON(["id", "tool", "opacityPct", "orig"]);
     const draft: PdfDraft = {
       v: 1,
       updatedAt: Date.now(),
@@ -187,6 +226,18 @@ function rgbaFromHex(hex: string, alpha01: number) {
   return `rgba(${r},${g},${b},${a})`;
 }
 
+function pushHistory() {
+  if (!c || history.lock) return;
+
+  const snap = c.toJSON(["id", "tool", "opacityPct", "orig"]);
+  history.stack = history.stack.slice(0, history.idx + 1);
+  history.stack.push(snap);
+  history.idx = history.stack.length - 1;
+
+  pageJson[page.value] = snap;
+  scheduleSaveDraft();
+}
+
 function ensureFabric() {
   if (!overlayCanvasRef.value) return;
 
@@ -207,21 +258,21 @@ function ensureFabric() {
   FabricObject.prototype.transparentCorners = false;
   FabricObject.prototype.cornerStyle = "circle";
 
-  const pushHistory = () => {
-    if (!c || history.lock) return;
-
-    const snap = c.toJSON(["id", "tool", "opacityPct"]);
-    history.stack = history.stack.slice(0, history.idx + 1);
-    history.stack.push(snap);
-    history.idx = history.stack.length - 1;
-
-    pageJson[page.value] = snap;
-    scheduleSaveDraft();
-  };
-
   c.on("path:created", pushHistory);
   c.on("object:modified", pushHistory);
   c.on("object:removed", pushHistory);
+
+  // keep the inspector panel in sync with the active selection
+  const syncActive = () => syncSelectedFromObject(c?.getActiveObject() ?? null);
+  c.on("selection:created", syncActive);
+  c.on("selection:updated", syncActive);
+  c.on("selection:cleared", () => {
+    selected.exists = false;
+  });
+  c.on("object:modified", syncActive);
+  c.on("object:moving", syncActive);
+  c.on("object:scaling", syncActive);
+  c.on("object:rotating", syncActive);
 
   applyMode();
 }
@@ -251,13 +302,13 @@ function loadCanvasForPage(p: number) {
   if (json) {
     c.loadFromJSON(json, () => {
       history.lock = false;
-      history.stack = [c!.toJSON(["id", "tool", "opacityPct"])];
+      history.stack = [c!.toJSON(["id", "tool", "opacityPct", "orig"])];
       history.idx = 0;
       c!.requestRenderAll();
     });
   } else {
     history.lock = false;
-    history.stack = [c.toJSON(["id", "tool", "opacityPct"])];
+    history.stack = [c.toJSON(["id", "tool", "opacityPct", "orig"])];
     history.idx = 0;
     c.requestRenderAll();
   }
@@ -418,8 +469,263 @@ function clearPage() {
   if (!c) return;
   c.clear();
   c.requestRenderAll();
-  pageJson[page.value] = c.toJSON(["id", "tool", "opacityPct"]);
+  pageJson[page.value] = c.toJSON(["id", "tool", "opacityPct", "orig"]);
   scheduleSaveDraft();
+}
+
+// =========================
+// Full editor: inspector (edit selected object)
+// =========================
+function activeObj(): any {
+  return c?.getActiveObject() ?? null;
+}
+
+function isTextObject(o: any): boolean {
+  const tp = String(o?.type || "").toLowerCase();
+  return tp === "textbox" || tp === "text" || tp === "i-text";
+}
+
+function hexFromColor(input: any): string {
+  const val = String(input ?? "").trim();
+  if (!val) return "#000000";
+  if (val.startsWith("#")) {
+    const v = val.replace("#", "");
+    const s = v.length === 3 ? v.split("").map((x) => x + x).join("") : v.slice(0, 6);
+    return `#${(s || "000000").padEnd(6, "0")}`;
+  }
+  const m = val.match(/rgba?\(([^)]+)\)/i);
+  if (m && m[1]) {
+    const parts = m[1].split(",").map((x) => parseFloat(x.trim()));
+    const hx = (n: number | undefined) =>
+      Math.max(0, Math.min(255, Math.round(n || 0))).toString(16).padStart(2, "0");
+    return `#${hx(parts[0])}${hx(parts[1])}${hx(parts[2])}`;
+  }
+  return "#000000";
+}
+
+// Read the selected object's props into the inspector state.
+function syncSelectedFromObject(obj: any) {
+  if (!obj || !c) {
+    selected.exists = false;
+    return;
+  }
+
+  selected.exists = true;
+  selected.isText = isTextObject(obj);
+
+  const sw = obj.getScaledWidth?.() ?? obj.width ?? 0;
+  const sh = obj.getScaledHeight?.() ?? obj.height ?? 0;
+
+  // origin is center (set globally), convert to top-left for display
+  selected.x = Math.round((obj.left ?? 0) - sw / 2);
+  selected.y = Math.round((obj.top ?? 0) - sh / 2);
+  selected.w = Math.round(sw);
+  selected.h = Math.round(sh);
+  selected.angle = Math.round(obj.angle ?? 0);
+  selected.opacity = Math.round((obj.opacity ?? 1) * 100);
+
+  if (selected.isText) {
+    selected.text = String(obj.text ?? "");
+    selected.fontFamily = String(obj.fontFamily ?? "Helvetica");
+    selected.fontSize = Math.round(obj.fontSize ?? 32);
+    selected.bold = String(obj.fontWeight ?? "normal") === "bold";
+    selected.italic = String(obj.fontStyle ?? "normal") === "italic";
+    selected.underline = !!obj.underline;
+    selected.align = (String(obj.textAlign ?? "left") as TextAlign);
+    selected.color = hexFromColor(obj.fill);
+  } else {
+    selected.color = hexFromColor(obj.stroke ?? obj.fill);
+  }
+}
+
+function commitSelected(obj: any) {
+  if (!c || !obj) return;
+  obj.setCoords?.();
+  c.requestRenderAll();
+  pushHistory();
+}
+
+// live update while typing (no history entry per keystroke)
+function applySelectedTextLive() {
+  const o = activeObj();
+  if (!o || !isTextObject(o) || !c) return;
+  o.set("text", selected.text);
+  o.setCoords?.();
+  c.requestRenderAll();
+}
+
+// commit on blur (single history entry)
+function applySelectedText() {
+  const o = activeObj();
+  if (!o || !isTextObject(o)) return;
+  o.set("text", selected.text);
+  commitSelected(o);
+}
+
+function applySelectedFont() {
+  const o = activeObj();
+  if (!o || !isTextObject(o)) return;
+  o.set("fontFamily", selected.fontFamily || "Helvetica");
+  commitSelected(o);
+  syncSelectedFromObject(o);
+}
+
+function applySelectedFontSize() {
+  const o = activeObj();
+  if (!o || !isTextObject(o)) return;
+  o.set("fontSize", clampInt(selected.fontSize, 4, 400));
+  commitSelected(o);
+  syncSelectedFromObject(o);
+}
+
+function toggleSelectedStyle(kind: "bold" | "italic" | "underline") {
+  const o = activeObj();
+  if (!o || !isTextObject(o)) return;
+  if (kind === "bold") {
+    selected.bold = !selected.bold;
+    o.set("fontWeight", selected.bold ? "bold" : "normal");
+  } else if (kind === "italic") {
+    selected.italic = !selected.italic;
+    o.set("fontStyle", selected.italic ? "italic" : "normal");
+  } else {
+    selected.underline = !selected.underline;
+    o.set("underline", selected.underline);
+  }
+  commitSelected(o);
+}
+
+function applySelectedAlign(align: TextAlign) {
+  const o = activeObj();
+  if (!o || !isTextObject(o)) return;
+  selected.align = align;
+  o.set("textAlign", align);
+  commitSelected(o);
+}
+
+function applySelectedColor() {
+  const o = activeObj();
+  if (!o) return;
+  if (isTextObject(o)) {
+    o.set("fill", selected.color);
+  } else {
+    o.set("stroke", selected.color);
+  }
+  commitSelected(o);
+}
+
+function applySelectedOpacity() {
+  const o = activeObj();
+  if (!o) return;
+  o.set("opacity", clampInt(selected.opacity, 0, 100) / 100);
+  commitSelected(o);
+}
+
+// Apply size / position / rotation from the inspector inputs.
+function applySelectedGeometry() {
+  const o = activeObj();
+  if (!o) return;
+
+  const newW = Math.max(1, selected.w);
+  const newH = Math.max(1, selected.h);
+
+  if (isTextObject(o)) {
+    // text reflows: width controls wrapping, height is derived
+    o.set({ width: newW, scaleX: 1, scaleY: 1 });
+  } else {
+    const bw = o.width || 1;
+    const bh = o.height || 1;
+    o.set({ scaleX: newW / bw, scaleY: newH / bh });
+  }
+
+  o.set("angle", selected.angle);
+
+  const sw = o.getScaledWidth?.() ?? newW;
+  const sh = o.getScaledHeight?.() ?? newH;
+  o.set({ left: selected.x + sw / 2, top: selected.y + sh / 2 });
+
+  commitSelected(o);
+  syncSelectedFromObject(o);
+}
+
+// Load extractable PDF text of the current page as editable text boxes.
+// Uses the backend text-extraction endpoint when available; degrades gracefully.
+async function loadEditableText() {
+  if (!c || !docId.value || isBusy.value) return;
+
+  errorMsg.value = null;
+  isBusy.value = true;
+  try {
+    type Block = OrigBlock;
+
+    const res = await $fetch<{ blocks?: Block[] }>(
+      api(`/pdf/text-blocks/${docId.value}/${page.value}?dpi=${dpi.value}`),
+    );
+
+    const blocks = res?.blocks ?? [];
+    if (!blocks.length) {
+      errorMsg.value = t("services.pdfEditor.full.noText");
+      return;
+    }
+
+    // backend coordinates are in the rendered PNG pixel space (at `dpi`);
+    // scale them into the displayed canvas space.
+    const scale = 1 / (calcMultiplier() || 1);
+
+    blocks.forEach((b, i) => {
+      const fontPx = clampInt(Math.round((b.fontSize ?? 12) * scale), 4, 400);
+      const box = new Textbox(b.text || "", {
+        width: Math.max(20, (b.w ?? 200) * scale),
+        fill: b.color || "#111111",
+        fontFamily: b.fontName || "Helvetica",
+        fontSize: fontPx,
+        fontWeight: b.bold ? "bold" : "normal",
+        fontStyle: b.italic ? "italic" : "normal",
+      });
+      (box as any).tool = "pdftext";
+      (box as any).id = b.id || genBlockId(page.value, i);
+
+      // keep the original extracted block verbatim so the backend can match
+      // the redaction region even after the user moves/edits the text.
+      (box as any).orig = {
+        id: b.id ?? null,
+        page: page.value,
+        dpi: dpi.value,
+        x: b.x ?? 0,
+        y: b.y ?? 0,
+        w: b.w ?? 0,
+        h: b.h ?? 0,
+        text: b.text ?? "",
+        fontSize: b.fontSize ?? null,
+        fontName: b.fontName ?? null,
+        bold: !!b.bold,
+        italic: !!b.italic,
+        color: b.color ?? null,
+      } as OrigBlockMeta;
+
+      setByTopLeft(box, (b.x ?? 0) * scale, (b.y ?? 0) * scale);
+      c!.add(box);
+    });
+
+    c.requestRenderAll();
+    pushHistory();
+
+    editor.fullMode = true;
+    editor.mode = "move";
+    applyMode();
+  } catch (e: any) {
+    errorMsg.value = e?.data?.detail?.message || t("services.pdfEditor.full.noText");
+  } finally {
+    isBusy.value = false;
+  }
+}
+
+function toggleFullMode() {
+  editor.fullMode = !editor.fullMode;
+  if (editor.fullMode) {
+    editor.mode = "move";
+    applyMode();
+    syncSelectedFromObject(activeObj());
+  }
 }
 
 // =========================
@@ -463,7 +769,7 @@ async function setPage(p: number) {
   const nextP = clampInt(p, 1, pages.value);
   if (nextP === page.value) return;
 
-  pageJson[page.value] = c.toJSON(["id", "tool", "opacityPct"]);
+  pageJson[page.value] = c.toJSON(["id", "tool", "opacityPct", "orig"]);
   page.value = nextP;
 
   await nextTick();
@@ -493,16 +799,167 @@ function calcMultiplier(): number {
   return Number.isFinite(m) && m > 0 ? m : 1;
 }
 
-async function exportOverlaysPngByPage(): Promise<Record<number, string>> {
-  if (!c) return {};
+// Raw text block as returned by the backend extraction endpoint.
+type OrigBlock = {
+  id?: string;
+  x: number;
+  y: number;
+  w?: number;
+  h?: number;
+  text: string;
+  fontSize?: number;
+  fontName?: string;
+  bold?: boolean;
+  italic?: boolean;
+  color?: string;
+};
+
+// The original block kept verbatim on the object (plus the page/dpi it came from),
+// so the backend can locate the source region even if the user moved the text.
+// `*Pt` are DPI-independent PDF points (added at save time); `x/y/w/h` are the raw
+// extraction pixels at `dpi`.
+type OrigBlockMeta = {
+  id: string | null;
+  page: number;
+  dpi: number;
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  xPt?: number;
+  yPt?: number;
+  wPt?: number;
+  hPt?: number;
+  text: string;
+  fontSize: number | null;
+  fontSizePt?: number | null;
+  fontName: string | null;
+  bold: boolean;
+  italic: boolean;
+  color: string | null;
+};
+
+// Structured representation of an edited PDF text block, sent to the backend
+// so it can redact the original text and/or re-typeset the new content.
+// Geometry is provided in two coordinate spaces (both top-left origin):
+//   - `x/y/w/h/fontSize`     : pixels in the rendered PNG at the export DPI (`dpi`)
+//   - `xPt/yPt/wPt/hPt/...Pt` : DPI-independent PDF points (72 per inch) — preferred
+type TextEditBlock = {
+  id?: string;
+  text: string;
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  fontSize: number;
+  xPt: number;
+  yPt: number;
+  wPt: number;
+  hPt: number;
+  fontSizePt: number;
+  fontName: string;
+  bold: boolean;
+  italic: boolean;
+  underline: boolean;
+  align: string;
+  color: string;
+  opacity: number;
+  angle: number;
+  // original extracted block, untouched (null for text the user added manually)
+  orig: OrigBlockMeta | null;
+};
+
+// PDF points from PNG pixels rendered at `dpiVal` (72 points per inch).
+function pxToPt(px: number, dpiVal: number): number {
+  const d = dpiVal > 0 ? dpiVal : 72;
+  return Math.round(((px * 72) / d) * 100) / 100;
+}
+
+// Enrich a verbatim original block with DPI-independent point coordinates,
+// without mutating the copy stored on the canvas object.
+function withOrigPoints(orig: OrigBlockMeta | null): OrigBlockMeta | null {
+  if (!orig) return null;
+  const d = orig.dpi > 0 ? orig.dpi : 72;
+  return {
+    ...orig,
+    xPt: pxToPt(orig.x, d),
+    yPt: pxToPt(orig.y, d),
+    wPt: pxToPt(orig.w, d),
+    hPt: pxToPt(orig.h, d),
+    fontSizePt: orig.fontSize != null ? pxToPt(orig.fontSize, d) : null,
+  };
+}
+
+let blockIdSeq = 0;
+function genBlockId(pageNo: number, i: number): string {
+  const rnd = (globalThis.crypto as any)?.randomUUID?.();
+  if (rnd) return rnd;
+  blockIdSeq += 1;
+  return `blk_${pageNo}_${i}_${Date.now()}_${blockIdSeq}`;
+}
+
+// Collect editable PDF-text objects (tool === "pdftext") from the current canvas.
+// `mult` converts display coords -> natural PNG pixels; `dpiVal` is the DPI those
+// pixels were rendered at, used to also express geometry in DPI-independent points.
+function collectTextEditsFromCanvas(mult: number, dpiVal: number): TextEditBlock[] {
+  if (!c) return [];
+  const blocks: TextEditBlock[] = [];
+
+  c.getObjects().forEach((o: any) => {
+    if (o?.tool !== "pdftext") return;
+
+    const sw = o.getScaledWidth?.() ?? o.width ?? 0;
+    const sh = o.getScaledHeight?.() ?? o.height ?? 0;
+
+    // natural PNG pixels (at dpiVal), top-left origin
+    const xPx = ((o.left ?? 0) - sw / 2) * mult;
+    const yPx = ((o.top ?? 0) - sh / 2) * mult;
+    const wPx = sw * mult;
+    const hPx = sh * mult;
+    const fsPx = (o.fontSize ?? 12) * mult;
+
+    blocks.push({
+      id: o.id,
+      text: String(o.text ?? ""),
+      x: Math.round(xPx),
+      y: Math.round(yPx),
+      w: Math.round(wPx),
+      h: Math.round(hPx),
+      fontSize: Math.round(fsPx),
+      xPt: pxToPt(xPx, dpiVal),
+      yPt: pxToPt(yPx, dpiVal),
+      wPt: pxToPt(wPx, dpiVal),
+      hPt: pxToPt(hPx, dpiVal),
+      fontSizePt: pxToPt(fsPx, dpiVal),
+      fontName: String(o.fontFamily ?? "Helvetica"),
+      bold: String(o.fontWeight ?? "normal") === "bold",
+      italic: String(o.fontStyle ?? "normal") === "italic",
+      underline: !!o.underline,
+      align: String(o.textAlign ?? "left"),
+      color: hexFromColor(o.fill),
+      opacity: o.opacity ?? 1,
+      angle: o.angle ?? 0,
+      orig: withOrigPoints((o.orig ?? null) as OrigBlockMeta | null),
+    });
+  });
+
+  return blocks;
+}
+
+async function exportOverlaysPngByPage(): Promise<{
+  overlays: Record<number, string>;
+  textEdits: Record<number, TextEditBlock[]>;
+}> {
+  if (!c) return { overlays: {}, textEdits: {} };
 
   // save current page json
-  pageJson[page.value] = c.toJSON(["id", "tool", "opacityPct"]);
+  pageJson[page.value] = c.toJSON(["id", "tool", "opacityPct", "orig"]);
 
   const overlays: Record<number, string> = {};
+  const textEdits: Record<number, TextEditBlock[]> = {};
 
   const curPage = page.value;
-  const curJson = c.toJSON(["id", "tool", "opacityPct"]);
+  const curJson = c.toJSON(["id", "tool", "opacityPct", "orig"]);
 
   for (let p = 1; p <= pages.value; p++) {
     const json = pageJson[p];
@@ -516,7 +973,29 @@ async function exportOverlaysPngByPage(): Promise<Record<number, string>> {
         try {
           resizeToPreview();
           const mult = calcMultiplier();
+
+          // structured edited text blocks (backend redacts originals / re-typesets)
+          const blocks = collectTextEditsFromCanvas(mult, dpi.value);
+          if (blocks.length) textEdits[p] = blocks;
+
+          // hide editable pdf-text from the raster overlay so it isn't baked in
+          // twice (the backend renders it from the structured data instead)
+          const hidden: any[] = [];
+          c!.getObjects().forEach((o: any) => {
+            if (o?.tool === "pdftext") {
+              o.visible = false;
+              hidden.push(o);
+            }
+          });
+          if (hidden.length) c!.requestRenderAll();
+
           overlays[p] = c!.toDataURL({ format: "png", multiplier: mult });
+
+          hidden.forEach((o) => {
+            o.visible = true;
+          });
+          if (hidden.length) c!.requestRenderAll();
+
           resolve();
         } catch (err) {
           reject(err);
@@ -540,7 +1019,7 @@ async function exportOverlaysPngByPage(): Promise<Record<number, string>> {
   });
 
   page.value = curPage;
-  return overlays;
+  return { overlays, textEdits };
 }
 
 async function saveDocument() {
@@ -558,11 +1037,20 @@ async function saveDocument() {
   isBusy.value = true;
 
   try {
-    const overlays = await exportOverlaysPngByPage();
+    const { overlays, textEdits } = await exportOverlaysPngByPage();
 
     const res = await $fetch<{ downloadUrl: string; expiresAtResult?: number }>(api(`/pdf/save/${docId.value}`), {
       method: "POST",
-      body: { overlays, dpi: dpi.value },
+      body: {
+        overlays,
+        textEdits,
+        dpi: dpi.value,
+        // page size in PDF points, so the backend can map pixel/point coords and
+        // flip the Y axis if it works in native PDF space (origin bottom-left).
+        page: { widthPt: pageW.value, heightPt: pageH.value },
+        // self-describing so the backend never has to guess the frame of reference.
+        coords: { space: "top-left", pointsPerInch: 72, pxDpi: dpi.value },
+      },
     });
 
     await refreshInfo();
@@ -690,7 +1178,7 @@ onBeforeUnmount(() => {
   if (img) img.removeEventListener("load", resizeToPreview as any);
 
   if (c) {
-    pageJson[page.value] = c.toJSON(["id", "tool", "opacityPct"]);
+    pageJson[page.value] = c.toJSON(["id", "tool", "opacityPct", "orig"]);
     saveDraftNow();
     c.dispose();
     c = null;
@@ -788,6 +1276,19 @@ onBeforeUnmount(() => {
           </div>
 
           <div class="pdf__toolstrip">
+            <button
+                type="button"
+                class="services__pill"
+                :class="{ services__pill_active: editor.fullMode }"
+                @click="toggleFullMode"
+                :disabled="isBusy"
+            >
+              <u-icon name="i-lucide-square-pen" />
+              {{ t("services.pdfEditor.toolstrip.fullMode") }}
+            </button>
+
+            <div class="pdf__sep pdf__sep_small" />
+
             <button
                 type="button"
                 class="services__pill"
@@ -934,6 +1435,119 @@ onBeforeUnmount(() => {
             </div>
           </div>
 
+          <!-- FULL EDITOR: inspector for the selected object -->
+          <div v-if="editor.fullMode" class="pdf__tool-section pdf__inspector">
+            <div class="pdf__inspector-head">
+              <div class="pdf__tool-title">{{ t("services.pdfEditor.full.title") }}</div>
+              <button type="button" class="services__pill" :disabled="isBusy" @click="loadEditableText">
+                <u-icon name="i-lucide-scan-text" />
+                {{ t("services.pdfEditor.full.loadText") }}
+              </button>
+            </div>
+
+            <div v-if="!selected.exists" class="pdf__help text-muted">
+              {{ t("services.pdfEditor.full.selectHint") }}
+            </div>
+
+            <div v-else class="pdf__inspector-body">
+              <div v-if="selected.isText" class="pdf__field pdf__field_row">
+                <div class="pdf__label">{{ t("services.pdfEditor.full.textContent") }}</div>
+                <u-textarea
+                    v-model="selected.text"
+                    :rows="2"
+                    autoresize
+                    @update:model-value="applySelectedTextLive"
+                    @blur="applySelectedText"
+                />
+              </div>
+
+              <div class="pdf__tool-grid4">
+                <div v-if="selected.isText" class="pdf__field">
+                  <div class="pdf__label">{{ t("services.pdfEditor.full.font") }}</div>
+                  <u-select
+                      v-model="selected.fontFamily"
+                      :items="FONT_FAMILIES.map((f) => ({ label: f, value: f }))"
+                      @update:model-value="applySelectedFont"
+                  />
+                </div>
+
+                <div v-if="selected.isText" class="pdf__field">
+                  <div class="pdf__label">{{ t("services.pdfEditor.full.fontSize") }}</div>
+                  <u-input
+                      v-model.number="selected.fontSize"
+                      type="number"
+                      min="4"
+                      max="400"
+                      @change="applySelectedFontSize"
+                  />
+                </div>
+
+                <div class="pdf__field">
+                  <div class="pdf__label">{{ t("services.pdfEditor.full.color") }}</div>
+                  <u-input v-model="selected.color" type="color" @update:model-value="applySelectedColor" />
+                </div>
+
+                <div class="pdf__field">
+                  <div class="pdf__label">{{ t("services.pdfEditor.full.opacity") }}</div>
+                  <u-input
+                      v-model.number="selected.opacity"
+                      type="number"
+                      min="0"
+                      max="100"
+                      @change="applySelectedOpacity"
+                  />
+                </div>
+              </div>
+
+              <div v-if="selected.isText" class="pdf__field pdf__field_row">
+                <div class="pdf__label">{{ t("services.pdfEditor.full.style") }}</div>
+                <div class="pdf__style-row">
+                  <button type="button" class="pdf__chip" :class="{ pdf__chip_active: selected.bold }" @click="toggleSelectedStyle('bold')">B</button>
+                  <button type="button" class="pdf__chip" :class="{ pdf__chip_active: selected.italic }" @click="toggleSelectedStyle('italic')">I</button>
+                  <button type="button" class="pdf__chip" :class="{ pdf__chip_active: selected.underline }" @click="toggleSelectedStyle('underline')">U</button>
+
+                  <div class="pdf__sep pdf__sep_small" />
+
+                  <button type="button" class="pdf__chip" :class="{ pdf__chip_active: selected.align === 'left' }" @click="applySelectedAlign('left')"><u-icon name="i-lucide-align-left" /></button>
+                  <button type="button" class="pdf__chip" :class="{ pdf__chip_active: selected.align === 'center' }" @click="applySelectedAlign('center')"><u-icon name="i-lucide-align-center" /></button>
+                  <button type="button" class="pdf__chip" :class="{ pdf__chip_active: selected.align === 'right' }" @click="applySelectedAlign('right')"><u-icon name="i-lucide-align-right" /></button>
+                  <button type="button" class="pdf__chip" :class="{ pdf__chip_active: selected.align === 'justify' }" @click="applySelectedAlign('justify')"><u-icon name="i-lucide-align-justify" /></button>
+                </div>
+              </div>
+
+              <div class="pdf__tool-grid4">
+                <div class="pdf__field">
+                  <div class="pdf__label">{{ t("services.pdfEditor.full.posX") }}</div>
+                  <u-input v-model.number="selected.x" type="number" @change="applySelectedGeometry" />
+                </div>
+                <div class="pdf__field">
+                  <div class="pdf__label">{{ t("services.pdfEditor.full.posY") }}</div>
+                  <u-input v-model.number="selected.y" type="number" @change="applySelectedGeometry" />
+                </div>
+                <div class="pdf__field">
+                  <div class="pdf__label">{{ t("services.pdfEditor.full.width") }}</div>
+                  <u-input v-model.number="selected.w" type="number" min="1" @change="applySelectedGeometry" />
+                </div>
+                <div class="pdf__field">
+                  <div class="pdf__label">{{ selected.isText ? t("services.pdfEditor.full.rotation") : t("services.pdfEditor.full.height") }}</div>
+                  <u-input
+                      v-if="selected.isText"
+                      v-model.number="selected.angle"
+                      type="number"
+                      min="-180"
+                      max="180"
+                      @change="applySelectedGeometry"
+                  />
+                  <u-input v-else v-model.number="selected.h" type="number" min="1" @change="applySelectedGeometry" />
+                </div>
+              </div>
+
+              <div class="pdf__help text-muted">
+                {{ t("services.pdfEditor.full.help") }}
+              </div>
+            </div>
+          </div>
+
           <div v-if="errorMsg" class="pdf__error">{{ errorMsg }}</div>
 
           <div class="pdf__canvas-wrap">
@@ -1014,6 +1628,29 @@ onBeforeUnmount(() => {
   font-weight: 900;
   margin-bottom: 10px;
   color: rgba(255, 255, 255, 0.9);
+}
+
+.pdf__inspector {
+  border-color: rgba(128, 90, 245, 0.28);
+  background: rgba(128, 90, 245, 0.06);
+}
+
+.pdf__inspector-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+
+  .pdf__tool-title {
+    margin-bottom: 0;
+  }
+}
+
+.pdf__inspector-body {
+  display: grid;
+  gap: 10px;
 }
 
 .light .pdf__tool-title {

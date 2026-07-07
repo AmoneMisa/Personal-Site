@@ -280,6 +280,16 @@ const countryItems = computed(() => {
       .sort((a, b) => a.label.localeCompare(b.label));
 });
 
+// Hide entries that are already added to the compare list so they can't be
+// re-selected as no-ops (and shorten the searchable dropdown).
+const usaStateItemsAvailable = computed(() =>
+    usaStateItems.value.filter(i => !selectedUSAStates.value.includes(i.value))
+);
+
+const countryItemsAvailable = computed(() =>
+    countryItems.value.filter(i => !selectedCountries.value.includes(i.value))
+);
+
 const addUsaState = ref<string>("");
 const addCountry = ref<string>("");
 
@@ -505,10 +515,14 @@ watch(user, (v) => lsSet(LS_KEYS.user, v), {deep: true});
 
           <!-- add USA state -->
           <div class="flex flex-col md:flex-row gap-2">
-            <u-select
+            <u-select-menu
                 v-model="addUsaState"
-                :items="usaStateItems"
+                :items="usaStateItemsAvailable"
+                value-key="value"
+                label-key="label"
+                class="flex-1"
                 :placeholder="t('quizzes.countryFit.addUsaStatePlaceholder')"
+                :search-input="{ placeholder: t('quizzes.countryFit.addUsaStatePlaceholder') }"
             />
             <u-button :disabled="!addUsaState" @click="addUsaStateToCompare">
               {{ t("common.add") }}
@@ -540,10 +554,14 @@ watch(user, (v) => lsSet(LS_KEYS.user, v), {deep: true});
 
           <!-- add country -->
           <div class="flex flex-col md:flex-row gap-2">
-            <u-select
+            <u-select-menu
                 v-model="addCountry"
-                :items="countryItems"
+                :items="countryItemsAvailable"
+                value-key="value"
+                label-key="label"
+                class="flex-1"
                 :placeholder="t('quizzes.countryFit.addCountryPlaceholder') || 'Выбери страну'"
+                :search-input="{ placeholder: t('quizzes.countryFit.addCountryPlaceholder') || 'Выбери страну' }"
             />
             <u-button :disabled="!addCountry" @click="addCountryToCompare">
               {{ t("common.add") }}
