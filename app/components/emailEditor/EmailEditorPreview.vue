@@ -7,6 +7,7 @@ const props = defineProps<{
   code: string;
   templateEngine: TemplateEngine;
   previewClient: PreviewClient;
+  fakeData?: { enabled: boolean; values: Record<string, string> };
 }>();
 
 const srcDoc = computed(() =>
@@ -14,6 +15,7 @@ const srcDoc = computed(() =>
       code: props.code,
       templateEngine: props.templateEngine,
       previewClient: props.previewClient,
+      fakeData: props.fakeData,
     })
 );
 </script>

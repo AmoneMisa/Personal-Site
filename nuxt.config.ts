@@ -52,7 +52,7 @@ export default defineNuxtConfig({
     },
     experimental: {appManifest: false},
     runtimeConfig: {
-        apiBase: 'http://backend:8000', //http://backend:8000/** - prod
+        apiBase: 'http://localhost:8000', //http://backend:8000/** - prod
         public: {
             apiBase: '/api'
         }
@@ -62,7 +62,7 @@ export default defineNuxtConfig({
             websocket: true
         },
         routeRules: {
-            '/api/**': {proxy: 'http://backend:8000/**'} //http://backend:8000/** - prod
+            '/api/**': {proxy: 'http://localhost:8000/**'} //http://backend:8000/** - prod
         }
     },
     icon: {

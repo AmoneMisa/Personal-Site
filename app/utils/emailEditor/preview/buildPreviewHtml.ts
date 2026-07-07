@@ -1,11 +1,21 @@
 import type { PreviewClient, TemplateEngine } from "./clientProfiles";
+import { renderWithFakeData } from "~/utils/emailEditor/fakeData/renderWithFakeData";
 
 export function buildPreviewHtml(input: {
     code: string;
     templateEngine: TemplateEngine;
     previewClient: PreviewClient;
+    fakeData?: { enabled: boolean; values: Record<string, string> };
 }) {
-    const safe = sanitizeEmailHtml(String(input.code ?? ""));
+    let source = String(input.code ?? "");
+
+    // When fake data is enabled, substitute variable interpolations with the
+    // user-provided sample values so the preview shows resolved content.
+    if (input.fakeData?.enabled) {
+        source = renderWithFakeData(source, input.templateEngine, input.fakeData.values);
+    }
+
+    const safe = sanitizeEmailHtml(source);
 
     const baseReset = previewBaseResetForClient(input.previewClient);
 

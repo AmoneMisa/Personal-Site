@@ -318,7 +318,10 @@
       "channel_telegram": "Switch to Telegram",
       "enter_tg": "Please enter your Telegram username starting with @ so the developer can contact you directly.",
       "telegram_done": "Thank you. The developer will contact you as soon as possible from @WhitesLove.",
-      "session_closed": "The conversation has been closed."
+      "session_closed": "The conversation has been closed. You can start a new one at any time.",
+      "site_started": "Alright! Write a message — I'll pass it on to the developer.",
+      "invalid_tg": "The username must be in @username format (5–32 characters).",
+      "new_dialog": "Start a new conversation"
     },
     "errors": {
       "empty": "Message cannot be empty",
@@ -452,6 +455,20 @@
         "insertImage": "Insert image",
         "insertLink": "Insert link",
         "insertTemplate": "Insert template"
+      },
+      "fakeData": {
+        "toggle": "Fake data",
+        "edit": "Edit fake data",
+        "title": "Fake data",
+        "intro": "Provide sample values for the template variables detected below. Each entry is shown by its variable path and is substituted into the preview.",
+        "valuePlaceholder": "Sample value",
+        "custom": "Custom",
+        "remove": "Remove variable",
+        "empty": "No variables detected yet. Add a variable path to your template, or create one manually below.",
+        "addLabel": "Add a variable path",
+        "addPlaceholder": "e.g. user.name",
+        "add": "Add",
+        "done": "Done"
       },
       "template": {
         "label": "Template engine",
@@ -739,6 +756,7 @@
         "moveModeHelp": "Move mode lets you resize and move objects. Drawing modes paint directly on the page. Draft is saved automatically."
       },
       "toolstrip": {
+        "fullMode": "Full editor",
         "move": "Move",
         "pen": "Pen",
         "highlighter": "Highlighter",
@@ -751,6 +769,24 @@
         "redo": "Redo",
         "remove": "Remove",
         "clearPage": "Clear page"
+      },
+      "full": {
+        "title": "Full editor",
+        "loadText": "Load page text",
+        "noText": "No editable text could be extracted from this page.",
+        "selectHint": "Select an object on the page to edit its text, size, position, style and fonts.",
+        "textContent": "Text",
+        "font": "Font",
+        "fontSize": "Font size",
+        "color": "Color",
+        "opacity": "Opacity",
+        "style": "Style & alignment",
+        "posX": "X",
+        "posY": "Y",
+        "width": "Width",
+        "height": "Height",
+        "rotation": "Rotation",
+        "help": "Edit the selected object directly. Double-click text to edit inline, or drag handles to resize and move. Changes are saved automatically."
       },
       "fields": {
         "color": "Color",
@@ -775,15 +811,15 @@
       "modes": {
         "media": {
           "title": "Images",
-          "desc": "Convert PNG/JPG/WebP. Up to 20 files."
+          "desc": "PNG/JPG/WebP/GIF/BMP/TIFF/AVIF. Up to 20 files, ZIP output."
         },
         "data": {
           "title": "Data",
-          "desc": "CSV/JSON/XML → CSV/JSON/XML/XLSX. One file at a time."
+          "desc": "CSV/JSON/XML/XLSX/YAML/TSV. One file at a time."
         },
         "docs": {
           "title": "Documents",
-          "desc": "DOCX ↔ PDF. PDF→DOCX is best effort."
+          "desc": "PDF/DOCX/TXT/HTML/MD/ODT/RTF. One file at a time."
         }
       },
       "panel": {
@@ -793,15 +829,25 @@
           "docs": "Documents"
         },
         "description": {
-          "media": "Supported: png, jpg/jpeg, webp. Up to 20 files. If more than one — ZIP output.",
-          "data": "Supported: csv, json, xml. Targets: csv/json/xml/xlsx. Single file.",
-          "docs": "Supported: docx and pdf. DOCX→PDF via LibreOffice, PDF→DOCX best effort."
+          "media": "Supported: png, jpg/jpeg, webp, gif, bmp, tiff, avif. Up to 20 files. If more than one — ZIP output.",
+          "data": "Supported: csv, json, xml, xlsx, yaml, tsv. Single file.",
+          "docs": "Supported: pdf, docx, txt, html, md, odt, rtf. Conversion via LibreOffice; complex layouts are best effort."
         }
       },
       "controls": {
         "targetFormat": "Output format",
         "convert": "Convert",
         "converting": "Converting…"
+      },
+      "messages": {
+        "noFiles": "Add file(s) to convert.",
+        "singleOnly": "Only one file can be uploaded in this mode.",
+        "mediaMax": "Maximum 20 files for images.",
+        "unsupported": "Unsupported file: {name}",
+        "tookFirst": "Took the first {count} files 🙂",
+        "httpError": "Error: {status}",
+        "success": "Done! File downloaded 👌",
+        "failed": "Conversion failed."
       },
       "dropzone": {
         "title": "Drop file here",
