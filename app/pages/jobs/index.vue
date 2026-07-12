@@ -205,8 +205,10 @@ const displayCurrency = ref("USD"); // currency the user wants amounts shown in
 const displayPeriod = ref<Period>("month"); // hour | month | year for converted salaries
 const sort = ref("date"); // date | oldest | title | company | salary | ats
 
-// advanced filters — default country is Uzbekistan per the user's preference.
-const country = ref("UZ");
+// advanced filters — default to "Any" country. Country is a heuristic guess from
+// job text, so pinning it to a single CIS country (e.g. UZ) hides almost every
+// vacancy; users can still narrow to Uzbekistan/CIS via the Country selector.
+const country = ref("");
 const workMode = ref("");
 const relocation = ref("");
 const foreignerOnly = ref(false);
@@ -283,7 +285,7 @@ async function load(toPage = 1) {
 }
 
 function resetFilters() {
-  country.value = "UZ"; workMode.value = ""; relocation.value = "";
+  country.value = ""; workMode.value = ""; relocation.value = "";
   foreignerOnly.value = false; language.value = ""; languageLevel.value = ""; skills.value = "";
   load(1);
 }
