@@ -287,11 +287,19 @@ const DEFAULT_GREENHOUSE = [
   'mongodb:MongoDB', 'monzo:Monzo', 'netlify:Netlify', 'newrelic:New Relic', 'reddit:Reddit',
   'roblox:Roblox', 'scaleai:Scale AI', 'skyscanner:Skyscanner', 'smartsheet:Smartsheet',
   'tripadvisor:Tripadvisor', 'twilio:Twilio', 'twitch:Twitch', 'zscaler:Zscaler',
+  // marketplaces / mobility / fintech
+  'stockx:StockX', 'getyourguide:GetYourGuide', 'careem:Careem', 'shein:SHEIN',
+  'wallapop:Wallapop', 'mirakl:Mirakl', 'cabify:Cabify', 'bird:Bird', 'n26:N26',
+  'trustpilot:Trustpilot', 'sumup:SumUp',
 ].join(',')
-const DEFAULT_LEVER = ['ajax:Ajax Systems', 'easybrain:Easybrain'].join(',')
+const DEFAULT_LEVER = [
+  'ajax:Ajax Systems', 'easybrain:Easybrain', 'trendyol:Trendyol',
+  'vestiairecollective:Vestiaire Collective', 'qonto:Qonto',
+].join(',')
 const DEFAULT_SMARTRECRUITERS = [
   'DeliveryHero:Delivery Hero', 'Wise:Wise', 'Canva:Canva', 'ASOS:ASOS',
   'ByteDance:ByteDance', 'Joom:Joom', 'Uber:Uber', 'Wayfair:Wayfair',
+  'Grab:Grab', 'BigCommerce:BigCommerce', 'Omio:Omio',
 ].join(',')
 
 function prettyLabel(token: string): string {
