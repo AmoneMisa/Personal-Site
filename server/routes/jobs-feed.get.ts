@@ -30,6 +30,7 @@ import {
   fetchTheMuse,
 } from '../utils/sources'
 import { filterAndPaginate } from '../utils/aggregate'
+import { getStoredJobs, refreshJobStore } from '../utils/jobsStore'
 
 const FETCHERS: Record<JobSource, (q: string) => Promise<Job[]>> = {
   remotive: fetchRemotive,
@@ -157,9 +158,16 @@ export default defineEventHandler(async (event) => {
     .map((s) => s.trim())
     .filter(Boolean)
 
-  const results = await Promise.all(finalSources.map((s) => getSource(s, search)))
+  // Primary path: read the pre-aggregated store the scheduled worker maintains,
+  // so requests never block on (or get geo-blocked by) upstream boards. Cold
+  // fallback: pull live once and kick a background refresh to warm the store.
+  let pool = await getStoredJobs()
+  if (!pool.length) {
+    pool = (await Promise.all(finalSources.map((s) => getSource(s, search)))).flat()
+    refreshJobStore().catch(() => {})
+  }
 
-  return filterAndPaginate(results.flat(), {
+  return filterAndPaginate(pool, {
     q: search,
     location: String(q.location ?? '').trim(),
     remote,

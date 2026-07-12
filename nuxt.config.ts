@@ -69,7 +69,12 @@ export default defineNuxtConfig({
     },
     nitro: {
         experimental: {
-            websocket: true
+            websocket: true,
+            tasks: true // enable Nitro tasks (jobs:refresh vacancy worker)
+        },
+        // Daily worker: refresh the Redis vacancy store + prune closed/old postings.
+        scheduledTasks: {
+            '0 3 * * *': ['jobs:refresh']
         },
         routeRules: {
             '/api/**': {proxy: 'http://backend:8000/**'}, //http://backend:8000/** - prod
