@@ -156,12 +156,14 @@ export const SKILLS: string[] = [
   'node.js', 'python', 'django', 'flask', 'fastapi', 'java', 'spring', 'kotlin', 'go',
   'golang', 'rust', 'c++', 'c#', '.net', 'php', 'laravel', 'ruby', 'rails', 'scala',
   'swift', 'objective-c', 'flutter', 'dart', 'android', 'ios', 'react native',
-  'sql', 'postgresql', 'mysql', 'mariadb', 'mongodb', 'redis', 'elasticsearch',
+  'sql', 'postgresql', 'mysql', 'mariadb', 'mongodb', 'redis', 'elasticsearch', 'clickhouse',
   'graphql', 'rest', 'grpc', 'kafka', 'rabbitmq', 'docker', 'kubernetes', 'terraform',
-  'ansible', 'aws', 'gcp', 'azure', 'ci/cd', 'git', 'linux', 'nginx', 'microservices',
+  'ansible', 'aws', 'gcp', 'azure', 'ci/cd', 'jenkins', 'git', 'gitlab', 'github', 'bitbucket',
+  'linux', 'bash', 'nginx', 'tomcat', 'microservices',
   'html', 'css', 'sass', 'tailwind', 'webpack', 'vite', 'redux', 'jest', 'cypress',
   'playwright', 'selenium', 'pandas', 'numpy', 'tensorflow', 'pytorch', 'spark',
-  'machine learning', 'data science', 'nlp', 'devops', 'figma', 'jira', 'agile', 'scrum',
+  'machine learning', 'data science', 'nlp', 'devops', 'power bi', 'tableau', 'airflow', 'hadoop',
+  'figma', 'jira', 'confluence', 'agile', 'scrum', 'kanban', 'sdlc', 'tdd', 'bdd', 'excel',
 ]
 
 function matchSkills(text: string): string[] {

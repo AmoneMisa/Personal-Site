@@ -19,7 +19,10 @@ function stripHtml(html: string | undefined | null): string {
     .trim()
 }
 
-const DESC_MAX = 900
+// Kept long enough that skill/requirement keywords further down a posting
+// (e.g. a "Nice to have" or tools list) still reach the enrichment + ATS scan.
+// The UI clamps the card to a few lines, so this only affects matching, not layout.
+const DESC_MAX = 4000
 
 async function fetchJson<T>(url: string, init?: RequestInit): Promise<T> {
   const res = await fetch(url, {
