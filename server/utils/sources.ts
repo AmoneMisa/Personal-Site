@@ -107,6 +107,20 @@ export async function fetchArbeitnow(_q: string): Promise<Job[]> {
 // Override with HH_AREAS="5,40,..." (or legacy HH_AREA).
 const HH_CIS_AREAS = ['5', '40', '9', '28', '97', '13', '48', '62', '86', '93']
 
+// Ukraine (5) and Uzbekistan (97) are pulled several pages deep so the feed
+// carries their full breadth of professions — including non-IT roles — rather
+// than only the newest ~50. Other CIS areas take a single page to stay light.
+// Since the worker queries HH with an empty text, deeper paging = more industries.
+// Depth is overridable via HH_PAGES (applies to the deep areas only).
+const HH_DEEP_AREAS = new Set(['5', '97'])
+const HH_PAGE_SIZE = 100 // HH allows up to 100 per page (max 2000 results / 20 pages)
+
+function hhPages(area: string): number {
+  const env = Number(process.env.HH_PAGES)
+  const deep = Number.isFinite(env) && env > 0 ? Math.min(env, 20) : 5
+  return HH_DEEP_AREAS.has(area) ? deep : 1
+}
+
 function hhAreas(): string[] {
   const env = process.env.HH_AREAS || process.env.HH_AREA
   const list = env ? env.split(',').map((s) => s.trim()).filter(Boolean) : HH_CIS_AREAS
@@ -114,9 +128,10 @@ function hhAreas(): string[] {
   return list.filter((a) => a !== '113' && a !== '16')
 }
 
-async function fetchHhArea(area: string, q: string): Promise<Job[]> {
+async function fetchHhArea(area: string, q: string, page: number): Promise<Job[]> {
   const params = new URLSearchParams({
-    per_page: '50',
+    per_page: String(HH_PAGE_SIZE),
+    page: String(page),
     order_by: 'publication_time',
     period: '14', // last 14 days
     area,
@@ -145,14 +160,18 @@ async function fetchHhArea(area: string, q: string): Promise<Job[]> {
 }
 
 export async function fetchHeadHunter(q: string): Promise<Job[]> {
-  const results = await Promise.all(
-    hhAreas().map((area) =>
-      fetchHhArea(area, q).catch((err) => {
-        console.error(`[jobs] hh area ${area} failed:`, (err as Error).message)
-        return [] as Job[]
-      }),
-    ),
-  )
+  const tasks: Promise<Job[]>[] = []
+  for (const area of hhAreas()) {
+    for (let page = 0; page < hhPages(area); page++) {
+      tasks.push(
+        fetchHhArea(area, q, page).catch((err) => {
+          console.error(`[jobs] hh area ${area} p${page} failed:`, (err as Error).message)
+          return [] as Job[]
+        }),
+      )
+    }
+  }
+  const results = await Promise.all(tasks)
   return results.flat()
 }
 
@@ -267,14 +286,15 @@ export async function fetchJooble(q: string): Promise<Job[]> {
   }))
 }
 
-// ---------- Company career sites (Greenhouse + Lever + SmartRecruiters APIs) ----
+// ---------- Company career sites (Greenhouse + Lever + SmartRecruiters + Ashby) --
 // Many famous companies (incl. game studios) publish their careers pages through
-// Greenhouse, Lever or SmartRecruiters, all of which expose a free, official JSON
-// API — no scraping. Configure the boards you want; sensible defaults ship built-in.
+// Greenhouse, Lever, SmartRecruiters or Ashby, all of which expose a free, official
+// JSON API — no scraping. Configure the boards you want; sensible defaults ship in.
 // NB: custom career sites (most banks/telecoms) have no such API and can't be added.
 //   GREENHOUSE_BOARDS="airbnb,figma"            (board tokens; optional "token:Label")
 //   LEVER_COMPANIES="ajax,easybrain"            (lever handles; optional "handle:Label")
 //   SMARTRECRUITERS_COMPANIES="Wise,Canva"      (SR identifiers; optional "id:Label")
+//   ASHBY_COMPANIES="openai,notion"             (ashby handles; optional "handle:Label")
 // Set COMPANIES_SOURCE=off to disable, or COMPANIES_DEFAULTS=off to drop the seed list.
 // Seeds below were verified (2026-07) to return live postings via their public API.
 const DEFAULT_GREENHOUSE = [
@@ -291,15 +311,51 @@ const DEFAULT_GREENHOUSE = [
   'stockx:StockX', 'getyourguide:GetYourGuide', 'careem:Careem', 'shein:SHEIN',
   'wallapop:Wallapop', 'mirakl:Mirakl', 'cabify:Cabify', 'bird:Bird', 'n26:N26',
   'trustpilot:Trustpilot', 'sumup:SumUp',
+  // verified 2026-07 batch: big tech / data / fintech / dev-tools
+  'databricks:Databricks', 'stripe:Stripe', 'pinterest:Pinterest', 'robinhood:Robinhood',
+  'samsara:Samsara', 'verkada:Verkada', 'wolt:Wolt', 'braze:Braze', 'celonis:Celonis',
+  'affirm:Affirm', 'klaviyo:Klaviyo', 'doctolib:Doctolib', 'flexport:Flexport',
+  'gongio:Gong', 'faire:Faire', 'chime:Chime', 'sofi:SoFi', 'vercel:Vercel',
+  'temporaltechnologies:Temporal', 'bitpanda:Bitpanda', 'attentive:Attentive',
+  'amplitude:Amplitude', 'mixpanel:Mixpanel', 'airtable:Airtable', 'betterment:Betterment',
+  'raisin:Raisin', 'gocardless:GoCardless', 'dataiku:Dataiku', 'contentful:Contentful',
+  'cockroachlabs:Cockroach Labs', 'gemini:Gemini', 'iterable:Iterable', 'squarespace:Squarespace',
+  'yotpo:Yotpo', 'calendly:Calendly', 'labelbox:Labelbox', 'truelayer:TrueLayer',
+  'planetscale:PlanetScale', 'consensys:ConsenSys',
+  // AAA / big game studios (verified 2026-07)
+  'riotgames:Riot Games', 'epicgames:Epic Games', 'rockstargames:Rockstar Games',
+  'taketwo:Take-Two', 'krafton:KRAFTON', 'scopely:Scopely', 'peak:Peak Games',
+  'wildlifestudios:Wildlife Studios', 'wooga:Wooga',
+  // Ukraine: N-iX (IT services) + MHP (agri, non-IT)
+  'nix:N-iX', 'mhp:MHP',
 ].join(',')
 const DEFAULT_LEVER = [
   'ajax:Ajax Systems', 'easybrain:Easybrain', 'trendyol:Trendyol',
   'vestiairecollective:Vestiaire Collective', 'qonto:Qonto',
+  // verified 2026-07
+  'palantir:Palantir', 'spotify:Spotify', 'toptal:Toptal',
+  // games + Ukraine IT
+  'matchgroup:Match Group', 'dreamgames:Dream Games', 'jamcity:Jam City',
+  'eleks:ELEKS', 'intellias:Intellias',
 ].join(',')
 const DEFAULT_SMARTRECRUITERS = [
   'DeliveryHero:Delivery Hero', 'Wise:Wise', 'Canva:Canva', 'ASOS:ASOS',
   'ByteDance:ByteDance', 'Joom:Joom', 'Uber:Uber', 'Wayfair:Wayfair',
-  'Grab:Grab', 'BigCommerce:BigCommerce', 'Omio:Omio',
+  'Grab:Grab', 'BigCommerce:BigCommerce', 'Omio:Omio', 'Gameloft:Gameloft',
+].join(',')
+// Ashby (api.ashbyhq.com) — public job-board API used by many modern AI/dev-tool
+// companies. Handles verified 2026-07 to return live postings.
+const DEFAULT_ASHBY = [
+  'openai:OpenAI', 'harvey:Harvey', 'elevenlabs:ElevenLabs', 'sierra:Sierra',
+  'notion:Notion', 'cohere:Cohere', 'ramp:Ramp', 'decagon:Decagon', 'vanta:Vanta',
+  'cursor:Cursor', 'replit:Replit', 'perplexity:Perplexity', 'synthesia:Synthesia',
+  'baseten:Baseten', 'mercor:Mercor', 'writer:Writer', 'benchling:Benchling',
+  'supabase:Supabase', 'watershed:Watershed', 'sardine:Sardine', 'modal:Modal',
+  'rho:Rho', 'linear:Linear', 'posthog:PostHog', 'railway:Railway', 'runway:Runway',
+  // games + Ukraine IT/product (Genesis ecosystem)
+  'voodoo:Voodoo', 'supercell:Supercell', 'preply:Preply', 'headway:Headway',
+  'solidgate:Solidgate', 'genesis:Genesis', 'obrio:OBRIO', 'universe:Universe',
+  'restream:Restream',
 ].join(',')
 
 function prettyLabel(token: string): string {
@@ -323,11 +379,13 @@ const SEED_BY_KIND = {
   greenhouse: DEFAULT_GREENHOUSE,
   lever: DEFAULT_LEVER,
   smartrecruiters: DEFAULT_SMARTRECRUITERS,
+  ashby: DEFAULT_ASHBY,
 } as const
 const ENV_BY_KIND = {
   greenhouse: 'GREENHOUSE_BOARDS',
   lever: 'LEVER_COMPANIES',
   smartrecruiters: 'SMARTRECRUITERS_COMPANIES',
+  ashby: 'ASHBY_COMPANIES',
 } as const
 
 function companyBoards(kind: keyof typeof SEED_BY_KIND): { handle: string; label: string }[] {
@@ -405,6 +463,37 @@ async function fetchSmartRecruitersBoard(handle: string, label: string): Promise
   })
 }
 
+// Ashby returns a full posting list (title/location/date + HTML description).
+// workplaceType is "Remote"/"Hybrid"/"OnSite"; isRemote may be null.
+async function fetchAshbyBoard(handle: string, label: string): Promise<Job[]> {
+  const data = await fetchJson<{ jobs: any[] }>(
+    `https://api.ashbyhq.com/posting-api/job-board/${encodeURIComponent(handle)}`,
+  )
+  return (data.jobs || [])
+    .filter((j) => j.isListed !== false)
+    .map((j) => {
+      const loc = j.location
+        || (j.secondaryLocations || []).map((l: any) => l.location).filter(Boolean).join(', ')
+        || 'See listing'
+      return {
+        id: `companies-ashby-${handle}-${j.id}`,
+        title: j.title,
+        company: label,
+        location: loc,
+        url: j.jobUrl || j.applyUrl,
+        source: 'companies' as const,
+        remote:
+          j.isRemote === true
+          || /remote/i.test(j.workplaceType || '')
+          || /remote|anywhere|distributed/i.test(`${j.title} ${loc}`),
+        tags: [label, j.department, j.team].filter(Boolean),
+        postedAt: new Date(j.publishedAt || Date.now()).toISOString(),
+        employmentType: j.employmentType,
+        description: stripHtml(j.descriptionPlain || j.descriptionHtml).slice(0, DESC_MAX),
+      }
+    })
+}
+
 export async function fetchCompanies(q: string): Promise<Job[]> {
   if (process.env.COMPANIES_SOURCE === 'off') return []
   const tasks: Promise<Job[]>[] = [
@@ -423,6 +512,12 @@ export async function fetchCompanies(q: string): Promise<Job[]> {
     ...companyBoards('smartrecruiters').map((b) =>
       fetchSmartRecruitersBoard(b.handle, b.label).catch((err) => {
         console.error(`[jobs] smartrecruiters "${b.handle}" failed:`, (err as Error).message)
+        return [] as Job[]
+      }),
+    ),
+    ...companyBoards('ashby').map((b) =>
+      fetchAshbyBoard(b.handle, b.label).catch((err) => {
+        console.error(`[jobs] ashby "${b.handle}" failed:`, (err as Error).message)
         return [] as Job[]
       }),
     ),

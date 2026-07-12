@@ -165,6 +165,9 @@ const countryOptions = [
   { value: "DE", label: "Germany" },
   { value: "GB", label: "UK" },
   { value: "US", label: "USA" },
+  { value: "CN", label: "China" },
+  { value: "JP", label: "Japan" },
+  { value: "KR", label: "South Korea" },
 ];
 
 const languageOptions = ["English", "German", "Russian", "Ukrainian", "Uzbek", "French", "Spanish", "Polish", "Turkish"];
@@ -176,6 +179,7 @@ const USD_RATES: Record<string, number> = {
   USD: 1, EUR: 1.09, GBP: 1.27, PLN: 0.25, UAH: 0.024, KZT: 0.0019,
   UZS: 0.000079, AZN: 0.59, GEL: 0.37, AMD: 0.0026, KGS: 0.011, MDL: 0.056,
   TJS: 0.092, TMT: 0.286, TRY: 0.030, CAD: 0.73, CHF: 1.12, INR: 0.012,
+  CNY: 0.14, JPY: 0.0064, KRW: 0.00072,
 };
 const currencyOptions = ["USD", "EUR", "UZS", "UAH", "KZT", "PLN", "GBP", "AZN", "GEL", "AMD", "KGS", "MDL", "TJS", "TRY"];
 const CURRENCY_SYMBOL: Record<string, string> = { USD: "$", EUR: "€", GBP: "£" };
@@ -856,7 +860,7 @@ await load(1);
 .stats__chip_skill { border-color: rgba(128,90,245,0.35); color: #c4b5fd; }
 
 .jobs__grid {
-  display: grid; gap: 12px; grid-template-columns: 1fr;
+  display: grid; gap: 12px; grid-template-columns: 1fr; align-items: stretch;
   @media (min-width: 640px) { grid-template-columns: repeat(2, 1fr); }
   @media (min-width: 1024px) { grid-template-columns: repeat(3, 1fr); }
 }
@@ -864,7 +868,11 @@ await load(1);
   padding: 16px; border-radius: 18px; border: 1px solid var(--ui-border);
   background: rgba(255,255,255,0.03); box-shadow: inset 0 1px 0 rgba(255,255,255,0.06);
   transition: transform 140ms ease, border-color 180ms ease;
+  /* Uniform cards: fill the grid cell so every card in a row is the same height. */
+  height: 100%; min-height: 210px; display: flex; flex-direction: column;
 }
+/* Tags/skills sink to the bottom so cards line up regardless of body length. */
+.job-card__tags, .job-card__skills:last-child { margin-top: auto; }
 .job-card:hover { transform: translateY(-2px); border-color: rgba(128,90,245,0.40); }
 .job-card__head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
 .job-card__title { font-weight: 800; font-size: 16px; text-decoration: none; color: var(--text-white, inherit); }

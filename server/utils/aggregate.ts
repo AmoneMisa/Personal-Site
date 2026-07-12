@@ -71,6 +71,8 @@ function matches(job: Job, query: JobQuery, oldestAllowed: number): boolean {
   }
 
   // ---- advanced (enriched) filters ----
+  // Country filters strictly by the job's location country. Remote-only postings
+  // are surfaced via the separate Work mode = Remote filter, not by country.
   if (query.countries.length && !query.countries.includes(job.country || '')) return false
   if (query.workMode && job.workMode !== query.workMode) return false
   if (query.relocation && job.relocation !== query.relocation) return false

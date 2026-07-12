@@ -5,12 +5,58 @@
 
 import type { Job, LanguageReq, Relocation, SalaryPeriod, WorkMode } from './jobTypes'
 
+// ---- HTML → plain text ----
+// Many boards return HTML (sometimes HTML-encoded, occasionally double-encoded)
+// in titles/descriptions, so cards were showing raw "<p>…&quot;content-intro…"
+// or "&nbsp;"/"&#26;" markup. Strip tags + decode entities to clean plain text.
+const NAMED_ENTITIES: Record<string, string> = {
+  amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", nbsp: ' ',
+  ndash: '–', mdash: '—', hellip: '…', middot: '·', bull: '•',
+  laquo: '«', raquo: '»', rsquo: '’', lsquo: '‘', ldquo: '“', rdquo: '”', deg: '°',
+  // Common Latin-1 accented letters (EU job posts: German/French/Spanish/etc.).
+  auml: 'ä', ouml: 'ö', uuml: 'ü', Auml: 'Ä', Ouml: 'Ö', Uuml: 'Ü', szlig: 'ß',
+  agrave: 'à', aacute: 'á', acirc: 'â', atilde: 'ã', aring: 'å', aelig: 'æ',
+  ccedil: 'ç', egrave: 'è', eacute: 'é', ecirc: 'ê', euml: 'ë',
+  igrave: 'ì', iacute: 'í', icirc: 'î', iuml: 'ï', ntilde: 'ñ',
+  ograve: 'ò', oacute: 'ó', ocirc: 'ô', otilde: 'õ', oslash: 'ø',
+  ugrave: 'ù', uacute: 'ú', ucirc: 'û', yacute: 'ý', euro: '€', pound: '£', copy: '©', reg: '®', trade: '™',
+}
+function decodeEntities(text: string): string {
+  return text.replace(/&(#x?[0-9a-f]+|[a-z]+);/gi, (m, code: string) => {
+    if (code[0] === '#') {
+      const cp =
+        code[1] === 'x' || code[1] === 'X'
+          ? parseInt(code.slice(2), 16)
+          : parseInt(code.slice(1), 10)
+      if (!Number.isFinite(cp)) return m
+      return cp >= 0x20 ? String.fromCodePoint(cp) : ' ' // drop control chars (e.g. &#26;)
+    }
+    // Entity names are case-sensitive (&Auml; ≠ &auml;); try exact, then lowercase.
+    return NAMED_ENTITIES[code] ?? NAMED_ENTITIES[code.toLowerCase()] ?? m
+  })
+}
+export function cleanText(raw: string | undefined): string {
+  if (!raw) return ''
+  let s = raw
+  // Two passes so single- and double-encoded HTML both end up as plain text.
+  for (let i = 0; i < 2; i++) {
+    s = s
+      .replace(/<(script|style)[^>]*>[\s\S]*?<\/\1>/gi, ' ') // drop scripts/styles
+      .replace(/<\/?(p|div|li|ul|ol|br|h[1-6]|tr|section)[^>]*>/gi, ' ') // blocks → space
+      .replace(/<[^>]+>/g, ' ') // strip any remaining tags
+      .replace(/<[^>]*$/g, ' ') // strip a trailing tag cut off by truncation
+    s = decodeEntities(s)
+  }
+  return s.replace(/[\u0000-\u001f]+/g, ' ').replace(/\s+/g, ' ').trim()
+}
+
 // ---- Currency → USD (APPROXIMATE static rates; update as needed) ----
 // Russia/Belarus intentionally omitted (excluded elsewhere).
 const USD_RATES: Record<string, number> = {
   USD: 1, EUR: 1.09, GBP: 1.27, PLN: 0.25, UAH: 0.024, KZT: 0.0019,
   UZS: 0.000079, AZN: 0.59, GEL: 0.37, AMD: 0.0026, KGS: 0.011, MDL: 0.056,
   TJS: 0.092, TMT: 0.286, TRY: 0.030, CAD: 0.73, CHF: 1.12, INR: 0.012,
+  CNY: 0.14, JPY: 0.0064, KRW: 0.00072,
 }
 
 export function toUsd(amount: number | undefined, currency: string | undefined): number | undefined {
@@ -70,6 +116,9 @@ const COUNTRY_PATTERNS: [string, RegExp][] = [
   ['DE', /german|berlin|munich|герман|берлин|deutschland/i],
   ['GB', /united kingdom|london|england|британ|лондон/i],
   ['US', /united states|\busa\b|new york|сша|remote us/i],
+  ['CN', /\bchina\b|beijing|shanghai|shenzhen|guangzhou|hangzhou|китай|пекин|шанхай/i],
+  ['JP', /\bjapan\b|tokyo|osaka|kyoto|япони|токио|осака/i],
+  ['KR', /south korea|\bkorea\b|seoul|busan|коре|сеул/i],
 ]
 
 // Resolve a free-text blob (EN/RU/UK; country name OR capital city) to an ISO-2
@@ -210,14 +259,17 @@ function detectNiceToHave(text: string, skills: string[]): string[] {
 
 export function enrichJob(job: Job): Job {
   if (job.workMode !== undefined) return job // already enriched
-  const text = `${job.title} \n ${job.tags.join(' ')} \n ${job.description || ''}`
+  const title = cleanText(job.title) || job.title
+  const description = cleanText(job.description)
+  const clean = { ...job, title, description: description || undefined }
+  const text = `${title} \n ${job.tags.join(' ')} \n ${description}`
   const skills = matchSkills(text)
   const niceToHave = detectNiceToHave(text, skills)
   const core = skills.filter((s) => !niceToHave.includes(s))
-  const salaryPeriod = detectSalaryPeriod(job, text)
+  const salaryPeriod = detectSalaryPeriod(clean, text)
   return {
-    ...job,
-    country: detectCountry(job),
+    ...clean,
+    country: detectCountry(clean),
     workMode: detectWorkMode(text, job),
     relocation: detectRelocation(text),
     foreignerFriendly: detectForeignerFriendly(text),
