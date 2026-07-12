@@ -133,7 +133,12 @@ export default defineEventHandler(async (event) => {
   const salaryMin = q.salaryMin ? clampInt(q.salaryMin, 0, 0, 100_000_000) : undefined
 
   // Advanced enriched filters (all optional).
-  const country = String(q.country ?? '').trim().toUpperCase() || undefined
+  const countries = String(q.country ?? '')
+    .split(',')
+    .map((s) => s.trim().toUpperCase())
+    .filter(Boolean)
+  const includeRu = q.includeRu === 'true'
+  const includeBy = q.includeBy === 'true'
   const workMode = WORK_MODES.includes(q.workMode as WorkMode) ? (q.workMode as WorkMode) : undefined
   const relocation = RELOCATIONS.includes(q.relocation as Relocation)
     ? (q.relocation as Relocation)
@@ -143,6 +148,10 @@ export default defineEventHandler(async (event) => {
   else if (q.foreignerFriendly === 'false') foreignerFriendly = false
   const language = String(q.language ?? '').trim() || undefined
   const languageLevel = String(q.languageLevel ?? '').trim() || undefined
+  const excludeLanguages = String(q.excludeLanguage ?? '')
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean)
   const skills = String(q.skills ?? '')
     .split(',')
     .map((s) => s.trim())
@@ -158,12 +167,15 @@ export default defineEventHandler(async (event) => {
     sort,
     maxAgeDays: clampInt(q.maxAgeDays, 14, 1, 14),
     salaryMin,
-    country,
+    countries,
+    includeRu,
+    includeBy,
     workMode,
     relocation,
     foreignerFriendly,
     language,
     languageLevel,
+    excludeLanguages,
     skills,
     page: clampInt(q.page, 1, 1, 10000),
     pageSize: clampInt(q.pageSize, 20, 1, 100),

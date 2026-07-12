@@ -68,8 +68,10 @@ const messages = {
     prev: "Previous", next: "Next", page: "Page {page} / {total}", remote: "Remote", today: "today",
     yesterday: "yesterday", daysAgo: "{n}d ago", monthsAgo: "{n}mo ago",
     // advanced filters
-    advanced: "Advanced filters", country: "Country", workMode: "Work mode", relocation: "Relocation",
+    advanced: "Advanced filters", country: "Countries", workMode: "Work mode", relocation: "Relocation",
     language: "Language", languageLevel: "Level", skills: "Skills (comma-separated)",
+    excludeLanguage: "Exclude languages", includeRu: "Include Russia", includeBy: "Include Belarus",
+    countryPlaceholder: "Any country", excludeLangPlaceholder: "None",
     foreigner: "Foreigner-friendly", any: "Any",
     wmRemote: "Remote", wmHybrid: "Hybrid", wmOffice: "Office",
     relYes: "Offered", relNo: "None", reset: "Reset filters",
@@ -100,8 +102,10 @@ const messages = {
     jobsFound: "Вакансий: {n}", empty: "Ничего не найдено.", error: "Не удалось загрузить вакансии.",
     prev: "Назад", next: "Вперёд", page: "Страница {page} / {total}", remote: "Удалённо", today: "сегодня",
     yesterday: "вчера", daysAgo: "{n} дн. назад", monthsAgo: "{n} мес. назад",
-    advanced: "Расширенные фильтры", country: "Страна", workMode: "Формат работы", relocation: "Релокация",
+    advanced: "Расширенные фильтры", country: "Страны", workMode: "Формат работы", relocation: "Релокация",
     language: "Язык", languageLevel: "Уровень", skills: "Навыки (через запятую)",
+    excludeLanguage: "Исключить языки", includeRu: "Включить Россию", includeBy: "Включить Беларусь",
+    countryPlaceholder: "Любая страна", excludeLangPlaceholder: "Нет",
     foreigner: "Для иностранцев", any: "Любой",
     wmRemote: "Удалённо", wmHybrid: "Гибрид", wmOffice: "Офис",
     relYes: "Есть", relNo: "Нет", reset: "Сбросить фильтры",
@@ -208,15 +212,18 @@ const displayCurrency = ref("USD"); // currency the user wants amounts shown in
 const displayPeriod = ref<Period>("month"); // hour | month | year for converted salaries
 const sort = ref("date"); // date | oldest | title | company | salary | ats
 
-// advanced filters — default to "Any" country. Country is a heuristic guess from
-// job text, so pinning it to a single CIS country (e.g. UZ) hides almost every
-// vacancy; users can still narrow to Uzbekistan/CIS via the Country selector.
-const country = ref("");
+// advanced filters — default to no country selected (= any). Country is a
+// heuristic guess from job text, so pinning it to a single CIS country hides
+// almost every vacancy; users can multi-select the countries they care about.
+const countries = ref<string[]>([]);
+const includeRu = ref(false); // Russia is excluded by the backend unless opted-in
+const includeBy = ref(false); // Belarus is excluded by the backend unless opted-in
 const workMode = ref("");
 const relocation = ref("");
 const foreignerOnly = ref(false);
 const language = ref("");
 const languageLevel = ref("");
+const excludeLanguages = ref<string[]>([]);
 const skills = ref("");
 const showAdvanced = ref(true);
 
@@ -266,12 +273,15 @@ async function load(toPage = 1) {
     const inUsd = convertCurrency(salaryMin.value, displayCurrency.value, "USD");
     if (inUsd) params.salaryMin = String(convertPeriod(inUsd, displayPeriod.value, "year"));
   }
-  if (country.value) params.country = country.value;
+  if (countries.value.length) params.country = countries.value.join(",");
+  if (includeRu.value) params.includeRu = "true";
+  if (includeBy.value) params.includeBy = "true";
   if (workMode.value) params.workMode = workMode.value;
   if (relocation.value) params.relocation = relocation.value;
   if (foreignerOnly.value) params.foreignerFriendly = "true";
   if (language.value) params.language = language.value;
   if (languageLevel.value) params.languageLevel = languageLevel.value;
+  if (excludeLanguages.value.length) params.excludeLanguage = excludeLanguages.value.join(",");
   if (skills.value.trim()) params.skills = skills.value.trim();
 
   // Served by Nitro at /jobs-feed (NOT under /api, which the host site proxies to FastAPI).
@@ -286,8 +296,10 @@ async function load(toPage = 1) {
 }
 
 function resetFilters() {
-  country.value = ""; workMode.value = ""; relocation.value = "";
-  foreignerOnly.value = false; language.value = ""; languageLevel.value = ""; skills.value = "";
+  countries.value = []; includeRu.value = false; includeBy.value = false;
+  workMode.value = ""; relocation.value = "";
+  foreignerOnly.value = false; language.value = ""; languageLevel.value = "";
+  excludeLanguages.value = []; skills.value = "";
   load(1);
 }
 
@@ -415,8 +427,9 @@ const sortItems = computed<Item[]>(() => {
   if (cvProfile.value) base.push({ label: t("sortAts"), value: "ats" });
   return base;
 });
+// Multi-select: drop the "any" pseudo-option (empty selection already means any).
 const countryItems = computed<Item[]>(() =>
-  countryOptions.map((c) => ({ value: c.value, label: c.label ?? t(c.labelKey!) })),
+  countryOptions.filter((c) => c.value).map((c) => ({ value: c.value, label: c.label! })),
 );
 const currencyItems = computed<Item[]>(() => currencyOptions.map((c) => ({ label: c, value: c })));
 const periodItems = computed<Item[]>(() => periodOptions.map((p) => ({ label: periodLabel(p), value: p })));
@@ -435,6 +448,10 @@ const languageItems = computed<Item[]>(() => [
   { label: t("any"), value: "" },
   ...languageOptions.map((l) => ({ label: l, value: l })),
 ]);
+// Multi-select of languages to exclude (no "any" pseudo-option).
+const excludeLanguageItems = computed<Item[]>(() =>
+  languageOptions.map((l) => ({ label: l, value: l })),
+);
 const levelItems = computed<Item[]>(() => [
   { label: t("any"), value: "" },
   ...levelOptions.map((l) => ({ label: l, value: l })),
@@ -530,7 +547,8 @@ await load(1);
         <label class="jobs__field">
           <span class="jobs__field-label">{{ t("country") }}</span>
           <u-select-menu
-              v-model="country" :items="countryItems" value-key="value" label-key="label"
+              v-model="countries" :items="countryItems" value-key="value" label-key="label"
+              multiple :placeholder="t('countryPlaceholder')"
               class="jobs__select" @update:model-value="load(1)"
           />
         </label>
@@ -576,6 +594,14 @@ await load(1);
               :search-input="false" :disabled="!language" class="jobs__select" @update:model-value="load(1)"
           />
         </label>
+        <label class="jobs__field">
+          <span class="jobs__field-label">{{ t("excludeLanguage") }}</span>
+          <u-select-menu
+              v-model="excludeLanguages" :items="excludeLanguageItems" value-key="value" label-key="label"
+              multiple :placeholder="t('excludeLangPlaceholder')"
+              class="jobs__select" @update:model-value="load(1)"
+          />
+        </label>
         <label class="jobs__field jobs__field_wide">
           <span class="jobs__field-label">{{ t("skills") }}</span>
           <u-input v-model="skills" icon="i-lucide-wrench" placeholder="react, typescript, docker" @keyup.enter="load(1)" />
@@ -583,6 +609,14 @@ await load(1);
         <label class="jobs__remote jobs__field_inline">
           <u-switch v-model="foreignerOnly" @update:model-value="load(1)" />
           <span>{{ t("foreigner") }}</span>
+        </label>
+        <label class="jobs__remote jobs__field_inline">
+          <u-switch v-model="includeRu" @update:model-value="load(1)" />
+          <span>{{ t("includeRu") }}</span>
+        </label>
+        <label class="jobs__remote jobs__field_inline">
+          <u-switch v-model="includeBy" @update:model-value="load(1)" />
+          <span>{{ t("includeBy") }}</span>
         </label>
         <u-button type="button" variant="ghost" color="neutral" size="sm" icon="i-lucide-rotate-ccw" @click="resetFilters">
           {{ t("reset") }}
@@ -821,7 +855,11 @@ await load(1);
 .stats__chip { font-size: 12px; padding: 2px 9px; border-radius: 999px; border: 1px solid var(--ui-border); color: var(--ui-text-muted); }
 .stats__chip_skill { border-color: rgba(128,90,245,0.35); color: #c4b5fd; }
 
-.jobs__grid { display: grid; grid-template-columns: 1fr; gap: 12px; @media (min-width: 800px) { grid-template-columns: 1fr 1fr; } }
+.jobs__grid {
+  display: grid; gap: 12px; grid-template-columns: 1fr;
+  @media (min-width: 640px) { grid-template-columns: repeat(2, 1fr); }
+  @media (min-width: 1024px) { grid-template-columns: repeat(3, 1fr); }
+}
 .job-card {
   padding: 16px; border-radius: 18px; border: 1px solid var(--ui-border);
   background: rgba(255,255,255,0.03); box-shadow: inset 0 1px 0 rgba(255,255,255,0.06);

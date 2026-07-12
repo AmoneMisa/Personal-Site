@@ -63,6 +63,10 @@ const props = defineProps({
 </template>
 
 <style scoped lang="scss">
+.footer__contact-item {
+  list-style: none;
+}
+
 .footer__contact-social {
   display: inline-flex;
   width: 32px;

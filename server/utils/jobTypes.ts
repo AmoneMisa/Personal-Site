@@ -76,12 +76,15 @@ export interface JobQuery {
   pageSize: number
 
   // --- new advanced filters ---
-  country?: string // ISO-2, or 'REMOTE'
+  countries: string[] // ISO-2 codes (any-of); empty = any country
+  includeRu?: boolean // opt-in to Russia postings (excluded by default)
+  includeBy?: boolean // opt-in to Belarus postings (excluded by default)
   workMode?: WorkMode
   relocation?: Relocation
   foreignerFriendly?: boolean
   language?: string // e.g. "english"
   languageLevel?: string // e.g. "b2"
+  excludeLanguages: string[] // drop vacancies requiring any of these languages
   skills: string[] // all must be present
 }
 

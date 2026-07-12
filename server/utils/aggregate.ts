@@ -15,25 +15,31 @@ import type {
   WorkMode,
 } from './jobTypes'
 
-// User preference: favor CIS but exclude Russia & Belarus. A vacancy is dropped
-// when its location clearly names one of these (country names, common variants,
-// and capital cities). Remote/worldwide postings are unaffected.
-const EXCLUDED_LOCATION = new RegExp(
+// User preference: favor CIS but exclude Russia & Belarus by default. Each country
+// has its own matcher so the two can be toggled back on independently via the
+// includeRu / includeBy query flags. Remote/worldwide postings are unaffected.
+const RUSSIA_LOCATION = new RegExp(
   [
     'russia', 'russian federation', '\\bru\\b',
     'росси', 'рф\\b', 'москв', 'moscow', 'петербург', 'saint petersburg', 'st\\.? petersburg',
-    'belarus', 'belarusian', 'белар', 'білор', 'беларусь', 'минск', 'мінськ', 'minsk',
   ].join('|'),
   'i',
 )
+const BELARUS_LOCATION = new RegExp(
+  ['belarus', 'belarusian', 'белар', 'білор', 'беларусь', 'минск', 'мінськ', 'minsk'].join('|'),
+  'i',
+)
 
-function isExcludedLocation(job: Job): boolean {
+function isExcludedLocation(job: Job, includeRu: boolean, includeBy: boolean): boolean {
   if (job.remote) return false
   const loc = job.location || ''
   if (/worldwide|anywhere|remote|global/i.test(loc)) return false
   // Location is often a placeholder, so also scan the title where the city is
   // frequently named (keeps the RU/BY exclusion working for those postings).
-  return EXCLUDED_LOCATION.test(loc) || EXCLUDED_LOCATION.test(job.title || '')
+  const hay = `${loc} ${job.title || ''}`
+  if (job.country === 'RU' || RUSSIA_LOCATION.test(hay)) return !includeRu
+  if (job.country === 'BY' || BELARUS_LOCATION.test(hay)) return !includeBy
+  return false
 }
 
 function matches(job: Job, query: JobQuery, oldestAllowed: number): boolean {
@@ -41,8 +47,8 @@ function matches(job: Job, query: JobQuery, oldestAllowed: number): boolean {
   const posted = new Date(job.postedAt).getTime()
   if (Number.isNaN(posted) || posted < oldestAllowed) return false
 
-  // Hard rule: exclude Russia & Belarus locations.
-  if (isExcludedLocation(job)) return false
+  // Exclude Russia & Belarus locations unless explicitly opted-in.
+  if (isExcludedLocation(job, query.includeRu === true, query.includeBy === true)) return false
 
   if (query.remote !== undefined && job.remote !== query.remote) return false
   if (query.location) {
@@ -65,7 +71,7 @@ function matches(job: Job, query: JobQuery, oldestAllowed: number): boolean {
   }
 
   // ---- advanced (enriched) filters ----
-  if (query.country && job.country !== query.country) return false
+  if (query.countries.length && !query.countries.includes(job.country || '')) return false
   if (query.workMode && job.workMode !== query.workMode) return false
   if (query.relocation && job.relocation !== query.relocation) return false
   if (query.foreignerFriendly !== undefined && job.foreignerFriendly !== query.foreignerFriendly) {
@@ -79,6 +85,10 @@ function matches(job: Job, query: JobQuery, oldestAllowed: number): boolean {
     if (query.languageLevel && (hit.level || '').toLowerCase() !== query.languageLevel.toLowerCase()) {
       return false
     }
+  }
+  if (query.excludeLanguages.length) {
+    const have = new Set((job.languages || []).map((l) => l.language.toLowerCase()))
+    for (const ex of query.excludeLanguages) if (have.has(ex.toLowerCase())) return false
   }
   if (query.skills.length) {
     const have = new Set([...(job.skills || []), ...(job.niceToHave || [])].map((s) => s.toLowerCase()))
