@@ -267,15 +267,32 @@ export async function fetchJooble(q: string): Promise<Job[]> {
   }))
 }
 
-// ---------- Company career sites (Greenhouse + Lever public ATS APIs) ----------
+// ---------- Company career sites (Greenhouse + Lever + SmartRecruiters APIs) ----
 // Many famous companies (incl. game studios) publish their careers pages through
-// Greenhouse or Lever, both of which expose a free, official JSON API — no
-// scraping. Configure the boards you want; sensible defaults ship built-in.
-//   GREENHOUSE_BOARDS="airbnb,stripe,playrix"   (board tokens; optional "token:Label")
-//   LEVER_COMPANIES="plaid,ramp"                (lever handles; optional "handle:Label")
+// Greenhouse, Lever or SmartRecruiters, all of which expose a free, official JSON
+// API — no scraping. Configure the boards you want; sensible defaults ship built-in.
+// NB: custom career sites (most banks/telecoms) have no such API and can't be added.
+//   GREENHOUSE_BOARDS="airbnb,figma"            (board tokens; optional "token:Label")
+//   LEVER_COMPANIES="ajax,easybrain"            (lever handles; optional "handle:Label")
+//   SMARTRECRUITERS_COMPANIES="Wise,Canva"      (SR identifiers; optional "id:Label")
 // Set COMPANIES_SOURCE=off to disable, or COMPANIES_DEFAULTS=off to drop the seed list.
-const DEFAULT_GREENHOUSE = 'airbnb,stripe,dropbox,coinbase,figma,gitlab'
-const DEFAULT_LEVER = 'plaid,ramp,brex'
+// Seeds below were verified (2026-07) to return live postings via their public API.
+const DEFAULT_GREENHOUSE = [
+  'airbnb:Airbnb', 'adyen:Adyen', 'anthropic:Anthropic', 'asana:Asana', 'block:Block',
+  'brex:Brex', 'canonical:Canonical', 'cloudflare:Cloudflare', 'coinbase:Coinbase',
+  'coupang:Coupang', 'datadog:Datadog', 'deepmind:DeepMind', 'discord:Discord',
+  'dropbox:Dropbox', 'elastic:Elastic', 'fastly:Fastly', 'figma:Figma', 'fxpro:FxPro',
+  'gitlab:GitLab', 'grafanalabs:Grafana Labs', 'gusto:Gusto', 'hellofresh:HelloFresh',
+  'instacart:Instacart', 'jetbrains:JetBrains', 'lucidmotors:Lucid Motors', 'lyft:Lyft',
+  'mongodb:MongoDB', 'monzo:Monzo', 'netlify:Netlify', 'newrelic:New Relic', 'reddit:Reddit',
+  'roblox:Roblox', 'scaleai:Scale AI', 'skyscanner:Skyscanner', 'smartsheet:Smartsheet',
+  'tripadvisor:Tripadvisor', 'twilio:Twilio', 'twitch:Twitch', 'zscaler:Zscaler',
+].join(',')
+const DEFAULT_LEVER = ['ajax:Ajax Systems', 'easybrain:Easybrain'].join(',')
+const DEFAULT_SMARTRECRUITERS = [
+  'DeliveryHero:Delivery Hero', 'Wise:Wise', 'Canva:Canva', 'ASOS:ASOS',
+  'ByteDance:ByteDance', 'Joom:Joom', 'Uber:Uber', 'Wayfair:Wayfair',
+].join(',')
 
 function prettyLabel(token: string): string {
   return token.charAt(0).toUpperCase() + token.slice(1)
@@ -294,13 +311,20 @@ function parseBoards(raw: string): { handle: string; label: string }[] {
     .filter((b) => b.handle)
 }
 
-function companyBoards(kind: 'greenhouse' | 'lever'): { handle: string; label: string }[] {
-  const seed = process.env.COMPANIES_DEFAULTS === 'off'
-    ? ''
-    : kind === 'greenhouse'
-      ? DEFAULT_GREENHOUSE
-      : DEFAULT_LEVER
-  const env = kind === 'greenhouse' ? process.env.GREENHOUSE_BOARDS : process.env.LEVER_COMPANIES
+const SEED_BY_KIND = {
+  greenhouse: DEFAULT_GREENHOUSE,
+  lever: DEFAULT_LEVER,
+  smartrecruiters: DEFAULT_SMARTRECRUITERS,
+} as const
+const ENV_BY_KIND = {
+  greenhouse: 'GREENHOUSE_BOARDS',
+  lever: 'LEVER_COMPANIES',
+  smartrecruiters: 'SMARTRECRUITERS_COMPANIES',
+} as const
+
+function companyBoards(kind: keyof typeof SEED_BY_KIND): { handle: string; label: string }[] {
+  const seed = process.env.COMPANIES_DEFAULTS === 'off' ? '' : SEED_BY_KIND[kind]
+  const env = process.env[ENV_BY_KIND[kind]]
   return parseBoards([seed, env || ''].filter(Boolean).join(','))
 }
 
@@ -347,6 +371,32 @@ async function fetchLeverBoard(handle: string, label: string): Promise<Job[]> {
   })
 }
 
+// SmartRecruiters exposes a public postings list (no auth). It returns metadata
+// only (no description body) — enough for title/company/location/date; enrich.ts
+// still derives skills/country from the title. We take up to 100 recent postings.
+async function fetchSmartRecruitersBoard(handle: string, label: string): Promise<Job[]> {
+  const data = await fetchJson<{ content: any[] }>(
+    `https://api.smartrecruiters.com/v1/companies/${encodeURIComponent(handle)}/postings?limit=100`,
+  )
+  return (data.content || []).map((j) => {
+    const loc = j.location?.fullLocation
+      || [j.location?.city, j.location?.country?.toUpperCase()].filter(Boolean).join(', ')
+      || 'See listing'
+    return {
+      id: `companies-sr-${handle}-${j.id}`,
+      title: j.name,
+      company: j.company?.name || label,
+      location: loc,
+      url: `https://jobs.smartrecruiters.com/${handle}/${j.id}`,
+      source: 'companies' as const,
+      remote: j.location?.remote === true || /remote|anywhere|distributed/i.test(`${j.name} ${loc}`),
+      tags: [label, j.function?.label, j.industry?.label].filter(Boolean),
+      postedAt: new Date(j.releasedDate || Date.now()).toISOString(),
+      employmentType: j.typeOfEmployment?.label,
+    }
+  })
+}
+
 export async function fetchCompanies(q: string): Promise<Job[]> {
   if (process.env.COMPANIES_SOURCE === 'off') return []
   const tasks: Promise<Job[]>[] = [
@@ -359,6 +409,12 @@ export async function fetchCompanies(q: string): Promise<Job[]> {
     ...companyBoards('lever').map((b) =>
       fetchLeverBoard(b.handle, b.label).catch((err) => {
         console.error(`[jobs] lever "${b.handle}" failed:`, (err as Error).message)
+        return [] as Job[]
+      }),
+    ),
+    ...companyBoards('smartrecruiters').map((b) =>
+      fetchSmartRecruitersBoard(b.handle, b.label).catch((err) => {
+        console.error(`[jobs] smartrecruiters "${b.handle}" failed:`, (err as Error).message)
         return [] as Job[]
       }),
     ),
