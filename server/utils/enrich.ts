@@ -72,10 +72,27 @@ const COUNTRY_PATTERNS: [string, RegExp][] = [
   ['US', /united states|\busa\b|new york|сша|remote us/i],
 ]
 
+// Resolve a free-text blob (EN/RU/UK; country name OR capital city) to an ISO-2
+// code, or undefined. Exported so the location filter can match typed queries
+// like "Узбекистан"/"Ташкент"/"Uzbekistan" against a job's detected country.
+export function resolveCountry(text: string): string | undefined {
+  if (!text) return undefined
+  for (const [code, re] of COUNTRY_PATTERNS) if (re.test(text)) return code
+  return undefined
+}
+
 function detectCountry(job: Job): string {
   const loc = (job.location || '').trim()
   if (/worldwide|anywhere|global|remote/i.test(loc) && !/[,]/.test(loc)) return 'REMOTE'
-  for (const [code, re] of COUNTRY_PATTERNS) if (re.test(loc)) return code
+  // Prefer the location field; but many boards (notably DOU.ua) leave it as a
+  // placeholder like "See listing" and only name the city/country in the title,
+  // so fall back to the title + tags before giving up.
+  const byLoc = resolveCountry(loc)
+  if (byLoc) return byLoc
+  const byTitle = resolveCountry(`${job.title} ${job.tags.join(' ')}`)
+  if (byTitle) return byTitle
+  // Board-level fallback: DOU.ua is a Ukraine-only board.
+  if (/dou/i.test(job.company) || /dou/i.test(job.id)) return 'UA'
   if (job.remote) return 'REMOTE'
   return 'OTHER'
 }

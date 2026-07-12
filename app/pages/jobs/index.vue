@@ -58,8 +58,8 @@ const messages = {
   en: {
     title: "Job Finder", headline: "Vacancies from many sources, no older than 14 days",
     subtitle: "Search jobs aggregated from HeadHunter, DOU.ua, Jooble, The Muse, Jobicy, Remotive, RemoteOK, Arbeitnow and more. Tuned for Uzbekistan & CIS.",
-    searchPlaceholder: "Title, keyword or company", locationPlaceholder: "Location",
-    remoteOnly: "Remote only", search: "Search", searching: "Searching…", all: "All",
+    searchPlaceholder: "Title, keyword or company",
+    search: "Search", searching: "Searching…", all: "All",
     sortLabel: "Sort", salaryMin: "Min salary", currency: "Currency", period: "Per",
     perHour: "hour", perMonth: "month", perYear: "year",
     sortDate: "Newest", sortOldest: "Oldest", sortTitle: "Title A–Z", sortCompany: "Company A–Z",
@@ -89,8 +89,8 @@ const messages = {
   ru: {
     title: "Поиск вакансий", headline: "Вакансии из множества источников, не старше 14 дней",
     subtitle: "Поиск вакансий из HeadHunter, DOU.ua, Jooble, The Muse, Jobicy, Remotive, RemoteOK, Arbeitnow и других. Настроено на Узбекистан и СНГ.",
-    searchPlaceholder: "Должность, ключевое слово или компания", locationPlaceholder: "Локация",
-    remoteOnly: "Только удалённо", search: "Искать", searching: "Поиск…", all: "Все",
+    searchPlaceholder: "Должность, ключевое слово или компания",
+    search: "Искать", searching: "Поиск…", all: "Все",
     sortLabel: "Сортировка", salaryMin: "Зарплата от", currency: "Валюта", period: "За",
     perHour: "час", perMonth: "месяц", perYear: "год",
     sortDate: "Сначала новые", sortOldest: "Сначала старые", sortTitle: "Название A–Я", sortCompany: "Компания A–Я",
@@ -138,7 +138,8 @@ const sourceOptions = [
   { value: "companies", label: "Companies" },
 ];
 
-// CIS-focused country list (RU/BY excluded by the backend). REMOTE = worldwide.
+// CIS-focused country list (RU/BY excluded by the backend). "Remote" is NOT a
+// country — remote/worldwide postings are filtered via the Work mode selector.
 const countryOptions = [
   { value: "", labelKey: "any" },
   { value: "UZ", label: "🇺🇿 Uzbekistan" },
@@ -155,7 +156,6 @@ const countryOptions = [
   { value: "DE", label: "🇩🇪 Germany" },
   { value: "GB", label: "🇬🇧 UK" },
   { value: "US", label: "🇺🇸 USA" },
-  { value: "REMOTE", label: "🌍 Remote" },
 ];
 
 const languageOptions = ["English", "German", "Russian", "Ukrainian", "Uzbek", "French", "Spanish", "Polish", "Turkish"];
@@ -197,8 +197,6 @@ function convertPeriod(amount: number, from: Period, to: Period): number {
 }
 
 const query = ref("");
-const location = ref("");
-const remoteOnly = ref(false);
 const source = ref("");
 const salaryMin = ref<number | undefined>(undefined);
 const displayCurrency = ref("USD"); // currency the user wants amounts shown in
@@ -256,8 +254,6 @@ async function load(toPage = 1) {
     page: String(toPage), pageSize: String(cvProfile.value ? 50 : pageSize.value), sort: serverSort,
   };
   if (query.value) params.q = query.value;
-  if (location.value) params.location = location.value;
-  if (remoteOnly.value) params.remote = "true";
   if (source.value) params.source = source.value;
   if (salaryMin.value) {
     // salaryMin is entered in the chosen currency + period; the server filters on
@@ -447,7 +443,6 @@ await load(1);
     <!-- Filters + sort -->
     <form class="jobs__controls" @submit.prevent="load(1)">
       <u-input v-model="query" icon="i-lucide-search" :placeholder="t('searchPlaceholder')" />
-      <u-input v-model="location" icon="i-lucide-map-pin" :placeholder="t('locationPlaceholder')" />
       <u-input v-model.number="salaryMin" type="number" icon="i-lucide-banknote" :placeholder="`${t('salaryMin')} (${displayCurrency}/${periodLabel(displayPeriod)})`" />
       <div class="jobs__sort">
         <u-icon name="i-lucide-arrow-down-wide-narrow" />
@@ -474,10 +469,6 @@ await load(1);
             {{ opt.label ?? t(opt.labelKey!) }}
           </button>
         </div>
-        <label class="jobs__remote">
-          <u-switch v-model="remoteOnly" />
-          <span>{{ t("remoteOnly") }}</span>
-        </label>
         <u-button type="submit" :loading="loading" icon="i-lucide-search">
           {{ loading ? t("searching") : t("search") }}
         </u-button>
@@ -719,7 +710,7 @@ await load(1);
 
 .jobs__controls {
   margin: 16px 0 28px; display: grid; gap: 12px; grid-template-columns: 1fr;
-  @media (min-width: 900px) { grid-template-columns: 1fr 1fr 160px 180px; }
+  @media (min-width: 900px) { grid-template-columns: 1fr 200px 180px; }
 }
 .jobs__sort { display: flex; align-items: center; gap: 8px; }
 .jobs__select {

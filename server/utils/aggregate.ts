@@ -3,7 +3,7 @@
 // headerMenu pattern. Jobs are enriched (enrich.ts) before filtering so the new
 // structured filters and stats can operate on derived fields.
 
-import { enrichJob } from './enrich'
+import { enrichJob, resolveCountry } from './enrich'
 import type {
   Job,
   JobQuery,
@@ -31,7 +31,9 @@ function isExcludedLocation(job: Job): boolean {
   if (job.remote) return false
   const loc = job.location || ''
   if (/worldwide|anywhere|remote|global/i.test(loc)) return false
-  return EXCLUDED_LOCATION.test(loc)
+  // Location is often a placeholder, so also scan the title where the city is
+  // frequently named (keeps the RU/BY exclusion working for those postings).
+  return EXCLUDED_LOCATION.test(loc) || EXCLUDED_LOCATION.test(job.title || '')
 }
 
 function matches(job: Job, query: JobQuery, oldestAllowed: number): boolean {
@@ -43,8 +45,15 @@ function matches(job: Job, query: JobQuery, oldestAllowed: number): boolean {
   if (isExcludedLocation(job)) return false
 
   if (query.remote !== undefined && job.remote !== query.remote) return false
-  if (query.location && !job.location.toLowerCase().includes(query.location.toLowerCase())) {
-    return false
+  if (query.location) {
+    const want = query.location.toLowerCase()
+    // Match the raw location text, OR — when the query names a country/city in
+    // EN/RU/UK (e.g. "Узбекистан", "Ташкент", "Uzbekistan") — the job's detected
+    // country, so postings with a placeholder location still match.
+    const wantCode = resolveCountry(query.location)
+    const hitText = job.location.toLowerCase().includes(want)
+    const hitCode = wantCode !== undefined && job.country === wantCode
+    if (!hitText && !hitCode) return false
   }
   if (query.salaryMin !== undefined) {
     const pay = job.salaryUsd ?? job.salaryMax ?? job.salaryMin
