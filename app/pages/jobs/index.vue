@@ -117,7 +117,6 @@ const messages = {
 } as const;
 
 const { t } = useI18n({ useScope: "local", messages });
-const config = useRuntimeConfig();
 
 useSeoMeta({
   title: () => t("seoTitle"), description: () => t("seoDescription"),
@@ -272,7 +271,8 @@ async function load(toPage = 1) {
   if (languageLevel.value) params.languageLevel = languageLevel.value;
   if (skills.value.trim()) params.skills = skills.value.trim();
 
-  const { data, error } = await safeFetch<JobResult>(`${config.public.apiBase}/jobs`, { params });
+  // Served by Nitro at /jobs-feed (NOT under /api, which the host site proxies to FastAPI).
+  const { data, error } = await safeFetch<JobResult>("/jobs-feed", { params });
   if (error || !data) {
     failed.value = true; jobs.value = []; total.value = 0; stats.value = null;
   } else {

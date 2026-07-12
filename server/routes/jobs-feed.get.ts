@@ -1,5 +1,7 @@
-// GET /api/jobs — Nitro server route. Sits above the "/api/**" proxy just like
-// server/api/headerMenu.get.ts, so it is handled here (not proxied to FastAPI).
+// GET /jobs-feed — Nitro server route. Deliberately NOT under "/api/**": in the
+// host site that whole prefix is a routeRules proxy to the FastAPI backend (a
+// global middleware that runs before file routes), so an /api/* handler would be
+// forwarded to FastAPI and 404. Living at /jobs-feed keeps it served by Nitro.
 //
 // Aggregates many job boards, caches each pull in Redis (5 min), then filters/
 // sorts/paginates. Optional sources activate only when their env keys are set.
