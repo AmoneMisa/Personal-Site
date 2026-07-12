@@ -13,7 +13,7 @@
 
 @font-face {
     font-family: "PT Root UI";
-    src: url("../fonts/PT Root UI_Medium.woff2") format("woff2");
+    src: url("/fonts/PT Root UI_Medium.woff2") format("woff2");
     font-weight: 500;
     font-style: normal;
     font-display: swap;
@@ -21,15 +21,7 @@
 
 @font-face {
     font-family: "PT Root UI";
-    src: url("../../../public/fonts/PT Root UI_Regular.woff2") format("woff2");
-    font-weight: 400;
-    font-style: normal;
-    font-display: swap;
-}
-
-@font-face {
-    font-family: "PT Root UI";
-    src: url("../fonts/PT Root UI_Bold.woff2") format("woff2");
+    src: url("/fonts/PT Root UI_Bold.woff2") format("woff2");
     font-weight: 700;
     font-style: normal;
     font-display: swap;

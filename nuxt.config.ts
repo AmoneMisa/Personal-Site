@@ -3,11 +3,21 @@ import svgLoader from 'vite-svg-loader';
 export default defineNuxtConfig({
     app: {
         head: {
+            htmlAttrs: {
+                lang: 'ru'
+            },
             link: [
                 {
                     rel: "preload",
                     as: "font",
                     href: "/fonts/PT Root UI_Regular.woff2",
+                    type: "font/woff2",
+                    crossorigin: "anonymous"
+                },
+                {
+                    rel: "preload",
+                    as: "font",
+                    href: "/fonts/PT Root UI_Bold.woff2",
                     type: "font/woff2",
                     crossorigin: "anonymous"
                 }
@@ -62,7 +72,11 @@ export default defineNuxtConfig({
             websocket: true
         },
         routeRules: {
-            '/api/**': {proxy: 'http://backend:8000/**'} //http://backend:8000/** - prod
+            '/api/**': {proxy: 'http://backend:8000/**'}, //http://backend:8000/** - prod
+            '/fonts/**': {headers: {'cache-control': 'public, max-age=31536000, immutable'}},
+            '/images/**': {headers: {'cache-control': 'public, max-age=31536000, immutable'}},
+            '/svg/**': {headers: {'cache-control': 'public, max-age=31536000, immutable'}},
+            '/_ipx/**': {headers: {'cache-control': 'public, max-age=31536000, immutable'}}
         }
     },
     icon: {

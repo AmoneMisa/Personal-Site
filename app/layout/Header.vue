@@ -186,7 +186,7 @@ onMounted(() => {
               class="h-11 w-full rounded-xl border border-white/10 bg-white/5 text-sm font-semibold dark:text-white/90 text-[var(--ui-text)]/90 dark:hover:text-white hover:text-[var(--ui-text)]"
               @click="toggleTheme(); close?.()"
           >
-            t('header.button.changeTheme')
+            {{ t('header.button.changeTheme') }}
           </button>
 
           <u-link

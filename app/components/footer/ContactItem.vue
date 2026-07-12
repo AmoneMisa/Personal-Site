@@ -18,7 +18,7 @@ const props = defineProps({
 </script>
 
 <template>
-  <template v-for="contact in contacts" :key="contact.id">
+  <li v-for="contact in contacts" :key="contact.id" class="footer__contact-item">
     <a
         v-if="contact.type === 'address'"
         href="#"
@@ -59,7 +59,7 @@ const props = defineProps({
     <span v-else-if="contact.type === 'other'" class="footer__contact-link">
       {{ contact.value }} {{ t(contact.labelKey) }}
     </span>
-  </template>
+  </li>
 </template>
 
 <style scoped lang="scss">

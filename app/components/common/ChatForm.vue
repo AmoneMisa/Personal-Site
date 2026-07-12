@@ -459,7 +459,7 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <button class="floating-chat-toggle" type="button" @click="toggleChat">
+  <button class="floating-chat-toggle" type="button" :aria-label="$t('chat.a11y.open')" @click="toggleChat">
     <u-icon name="i-lucide-send" class="floating-chat-toggle__icon" />
     <span v-if="hasUnread" class="floating-chat-toggle__unread" />
   </button>
@@ -488,6 +488,7 @@ onBeforeUnmount(() => {
                 variant="ghost"
                 class="floating-chat-header__action"
                 type="button"
+                :aria-label="$t('chat.a11y.endSession')"
                 @click="closeSessionFromSite"
             >
               <u-icon name="i-lucide-ban" class="floating-chat-header__action-icon" />
@@ -497,6 +498,7 @@ onBeforeUnmount(() => {
                 variant="ghost"
                 class="floating-chat-header__close"
                 type="button"
+                :aria-label="$t('chat.a11y.close')"
                 @click="closeChat"
             >
               <u-icon name="i-lucide-x" class="floating-chat-header__close-icon" />

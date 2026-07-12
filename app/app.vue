@@ -1,7 +1,7 @@
 <template>
   <u-app>
     <custom-header/>
-    <u-main>
+    <u-main as="main">
       <u-container class="m-auto">
         <NuxtPage/>
       </u-container>

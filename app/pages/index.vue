@@ -114,21 +114,24 @@ const {data: animatedText} = await useAsyncData<AnimatedTextItem[]>(
       />
       <u-container class="max-w-6xl mx-auto admin-panel">
         <div class="admin-panel__image">
-          <h3 class="text-pretty font-bold text-highlighted mx-auto whitespace-normal [overflow-wrap:anywhere] text-3xl sm:text-4xl lg:text-5xl mb-9 gradient-text text-center">
-            {{ t('adminPanel.title') }}</h3>
+          <h2 class="text-pretty font-bold text-highlighted mx-auto whitespace-normal [overflow-wrap:anywhere] text-3xl sm:text-4xl lg:text-5xl mb-9 gradient-text text-center">
+            {{ t('adminPanel.title') }}</h2>
           <nuxt-img
               class="w-full rounded-lg"
               src="/images/admin-panel.png"
               alt="Admin panel"
               format="webp"
               :quality="80"
+              width="2536"
+              height="1340"
               sizes="(max-width: 1024px) 100vw, 988px"
               :widths="[480, 640, 768, 988, 1200, 1976]"
+              fetchpriority="high"
           />
         </div>
       </u-container>
       <u-container class="flex items-center flex-col justify-center min-w-0 mb-0">
-        <h3 class="text-2xl font-semibold text-center text-muted uppercase mb-8">{{ t('trust.title') }}</h3>
+        <h2 class="text-2xl font-semibold text-center text-muted uppercase mb-8">{{ t('trust.title') }}</h2>
         <images-carousel :images="[
             '/images/intellij.png',
             '/images/restapi.png',
@@ -177,6 +180,8 @@ const {data: animatedText} = await useAsyncData<AnimatedTextItem[]>(
               alt="Letter Logo Background"
               format="webp"
               :quality="80"
+              width="1536"
+              height="1024"
               sizes="(max-width: 1152px) 100vw, 1152px"
               :widths="[480, 768, 1024, 1152, 1440, 2304]"
               loading="lazy"
@@ -198,6 +203,8 @@ const {data: animatedText} = await useAsyncData<AnimatedTextItem[]>(
               :alt="t('page.community.title')"
               format="webp"
               quality="80"
+              width="368"
+              height="212"
               sizes="184px"
               :widths="[92, 184, 368]"
               loading="lazy"
@@ -251,7 +258,9 @@ const {data: animatedText} = await useAsyncData<AnimatedTextItem[]>(
 <style scoped lang="scss">
 .violet-block {
   padding: 50px 80px 60px;
-  background-color: var(--color-primary);
+  /* Slightly deeper purple than --color-primary (#805AF5) so white text meets
+     WCAG AA 4.5:1 (raises ~4.47:1 -> ~5.7:1); same hue, minimal visual change. */
+  background-color: #6c47e8;
 }
 
 .logo-shadow {

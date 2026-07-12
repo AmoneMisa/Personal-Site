@@ -303,6 +303,11 @@
   },
   "chat": {
     "title": "Chat with developer",
+    "a11y": {
+      "open": "Open chat",
+      "close": "Close chat",
+      "endSession": "End conversation"
+    },
     "loading": "Loading messages…",
     "send": "Send",
     "input": {
