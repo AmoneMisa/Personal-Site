@@ -83,7 +83,9 @@ const messages = {
     atsTitle: "ATS match", atsIntro: "Upload or paste your CV to see how well you match each vacancy. Your CV stays in your browser.",
     atsUpload: "Upload CV (.pdf .docx .txt)", atsPaste: "…or paste CV text here",
     atsClear: "Clear CV", atsReady: "CV loaded — scores shown on each vacancy.", atsMatch: "match",
-    atsMissing: "Missing keywords", seoTitle: "Job Finder — vacancies from many sources with ATS match",
+    atsMatched: "Matching keywords", atsMissing: "Missing keywords",
+    atsNoSkills: "No recognizable tech skills in this vacancy.",
+    seoTitle: "Job Finder — vacancies from many sources with ATS match",
     seoDescription: "Search fresh job vacancies (max 14 days) from multiple sources, filter by country/skills/language, see salary statistics, and get an ATS match score for your CV.",
   },
   ru: {
@@ -111,7 +113,9 @@ const messages = {
     atsTitle: "Совпадение ATS", atsIntro: "Загрузите или вставьте резюме, чтобы увидеть, насколько вы подходите. Резюме остаётся в браузере.",
     atsUpload: "Загрузить резюме (.pdf .docx .txt)", atsPaste: "…или вставьте текст резюме",
     atsClear: "Очистить", atsReady: "Резюме загружено — оценки показаны у вакансий.", atsMatch: "совпадение",
-    atsMissing: "Не хватает ключевых слов", seoTitle: "Поиск вакансий из множества источников с оценкой ATS",
+    atsMatched: "Совпадающие ключевые слова", atsMissing: "Не хватает ключевых слов",
+    atsNoSkills: "В вакансии нет распознаваемых тех. навыков.",
+    seoTitle: "Поиск вакансий из множества источников с оценкой ATS",
     seoDescription: "Поиск свежих вакансий (не старше 14 дней) из разных источников, фильтры по стране/навыкам/языку, статистика зарплат и оценка ATS для резюме.",
   },
 } as const;
@@ -140,22 +144,23 @@ const sourceOptions = [
 
 // CIS-focused country list (RU/BY excluded by the backend). "Remote" is NOT a
 // country — remote/worldwide postings are filtered via the Work mode selector.
+// No flag emojis: Windows renders them as raw region letters ("uz Uzbekistan").
 const countryOptions = [
   { value: "", labelKey: "any" },
-  { value: "UZ", label: "🇺🇿 Uzbekistan" },
-  { value: "UA", label: "🇺🇦 Ukraine" },
-  { value: "KZ", label: "🇰🇿 Kazakhstan" },
-  { value: "GE", label: "🇬🇪 Georgia" },
-  { value: "AZ", label: "🇦🇿 Azerbaijan" },
-  { value: "AM", label: "🇦🇲 Armenia" },
-  { value: "KG", label: "🇰🇬 Kyrgyzstan" },
-  { value: "MD", label: "🇲🇩 Moldova" },
-  { value: "TJ", label: "🇹🇯 Tajikistan" },
-  { value: "TM", label: "🇹🇲 Turkmenistan" },
-  { value: "PL", label: "🇵🇱 Poland" },
-  { value: "DE", label: "🇩🇪 Germany" },
-  { value: "GB", label: "🇬🇧 UK" },
-  { value: "US", label: "🇺🇸 USA" },
+  { value: "UZ", label: "Uzbekistan" },
+  { value: "UA", label: "Ukraine" },
+  { value: "KZ", label: "Kazakhstan" },
+  { value: "GE", label: "Georgia" },
+  { value: "AZ", label: "Azerbaijan" },
+  { value: "AM", label: "Armenia" },
+  { value: "KG", label: "Kyrgyzstan" },
+  { value: "MD", label: "Moldova" },
+  { value: "TJ", label: "Tajikistan" },
+  { value: "TM", label: "Turkmenistan" },
+  { value: "PL", label: "Poland" },
+  { value: "DE", label: "Germany" },
+  { value: "GB", label: "UK" },
+  { value: "US", label: "USA" },
 ];
 
 const languageOptions = ["English", "German", "Russian", "Ukrainian", "Uzbek", "French", "Spanish", "Polish", "Turkish"];
@@ -397,6 +402,44 @@ const workModeStats = computed(() => {
   ].filter((x) => x.n > 0);
 });
 
+// { label, value } item lists for the u-select-menu controls (site convention).
+type Item = { label: string; value: string };
+const sortItems = computed<Item[]>(() => {
+  const base: Item[] = [
+    { label: t("sortDate"), value: "date" },
+    { label: t("sortOldest"), value: "oldest" },
+    { label: t("sortTitle"), value: "title" },
+    { label: t("sortCompany"), value: "company" },
+    { label: t("sortSalary"), value: "salary" },
+  ];
+  if (cvProfile.value) base.push({ label: t("sortAts"), value: "ats" });
+  return base;
+});
+const countryItems = computed<Item[]>(() =>
+  countryOptions.map((c) => ({ value: c.value, label: c.label ?? t(c.labelKey!) })),
+);
+const currencyItems = computed<Item[]>(() => currencyOptions.map((c) => ({ label: c, value: c })));
+const periodItems = computed<Item[]>(() => periodOptions.map((p) => ({ label: periodLabel(p), value: p })));
+const workModeItems = computed<Item[]>(() => [
+  { label: t("any"), value: "" },
+  { label: t("wmRemote"), value: "remote" },
+  { label: t("wmHybrid"), value: "hybrid" },
+  { label: t("wmOffice"), value: "office" },
+]);
+const relocationItems = computed<Item[]>(() => [
+  { label: t("any"), value: "" },
+  { label: t("relYes"), value: "offered" },
+  { label: t("relNo"), value: "none" },
+]);
+const languageItems = computed<Item[]>(() => [
+  { label: t("any"), value: "" },
+  ...languageOptions.map((l) => ({ label: l, value: l })),
+]);
+const levelItems = computed<Item[]>(() => [
+  { label: t("any"), value: "" },
+  ...levelOptions.map((l) => ({ label: l, value: l })),
+]);
+
 await load(1);
 </script>
 
@@ -446,14 +489,16 @@ await load(1);
       <u-input v-model.number="salaryMin" type="number" icon="i-lucide-banknote" :placeholder="`${t('salaryMin')} (${displayCurrency}/${periodLabel(displayPeriod)})`" />
       <div class="jobs__sort">
         <u-icon name="i-lucide-arrow-down-wide-narrow" />
-        <select v-model="sort" class="jobs__select" :aria-label="t('sortLabel')" @change="sort !== 'ats' && load(1)">
-          <option value="date">{{ t("sortDate") }}</option>
-          <option value="oldest">{{ t("sortOldest") }}</option>
-          <option value="title">{{ t("sortTitle") }}</option>
-          <option value="company">{{ t("sortCompany") }}</option>
-          <option value="salary">{{ t("sortSalary") }}</option>
-          <option v-if="cvProfile" value="ats">{{ t("sortAts") }}</option>
-        </select>
+        <u-select-menu
+            v-model="sort"
+            :items="sortItems"
+            value-key="value"
+            label-key="label"
+            :search-input="false"
+            class="jobs__select"
+            :aria-label="t('sortLabel')"
+            @update:model-value="(v: string) => v !== 'ats' && load(1)"
+        />
       </div>
 
       <div class="jobs__row">
@@ -484,54 +529,52 @@ await load(1);
       <div v-if="showAdvanced" class="jobs__advanced">
         <label class="jobs__field">
           <span class="jobs__field-label">{{ t("country") }}</span>
-          <select v-model="country" class="jobs__select" @change="load(1)">
-            <option v-for="c in countryOptions" :key="c.value" :value="c.value">
-              {{ c.label ?? t(c.labelKey!) }}
-            </option>
-          </select>
+          <u-select-menu
+              v-model="country" :items="countryItems" value-key="value" label-key="label"
+              class="jobs__select" @update:model-value="load(1)"
+          />
         </label>
         <label class="jobs__field">
           <span class="jobs__field-label">{{ t("currency") }}</span>
-          <select v-model="displayCurrency" class="jobs__select" @change="salaryMin && load(1)">
-            <option v-for="c in currencyOptions" :key="c" :value="c">{{ c }}</option>
-          </select>
+          <u-select-menu
+              v-model="displayCurrency" :items="currencyItems" value-key="value" label-key="label"
+              class="jobs__select" @update:model-value="salaryMin && load(1)"
+          />
         </label>
         <label class="jobs__field">
           <span class="jobs__field-label">{{ t("period") }}</span>
-          <select v-model="displayPeriod" class="jobs__select" @change="salaryMin && load(1)">
-            <option v-for="p in periodOptions" :key="p" :value="p">{{ periodLabel(p) }}</option>
-          </select>
+          <u-select-menu
+              v-model="displayPeriod" :items="periodItems" value-key="value" label-key="label"
+              :search-input="false" class="jobs__select" @update:model-value="salaryMin && load(1)"
+          />
         </label>
         <label class="jobs__field">
           <span class="jobs__field-label">{{ t("workMode") }}</span>
-          <select v-model="workMode" class="jobs__select" @change="load(1)">
-            <option value="">{{ t("any") }}</option>
-            <option value="remote">{{ t("wmRemote") }}</option>
-            <option value="hybrid">{{ t("wmHybrid") }}</option>
-            <option value="office">{{ t("wmOffice") }}</option>
-          </select>
+          <u-select-menu
+              v-model="workMode" :items="workModeItems" value-key="value" label-key="label"
+              :search-input="false" class="jobs__select" @update:model-value="load(1)"
+          />
         </label>
         <label class="jobs__field">
           <span class="jobs__field-label">{{ t("relocation") }}</span>
-          <select v-model="relocation" class="jobs__select" @change="load(1)">
-            <option value="">{{ t("any") }}</option>
-            <option value="offered">{{ t("relYes") }}</option>
-            <option value="none">{{ t("relNo") }}</option>
-          </select>
+          <u-select-menu
+              v-model="relocation" :items="relocationItems" value-key="value" label-key="label"
+              :search-input="false" class="jobs__select" @update:model-value="load(1)"
+          />
         </label>
         <label class="jobs__field">
           <span class="jobs__field-label">{{ t("language") }}</span>
-          <select v-model="language" class="jobs__select" @change="load(1)">
-            <option value="">{{ t("any") }}</option>
-            <option v-for="l in languageOptions" :key="l" :value="l">{{ l }}</option>
-          </select>
+          <u-select-menu
+              v-model="language" :items="languageItems" value-key="value" label-key="label"
+              class="jobs__select" @update:model-value="load(1)"
+          />
         </label>
         <label class="jobs__field">
           <span class="jobs__field-label">{{ t("languageLevel") }}</span>
-          <select v-model="languageLevel" class="jobs__select" :disabled="!language" @change="load(1)">
-            <option value="">{{ t("any") }}</option>
-            <option v-for="lv in levelOptions" :key="lv" :value="lv">{{ lv }}</option>
-          </select>
+          <u-select-menu
+              v-model="languageLevel" :items="levelItems" value-key="value" label-key="label"
+              :search-input="false" :disabled="!language" class="jobs__select" @update:model-value="load(1)"
+          />
         </label>
         <label class="jobs__field jobs__field_wide">
           <span class="jobs__field-label">{{ t("skills") }}</span>
@@ -646,10 +689,19 @@ await load(1);
           </span>
         </div>
         <p v-if="job.description" class="job-card__desc text-muted">{{ job.description }}</p>
-        <div v-if="ats && ats.missing.length" class="job-card__missing">
-          <span class="job-card__missing-label">{{ t("atsMissing") }}:</span>
-          <span v-for="kw in ats.missing" :key="kw" class="job-card__tag job-card__tag_miss">{{ kw }}</span>
-        </div>
+        <template v-if="ats">
+          <div v-if="ats.matched.length" class="job-card__skills">
+            <span class="job-card__skills-label">{{ t("atsMatched") }}:</span>
+            <span v-for="kw in ats.matched" :key="kw" class="job-card__tag job-card__tag_match">{{ kw }}</span>
+          </div>
+          <div v-if="ats.missing.length" class="job-card__skills">
+            <span class="job-card__skills-label">{{ t("atsMissing") }}:</span>
+            <span v-for="kw in ats.missing" :key="kw" class="job-card__tag job-card__tag_miss">{{ kw }}</span>
+          </div>
+          <div v-if="!ats.matched.length && !ats.missing.length" class="job-card__skills">
+            <span class="job-card__skills-label">{{ t("atsNoSkills") }}</span>
+          </div>
+        </template>
         <div v-else-if="job.skills && job.skills.length" class="job-card__tags">
           <span v-for="s in job.skills.slice(0, 8)" :key="s" class="job-card__tag job-card__tag_skill">{{ s }}</span>
           <span v-for="s in (job.niceToHave || []).slice(0, 4)" :key="'plus-' + s" class="job-card__tag job-card__tag_plus" :title="t('cardReloc')">+{{ s }}</span>
@@ -713,11 +765,9 @@ await load(1);
   @media (min-width: 900px) { grid-template-columns: 1fr 200px 180px; }
 }
 .jobs__sort { display: flex; align-items: center; gap: 8px; }
-.jobs__select {
-  flex: 1; height: 40px; padding: 0 10px; border-radius: 8px;
-  border: 1px solid var(--ui-border); background: rgba(255,255,255,0.03); color: inherit; font-size: 14px;
-}
-.jobs__select:disabled { opacity: 0.5; }
+/* u-select-menu carries the site's own theme; we only own the width here. */
+.jobs__select { flex: 1; width: 100%; }
+.jobs__select :deep(button) { width: 100%; }
 .jobs__row { grid-column: 1 / -1; display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
 .jobs__filters { display: flex; flex-wrap: wrap; gap: 8px; }
 .jobs__pill {
@@ -802,11 +852,12 @@ await load(1);
   margin-top: 8px; font-size: 13px; line-height: 1.45;
   display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden;
 }
-.job-card__tags, .job-card__missing { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; align-items: center; }
-.job-card__missing-label { font-size: 11px; opacity: 0.7; }
+.job-card__tags, .job-card__skills { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; align-items: center; }
+.job-card__skills-label { font-size: 11px; opacity: 0.7; }
 .job-card__tag { border-radius: 6px; padding: 2px 8px; font-size: 11px; border: 1px solid var(--ui-border); color: var(--ui-text-muted); }
 .job-card__tag_skill { border-color: rgba(128,90,245,0.3); color: #c4b5fd; }
 .job-card__tag_plus { border-color: rgba(52,211,153,0.35); color: #6ee7b7; }
+.job-card__tag_match { border-color: rgba(52,211,153,0.45); color: #34d399; background: rgba(52,211,153,0.10); }
 .job-card__tag_miss { border-color: rgba(248,113,113,0.4); color: #f87171; }
 .jobs__empty { margin-top: 18px; text-align: center; padding: 18px; border-radius: 18px; border: 1px solid var(--ui-border); background: rgba(255,255,255,0.03); }
 .jobs__pager { display: flex; align-items: center; justify-content: center; gap: 16px; margin-top: 24px; }
