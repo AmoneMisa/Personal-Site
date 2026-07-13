@@ -890,6 +890,61 @@ async function fetchCareerPage(pageUrl: string, label: string): Promise<Job[]> {
   return parseJobAnchors(html, pageUrl, label)
 }
 
+// ---------- DOU.ua company vacancy pages (HTML, Ukraine) ----------
+// Several Ukrainian companies run their own SPA / bot-gated / builder career sites
+// (MacPaw = Next.js SPA, Uklon = Weblium builder, Genesis parent = under construction)
+// that expose no fetchable job API — but they all publish their live openings on their
+// DOU.ua company profile, which is server-rendered as <ul class="vacancies-list">.
+// This targets specific companies by DOU slug: the general DOU RSS only carries the
+// latest ~50 across ALL companies, so a given company never surfaces reliably there.
+// Handles verified 2026-07-13. Configure via DOU_COMPANIES="slug:Label,slug2:Label2";
+// COMPANIES_DEFAULTS=off drops the seed, COMPANIES_SOURCE=off disables all companies.
+const DEFAULT_DOU_COMPANIES = [
+  'macpaw:MacPaw', 'uklon:Uklon', 'genesis-technology-partners:Genesis',
+].join(',')
+
+function douCompanies(): { handle: string; label: string }[] {
+  const seed = process.env.COMPANIES_DEFAULTS === 'off' ? '' : DEFAULT_DOU_COMPANIES
+  const env = process.env.DOU_COMPANIES
+  return parseBoards([seed, env || ''].filter(Boolean).join(','))
+}
+
+// A DOU company page lists each opening as
+//   <li><a href=".../companies/<slug>/vacancies/<id>/?from=widget_company">Title</a>
+//       <span class="cities">, Київ, віддалено</span></li>
+// The page carries no post date, so presence == still open (postedAt = now); a closed
+// role drops off the page and ages out via the store's not-seen-recently pruning.
+const DOU_VACANCY_RE =
+  /<a\s+href="([^"]*\/vacancies\/(\d+)\/[^"]*)"[^>]*>([\s\S]*?)<\/a>\s*(?:<span class="cities">([^<]*)<\/span>)?/gi
+
+async function fetchDouCompany(slug: string, label: string): Promise<Job[]> {
+  const html = await fetchPageHtml(`https://jobs.dou.ua/companies/${encodeURIComponent(slug)}/`)
+  const out: Job[] = []
+  DOU_VACANCY_RE.lastIndex = 0
+  let m: RegExpExecArray | null
+  while ((m = DOU_VACANCY_RE.exec(html))) {
+    const href = m[1]!
+    // The page also renders a "similar companies" widget; keep only THIS company's ads.
+    if (!href.includes(`/companies/${slug}/`)) continue
+    const title = stripHtml(m[3]!)
+    if (!title) continue
+    const cities = (m[4] || '').replace(/^[,\s]+/, '').trim()
+    out.push({
+      id: `companies-dou-${slug}-${m[2]}`,
+      title,
+      company: label,
+      location: cities ? `${cities}, Ukraine` : 'Ukraine',
+      url: href.split('?')[0]!, // canonical (drop ?from=widget_company) for clean dedup
+      source: 'companies' as const,
+      remote: /віддален|remote/i.test(cities),
+      tags: [label],
+      postedAt: new Date().toISOString(),
+    })
+    if (out.length >= 100) break
+  }
+  return out
+}
+
 export async function fetchCompanies(q: string): Promise<Job[]> {
   if (process.env.COMPANIES_SOURCE === 'off') return []
   const tasks: (() => Promise<Job[]>)[] = [
@@ -920,6 +975,12 @@ export async function fetchCompanies(q: string): Promise<Job[]> {
     ...careersPages().map((p) => () =>
       fetchCareerPage(p.url, p.label).catch((err) => {
         console.error(`[jobs] careers page "${p.label}" failed:`, (err as Error).message)
+        return [] as Job[]
+      }),
+    ),
+    ...douCompanies().map((c) => () =>
+      fetchDouCompany(c.handle, c.label).catch((err) => {
+        console.error(`[jobs] dou company "${c.handle}" failed:`, (err as Error).message)
         return [] as Job[]
       }),
     ),
