@@ -128,6 +128,14 @@ function hhAreas(): string[] {
   return list.filter((a) => a !== '113' && a !== '16')
 }
 
+// HH closed anonymous access to /vacancies (the API now answers 403 "forbidden"
+// without credentials — verified 2026-07). Register an app at https://dev.hh.ru,
+// then set HH_TOKEN to the application token to re-enable this source.
+function hhHeaders(): Record<string, string> {
+  const token = process.env.HH_TOKEN
+  return token ? { Authorization: `Bearer ${token}` } : {}
+}
+
 async function fetchHhArea(area: string, q: string, page: number): Promise<Job[]> {
   const params = new URLSearchParams({
     per_page: String(HH_PAGE_SIZE),
@@ -137,7 +145,9 @@ async function fetchHhArea(area: string, q: string, page: number): Promise<Job[]
     area,
   })
   if (q) params.set('text', q)
-  const data = await fetchJson<{ items: any[] }>(`https://api.hh.ru/vacancies?${params}`)
+  const data = await fetchJson<{ items: any[] }>(`https://api.hh.ru/vacancies?${params}`, {
+    headers: hhHeaders(),
+  })
   return (data.items || []).map((j) => {
     const snippet = [j.snippet?.requirement, j.snippet?.responsibility].filter(Boolean).join(' ')
     return {
@@ -161,17 +171,25 @@ async function fetchHhArea(area: string, q: string, page: number): Promise<Job[]
 
 export async function fetchHeadHunter(q: string): Promise<Job[]> {
   const tasks: Promise<Job[]>[] = []
+  let forbidden = 0
   for (const area of hhAreas()) {
     for (let page = 0; page < hhPages(area); page++) {
       tasks.push(
         fetchHhArea(area, q, page).catch((err) => {
-          console.error(`[jobs] hh area ${area} p${page} failed:`, (err as Error).message)
+          if (/-> 403/.test((err as Error).message)) forbidden++
+          else console.error(`[jobs] hh area ${area} p${page} failed:`, (err as Error).message)
           return [] as Job[]
         }),
       )
     }
   }
   const results = await Promise.all(tasks)
+  if (forbidden) {
+    console.error(
+      `[jobs] hh: ${forbidden} request(s) rejected with 403. HH requires authorization now — `
+      + `register an app at https://dev.hh.ru and set HH_TOKEN${process.env.HH_TOKEN ? ' (current token was rejected)' : ''}.`,
+    )
+  }
   return results.flat()
 }
 
@@ -290,7 +308,7 @@ export async function fetchJooble(q: string): Promise<Job[]> {
 // Many famous companies (incl. game studios) publish their careers pages through
 // Greenhouse, Lever, SmartRecruiters or Ashby, all of which expose a free, official
 // JSON API — no scraping. Configure the boards you want; sensible defaults ship in.
-// NB: custom career sites (most banks/telecoms) have no such API and can't be added.
+// NB: other career sites are handled by the CAREERS_PAGES HTML parser further down.
 //   GREENHOUSE_BOARDS="airbnb,figma"            (board tokens; optional "token:Label")
 //   LEVER_COMPANIES="ajax,easybrain"            (lever handles; optional "handle:Label")
 //   SMARTRECRUITERS_COMPANIES="Wise,Canva"      (SR identifiers; optional "id:Label")
@@ -328,6 +346,7 @@ const DEFAULT_GREENHOUSE = [
   'wildlifestudios:Wildlife Studios', 'wooga:Wooga',
   // Ukraine: N-iX (IT services) + MHP (agri, non-IT)
   'nix:N-iX', 'mhp:MHP',
+  'baidu:Baidu',
 ].join(',')
 const DEFAULT_LEVER = [
   'ajax:Ajax Systems', 'easybrain:Easybrain', 'trendyol:Trendyol',
@@ -494,35 +513,416 @@ async function fetchAshbyBoard(handle: string, label: string): Promise<Job[]> {
     })
 }
 
+// ---------- Company career pages (HTML parsing) ----------
+// For companies whose careers site has no simple hosted ATS API. Each configured
+// page's HTML is fetched once and parsed with a chain of strategies, first hit wins:
+//   1. Phenom sites (phApp.ddo marker) -> POST <origin>/widgets, a public JSON API
+//      that most Phenom career sites expose (DHL, Mastercard, Allianz, BCG, ...);
+//      falls back to the ~10 jobs embedded in the /search-results page HTML.
+//   2. Workday link on the page -> the public CXS JSON API of that tenant/site.
+//   3. Embedded known-ATS links (Greenhouse/Lever/Ashby/SmartRecruiters) -> their API.
+//   4. schema.org JSON-LD JobPosting blocks in the HTML.
+//   5. Job-looking <a> anchors (works for Teamtailor-hosted pages and many custom lists).
+// Configure with CAREERS_PAGES="Label|https://careers.example.com,Label2|https://..."
+// (COMPANIES_DEFAULTS=off drops the seed list below; COMPANIES_SOURCE=off disables all).
+// Seeds verified 2026-07 to yield jobs through one of the strategies above.
+const DEFAULT_CAREERS_PAGES = [
+  // Phenom-powered
+  'DHL|https://careers.dhl.com/global/en',
+  'Mastercard|https://careers.mastercard.com/us/en',
+  'Allianz|https://careers.allianz.com/global/en',
+  'BCG|https://careers.bcg.com/global/en',
+  'Air Canada|https://careers.aircanada.com/ca/en',
+  'Alight|https://careers.alight.com/us/en',
+  'Fiserv|https://careers.fiserv.com/us/en',
+  'FIS|https://careers.fisglobal.com/us/en',
+  'Robert Half|https://careers.roberthalf.com/global/en',
+  'Southwest Airlines|https://careers.southwestair.com/us/en',
+  'Thales|https://careers.thalesgroup.com/global/en',
+  'United Airlines|https://careers.united.com/us/en',
+  'eBay|https://jobs.ebayinc.com/us/en',
+  'Air Arabia|https://www.airarabiagroupcareers.com/gb/en',
+  'RTX|https://careers.rtx.com/global/en',
+  // Workday-powered (CXS API discovered from the page HTML)
+  'Unilever|https://careers.unilever.com/en',
+  'Nike|https://careers.nike.com/',
+  'Expedia Group|https://careers.expediagroup.com/',
+  'Home Depot|https://careers.homedepot.com/',
+  'Linklaters|https://www.linklaters.com/careers',
+  // Teamtailor-hosted (anchor parsing)
+  'Voi|https://careers.voi.com/',
+  'Moove|https://careers.moove.io/',
+  'Savills|https://careers.savills.com/',
+  // verified 2026-07-13 batch (out of ~540 user-suggested URLs, these parse):
+  // big tech / enterprise / pharma
+  'Cisco|https://careers.cisco.com/',
+  'Adobe|https://careers.adobe.com/',
+  'Red Hat|https://careers.redhat.com/',
+  'Autodesk|https://careers.autodesk.com/',
+  'Snowflake|https://careers.snowflake.com/',
+  'Sophos|https://careers.sophos.com/',
+  'Juniper Networks|https://careers.juniper.net/',
+  'Analog Devices|https://careers.analog.com/',
+  'Roche|https://careers.roche.com/',
+  'Novartis|https://careers.novartis.com/',
+  'Warner Bros. Discovery|https://careers.wbd.com/',
+  'Zillow|https://careers.zillowgroup.com/',
+  'NTT Data|https://www.nttdata.com/global/en/careers',
+  'Rakuten|https://japan-job-en.rakuten.careers/search-jobs',
+  'MUFG|https://www.mufg.jp/english/careers/',
+  'Tencent|https://tencent.wd1.myworkdayjobs.com/Tencent_Careers',
+  'BYD Europe|https://careers.bydeurope.com/',
+  // game studios
+  'Blizzard|https://careers.blizzard.com/',
+  'Activision Blizzard|https://careers.activisionblizzard.com/',
+  'CD Projekt Red|https://www.cdprojektred.com/en/jobs/',
+  'King|https://careers.king.com/',
+  'People Can Fly|https://careers.peoplecanfly.com/',
+  'Embark Studios|https://careers.embark-studios.com/',
+  'Crytek|https://www.crytek.com/career',
+  'PlayStation|https://careers.playstation.com/',
+  'Bungie|https://www.bungie.net/careers',
+  // Ukraine IT
+  'Boosta|https://boosta.biz/careers/',
+  'SoftServe|https://career.softserveinc.com/en-us/vacancies',
+  'Sigma Software|https://career.sigma.software/',
+  'Levi9 Ukraine|https://jobs.ua.levi9.com/',
+  'Ecommpay|https://careers.ecommpay.com/',
+].join(',')
+
+function careersPages(): { label: string; url: string }[] {
+  const parts: string[] = []
+  if (process.env.COMPANIES_DEFAULTS !== 'off') parts.push(DEFAULT_CAREERS_PAGES)
+  if (process.env.CAREERS_PAGES) parts.push(process.env.CAREERS_PAGES)
+  return parts
+    .join(',')
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean)
+    .map((entry) => {
+      const i = entry.indexOf('|')
+      const label = i > 0 ? entry.slice(0, i).trim() : ''
+      const url = (i > 0 ? entry.slice(i + 1) : entry).trim()
+      return { label, url }
+    })
+    .filter((p) => /^https?:\/\//.test(p.url))
+    .map((p) => ({ url: p.url, label: p.label || new URL(p.url).hostname.replace(/^(careers|jobs|www)\./, '') }))
+}
+
+function pageJobId(pageUrl: string, unique: string): string {
+  return `companies-page-${new URL(pageUrl).hostname}-${unique}`
+}
+
+// Some corporate career sites (e.g. Cushman & Wakefield) 403 non-browser agents,
+// so page-HTML fetches use a browser-style UA. API-style endpoints keep the
+// honest jobFinder UA above.
+const BROWSER_UA =
+  'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36'
+
+// Arbitrary company sites can hang for minutes; a slow page must not stall the
+// whole refresh, so every career-page request gets a hard timeout.
+const PAGE_TIMEOUT_MS = 25_000
+
+async function fetchPageHtml(url: string): Promise<string> {
+  const res = await fetch(url, {
+    headers: { 'User-Agent': BROWSER_UA, Accept: 'text/html' },
+    signal: AbortSignal.timeout(PAGE_TIMEOUT_MS),
+  })
+  if (!res.ok) throw new Error(`${url} -> ${res.status}`)
+  return res.text()
+}
+
+// --- Strategy 1: Phenom ---
+// Locale segments in the path (/us/en, /global/en, /ca/en) drive the widget params.
+function phenomParams(pageUrl: string): { country: string; lang: string } {
+  const segs = new URL(pageUrl).pathname.split('/').filter(Boolean)
+  for (let i = 0; i + 1 < segs.length; i++) {
+    const c = segs[i]!
+    const l = segs[i + 1]!
+    if ((/^[a-z]{2}$/.test(c) || c === 'global') && /^[a-z]{2}$/.test(l)) {
+      return { country: c, lang: `${l}_${c === 'global' ? 'global' : c}` }
+    }
+  }
+  return { country: 'global', lang: 'en_global' }
+}
+
+function mapPhenomJob(j: any, pageUrl: string, label: string): Job {
+  const location =
+    (j.multi_location || []).join('; ') || j.cityStateCountry || j.location || j.country || 'See listing'
+  return {
+    id: pageJobId(pageUrl, String(j.jobSeqNo || j.jobId || j.reqId)),
+    title: j.title,
+    company: label,
+    location,
+    url: j.applyUrl || pageUrl,
+    source: 'companies' as const,
+    remote: /remote/i.test(`${j.title} ${location} ${j.workHours || ''}`),
+    tags: [label, ...(j.multi_category || [])].filter(Boolean).slice(0, 6),
+    postedAt: new Date(j.postedDate || j.dateCreated || Date.now()).toISOString(),
+    employmentType: j.workHours || j.contractType1,
+    description: stripHtml(j.descriptionTeaser).slice(0, DESC_MAX),
+  }
+}
+
+async function fetchPhenomJobs(pageUrl: string, label: string): Promise<Job[]> {
+  const { country, lang } = phenomParams(pageUrl)
+  const body = {
+    lang, country, deviceType: 'desktop', pageName: 'search-results', ddoKey: 'refineSearch',
+    sortBy: 'Most recent', subsearch: '', from: 0, jobs: true, counts: true,
+    all_fields: ['category', 'country', 'state', 'city', 'type'], size: 100, clearAll: false,
+    jdsource: 'facets', isSliderEnable: false, pageId: 'page10', siteType: 'external',
+    keywords: '', global: true, selected_fields: {}, locationData: {},
+  }
+  try {
+    const data = await fetchJson<any>(`${new URL(pageUrl).origin}/widgets`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+      signal: AbortSignal.timeout(PAGE_TIMEOUT_MS),
+    })
+    const jobs = data?.refineSearch?.data?.jobs || []
+    if (jobs.length) return jobs.map((j: any) => mapPhenomJob(j, pageUrl, label))
+  } catch {
+    /* fall through to the embedded-JSON fallback */
+  }
+  // Fallback: the search-results page embeds the first ~10 jobs in phApp.ddo.
+  const html = await fetchPageHtml(`${pageUrl.replace(/\/+$/, '')}/search-results`)
+  const m = html.match(/phApp\.ddo\s*=\s*({[\s\S]*?});/)
+  if (!m) return []
+  const jobs = JSON.parse(m[1]!)?.eagerLoadRefineSearch?.data?.jobs || []
+  return jobs.map((j: any) => mapPhenomJob(j, pageUrl, label))
+}
+
+// --- Strategy 2: Workday (public CXS API of the tenant/site linked from the page) ---
+function workdayPostedAt(postedOn: string | undefined): string {
+  const s = postedOn || ''
+  let days = 30 // unknown -> treat as old; the 14-day cap filters it out
+  if (/today/i.test(s)) days = 0
+  else if (/yesterday/i.test(s)) days = 1
+  else {
+    const m = /(\d+)\+?\s*days/i.exec(s)
+    if (m) days = Number(m[1])
+  }
+  return new Date(Date.now() - days * 86_400_000).toISOString()
+}
+
+async function fetchWorkdayJobs(html: string, pageUrl: string, label: string): Promise<Job[]> {
+  const m = html.match(
+    /https:\/\/([a-z0-9-]+)\.(wd\d+)\.myworkdayjobs\.com\/(?:[a-z]{2}-[A-Za-z]{2,5}\/)?([A-Za-z0-9_-]+)/,
+  )
+  if (!m) return []
+  const [, tenant, wd, site] = m
+  if (!site || site === 'wday') return []
+  const base = `https://${tenant}.${wd}.myworkdayjobs.com`
+  const out: Job[] = []
+  for (let offset = 0; offset < 60; offset += 20) {
+    const data = await fetchJson<any>(`${base}/wday/cxs/${tenant}/${site}/jobs`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+      body: JSON.stringify({ appliedFacets: {}, limit: 20, offset, searchText: '' }),
+      signal: AbortSignal.timeout(PAGE_TIMEOUT_MS),
+    })
+    const posts = data?.jobPostings || []
+    for (const p of posts) {
+      if (!p?.title || !p?.externalPath) continue
+      const loc = p.locationsText || 'See listing'
+      out.push({
+        id: pageJobId(pageUrl, String(p.bulletFields?.[0] || p.externalPath)),
+        title: p.title,
+        company: label,
+        location: loc,
+        url: `${base}/${site}${p.externalPath}`,
+        source: 'companies' as const,
+        remote: /remote/i.test(`${p.title} ${loc}`),
+        tags: [label],
+        postedAt: workdayPostedAt(p.postedOn),
+      })
+    }
+    if (posts.length < 20) break
+  }
+  return out
+}
+
+// --- Strategy 3: known ATS embedded in the page (reuse the hosted-board fetchers) ---
+async function fetchEmbeddedAts(html: string, label: string): Promise<Job[]> {
+  let m = html.match(/boards\.greenhouse\.io\/(?:embed\/job_board\?for=)?([a-z0-9_-]{2,})/i)
+  if (m && m[1] !== 'embed') return fetchGreenhouseBoard(m[1]!, label)
+  m = html.match(/jobs\.(?:eu\.)?lever\.co\/([A-Za-z0-9_-]{2,})/)
+  if (m) return fetchLeverBoard(m[1]!, label)
+  m = html.match(/jobs\.ashbyhq\.com\/([A-Za-z0-9_-]{2,})/)
+  if (m) return fetchAshbyBoard(m[1]!, label)
+  m = html.match(/(?:careers|jobs)\.smartrecruiters\.com\/([A-Za-z0-9]{2,})/)
+  if (m) return fetchSmartRecruitersBoard(m[1]!, label)
+  return []
+}
+
+// --- Strategy 4: schema.org JSON-LD JobPosting blocks ---
+function parseJsonLdJobs(html: string, pageUrl: string, label: string): Job[] {
+  const out: Job[] = []
+  const re = /<script[^>]*type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi
+  let m: RegExpExecArray | null
+  while ((m = re.exec(html))) {
+    let data: any
+    try {
+      data = JSON.parse(m[1]!)
+    } catch {
+      continue
+    }
+    const nodes = Array.isArray(data) ? data : data?.['@graph'] || [data]
+    for (const n of nodes) {
+      const type = n?.['@type']
+      const isPosting = type === 'JobPosting' || (Array.isArray(type) && type.includes('JobPosting'))
+      if (!isPosting || !n.title) continue
+      const locs = Array.isArray(n.jobLocation) ? n.jobLocation : [n.jobLocation].filter(Boolean)
+      const location =
+        locs
+          .map((l: any) => [l?.address?.addressLocality, l?.address?.addressCountry].filter(Boolean).join(', '))
+          .filter(Boolean)
+          .join('; ') || 'See listing'
+      const url = n.url || n.sameAs || pageUrl
+      out.push({
+        id: pageJobId(pageUrl, String(n.identifier?.value || n.identifier || url)),
+        title: stripHtml(n.title),
+        company: n.hiringOrganization?.name || label,
+        location,
+        url,
+        source: 'companies' as const,
+        remote: n.jobLocationType === 'TELECOMMUTE' || /remote/i.test(`${n.title} ${location}`),
+        tags: [label],
+        postedAt: new Date(n.datePosted || Date.now()).toISOString(),
+        employmentType: Array.isArray(n.employmentType) ? n.employmentType[0] : n.employmentType,
+        description: stripHtml(n.description).slice(0, DESC_MAX),
+      })
+    }
+  }
+  return out
+}
+
+// --- Strategy 5: job-looking anchors (Teamtailor-hosted pages, custom lists) ---
+// A URL counts as a job link when its path ends in a /jobs|vacancies|positions/…
+// segment that carries an id or a long slug. Several anchors often point at the
+// same job (image card + title link); keep the shortest clean text per URL and
+// fall back to a title derived from the slug.
+const JOB_PATH_RE = /\/(?:jobs?|vacanc\w*|positions?|openings?)\/(?:[a-z]{2}\/)?([^/?#]*\d[^/?#]*|[a-z0-9][a-z0-9-]{10,})\/?$/i
+
+function slugTitle(href: string): string {
+  const m = JOB_PATH_RE.exec(new URL(href).pathname)
+  const slug = (m?.[1] || '').replace(/^\d+-?/, '').replace(/[-_]+/g, ' ').trim()
+  return slug ? slug.charAt(0).toUpperCase() + slug.slice(1) : ''
+}
+
+function parseJobAnchors(html: string, pageUrl: string, label: string): Job[] {
+  const byHref = new Map<string, string>() // href -> best (shortest useful) anchor text
+  const re = /<a\b[^>]*href=["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>/gi
+  let m: RegExpExecArray | null
+  while ((m = re.exec(html))) {
+    let href: string
+    try {
+      href = new URL(m[1]!, pageUrl).toString()
+    } catch {
+      continue
+    }
+    if (!JOB_PATH_RE.test(new URL(href).pathname)) continue
+    const text = stripHtml(m[2]!)
+    const prev = byHref.get(href)
+    const usable = text.length >= 4 && text.length <= 120 && !/^(view|see|all|apply|read|learn|more)\b/i.test(text)
+    if (prev === undefined) byHref.set(href, usable ? text : '')
+    else if (usable && (!prev || text.length < prev.length)) byHref.set(href, text)
+  }
+  const now = new Date().toISOString()
+  const out: Job[] = []
+  for (const [href, text] of byHref) {
+    const title = text || slugTitle(href)
+    if (!title) continue
+    out.push({
+      id: pageJobId(pageUrl, href),
+      title,
+      company: label,
+      location: 'See listing',
+      url: href,
+      source: 'companies' as const,
+      remote: /remote/i.test(title),
+      tags: [label],
+      postedAt: now, // listing pages carry no dates; presence = still open
+    })
+    if (out.length >= 100) break
+  }
+  return out
+}
+
+// The companies source fires ~190 fetch tasks (hosted boards + career pages).
+// Launching them all at once trips upstream rate limits — verified: Greenhouse
+// throttles the burst, so career pages whose strategy hits the same API return
+// nothing while working fine in isolation. One shared pool bounds the burst.
+const COMPANIES_POOL_SIZE = 16
+
+async function runPool<T>(tasks: (() => Promise<T>)[], limit: number): Promise<T[]> {
+  const results: T[] = new Array(tasks.length)
+  let next = 0
+  await Promise.all(
+    Array.from({ length: Math.min(limit, tasks.length) }, async () => {
+      for (;;) {
+        const i = next++
+        if (i >= tasks.length) return
+        results[i] = await tasks[i]!()
+      }
+    }),
+  )
+  return results
+}
+
+async function fetchCareerPage(pageUrl: string, label: string): Promise<Job[]> {
+  const html = await fetchPageHtml(pageUrl)
+  if (/phApp\.ddo/.test(html)) {
+    const jobs = await fetchPhenomJobs(pageUrl, label).catch(() => [] as Job[])
+    if (jobs.length) return jobs
+  }
+  if (/myworkdayjobs\.com/.test(html)) {
+    const jobs = await fetchWorkdayJobs(html, pageUrl, label).catch(() => [] as Job[])
+    if (jobs.length) return jobs
+  }
+  const ats = await fetchEmbeddedAts(html, label).catch(() => [] as Job[])
+  if (ats.length) return ats
+  const ld = parseJsonLdJobs(html, pageUrl, label)
+  if (ld.length) return ld
+  return parseJobAnchors(html, pageUrl, label)
+}
+
 export async function fetchCompanies(q: string): Promise<Job[]> {
   if (process.env.COMPANIES_SOURCE === 'off') return []
-  const tasks: Promise<Job[]>[] = [
-    ...companyBoards('greenhouse').map((b) =>
+  const tasks: (() => Promise<Job[]>)[] = [
+    ...companyBoards('greenhouse').map((b) => () =>
       fetchGreenhouseBoard(b.handle, b.label).catch((err) => {
         console.error(`[jobs] greenhouse "${b.handle}" failed:`, (err as Error).message)
         return [] as Job[]
       }),
     ),
-    ...companyBoards('lever').map((b) =>
+    ...companyBoards('lever').map((b) => () =>
       fetchLeverBoard(b.handle, b.label).catch((err) => {
         console.error(`[jobs] lever "${b.handle}" failed:`, (err as Error).message)
         return [] as Job[]
       }),
     ),
-    ...companyBoards('smartrecruiters').map((b) =>
+    ...companyBoards('smartrecruiters').map((b) => () =>
       fetchSmartRecruitersBoard(b.handle, b.label).catch((err) => {
         console.error(`[jobs] smartrecruiters "${b.handle}" failed:`, (err as Error).message)
         return [] as Job[]
       }),
     ),
-    ...companyBoards('ashby').map((b) =>
+    ...companyBoards('ashby').map((b) => () =>
       fetchAshbyBoard(b.handle, b.label).catch((err) => {
         console.error(`[jobs] ashby "${b.handle}" failed:`, (err as Error).message)
         return [] as Job[]
       }),
     ),
+    ...careersPages().map((p) => () =>
+      fetchCareerPage(p.url, p.label).catch((err) => {
+        console.error(`[jobs] careers page "${p.label}" failed:`, (err as Error).message)
+        return [] as Job[]
+      }),
+    ),
   ]
-  const all = (await Promise.all(tasks)).flat()
+  const all = (await runPool(tasks, COMPANIES_POOL_SIZE)).flat()
   // These boards have no server-side search, so filter locally when a query is set.
   if (!q) return all
   const needle = q.toLowerCase()
