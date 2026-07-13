@@ -24,6 +24,7 @@ import {
   fetchHeadHunter,
   fetchJobicy,
   fetchJooble,
+  fetchOlx,
   fetchRemoteOk,
   fetchRemotive,
   fetchRss,
@@ -43,6 +44,7 @@ const FETCHERS: Record<JobSource, (q: string) => Promise<Job[]>> = {
   jooble: fetchJooble,
   rss: fetchRss,
   companies: fetchCompanies,
+  olx: fetchOlx,
 }
 
 // Optional sources are only queried when configured, to avoid wasted calls.
@@ -58,6 +60,9 @@ function isConfigured(source: JobSource): boolean {
     case 'companies':
       // On by default thanks to the built-in Greenhouse/Lever seed boards.
       return process.env.COMPANIES_SOURCE !== 'off'
+    case 'olx':
+      // On by default — public OLX UZ/KZ jobs API, no key required.
+      return process.env.OLX_SOURCE !== 'off'
     default:
       return true
   }
@@ -122,6 +127,7 @@ export default defineEventHandler(async (event) => {
         'jooble' as JobSource,
         'rss' as JobSource,
         'companies' as JobSource,
+        'olx' as JobSource,
       ]
   const activeSources = chosen.filter(isConfigured)
   const finalSources = activeSources.length ? activeSources : FREE_SOURCES

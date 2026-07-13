@@ -16,6 +16,7 @@ import {
   fetchHeadHunter,
   fetchJobicy,
   fetchJooble,
+  fetchOlx,
   fetchRemoteOk,
   fetchRemotive,
   fetchRss,
@@ -38,6 +39,7 @@ const FETCHERS: Record<JobSource, (q: string) => Promise<Job[]>> = {
   jooble: fetchJooble,
   rss: fetchRss,
   companies: fetchCompanies,
+  olx: fetchOlx,
 }
 
 // Only pull optional sources when their credentials/opt-in are present.
@@ -51,6 +53,8 @@ function isConfigured(source: JobSource): boolean {
       return process.env.RSS_DEFAULTS !== 'off' || !!process.env.RSS_FEEDS
     case 'companies':
       return process.env.COMPANIES_SOURCE !== 'off'
+    case 'olx':
+      return process.env.OLX_SOURCE !== 'off'
     default:
       return true
   }

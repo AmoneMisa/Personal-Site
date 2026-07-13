@@ -48,6 +48,7 @@ export type JobSource =
   | 'jooble'
   | 'rss'
   | 'companies'
+  | 'olx'
 
 export const FREE_SOURCES: JobSource[] = [
   'remotive',
@@ -58,7 +59,7 @@ export const FREE_SOURCES: JobSource[] = [
   'jobicy',
 ]
 
-export const OPTIONAL_SOURCES: JobSource[] = ['adzuna', 'jooble', 'rss', 'companies']
+export const OPTIONAL_SOURCES: JobSource[] = ['adzuna', 'jooble', 'rss', 'companies', 'olx']
 
 export const ALL_SOURCES: JobSource[] = [...FREE_SOURCES, ...OPTIONAL_SOURCES]
 

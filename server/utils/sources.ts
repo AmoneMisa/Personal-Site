@@ -986,3 +986,81 @@ export async function fetchRss(q: string): Promise<Job[]> {
   const needle = q.toLowerCase()
   return all.filter((j) => `${j.title} ${j.company}`.toLowerCase().includes(needle))
 }
+
+// ---------- OLX (no key) — Uzbekistan + Kazakhstan classifieds ----------
+// OLX exposes a public offers JSON API (the same one its own site calls). This is
+// the only viable UZ/KZ source when HeadHunter is unavailable: hh.uz/hh.kz are
+// separate, auth-gated DBs, and every UZ/KZ career site is either bespoke, SPA,
+// geo-blocked, or robots-forbidden. OLX's robots.txt permits /api/v1/offers/
+// (only */ajax/, */search/ and specific sub-endpoints are disallowed), so this
+// uses the allowed listing endpoint — an official API, not HTML scraping.
+//
+// category_id=6 is "Работа" (Jobs). Ads carry created_time AND last_refresh_time;
+// we use last_refresh_time as postedAt because an OLX ad that was re-activated is
+// an ACTIVE vacancy — the freshness signal that matters to a job seeker — which
+// also keeps far more live UZ/KZ roles inside the 14-day cap. Disable with OLX_SOURCE=off.
+const OLX_JOBS_CATEGORY = 6
+const OLX_HOSTS: { host: string; country: string; countryName: string }[] = [
+  { host: 'www.olx.uz', country: 'UZ', countryName: 'Uzbekistan' },
+  { host: 'www.olx.kz', country: 'KZ', countryName: 'Kazakhstan' },
+]
+const OLX_PAGE_SIZE = 50 // API max per request
+const OLX_PAGES = 6 // 6 * 50 = up to 300 newest ads per country per refresh
+
+async function fetchOlxHost(
+  host: string,
+  countryName: string,
+  page: number,
+): Promise<Job[]> {
+  const params = new URLSearchParams({
+    offset: String(page * OLX_PAGE_SIZE),
+    limit: String(OLX_PAGE_SIZE),
+    category_id: String(OLX_JOBS_CATEGORY),
+    sort_by: 'created_at:desc',
+  })
+  const data = await fetchJson<{ data: any[] }>(`https://${host}/api/v1/offers/?${params}`)
+  return (data.data || [])
+    .filter((o) => o.status === 'active' || !o.status)
+    .map((o) => {
+      const city = o.location?.city?.name
+      const region = o.location?.region?.name
+      const location = [city, countryName].filter(Boolean).join(', ') || countryName
+      const salary = (o.params || []).find((p: any) => /salary/i.test(p.key))?.value
+      const text = `${o.title} ${stripHtml(o.description)}`
+      return {
+        id: `olx-${host}-${o.id}`,
+        title: o.title,
+        company: o.user?.name || (o.business ? 'OLX (business)' : 'OLX'),
+        location,
+        url: o.url,
+        source: 'olx' as const,
+        remote: /\bremote\b|удал[её]нк|masofaviy|онлайн|online/i.test(text),
+        tags: [countryName, region].filter(Boolean),
+        // Re-activation date = the ad is a live vacancy now; fall back to first post.
+        postedAt: new Date(o.last_refresh_time || o.created_time || Date.now()).toISOString(),
+        salaryMin: typeof salary?.from === 'number' ? salary.from : undefined,
+        salaryMax: typeof salary?.to === 'number' ? salary.to : undefined,
+        salaryCurrency: salary?.currency || undefined,
+        description: stripHtml(o.description).slice(0, DESC_MAX),
+      }
+    })
+}
+
+export async function fetchOlx(q: string): Promise<Job[]> {
+  if (process.env.OLX_SOURCE === 'off') return []
+  const tasks: Promise<Job[]>[] = []
+  for (const { host, countryName } of OLX_HOSTS) {
+    for (let page = 0; page < OLX_PAGES; page++) {
+      tasks.push(
+        fetchOlxHost(host, countryName, page).catch((err) => {
+          console.error(`[jobs] olx ${host} p${page} failed:`, (err as Error).message)
+          return [] as Job[]
+        }),
+      )
+    }
+  }
+  const all = (await Promise.all(tasks)).flat()
+  if (!q) return all
+  const needle = q.toLowerCase()
+  return all.filter((j) => `${j.title} ${j.company}`.toLowerCase().includes(needle))
+}

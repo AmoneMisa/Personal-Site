@@ -144,6 +144,7 @@ const sourceOptions = [
   { value: "arbeitnow", label: "Arbeitnow" },
   { value: "adzuna", label: "Adzuna" },
   { value: "companies", label: "Companies" },
+  { value: "olx", label: "OLX" },
 ];
 
 // CIS-focused country list (RU/BY excluded by the backend). "Remote" is NOT a
