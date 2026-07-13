@@ -29,6 +29,7 @@ interface Job {
   workMode?: "remote" | "hybrid" | "office" | "unknown";
   relocation?: "offered" | "none" | "unknown";
   foreignerFriendly?: boolean;
+  noExperience?: boolean;
   languages?: LanguageReq[];
   skills?: string[];
   niceToHave?: string[];
@@ -72,7 +73,7 @@ const messages = {
     language: "Language", languageLevel: "Level", skills: "Skills (comma-separated)",
     excludeLanguage: "Exclude languages", includeRu: "Include Russia", includeBy: "Include Belarus",
     countryPlaceholder: "Any country", excludeLangPlaceholder: "None",
-    foreigner: "Foreigner-friendly", any: "Any",
+    foreigner: "Foreigner-friendly", any: "Any", noExperience: "Without experience",
     wmRemote: "Remote", wmHybrid: "Hybrid", wmOffice: "Office",
     relYes: "Offered", relNo: "None", reset: "Reset filters",
     // stats
@@ -106,7 +107,7 @@ const messages = {
     language: "Язык", languageLevel: "Уровень", skills: "Навыки (через запятую)",
     excludeLanguage: "Исключить языки", includeRu: "Включить Россию", includeBy: "Включить Беларусь",
     countryPlaceholder: "Любая страна", excludeLangPlaceholder: "Нет",
-    foreigner: "Для иностранцев", any: "Любой",
+    foreigner: "Для иностранцев", any: "Любой", noExperience: "Без опыта",
     wmRemote: "Удалённо", wmHybrid: "Гибрид", wmOffice: "Офис",
     relYes: "Есть", relNo: "Нет", reset: "Сбросить фильтры",
     statsTitle: "Статистика", statsSalary: "Зарплата", statMedian: "медиана", statAvg: "средн.",
@@ -226,6 +227,7 @@ const includeBy = ref(false); // Belarus is excluded by the backend unless opted
 const workMode = ref("");
 const relocation = ref("");
 const foreignerOnly = ref(false);
+const noExperience = ref(false);
 const language = ref("");
 const languageLevel = ref("");
 const excludeLanguages = ref<string[]>([]);
@@ -284,6 +286,7 @@ async function load(toPage = 1) {
   if (workMode.value) params.workMode = workMode.value;
   if (relocation.value) params.relocation = relocation.value;
   if (foreignerOnly.value) params.foreignerFriendly = "true";
+  if (noExperience.value) params.noExperience = "true";
   if (language.value) params.language = language.value;
   if (languageLevel.value) params.languageLevel = languageLevel.value;
   if (excludeLanguages.value.length) params.excludeLanguage = excludeLanguages.value.join(",");
@@ -303,7 +306,7 @@ async function load(toPage = 1) {
 function resetFilters() {
   countries.value = []; includeRu.value = false; includeBy.value = false;
   workMode.value = ""; relocation.value = "";
-  foreignerOnly.value = false; language.value = ""; languageLevel.value = "";
+  foreignerOnly.value = false; noExperience.value = false; language.value = ""; languageLevel.value = "";
   excludeLanguages.value = []; skills.value = "";
   load(1);
 }
@@ -616,6 +619,10 @@ await load(1);
           <span>{{ t("foreigner") }}</span>
         </label>
         <label class="jobs__remote jobs__field_inline">
+          <u-switch v-model="noExperience" @update:model-value="load(1)" />
+          <span>{{ t("noExperience") }}</span>
+        </label>
+        <label class="jobs__remote jobs__field_inline">
           <u-switch v-model="includeRu" @update:model-value="load(1)" />
           <span>{{ t("includeRu") }}</span>
         </label>
@@ -696,7 +703,8 @@ await load(1);
       </div>
     </section>
 
-    <div class="jobs__grid">
+    <div class="jobs__results">
+     <div class="jobs__grid" :class="{ 'jobs__grid_loading': loading }">
       <div v-for="{ job, ats } in scored" :key="job.id" class="job-card">
         <div class="job-card__head">
           <a :href="job.url" target="_blank" rel="noopener noreferrer" class="job-card__title">{{ job.title }}</a>
@@ -749,6 +757,11 @@ await load(1);
           <span v-for="tag in job.tags.slice(0, 6)" :key="tag" class="job-card__tag">{{ tag }}</span>
         </div>
       </div>
+     </div>
+     <div v-if="loading" class="jobs__loader" role="status" aria-live="polite">
+       <u-icon name="i-lucide-loader-circle" class="jobs__loader-icon" />
+       <span>{{ t("searching") }}</span>
+     </div>
     </div>
 
     <div v-if="!loading && !jobs.length && !failed" class="jobs__empty">
@@ -860,11 +873,21 @@ await load(1);
 .stats__chip { font-size: 12px; padding: 2px 9px; border-radius: 999px; border: 1px solid var(--ui-border); color: var(--ui-text-muted); }
 .stats__chip_skill { border-color: rgba(128,90,245,0.35); color: #c4b5fd; }
 
+.jobs__results { position: relative; }
 .jobs__grid {
   display: grid; gap: 12px; grid-template-columns: 1fr; align-items: stretch;
   @media (min-width: 640px) { grid-template-columns: repeat(2, 1fr); }
   @media (min-width: 1024px) { grid-template-columns: repeat(3, 1fr); }
 }
+/* Dim + lock the current results while a new page/filter is loading, and float a
+   spinner over them so it's clear the list is refreshing (not empty). */
+.jobs__grid_loading { opacity: 0.35; pointer-events: none; transition: opacity 140ms ease; }
+.jobs__loader {
+  position: absolute; inset: 0; display: flex; align-items: flex-start; justify-content: center;
+  gap: 10px; padding-top: 72px; color: var(--ui-text-muted); font-weight: 600; z-index: 2;
+}
+.jobs__loader-icon { width: 28px; height: 28px; animation: jobs-spin 0.7s linear infinite; }
+@keyframes jobs-spin { to { transform: rotate(360deg); } }
 .job-card {
   padding: 16px; border-radius: 18px; border: 1px solid var(--ui-border);
   background: rgba(255,255,255,0.03); box-shadow: inset 0 1px 0 rgba(255,255,255,0.06);

@@ -153,6 +153,7 @@ export default defineEventHandler(async (event) => {
   let foreignerFriendly: boolean | undefined
   if (q.foreignerFriendly === 'true') foreignerFriendly = true
   else if (q.foreignerFriendly === 'false') foreignerFriendly = false
+  const noExperience = q.noExperience === 'true'
   const language = String(q.language ?? '').trim() || undefined
   const languageLevel = String(q.languageLevel ?? '').trim() || undefined
   const excludeLanguages = String(q.excludeLanguage ?? '')
@@ -187,6 +188,7 @@ export default defineEventHandler(async (event) => {
     workMode,
     relocation,
     foreignerFriendly,
+    noExperience,
     language,
     languageLevel,
     excludeLanguages,

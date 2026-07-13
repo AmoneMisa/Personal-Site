@@ -173,6 +173,23 @@ function detectForeignerFriendly(text: string): boolean {
   )
 }
 
+// ---- Entry level / no prior experience required ----
+// Explicit "no experience" phrasing OR an entry-level role type (trainee/intern/
+// junior/graduate), across EN/RU/UK. Heuristic — meant for the "without experience"
+// filter, not an authoritative seniority label.
+function detectNoExperience(text: string): boolean {
+  if (
+    /no experience (required|needed|necessary)|without (any )?experience|no prior experience|entry[- ]level|без опыта|без досвід|досвід не потр|опыт работы не|опыт не требуется/i.test(
+      text,
+    )
+  ) {
+    return true
+  }
+  return /\b(trainee|intern|internship|graduate|junior)\b|джун\w*|джуніор|стаж[ёе]р|стажир|стажув|стажов|початківц|начинающ/i.test(
+    text,
+  )
+}
+
 // ---- Languages + levels ----
 const LANGUAGES: [string, RegExp][] = [
   ['English', /english|англий|англ\.|англійськ/i],
@@ -273,6 +290,7 @@ export function enrichJob(job: Job): Job {
     workMode: detectWorkMode(text, job),
     relocation: detectRelocation(text),
     foreignerFriendly: detectForeignerFriendly(text),
+    noExperience: detectNoExperience(text),
     languages: detectLanguages(text),
     skills: core,
     niceToHave,

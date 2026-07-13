@@ -79,6 +79,7 @@ function matches(job: Job, query: JobQuery, oldestAllowed: number): boolean {
   if (query.foreignerFriendly !== undefined && job.foreignerFriendly !== query.foreignerFriendly) {
     return false
   }
+  if (query.noExperience && !job.noExperience) return false
   if (query.language) {
     const langs = job.languages || []
     const want = query.language.toLowerCase()

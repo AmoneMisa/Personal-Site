@@ -30,6 +30,7 @@ export interface Job {
   workMode?: WorkMode
   relocation?: Relocation
   foreignerFriendly?: boolean // visa sponsorship / open to foreigners
+  noExperience?: boolean // entry-level: no prior experience required (trainee/intern/junior/"без опыта")
   languages?: LanguageReq[]
   skills?: string[]
   niceToHave?: string[] // "will be a plus"
@@ -83,6 +84,7 @@ export interface JobQuery {
   workMode?: WorkMode
   relocation?: Relocation
   foreignerFriendly?: boolean
+  noExperience?: boolean // only entry-level / no-experience-required roles
   language?: string // e.g. "english"
   languageLevel?: string // e.g. "b2"
   excludeLanguages: string[] // drop vacancies requiring any of these languages
