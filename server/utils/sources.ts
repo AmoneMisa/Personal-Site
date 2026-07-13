@@ -371,9 +371,11 @@ const DEFAULT_ASHBY = [
   'baseten:Baseten', 'mercor:Mercor', 'writer:Writer', 'benchling:Benchling',
   'supabase:Supabase', 'watershed:Watershed', 'sardine:Sardine', 'modal:Modal',
   'rho:Rho', 'linear:Linear', 'posthog:PostHog', 'railway:Railway', 'runway:Runway',
-  // games + Ukraine IT/product (Genesis ecosystem)
+  // games + Ukraine IT/product (Genesis ecosystem).
+  // NB: 'genesis' on Ashby is a US AI-robotics company (Bay Area), NOT the
+  // Ukrainian Genesis (own career site, Cloudflare-gated) — do not re-add it.
   'voodoo:Voodoo', 'supercell:Supercell', 'preply:Preply', 'headway:Headway',
-  'solidgate:Solidgate', 'genesis:Genesis', 'obrio:OBRIO', 'universe:Universe',
+  'solidgate:Solidgate', 'obrio:OBRIO', 'universe:Universe',
   'restream:Restream',
 ].join(',')
 
