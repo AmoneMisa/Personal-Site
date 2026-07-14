@@ -361,6 +361,8 @@ const DEFAULT_SMARTRECRUITERS = [
   'DeliveryHero:Delivery Hero', 'Wise:Wise', 'Canva:Canva', 'ASOS:ASOS',
   'ByteDance:ByteDance', 'Joom:Joom', 'Uber:Uber', 'Wayfair:Wayfair',
   'Grab:Grab', 'BigCommerce:BigCommerce', 'Omio:Omio', 'Gameloft:Gameloft',
+  // remote-first / large employers (work-from-home list, verified 2026-07)
+  'Alorica:Alorica', 'geico:GEICO',
 ].join(',')
 // Ashby (api.ashbyhq.com) — public job-board API used by many modern AI/dev-tool
 // companies. Handles verified 2026-07 to return live postings.
@@ -377,6 +379,8 @@ const DEFAULT_ASHBY = [
   'voodoo:Voodoo', 'supercell:Supercell', 'preply:Preply', 'headway:Headway',
   'solidgate:Solidgate', 'obrio:OBRIO', 'universe:Universe',
   'restream:Restream',
+  // remote-first employers (from the "work-from-home companies" list, verified 2026-07)
+  'zapier:Zapier', 'buffer:Buffer',
 ].join(',')
 
 function prettyLabel(token: string): string {
@@ -545,12 +549,17 @@ const DEFAULT_CAREERS_PAGES = [
   'eBay|https://jobs.ebayinc.com/us/en',
   'Air Arabia|https://www.airarabiagroupcareers.com/gb/en',
   'RTX|https://careers.rtx.com/global/en',
+  // US healthcare/insurance remote employers (work-from-home list, Phenom, verified 2026-07)
+  'Humana|https://careers.humana.com/',
+  'CVS Health|https://jobs.cvshealth.com/us/en',
+  'Cigna|https://jobs.thecignagroup.com/us/en',
   // Workday-powered (CXS API discovered from the page HTML)
   'Unilever|https://careers.unilever.com/en',
   'Nike|https://careers.nike.com/',
   'Expedia Group|https://careers.expediagroup.com/',
   'Home Depot|https://careers.homedepot.com/',
   'Linklaters|https://www.linklaters.com/careers',
+  'Elevance Health|https://careers.elevancehealth.com/',
   // Teamtailor-hosted (anchor parsing)
   'Voi|https://careers.voi.com/',
   'Moove|https://careers.moove.io/',
