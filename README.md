@@ -1,75 +1,60 @@
-# Nuxt Minimal Starter
+# WhitesLove — Personal Site
 
-Look at the [Nuxt documentation](https://nuxt.com/docs/getting-started/introduction) to learn more.
+Source code for [whiteslove.me](https://whiteslove.me) — a personal developer site featuring a set of small productivity tools (PDF editor, JSON merger, Markdown editor, SVG editor, DockerHub search, and more).
 
-## Setup
+## Features
+- Multi-language support (i18n)
+- Country-fit quiz and job search tools
+- Standalone dev utilities: PDF editor, Markdown editor, JSON merger, SVG editor, DockerHub search, email editor
+- Server-side logic for dynamic features
+- Dockerized deployment with CI/CD
 
-Make sure to install dependencies:
+## Tech Stack
+- **Framework:** Nuxt.js (Vue.js)
+- **Language:** TypeScript
+- **Styling:** CSS
+- **Containerization:** Docker
+- **CI/CD:** GitHub Actions
+- **i18n:** Multi-locale support
 
+## Project Structure
+├── app/ # Application code
+├── server/ # Server-side logic/API routes
+├── i18n/locales/ # Translation files
+├── quizzData/country/ # Data for the country-fit quiz
+├── public/ # Static assets
+├── .github/workflows/ # CI/CD pipeline
+└── Dockerfile
+
+## Getting Started
+
+### Prerequisites
+- Node.js
+- npm
+
+### Setup
 ```bash
-# npm
+git clone https://github.com/AmoneMisa/Personal-Site.git
+cd Personal-Site
 npm install
-
-# pnpm
-pnpm install
-
-# yarn
-yarn install
-
-# bun
-bun install
 ```
 
-## Development Server
-
-Start the development server on `http://localhost:3000`:
-
+### Development
 ```bash
-# npm
 npm run dev
-
-# pnpm
-pnpm dev
-
-# yarn
-yarn dev
-
-# bun
-bun run dev
 ```
+Runs at [http://localhost:3000](http://localhost:3000).
 
-## Production
-
-Build the application for production:
-
+### Production Build
 ```bash
-# npm
 npm run build
-
-# pnpm
-pnpm build
-
-# yarn
-yarn build
-
-# bun
-bun run build
-```
-
-Locally preview production build:
-
-```bash
-# npm
 npm run preview
-
-# pnpm
-pnpm preview
-
-# yarn
-yarn preview
-
-# bun
-bun run preview
 ```
 
-Check out the [deployment documentation](https://nuxt.com/docs/getting-started/deployment) for more information.
+## Related
+- Admin panel: [Personal-Site-Admin-Frontend](https://github.com/AmoneMisa/Personal-Site-Admin-Frontend)
+- Backend: [Personal-Site-Backend](https://github.com/AmoneMisa/Personal-Site-Backend)
+- Live site: [whiteslove.me](https://whiteslove.me)
+
+## License
+Personal project, shared for demonstration purposes.
