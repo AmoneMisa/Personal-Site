@@ -161,7 +161,11 @@ let c: Canvas | null = null;
 // --- preview URL
 const previewUrl = computed(() => {
   if (!docId.value) return "";
-  return `${config.public.apiBase}/pdf/preview/${docId.value}/${page.value}?dpi=${dpi.value}`;
+  // Once a page's text/images are loaded as editable objects, show the clean
+  // background render (originals removed) so nothing is drawn twice. Pages with
+  // no extractable content keep the normal full-page preview.
+  const kind = autoLoaded[page.value] ? "background" : "preview";
+  return `${config.public.apiBase}/pdf/${kind}/${docId.value}/${page.value}?dpi=${dpi.value}`;
 });
 
 function clampInt(n: number, min: number, max: number) {
@@ -793,6 +797,10 @@ async function loadEditableText(silent = false): Promise<boolean> {
 
     c.requestRenderAll();
     pushHistory();
+
+    // switch the preview raster to the clean background (originals removed) so
+    // the editable objects we just added aren't shown on top of their copies
+    autoLoaded[page.value] = true;
 
     editor.fullMode = true;
     editor.mode = "move";
