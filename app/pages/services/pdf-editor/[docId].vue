@@ -44,6 +44,25 @@ const overlayCanvasRef = ref<HTMLCanvasElement | null>(null);
 
 const bgColor = ref<string | null>(null);
 
+// --- clickable links (auto-detected URLs / e-mails + source annotations)
+type LinkRegion = { x: number; y: number; w: number; h: number; uri: string };
+// per-page link regions in rendered-PNG pixel space at `dpi`
+const pageLinks = reactive<Record<number, LinkRegion[]>>({});
+// display px per PNG px (previewWidth / naturalWidth); kept in sync on resize
+const displayScale = ref(1);
+// true while Ctrl/Cmd is held -> link hotspots become clickable
+const linkArmed = ref(false);
+// pages whose editable text was already auto-loaded on open
+const autoLoaded = reactive<Record<number, boolean>>({});
+
+// --- original embedded images loaded as movable objects
+// raw extracted image as returned by the backend (PNG pixel space at `dpi`)
+type ImageRegion = { id?: string; name: string; url: string; x: number; y: number; w: number; h: number };
+// originals the user deleted (kept per page so the exporter can redact them
+// even though the canvas object is gone); px geometry at the given `dpi`
+type DeletedImg = { name: string; x: number; y: number; w: number; h: number; dpi: number };
+const deletedImages = reactive<Record<number, DeletedImg[]>>({});
+
 // --- editor tool state
 type Mode = "move" | "pen" | "highlighter" | "signature" | "rect" | "circle" | "text" | "image";
 type BrushShape = "round" | "square";
@@ -123,6 +142,7 @@ type PdfDraft = {
   v: 1;
   updatedAt: number;
   pages: Record<number, any>;
+  deletedImages?: Record<number, DeletedImg[]>;
   ui?: { page?: number; zoom?: number };
 };
 
@@ -171,11 +191,12 @@ function scheduleSaveDraft() {
 async function saveDraftNow() {
   if (!docId.value) return;
   try {
-    if (c) pageJson[page.value] = c.toJSON(["id", "tool", "opacityPct", "orig"]);
+    if (c) pageJson[page.value] = c.toJSON(["id", "tool", "opacityPct", "orig", "name"]);
     const draft: PdfDraft = {
       v: 1,
       updatedAt: Date.now(),
       pages: { ...pageJson },
+      deletedImages: { ...deletedImages },
       ui: { page: page.value },
     };
     await $fetch(api(`/pdf/draft/${docId.value}`), { method: "PUT", body: { draft } });
@@ -190,6 +211,7 @@ async function loadDraft() {
     const res = await $fetch<{ draft: PdfDraft }>(api(`/pdf/draft/${docId.value}`));
     if (res?.draft?.pages) {
       Object.assign(pageJson, res.draft.pages);
+      if (res.draft.deletedImages) Object.assign(deletedImages, res.draft.deletedImages);
       if (res.draft.ui?.page) page.value = clampInt(res.draft.ui.page, 1, 9999);
     }
   } catch {
@@ -229,7 +251,7 @@ function rgbaFromHex(hex: string, alpha01: number) {
 function pushHistory() {
   if (!c || history.lock) return;
 
-  const snap = c.toJSON(["id", "tool", "opacityPct", "orig"]);
+  const snap = c.toJSON(["id", "tool", "opacityPct", "orig", "name"]);
   history.stack = history.stack.slice(0, history.idx + 1);
   history.stack.push(snap);
   history.idx = history.stack.length - 1;
@@ -288,6 +310,9 @@ function resizeToPreview() {
   c.setDimensions({ width: w, height: h });
   c.calcOffset();
   c.requestRenderAll();
+
+  // keep link hotspots aligned with the displayed preview size
+  displayScale.value = 1 / (calcMultiplier() || 1);
 }
 
 function loadCanvasForPage(p: number) {
@@ -308,7 +333,7 @@ function loadCanvasForPage(p: number) {
     });
   } else {
     history.lock = false;
-    history.stack = [c.toJSON(["id", "tool", "opacityPct", "orig"])];
+    history.stack = [c.toJSON(["id", "tool", "opacityPct", "orig", "name"])];
     history.idx = 0;
     c.requestRenderAll();
   }
@@ -455,10 +480,26 @@ async function onPickImage(e: Event) {
   reader.readAsDataURL(file);
 }
 
+// Remember a deleted original image so the exporter can still redact it from
+// the source (the canvas object won't exist at save time).
+function trackDeletedImage(obj: any) {
+  if (!obj || obj.tool !== "pdfimg" || !obj.orig) return;
+  const o = obj.orig;
+  const arr = deletedImages[page.value] || (deletedImages[page.value] = []);
+  arr.push({ name: String(obj.name || ""), x: o.x, y: o.y, w: o.w, h: o.h, dpi: o.dpi });
+}
+
 function removeSelected() {
   if (!c) return;
   const obj: any = c.getActiveObject();
   if (!obj) return;
+
+  // an active selection wraps several objects; track any images inside it
+  if (typeof obj.getObjects === "function") {
+    obj.getObjects().forEach(trackDeletedImage);
+  } else {
+    trackDeletedImage(obj);
+  }
 
   c.remove(obj);
   c.discardActiveObject();
@@ -467,9 +508,10 @@ function removeSelected() {
 
 function clearPage() {
   if (!c) return;
+  c.getObjects().forEach(trackDeletedImage);
   c.clear();
   c.requestRenderAll();
-  pageJson[page.value] = c.toJSON(["id", "tool", "opacityPct", "orig"]);
+  pageJson[page.value] = c.toJSON(["id", "tool", "opacityPct", "orig", "name"]);
   scheduleSaveDraft();
 }
 
@@ -649,22 +691,28 @@ function applySelectedGeometry() {
 
 // Load extractable PDF text of the current page as editable text boxes.
 // Uses the backend text-extraction endpoint when available; degrades gracefully.
-async function loadEditableText() {
-  if (!c || !docId.value || isBusy.value) return;
+async function loadEditableText(silent = false): Promise<boolean> {
+  if (!c || !docId.value || isBusy.value) return false;
 
   errorMsg.value = null;
   isBusy.value = true;
   try {
     type Block = OrigBlock;
 
-    const res = await $fetch<{ blocks?: Block[] }>(
+    const res = await $fetch<{ blocks?: Block[]; links?: LinkRegion[]; images?: ImageRegion[] }>(
       api(`/pdf/text-blocks/${docId.value}/${page.value}?dpi=${dpi.value}`),
     );
 
+    // clickable link regions (PNG pixel space at dpi) for this page
+    pageLinks[page.value] = (res?.links ?? [])
+      .map((l) => ({ x: l.x ?? 0, y: l.y ?? 0, w: l.w ?? 0, h: l.h ?? 0, uri: String(l.uri || "") }))
+      .filter((l) => l.uri);
+
     const blocks = res?.blocks ?? [];
-    if (!blocks.length) {
-      errorMsg.value = t("services.pdfEditor.full.noText");
-      return;
+    const images = res?.images ?? [];
+    if (!blocks.length && !images.length) {
+      if (!silent) errorMsg.value = t("services.pdfEditor.full.noText");
+      return false;
     }
 
     // backend coordinates are in the rendered PNG pixel space (at `dpi`);
@@ -706,17 +754,106 @@ async function loadEditableText() {
       c!.add(box);
     });
 
+    // original embedded images as movable/resizable/rotatable objects; the
+    // backend redacts each original and re-inserts (vector) only if it changed.
+    for (const im of images) {
+      try {
+        const fimg = await FabricImage.fromURL(api(im.url), { crossOrigin: "anonymous" });
+        const natW = fimg.width || 1;
+        const natH = fimg.height || 1;
+        const targetW = Math.max(1, (im.w ?? natW) * scale);
+        const targetH = Math.max(1, (im.h ?? natH) * scale);
+        fimg.set({ scaleX: targetW / natW, scaleY: targetH / natH });
+
+        (fimg as any).tool = "pdfimg";
+        (fimg as any).id = im.id || genBlockId(page.value, 0);
+        (fimg as any).name = im.name;
+        (fimg as any).orig = {
+          id: im.id ?? null,
+          page: page.value,
+          dpi: dpi.value,
+          x: im.x ?? 0,
+          y: im.y ?? 0,
+          w: im.w ?? 0,
+          h: im.h ?? 0,
+          text: "",
+          fontSize: null,
+          fontName: null,
+          bold: false,
+          italic: false,
+          color: null,
+        } as OrigBlockMeta;
+
+        setByTopLeft(fimg, (im.x ?? 0) * scale, (im.y ?? 0) * scale);
+        c!.add(fimg);
+      } catch {
+        // skip an image that fails to load; text editing still works
+      }
+    }
+
     c.requestRenderAll();
     pushHistory();
 
     editor.fullMode = true;
     editor.mode = "move";
     applyMode();
+    return true;
   } catch (e: any) {
-    errorMsg.value = e?.data?.detail?.message || t("services.pdfEditor.full.noText");
+    if (!silent) errorMsg.value = e?.data?.detail?.message || t("services.pdfEditor.full.noText");
+    return false;
   } finally {
     isBusy.value = false;
   }
+}
+
+// Auto-load the page's editable text on open (once per page), unless the draft
+// already restored editable pdf-text objects. Requires the preview raster to be
+// loaded so coordinates map correctly.
+function currentHasPdfText(): boolean {
+  return !!c && c.getObjects().some((o: any) => o?.tool === "pdftext" || o?.tool === "pdfimg");
+}
+
+async function maybeAutoLoadText() {
+  if (!c || autoLoaded[page.value] || isBusy.value) return;
+
+  const img = previewImgRef.value;
+  if (!img || !img.complete || img.naturalWidth === 0) return;
+
+  if (currentHasPdfText()) {
+    autoLoaded[page.value] = true;
+    return;
+  }
+
+  const ok = await loadEditableText(true);
+  if (ok) autoLoaded[page.value] = true;
+}
+
+// Open a link region (Ctrl/Cmd-click) in a new tab.
+function openLink(uri: string) {
+  if (!uri) return;
+  window.open(uri, "_blank", "noopener,noreferrer");
+}
+
+// Link hotspots for the current page, in displayed-preview pixels.
+const linkHotspots = computed(() => {
+  const arr = pageLinks[page.value] || [];
+  const s = displayScale.value || 1;
+  return arr.map((l, i) => ({
+    key: `${page.value}_${i}`,
+    uri: l.uri,
+    left: l.x * s,
+    top: l.y * s,
+    width: Math.max(6, l.w * s),
+    height: Math.max(6, l.h * s),
+  }));
+});
+
+// Track Ctrl/Cmd so hotspots only intercept clicks while a modifier is held.
+function onModKey(e: KeyboardEvent) {
+  linkArmed.value = e.ctrlKey || e.metaKey;
+}
+function clearArmed() {
+  linkArmed.value = false;
 }
 
 function toggleFullMode() {
@@ -769,7 +906,7 @@ async function setPage(p: number) {
   const nextP = clampInt(p, 1, pages.value);
   if (nextP === page.value) return;
 
-  pageJson[page.value] = c.toJSON(["id", "tool", "opacityPct", "orig"]);
+  pageJson[page.value] = c.toJSON(["id", "tool", "opacityPct", "orig", "name"]);
   page.value = nextP;
 
   await nextTick();
@@ -946,20 +1083,85 @@ function collectTextEditsFromCanvas(mult: number, dpiVal: number): TextEditBlock
   return blocks;
 }
 
+// Structured edit for an original embedded image the user changed or deleted.
+// Geometry is DPI-independent PDF points (top-left origin, unrotated box).
+type ImageEdit = {
+  name: string;
+  xPt: number;
+  yPt: number;
+  wPt: number;
+  hPt: number;
+  angle: number;
+  deleted: boolean;
+  orig: { xPt: number; yPt: number; wPt: number; hPt: number };
+};
+
+// Collect moved/resized/rotated original images (tool === "pdfimg") from the
+// current canvas. Only images whose geometry differs from the extracted
+// original are emitted; untouched images are left byte-for-byte in the source.
+function collectImageEditsFromCanvas(mult: number, dpiVal: number): ImageEdit[] {
+  if (!c) return [];
+  const out: ImageEdit[] = [];
+
+  c.getObjects().forEach((o: any) => {
+    if (o?.tool !== "pdfimg" || !o.orig) return;
+
+    const sw = o.getScaledWidth?.() ?? o.width ?? 0;
+    const sh = o.getScaledHeight?.() ?? o.height ?? 0;
+    const ctr = o.getCenterPoint?.() ?? { x: o.left ?? 0, y: o.top ?? 0 };
+
+    // natural PNG pixels (at dpiVal), unrotated box, top-left origin
+    const wPx = sw * mult;
+    const hPx = sh * mult;
+    const xPx = ctr.x * mult - wPx / 2;
+    const yPx = ctr.y * mult - hPx / 2;
+    const angle = o.angle ?? 0;
+
+    const cur = {
+      xPt: pxToPt(xPx, dpiVal),
+      yPt: pxToPt(yPx, dpiVal),
+      wPt: pxToPt(wPx, dpiVal),
+      hPt: pxToPt(hPx, dpiVal),
+    };
+
+    const op = withOrigPoints(o.orig as OrigBlockMeta);
+    const origPt = {
+      xPt: op?.xPt ?? 0,
+      yPt: op?.yPt ?? 0,
+      wPt: op?.wPt ?? 0,
+      hPt: op?.hPt ?? 0,
+    };
+
+    const moved =
+      Math.abs(cur.xPt - origPt.xPt) > 0.5 ||
+      Math.abs(cur.yPt - origPt.yPt) > 0.5 ||
+      Math.abs(cur.wPt - origPt.wPt) > 0.5 ||
+      Math.abs(cur.hPt - origPt.hPt) > 0.5 ||
+      Math.abs(angle) > 0.1;
+    if (!moved) return;
+
+    out.push({ name: String(o.name || ""), ...cur, angle, deleted: false, orig: origPt });
+  });
+
+  return out;
+}
+
 async function exportOverlaysPngByPage(): Promise<{
   overlays: Record<number, string>;
   textEdits: Record<number, TextEditBlock[]>;
+  imageEdits: Record<number, ImageEdit[]>;
 }> {
-  if (!c) return { overlays: {}, textEdits: {} };
+  if (!c) return { overlays: {}, textEdits: {}, imageEdits: {} };
 
   // save current page json
-  pageJson[page.value] = c.toJSON(["id", "tool", "opacityPct", "orig"]);
+  pageJson[page.value] = c.toJSON(["id", "tool", "opacityPct", "orig", "name"]);
 
   const overlays: Record<number, string> = {};
   const textEdits: Record<number, TextEditBlock[]> = {};
+  const imageEdits: Record<number, ImageEdit[]> = {};
 
   const curPage = page.value;
-  const curJson = c.toJSON(["id", "tool", "opacityPct", "orig"]);
+  const curJson = c.toJSON(["id", "tool", "opacityPct", "orig", "name"]);
 
   for (let p = 1; p <= pages.value; p++) {
     const json = pageJson[p];
@@ -978,11 +1180,44 @@ async function exportOverlaysPngByPage(): Promise<{
           const blocks = collectTextEditsFromCanvas(mult, dpi.value);
           if (blocks.length) textEdits[p] = blocks;
 
-          // hide editable pdf-text from the raster overlay so it isn't baked in
-          // twice (the backend renders it from the structured data instead)
+          // structured image edits: changed originals + originals deleted on
+          // this page (backend redacts + vector re-inserts). Skip a "deleted"
+          // entry whose image is actually still present (e.g. after undo).
+          const changed = collectImageEditsFromCanvas(mult, dpi.value);
+          const presentNames = new Set(
+            c!.getObjects()
+              .filter((o: any) => o?.tool === "pdfimg")
+              .map((o: any) => String(o.name || "")),
+          );
+          const removed: ImageEdit[] = (deletedImages[p] || [])
+            .filter((d) => !presentNames.has(d.name))
+            .map((d) => {
+              const dv = d.dpi > 0 ? d.dpi : dpi.value;
+              return {
+                name: d.name,
+                xPt: 0,
+                yPt: 0,
+                wPt: 0,
+                hPt: 0,
+                angle: 0,
+                deleted: true,
+                orig: {
+                  xPt: pxToPt(d.x, dv),
+                  yPt: pxToPt(d.y, dv),
+                  wPt: pxToPt(d.w, dv),
+                  hPt: pxToPt(d.h, dv),
+                },
+              };
+            });
+          const imgEdits = [...changed, ...removed];
+          if (imgEdits.length) imageEdits[p] = imgEdits;
+
+          // hide editable pdf-text AND original images from the raster overlay so
+          // they aren't baked in (the backend renders them from structured data;
+          // untouched images stay in the source untouched)
           const hidden: any[] = [];
           c!.getObjects().forEach((o: any) => {
-            if (o?.tool === "pdftext") {
+            if (o?.tool === "pdftext" || o?.tool === "pdfimg") {
               o.visible = false;
               hidden.push(o);
             }
@@ -1019,7 +1254,7 @@ async function exportOverlaysPngByPage(): Promise<{
   });
 
   page.value = curPage;
-  return { overlays, textEdits };
+  return { overlays, textEdits, imageEdits };
 }
 
 async function saveDocument() {
@@ -1037,13 +1272,30 @@ async function saveDocument() {
   isBusy.value = true;
 
   try {
-    const { overlays, textEdits } = await exportOverlaysPngByPage();
+    const { overlays, textEdits, imageEdits } = await exportOverlaysPngByPage();
+
+    // clickable links per page, converted to DPI-independent PDF points
+    const links: Record<number, Array<{ xPt: number; yPt: number; wPt: number; hPt: number; uri: string }>> = {};
+    for (const [p, arr] of Object.entries(pageLinks)) {
+      const list = (arr || [])
+        .filter((l) => l.uri)
+        .map((l) => ({
+          xPt: pxToPt(l.x, dpi.value),
+          yPt: pxToPt(l.y, dpi.value),
+          wPt: pxToPt(l.w, dpi.value),
+          hPt: pxToPt(l.h, dpi.value),
+          uri: l.uri,
+        }));
+      if (list.length) links[Number(p)] = list;
+    }
 
     const res = await $fetch<{ downloadUrl: string; expiresAtResult?: number }>(api(`/pdf/save/${docId.value}`), {
       method: "POST",
       body: {
         overlays,
         textEdits,
+        imageEdits,
+        links,
         dpi: dpi.value,
         // page size in PDF points, so the backend can map pixel/point coords and
         // flip the Y axis if it works in native PDF space (origin bottom-left).
@@ -1119,6 +1371,7 @@ watch(
 // Lifecycle
 // =========================
 let onResize: any = null;
+let onPreviewLoad: any = null;
 
 async function boot() {
   if (!docId.value) return;
@@ -1141,13 +1394,22 @@ async function boot() {
     onResize = () => resizeToPreview();
     window.addEventListener("resize", onResize);
 
+    // when the preview raster loads: resize, then auto-load editable text
+    onPreviewLoad = () => {
+      resizeToPreview();
+      maybeAutoLoadText();
+    };
+
     const img = previewImgRef.value;
     if (img) {
-      img.addEventListener("load", resizeToPreview, { passive: true });
-      if (img.complete) resizeToPreview();
+      img.addEventListener("load", onPreviewLoad, { passive: true });
+      if (img.complete) onPreviewLoad();
     }
 
     window.addEventListener("keydown", onKeyDown);
+    window.addEventListener("keydown", onModKey);
+    window.addEventListener("keyup", onModKey);
+    window.addEventListener("blur", clearArmed);
   } catch (e: any) {
     errorMsg.value = e?.data?.detail?.message || e?.message || "Init failed";
   } finally {
@@ -1158,6 +1420,9 @@ async function boot() {
 watch(docId, async () => {
   page.value = 1;
   Object.keys(pageJson).forEach((k) => delete pageJson[Number(k)]);
+  Object.keys(pageLinks).forEach((k) => delete pageLinks[Number(k)]);
+  Object.keys(autoLoaded).forEach((k) => delete autoLoaded[Number(k)]);
+  Object.keys(deletedImages).forEach((k) => delete deletedImages[Number(k)]);
   history.stack = [];
   history.idx = -1;
   errorMsg.value = null;
@@ -1172,13 +1437,16 @@ onBeforeUnmount(() => {
   clearTimeout(saveDraftTimer);
 
   window.removeEventListener("keydown", onKeyDown);
+  window.removeEventListener("keydown", onModKey);
+  window.removeEventListener("keyup", onModKey);
+  window.removeEventListener("blur", clearArmed);
   if (onResize) window.removeEventListener("resize", onResize);
 
   const img = previewImgRef.value;
-  if (img) img.removeEventListener("load", resizeToPreview as any);
+  if (img && onPreviewLoad) img.removeEventListener("load", onPreviewLoad as any);
 
   if (c) {
-    pageJson[page.value] = c.toJSON(["id", "tool", "opacityPct", "orig"]);
+    pageJson[page.value] = c.toJSON(["id", "tool", "opacityPct", "orig", "name"]);
     saveDraftNow();
     c.dispose();
     c = null;
@@ -1439,7 +1707,7 @@ onBeforeUnmount(() => {
           <div v-if="editor.fullMode" class="pdf__tool-section pdf__inspector">
             <div class="pdf__inspector-head">
               <div class="pdf__tool-title">{{ t("services.pdfEditor.full.title") }}</div>
-              <button type="button" class="services__pill" :disabled="isBusy" @click="loadEditableText">
+              <button type="button" class="services__pill" :disabled="isBusy" @click="loadEditableText()">
                 <u-icon name="i-lucide-scan-text" />
                 {{ t("services.pdfEditor.full.loadText") }}
               </button>
@@ -1558,6 +1826,22 @@ onBeforeUnmount(() => {
             >
               <img ref="previewImgRef" :src="previewUrl" class="pdf__preview" alt="" />
               <canvas ref="overlayCanvasRef" class="pdf__overlay" />
+
+              <!-- Clickable link hotspots (URLs / e-mails). Only intercept clicks
+                   while Ctrl/Cmd is held, so normal clicks still edit the canvas. -->
+              <div class="pdf__links" :class="{ pdf__links_armed: linkArmed }">
+                <a
+                    v-for="h in linkHotspots"
+                    :key="h.key"
+                    class="pdf__link-hotspot"
+                    :href="h.uri"
+                    :title="h.uri"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    :style="{ left: h.left + 'px', top: h.top + 'px', width: h.width + 'px', height: h.height + 'px' }"
+                    @click.prevent="openLink(h.uri)"
+                />
+              </div>
             </div>
           </div>
         </div>
@@ -1763,5 +2047,30 @@ onBeforeUnmount(() => {
   width: 100%;
   height: 100%;
   touch-action: none;
+}
+
+/* Link hotspot layer sits above the fabric canvas but is click-through until
+   Ctrl/Cmd is held (pdf__links_armed), so it never blocks normal editing. */
+.pdf__links {
+  position: absolute;
+  inset: 0;
+  z-index: 10;
+  pointer-events: none;
+}
+
+.pdf__links_armed {
+  pointer-events: auto;
+}
+
+.pdf__link-hotspot {
+  position: absolute;
+  display: block;
+  border-radius: 3px;
+  cursor: pointer;
+}
+
+.pdf__links_armed .pdf__link-hotspot {
+  background: rgba(128, 90, 245, 0.18);
+  outline: 1px solid rgba(128, 90, 245, 0.55);
 }
 </style>
