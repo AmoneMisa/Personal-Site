@@ -129,6 +129,22 @@ const FONT_FAMILIES = [
   "Open Sans",
 ];
 
+// PDF font names (e.g. "Now-Black", "Aileron-Italic", "ABCDEF+Lato-Bold") are
+// almost never installed in the browser, so using them raw makes the canvas
+// fall back to its default serif. Resolve to a web-safe stack, guessing
+// serif vs sans from the name so the substitute at least matches the style.
+const SERIF_HINTS = ["times", "serif", "georgia", "garamond", "roman", "minion", "cambria", "antiqua"];
+function resolveFontFamily(raw?: string): string {
+  const name = (raw || "").trim();
+  if (!name) return "Arial, Helvetica, sans-serif";
+  const base = name.replace(/^[A-Z]{6}\+/, "").split(/[-,]/)[0]?.trim() ?? "";
+  const lower = base.toLowerCase();
+  const isSerif = SERIF_HINTS.some((h) => lower.includes(h));
+  const known = FONT_FAMILIES.find((f) => f.toLowerCase() === lower);
+  if (known) return `"${known}", ${isSerif ? "serif" : "sans-serif"}`;
+  return isSerif ? "Georgia, 'Times New Roman', serif" : "Arial, Helvetica, sans-serif";
+}
+
 type TextAlign = "left" | "center" | "right" | "justify";
 
 // --- inspector state (bound to the currently selected object)
@@ -1103,11 +1119,12 @@ async function loadEditableText(silent = false): Promise<boolean> {
       // Widen the box so no hard line soft-wraps under the substituted browser
       // font, but never shrink below the source width. This keeps the original
       // layout (single-line name, one row per list item) instead of wrapping.
+      const fontFamily = resolveFontFamily(b.fontName);
       const baseW = Math.max(20, (b.w ?? 200) * scale);
       const measuredW = measureMaxLineWidth(
         b.text || "",
         fontPx,
-        b.fontName || "Helvetica",
+        fontFamily,
         anyBold,
         !!b.italic,
       );
@@ -1116,7 +1133,7 @@ async function loadEditableText(silent = false): Promise<boolean> {
       const box = new Textbox(b.text || "", {
         width: boxW,
         fill: b.color || "#111111",
-        fontFamily: b.fontName || "Helvetica",
+        fontFamily,
         fontSize: fontPx,
         lineHeight,
         fontWeight: b.bold ? "bold" : "normal",
