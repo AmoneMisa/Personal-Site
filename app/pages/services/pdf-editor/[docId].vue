@@ -854,6 +854,13 @@ async function loadEditableText(silent = false): Promise<boolean> {
       return false;
     }
 
+    // Idempotent load: drop any editable originals already on the canvas for
+    // this page before re-adding, so calling this twice (auto-load + the manual
+    // "Load text" button) never stacks a duplicate copy over the first.
+    c.getObjects()
+      .filter((o: any) => o?.tool === "pdftext" || o?.tool === "pdfimg")
+      .forEach((o) => c!.remove(o));
+
     // backend coordinates are in the rendered PNG pixel space (at `dpi`);
     // scale them into the displayed canvas space.
     const scale = 1 / (calcMultiplier() || 1);
@@ -2009,8 +2016,17 @@ onBeforeUnmount(() => {
 </template>
 
 <style scoped lang="scss">
+/* Breathing room below the editor so it never butts up against the footer. */
+.pdf {
+  padding-top: 24px;
+  padding-bottom: 96px;
+}
+
 .pdf__page-chip {
-  padding: 8px 12px;
+  display: inline-flex;
+  align-items: center;
+  height: 40px;
+  padding: 0 14px;
   border-radius: 999px;
   border: 1px solid var(--ui-border);
   background: rgba(255, 255, 255, 0.03);
@@ -2024,8 +2040,12 @@ onBeforeUnmount(() => {
   flex-wrap: wrap;
 }
 
+/* Match the pill/icon controls in the same row: same height, pill radius,
+   so the primary action sits inline instead of towering over the toolbar. */
 .pdf__save-btn {
-  min-width: 190px;
+  min-width: 170px;
+  height: 40px !important;
+  border-radius: 999px !important;
 }
 
 .pdf__sep {
@@ -2102,13 +2122,14 @@ onBeforeUnmount(() => {
   background: rgba(128, 90, 245, 0.18);
 }
 
-/* Square icon buttons in the top actions row (page nav / download). */
+/* Round icon buttons in the top actions row (page nav / download). Sized to
+   match the pill/select/save controls beside them so the row aligns. */
 .pdf__icon-btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 36px;
-  height: 36px;
+  width: 40px;
+  height: 40px;
   border-radius: 999px;
   border: 1px solid var(--ui-border);
   background: rgba(255, 255, 255, 0.03);
