@@ -13,14 +13,12 @@ const { t } = useI18n();
 useSeoMeta({
   title: () => t('seo.pages.pdfEditorDoc.title'),
   description: () => t('seo.pages.pdfEditorDoc.description'),
-  robots: () => t('seo.common.robots'),
-  ogType: () => t('seo.common.ogType'),
+  // per-user document workspace: keep these dynamic URLs out of the index
+  robots: "noindex, nofollow",
+  ogType: "website",
   ogSiteName: () => t('seo.common.siteName'),
   ogTitle: () => t('seo.pages.pdfEditorDoc.ogTitle'),
-  ogDescription: () => t('seo.pages.pdfEditorDoc.ogDescription'),
-  twitterCard: () => t('seo.common.twitterCard'),
-  twitterTitle: () => t('seo.pages.pdfEditorDoc.twitterTitle'),
-  twitterDescription: () => t('seo.pages.pdfEditorDoc.twitterDescription')
+  ogDescription: () => t('seo.pages.pdfEditorDoc.ogDescription')
 });
 const route = useRoute();
 const router = useRouter();
@@ -54,6 +52,14 @@ const displayScale = ref(1);
 const linkArmed = ref(false);
 // pages whose editable text was already auto-loaded on open
 const autoLoaded = reactive<Record<number, boolean>>({});
+
+// --- Figma-style alignment guides (shown while dragging an object)
+// Each guide is a line in displayed-canvas CSS pixels: vertical guides use
+// `pos` as x and span [start,end] in y; horizontal guides are the transpose.
+type AlignGuide = { k: string; v: boolean; pos: number; start: number; end: number };
+const alignGuides = ref<AlignGuide[]>([]);
+// snap threshold in CSS px: how close an edge/center must be to lock on
+const SNAP_PX = 6;
 
 // --- original embedded images loaded as movable objects
 // raw extracted image as returned by the backend (PNG pixel space at `dpi`)
@@ -182,6 +188,26 @@ function api(path: string) {
   return `${config.public.apiBase}${path}`;
 }
 
+// Preload an image URL, resolving once it is fully decoded (or on error, so we
+// never hang). Used to fetch the clean background BEFORE swapping the preview
+// raster, so the visible page doesn't flash/jump while the new PNG streams in.
+function preloadImage(url: string): Promise<void> {
+  return new Promise((resolve) => {
+    if (!url) return resolve();
+    const im = new Image();
+    im.crossOrigin = "anonymous";
+    im.onload = () => resolve();
+    im.onerror = () => resolve();
+    im.src = url;
+  });
+}
+
+// URL of the clean-background raster (originals removed) for a given page.
+function backgroundUrl(pageNo: number): string {
+  if (!docId.value) return "";
+  return `${config.public.apiBase}/pdf/background/${docId.value}/${pageNo}?dpi=${dpi.value}`;
+}
+
 // =========================
 // Draft: load/save Redis
 // =========================
@@ -300,6 +326,12 @@ function ensureFabric() {
   c.on("object:scaling", syncActive);
   c.on("object:rotating", syncActive);
 
+  // alignment guides: snap while moving, clear once the drag/gesture ends
+  c.on("object:moving", onObjectMoving);
+  c.on("object:modified", clearGuides);
+  c.on("mouse:up", clearGuides);
+  c.on("selection:cleared", clearGuides);
+
   applyMode();
 }
 
@@ -319,11 +351,114 @@ function resizeToPreview() {
   displayScale.value = 1 / (calcMultiplier() || 1);
 }
 
+// =========================
+// Alignment guides + snapping (Figma-style)
+// =========================
+type Edges = { left: number; top: number; right: number; bottom: number; cx: number; cy: number };
+
+function edgesOf(o: any): Edges {
+  const r = o.getBoundingRect();
+  return {
+    left: r.left,
+    top: r.top,
+    right: r.left + r.width,
+    bottom: r.top + r.height,
+    cx: r.left + r.width / 2,
+    cy: r.top + r.height / 2,
+  };
+}
+
+function clearGuides() {
+  if (alignGuides.value.length) alignGuides.value = [];
+}
+
+// While dragging: snap the moving object's edges/center to the edges/centers of
+// the other objects (and the canvas centre lines), and surface guide lines for
+// every axis that locked on.
+function onObjectMoving(e: any) {
+  const obj = e?.target;
+  if (!c || !obj) {
+    clearGuides();
+    return;
+  }
+  // only single, axis-aligned objects snap (skip multi-selections & rotated)
+  if (obj.type === "activeselection" || Math.round(obj.angle || 0) % 360 !== 0) {
+    clearGuides();
+    return;
+  }
+
+  const others = c.getObjects().filter((o: any) => o !== obj && o.visible !== false);
+  const m = edgesOf(obj);
+  const cw = c.getWidth();
+  const ch = c.getHeight();
+
+  // vertical (x) snap candidates: {target x, y-extent of the reference}
+  const vCand: { t: number; a: number; b: number }[] = [{ t: cw / 2, a: 0, b: ch }];
+  // horizontal (y) snap candidates: {target y, x-extent of the reference}
+  const hCand: { t: number; a: number; b: number }[] = [{ t: ch / 2, a: 0, b: cw }];
+  for (const o of others) {
+    const r = edgesOf(o);
+    vCand.push({ t: r.left, a: r.top, b: r.bottom });
+    vCand.push({ t: r.cx, a: r.top, b: r.bottom });
+    vCand.push({ t: r.right, a: r.top, b: r.bottom });
+    hCand.push({ t: r.top, a: r.left, b: r.right });
+    hCand.push({ t: r.cy, a: r.left, b: r.right });
+    hCand.push({ t: r.bottom, a: r.left, b: r.right });
+  }
+
+  let bestX: { d: number; t: number; a: number; b: number } | null = null;
+  for (const mv of [m.left, m.cx, m.right]) {
+    for (const cand of vCand) {
+      const d = cand.t - mv;
+      if (Math.abs(d) <= SNAP_PX && (bestX === null || Math.abs(d) < Math.abs(bestX.d))) {
+        bestX = { d, t: cand.t, a: cand.a, b: cand.b };
+      }
+    }
+  }
+
+  let bestY: { d: number; t: number; a: number; b: number } | null = null;
+  for (const mv of [m.top, m.cy, m.bottom]) {
+    for (const cand of hCand) {
+      const d = cand.t - mv;
+      if (Math.abs(d) <= SNAP_PX && (bestY === null || Math.abs(d) < Math.abs(bestY.d))) {
+        bestY = { d, t: cand.t, a: cand.a, b: cand.b };
+      }
+    }
+  }
+
+  if (bestX) obj.left = (obj.left || 0) + bestX.d;
+  if (bestY) obj.top = (obj.top || 0) + bestY.d;
+  if (bestX || bestY) obj.setCoords();
+
+  const guides: AlignGuide[] = [];
+  const mm = edgesOf(obj);
+  if (bestX) {
+    guides.push({
+      k: "v",
+      v: true,
+      pos: bestX.t,
+      start: Math.min(bestX.a, mm.top),
+      end: Math.max(bestX.b, mm.bottom),
+    });
+  }
+  if (bestY) {
+    guides.push({
+      k: "h",
+      v: false,
+      pos: bestY.t,
+      start: Math.min(bestY.a, mm.left),
+      end: Math.max(bestY.b, mm.right),
+    });
+  }
+  alignGuides.value = guides;
+}
+
 function loadCanvasForPage(p: number) {
   if (!c) return;
 
   history.lock = true;
   c.clear();
+  clearGuides();
 
   resizeToPreview();
 
@@ -799,7 +934,9 @@ async function loadEditableText(silent = false): Promise<boolean> {
     pushHistory();
 
     // switch the preview raster to the clean background (originals removed) so
-    // the editable objects we just added aren't shown on top of their copies
+    // the editable objects we just added aren't shown on top of their copies.
+    // Preload it first so the swap is instant and the page doesn't visibly jump.
+    await preloadImage(backgroundUrl(page.value));
     autoLoaded[page.value] = true;
 
     editor.fullMode = true;
@@ -1660,7 +1797,7 @@ onBeforeUnmount(() => {
             <div class="pdf__tool-grid4">
               <div class="pdf__field">
                 <div class="pdf__label">{{ t("services.pdfEditor.fields.color") }}</div>
-                <u-input v-model="editor.color" type="color" />
+                <u-input v-model="editor.color" type="color" class="pdf__color" />
               </div>
 
               <div class="pdf__field">
@@ -1835,6 +1972,19 @@ onBeforeUnmount(() => {
               <img ref="previewImgRef" :src="previewUrl" class="pdf__preview" alt="" />
               <canvas ref="overlayCanvasRef" class="pdf__overlay" />
 
+              <!-- Figma-style alignment guides while dragging an object. -->
+              <div class="pdf__guides">
+                <div
+                    v-for="g in alignGuides"
+                    :key="g.k"
+                    class="pdf__guide"
+                    :class="g.v ? 'pdf__guide_v' : 'pdf__guide_h'"
+                    :style="g.v
+                      ? { left: g.pos + 'px', top: g.start + 'px', height: (g.end - g.start) + 'px' }
+                      : { top: g.pos + 'px', left: g.start + 'px', width: (g.end - g.start) + 'px' }"
+                />
+              </div>
+
               <!-- Clickable link hotspots (URLs / e-mails). Only intercept clicks
                    while Ctrl/Cmd is held, so normal clicks still edit the canvas. -->
               <div class="pdf__links" :class="{ pdf__links_armed: linkArmed }">
@@ -1906,6 +2056,83 @@ onBeforeUnmount(() => {
   gap: 8px;
   flex-wrap: wrap;
   margin-top: 10px;
+}
+
+/* Toolbar pill buttons (Move / Pen / Undo / …). Defined here because the shared
+   `services__pill` style lives in other pages' scoped blocks and wouldn't reach
+   this page — leaving these buttons unstyled/inconsistent otherwise. */
+.services__pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 36px;
+  padding: 0 14px;
+  border-radius: 999px;
+  border: 1px solid var(--ui-border);
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--ui-text-muted);
+  font-weight: 700;
+  font-size: 13px;
+  cursor: pointer;
+  transition: filter 180ms ease, transform 140ms ease, color 180ms ease;
+}
+
+.services__pill:hover {
+  filter: brightness(1.06);
+  color: var(--text-white);
+}
+
+.services__pill:active {
+  transform: translateY(1px);
+}
+
+.services__pill:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(128, 90, 245, 0.3), 0 0 0 6px rgba(128, 90, 245, 0.14);
+}
+
+.services__pill:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.services__pill_active {
+  color: var(--text-white);
+  border-color: rgba(128, 90, 245, 0.4);
+  background: rgba(128, 90, 245, 0.18);
+}
+
+/* Square icon buttons in the top actions row (page nav / download). */
+.pdf__icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 999px;
+  border: 1px solid var(--ui-border);
+  background: rgba(255, 255, 255, 0.03);
+  color: rgba(255, 255, 255, 0.85);
+  cursor: pointer;
+  transition: filter 160ms ease, transform 140ms ease;
+}
+
+.pdf__icon-btn:hover {
+  filter: brightness(1.08);
+}
+
+.pdf__icon-btn:active {
+  transform: translateY(1px);
+}
+
+.pdf__icon-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+/* Keep the colour swatch compact instead of stretching the whole grid column. */
+.pdf__color {
+  max-width: 120px;
 }
 
 .pdf__tool-section {
@@ -2055,6 +2282,28 @@ onBeforeUnmount(() => {
   width: 100%;
   height: 100%;
   touch-action: none;
+}
+
+/* Alignment guide overlay: thin magenta lines drawn above the canvas while an
+   object is being dragged. Purely visual, never intercepts pointer events. */
+.pdf__guides {
+  position: absolute;
+  inset: 0;
+  z-index: 11;
+  pointer-events: none;
+}
+
+.pdf__guide {
+  position: absolute;
+  background: #f43f5e;
+}
+
+.pdf__guide_v {
+  width: 1px;
+}
+
+.pdf__guide_h {
+  height: 1px;
 }
 
 /* Link hotspot layer sits above the fabric canvas but is click-through until

@@ -15,13 +15,10 @@ useSeoMeta({
   title: () => t('seo.pages.markdownEditor.title'),
   description: () => t('seo.pages.markdownEditor.description'),
   robots: () => t('seo.common.robots'),
-  ogType: () => t('seo.common.ogType'),
+  ogType: "website",
   ogSiteName: () => t('seo.common.siteName'),
   ogTitle: () => t('seo.pages.markdownEditor.ogTitle'),
-  ogDescription: () => t('seo.pages.markdownEditor.ogDescription'),
-  twitterCard: () => t('seo.common.twitterCard'),
-  twitterTitle: () => t('seo.pages.markdownEditor.twitterTitle'),
-  twitterDescription: () => t('seo.pages.markdownEditor.twitterDescription')
+  ogDescription: () => t('seo.pages.markdownEditor.ogDescription')
 });
 
 const MAX = 8000;

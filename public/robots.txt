@@ -1,3 +1,5 @@
 User-agent: *
 Disallow: /api/
 Disallow: /admin/
+
+Sitemap: https://whiteslove.me/sitemap.xml

@@ -14,13 +14,10 @@ useSeoMeta({
   title: () => t('seo.pages.mergeJson.title'),
   description: () => t('seo.pages.mergeJson.description'),
   robots: () => t('seo.common.robots'),
-  ogType: () => t('seo.common.ogType'),
+  ogType: "website",
   ogSiteName: () => t('seo.common.siteName'),
   ogTitle: () => t('seo.pages.mergeJson.ogTitle'),
-  ogDescription: () => t('seo.pages.mergeJson.ogDescription'),
-  twitterCard: () => t('seo.common.twitterCard'),
-  twitterTitle: () => t('seo.pages.mergeJson.twitterTitle'),
-  twitterDescription: () => t('seo.pages.mergeJson.twitterDescription')
+  ogDescription: () => t('seo.pages.mergeJson.ogDescription')
 });
 const ui = proxyRefs(useMergeJsonState());
 

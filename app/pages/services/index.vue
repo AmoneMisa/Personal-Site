@@ -10,13 +10,10 @@ useSeoMeta({
   title: () => t('seo.pages.services.title'),
   description: () => t('seo.pages.services.description'),
   robots: () => t('seo.common.robots'),
-  ogType: () => t('seo.common.ogType'),
+  ogType: "website",
   ogSiteName: () => t('seo.common.siteName'),
   ogTitle: () => t('seo.pages.services.ogTitle'),
-  ogDescription: () => t('seo.pages.services.ogDescription'),
-  twitterCard: () => t('seo.common.twitterCard'),
-  twitterTitle: () => t('seo.pages.services.twitterTitle'),
-  twitterDescription: () => t('seo.pages.services.twitterDescription')
+  ogDescription: () => t('seo.pages.services.ogDescription')
 });
 
 const {data: rawServicesData} = await safeFetch<ServiceType[]>(

@@ -8,13 +8,10 @@ useSeoMeta({
   title: () => t("seo.pages.emailEditor.title"),
   description: () => t("seo.pages.emailEditor.description"),
   robots: () => t("seo.common.robots"),
-  ogType: () => t("seo.common.ogType"),
+  ogType: "website",
   ogSiteName: () => t("seo.common.siteName"),
   ogTitle: () => t("seo.pages.emailEditor.ogTitle"),
-  ogDescription: () => t("seo.pages.emailEditor.ogDescription"),
-  twitterCard: () => t("seo.common.twitterCard"),
-  twitterTitle: () => t("seo.pages.emailEditor.twitterTitle"),
-  twitterDescription: () => t("seo.pages.emailEditor.twitterDescription"),
+  ogDescription: () => t("seo.pages.emailEditor.ogDescription")
 });
 </script>
 

@@ -24,13 +24,10 @@ useSeoMeta({
   title: () => t("seo.pages.quizzes.title"),
   description: () => t("seo.pages.quizzes.description"),
   robots: () => t("seo.common.robots"),
-  ogType: () => t("seo.common.ogType"),
+  ogType: "website",
   ogSiteName: () => t("seo.common.siteName"),
   ogTitle: () => t("seo.pages.quizzes.ogTitle"),
-  ogDescription: () => t("seo.pages.quizzes.ogDescription"),
-  twitterCard: () => t("seo.common.twitterCard"),
-  twitterTitle: () => t("seo.pages.quizzes.twitterTitle"),
-  twitterDescription: () => t("seo.pages.quizzes.twitterDescription"),
+  ogDescription: () => t("seo.pages.quizzes.ogDescription")
 });
 
 const { data: rawQuizzesData } = await safeFetch<QuizType[]>(

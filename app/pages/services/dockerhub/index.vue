@@ -31,13 +31,10 @@ useSeoMeta({
   title: () => t('seo.pages.dockerSearch.title'),
   description: () => t('seo.pages.dockerSearch.description'),
   robots: () => t('seo.common.robots'),
-  ogType: () => t('seo.common.ogType'),
+  ogType: "website",
   ogSiteName: () => t('seo.common.siteName'),
   ogTitle: () => t('seo.pages.dockerSearch.ogTitle'),
-  ogDescription: () => t('seo.pages.dockerSearch.ogDescription'),
-  twitterCard: () => t('seo.common.twitterCard'),
-  twitterTitle: () => t('seo.pages.dockerSearch.twitterTitle'),
-  twitterDescription: () => t('seo.pages.dockerSearch.twitterDescription')
+  ogDescription: () => t('seo.pages.dockerSearch.ogDescription')
 });
 
 type ResolveResponse = {

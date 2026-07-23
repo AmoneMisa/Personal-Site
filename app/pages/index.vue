@@ -15,13 +15,10 @@ useSeoMeta({
   title: () => t('seo.pages.home.title'),
   description: () => t('seo.pages.home.description'),
   robots: () => t('seo.common.robots'),
-  ogType: () => t('seo.common.ogType'),
+  ogType: "website",
   ogSiteName: () => t('seo.common.siteName'),
   ogTitle: () => t('seo.pages.home.ogTitle'),
-  ogDescription: () => t('seo.pages.home.ogDescription'),
-  twitterCard: () => t('seo.common.twitterCard'),
-  twitterTitle: () => t('seo.pages.home.twitterTitle'),
-  twitterDescription: () => t('seo.pages.home.twitterDescription')
+  ogDescription: () => t('seo.pages.home.ogDescription')
 });
 const isPageLoaded = ref(false);
 

@@ -10,13 +10,10 @@ useSeoMeta({
   title: () => t('seo.pages.pdfEditor.title'),
   description: () => t('seo.pages.pdfEditor.description'),
   robots: () => t('seo.common.robots'),
-  ogType: () => t('seo.common.ogType'),
+  ogType: "website",
   ogSiteName: () => t('seo.common.siteName'),
   ogTitle: () => t('seo.pages.pdfEditor.ogTitle'),
-  ogDescription: () => t('seo.pages.pdfEditor.ogDescription'),
-  twitterCard: () => t('seo.common.twitterCard'),
-  twitterTitle: () => t('seo.pages.pdfEditor.twitterTitle'),
-  twitterDescription: () => t('seo.pages.pdfEditor.twitterDescription')
+  ogDescription: () => t('seo.pages.pdfEditor.ogDescription')
 });
 const router = useRouter();
 
