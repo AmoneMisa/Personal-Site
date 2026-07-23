@@ -1276,7 +1276,12 @@ async function loadEditableText(silent = false): Promise<boolean> {
     }
 
     c.requestRenderAll();
+    // The freshly loaded page IS the undo baseline: collapse history down to it
+    // (rather than leaving the empty pre-load canvas underneath) so the first
+    // Ctrl+Z can't revert to a blank page and wipe every extracted object.
     pushHistory();
+    history.stack = [history.stack[history.idx]];
+    history.idx = 0;
 
     // switch the preview raster to the clean background (originals removed) so
     // the editable objects we just added aren't shown on top of their copies.
