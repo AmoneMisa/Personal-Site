@@ -569,6 +569,12 @@ function loadCanvasForPage(p: number) {
       history.idx = 0;
       recoverPhotoFrame(p);
       c!.requestRenderAll();
+      // A draft saved before the width fix may hold boxes measured against the
+      // fallback font; grow them once the real webfonts resolve so restored text
+      // doesn't wrap into the block below.
+      const fonts = (typeof document !== "undefined" ? (document as any).fonts : null);
+      if (fonts?.ready) fonts.ready.then(() => refitPdfTextWidths()).catch(() => {});
+      else refitPdfTextWidths();
     });
   } else {
     history.lock = false;
@@ -1082,6 +1088,29 @@ function measureMaxLineWidth(
   return max;
 }
 
+// Re-measure every extracted text box with its current font and grow its width
+// so no hard line soft-wraps. Called once the real CV webfonts finish loading:
+// they render wider than the fallback the box was first measured against, so a
+// box sized while the font was still loading would wrap and push later lines
+// down onto the next block. Never shrinks below the source width.
+function refitPdfTextWidths(): void {
+  if (!c) return;
+  let changed = false;
+  for (const o of c.getObjects() as any[]) {
+    if (o?.tool !== "pdftext") continue;
+    const bold = o.fontWeight === "bold" || o.fontWeight === 700 || o.fontWeight === "700";
+    const italic = o.fontStyle === "italic";
+    const measured = measureMaxLineWidth(o.text ?? "", o.fontSize ?? 12, o.fontFamily || "", bold, italic);
+    const needed = Math.ceil(measured) + Math.ceil((o.fontSize ?? 12) * 0.6) + 4;
+    const target = Math.max(o.baseW ?? 0, needed);
+    if (target > (o.width ?? 0) + 0.5) {
+      o.set("width", target);
+      changed = true;
+    }
+  }
+  if (changed) c.requestRenderAll();
+}
+
 // Load extractable PDF text of the current page as editable text boxes.
 // Uses the backend text-extraction endpoint when available; degrades gracefully.
 async function loadEditableText(silent = false): Promise<boolean> {
@@ -1125,7 +1154,7 @@ async function loadEditableText(silent = false): Promise<boolean> {
     // ones without re-running the whole load.
     await ensureEditorFontsReady();
     const fonts = (typeof document !== "undefined" ? (document as any).fonts : null);
-    if (fonts?.ready) fonts.ready.then(() => c?.requestRenderAll()).catch(() => {});
+    if (fonts?.ready) fonts.ready.then(() => refitPdfTextWidths()).catch(() => {});
 
     blocks.forEach((b, i) => {
       const fontPx = clampInt(Math.round((b.fontSize ?? 12) * scale), 4, 400);
@@ -1188,7 +1217,12 @@ async function loadEditableText(silent = false): Promise<boolean> {
         anyBold,
         !!b.italic,
       );
-      const boxW = Math.max(baseW, Math.ceil(measuredW) + 2);
+      // Generous slack (≈ half an em) absorbs the gap between our canvas
+      // measurement and Fabric's own word metrics, and covers the case where the
+      // real webfont (wider than the fallback) is still loading when we measure —
+      // without it, a single wrapped word cascades every later line down into the
+      // next block. refitPdfTextWidths() re-tightens once the fonts resolve.
+      const boxW = Math.max(baseW, Math.ceil(measuredW) + Math.ceil(fontPx * 0.6) + 4);
 
       const box = new Textbox(b.text || "", {
         width: boxW,
@@ -1201,6 +1235,7 @@ async function loadEditableText(silent = false): Promise<boolean> {
         ...(charStyles ? { styles: charStyles } : {}),
       });
       (box as any).tool = "pdftext";
+      (box as any).baseW = baseW;
       (box as any).id = b.id || genBlockId(page.value, i);
 
       // keep the original extracted block verbatim so the backend can match
