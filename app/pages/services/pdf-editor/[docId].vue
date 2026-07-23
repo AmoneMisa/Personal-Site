@@ -1082,6 +1082,39 @@ async function loadEditableText(silent = false): Promise<boolean> {
       const lineHeight =
         nLines > 1 && boxHpx > 0 ? Math.min(3, Math.max(0.8, boxHpx / nLines / fontPx)) : 1.16;
 
+      // Per-span (intra-line) bold/italic/colour so a block keeps each run's
+      // style instead of collapsing to one dominant weight — e.g. a bold
+      // MARHARYTA next to a regular KUBAI on the same line, or a regular date
+      // over a bold company over an italic role.
+      const lineRuns = Array.isArray(b.lineRuns) ? b.lineRuns : null;
+      const anyBold =
+        !!b.bold || !!lineRuns?.some((line) => line.some((r) => r.bold));
+      let charStyles: Record<number, Record<number, any>> | undefined;
+      if (lineRuns) {
+        const textLines = (b.text || "").split("\n");
+        const cs: Record<number, Record<number, any>> = {};
+        for (let li = 0; li < textLines.length; li++) {
+          const runs = lineRuns[li];
+          const lineText = textLines[li] ?? "";
+          if (!runs || !runs.length) continue;
+          const perChar: Record<number, any> = {};
+          let offset = 0;
+          for (const run of runs) {
+            const end = Math.min(lineText.length, offset + (run.n ?? 0));
+            for (let ci = offset; ci < end; ci++) {
+              perChar[ci] = {
+                fontWeight: run.bold ? "bold" : "normal",
+                fontStyle: run.italic ? "italic" : "normal",
+                fill: run.color || b.color || "#111111",
+              };
+            }
+            offset = end;
+          }
+          cs[li] = perChar;
+        }
+        charStyles = cs;
+      }
+
       // Widen the box so no hard line soft-wraps under the substituted browser
       // font, but never shrink below the source width. This keeps the original
       // layout (single-line name, one row per list item) instead of wrapping.
@@ -1090,7 +1123,7 @@ async function loadEditableText(silent = false): Promise<boolean> {
         b.text || "",
         fontPx,
         b.fontName || "Helvetica",
-        !!b.bold,
+        anyBold,
         !!b.italic,
       );
       const boxW = Math.max(baseW, Math.ceil(measuredW) + 2);
@@ -1103,6 +1136,7 @@ async function loadEditableText(silent = false): Promise<boolean> {
         lineHeight,
         fontWeight: b.bold ? "bold" : "normal",
         fontStyle: b.italic ? "italic" : "normal",
+        ...(charStyles ? { styles: charStyles } : {}),
       });
       (box as any).tool = "pdftext";
       (box as any).id = b.id || genBlockId(page.value, i);
@@ -1352,6 +1386,15 @@ function calcMultiplier(): number {
 }
 
 // Raw text block as returned by the backend extraction endpoint.
+type OrigRun = {
+  n: number;
+  fontSize?: number;
+  fontName?: string;
+  bold?: boolean;
+  italic?: boolean;
+  color?: string;
+};
+
 type OrigBlock = {
   id?: string;
   x: number;
@@ -1364,6 +1407,7 @@ type OrigBlock = {
   bold?: boolean;
   italic?: boolean;
   color?: string;
+  lineRuns?: OrigRun[][];
 };
 
 // The original block kept verbatim on the object (plus the page/dpi it came from),
@@ -2089,17 +2133,17 @@ onBeforeUnmount(() => {
               </div>
 
               <div class="pdf__field">
-                <div class="pdf__label">{{ t("services.pdfEditor.fields.shape") }}</div>
+                <div class="pdf__label" :title="t('services.pdfEditor.fields.shapeHelp')">
+                  {{ t("services.pdfEditor.fields.shape") }}
+                </div>
                 <u-select
                     v-model="editor.brushShape"
+                    :title="t('services.pdfEditor.fields.shapeHelp')"
                     :items="[
                     { label: t('services.pdfEditor.fields.shapeRound'), value: 'round' },
                     { label: t('services.pdfEditor.fields.shapeSquare'), value: 'square' }
                   ]"
                 />
-                <div class="pdf__help text-muted" style="margin-top: 6px">
-                  {{ t("services.pdfEditor.fields.shapeHelp") }}
-                </div>
               </div>
 
               <div class="pdf__field pdf__field_row">
@@ -2480,6 +2524,9 @@ onBeforeUnmount(() => {
   grid-template-columns: 1fr;
   gap: 10px;
   margin-bottom: 10px;
+  /* Top-align every field so the inputs share one baseline even when a cell
+     has extra content (labels/help). Keeps the row visually on one line. */
+  align-items: start;
 
   @media (min-width: 860px) {
     grid-template-columns: repeat(4, minmax(0, 1fr));
