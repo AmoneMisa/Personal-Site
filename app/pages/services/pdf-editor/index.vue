@@ -296,19 +296,30 @@ async function createDoc() {
 }
 
 .pdf__icon-btn_danger {
-  border-color: rgba(255, 255, 255, 0.1);
-  background: rgba(255, 80, 120, 0.08);
+  border-color: rgba(255, 80, 120, 0.28);
+  background: rgba(255, 80, 120, 0.10);
+  color: rgb(255, 120, 150);
+}
+
+.pdf__icon-btn_danger:hover {
+  background: rgba(255, 80, 120, 0.20);
+  color: rgb(255, 150, 175);
 }
 
 .pdf__upload-actions {
   margin-top: 12px;
   display: flex;
+  align-items: center;
   gap: 10px;
   flex-wrap: wrap;
 }
 
+/* Match the neighbouring "Clear list" pill: same height and radius so the
+   primary action sits inline instead of towering over it. */
 .pdf__run-btn {
-  min-width: 220px;
+  min-width: 200px;
+  height: 40px !important;
+  border-radius: 14px !important;
 }
 
 .pdf__error {

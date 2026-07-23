@@ -63,7 +63,8 @@ const SNAP_PX = 6;
 
 // --- original embedded images loaded as movable objects
 // raw extracted image as returned by the backend (PNG pixel space at `dpi`)
-type ImageRegion = { id?: string; name: string; url: string; x: number; y: number; w: number; h: number };
+type ImageClip = { cx: number; cy: number; rx: number; ry: number };
+type ImageRegion = { id?: string; name: string; url: string; x: number; y: number; w: number; h: number; clip?: ImageClip };
 // originals the user deleted (kept per page so the exporter can redact them
 // even though the canvas object is gone); px geometry at the given `dpi`
 type DeletedImg = { name: string; x: number; y: number; w: number; h: number; dpi: number };
@@ -619,6 +620,48 @@ async function onPickImage(e: Event) {
   reader.readAsDataURL(file);
 }
 
+// Swap the pixels of the selected image (e.g. drop a new headshot into the
+// existing circular frame) while keeping its position, on-canvas size and clip.
+const replaceInput = ref<HTMLInputElement | null>(null);
+
+function replaceSelectedImage() {
+  if (!c) return;
+  const obj: any = c.getActiveObject();
+  if (!obj || typeof obj.setSrc !== "function") return;
+  replaceInput.value?.click();
+}
+
+async function onPickReplaceImage(e: Event) {
+  const input = e.target as HTMLInputElement;
+  const file = input.files?.[0];
+  input.value = "";
+  if (!file || !c) return;
+
+  const obj: any = c.getActiveObject();
+  if (!obj || typeof obj.setSrc !== "function") return;
+
+  // preserve the current footprint so the new photo lands in the same box/frame
+  const prevW = obj.getScaledWidth();
+  const prevH = obj.getScaledHeight();
+
+  const reader = new FileReader();
+  reader.onload = async () => {
+    try {
+      await obj.setSrc(reader.result as string, { crossOrigin: "anonymous" });
+      const natW = obj.width || 1;
+      const natH = obj.height || 1;
+      obj.set({ scaleX: prevW / natW, scaleY: prevH / natH });
+      obj.setCoords();
+      c!.requestRenderAll();
+      pushHistory();
+      scheduleSaveDraft();
+    } catch {
+      // leave the original image in place if the swap fails
+    }
+  };
+  reader.readAsDataURL(file);
+}
+
 // Remember a deleted original image so the exporter can still redact it from
 // the source (the canvas object won't exist at save time).
 function trackDeletedImage(obj: any) {
@@ -867,11 +910,22 @@ async function loadEditableText(silent = false): Promise<boolean> {
 
     blocks.forEach((b, i) => {
       const fontPx = clampInt(Math.round((b.fontSize ?? 12) * scale), 4, 400);
+
+      // Match the original paragraph's line pitch. The backend joins a block's
+      // rows with "\n"; Fabric's default lineHeight (~1.16) stacks them taller
+      // than the source, so multi-line blocks drift down and overlap the next
+      // one. Derive the multiplier from the extracted block height / row count.
+      const nLines = Math.max(1, (b.text || "").split("\n").length);
+      const boxHpx = (b.h ?? 0) * scale;
+      const lineHeight =
+        nLines > 1 && boxHpx > 0 ? Math.min(3, Math.max(0.8, boxHpx / nLines / fontPx)) : 1.16;
+
       const box = new Textbox(b.text || "", {
         width: Math.max(20, (b.w ?? 200) * scale),
         fill: b.color || "#111111",
         fontFamily: b.fontName || "Helvetica",
         fontSize: fontPx,
+        lineHeight,
         fontWeight: b.bold ? "bold" : "normal",
         fontStyle: b.italic ? "italic" : "normal",
       });
@@ -914,6 +968,26 @@ async function loadEditableText(silent = false): Promise<boolean> {
         (fimg as any).tool = "pdfimg";
         (fimg as any).id = im.id || genBlockId(page.value, 0);
         (fimg as any).name = im.name;
+
+        // Circular framing from the source PDF (a vector clip around the photo).
+        // Anchor an absolutely-positioned Ellipse in canvas space at the circle,
+        // so the photo shows round where the frame is but reveals the full
+        // rectangle once it's dragged out of the circle.
+        if (im.clip) {
+            const cxCanvas = ((im.x ?? 0) + im.clip.cx * (im.w ?? 0)) * scale;
+            const cyCanvas = ((im.y ?? 0) + im.clip.cy * (im.h ?? 0)) * scale;
+            const rxCanvas = Math.max(1, im.clip.rx * (im.w ?? 0) * scale);
+            const ryCanvas = Math.max(1, im.clip.ry * (im.h ?? 0) * scale);
+            (fimg as any).clipPath = new Ellipse({
+                originX: "center",
+                originY: "center",
+                left: cxCanvas,
+                top: cyCanvas,
+                rx: rxCanvas,
+                ry: ryCanvas,
+                absolutePositioned: true,
+            });
+        }
         (fimg as any).orig = {
           id: im.id ?? null,
           page: page.value,
@@ -1773,6 +1847,7 @@ onBeforeUnmount(() => {
               {{ t("services.pdfEditor.toolstrip.image") }}
             </button>
             <input ref="imageInput" type="file" accept="image/*" class="hidden" @change="onPickImage" />
+            <input ref="replaceInput" type="file" accept="image/*" class="hidden" @change="onPickReplaceImage" />
 
             <div class="pdf__sep pdf__sep_small" />
 
@@ -1870,6 +1945,13 @@ onBeforeUnmount(() => {
             </div>
 
             <div v-else class="pdf__inspector-body">
+              <div v-if="!selected.isText" class="pdf__field pdf__field_row">
+                <button type="button" class="services__pill" :disabled="isBusy" @click="replaceSelectedImage">
+                  <u-icon name="i-lucide-image-plus" />
+                  {{ t("services.pdfEditor.full.replaceImage") }}
+                </button>
+              </div>
+
               <div v-if="selected.isText" class="pdf__field pdf__field_row">
                 <div class="pdf__label">{{ t("services.pdfEditor.full.textContent") }}</div>
                 <u-textarea
@@ -2204,7 +2286,7 @@ onBeforeUnmount(() => {
   margin-bottom: 10px;
 
   @media (min-width: 860px) {
-    grid-template-columns: 2fr 1fr 1fr 1fr;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
   }
 }
 

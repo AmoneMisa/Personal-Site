@@ -155,7 +155,7 @@ onMounted(() => {
               href="https://amonemisa.github.io/personal/"
               no-rel
               target="_blank"
-              class="ui-pill-btn__inner text-sm font-semibold dark:text-white/90 text-[var(--ui-text)]/90 dark:hover:text-white hover:text-[var(--ui-text)]"
+              class="ui-pill-btn__inner text-sm font-semibold dark:text-white/90 text-[var(--ui-text)]/90 dark:hover:text-white hover:text-[var(--ui-text)] whitespace-nowrap"
           >
             {{ t('button.getStart') }}
           </u-link>

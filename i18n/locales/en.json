@@ -783,6 +783,7 @@
       "full": {
         "title": "Full editor",
         "loadText": "Load page text",
+        "replaceImage": "Replace image",
         "noText": "No editable text could be extracted from this page.",
         "selectHint": "Select an object on the page to edit its text, size, position, style and fonts.",
         "textContent": "Text",
