@@ -23,6 +23,21 @@ useSeoMeta({
 const route = useRoute();
 const router = useRouter();
 
+// Load the CV's embedded families as webfonts so the editable overlay matches
+// the rendered background instead of falling back to Arial. Lato (body) is a
+// Google font; "Now" (title) is commercial, so the closest free geometric sans
+// Montserrat stands in; Aileron is a Helvetica clone and keeps the Arial stack.
+useHead({
+  link: [
+    { rel: "preconnect", href: "https://fonts.googleapis.com" },
+    { rel: "preconnect", href: "https://fonts.gstatic.com", crossorigin: "" },
+    {
+      rel: "stylesheet",
+      href: "https://fonts.googleapis.com/css2?family=Lato:ital,wght@0,400;0,700;1,400&family=Montserrat:wght@400;700;900&display=swap",
+    },
+  ],
+});
+
 const docId = computed(() => String(route.params.docId || ""));
 
 // --- pdf meta
@@ -127,7 +142,32 @@ const FONT_FAMILIES = [
   "Tahoma",
   "Roboto",
   "Open Sans",
+  "Lato",
+  "Montserrat",
 ];
+
+// Webfonts the editor pulls in for extracted CV text (see useHead above). Fabric
+// measures text with the canvas, so these must finish downloading before blocks
+// are placed or the first render mis-measures against the fallback font.
+const EDITOR_WEBFONT_SPECS = [
+  '400 16px "Montserrat"',
+  '700 16px "Montserrat"',
+  '900 16px "Montserrat"',
+  '400 16px "Lato"',
+  '700 16px "Lato"',
+  'italic 400 16px "Lato"',
+];
+
+async function ensureEditorFontsReady(): Promise<void> {
+  const fonts = (typeof document !== "undefined" ? (document as any).fonts : null);
+  if (!fonts?.load) return;
+  try {
+    await Promise.all(EDITOR_WEBFONT_SPECS.map((s) => fonts.load(s)));
+    await fonts.ready;
+  } catch {
+    // offline / blocked: fall back to the system stack, no hard failure
+  }
+}
 
 // PDF font names (e.g. "Now-Black", "Aileron-Italic", "ABCDEF+Lato-Bold") are
 // almost never installed in the browser, so using them raw makes the canvas
@@ -139,6 +179,12 @@ function resolveFontFamily(raw?: string): string {
   if (!name) return "Arial, Helvetica, sans-serif";
   const base = name.replace(/^[A-Z]{6}\+/, "").split(/[-,]/)[0]?.trim() ?? "";
   const lower = base.toLowerCase();
+  // Real embedded CV families, loaded as webfonts (see useHead). "Now" is
+  // commercial, so the closest free geometric sans (Montserrat) stands in;
+  // Aileron is a Helvetica clone and matches the Arial stack closely.
+  if (lower.includes("now")) return '"Montserrat", Arial, sans-serif';
+  if (lower.includes("lato")) return '"Lato", Arial, sans-serif';
+  if (lower.includes("aileron")) return 'Arial, "Helvetica Neue", Helvetica, sans-serif';
   const isSerif = SERIF_HINTS.some((h) => lower.includes(h));
   const known = FONT_FAMILIES.find((f) => f.toLowerCase() === lower);
   if (known) return `"${known}", ${isSerif ? "serif" : "sans-serif"}`;
@@ -1066,6 +1112,9 @@ async function loadEditableText(silent = false): Promise<boolean> {
     // backend coordinates are in the rendered PNG pixel space (at `dpi`);
     // scale them into the displayed canvas space.
     const scale = 1 / (calcMultiplier() || 1);
+
+    // wait for the CV webfonts so text is measured/placed with the real glyphs
+    await ensureEditorFontsReady();
 
     blocks.forEach((b, i) => {
       const fontPx = clampInt(Math.round((b.fontSize ?? 12) * scale), 4, 400);
