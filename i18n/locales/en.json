@@ -753,6 +753,8 @@
       },
       "pages": "Pages",
       "page": "Page",
+      "addPage": "Add page",
+      "addPageFailed": "Could not add a page.",
       "preview": "Preview",
       "previewHint": "Upload a file to see preview.",
       "actions": {

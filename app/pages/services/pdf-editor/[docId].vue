@@ -70,6 +70,13 @@ type ImageRegion = { id?: string; name: string; url: string; x: number; y: numbe
 type DeletedImg = { name: string; x: number; y: number; w: number; h: number; dpi: number };
 const deletedImages = reactive<Record<number, DeletedImg[]>>({});
 
+// Circular photo frame per page, in *canvas* pixels. A source PDF that rounds a
+// photo with a vector circle gives us this; any image whose centre sits inside
+// the frame is clipped to the circle, and it reveals the full rectangle (on top)
+// once dragged out. Lets you drop a different photo straight into the frame.
+type PhotoFrame = { cx: number; cy: number; rx: number; ry: number };
+const photoFrames = reactive<Record<number, PhotoFrame>>({});
+
 // --- editor tool state
 type Mode = "move" | "pen" | "highlighter" | "signature" | "rect" | "circle" | "text" | "image";
 type BrushShape = "round" | "square";
@@ -333,6 +340,17 @@ function ensureFabric() {
   c.on("mouse:up", clearGuides);
   c.on("selection:cleared", clearGuides);
 
+  // toggle the circular photo-frame clip as an image enters/leaves the circle
+  // while dragging; on drop, fill+clip a photo that landed inside the circle.
+  const clipOnMove = (e: any) => refreshImageClip(e?.target);
+  c.on("object:moving", clipOnMove);
+  c.on("object:scaling", clipOnMove);
+  c.on("object:modified", (e: any) => onImageDrop(e?.target));
+
+  // right-click a photo to swap it out (context menu -> file picker)
+  c.on("mouse:down", onCanvasMouseDown);
+  c.upperCanvasEl?.addEventListener("contextmenu", (ev) => ev.preventDefault());
+
   applyMode();
 }
 
@@ -454,6 +472,19 @@ function onObjectMoving(e: any) {
   alignGuides.value = guides;
 }
 
+// After restoring a draft, rebuild the page's photo frame from any image that
+// still carries a circular clip, so entering/leaving the circle keeps toggling.
+function recoverPhotoFrame(p: number) {
+  if (!c || photoFrames[p]) return;
+  for (const o of c.getObjects() as any[]) {
+    const cp = o?.clipPath;
+    if (isImageObject(o) && cp && typeof cp.rx === "number" && cp.absolutePositioned) {
+      photoFrames[p] = { cx: cp.left, cy: cp.top, rx: cp.rx, ry: cp.ry };
+      return;
+    }
+  }
+}
+
 function loadCanvasForPage(p: number) {
   if (!c) return;
 
@@ -469,6 +500,7 @@ function loadCanvasForPage(p: number) {
       history.lock = false;
       history.stack = [c!.toJSON(["id", "tool", "opacityPct", "orig"])];
       history.idx = 0;
+      recoverPhotoFrame(p);
       c!.requestRenderAll();
     });
   } else {
@@ -655,11 +687,111 @@ async function onPickReplaceImage(e: Event) {
       c!.requestRenderAll();
       pushHistory();
       scheduleSaveDraft();
+      refreshImageClip(obj);
     } catch {
       // leave the original image in place if the swap fails
     }
   };
   reader.readAsDataURL(file);
+}
+
+function isImageObject(obj: any): boolean {
+  return !!obj && (obj.type === "image" || typeof obj.setSrc === "function");
+}
+
+// Right-click a photo to replace it: select the image under the cursor and open
+// the file picker. The native context menu is suppressed on the canvas.
+function onCanvasMouseDown(e: any) {
+  if (!c || e?.e?.button !== 2) return;
+  const obj: any = e.target;
+  if (!isImageObject(obj)) return;
+  c.setActiveObject(obj);
+  c.requestRenderAll();
+  replaceInput.value?.click();
+}
+
+// Clip an image to the page's circular photo frame while its centre sits inside
+// the circle; drop the clip (and lift it to the front) once it's dragged out, so
+// the full rectangle shows on top instead of vanishing under the frame. Used for
+// the original avatar, replaced photos and any image dragged into the circle.
+function refreshImageClip(obj: any) {
+  if (!c || !isImageObject(obj)) return;
+  const frame = photoFrames[page.value];
+  if (!frame) return;
+
+  const c2 = obj.getCenterPoint();
+  const dx = (c2.x - frame.cx) / frame.rx;
+  const dy = (c2.y - frame.cy) / frame.ry;
+  const inside = dx * dx + dy * dy <= 1;
+
+  if (inside) {
+    obj.clipPath = new Ellipse({
+      originX: "center",
+      originY: "center",
+      left: frame.cx,
+      top: frame.cy,
+      rx: frame.rx,
+      ry: frame.ry,
+      absolutePositioned: true,
+    });
+  } else if (obj.clipPath) {
+    obj.clipPath = undefined;
+    c.bringObjectToFront(obj);
+  }
+  obj.setCoords();
+}
+
+// Snap an image to completely fill the circular photo frame (cover-fit, centred)
+// and clip it to the circle — the "drop a photo onto the avatar" behaviour. Runs
+// on drop so it doesn't fight the drag. Returns true if the image was fitted.
+function fitImageToFrame(obj: any): boolean {
+  if (!c || !isImageObject(obj)) return false;
+  const frame = photoFrames[page.value];
+  if (!frame) return false;
+
+  const cp = obj.getCenterPoint();
+  const dx = (cp.x - frame.cx) / frame.rx;
+  const dy = (cp.y - frame.cy) / frame.ry;
+  if (dx * dx + dy * dy > 1) return false; // centre outside the circle: leave as-is
+
+  const natW = obj.width || 1;
+  const natH = obj.height || 1;
+  // cover the ellipse's bounding box so no gaps show inside the circle
+  const scale = Math.max((frame.rx * 2) / natW, (frame.ry * 2) / natH);
+  const scaledW = natW * scale;
+  const scaledH = natH * scale;
+
+  obj.set({
+    angle: 0,
+    scaleX: scale,
+    scaleY: scale,
+    left: frame.cx - scaledW / 2,
+    top: frame.cy - scaledH / 2,
+  });
+  obj.clipPath = new Ellipse({
+    originX: "center",
+    originY: "center",
+    left: frame.cx,
+    top: frame.cy,
+    rx: frame.rx,
+    ry: frame.ry,
+    absolutePositioned: true,
+  });
+  obj.setCoords();
+  return true;
+}
+
+// Drop handler: fill+clip a photo dropped onto the circle, otherwise fall back
+// to the plain enter/leave clip toggle. Re-commits so the fit is saved/undoable.
+function onImageDrop(obj: any) {
+  if (!c) return;
+  if (fitImageToFrame(obj)) {
+    c.requestRenderAll();
+    syncSelectedFromObject(obj);
+    pushHistory();
+  } else {
+    refreshImageClip(obj);
+  }
 }
 
 // Remember a deleted original image so the exporter can still redact it from
@@ -867,8 +999,38 @@ function applySelectedGeometry() {
   const sh = o.getScaledHeight?.() ?? newH;
   o.set({ left: selected.x + sw / 2, top: selected.y + sh / 2 });
 
+  refreshImageClip(o);
   commitSelected(o);
   syncSelectedFromObject(o);
+}
+
+// Measure the widest hard-wrapped line of `text` as the browser will actually
+// render it. The PDF's embedded fonts are usually unavailable, so the browser
+// substitutes a wider face; feeding the raw PDF width to a Fabric Textbox then
+// soft-wraps lines that were single lines in the source (name splits, list
+// items grow taller and appear to drift down). Measuring with the same font the
+// canvas will use lets us size the box so hard lines never soft-wrap.
+let _measureCtx: CanvasRenderingContext2D | null = null;
+function measureMaxLineWidth(
+  text: string,
+  fontPx: number,
+  fontFamily: string,
+  bold: boolean,
+  italic: boolean,
+): number {
+  if (!_measureCtx) {
+    _measureCtx = document.createElement("canvas").getContext("2d");
+  }
+  if (!_measureCtx) return 0;
+  const style = italic ? "italic " : "";
+  const weight = bold ? "700 " : "400 ";
+  _measureCtx.font = `${style}${weight}${fontPx}px ${fontFamily || "Helvetica"}`;
+  let max = 0;
+  for (const line of (text || "").split("\n")) {
+    const w = _measureCtx.measureText(line).width;
+    if (w > max) max = w;
+  }
+  return max;
 }
 
 // Load extractable PDF text of the current page as editable text boxes.
@@ -920,8 +1082,21 @@ async function loadEditableText(silent = false): Promise<boolean> {
       const lineHeight =
         nLines > 1 && boxHpx > 0 ? Math.min(3, Math.max(0.8, boxHpx / nLines / fontPx)) : 1.16;
 
+      // Widen the box so no hard line soft-wraps under the substituted browser
+      // font, but never shrink below the source width. This keeps the original
+      // layout (single-line name, one row per list item) instead of wrapping.
+      const baseW = Math.max(20, (b.w ?? 200) * scale);
+      const measuredW = measureMaxLineWidth(
+        b.text || "",
+        fontPx,
+        b.fontName || "Helvetica",
+        !!b.bold,
+        !!b.italic,
+      );
+      const boxW = Math.max(baseW, Math.ceil(measuredW) + 2);
+
       const box = new Textbox(b.text || "", {
-        width: Math.max(20, (b.w ?? 200) * scale),
+        width: boxW,
         fill: b.color || "#111111",
         fontFamily: b.fontName || "Helvetica",
         fontSize: fontPx,
@@ -969,24 +1144,16 @@ async function loadEditableText(silent = false): Promise<boolean> {
         (fimg as any).id = im.id || genBlockId(page.value, 0);
         (fimg as any).name = im.name;
 
-        // Circular framing from the source PDF (a vector clip around the photo).
-        // Anchor an absolutely-positioned Ellipse in canvas space at the circle,
-        // so the photo shows round where the frame is but reveals the full
-        // rectangle once it's dragged out of the circle.
+        // Circular framing from the source PDF: remember the circle as a
+        // page-level frame (canvas px) so this photo — and any other dropped in
+        // later — is clipped to it while inside and shown full when moved out.
         if (im.clip) {
-            const cxCanvas = ((im.x ?? 0) + im.clip.cx * (im.w ?? 0)) * scale;
-            const cyCanvas = ((im.y ?? 0) + im.clip.cy * (im.h ?? 0)) * scale;
-            const rxCanvas = Math.max(1, im.clip.rx * (im.w ?? 0) * scale);
-            const ryCanvas = Math.max(1, im.clip.ry * (im.h ?? 0) * scale);
-            (fimg as any).clipPath = new Ellipse({
-                originX: "center",
-                originY: "center",
-                left: cxCanvas,
-                top: cyCanvas,
-                rx: rxCanvas,
-                ry: ryCanvas,
-                absolutePositioned: true,
-            });
+          photoFrames[page.value] = {
+            cx: ((im.x ?? 0) + im.clip.cx * (im.w ?? 0)) * scale,
+            cy: ((im.y ?? 0) + im.clip.cy * (im.h ?? 0)) * scale,
+            rx: Math.max(1, im.clip.rx * (im.w ?? 0) * scale),
+            ry: Math.max(1, im.clip.ry * (im.h ?? 0) * scale),
+          };
         }
         (fimg as any).orig = {
           id: im.id ?? null,
@@ -1006,6 +1173,7 @@ async function loadEditableText(silent = false): Promise<boolean> {
 
         setByTopLeft(fimg, (im.x ?? 0) * scale, (im.y ?? 0) * scale);
         c!.add(fimg);
+        refreshImageClip(fimg);
       } catch {
         // skip an image that fails to load; text editing still works
       }
@@ -1138,6 +1306,27 @@ async function setPage(p: number) {
   await nextTick();
   loadCanvasForPage(page.value);
   scheduleSaveDraft();
+}
+
+// Append an empty themed page (same coloured columns as page 1, no avatar) and
+// jump to it. The backend edits source.pdf in place; existing pages are kept.
+async function addDesignPage() {
+  if (!docId.value || !c || isBusy.value) return;
+  isBusy.value = true;
+  errorMsg.value = null;
+  try {
+    const res = await $fetch<{ pages: number; page: number }>(
+      api(`/pdf/add-design-page/${docId.value}`),
+      { method: "POST" },
+    );
+    pages.value = res.pages;
+    await setPage(res.page);
+  } catch (e: any) {
+    errorMsg.value =
+      e?.data?.detail?.message || e?.data?.detail || e?.message || t("services.pdfEditor.addPageFailed");
+  } finally {
+    isBusy.value = false;
+  }
 }
 
 watch(page, () => {
@@ -1743,6 +1932,13 @@ onBeforeUnmount(() => {
                   @click="setPage(page + 1)"
               >
                 <u-icon name="i-lucide-chevron-right" />
+              </button>
+
+              <button type="button" class="ui-pill-btn" @click="addDesignPage" :disabled="isBusy">
+                <span class="ui-pill-btn__inner">
+                  <u-icon name="i-lucide-file-plus" />
+                  {{ t("services.pdfEditor.addPage") }}
+                </span>
               </button>
 
               <div class="pdf__sep" />
@@ -2363,12 +2559,16 @@ onBeforeUnmount(() => {
   inset: 0;
   width: 100% !important;
   height: 100% !important;
+  /* Stop the browser from scrolling the page while dragging an object on the
+     canvas (trackpad/touch/pen), which made the view "jump" mid-drag. */
+  touch-action: none;
 }
 
 .pdf__stage :deep(.lower-canvas),
 .pdf__stage :deep(.upper-canvas) {
   position: absolute;
   inset: 0;
+  touch-action: none;
 }
 
 .pdf__preview {

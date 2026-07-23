@@ -279,6 +279,9 @@ async function createDoc() {
   border: 1px solid rgba(255, 255, 255, 0.08);
   background: rgba(255, 255, 255, 0.04);
   color: rgba(255, 255, 255, 0.85);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   transition: filter 160ms ease, transform 140ms ease;
 }
 
@@ -320,6 +323,10 @@ async function createDoc() {
   min-width: 200px;
   height: 40px !important;
   border-radius: 14px !important;
+  display: inline-flex !important;
+  align-items: center;
+  justify-content: center !important;
+  text-align: center;
 }
 
 .pdf__error {
