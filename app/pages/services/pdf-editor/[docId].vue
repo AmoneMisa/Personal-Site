@@ -161,12 +161,18 @@ const EDITOR_WEBFONT_SPECS = [
 async function ensureEditorFontsReady(): Promise<void> {
   const fonts = (typeof document !== "undefined" ? (document as any).fonts : null);
   if (!fonts?.load) return;
-  try {
-    await Promise.all(EDITOR_WEBFONT_SPECS.map((s) => fonts.load(s)));
-    await fonts.ready;
-  } catch {
-    // offline / blocked: fall back to the system stack, no hard failure
-  }
+  const load = (async () => {
+    try {
+      await Promise.all(EDITOR_WEBFONT_SPECS.map((s) => fonts.load(s)));
+      await fonts.ready;
+    } catch {
+      // offline / blocked: fall back to the system stack, no hard failure
+    }
+  })();
+  // A slow or blocked font CDN (e.g. Google Fonts) must never stall the editor:
+  // cap the wait and let text render with the fallback, then repaint once the
+  // real glyphs arrive (see loadEditableText).
+  await Promise.race([load, new Promise<void>((r) => setTimeout(r, 1200))]);
 }
 
 // PDF font names (e.g. "Now-Black", "Aileron-Italic", "ABCDEF+Lato-Bold") are
@@ -1113,8 +1119,13 @@ async function loadEditableText(silent = false): Promise<boolean> {
     // scale them into the displayed canvas space.
     const scale = 1 / (calcMultiplier() || 1);
 
-    // wait for the CV webfonts so text is measured/placed with the real glyphs
+    // wait for the CV webfonts so text is measured/placed with the real glyphs,
+    // but bounded so a slow CDN can't block the load; if they arrive after we
+    // already drew, repaint so the fallback glyphs are replaced with the real
+    // ones without re-running the whole load.
     await ensureEditorFontsReady();
+    const fonts = (typeof document !== "undefined" ? (document as any).fonts : null);
+    if (fonts?.ready) fonts.ready.then(() => c?.requestRenderAll()).catch(() => {});
 
     blocks.forEach((b, i) => {
       const fontPx = clampInt(Math.round((b.fontSize ?? 12) * scale), 4, 400);
@@ -2370,6 +2381,13 @@ onBeforeUnmount(() => {
                     @click.prevent="openLink(h.uri)"
                 />
               </div>
+
+              <!-- Loading overlay while the page raster is fetched and the
+                   editable text/images are being prepared. -->
+              <div v-if="isBusy" class="pdf__loader" role="status" aria-live="polite">
+                <span class="pdf__spinner" aria-hidden="true" />
+                <span class="pdf__loader-text">{{ t("services.pdfEditor.full.preparing") }}</span>
+              </div>
             </div>
           </div>
         </div>
@@ -2673,6 +2691,41 @@ onBeforeUnmount(() => {
   width: 100%;
   height: 100%;
   touch-action: none;
+}
+
+/* Loading overlay covering the stage while the page is fetched and prepared. */
+.pdf__loader {
+  position: absolute;
+  inset: 0;
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  background: rgba(12, 18, 28, 0.55);
+  backdrop-filter: blur(2px);
+}
+
+.pdf__spinner {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  border: 3px solid rgba(255, 255, 255, 0.25);
+  border-top-color: #fff;
+  animation: pdf-spin 0.8s linear infinite;
+}
+
+.pdf__loader-text {
+  font-weight: 600;
+  color: #fff;
+  letter-spacing: 0.01em;
+}
+
+@keyframes pdf-spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 /* Alignment guide overlay: thin magenta lines drawn above the canvas while an

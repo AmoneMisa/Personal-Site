@@ -799,7 +799,8 @@
         "width": "Width",
         "height": "Height",
         "rotation": "Rotation",
-        "help": "Edit the selected object directly. Double-click text to edit inline, or drag handles to resize and move. Changes are saved automatically."
+        "help": "Edit the selected object directly. Double-click text to edit inline, or drag handles to resize and move. Changes are saved automatically.",
+        "preparing": "Preparing document…"
       },
       "fields": {
         "color": "Color",
