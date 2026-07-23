@@ -135,7 +135,6 @@ type TextAlign = "left" | "center" | "right" | "justify";
 const selected = reactive({
   exists: false,
   isText: false,
-  text: "",
   fontFamily: "Helvetica",
   fontSize: 32,
   bold: false,
@@ -881,7 +880,6 @@ function syncSelectedFromObject(obj: any) {
   selected.opacity = Math.round((obj.opacity ?? 1) * 100);
 
   if (selected.isText) {
-    selected.text = String(obj.text ?? "");
     selected.fontFamily = String(obj.fontFamily ?? "Helvetica");
     selected.fontSize = Math.round(obj.fontSize ?? 32);
     selected.bold = String(obj.fontWeight ?? "normal") === "bold";
@@ -899,23 +897,6 @@ function commitSelected(obj: any) {
   obj.setCoords?.();
   c.requestRenderAll();
   pushHistory();
-}
-
-// live update while typing (no history entry per keystroke)
-function applySelectedTextLive() {
-  const o = activeObj();
-  if (!o || !isTextObject(o) || !c) return;
-  o.set("text", selected.text);
-  o.setCoords?.();
-  c.requestRenderAll();
-}
-
-// commit on blur (single history entry)
-function applySelectedText() {
-  const o = activeObj();
-  if (!o || !isTextObject(o)) return;
-  o.set("text", selected.text);
-  commitSelected(o);
 }
 
 function applySelectedFont() {
@@ -1073,14 +1054,18 @@ async function loadEditableText(silent = false): Promise<boolean> {
     blocks.forEach((b, i) => {
       const fontPx = clampInt(Math.round((b.fontSize ?? 12) * scale), 4, 400);
 
-      // Match the original paragraph's line pitch. The backend joins a block's
-      // rows with "\n"; Fabric's default lineHeight (~1.16) stacks them taller
-      // than the source, so multi-line blocks drift down and overlap the next
-      // one. Derive the multiplier from the extracted block height / row count.
+      // Match the original paragraph's line pitch so overlaid rows keep
+      // aligning with background bullets/rules. Prefer the exact multiplier the
+      // backend derived from real baselines; otherwise estimate it from the
+      // block height / row count (Fabric's default ~1.16 stacks rows too tall).
       const nLines = Math.max(1, (b.text || "").split("\n").length);
       const boxHpx = (b.h ?? 0) * scale;
       const lineHeight =
-        nLines > 1 && boxHpx > 0 ? Math.min(3, Math.max(0.8, boxHpx / nLines / fontPx)) : 1.16;
+        b.lineHeight && b.lineHeight > 0
+          ? Math.min(3, Math.max(0.8, b.lineHeight))
+          : nLines > 1 && boxHpx > 0
+            ? Math.min(3, Math.max(0.8, boxHpx / nLines / fontPx))
+            : 1.16;
 
       // Per-span (intra-line) bold/italic/colour so a block keeps each run's
       // style instead of collapsing to one dominant weight — e.g. a bold
@@ -1407,6 +1392,7 @@ type OrigBlock = {
   bold?: boolean;
   italic?: boolean;
   color?: string;
+  lineHeight?: number;
   lineRuns?: OrigRun[][];
 };
 
@@ -2190,17 +2176,6 @@ onBeforeUnmount(() => {
                   <u-icon name="i-lucide-image-plus" />
                   {{ t("services.pdfEditor.full.replaceImage") }}
                 </button>
-              </div>
-
-              <div v-if="selected.isText" class="pdf__field pdf__field_row">
-                <div class="pdf__label">{{ t("services.pdfEditor.full.textContent") }}</div>
-                <u-textarea
-                    v-model="selected.text"
-                    :rows="2"
-                    autoresize
-                    @update:model-value="applySelectedTextLive"
-                    @blur="applySelectedText"
-                />
               </div>
 
               <div class="pdf__tool-grid4">
