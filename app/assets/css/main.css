@@ -1,5 +1,6 @@
 @import "tailwindcss";
 @import "@nuxt/ui";
+@import "./redesign-fonts.css";
 @import "./tabs.css";
 @import "./jsonEditor.scss";
 
@@ -42,6 +43,20 @@
     }
 }
 
+/* ---- Redesign global typography + ground (site-wide) ---- */
+body {
+    background: var(--bg-deep);
+    font-family: "Inter", "PT Root UI", sans-serif;
+    color: var(--text-primary);
+}
+h1, h2, h3, h4, h5, h6 {
+    font-family: "Golos Text", "Segoe UI", sans-serif;
+    letter-spacing: 0;
+}
+.mono {
+    font-family: "JetBrains Mono", monospace;
+}
+
 @theme {
     --color-primary: #805AF5;
     --color-primary-alt: #35316f;
@@ -59,8 +74,20 @@
     --color-link: #BCC3D7;
 }
 :root {
-    --background-color: #0E0C15;
-    --ui-bg: #0E0C15;
+    /* ---- Redesign design tokens (dark navy, flat, 1px lines) ---- */
+    --bg-deep: #0d1128;
+    --bg-panel: #131730;
+    --bg-panel-2: #171c3a;
+    --accent-pink: #e0679a;
+    --accent-blue: #7189d9;
+    --line: #252a4a;
+    --text-primary: #e4e5f0;
+    --text-muted: #8286a6;
+    --radius: 10px;
+
+    /* Base surface now follows the redesign navy site-wide. */
+    --background-color: #0d1128;
+    --ui-bg: #0d1128;
     --color-dark: #21242D;
     --color-blackest: #16181E;
     --color-lessdark: #2E313D;
@@ -71,7 +98,7 @@
     --shadow-primary: 0 0 20px 5px rgba(20, 126, 243, 0.1);
     --color-gray: #3E414B;
     --color-darker: rgba(6, 6, 6, 0.7);
-    font-family: "PT Root UI", sans-serif;
+    font-family: "Inter", "PT Root UI", sans-serif;
     --half-border: linear-gradient(180deg, var(--color-primary-gradient-start) 0%, var(--color-primary-gradient-start), transparent 77%);
     --text-white: #FFFFFF;
 }
