@@ -23,20 +23,9 @@ useSeoMeta({
   twitterDescription: () => t('seo.pages.home.twitterDescription')
 });
 
-// LCP hint for the hero image — scoped to the home page only. (Previously this
-// preload lived in app.vue and fired on every route, wasting bandwidth on pages
-// that never render this image.)
-useHead({
-  link: [
-    {
-      rel: 'preload',
-      as: 'image',
-      href: '/_ipx/w_988&f_webp&q_80/images/admin-panel.png',
-      fetchpriority: 'high',
-      type: 'image/webp'
-    }
-  ]
-});
+// The LCP image (admin-panel) is preloaded via <nuxt-img preload> in the
+// template instead of a hand-written link — that guarantees the preloaded URL
+// matches the exact responsive candidate the browser actually fetches.
 const isPageLoaded = ref(false);
 
 onMounted(() => {
@@ -135,11 +124,12 @@ const {data: animatedText} = await useAsyncData<AnimatedTextItem[]>(
               src="/images/admin-panel.png"
               alt="Admin panel"
               format="webp"
-              :quality="80"
-              width="2536"
-              height="1340"
-              sizes="(max-width: 1024px) 100vw, 988px"
-              :widths="[480, 640, 768, 988, 1200, 1976]"
+              :quality="70"
+              width="1976"
+              height="1044"
+              sizes="(max-width: 640px) 94vw, (max-width: 1024px) 90vw, 988px"
+              :widths="[420, 560, 760, 988, 1200]"
+              preload
               fetchpriority="high"
           />
         </div>
@@ -193,11 +183,11 @@ const {data: animatedText} = await useAsyncData<AnimatedTextItem[]>(
               src="/images/split-2-background.png"
               alt="Letter Logo Background"
               format="webp"
-              :quality="80"
+              :quality="65"
               width="1536"
               height="1024"
-              sizes="(max-width: 1152px) 100vw, 1152px"
-              :widths="[480, 768, 1024, 1152, 1440, 2304]"
+              sizes="(max-width: 1152px) 100vw, 640px"
+              :widths="[480, 768, 1024, 1280]"
               loading="lazy"
           />
         </div>

@@ -43,7 +43,10 @@ const localeHead = useLocaleHead({
 // every route produces a valid card; twitter:title/description fall back to the
 // per-page og:title/og:description automatically when a page doesn't set them.
 useSeoMeta({
-  ogImage: `${SITE_URL}/images/admin-panel.png`,
+  ogImage: `${SITE_URL}/images/og-home.png`,
+  ogImageWidth: 1200,
+  ogImageHeight: 630,
+  ogImageType: "image/png",
   ogUrl: () => `${SITE_URL}${route.path === '/' ? '' : route.path}` || SITE_URL,
   ogLocale: () => OG_LOCALE[locale.value] ?? 'ru_RU',
   ogLocaleAlternate: () => activeCodes.value
@@ -51,7 +54,7 @@ useSeoMeta({
       .map((c) => OG_LOCALE[c])
       .filter(Boolean),
   twitterCard: () => t('seo.common.twitterCard'),
-  twitterImage: `${SITE_URL}/images/admin-panel.png`
+  twitterImage: `${SITE_URL}/images/og-home.png`
 });
 
 useHead({

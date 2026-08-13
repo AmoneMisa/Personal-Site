@@ -99,9 +99,9 @@ onBeforeUnmount(() => {
               <section class="tabs-card">
                 <div class="tabs-card__inner">
                   <div class="tabs-card__content">
-                    <h4 class="tabs-card__title mb-4 mt-2">
+                    <h3 class="tabs-card__title mb-4 mt-2">
                       {{ t(item.titleKey) }}
-                    </h4>
+                    </h3>
                     <p v-if="item?.textKey" class="tabs-card__description text-white/70">{{ t(item.textKey) }}</p>
                     <ul v-if="item.list" class="flex flex-col tabs-card__list mb-6">
                       <li class="flex items-center gap-2" v-for="(li, idx) in item.list" :key="idx">

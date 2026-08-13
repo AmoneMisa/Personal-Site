@@ -18,6 +18,8 @@ const {t} = useI18n();
           icon="i-heroicons-arrow-right"
           size="lg"
           color="primary"
+          type="submit"
+          :aria-label="t('footer.newsletter.title')"
           class="newsletter__button px-5"
       />
     </div>

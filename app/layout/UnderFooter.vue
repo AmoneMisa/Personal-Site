@@ -14,7 +14,9 @@ const contacts = computed(() => contactsData?.value?.contacts ?? []);
     </div>
 
     <div class="under-footer__column">
-      <contact-item :contacts="contacts.filter(contact => contact.type === 'other') || []"/>
+      <u-page-list class="under-footer__list">
+        <contact-item :contacts="contacts.filter(contact => contact.type === 'other') || []"/>
+      </u-page-list>
     </div>
   </div>
 </template>
