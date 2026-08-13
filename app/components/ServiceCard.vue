@@ -9,12 +9,22 @@ defineProps<{
 }>();
 
 const {t} = useI18n();
+const localeRoute = useLocaleRoute();
+
+// Resolve the target to the active locale's route. Handles both string paths
+// ("/services/pdf-editor" from the API) and named-route objects; external URLs
+// (http...) and in-page hashes pass through untouched.
+function resolveLink(l: any) {
+  if (!l) return undefined;
+  if (typeof l === 'string' && !l.startsWith('/')) return l;
+  return localeRoute(l) ?? l;
+}
 </script>
 
 <template>
   <component
       :is="link ? NuxtLink : 'div'"
-      :to="link"
+      :to="resolveLink(link)"
       class="block"
       style="text-decoration: none"
   >

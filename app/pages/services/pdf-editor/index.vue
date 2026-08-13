@@ -16,6 +16,7 @@ useSeoMeta({
   ogDescription: () => t('seo.pages.pdfEditor.ogDescription')
 });
 const router = useRouter();
+const localePath = useLocalePath();
 
 const fileInput = ref<HTMLInputElement | null>(null);
 const selectedFile = ref<File | null>(null);
@@ -72,7 +73,7 @@ async function createDoc() {
       body: form,
     });
 
-    await router.push(`/services/pdf-editor/${res.docId}`);
+    await router.push(localePath(`/services/pdf-editor/${res.docId}`));
   } catch (e: any) {
     errorMsg.value = e?.data?.detail?.message || e?.data?.message || e?.message || "Create failed";
   } finally {

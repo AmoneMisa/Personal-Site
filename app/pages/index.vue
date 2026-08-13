@@ -18,7 +18,24 @@ useSeoMeta({
   ogType: "website",
   ogSiteName: () => t('seo.common.siteName'),
   ogTitle: () => t('seo.pages.home.ogTitle'),
-  ogDescription: () => t('seo.pages.home.ogDescription')
+  ogDescription: () => t('seo.pages.home.ogDescription'),
+  twitterTitle: () => t('seo.pages.home.twitterTitle'),
+  twitterDescription: () => t('seo.pages.home.twitterDescription')
+});
+
+// LCP hint for the hero image — scoped to the home page only. (Previously this
+// preload lived in app.vue and fired on every route, wasting bandwidth on pages
+// that never render this image.)
+useHead({
+  link: [
+    {
+      rel: 'preload',
+      as: 'image',
+      href: '/_ipx/w_988&f_webp&q_80/images/admin-panel.png',
+      fetchpriority: 'high',
+      type: 'image/webp'
+    }
+  ]
 });
 const isPageLoaded = ref(false);
 

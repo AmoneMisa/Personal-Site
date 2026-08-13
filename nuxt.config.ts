@@ -51,7 +51,12 @@ export default defineNuxtConfig({
             {code: 'ru', language: 'ru-RU', name: 'Русский'},
             // {code: 'kk', language: 'kk-KZ', name: 'Қазақша'}
         ],
-        strategy: 'no_prefix',
+        // Russian is the default and stays unprefixed at "/"; other locales get a
+        // path prefix ("/en/..."). This gives every language a distinct, indexable
+        // URL so hreflang alternates and the per-locale sitemap actually mean
+        // something to search engines. Live messages still load from the backend
+        // DB keyed off $i18n.locale, which the route prefix sets automatically.
+        strategy: 'prefix_except_default',
         detectBrowserLanguage: {
             useCookie: true, // Crucial: This tells i18n to use a cookie
             cookieKey: 'i18n_lang', // Default cookie name, you can change it
@@ -68,6 +73,9 @@ export default defineNuxtConfig({
         }
     },
     nitro: {
+        // Pre-compress public assets (brotli + gzip) at build time so fonts, CSS,
+        // JS and SVGs ship smaller without relying on the proxy to compress.
+        compressPublicAssets: {gzip: true, brotli: true},
         experimental: {
             websocket: true,
             tasks: true // enable Nitro tasks (jobs:refresh vacancy worker)

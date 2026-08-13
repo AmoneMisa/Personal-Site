@@ -10,6 +10,7 @@ const isVisible = ref(false);
 type Lang = { code: string; name?: string };
 
 const {locale, setLocaleCookie, setLocale, t} = useI18n();
+const localePath = useLocalePath();
 
 const config = useRuntimeConfig();
 const api = config.public.apiBase;
@@ -103,7 +104,7 @@ onMounted(() => {
   }"
   >
     <template #left>
-      <a class="header__logo" href="/">
+      <a class="header__logo" :href="localePath('/')">
         <nuxt-img
             class="header__logo-image"
             src="/images/logo.png"

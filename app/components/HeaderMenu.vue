@@ -4,7 +4,13 @@ const props = withDefaults(defineProps<{ variant?: 'desktop' | 'mobile' }>(), {
 });
 
 const {t} = useI18n();
+const localePath = useLocalePath();
 const menu = useHeaderMenu();
+
+// Prefix internal paths with the active locale ("/services" -> "/en/services")
+// while leaving external URLs (mailto:, https://, tel:) untouched.
+const toLocale = (href?: string) =>
+    href && href.startsWith('/') ? localePath(href) : href;
 const emit = defineEmits<{
   (e: 'navigate'): void
 }>();
@@ -24,7 +30,7 @@ const emit = defineEmits<{
         <a
             v-if="item.type === 'simple'"
             class="header-menu__link"
-            :href="item.href"
+            :href="toLocale(item.href)"
             @click="emit('navigate')"
         >
           {{ t(item.labelKey) }}
@@ -40,7 +46,7 @@ const emit = defineEmits<{
                 :key="j"
                 class="header-menu__dropdown-item"
             >
-              <a class="header-menu__dropdown-link" :href="sub.href"
+              <a class="header-menu__dropdown-link" :href="toLocale(sub.href)"
                  @click="emit('navigate')">
                 {{ t(sub.labelKey) }} <span v-if="sub.badge" class="header-menu__badge line-clamp-1">{{
                   t(sub.labelKey)
@@ -67,7 +73,7 @@ const emit = defineEmits<{
                     :key="s"
                     class="header-menu__mega-item"
                 >
-                  <a class="header-menu__mega-link" :href="sub.href"
+                  <a class="header-menu__mega-link" :href="toLocale(sub.href)"
                      @click="emit('navigate')">
                     {{ t(sub.labelKey) }} <span v-if="sub.badge"
                                                 class="header-menu__badge line-clamp-1">{{ t(sub.labelKey) }}</span>

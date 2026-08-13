@@ -6,6 +6,11 @@ const contactsData = useContacts();
 const contacts = computed(() => contactsData?.value?.contacts ?? []);
 
 const {t} = useI18n();
+const localePath = useLocalePath();
+
+// Prefix internal paths with the active locale; leave external URLs untouched.
+const toLocale = (href?: string) =>
+    href && href.startsWith('/') ? localePath(href) : href;
 </script>
 
 <template>
@@ -14,7 +19,7 @@ const {t} = useI18n();
             flex flex-wrap gap-5 justify-center">
       <div class="footer__column">
         <div class="footer__col-item">
-          <a class="footer__logo max-h-[35px] min-w-[160px]" href="/">
+          <a class="footer__logo max-h-[35px] min-w-[160px]" :href="localePath('/')">
             <nuxt-img
                 class="footer__logo-image"
                 src="/images/logo.png"
@@ -45,7 +50,7 @@ const {t} = useI18n();
           <h4 class="footer__title" v-if="menu?.titleKey">{{ t(menu.titleKey) }}</h4>
           <u-page-list class="footer__list" v-if="menu?.links">
             <li v-for="item in menu.links" :key="item.href">
-              <a class="footer__link" :href="item.href">{{ t(item.labelKey) }}</a>
+              <a class="footer__link" :href="toLocale(item.href)">{{ t(item.labelKey) }}</a>
             </li>
           </u-page-list>
         </div>

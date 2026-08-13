@@ -131,6 +131,7 @@ useSeoMeta({
   title: () => t("seoTitle"), description: () => t("seoDescription"),
   robots: () => "index, follow", ogType: () => "website",
   ogTitle: () => t("seoTitle"), ogDescription: () => t("seoDescription"),
+  twitterTitle: () => t("seoTitle"), twitterDescription: () => t("seoDescription"),
 });
 
 const sourceOptions = [

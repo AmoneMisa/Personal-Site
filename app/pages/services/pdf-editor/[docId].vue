@@ -22,6 +22,7 @@ useSeoMeta({
 });
 const route = useRoute();
 const router = useRouter();
+const localePath = useLocalePath();
 
 // Load the CV's embedded families as webfonts so the editable overlay matches
 // the rendered background instead of falling back to Arial. Lato (body) is a
@@ -1883,7 +1884,7 @@ async function saveDocument() {
 // Other actions
 // =========================
 function uploadNew() {
-  router.push("/services/pdf-editor");
+  router.push(localePath("/services/pdf-editor"));
 }
 
 function downloadSource() {

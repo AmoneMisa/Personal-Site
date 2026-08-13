@@ -10,6 +10,7 @@ const props = defineProps<{
 }>();
 
 const { t } = useI18n();
+const localePath = useLocalePath();
 
 const code = computed(() => props.error?.statusCode ?? 500);
 const is404 = computed(() => code.value === 404);
@@ -78,10 +79,10 @@ function retry() {
           </div>
 
           <div class="err-card__links">
-            <NuxtLink to="/" class="err-card__link">
+            <NuxtLink :to="localePath('/')" class="err-card__link">
               {{ t("errors.links.main") }}
             </NuxtLink>
-            <NuxtLink to="/services" class="err-card__link">
+            <NuxtLink :to="localePath('/services')" class="err-card__link">
               {{ t("errors.links.services") }}
             </NuxtLink>
           </div>
