@@ -39,8 +39,8 @@ const projects = [
     name: "WhitesLove — developer tools platform",
     href: SITE_URL,
     stack: "Nuxt 4 · SSR · i18n · WebSockets",
-    ru: "Персональная платформа онлайн-инструментов: SSR на Nuxt, мультиязычность, real-time чат, собственный REST-бэкенд.",
-    en: "Personal platform of online tools: Nuxt SSR, multi-language, real-time chat, custom REST backend.",
+    ru: "Персональная платформа онлайн-инструментов: SSR на Nuxt, мультиязычность, собственный REST-бэкенд.",
+    en: "Personal platform of online tools: Nuxt SSR, multi-language, custom REST backend.",
   },
   {
     name: "Online PDF editor",

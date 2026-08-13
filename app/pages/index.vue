@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import TextareaRequestForm from "~/components/common/TextareaRequestForm.vue";
 import FeaturesCarousel from "~/components/FeaturesCarousel.vue";
 import TabsWithUnderButtons from "~/components/TabsWithUnderButtons.vue";
 import ImagesCarousel from "~/components/ImagesCarousel.vue";
@@ -111,10 +110,6 @@ const {data: animatedText} = await useAsyncData<AnimatedTextItem[]>(
       <page-header description="hero.subtitle" descriptionSize="24" class="mt-2" :is-centered="true"/>
     </div>
     <u-page-body class="mt-4 pb-0 gap-16 flex flex-col justify-center">
-      <textarea-request-form
-          :placeholder="t('form.placeholder')"
-          :button-text="t('form.button')"
-      />
       <u-container class="max-w-6xl mx-auto admin-panel">
         <div class="admin-panel__image">
           <h2 class="text-pretty font-bold text-highlighted mx-auto whitespace-normal [overflow-wrap:anywhere] text-3xl sm:text-4xl lg:text-5xl mb-9 gradient-text text-center">
