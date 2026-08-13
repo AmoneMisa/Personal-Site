@@ -352,3 +352,18 @@ class AnimatedText(Base):
     titleKey = Column(String(255), nullable=False)
     isVisible = Column(Boolean, default=True, nullable=False)
     order = Column(Integer, default=0, nullable=False)
+
+
+# -------------------------
+# Setting (owner-editable key/value store)
+# -------------------------
+# Generic site-wide settings addressed by a string key with a free-form JSON
+# value. Backs the SEO settings surface (default OG image, canonical base,
+# robots directive, social handles, verification tokens, feature flags, ...).
+# Public GET, owner-only writes. Replaces the old, unwired src/models/content.py.
+class Setting(Base):
+    __tablename__ = "Setting"
+
+    key = Column(String(255), primary_key=True)
+    value = Column(JSON, nullable=True)
+    updatedAt = Column(DateTime, default=lambda: datetime.now(UTC), onupdate=lambda: datetime.now(UTC))
