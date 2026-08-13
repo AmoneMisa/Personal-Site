@@ -1,20 +1,16 @@
 <template>
   <u-app>
-    <custom-header/>
+    <header-nav/>
     <u-main as="main">
-      <u-container class="m-auto">
-        <NuxtPage/>
-      </u-container>
+      <NuxtPage/>
     </u-main>
-    <custom-footer/>
-    <under-footer/>
+    <site-footer/>
     <i18n-loader-overlay/>
   </u-app>
 </template>
 <script setup lang="ts">
-import CustomHeader from "~/layout/Header.vue";
-import CustomFooter from "~/layout/Footer.vue";
-import UnderFooter from "~/layout/UnderFooter.vue";
+import HeaderNav from "~/components/redesign/HeaderNav.vue";
+import SiteFooter from "~/components/redesign/SiteFooter.vue";
 import I18nLoaderOverlay from "~/components/common/I18nLoaderOverlay.vue";
 
 const SITE_URL = "https://whiteslove.me";

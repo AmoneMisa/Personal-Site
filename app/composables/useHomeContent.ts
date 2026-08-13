@@ -11,7 +11,9 @@ export interface NavLinkT { label: string; href: string }
 // ---- Shared structural data (locale-independent) ----
 export const CONTACTS = {
   telegram: "https://t.me/WhitesLove",
-  whatsapp: "", // EDIT: put the real WhatsApp link (wa.me/...) — left empty hides it
+  // WhatsApp username link. If wa.me/<username> doesn't resolve for you, replace
+  // with wa.me/<full phone number> (no +, no spaces).
+  whatsapp: "https://wa.me/whiteslove",
   linkedin: "https://www.linkedin.com/in/marharyta-kubai-51520a362",
   github: "https://github.com/AmoneMisa",
   email: "kubai.rita5@gmail.com",

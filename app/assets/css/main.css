@@ -57,6 +57,30 @@ h1, h2, h3, h4, h5, h6 {
     font-family: "JetBrains Mono", monospace;
 }
 
+/* ---- Redesign layout utilities ---- */
+.rd-wrap {
+    max-width: 1140px;
+    margin: 0 auto;
+    padding: 0 32px;
+}
+.rd-section {
+    padding: 72px 0;
+}
+.rd-divider {
+    height: 1px;
+    background: var(--line);
+    max-width: 1140px;
+    margin: 0 auto;
+}
+@media (max-width: 600px) {
+    .rd-wrap {
+        padding: 0 20px;
+    }
+    .rd-section {
+        padding: 52px 0;
+    }
+}
+
 @theme {
     --color-primary: #805AF5;
     --color-primary-alt: #35316f;
