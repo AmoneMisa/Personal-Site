@@ -7,14 +7,12 @@ from fastapi.middleware.cors import CORSMiddleware
 from .routers import (
     languages, translations, testimonials, headerMenu, users, auth, offerCards, contacts, footer,
     featureCards, cleanup, services, serviceCategories, pdf, convert, dockerhub, tabs, animatedText,
-    chat, countryIndices, settings, owner
+    countryIndices, settings, owner
 )
 from .models.models import Base
 from .db.session import engine
 from .init_admin import init_admin
 from .routers.pdf import pdf_storage_cleanup_loop
-from .services.chat_bus import chat_bus_loop
-from .services.ws_manager import ws_manager
 
 
 @asynccontextmanager
@@ -25,12 +23,11 @@ async def lifespan(app: FastAPI):
     await init_admin()
 
     cleanup_task = asyncio.create_task(pdf_storage_cleanup_loop(), name="pdf_storage_cleanup_loop")
-    chat_bus_task = asyncio.create_task(chat_bus_loop(ws_manager), name="chat_bus_loop")
 
     try:
         yield
     finally:
-        for t in (cleanup_task, chat_bus_task):
+        for t in (cleanup_task,):
             t.cancel()
             try:
                 await t
@@ -75,7 +72,6 @@ app.include_router(convert.router)
 app.include_router(dockerhub.router)
 app.include_router(tabs.router)
 app.include_router(animatedText.router)
-app.include_router(chat.router)
 app.include_router(countryIndices.router)
 app.include_router(settings.router)
 app.include_router(owner.router)
