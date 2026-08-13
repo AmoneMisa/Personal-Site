@@ -10,9 +10,6 @@ class Settings(BaseSettings):
     MARIADB_PASSWORD: str
     MARIADB_DATABASE: str
     REDIS_HOST: str
-    BOT_TOKEN: str
-    OWNER_ID: str
-    POLLING: bool
 
     # Optional long-lived secret for the owner-only content API. When set, it can
     # be sent as the "X-Owner-Key" header to authorize write endpoints from

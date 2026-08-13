@@ -57,24 +57,6 @@ services:
     volumes:
       - redis_data:/data
 
-  telegram-bot:
-    build:
-      context: ./telegram-bot
-    restart: unless-stopped
-    environment:
-      BACKEND_URL: "http://backend:8000"
-      BOT_TOKEN: "${BOT_TOKEN}"
-      OWNER_ID: "${OWNER_ID}"
-      REDIS_HOST: "redis"
-      REDIS_PORT: "6379"
-      POLLING: "true"
-      DEBUG: "false"
-    depends_on:
-      redis:
-        condition: service_started
-      backend:
-        condition: service_started
-
 volumes:
   mariadb_data:
   redis_data:
