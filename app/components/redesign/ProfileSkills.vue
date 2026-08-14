@@ -1,10 +1,11 @@
 <script setup lang="ts">
 import { useHomeContent } from "~/composables/useHomeContent";
-import { useExperienceYears } from "~/composables/useExperienceYears";
 
 const content = useHomeContent();
 const s = computed(() => content.value.skillsSection);
-const { label: expLabel } = useExperienceYears();
+// 4 topical cards in a 2x2 grid; the last card (Languages) is shown separately.
+const topical = computed(() => s.value.cards.slice(0, 4));
+const languages = computed(() => s.value.cards[s.value.cards.length - 1]);
 </script>
 
 <template>
@@ -14,23 +15,22 @@ const { label: expLabel } = useExperienceYears();
         <div class="eyebrow mono">{{ s.eyebrow }}</div>
         <h2>{{ s.title }}</h2>
         <p>{{ s.subtitle }}</p>
-        <div class="highlight-strip">
-          <div v-for="h in s.highlights" :key="h" class="highlight-item mono">
-            <span class="dash" />{{ h }}
-          </div>
-          <div class="highlight-item mono">
-            <span class="dash" />{{ expLabel }} {{ s.highlightYearsSuffix }}
-          </div>
-        </div>
       </div>
 
       <div class="skills-grid">
-        <div v-for="card in s.cards" :key="card.title" class="skill-card">
+        <div v-for="card in topical" :key="card.title" class="skill-card">
           <h4 class="mono">{{ card.title }}</h4>
           <ul>
             <li v-for="item in card.items" :key="item">{{ item }}</li>
           </ul>
         </div>
+      </div>
+
+      <div class="skills-langs">
+        <h4 class="mono">{{ languages.title }}</h4>
+        <ul class="lang-chips">
+          <li v-for="item in languages.items" :key="item">{{ item }}</li>
+        </ul>
       </div>
 
       <div class="skills-cta">
@@ -61,30 +61,9 @@ h2 {
   margin-top: 10px;
   font-size: 14.5px;
 }
-.highlight-strip {
-  display: flex;
-  gap: 24px;
-  flex-wrap: wrap;
-  margin-top: 20px;
-  padding-top: 20px;
-  border-top: 1px solid var(--line);
-}
-.highlight-item {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 13.5px;
-  color: var(--text-primary);
-}
-.highlight-item .dash {
-  width: 10px;
-  height: 1px;
-  background: var(--accent-pink);
-  flex-shrink: 0;
-}
 .skills-grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(2, 1fr);
   gap: 1px;
   background: var(--line);
   border: 1px solid var(--line);
@@ -119,6 +98,34 @@ h2 {
   left: 0;
   color: var(--line);
 }
+.skills-langs {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  flex-wrap: wrap;
+  margin-top: 24px;
+  padding: 18px 24px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+}
+.skills-langs h4 {
+  font-size: 12px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.lang-chips {
+  display: flex;
+  gap: 20px;
+  flex-wrap: wrap;
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+.lang-chips li {
+  font-size: 13.5px;
+  color: var(--text-primary);
+}
 .skills-cta {
   display: flex;
   align-items: center;
@@ -140,7 +147,7 @@ h2 {
   border-color: var(--text-primary);
 }
 
-@media (max-width: 960px) {
+@media (max-width: 760px) {
   .skills-grid {
     grid-template-columns: 1fr;
   }

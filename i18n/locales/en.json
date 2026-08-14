@@ -362,12 +362,12 @@
         "twitterTitle": "HTML Email Editor"
       },
       "home": {
-        "description": "Frontend developer Kubai Marharyta's website. Contains basic information about the specialist, as well as some useful services: searching for the necessary docker image, json merging, pdf editor, and others.",
-        "ogDescription": "Meet and contact the developer. Also, take advantage of the following services: converters, editors, and utilities for teamwork.",
-        "ogTitle": "WhitesLove — Front-end developer",
-        "title": "WhitesLove — Front-end developer",
-        "twitterDescription": "Meet front-end developer Marharyta Kubai. Also, on the resource: convert files, edit content.",
-        "twitterTitle": "WhitesLove — Front-end developer"
+        "description": "Frontend developer with 6+ years of commercial experience in e-commerce and marketplaces. Vue.js and Nuxt.js, production code, legacy, backend integration and delivery.",
+        "ogDescription": "Frontend developer with 6+ years in e-commerce and marketplaces. Vue.js and Nuxt.js, production code, legacy and delivery.",
+        "ogTitle": "Marharyta Kubai — Frontend Developer",
+        "title": "Marharyta Kubai — Frontend Developer | Vue.js & Nuxt.js",
+        "twitterDescription": "Frontend developer with 6+ years in e-commerce and marketplaces. Vue.js and Nuxt.js, production code, legacy and delivery.",
+        "twitterTitle": "Marharyta Kubai — Frontend Developer"
       },
       "markdownEditor": {
         "description": "Prepare formatted text for Telegram, WhatsApp, and other platforms with live preview.",

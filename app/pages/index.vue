@@ -5,6 +5,7 @@ import ProfileSkills from "~/components/redesign/ProfileSkills.vue";
 import ExperienceTimeline from "~/components/redesign/ExperienceTimeline.vue";
 import PetProjectsGrid from "~/components/redesign/PetProjectsGrid.vue";
 import ToolsRow from "~/components/redesign/ToolsRow.vue";
+import ClosingCta from "~/components/redesign/ClosingCta.vue";
 
 const { t } = useI18n();
 
@@ -33,5 +34,7 @@ useSeoMeta({
     <pet-projects-grid />
     <div class="rd-divider" />
     <tools-row />
+    <div class="rd-divider" />
+    <closing-cta />
   </div>
 </template>

@@ -1,18 +1,17 @@
 // All homepage content as data (bilingual RU/EN). Edit here, not in templates.
-// The two dynamic year insertions (hero stat + skills highlight) are composed in
-// the components from useExperienceYears.
+// The hero years stat uses a {years} token replaced in the component from
+// useExperienceYears (auto-counted, so it never goes stale).
 
 export interface DropdownItem { label: string; sub: string; href: string }
 export interface SkillCard { title: string; items: string[] }
 export interface ExperienceItem { period: string; title: string; meta: string; description: string; tags: string[] }
 export interface PetProject { kind: string; title: string; description: string; linkLabel: string; href: string | null; span2?: boolean }
 export interface NavLinkT { label: string; href: string }
+export interface HeroStat { value: string; label: string }
 
 // ---- Shared structural data (locale-independent) ----
 export const CONTACTS = {
   telegram: "https://t.me/WhitesLove",
-  // WhatsApp username link. If wa.me/<username> doesn't resolve for you, replace
-  // with wa.me/<full phone number> (no +, no spaces).
   whatsapp: "https://wa.me/whiteslove",
   linkedin: "https://www.linkedin.com/in/marharyta-kubai-51520a362",
   github: "https://github.com/AmoneMisa",
@@ -20,11 +19,10 @@ export const CONTACTS = {
 };
 
 export const TOOLS = [
-  "Vue.js", "JavaScript", "TypeScript", "SCSS", "Freemarker", "REST API",
-  "PostgreSQL", "Git", "Docker", "GitLab CI/CD", "Jira", "Confluence",
+  "Vue.js", "Nuxt.js", "JavaScript", "TypeScript", "SCSS", "Freemarker",
+  "REST API", "Git", "Docker", "GitLab CI/CD", "PostgreSQL", "Jira", "Confluence",
 ];
 
-// Twemoji codepoints used across the page (self-hosted in /public/twemoji).
 export const EMOJI = { shark: "1f988", cat: "1f63b" };
 
 const RU = {
@@ -55,52 +53,47 @@ const RU = {
   fastnav: ["Обо мне", "Что я умею", "Мой опыт", "Pet-проекты", "Инструменты", "Контакты"],
   hero: {
     eyebrow: "профиль",
-    h1before: "Фронтендер с потенциалом в ",
-    h1accent: "фулстек",
-    lead: "Маргарита Кубай. Пять лет держу production-фронтенд e-commerce и маркетплейсов на Vue.js и Nuxt.js — и не останавливаюсь на вёрстке: пишу backend-логику, настраиваю CI/CD и деплой, разбираю чужой легаси. Беру задачу целиком, а не только свою часть.",
-    ctaPrimary: "Связаться со мной",
+    h1before: "Frontend-разработчик, который доводит фичу до ",
+    h1accent: "релиза",
+    lead: "Маргарита Кубай, frontend-разработчик с 6+ годами коммерческого опыта в e-commerce и маркетплейсах. Работаю в основном с Vue.js и Nuxt.js, поддерживаю production-код, беру на себя легаси-проекты, интегрирую фронтенд с бэкенд-системами и закрываю задачи по доставке фичи, когда это нужно.",
+    ctaPrimary: "Связаться",
     ctaText: "Что я умею",
-    statPracticeLabel: "практики",
-    statCompanies: "компании, реальный опыт",
-    portraitPlaceholder: "место для живой фотографии или иллюстрации-портрета",
+    stats: [
+      { value: "{years}+ лет", label: "коммерческой разработки" },
+      { value: "E-commerce и маркетплейсы", label: "production-опыт" },
+      { value: "Vue.js · Nuxt.js · TypeScript", label: "основной стек" },
+    ] as HeroStat[],
     portraitCaption: "глажу котов между спринтами",
   },
   skillsSection: {
-    eyebrow: "чем занимаюсь на практике",
+    eyebrow: "с чем работаю",
     title: "Что я умею",
-    subtitle: "Пять сторон одной и той же работы — от вёрстки до общения с заказчиком.",
-    highlights: [
-      "Production e-commerce и маркетплейсы",
-      "Весь цикл: фронт → бэк → деплой",
-    ],
-    highlightYearsSuffix: "практики, не только на бумаге",
-    ctaLead: "Похожая задача есть прямо сейчас?",
-    ctaText: "Расскажите — обсудим",
+    subtitle: "Фронтенд — моя основа. Беру и то, что вокруг, когда этого требует задача.",
+    ctaLead: "Нужен человек, который подхватит существующий фронтенд и продвинет задачу?",
+    ctaText: "Расскажите о проекте",
     cards: [
-      { title: "Как фронтендер", items: [
-        "Довожу интерфейсы маркетплейса до продакшена под реальную нагрузку — от каталога до email-шаблонов",
-        "Работаю с Vuex/Pinia, Vuetify/NuxtUI/Tailwind",
-        "Интегрирую фронтенд поверх любого бэкенд-шаблонизатора — Freemarker, Liquid, Velocity, Nunjucks",
+      { title: "Продуктовый фронтенд", items: [
+        "Разрабатываю и поддерживаю production-интерфейсы e-commerce и маркетплейсов",
+        "Работаю с Vue.js, Nuxt.js, JavaScript и TypeScript",
+        "Использую Vuex / Pinia, Vuetify, Nuxt UI и Tailwind",
+        "Работаю с шаблонизаторами: Freemarker, Liquid, Velocity и Nunjucks",
       ] },
-      { title: "Общение с клиентами", items: [
-        "На первом месте (ITSUA) участвовала в созвонах с заказчиком вместе с менеджером, не соло",
-        "На текущем проекте (BPC) несколько раз созванивалась с клиентом по функционалу в своей зоне ответственности",
-        "В целом переговоры ведут менеджеры — подключаюсь точечно, когда нужна техническая сторона",
+      { title: "Production и легаси", items: [
+        "Разбираю регрессии и баги в проде в существующих кодовых базах",
+        "Беру легаси-код, не превращая каждую задачу в переписывание с нуля",
+        "Работаю над каталогом, карточками товара и адаптивным поведением UI",
+        "Поддерживаю фронтенд, который уже работает в проде",
       ] },
-      { title: "Решение проблем", items: [
-        "Чиню регрессии и баги в проде под нагрузкой — быстро и без раскачки",
-        "Ускоряю отрисовку каталога и карточек товара",
-        "Беру чужой легаси-код и довожу до рабочего состояния, не переписывая всё с нуля",
+      { title: "Бэкенд и доставка", items: [
+        "Пишу REST API и cron-джобы на Node.js и FastAPI",
+        "Работаю с PostgreSQL, MongoDB и Redis",
+        "Настраиваю и поддерживаю CI/CD-пайплайны в GitLab",
+        "Работаю с Docker и участвую в релизах и деплоях",
       ] },
-      { title: "DevOps-задачи", items: [
-        "Настраиваю CI/CD-пайплайны (GitLab CI) с нуля",
-        "Работаю с Docker-контейнерами в проде",
-        "Веду деплой и релизы наравне с разработкой фичи — не жду отдельного DevOps-инженера",
-      ] },
-      { title: "Backend-задачи", items: [
-        "Пишу REST API и cron-джобы на Node.js и Python (FastAPI)",
-        "Работаю с PostgreSQL, MongoDB, Redis; парсю HTML для интеграций",
-        "Довожу Telegram/Discord-ботов и Electron-приложения до релиза как отдельные продукты",
+      { title: "Техническая коммуникация", items: [
+        "Работаю напрямую с бэкенд-разработчиками, QA, дизайнерами и менеджерами",
+        "Подключаюсь к клиентским звонкам, когда нужен фронтенд- или технический контекст",
+        "Объясняю ограничения реализации и технические компромиссы без прятанья за жаргоном",
       ] },
       { title: "Языки", items: [
         "Русский — родной", "Украинский — родной", "Английский — B2", "Турецкий — A1",
@@ -108,50 +101,55 @@ const RU = {
     ] as SkillCard[],
   },
   experienceSection: {
-    eyebrow: "хронология",
-    title: "Мой опыт",
-    subtitle: "Реальная последовательность проектов — от первых верстальных задач до полноценных фронтенд-решений для маркетплейсов.",
+    eyebrow: "опыт",
+    title: "Коммерческий опыт",
+    subtitle: "",
     items: [
       { period: "2021 — сейчас", title: "Frontend Developer, BPC", meta: "Remote · Vue.js, Freemarker",
-        description: "Разработка и поддержка фронтенда маркетплейса под high-load: вёрстка на Freemarker- и Velocity-шаблонах, адаптивность на разных устройствах, продакшн email-шаблоны, доработки на основе бизнес-требований. Тесная работа с бэкендом, тестировщиками и дизайнером.",
-        tags: ["Vue.js", "Freemarker", "Velocity", "Email-шаблоны", "High-load", "Docker", "CI/CD"] },
+        description: "Разработка и поддержка production-фронтенда маркетплейса. Работаю с Vue.js, Freemarker и Velocity, делаю и поддерживаю адаптивные интерфейсы и production email-шаблоны, реализую бизнес-изменения, разбираю регрессии и тесно работаю с бэкенд-разработчиками, QA и дизайном. Также работаю с Docker, CI/CD и релизами наравне с фронтенд-разработкой.",
+        tags: ["Vue.js", "Freemarker", "Velocity", "Email-шаблоны", "Docker", "CI/CD"] },
       { period: "2020 — 2021", title: "Junior Frontend Developer, ITSUA", meta: "Харьков · Vue.js, Shopify, Liquid",
-        description: "Приложение для Shopify на Vue.js: кастомизация и поддержка тем на Liquid, интеграция в экосистему Shopify, поддержка существующих e-commerce решений.",
+        description: "Работала над e-commerce проектами на Shopify: разработка приложения на Vue.js, кастомизация тем на Liquid, интеграции и поддержка существующего функционала витрины.",
         tags: ["Vue.js", "Shopify", "Liquid"] },
     ] as ExperienceItem[],
   },
   petSection: {
-    eyebrow: "вне работы, но по-серьёзному",
+    eyebrow: "вне работы",
     title: "Pet-проекты",
-    subtitle: "По убыванию близости к основному стеку — от Vue.js-сервисов до нативного Android.",
+    subtitle: "Использую сайд-проекты, чтобы работать с технологиями и продуктовыми идеями, которые не всегда попадают в повседневную фронтенд-работу.",
     allLabel: "Все проекты",
     items: [
-      { kind: "Web-утилиты · Vue.js / Nuxt.js", title: "Каталог инструментов", span2: true,
-        description: "PDF-редактор, JSON merge, DockerHub поиск и другие небольшие сервисы — те же технологии, что и в основной работе.",
+      { kind: "Web · Vue.js / Nuxt.js", title: "Каталог инструментов", span2: true,
+        description: "Небольшие веб-утилиты: PDF-редактор, слияние JSON, поиск в DockerHub и другие инструменты.",
         linkLabel: "Все сервисы", href: "/services" },
       { kind: "Desktop · Electron.js + Vite", title: "i18n Properties Manager",
-        description: "Менеджер файлов локализации, включая .ftlh (Freemarker) — та же технология, что используется в работе на BPC.",
+        description: "Десктоп-инструмент для работы с файлами локализации, включая процессы с Freemarker .ftlh.",
         linkLabel: "GitHub", href: "https://github.com/AmoneMisa/i18nPropertiesManager" },
-      { kind: "Desktop · Electron.js + Vue.js", title: "Менеджер персонажей для Lost Ark",
-        description: "Автоматически подтягивает данные персонажей парсингом HTML, отслеживает активности с автосбросом.",
+      { kind: "Desktop · Electron.js + Vue.js", title: "Менеджер персонажей Lost Ark",
+        description: "Подтягивает данные персонажей из веба и отслеживает повторяющиеся игровые активности с автосбросом.",
         linkLabel: "Подробнее", href: null },
       { kind: "Mobile · React Native + TypeScript", title: "MediKit",
-        description: "Приложение для учёта домашней аптечки: сроки годности, остатки лекарств, доступ для семьи.",
+        description: "Общий трекер домашней аптечки: сроки годности, остатки лекарств и доступ для семьи.",
         linkLabel: "GitHub", href: "https://github.com/AmoneMisa/MediKit" },
-      { kind: "Mobile · React Native (Expo) + TypeScript", title: "Fun Things Tracker",
-        description: "Поиск, отслеживание и группировка того, что хочется или уже удалось посмотреть/прочитать/посетить: манга, книги, фильмы, сериалы, места для посещения.",
+      { kind: "Mobile · React Native + TypeScript", title: "Fun Things Tracker",
+        description: "Личный трекер книг, манги, фильмов, сериалов, мест и всего, что хочется найти или запомнить.",
         linkLabel: "GitHub", href: "https://github.com/AmoneMisa/FunThingsTracker" },
       { kind: "Telegram-бот · Node.js", title: "Genshin Impact bot",
-        description: "Открытый бот для групп: мини-игры (карточки, слоты, боулинг, боссы), система опыта, лута и снаряжения, админ-инструменты для управления участниками.",
+        description: "Групповой бот с мини-играми, системой опыта, лута, снаряжения и админ-инструментами.",
         linkLabel: "GitHub", href: "https://github.com/AmoneMisa/Genshin-Impact-tg-bot" },
-      { kind: "Mobile · Kotlin (native Android)", title: "Rustic Price Converter",
-        description: "Конвертер валют и сравнение цен на лету.",
+      { kind: "Android · Kotlin", title: "Rustic Price Converter",
+        description: "Нативное Android-приложение для конвертации валют и быстрого сравнения цен.",
         linkLabel: "GitHub", href: "https://github.com/AmoneMisa/RusticPriceConvertor" },
     ] as PetProject[],
   },
-  toolsSection: { eyebrow: "чаще всего в работе", title: "Наиболее часто используемые" },
+  toolsSection: { eyebrow: "повседневный стек", title: "Чем пользуюсь регулярно" },
+  closingCta: {
+    text: "Нужно больше, чем ещё один компонент? Я работаю с существующими продуктами, легаси-кодом, интеграциями и production-релизами — в основном вокруг Vue.js и Nuxt.js. Если это похоже на вашу задачу — расскажите о ней.",
+    contactLabel: "Связаться",
+    cvLabel: "Смотреть CV",
+  },
   footer: {
-    tag: "Фронтендер с потенциалом в фулстек. Пишу интерфейсы, backend-логику и деплой-процессы.",
+    tag: "Frontend-разработчик. Собираю production-интерфейсы и довожу фичи до релиза.",
     navTitle: "Навигация",
     navLinks: [
       { label: "Резюме", href: "/cv" },
@@ -193,52 +191,47 @@ const EN: typeof RU = {
   fastnav: ["About me", "What I do", "My experience", "Pet projects", "Tools", "Contact"],
   hero: {
     eyebrow: "profile",
-    h1before: "A frontend dev growing into ",
-    h1accent: "full-stack",
-    lead: "Marharyta Kubai. Five years keeping production e-commerce and marketplace frontends running on Vue.js and Nuxt.js — and I don't stop at markup: I write backend logic, set up CI/CD and deploys, and untangle other people's legacy. I take the whole task, not just my slice.",
+    h1before: "Frontend developer who can take a feature all the way to ",
+    h1accent: "release",
+    lead: "I'm Marharyta Kubai, a frontend developer with 6+ years of commercial experience in e-commerce and marketplaces. I work mainly with Vue.js and Nuxt.js, maintain production code, take over legacy projects, integrate frontend with backend systems, and handle the delivery work around a feature when needed.",
     ctaPrimary: "Get in touch",
-    ctaText: "What I do",
-    statPracticeLabel: "of practice",
-    statCompanies: "companies, real experience",
-    portraitPlaceholder: "space for a real photo or portrait illustration",
+    ctaText: "See what I do",
+    stats: [
+      { value: "{years}+ years", label: "commercial development" },
+      { value: "E-commerce & marketplaces", label: "production experience" },
+      { value: "Vue.js · Nuxt.js · TypeScript", label: "core stack" },
+    ],
     portraitCaption: "petting cats between sprints",
   },
   skillsSection: {
-    eyebrow: "what I actually do",
+    eyebrow: "what I work with",
     title: "What I do",
-    subtitle: "Five sides of the same job — from markup to talking with the client.",
-    highlights: [
-      "Production e-commerce & marketplaces",
-      "Full cycle: frontend → backend → deploy",
-    ],
-    highlightYearsSuffix: "of practice, not just on paper",
-    ctaLead: "Have a task like this right now?",
-    ctaText: "Tell me — let's talk",
+    subtitle: "Frontend is my core. I handle the parts around it when the task needs it.",
+    ctaLead: "Need someone who can pick up an existing frontend and move the task forward?",
+    ctaText: "Tell me about the project",
     cards: [
-      { title: "As a frontend dev", items: [
-        "Ship marketplace interfaces to production under real load — from catalog to email templates",
-        "Work with Vuex/Pinia, Vuetify/NuxtUI/Tailwind",
-        "Integrate the frontend on top of any backend templating engine — Freemarker, Liquid, Velocity, Nunjucks",
+      { title: "Product frontend", items: [
+        "Build and maintain production e-commerce and marketplace interfaces",
+        "Work with Vue.js, Nuxt.js, JavaScript and TypeScript",
+        "Use Vuex / Pinia, Vuetify, Nuxt UI and Tailwind",
+        "Work with template-driven frontends: Freemarker, Liquid, Velocity and Nunjucks",
       ] },
-      { title: "Client communication", items: [
-        "At my first role (ITSUA) I joined client calls together with the manager, not solo",
-        "On the current project (BPC) I've had several client calls about features in my area of responsibility",
-        "Managers run negotiations in general — I step in when the technical side is needed",
+      { title: "Production & legacy", items: [
+        "Investigate regressions and production bugs in existing codebases",
+        "Take over legacy code without turning every task into a rewrite",
+        "Work on catalogue, product-card and responsive UI behaviour",
+        "Maintain frontend that is already used in production",
       ] },
-      { title: "Problem solving", items: [
-        "Fix regressions and prod bugs under load — fast, no ramp-up",
-        "Speed up catalog and product-card rendering",
-        "Take over someone else's legacy and get it working without rewriting everything",
+      { title: "Backend & delivery", items: [
+        "Build REST APIs and scheduled jobs with Node.js and FastAPI",
+        "Work with PostgreSQL, MongoDB and Redis",
+        "Set up and maintain GitLab CI/CD pipelines",
+        "Work with Docker and participate in releases and deploys",
       ] },
-      { title: "DevOps tasks", items: [
-        "Set up CI/CD pipelines (GitLab CI) from scratch",
-        "Work with Docker containers in production",
-        "Run deploys and releases alongside feature work — I don't wait for a separate DevOps engineer",
-      ] },
-      { title: "Backend tasks", items: [
-        "Write REST APIs and cron jobs in Node.js and Python (FastAPI)",
-        "Work with PostgreSQL, MongoDB, Redis; parse HTML for integrations",
-        "Ship Telegram/Discord bots and Electron apps as standalone products",
+      { title: "Technical communication", items: [
+        "Work directly with backend developers, QA, designers and managers",
+        "Join client calls when frontend or technical context is needed",
+        "Explain implementation constraints and technical trade-offs without hiding behind jargon",
       ] },
       { title: "Languages", items: [
         "Russian — native", "Ukrainian — native", "English — B2", "Turkish — A1",
@@ -246,50 +239,55 @@ const EN: typeof RU = {
     ],
   },
   experienceSection: {
-    eyebrow: "timeline",
-    title: "My experience",
-    subtitle: "The real sequence of projects — from first markup tasks to full frontend solutions for marketplaces.",
+    eyebrow: "experience",
+    title: "Commercial experience",
+    subtitle: "",
     items: [
       { period: "2021 — present", title: "Frontend Developer, BPC", meta: "Remote · Vue.js, Freemarker",
-        description: "Development and support of a high-load marketplace frontend: markup on Freemarker and Velocity templates, responsiveness across devices, production email templates, business-driven changes. Close work with the backend, testers and the designer.",
-        tags: ["Vue.js", "Freemarker", "Velocity", "Email templates", "High-load", "Docker", "CI/CD"] },
+        description: "Development and support of a production marketplace frontend. I work with Vue.js, Freemarker and Velocity, build and maintain responsive interfaces and production email templates, implement business changes, investigate regressions and work closely with backend developers, QA and design. I also work with Docker, CI/CD and releases alongside frontend development.",
+        tags: ["Vue.js", "Freemarker", "Velocity", "Email templates", "Docker", "CI/CD"] },
       { period: "2020 — 2021", title: "Junior Frontend Developer, ITSUA", meta: "Kharkiv · Vue.js, Shopify, Liquid",
-        description: "A Shopify app in Vue.js: theme customization and support on Liquid, integration into the Shopify ecosystem, support of existing e-commerce solutions.",
+        description: "Worked on Shopify e-commerce projects: Vue.js application development, Liquid theme customisation, integrations and support of existing storefront functionality.",
         tags: ["Vue.js", "Shopify", "Liquid"] },
     ],
   },
   petSection: {
-    eyebrow: "outside work, but seriously",
+    eyebrow: "things I build outside work",
     title: "Pet projects",
-    subtitle: "By decreasing closeness to my main stack — from Vue.js services to native Android.",
+    subtitle: "I use side projects to work with technologies and product ideas that don't always fit into my day-to-day frontend work.",
     allLabel: "All projects",
     items: [
-      { kind: "Web utilities · Vue.js / Nuxt.js", title: "Tools catalog", span2: true,
-        description: "PDF editor, JSON merge, DockerHub search and other small services — the same tech as my main work.",
+      { kind: "Web · Vue.js / Nuxt.js", title: "Tools catalog", span2: true,
+        description: "Small web utilities including a PDF editor, JSON merge, DockerHub search and other tools.",
         linkLabel: "All services", href: "/services" },
       { kind: "Desktop · Electron.js + Vite", title: "i18n Properties Manager",
-        description: "A localization-files manager, incl. .ftlh (Freemarker) — the same tech used at BPC.",
+        description: "A desktop tool for working with localisation files, including Freemarker .ftlh workflows.",
         linkLabel: "GitHub", href: "https://github.com/AmoneMisa/i18nPropertiesManager" },
-      { kind: "Desktop · Electron.js + Vue.js", title: "Lost Ark character manager",
-        description: "Pulls character data by parsing HTML, tracks activities with auto-reset.",
+      { kind: "Desktop · Electron.js + Vue.js", title: "Lost Ark Character Manager",
+        description: "Pulls character data from the web and keeps track of recurring in-game activities with automatic resets.",
         linkLabel: "Details", href: null },
       { kind: "Mobile · React Native + TypeScript", title: "MediKit",
-        description: "A home medicine-cabinet tracker: expiry dates, remaining stock, family access.",
+        description: "A shared home medicine-cabinet tracker for expiry dates, remaining stock and family access.",
         linkLabel: "GitHub", href: "https://github.com/AmoneMisa/MediKit" },
-      { kind: "Mobile · React Native (Expo) + TypeScript", title: "Fun Things Tracker",
-        description: "Search, track and group what you want to or have watched/read/visited: manga, books, films, series, places.",
+      { kind: "Mobile · React Native + TypeScript", title: "Fun Things Tracker",
+        description: "A personal tracker for books, manga, films, series, places and other things you want to discover or remember.",
         linkLabel: "GitHub", href: "https://github.com/AmoneMisa/FunThingsTracker" },
-      { kind: "Telegram bot · Node.js", title: "Genshin Impact bot",
-        description: "An open group bot: mini-games (cards, slots, bowling, bosses), an XP / loot / gear system, and admin tools for managing members.",
+      { kind: "Telegram bot · Node.js", title: "Genshin Impact Bot",
+        description: "A group bot with mini-games, XP, loot, equipment and administration tools.",
         linkLabel: "GitHub", href: "https://github.com/AmoneMisa/Genshin-Impact-tg-bot" },
-      { kind: "Mobile · Kotlin (native Android)", title: "Rustic Price Converter",
-        description: "Currency conversion and on-the-fly price comparison.",
+      { kind: "Android · Kotlin", title: "Rustic Price Converter",
+        description: "A native Android app for currency conversion and quick price comparison.",
         linkLabel: "GitHub", href: "https://github.com/AmoneMisa/RusticPriceConvertor" },
     ],
   },
-  toolsSection: { eyebrow: "most often at work", title: "Most frequently used" },
+  toolsSection: { eyebrow: "day-to-day stack", title: "Tools I use regularly" },
+  closingCta: {
+    text: "Have a frontend problem that needs more than another component? I work with existing products, legacy code, integrations and production releases — mostly around Vue.js and Nuxt.js. If that sounds close to what you're working on, tell me about the task.",
+    contactLabel: "Contact me",
+    cvLabel: "View CV",
+  },
   footer: {
-    tag: "A frontend dev growing into full-stack. I write interfaces, backend logic and deploy processes.",
+    tag: "Frontend developer. I build production interfaces and take features through to release.",
     navTitle: "Navigation",
     navLinks: [
       { label: "CV", href: "/cv" },

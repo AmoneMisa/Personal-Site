@@ -5,7 +5,13 @@ import { useExperienceYears } from "~/composables/useExperienceYears";
 
 const content = useHomeContent();
 const hero = computed(() => content.value.hero);
-const { labelYM } = useExperienceYears();
+const { years } = useExperienceYears();
+const heroStats = computed(() =>
+  hero.value.stats.map((s) => ({
+    value: s.value.replace("{years}", String(years.value)),
+    label: s.label,
+  }))
+);
 </script>
 
 <template>
@@ -21,13 +27,9 @@ const { labelYM } = useExperienceYears();
             <a class="btn-text" href="#profile-skills">{{ hero.ctaText }}</a>
           </div>
           <div class="stat-row">
-            <div class="stat">
-              <b>{{ labelYM }}</b>
-              <span class="mono">{{ hero.statPracticeLabel }}</span>
-            </div>
-            <div class="stat">
-              <b>2</b>
-              <span class="mono">{{ hero.statCompanies }}</span>
+            <div class="stat" v-for="(s, i) in heroStats" :key="i">
+              <b>{{ s.value }}</b>
+              <span class="mono">{{ s.label }}</span>
             </div>
           </div>
         </div>
@@ -122,14 +124,17 @@ h1 .accent {
   border-top: 1px solid var(--line);
   flex-wrap: wrap;
 }
+.stat {
+  max-width: 220px;
+}
 .stat b {
   display: block;
   font-family: "Golos Text", sans-serif;
   font-weight: 600;
-  font-size: 22px;
-  letter-spacing: -0.01em;
+  font-size: 15.5px;
+  line-height: 1.25;
   color: var(--text-primary);
-  margin-bottom: 3px;
+  margin-bottom: 4px;
 }
 .stat span {
   font-size: 12px;

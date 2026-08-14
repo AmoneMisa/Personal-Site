@@ -11,7 +11,7 @@ const e = computed(() => content.value.experienceSection);
       <div class="section-head">
         <div class="eyebrow mono">{{ e.eyebrow }}</div>
         <h2>{{ e.title }}</h2>
-        <p>{{ e.subtitle }}</p>
+        <p v-if="e.subtitle">{{ e.subtitle }}</p>
       </div>
 
       <div class="timeline">
