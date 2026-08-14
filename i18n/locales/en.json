@@ -1428,6 +1428,7 @@
         "useB": "Substitute the value from B into the result for the selected key."
       }
     },
+    "open": "Open",
     "pdfEditor": {
       "actions": {
         "download": "Download",
