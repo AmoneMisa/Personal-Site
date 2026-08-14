@@ -33,6 +33,7 @@ const RU = {
     experience: "Опыт",
     petProjects: "Pet-проекты и не только",
     tools: "Инструменты",
+    cv: "Резюме",
     aboutMe: "Подробнее обо мне",
     contact: "Связаться",
     dropdown: {
@@ -152,6 +153,8 @@ const RU = {
     tag: "Фронтендер с потенциалом в фулстек. Пишу интерфейсы, backend-логику и деплой-процессы.",
     navTitle: "Навигация",
     navLinks: [
+      { label: "Резюме", href: "/cv" },
+      { label: "Обо мне", href: "/about" },
       { label: "Опыт", href: "#experience" },
       { label: "Pet-проекты", href: "#pet-projects" },
     ] as NavLinkT[],
@@ -167,6 +170,7 @@ const EN: typeof RU = {
     experience: "Experience",
     petProjects: "Pet projects & more",
     tools: "Tools",
+    cv: "CV",
     aboutMe: "More about me",
     contact: "Contact",
     dropdown: {
@@ -286,6 +290,8 @@ const EN: typeof RU = {
     tag: "A frontend dev growing into full-stack. I write interfaces, backend logic and deploy processes.",
     navTitle: "Navigation",
     navLinks: [
+      { label: "CV", href: "/cv" },
+      { label: "About", href: "/about" },
       { label: "Experience", href: "#experience" },
       { label: "Pet projects", href: "#pet-projects" },
     ],

@@ -57,6 +57,7 @@ const mobileOpen = ref(false);
         </div>
 
         <a class="nav-link" :href="resolveHref('#tools')">{{ nav.tools }}</a>
+        <a class="nav-link" :href="resolveHref('/cv')">{{ nav.cv }}</a>
         <a class="nav-link highlight" :href="resolveHref('/about')">{{ nav.aboutMe }}</a>
       </nav>
 
@@ -84,6 +85,7 @@ const mobileOpen = ref(false);
       <a class="m-link" :href="resolveHref('#experience')" @click="mobileOpen = false">{{ nav.experience }}</a>
       <a class="m-link" :href="resolveHref('#pet-projects')" @click="mobileOpen = false">{{ nav.petProjects }}</a>
       <a class="m-link" :href="resolveHref('#tools')" @click="mobileOpen = false">{{ nav.tools }}</a>
+      <a class="m-link" :href="resolveHref('/cv')" @click="mobileOpen = false">{{ nav.cv }}</a>
       <a class="m-link highlight" :href="resolveHref('/about')" @click="mobileOpen = false">{{ nav.aboutMe }}</a>
       <div class="m-row">
         <button type="button" class="lang-pill mono" @click="toggleLocale">{{ String(locale).toUpperCase() }}</button>
