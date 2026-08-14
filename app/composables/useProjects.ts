@@ -37,13 +37,6 @@ const GROUPS: RawGroup[] = [
         ru: "Персональная платформа онлайн-инструментов: PDF-редактор, слияние JSON, поиск тегов DockerHub, редакторы email/markdown/SVG. Тот же стек, что и в основной работе — Nuxt с SSR, мультиязычность, собственный REST-бэкенд.",
         en: "A personal platform of online tools: PDF editor, JSON merge, DockerHub tag search, email/markdown/SVG editors. The same stack as my main work — Nuxt with SSR, multi-language, a custom REST backend.",
       },
-      {
-        name: "Account Status (Lost Ark)",
-        stack: "Vue.js",
-        href: "https://github.com/AmoneMisa/accountStatusLA",
-        ru: "Приложение для сохранения и проверки статуса персонажей в Lost Ark (для личного использования).",
-        en: "An app to save and check character status in Lost Ark (built for personal use).",
-      },
     ],
   },
   {
@@ -83,6 +76,13 @@ const GROUPS: RawGroup[] = [
         href: null,
         ru: "Автоматически подтягивает данные персонажей парсингом HTML, отслеживает игровые активности с автосбросом по расписанию.",
         en: "Automatically pulls character data by parsing HTML, and tracks in-game activities with a scheduled auto-reset.",
+      },
+      {
+        name: "Account Status (Lost Ark)",
+        stack: "Electron.js · Vue.js",
+        href: "https://github.com/AmoneMisa/accountStatusLA",
+        ru: "Десктоп-приложение для сохранения и проверки статуса персонажей в Lost Ark (для личного использования). Онлайн-модуль работает через отдельный Node API.",
+        en: "A desktop app to save and check character status in Lost Ark (built for personal use). Its online module runs on a separate Node API.",
       },
     ],
   },
