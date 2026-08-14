@@ -6,6 +6,21 @@ export default defineNuxtConfig({
             htmlAttrs: {
                 lang: 'ru'
             },
+            script: [
+                {
+                    // The site is dark-only. Lock the color-mode storage/cookie to
+                    // "dark" BEFORE @nuxtjs/color-mode's own inline script reads it,
+                    // so a stale "system"/"light" value from the old theme toggle can
+                    // never resolve to light (which would apply the .light class and
+                    // strip Nuxt UI's dark tokens). Runs pre-paint, so no flash.
+                    tagPriority: 'critical',
+                    innerHTML:
+                        "try{localStorage.setItem('nuxt-color-mode','dark');" +
+                        "document.cookie='nuxt-color-mode=dark;path=/;max-age=31536000';}catch(e){}" +
+                        "var d=document.documentElement;d.classList.add('dark');" +
+                        "d.classList.remove('light');d.style.colorScheme='dark';"
+                }
+            ],
             link: [
                 {
                     rel: "preload",
