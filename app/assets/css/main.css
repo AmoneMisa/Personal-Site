@@ -43,7 +43,11 @@
     }
 }
 
-/* ---- Redesign global typography + ground (site-wide) ---- */
+/* ---- Redesign global typography + ground (site-wide, dark-only) ---- */
+html {
+    background: var(--bg-deep);
+    color-scheme: dark;
+}
 body {
     background: var(--bg-deep);
     font-family: "Inter", "PT Root UI", sans-serif;

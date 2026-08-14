@@ -399,9 +399,9 @@ useHead({
   align-self: flex-start;
   padding: 6px 14px;
   border-radius: 100px;
-  border: 1px solid var(--ui-border);
-  background: var(--color-blackest);
-  color: var(--ui-text-muted);
+  border: 1px solid var(--line);
+  background: var(--bg-panel);
+  color: var(--text-muted);
   font-size: 13px;
   font-weight: 500;
 }
@@ -410,11 +410,11 @@ useHead({
   font-size: clamp(32px, 6vw, 56px);
   font-weight: 800;
   line-height: 1.05;
-  color: var(--ui-text, #fff);
+  color: var(--text-primary);
 }
 
 .cv__role {
-  background: var(--color-primary-gradient);
+  background: linear-gradient(90deg, var(--accent-pink), var(--accent-blue));
   -webkit-background-clip: text;
   background-clip: text;
   -webkit-text-fill-color: transparent;
@@ -423,7 +423,7 @@ useHead({
 .cv__tagline {
   font-size: 18px;
   font-weight: 600;
-  color: var(--color-secondary);
+  color: var(--accent-blue);
   letter-spacing: 0.3px;
 }
 
@@ -431,11 +431,11 @@ useHead({
   max-width: 720px;
   font-size: 17px;
   line-height: 1.6;
-  color: var(--ui-text-muted);
+  color: var(--text-muted);
 }
 
 .cv__meta {
-  color: var(--ui-text-muted);
+  color: var(--text-muted);
   font-size: 14px;
 }
 
@@ -453,9 +453,9 @@ useHead({
   padding: 0 20px;
   border-radius: 14px;
   font-weight: 650;
-  border: 1px solid var(--ui-border);
+  border: 1px solid var(--line);
   background: rgba(255, 255, 255, 0.03);
-  color: var(--ui-text, #fff);
+  color: var(--text-primary);
   transition: 0.2s ease;
 }
 
@@ -464,9 +464,9 @@ useHead({
 }
 
 .cv__btn_primary {
-  background: var(--color-primary);
+  background: var(--accent-pink);
   border-color: transparent;
-  color: #fff;
+  color: #1a0e14;
 }
 
 .cv__btn_primary:hover {
@@ -494,7 +494,7 @@ useHead({
 .cv__h2 {
   font-size: 24px;
   font-weight: 700;
-  color: var(--ui-text, #fff);
+  color: var(--text-primary);
 }
 
 .cv__skills {
@@ -513,7 +513,7 @@ useHead({
   font-size: 12px;
   text-transform: uppercase;
   letter-spacing: 0.6px;
-  color: var(--ui-text-muted);
+  color: var(--text-muted);
   margin-bottom: 10px;
 }
 
@@ -529,9 +529,9 @@ useHead({
 .cv__chip {
   padding: 6px 12px;
   border-radius: 10px;
-  border: 1px solid var(--ui-border);
-  background: var(--color-blackest);
-  color: var(--ui-text, #fff);
+  border: 1px solid var(--line);
+  background: var(--bg-panel);
+  color: var(--text-primary);
   font-size: 14px;
 }
 
@@ -553,23 +553,23 @@ useHead({
 
 .cv__job-role {
   font-weight: 700;
-  color: var(--ui-text, #fff);
+  color: var(--text-primary);
 }
 
 .cv__job-company {
-  color: var(--color-secondary);
+  color: var(--accent-blue);
 }
 
 .cv__job-period {
   margin-left: auto;
-  color: var(--ui-text-muted);
+  color: var(--text-muted);
   font-size: 14px;
 }
 
 .cv__job-points {
   margin: 8px 0 0;
   padding-left: 18px;
-  color: var(--ui-text-muted);
+  color: var(--text-muted);
   line-height: 1.6;
   display: flex;
   flex-direction: column;
@@ -578,7 +578,7 @@ useHead({
 
 .cv__edu-degree {
   margin: 6px 0 0;
-  color: var(--ui-text-muted);
+  color: var(--text-muted);
 }
 
 .cv__projects {
@@ -599,40 +599,29 @@ useHead({
   gap: 6px;
   padding: 18px;
   border-radius: 16px;
-  border: 1px solid var(--ui-border);
-  background: var(--color-blackest);
+  border: 1px solid var(--line);
+  background: var(--bg-panel);
   transition: 0.2s ease;
 }
 
 .cv__project:hover {
-  border-color: var(--color-primary);
+  border-color: var(--accent-pink);
   transform: translateY(-2px);
 }
 
 .cv__project-name {
   font-weight: 700;
-  color: var(--ui-text, #fff);
+  color: var(--text-primary);
 }
 
 .cv__project-stack {
   font-size: 13px;
-  color: var(--color-secondary);
+  color: var(--accent-blue);
 }
 
 .cv__project-desc {
   font-size: 14px;
   line-height: 1.5;
-  color: var(--ui-text-muted);
-}
-
-.light {
-  .cv__name,
-  .cv__h2,
-  .cv__chip,
-  .cv__project-name,
-  .cv__job-role,
-  .cv__btn {
-    color: var(--ui-text);
-  }
+  color: var(--text-muted);
 }
 </style>
