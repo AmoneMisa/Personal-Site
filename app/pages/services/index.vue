@@ -144,7 +144,8 @@ const howSteps = [
 }
 .services__h2 {
   font-size: 24px;
-  font-weight: 400;
+  font-weight: 500;
+  letter-spacing: -0.01em;
   margin-bottom: 22px;
 }
 .services__how-grid {

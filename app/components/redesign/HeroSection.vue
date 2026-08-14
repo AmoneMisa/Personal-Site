@@ -74,20 +74,22 @@ const { labelYM } = useExperienceYears();
   margin-bottom: 16px;
 }
 h1 {
-  font-size: 38px;
-  line-height: 1.24;
-  font-weight: 400;
-  margin-bottom: 20px;
+  font-size: clamp(34px, 5.2vw, 52px);
+  line-height: 1.08;
+  font-weight: 600;
+  letter-spacing: -0.015em;
+  margin-bottom: 22px;
+  color: var(--text-primary);
 }
 h1 .accent {
   color: var(--accent-pink);
 }
 .lead {
-  font-size: 16px;
-  color: var(--text-muted);
-  max-width: 500px;
-  margin-bottom: 30px;
-  line-height: 1.6;
+  font-size: 17px;
+  color: var(--text-soft);
+  max-width: 520px;
+  margin-bottom: 32px;
+  line-height: 1.62;
 }
 .hero-actions {
   display: flex;
@@ -123,10 +125,11 @@ h1 .accent {
 .stat b {
   display: block;
   font-family: "Golos Text", sans-serif;
-  font-weight: 400;
-  font-size: 19px;
+  font-weight: 600;
+  font-size: 22px;
+  letter-spacing: -0.01em;
   color: var(--text-primary);
-  margin-bottom: 2px;
+  margin-bottom: 3px;
 }
 .stat span {
   font-size: 12px;
@@ -165,9 +168,6 @@ h1 .accent {
   .hero-grid {
     grid-template-columns: 1fr;
     gap: 36px;
-  }
-  h1 {
-    font-size: 30px;
   }
 }
 </style>

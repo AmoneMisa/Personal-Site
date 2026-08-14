@@ -33,7 +33,8 @@ const t = computed(() => content.value.toolsSection);
 }
 h2 {
   font-size: 25px;
-  font-weight: 400;
+  font-weight: 500;
+  letter-spacing: -0.01em;
 }
 .tools-row {
   display: flex;

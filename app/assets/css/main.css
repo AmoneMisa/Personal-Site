@@ -109,8 +109,9 @@ h1, h2, h3, h4, h5, h6 {
     --accent-pink: #e0679a;
     --accent-blue: #7189d9;
     --line: #252a4a;
-    --text-primary: #e4e5f0;
-    --text-muted: #8286a6;
+    --text-primary: #eef0f7;
+    --text-soft: #c8ccdf;
+    --text-muted: #9ea4c1;
     --radius: 10px;
 
     /* Base surface now follows the redesign navy site-wide. */

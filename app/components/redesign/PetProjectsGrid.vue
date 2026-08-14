@@ -57,7 +57,8 @@ function isExternal(href: string | null) {
 }
 h2 {
   font-size: 25px;
-  font-weight: 400;
+  font-weight: 500;
+  letter-spacing: -0.01em;
 }
 .section-head p {
   color: var(--text-muted);

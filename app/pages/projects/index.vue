@@ -96,8 +96,9 @@ useSeoMeta({
   padding-top: 56px;
 }
 .projects-hero h1 {
-  font-size: 34px;
-  font-weight: 400;
+  font-size: clamp(30px, 5vw, 44px);
+  font-weight: 600;
+  letter-spacing: -0.015em;
   margin-bottom: 18px;
 }
 .projects-hero .lead {
@@ -108,7 +109,8 @@ useSeoMeta({
 }
 .group-title {
   font-size: 22px;
-  font-weight: 400;
+  font-weight: 500;
+  letter-spacing: -0.01em;
   margin-bottom: 22px;
 }
 .proj-grid {

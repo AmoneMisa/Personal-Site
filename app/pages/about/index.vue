@@ -263,8 +263,9 @@ useSeoMeta({
   padding-top: 56px;
 }
 .about-hero h1 {
-  font-size: 34px;
-  font-weight: 400;
+  font-size: clamp(30px, 5vw, 44px);
+  font-weight: 600;
+  letter-spacing: -0.015em;
   margin-bottom: 18px;
 }
 .about-hero .lead {
@@ -279,7 +280,8 @@ useSeoMeta({
 }
 .section-head h2 {
   font-size: 25px;
-  font-weight: 400;
+  font-weight: 500;
+  letter-spacing: -0.01em;
 }
 .section-head p {
   color: var(--text-muted);
