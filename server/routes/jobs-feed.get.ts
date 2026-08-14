@@ -21,7 +21,6 @@ import {
   fetchAdzuna,
   fetchArbeitnow,
   fetchCompanies,
-  fetchHeadHunter,
   fetchJobicy,
   fetchJooble,
   fetchOlx,
@@ -32,12 +31,12 @@ import {
 } from '../utils/sources'
 import { filterAndPaginate } from '../utils/aggregate'
 import { getStoredJobs, refreshJobStore } from '../utils/jobsStore'
+import { getRates, loadRates } from '../utils/currency'
 
 const FETCHERS: Record<JobSource, (q: string) => Promise<Job[]>> = {
   remotive: fetchRemotive,
   remoteok: fetchRemoteOk,
   arbeitnow: fetchArbeitnow,
-  headhunter: fetchHeadHunter,
   themuse: fetchTheMuse,
   jobicy: fetchJobicy,
   adzuna: fetchAdzuna,
@@ -165,6 +164,10 @@ export default defineEventHandler(async (event) => {
     .map((s) => s.trim())
     .filter(Boolean)
 
+  // Ensure the FX rate table is in memory before enrichment normalizes salaries
+  // to USD, and so the response can hand the live rates to the client.
+  await loadRates()
+
   // Primary path: read the pre-aggregated store the scheduled worker maintains,
   // so requests never block on (or get geo-blocked by) upstream boards. Cold
   // fallback: pull live once and kick a background refresh to warm the store.
@@ -174,26 +177,29 @@ export default defineEventHandler(async (event) => {
     refreshJobStore().catch(() => {})
   }
 
-  return filterAndPaginate(pool, {
-    q: search,
-    location: String(q.location ?? '').trim(),
-    remote,
-    sources: finalSources,
-    sort,
-    maxAgeDays: clampInt(q.maxAgeDays, 14, 1, 14),
-    salaryMin,
-    countries,
-    includeRu,
-    includeBy,
-    workMode,
-    relocation,
-    foreignerFriendly,
-    noExperience,
-    language,
-    languageLevel,
-    excludeLanguages,
-    skills,
-    page: clampInt(q.page, 1, 1, 10000),
-    pageSize: clampInt(q.pageSize, 20, 1, 100),
-  })
+  return {
+    ...filterAndPaginate(pool, {
+      q: search,
+      location: String(q.location ?? '').trim(),
+      remote,
+      sources: finalSources,
+      sort,
+      maxAgeDays: clampInt(q.maxAgeDays, 14, 1, 14),
+      salaryMin,
+      countries,
+      includeRu,
+      includeBy,
+      workMode,
+      relocation,
+      foreignerFriendly,
+      noExperience,
+      language,
+      languageLevel,
+      excludeLanguages,
+      skills,
+      page: clampInt(q.page, 1, 1, 10000),
+      pageSize: clampInt(q.pageSize, 20, 1, 100),
+    }),
+    rates: getRates(),
+  }
 })

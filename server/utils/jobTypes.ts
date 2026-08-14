@@ -42,7 +42,6 @@ export type JobSource =
   | 'remotive'
   | 'remoteok'
   | 'arbeitnow'
-  | 'headhunter'
   | 'themuse'
   | 'jobicy'
   | 'adzuna'
@@ -55,7 +54,6 @@ export const FREE_SOURCES: JobSource[] = [
   'remotive',
   'remoteok',
   'arbeitnow',
-  'headhunter',
   'themuse',
   'jobicy',
 ]
@@ -116,4 +114,8 @@ export interface JobResponse {
   pageSize: number
   sources: Partial<Record<JobSource, number>>
   stats: JobStats
+  // Live currency → USD rates (USD per 1 unit) used for this response, so the
+  // client can convert/display salaries in sync with the server. Filled by the
+  // route from the shared fx cache (server/utils/currency.ts).
+  rates?: Record<string, number>
 }

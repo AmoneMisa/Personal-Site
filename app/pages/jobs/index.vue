@@ -53,79 +53,12 @@ interface JobResult {
   pageSize: number;
   sources: Record<string, number>;
   stats: JobStats;
+  rates?: Record<string, number>;
 }
 
-const messages = {
-  en: {
-    title: "Job Finder", headline: "Vacancies from many sources, no older than 14 days",
-    subtitle: "Search jobs aggregated from HeadHunter, DOU.ua, Jooble, The Muse, Jobicy, Remotive, RemoteOK, Arbeitnow and more. Tuned for Uzbekistan & CIS.",
-    searchPlaceholder: "Title, keyword or company",
-    search: "Search", searching: "Searching…", all: "All",
-    sortLabel: "Sort", salaryMin: "Min salary", currency: "Currency", period: "Per",
-    perHour: "hour", perMonth: "month", perYear: "year",
-    sortDate: "Newest", sortOldest: "Oldest", sortTitle: "Title A–Z", sortCompany: "Company A–Z",
-    sortSalary: "Salary", sortAts: "ATS match",
-    jobsFound: "{n} jobs", empty: "No jobs match your search.", error: "Could not load jobs. Please try again.",
-    prev: "Previous", next: "Next", page: "Page {page} / {total}", remote: "Remote", today: "today",
-    yesterday: "yesterday", daysAgo: "{n}d ago", monthsAgo: "{n}mo ago",
-    // advanced filters
-    advanced: "Advanced filters", country: "Countries", workMode: "Work mode", relocation: "Relocation",
-    language: "Language", languageLevel: "Level", skills: "Skills (comma-separated)",
-    excludeLanguage: "Exclude languages", includeRu: "Include Russia", includeBy: "Include Belarus",
-    countryPlaceholder: "Any country", excludeLangPlaceholder: "None",
-    foreigner: "Foreigner-friendly", any: "Any", noExperience: "Without experience",
-    wmRemote: "Remote", wmHybrid: "Hybrid", wmOffice: "Office",
-    relYes: "Offered", relNo: "None", reset: "Reset filters",
-    // stats
-    statsTitle: "Statistics", statsSalary: "Salary", statMedian: "median", statAvg: "avg",
-    statRange: "range", statSamples: "{n} with pay", statByCountry: "Median pay by country",
-    statBySource: "Median pay by source", statByMode: "Work mode", statLanguages: "Languages in demand",
-    statForeigner: "Foreigner-friendly: {n}", statTopSkills: "Top skills", statNone: "Not enough salary data yet.",
-    // card
-    cardForeigner: "foreigner-friendly", cardReloc: "relocation",
-    atsTitle: "ATS match", atsIntro: "Upload or paste your CV to see how well you match each vacancy. Your CV stays in your browser.",
-    atsUpload: "Upload CV (.pdf .docx .txt)", atsPaste: "…or paste CV text here",
-    atsClear: "Clear CV", atsReady: "CV loaded — scores shown on each vacancy.", atsMatch: "match",
-    atsMatched: "Matching keywords", atsMissing: "Missing keywords",
-    atsNoSkills: "No recognizable tech skills in this vacancy.",
-    seoTitle: "Job Finder — vacancies from many sources with ATS match",
-    seoDescription: "Search fresh job vacancies (max 14 days) from multiple sources, filter by country/skills/language, see salary statistics, and get an ATS match score for your CV.",
-  },
-  ru: {
-    title: "Поиск вакансий", headline: "Вакансии из множества источников, не старше 14 дней",
-    subtitle: "Поиск вакансий из HeadHunter, DOU.ua, Jooble, The Muse, Jobicy, Remotive, RemoteOK, Arbeitnow и других. Настроено на Узбекистан и СНГ.",
-    searchPlaceholder: "Должность, ключевое слово или компания",
-    search: "Искать", searching: "Поиск…", all: "Все",
-    sortLabel: "Сортировка", salaryMin: "Зарплата от", currency: "Валюта", period: "За",
-    perHour: "час", perMonth: "месяц", perYear: "год",
-    sortDate: "Сначала новые", sortOldest: "Сначала старые", sortTitle: "Название A–Я", sortCompany: "Компания A–Я",
-    sortSalary: "Зарплата", sortAts: "Совпадение ATS",
-    jobsFound: "Вакансий: {n}", empty: "Ничего не найдено.", error: "Не удалось загрузить вакансии.",
-    prev: "Назад", next: "Вперёд", page: "Страница {page} / {total}", remote: "Удалённо", today: "сегодня",
-    yesterday: "вчера", daysAgo: "{n} дн. назад", monthsAgo: "{n} мес. назад",
-    advanced: "Расширенные фильтры", country: "Страны", workMode: "Формат работы", relocation: "Релокация",
-    language: "Язык", languageLevel: "Уровень", skills: "Навыки (через запятую)",
-    excludeLanguage: "Исключить языки", includeRu: "Включить Россию", includeBy: "Включить Беларусь",
-    countryPlaceholder: "Любая страна", excludeLangPlaceholder: "Нет",
-    foreigner: "Для иностранцев", any: "Любой", noExperience: "Без опыта",
-    wmRemote: "Удалённо", wmHybrid: "Гибрид", wmOffice: "Офис",
-    relYes: "Есть", relNo: "Нет", reset: "Сбросить фильтры",
-    statsTitle: "Статистика", statsSalary: "Зарплата", statMedian: "медиана", statAvg: "средн.",
-    statRange: "диапазон", statSamples: "{n} с зарплатой", statByCountry: "Медиана по странам",
-    statBySource: "Медиана по источникам", statByMode: "Формат работы", statLanguages: "Востребованные языки",
-    statForeigner: "Для иностранцев: {n}", statTopSkills: "Топ навыков", statNone: "Пока мало данных о зарплатах.",
-    cardForeigner: "для иностранцев", cardReloc: "релокация",
-    atsTitle: "Совпадение ATS", atsIntro: "Загрузите или вставьте резюме, чтобы увидеть, насколько вы подходите. Резюме остаётся в браузере.",
-    atsUpload: "Загрузить резюме (.pdf .docx .txt)", atsPaste: "…или вставьте текст резюме",
-    atsClear: "Очистить", atsReady: "Резюме загружено — оценки показаны у вакансий.", atsMatch: "совпадение",
-    atsMatched: "Совпадающие ключевые слова", atsMissing: "Не хватает ключевых слов",
-    atsNoSkills: "В вакансии нет распознаваемых тех. навыков.",
-    seoTitle: "Поиск вакансий из множества источников с оценкой ATS",
-    seoDescription: "Поиск свежих вакансий (не старше 14 дней) из разных источников, фильтры по стране/навыкам/языку, статистика зарплат и оценка ATS для резюме.",
-  },
-} as const;
-
-const { t } = useI18n({ useScope: "local", messages });
+const { t: translate } = useI18n();
+const t = (key: string, params: Record<string, unknown> = {}) =>
+  translate(`jobs.${key}`, params);
 
 useSeoMeta({
   title: () => t("seoTitle"), description: () => t("seoDescription"),
@@ -136,7 +69,6 @@ useSeoMeta({
 
 const sourceOptions = [
   { value: "", labelKey: "all" },
-  { value: "headhunter", label: "HeadHunter" },
   { value: "rss", label: "DOU.ua" },
   { value: "jooble", label: "Jooble" },
   { value: "themuse", label: "The Muse" },
@@ -176,21 +108,24 @@ const countryOptions = [
 const languageOptions = ["English", "German", "Russian", "Ukrainian", "Uzbek", "French", "Spanish", "Polish", "Turkish"];
 const levelOptions = ["A1", "A2", "B1", "B2", "C1", "C2", "Intermediate", "Upper-Intermediate", "Advanced", "Fluent", "Native"];
 
-// Approximate currency → USD rates. Mirrors server/utils/enrich.ts USD_RATES so the
-// client can display salaries in the user's chosen currency without a refetch.
-const USD_RATES: Record<string, number> = {
-  USD: 1, EUR: 1.09, GBP: 1.27, PLN: 0.25, UAH: 0.024, KZT: 0.0019,
-  UZS: 0.000079, AZN: 0.59, GEL: 0.37, AMD: 0.0026, KGS: 0.011, MDL: 0.056,
-  TJS: 0.092, TMT: 0.286, TRY: 0.030, CAD: 0.73, CHF: 1.12, INR: 0.012,
-  CNY: 0.14, JPY: 0.0064, KRW: 0.00072,
-};
-const currencyOptions = ["USD", "EUR", "UZS", "UAH", "KZT", "PLN", "GBP", "AZN", "GEL", "AMD", "KGS", "MDL", "TJS", "TRY"];
+// Rates are supplied by /jobs-feed from the shared server FX cache. Keep USD as
+// the cold/error fallback; the first successful response expands this to every
+// three-letter currency returned by the live provider.
+const usdRates = ref<Record<string, number>>({ USD: 1 });
+const preferredCurrencies = ["USD", "EUR", "UZS", "UAH", "KZT", "PLN", "GBP"];
+const currencyOptions = computed(() => {
+  const available = Object.keys(usdRates.value)
+    .filter((code) => /^[A-Z]{3}$/.test(code) && usdRates.value[code]! > 0);
+  const preferred = preferredCurrencies.filter((code) => available.includes(code));
+  const rest = available.filter((code) => !preferred.includes(code)).sort();
+  return [...preferred, ...rest];
+});
 const CURRENCY_SYMBOL: Record<string, string> = { USD: "$", EUR: "€", GBP: "£" };
 
 // Convert between two currencies via USD. Returns undefined if a rate is unknown.
 function convertCurrency(amount: number, from: string, to: string): number | undefined {
-  const rf = USD_RATES[(from || "USD").toUpperCase()];
-  const rt = USD_RATES[(to || "USD").toUpperCase()];
+  const rf = usdRates.value[(from || "USD").toUpperCase()];
+  const rt = usdRates.value[(to || "USD").toUpperCase()];
   if (!rf || !rt) return undefined;
   return Math.round((amount * rf) / rt);
 }
@@ -298,6 +233,7 @@ async function load(toPage = 1) {
   if (error || !data) {
     failed.value = true; jobs.value = []; total.value = 0; stats.value = null;
   } else {
+    if (data.rates && data.rates.USD) usdRates.value = data.rates;
     jobs.value = data.jobs; total.value = data.total; page.value = data.page;
     pageSize.value = data.pageSize; stats.value = data.stats;
   }
@@ -323,7 +259,7 @@ async function onCvFile(e: Event) {
     cvProfile.value = buildCvProfile(text);
     if (!jobs.value.length || total.value > pageSize.value) await load(1);
   } catch (err: any) {
-    cvError.value = err?.message || "Could not read file.";
+    cvError.value = err?.message || t("atsReadError");
   } finally {
     cvLoading.value = false;
   }
@@ -331,7 +267,7 @@ async function onCvFile(e: Event) {
 
 function applyPastedCv() {
   if (cvPaste.value.trim().length < 30) {
-    cvError.value = "Please paste a bit more CV text.";
+    cvError.value = t("atsPasteTooShort");
     return;
   }
   cvError.value = null;
@@ -440,7 +376,7 @@ const sortItems = computed<Item[]>(() => {
 const countryItems = computed<Item[]>(() =>
   countryOptions.filter((c) => c.value).map((c) => ({ value: c.value, label: c.label! })),
 );
-const currencyItems = computed<Item[]>(() => currencyOptions.map((c) => ({ label: c, value: c })));
+const currencyItems = computed<Item[]>(() => currencyOptions.value.map((c) => ({ label: c, value: c })));
 const periodItems = computed<Item[]>(() => periodOptions.map((p) => ({ label: periodLabel(p), value: p })));
 const workModeItems = computed<Item[]>(() => [
   { label: t("any"), value: "" },
@@ -613,7 +549,7 @@ await load(1);
         </label>
         <label class="jobs__field jobs__field_wide">
           <span class="jobs__field-label">{{ t("skills") }}</span>
-          <u-input v-model="skills" icon="i-lucide-wrench" placeholder="react, typescript, docker" @keyup.enter="load(1)" />
+          <u-input v-model="skills" icon="i-lucide-wrench" :placeholder="t('skillsPlaceholder')" @keyup.enter="load(1)" />
         </label>
         <label class="jobs__remote jobs__field_inline">
           <u-switch v-model="foreignerOnly" @update:model-value="load(1)" />

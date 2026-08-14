@@ -4,13 +4,19 @@
 // startup, and the daily scheduled task keeps it fresh thereafter.
 
 import { getStoredJobs, refreshJobStore } from '~~/server/utils/jobsStore'
+import { refreshRates } from '~~/server/utils/currency'
 
 export default defineNitroPlugin(() => {
   // Defer slightly so boot completes first; then only refresh a cold store.
   setTimeout(async () => {
     try {
       const existing = await getStoredJobs()
-      if (existing.length) return
+      // A cold job refresh already refreshes FX first. With a warm store, refresh
+      // FX directly so rates are still seeded once on every deployment.
+      if (existing.length) {
+        await refreshRates()
+        return
+      }
       const summary = await refreshJobStore()
       console.log(`[jobs:warmup] cold store populated: stored=${summary.stored}`)
     } catch (err) {

@@ -98,101 +98,6 @@ export async function fetchArbeitnow(_q: string): Promise<Job[]> {
   }))
 }
 
-// ---------- HeadHunter / hh (no key) ----------
-// Docs: https://api.hh.ru/openapi . Requires a User-Agent header.
-// Tuned for CIS: fetches CIS countries and deliberately EXCLUDES Russia (113)
-// and Belarus (16). Area ids (verified via api.hh.ru/areas/countries):
-// 5=Ukraine, 40=Kazakhstan, 9=Azerbaijan, 28=Georgia, 97=Uzbekistan,
-// 13=Armenia, 48=Kyrgyzstan, 62=Moldova, 86=Tajikistan, 93=Turkmenistan.
-// Override with HH_AREAS="5,40,..." (or legacy HH_AREA).
-const HH_CIS_AREAS = ['5', '40', '9', '28', '97', '13', '48', '62', '86', '93']
-
-// Ukraine (5) and Uzbekistan (97) are pulled several pages deep so the feed
-// carries their full breadth of professions — including non-IT roles — rather
-// than only the newest ~50. Other CIS areas take a single page to stay light.
-// Since the worker queries HH with an empty text, deeper paging = more industries.
-// Depth is overridable via HH_PAGES (applies to the deep areas only).
-const HH_DEEP_AREAS = new Set(['5', '97'])
-const HH_PAGE_SIZE = 100 // HH allows up to 100 per page (max 2000 results / 20 pages)
-
-function hhPages(area: string): number {
-  const env = Number(process.env.HH_PAGES)
-  const deep = Number.isFinite(env) && env > 0 ? Math.min(env, 20) : 5
-  return HH_DEEP_AREAS.has(area) ? deep : 1
-}
-
-function hhAreas(): string[] {
-  const env = process.env.HH_AREAS || process.env.HH_AREA
-  const list = env ? env.split(',').map((s) => s.trim()).filter(Boolean) : HH_CIS_AREAS
-  // Never query Russia (113) or Belarus (16), even if configured.
-  return list.filter((a) => a !== '113' && a !== '16')
-}
-
-// HH closed anonymous access to /vacancies (the API now answers 403 "forbidden"
-// without credentials — verified 2026-07). Register an app at https://dev.hh.ru,
-// then set HH_TOKEN to the application token to re-enable this source.
-function hhHeaders(): Record<string, string> {
-  const token = process.env.HH_TOKEN
-  return token ? { Authorization: `Bearer ${token}` } : {}
-}
-
-async function fetchHhArea(area: string, q: string, page: number): Promise<Job[]> {
-  const params = new URLSearchParams({
-    per_page: String(HH_PAGE_SIZE),
-    page: String(page),
-    order_by: 'publication_time',
-    period: '14', // last 14 days
-    area,
-  })
-  if (q) params.set('text', q)
-  const data = await fetchJson<{ items: any[] }>(`https://api.hh.ru/vacancies?${params}`, {
-    headers: hhHeaders(),
-  })
-  return (data.items || []).map((j) => {
-    const snippet = [j.snippet?.requirement, j.snippet?.responsibility].filter(Boolean).join(' ')
-    return {
-      id: `hh-${j.id}`,
-      title: j.name,
-      company: j.employer?.name || 'Unknown',
-      location: j.area?.name || 'Unknown',
-      url: j.alternate_url || j.url,
-      source: 'headhunter' as const,
-      remote: j.schedule?.id === 'remote',
-      tags: j.professional_roles?.map((r: any) => r.name).slice(0, 6) || [],
-      postedAt: new Date(j.published_at).toISOString(),
-      employmentType: j.employment?.name,
-      salaryMin: j.salary?.from ?? undefined,
-      salaryMax: j.salary?.to ?? undefined,
-      salaryCurrency: j.salary?.currency ?? undefined,
-      description: stripHtml(snippet).slice(0, DESC_MAX),
-    }
-  })
-}
-
-export async function fetchHeadHunter(q: string): Promise<Job[]> {
-  const tasks: Promise<Job[]>[] = []
-  let forbidden = 0
-  for (const area of hhAreas()) {
-    for (let page = 0; page < hhPages(area); page++) {
-      tasks.push(
-        fetchHhArea(area, q, page).catch((err) => {
-          if (/-> 403/.test((err as Error).message)) forbidden++
-          else console.error(`[jobs] hh area ${area} p${page} failed:`, (err as Error).message)
-          return [] as Job[]
-        }),
-      )
-    }
-  }
-  const results = await Promise.all(tasks)
-  if (forbidden) {
-    console.error(
-      `[jobs] hh: ${forbidden} request(s) rejected with 403. HH requires authorization now — `
-      + `register an app at https://dev.hh.ru and set HH_TOKEN${process.env.HH_TOKEN ? ' (current token was rejected)' : ''}.`,
-    )
-  }
-  return results.flat()
-}
-
 // ---------- The Muse (no key; optional MUSE_API_KEY) ----------
 export async function fetchTheMuse(q: string): Promise<Job[]> {
   const key = process.env.MUSE_API_KEY
@@ -1060,9 +965,8 @@ export async function fetchRss(q: string): Promise<Job[]> {
 }
 
 // ---------- OLX (no key) — Uzbekistan + Kazakhstan classifieds ----------
-// OLX exposes a public offers JSON API (the same one its own site calls). This is
-// the only viable UZ/KZ source when HeadHunter is unavailable: hh.uz/hh.kz are
-// separate, auth-gated DBs, and every UZ/KZ career site is either bespoke, SPA,
+// OLX exposes a public offers JSON API (the same one its own site calls). It is
+// the primary keyless UZ/KZ source; most regional career sites are bespoke, SPA,
 // geo-blocked, or robots-forbidden. OLX's robots.txt permits /api/v1/offers/
 // (only */ajax/, */search/ and specific sub-endpoints are disallowed), so this
 // uses the allowed listing endpoint — an official API, not HTML scraping.

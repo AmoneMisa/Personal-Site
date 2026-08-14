@@ -4,6 +4,7 @@
 // and meant to power filtering and statistics, not to be authoritative.
 
 import type { Job, LanguageReq, Relocation, SalaryPeriod, WorkMode } from './jobTypes'
+import { toUsd } from './currency'
 
 // ---- HTML → plain text ----
 // Many boards return HTML (sometimes HTML-encoded, occasionally double-encoded)
@@ -50,21 +51,9 @@ export function cleanText(raw: string | undefined): string {
   return s.replace(/[\u0000-\u001f]+/g, ' ').replace(/\s+/g, ' ').trim()
 }
 
-// ---- Currency → USD (APPROXIMATE static rates; update as needed) ----
-// Russia/Belarus intentionally omitted (excluded elsewhere).
-const USD_RATES: Record<string, number> = {
-  USD: 1, EUR: 1.09, GBP: 1.27, PLN: 0.25, UAH: 0.024, KZT: 0.0019,
-  UZS: 0.000079, AZN: 0.59, GEL: 0.37, AMD: 0.0026, KGS: 0.011, MDL: 0.056,
-  TJS: 0.092, TMT: 0.286, TRY: 0.030, CAD: 0.73, CHF: 1.12, INR: 0.012,
-  CNY: 0.14, JPY: 0.0064, KRW: 0.00072,
-}
-
-export function toUsd(amount: number | undefined, currency: string | undefined): number | undefined {
-  if (!amount || amount <= 0) return undefined
-  const rate = USD_RATES[(currency || 'USD').toUpperCase()]
-  if (!rate) return undefined
-  return Math.round(amount * rate)
-}
+// ---- Currency → USD ----
+// Live rates live in ./currency (fetched from an exchange-rate API, cached in
+// Redis, with a static fallback). `toUsd` is imported at the top of this file.
 
 // ---- Pay-period normalization ----
 // Salaries arrive in different periods (hourly/monthly/yearly) with no explicit
@@ -80,7 +69,7 @@ export const PER_YEAR: Record<SalaryPeriod, number> = {
 
 // Sources that quote monthly salaries by convention (CIS boards) when text gives
 // no explicit period. Everything else defaults to yearly (typical for remote/EU/US).
-const MONTHLY_SOURCES = new Set<Job['source']>(['headhunter', 'jooble', 'rss', 'olx'])
+const MONTHLY_SOURCES = new Set<Job['source']>(['jooble', 'rss', 'olx'])
 
 function detectSalaryPeriod(job: Job, text: string): SalaryPeriod {
   if (/per hour|\/\s?h(ou)?r\b|hourly|\bp\/h\b|в час|за час|годину|годин\b/i.test(text)) return 'hour'

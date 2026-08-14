@@ -9,11 +9,11 @@
 
 import { useRedis } from '~~/server/utils/redis'
 import { ALL_SOURCES, type Job, type JobSource } from './jobTypes'
+import { refreshRates } from './currency'
 import {
   fetchAdzuna,
   fetchArbeitnow,
   fetchCompanies,
-  fetchHeadHunter,
   fetchJobicy,
   fetchJooble,
   fetchOlx,
@@ -32,7 +32,6 @@ const FETCHERS: Record<JobSource, (q: string) => Promise<Job[]>> = {
   remotive: fetchRemotive,
   remoteok: fetchRemoteOk,
   arbeitnow: fetchArbeitnow,
-  headhunter: fetchHeadHunter,
   themuse: fetchTheMuse,
   jobicy: fetchJobicy,
   adzuna: fetchAdzuna,
@@ -100,6 +99,9 @@ export async function refreshJobStore(): Promise<{
 }> {
   const now = Date.now()
   const nowIso = new Date(now).toISOString()
+
+  // Refresh live FX rates on the same daily cadence as the vacancy pull.
+  await refreshRates()
 
   const sources = ALL_SOURCES.filter(isConfigured)
   const results = await Promise.all(
