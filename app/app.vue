@@ -49,6 +49,14 @@ useSeoMeta({
   twitterImage: `${SITE_URL}/images/og-home.png`
 });
 
+// Canonical URL for every route. useLocaleHead emits hreflang alternates but no
+// canonical, so pages were flagged "Canonical URL missing". Path-only (no query)
+// and locale-prefixed, so /en/about canonicalises to .../en/about.
+const canonicalUrl = computed(() => `${SITE_URL}${route.path === "/" ? "" : route.path}`);
+useHead(() => ({
+  link: [{ rel: "canonical", href: canonicalUrl.value }]
+}));
+
 useHead({
   ...localeHead,
   script: [
@@ -65,6 +73,36 @@ useHead({
           target: `${SITE_URL}/services?q={search_term_string}`,
           "query-input": "required name=search_term_string"
         }
+      })
+    },
+    {
+      // Person schema — the site is a developer portfolio, so the owner is the
+      // primary entity. Helps HR/recruiters and rich results tie the pages to a
+      // real professional profile (name, role, skills, verified social links).
+      type: "application/ld+json",
+      innerHTML: JSON.stringify({
+        "@context": "https://schema.org",
+        "@type": "Person",
+        name: "Marharyta Kubai",
+        alternateName: "Маргарита Кубай",
+        url: SITE_URL,
+        image: `${SITE_URL}/images/photo.png`,
+        jobTitle: "Frontend Developer",
+        knowsAbout: [
+          "Vue.js", "Nuxt.js", "TypeScript", "JavaScript", "SCSS",
+          "REST API", "Git", "Docker", "PostgreSQL"
+        ],
+        sameAs: [
+          "https://github.com/AmoneMisa",
+          "https://www.linkedin.com/in/marharyta-kubai-51520a362",
+          "https://t.me/WhitesLove"
+        ],
+        address: {
+          "@type": "PostalAddress",
+          addressLocality: "Bucharest",
+          addressCountry: "RO"
+        },
+        nationality: { "@type": "Country", name: "Ukraine" }
       })
     }
   ]
