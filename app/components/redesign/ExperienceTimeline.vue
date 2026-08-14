@@ -6,62 +6,62 @@ const e = computed(() => content.value.experienceSection);
 </script>
 
 <template>
-  <section class="rd-section" id="experience">
+  <section class="rd-section experience" id="experience">
     <div class="rd-wrap">
-      <div class="section-head">
-        <div class="eyebrow mono">{{ e.eyebrow }}</div>
-        <h2>{{ e.title }}</h2>
-        <p v-if="e.subtitle">{{ e.subtitle }}</p>
+      <div class="experience__header">
+        <div class="experience__eyebrow mono">{{ e.eyebrow }}</div>
+        <h2 class="experience__title">{{ e.title }}</h2>
+        <p v-if="e.subtitle" class="experience__subtitle">{{ e.subtitle }}</p>
       </div>
 
-      <div class="timeline">
-        <div v-for="job in e.items" :key="job.title" class="tl-item">
-          <div class="tl-year mono">{{ job.period }}</div>
-          <h3>{{ job.title }}</h3>
-          <div class="role">{{ job.meta }}</div>
-          <p>{{ job.description }}</p>
-          <div class="tl-tags">
-            <span v-for="tag in job.tags" :key="tag" class="tag mono">{{ tag }}</span>
+      <div class="experience__timeline">
+        <article v-for="job in e.items" :key="job.title" class="experience__item">
+          <div class="experience__period mono">{{ job.period }}</div>
+          <h3 class="experience__role-title">{{ job.title }}</h3>
+          <div class="experience__meta">{{ job.meta }}</div>
+          <p class="experience__description">{{ job.description }}</p>
+          <div class="experience__tags">
+            <span v-for="tag in job.tags" :key="tag" class="experience__tag mono">{{ tag }}</span>
           </div>
-        </div>
+        </article>
       </div>
     </div>
   </section>
 </template>
 
 <style scoped lang="scss">
-.section-head {
+.experience__header {
   margin-bottom: 42px;
   max-width: 600px;
 }
-.eyebrow {
+.experience__eyebrow {
   font-size: 12.5px;
   color: var(--text-muted);
   margin-bottom: 12px;
 }
-h2 {
+.experience__title {
   font-size: 25px;
   font-weight: 500;
   letter-spacing: -0.01em;
 }
-.section-head p {
+.experience__subtitle {
   color: var(--text-muted);
   margin-top: 10px;
   font-size: 14.5px;
 }
-.timeline {
+.experience__timeline {
   position: relative;
   padding-left: 28px;
   border-left: 1px solid var(--line);
 }
-.tl-item {
+.experience__item {
   position: relative;
   padding-bottom: 38px;
 }
-.tl-item:last-child {
+.experience__item:last-child {
   padding-bottom: 0;
 }
-.tl-item::before {
+.experience__item::before {
   content: "";
   position: absolute;
   left: -33px;
@@ -72,38 +72,38 @@ h2 {
   background: var(--bg-deep);
   border: 1px solid var(--accent-blue);
 }
-.tl-year {
+.experience__period {
   font-size: 12.5px;
   color: var(--text-muted);
   margin-bottom: 6px;
 }
-.tl-item h3 {
+.experience__role-title {
   font-size: 16.5px;
   font-weight: 400;
   margin-bottom: 5px;
 }
-.tl-item .role {
+.experience__meta {
   color: var(--text-muted);
   font-size: 13.5px;
   margin-bottom: 9px;
 }
-.tl-item p {
+.experience__description {
   color: var(--text-muted);
   font-size: 14px;
   max-width: 580px;
   line-height: 1.6;
 }
-.tl-tags {
+.experience__tags {
   display: flex;
   gap: 8px;
   margin-top: 12px;
   flex-wrap: wrap;
 }
-.tag {
+.experience__tag {
   font-size: 11px;
   color: var(--text-muted);
 }
-.tag:not(:last-child)::after {
+.experience__tag:not(:last-child)::after {
   content: "·";
   margin-left: 8px;
   color: var(--line);

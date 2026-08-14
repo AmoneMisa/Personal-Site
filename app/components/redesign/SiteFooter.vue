@@ -30,24 +30,25 @@ function isExternal(href: string) {
 <template>
   <footer id="contact" class="site-footer">
     <div class="rd-wrap">
-      <div class="footer-grid">
-        <div>
-          <a class="logo" :href="resolveHref('/')">
+      <div class="site-footer__grid">
+        <div class="site-footer__brand">
+          <a class="site-footer__logo" :href="resolveHref('/')">
             <redesign-emoji cp="1f988" :size="20" alt="акула" />
             WhitesLove
           </a>
-          <p class="footer-tag">{{ f.tag }}</p>
+          <p class="site-footer__tagline">{{ f.tag }}</p>
         </div>
-        <div class="footer-links">
-          <div class="footer-col">
-            <h6 class="mono">{{ f.navTitle }}</h6>
-            <a v-for="l in f.navLinks" :key="l.label" :href="resolveHref(l.href)">{{ l.label }}</a>
+        <div class="site-footer__links">
+          <div class="site-footer__column">
+            <h6 class="site-footer__column-title mono">{{ f.navTitle }}</h6>
+            <a v-for="l in f.navLinks" :key="l.label" class="site-footer__link" :href="resolveHref(l.href)">{{ l.label }}</a>
           </div>
-          <div class="footer-col">
-            <h6 class="mono">{{ f.contactsTitle }}</h6>
+          <div class="site-footer__column">
+            <h6 class="site-footer__column-title mono">{{ f.contactsTitle }}</h6>
             <a
                 v-for="c in contactLinks"
                 :key="c.label"
+                class="site-footer__link"
                 :href="c.href"
                 :target="isExternal(c.href) ? '_blank' : undefined"
                 :rel="isExternal(c.href) ? 'noopener noreferrer' : undefined"
@@ -55,9 +56,9 @@ function isExternal(href: string) {
           </div>
         </div>
       </div>
-      <div class="footer-bottom mono">
+      <div class="site-footer__bottom mono">
         <span>{{ f.copyright }}</span>
-        <span class="motto">
+        <span class="site-footer__motto">
           <redesign-emoji cp="1f988" :size="15" alt="акула" />
           {{ f.motto }}
         </span>
@@ -72,13 +73,13 @@ function isExternal(href: string) {
   padding: 44px 0 32px;
   margin-top: 16px;
 }
-.footer-grid {
+.site-footer__grid {
   display: flex;
   justify-content: space-between;
   gap: 40px;
   flex-wrap: wrap;
 }
-.logo {
+.site-footer__logo {
   display: flex;
   align-items: center;
   gap: 9px;
@@ -86,34 +87,34 @@ function isExternal(href: string) {
   font-size: 17px;
   color: var(--text-primary);
 }
-.footer-tag {
+.site-footer__tagline {
   color: var(--text-muted);
   font-size: 13px;
   max-width: 290px;
   margin-top: 14px;
   line-height: 1.6;
 }
-.footer-links {
+.site-footer__links {
   display: flex;
   gap: 36px;
   flex-wrap: wrap;
 }
-.footer-col h6 {
+.site-footer__column-title {
   font-size: 11px;
   color: var(--text-muted);
   margin-bottom: 12px;
   font-weight: 400;
 }
-.footer-col a {
+.site-footer__link {
   display: block;
   font-size: 13.5px;
   color: var(--text-muted);
   margin-bottom: 9px;
 }
-.footer-col a:hover {
+.site-footer__link:hover {
   color: var(--text-primary);
 }
-.footer-bottom {
+.site-footer__bottom {
   margin-top: 32px;
   padding-top: 18px;
   border-top: 1px solid var(--line);
@@ -125,7 +126,7 @@ function isExternal(href: string) {
   gap: 16px;
   flex-wrap: wrap;
 }
-.motto {
+.site-footer__motto {
   display: flex;
   align-items: center;
   gap: 6px;

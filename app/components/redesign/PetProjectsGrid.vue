@@ -14,65 +14,65 @@ function isExternal(href: string | null) {
 </script>
 
 <template>
-  <section class="rd-section" id="pet-projects">
+  <section class="rd-section pet-projects" id="pet-projects">
     <div class="rd-wrap">
-      <div class="section-head">
-        <div class="eyebrow mono">{{ p.eyebrow }}</div>
-        <h2>{{ p.title }}</h2>
-        <p>{{ p.subtitle }}</p>
+      <div class="pet-projects__header">
+        <div class="pet-projects__eyebrow mono">{{ p.eyebrow }}</div>
+        <h2 class="pet-projects__title">{{ p.title }}</h2>
+        <p class="pet-projects__subtitle">{{ p.subtitle }}</p>
       </div>
 
-      <div class="bento">
-        <div v-for="proj in p.items" :key="proj.title" class="p-card" :class="{ 'span-2': proj.span2 }">
+      <div class="pet-projects__grid">
+        <article v-for="proj in p.items" :key="proj.title" class="pet-projects__card" :class="{ 'pet-projects__card_wide': proj.span2 }">
           <div>
-            <div class="p-kind mono">{{ proj.kind }}</div>
-            <h4>{{ proj.title }}</h4>
-            <p>{{ proj.description }}</p>
+            <div class="pet-projects__kind mono">{{ proj.kind }}</div>
+            <h4 class="pet-projects__card-title">{{ proj.title }}</h4>
+            <p class="pet-projects__description">{{ proj.description }}</p>
           </div>
           <a
               v-if="proj.href"
-              class="p-link mono"
+              class="pet-projects__link mono"
               :href="resolveHref(proj.href)"
               :target="isExternal(proj.href) ? '_blank' : undefined"
               :rel="isExternal(proj.href) ? 'noopener noreferrer' : undefined"
           >{{ proj.linkLabel }} →</a>
-          <span v-else class="p-link p-link_muted mono">{{ proj.linkLabel }}</span>
-        </div>
+          <span v-else class="pet-projects__link pet-projects__link_muted mono">{{ proj.linkLabel }}</span>
+        </article>
       </div>
 
-      <a class="all-projects mono" :href="localePath('/projects')">{{ p.allLabel }} →</a>
+      <a class="pet-projects__all-link mono" :href="localePath('/projects')">{{ p.allLabel }} →</a>
     </div>
   </section>
 </template>
 
 <style scoped lang="scss">
-.section-head {
+.pet-projects__header {
   margin-bottom: 42px;
   max-width: 600px;
 }
-.eyebrow {
+.pet-projects__eyebrow {
   font-size: 12.5px;
   color: var(--text-muted);
   margin-bottom: 12px;
 }
-h2 {
+.pet-projects__title {
   font-size: 25px;
   font-weight: 500;
   letter-spacing: -0.01em;
 }
-.section-head p {
+.pet-projects__subtitle {
   color: var(--text-muted);
   margin-top: 10px;
   font-size: 14.5px;
 }
-.bento {
+.pet-projects__grid {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
   gap: 1px;
   background: var(--line);
   border: 1px solid var(--line);
 }
-.p-card {
+.pet-projects__card {
   background: var(--bg-deep);
   padding: 24px;
   display: flex;
@@ -80,10 +80,10 @@ h2 {
   justify-content: space-between;
   min-height: 172px;
 }
-.p-card.span-2 {
+.pet-projects__card_wide {
   grid-column: span 2;
 }
-.p-kind {
+.pet-projects__kind {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -91,51 +91,51 @@ h2 {
   color: var(--text-muted);
   margin-bottom: 14px;
 }
-.p-card h4 {
+.pet-projects__card-title {
   font-size: 15px;
   font-weight: 400;
   margin-bottom: 7px;
 }
-.p-card p {
+.pet-projects__description {
   font-size: 13px;
   color: var(--text-muted);
   line-height: 1.5;
 }
-.p-link {
+.pet-projects__link {
   margin-top: 14px;
   font-size: 12.5px;
   color: var(--text-muted);
   transition: color 0.15s;
 }
-a.p-link:hover {
+a.pet-projects__link:hover {
   color: var(--accent-pink);
 }
-.p-link_muted {
+.pet-projects__link_muted {
   opacity: 0.7;
 }
-.all-projects {
+.pet-projects__all-link {
   display: inline-block;
   margin-top: 20px;
   font-size: 13px;
   color: var(--text-muted);
 }
-.all-projects:hover {
+.pet-projects__all-link:hover {
   color: var(--accent-pink);
 }
 
 @media (max-width: 960px) {
-  .bento {
+  .pet-projects__grid {
     grid-template-columns: repeat(2, 1fr);
   }
-  .p-card.span-2 {
+  .pet-projects__card_wide {
     grid-column: span 2;
   }
 }
 @media (max-width: 560px) {
-  .bento {
+  .pet-projects__grid {
     grid-template-columns: 1fr;
   }
-  .p-card.span-2 {
+  .pet-projects__card_wide {
     grid-column: span 1;
   }
 }

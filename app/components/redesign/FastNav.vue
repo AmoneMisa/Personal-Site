@@ -46,37 +46,37 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div class="fastnav-root">
+  <div class="fast-nav">
     <button
         ref="toggle"
         type="button"
-        class="fastnav-toggle"
-        :class="{ open }"
+        class="fast-nav__toggle"
+        :class="{ 'fast-nav__toggle_open': open }"
         aria-label="Быстрая навигация по странице"
         :aria-expanded="open"
         @click="open = !open"
     >
-      <span class="bar" /><span class="bar" /><span class="bar" />
+      <span class="fast-nav__bar" /><span class="fast-nav__bar" /><span class="fast-nav__bar" />
     </button>
 
-    <nav ref="root" class="fastnav" :class="{ open }">
+    <nav ref="root" class="fast-nav__panel" :class="{ 'fast-nav__panel_open': open }">
       <a
           v-for="it in items"
           :key="it.id"
           :href="`#${it.id}`"
-          class="fastnav-link"
-          :class="{ active: active === it.id }"
+          class="fast-nav__link"
+          :class="{ 'fast-nav__link_active': active === it.id }"
           @click="open = false"
       >
-        <span class="tick" />
-        <span class="label mono">{{ it.label }}</span>
+        <span class="fast-nav__tick" />
+        <span class="fast-nav__label mono">{{ it.label }}</span>
       </a>
     </nav>
   </div>
 </template>
 
 <style scoped lang="scss">
-.fastnav-toggle {
+.fast-nav__toggle {
   position: fixed;
   left: 22px;
   top: 50%;
@@ -94,29 +94,29 @@ onBeforeUnmount(() => {
   flex-direction: column;
   gap: 4px;
 }
-.fastnav-toggle:hover {
+.fast-nav__toggle:hover {
   border-color: var(--accent-pink);
 }
-.fastnav-toggle .bar {
+.fast-nav__bar {
   width: 15px;
   height: 1.5px;
   background: var(--text-muted);
   transition: all 0.2s;
 }
-.fastnav-toggle.open .bar {
+.fast-nav__toggle_open .fast-nav__bar {
   background: var(--accent-pink);
 }
-.fastnav-toggle.open .bar:nth-child(1) {
+.fast-nav__toggle_open .fast-nav__bar:nth-child(1) {
   transform: translateY(5.5px) rotate(45deg);
 }
-.fastnav-toggle.open .bar:nth-child(2) {
+.fast-nav__toggle_open .fast-nav__bar:nth-child(2) {
   opacity: 0;
 }
-.fastnav-toggle.open .bar:nth-child(3) {
+.fast-nav__toggle_open .fast-nav__bar:nth-child(3) {
   transform: translateY(-5.5px) rotate(-45deg);
 }
 
-.fastnav {
+.fast-nav__panel {
   position: fixed;
   left: 70px;
   top: 50%;
@@ -133,40 +133,40 @@ onBeforeUnmount(() => {
   pointer-events: none;
   transition: opacity 0.18s, transform 0.18s;
 }
-.fastnav.open {
+.fast-nav__panel_open {
   opacity: 1;
   pointer-events: auto;
   transform: translateY(-50%) scale(1);
 }
-.fastnav-link {
+.fast-nav__link {
   display: flex;
   align-items: center;
   gap: 10px;
 }
-.fastnav-link .tick {
+.fast-nav__tick {
   width: 12px;
   height: 1px;
   background: var(--line);
   transition: all 0.2s;
   flex-shrink: 0;
 }
-.fastnav-link.active .tick {
+.fast-nav__link_active .fast-nav__tick {
   background: var(--accent-pink);
   width: 18px;
 }
-.fastnav-link .label {
+.fast-nav__label {
   font-size: 12px;
   color: var(--text-muted);
   white-space: nowrap;
   transition: color 0.15s;
 }
-.fastnav-link:hover .label,
-.fastnav-link.active .label {
+.fast-nav__link:hover .fast-nav__label,
+.fast-nav__link_active .fast-nav__label {
   color: var(--text-primary);
 }
 
 @media (max-width: 960px) {
-  .fastnav-root {
+  .fast-nav {
     display: none;
   }
 }

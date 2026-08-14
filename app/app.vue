@@ -1,10 +1,10 @@
 <template>
-  <u-app>
-    <header-nav/>
-    <u-main as="main">
-      <NuxtPage/>
+  <u-app class="site-app">
+    <header-nav class="site-app__header" />
+    <u-main class="site-app__main" as="main">
+      <NuxtPage />
     </u-main>
-    <site-footer/>
+    <site-footer class="site-app__footer" />
   </u-app>
 </template>
 <script setup lang="ts">

@@ -54,6 +54,7 @@ const baseWidth = computed(() => (props.isFullWidth ? 'w-full max-w-none' : 'max
 const alignText = computed(() => (props.isCentered ? 'mx-auto text-center' : 'mx-0 text-left'));
 
 const headlineClass = computed(() => [
+  'page-header__headline',
   baseWidth.value,
   props.isCentered ? 'justify-center text-center' : 'text-left',
   'page-eyebrow whitespace-normal break-words [overflow-wrap:anywhere]',
@@ -68,6 +69,7 @@ const titleSizeClass = computed(() =>
 );
 
 const titleClass = computed(() => [
+  'page-header__title',
   'whitespace-normal break-words [overflow-wrap:anywhere] leading-tight font-semibold text-highlighted',
   baseWidth.value,
   alignText.value,
@@ -81,6 +83,7 @@ const descriptionSizeClass = computed(() =>
 );
 
 const descriptionClass = computed(() => [
+  'page-header__description',
   baseWidth.value,
   alignText.value,
   'whitespace-normal break-words [overflow-wrap:anywhere]',
@@ -93,12 +96,16 @@ const descriptionClass = computed(() => [
 <template>
   <div
       :class="[
-      'border-0 py-0 my-0',
+      'page-header border-0 py-0 my-0',
       ui.root,
-      { 'm-auto': isCentered }
+      {
+        'page-header_centered': isCentered,
+        'm-auto': isCentered,
+        'page-header_full-width': isFullWidth
+      }
     ]"
   >
-    <div :class="['flex flex-col gap-3', ui.container]">
+    <div :class="['page-header__container flex flex-col gap-3', ui.container]">
       <div v-if="headline" :class="headlineClass">
         {{ t(headline) }}
       </div>
@@ -111,7 +118,7 @@ const descriptionClass = computed(() => [
         {{ t(description) }}
       </div>
 
-      <div v-if="$slots.default" :class="ui.links">
+      <div v-if="$slots.default" :class="['page-header__links', ui.links]">
         <slot />
       </div>
     </div>

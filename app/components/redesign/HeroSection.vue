@@ -17,27 +17,27 @@ const heroStats = computed(() =>
 <template>
   <section class="rd-section hero" id="hero-anchor">
     <div class="rd-wrap">
-      <div class="hero-grid">
-        <div>
-          <div class="eyebrow mono">{{ hero.eyebrow }}</div>
-          <h1>{{ hero.h1before }}<span class="accent">{{ hero.h1accent }}</span></h1>
-          <p class="lead">{{ hero.lead }}</p>
-          <div class="hero-actions">
-            <a class="btn-primary" href="#contact">{{ hero.ctaPrimary }}</a>
-            <a class="btn-text" href="#profile-skills">{{ hero.ctaText }}</a>
+      <div class="hero__grid">
+        <div class="hero__content">
+          <div class="hero__eyebrow mono">{{ hero.eyebrow }}</div>
+          <h1 class="hero__title">{{ hero.h1before }}<span class="hero__accent">{{ hero.h1accent }}</span></h1>
+          <p class="hero__lead">{{ hero.lead }}</p>
+          <div class="hero__actions">
+            <a class="hero__button hero__button_primary" href="#contact">{{ hero.ctaPrimary }}</a>
+            <a class="hero__button hero__button_text" href="#profile-skills">{{ hero.ctaText }}</a>
           </div>
-          <div class="stat-row">
-            <div class="stat" v-for="(s, i) in heroStats" :key="i">
-              <b>{{ s.value }}</b>
-              <span class="mono">{{ s.label }}</span>
+          <div class="hero__stats">
+            <div class="hero__stat" v-for="(s, i) in heroStats" :key="i">
+              <b class="hero__stat-value">{{ s.value }}</b>
+              <span class="hero__stat-label mono">{{ s.label }}</span>
             </div>
           </div>
         </div>
 
-        <div class="hero-portrait">
-          <div class="portrait-frame">
+        <div class="hero__portrait">
+          <div class="hero__portrait-frame">
             <nuxt-img
-                class="portrait-img"
+                class="hero__portrait-image"
                 src="/images/photo.png"
                 alt="Marharyta Kubai"
                 width="896"
@@ -49,7 +49,7 @@ const heroStats = computed(() =>
                 preload
             />
           </div>
-          <div class="portrait-caption">
+          <div class="hero__portrait-caption">
             <redesign-emoji cp="1f63b" :size="15" alt="кот" />
             {{ hero.portraitCaption }}
           </div>
@@ -63,19 +63,19 @@ const heroStats = computed(() =>
 .hero {
   padding: 76px 0 68px;
 }
-.hero-grid {
+.hero__grid {
   display: grid;
   grid-template-columns: 1.15fr 0.85fr;
   gap: 56px;
   align-items: center;
 }
-.eyebrow {
+.hero__eyebrow {
   font-size: 12.5px;
   color: var(--text-muted);
   letter-spacing: 0.02em;
   margin-bottom: 16px;
 }
-h1 {
+.hero__title {
   font-size: clamp(34px, 5.2vw, 52px);
   line-height: 1.08;
   font-weight: 600;
@@ -83,24 +83,24 @@ h1 {
   margin-bottom: 22px;
   color: var(--text-primary);
 }
-h1 .accent {
+.hero__accent {
   color: var(--accent-pink);
 }
-.lead {
+.hero__lead {
   font-size: 17px;
   color: var(--text-soft);
   max-width: 520px;
   margin-bottom: 32px;
   line-height: 1.62;
 }
-.hero-actions {
+.hero__actions {
   display: flex;
   gap: 16px;
   margin-bottom: 40px;
   flex-wrap: wrap;
   align-items: center;
 }
-.btn-primary {
+.hero__button_primary {
   background: var(--accent-pink);
   color: #1a0e14;
   font-weight: 500;
@@ -108,26 +108,26 @@ h1 .accent {
   border-radius: 6px;
   font-size: 14.5px;
 }
-.btn-text {
+.hero__button_text {
   color: var(--text-primary);
   font-size: 14.5px;
   border-bottom: 1px solid var(--line);
   padding-bottom: 2px;
 }
-.btn-text:hover {
+.hero__button_text:hover {
   border-color: var(--text-primary);
 }
-.stat-row {
+.hero__stats {
   display: flex;
   gap: 32px;
   padding-top: 24px;
   border-top: 1px solid var(--line);
   flex-wrap: wrap;
 }
-.stat {
+.hero__stat {
   max-width: 220px;
 }
-.stat b {
+.hero__stat-value {
   display: block;
   font-family: "Golos Text", sans-serif;
   font-weight: 600;
@@ -136,28 +136,28 @@ h1 .accent {
   color: var(--text-primary);
   margin-bottom: 4px;
 }
-.stat span {
+.hero__stat-label {
   font-size: 12px;
   color: var(--text-muted);
 }
-.hero-portrait {
+.hero__portrait {
   position: relative;
 }
-.portrait-frame {
+.hero__portrait-frame {
   aspect-ratio: 4 / 5;
   border-radius: 16px;
   overflow: hidden;
   background: var(--bg-panel);
   border: 1px solid var(--line);
 }
-.portrait-img {
+.hero__portrait-image {
   width: 100%;
   height: 100%;
   object-fit: cover;
   object-position: center top;
   display: block;
 }
-.portrait-caption {
+.hero__portrait-caption {
   margin-top: 14px;
   font-size: 13px;
   color: var(--text-muted);
@@ -170,7 +170,7 @@ h1 .accent {
   .hero {
     padding: 40px 0 36px;
   }
-  .hero-grid {
+  .hero__grid {
     grid-template-columns: 1fr;
     gap: 36px;
   }

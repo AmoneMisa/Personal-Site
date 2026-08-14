@@ -23,7 +23,7 @@ useSeoMeta({
 </script>
 
 <template>
-  <div class="home">
+  <div class="home-page">
     <fast-nav />
     <hero-section />
     <div class="rd-divider" />

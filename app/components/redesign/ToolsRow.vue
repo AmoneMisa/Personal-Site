@@ -6,15 +6,15 @@ const t = computed(() => content.value.toolsSection);
 </script>
 
 <template>
-  <section class="rd-section" id="tools">
+  <section class="rd-section tools" id="tools">
     <div class="rd-wrap">
-      <div class="section-head">
-        <div class="eyebrow mono">{{ t.eyebrow }}</div>
-        <h2>{{ t.title }}</h2>
+      <div class="tools__header">
+        <div class="tools__eyebrow mono">{{ t.eyebrow }}</div>
+        <h2 class="tools__title">{{ t.title }}</h2>
       </div>
-      <div class="tools-row">
-        <div v-for="tool in TOOLS" :key="tool" class="tool-pill">
-          <span class="dash" />{{ tool }}
+      <div class="tools__list">
+        <div v-for="tool in TOOLS" :key="tool" class="tools__item">
+          <span class="tools__dash" />{{ tool }}
         </div>
       </div>
     </div>
@@ -22,33 +22,33 @@ const t = computed(() => content.value.toolsSection);
 </template>
 
 <style scoped lang="scss">
-.section-head {
+.tools__header {
   margin-bottom: 42px;
   max-width: 600px;
 }
-.eyebrow {
+.tools__eyebrow {
   font-size: 12.5px;
   color: var(--text-muted);
   margin-bottom: 12px;
 }
-h2 {
+.tools__title {
   font-size: 25px;
   font-weight: 500;
   letter-spacing: -0.01em;
 }
-.tools-row {
+.tools__list {
   display: flex;
   gap: 22px;
   flex-wrap: wrap;
 }
-.tool-pill {
+.tools__item {
   display: flex;
   align-items: center;
   gap: 8px;
   font-size: 13.5px;
   color: var(--text-muted);
 }
-.tool-pill .dash {
+.tools__dash {
   width: 10px;
   height: 1px;
   background: var(--accent-blue);

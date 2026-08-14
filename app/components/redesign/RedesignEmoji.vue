@@ -12,7 +12,7 @@ const props = withDefaults(defineProps<{ cp: string; size?: number; alt?: string
       :width="props.size"
       :height="props.size"
       :alt="props.alt"
-      class="tw-emoji"
+      class="redesign-emoji"
       loading="lazy"
       decoding="async"
       draggable="false"
@@ -20,7 +20,7 @@ const props = withDefaults(defineProps<{ cp: string; size?: number; alt?: string
 </template>
 
 <style scoped>
-.tw-emoji {
+.redesign-emoji {
   display: inline-block;
   vertical-align: -0.15em;
   flex-shrink: 0;

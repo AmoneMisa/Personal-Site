@@ -42,85 +42,85 @@ useSeoMeta({
 </script>
 
 <template>
-  <div class="projects">
-    <section class="rd-section projects-hero">
+  <div class="projects-page">
+    <section class="rd-section projects-page__hero">
       <div class="rd-wrap">
-        <div class="eyebrow mono">{{ chrome.eyebrow }}</div>
-        <h1>{{ chrome.title }}</h1>
-        <p class="lead">{{ chrome.subtitle }}</p>
+        <div class="projects-page__eyebrow mono">{{ chrome.eyebrow }}</div>
+        <h1 class="projects-page__title">{{ chrome.title }}</h1>
+        <p class="projects-page__lead">{{ chrome.subtitle }}</p>
       </div>
     </section>
 
     <template v-for="(group, gi) in groups" :key="group.title">
       <div class="rd-divider" />
-      <section class="rd-section">
+      <section class="rd-section projects-page__section">
         <div class="rd-wrap">
-          <h2 class="group-title">{{ group.title }}</h2>
-          <div class="proj-grid">
-            <div v-for="p in group.items" :key="p.name" class="proj-card">
+          <h2 class="projects-page__group-title">{{ group.title }}</h2>
+          <div class="projects-page__grid">
+            <article v-for="p in group.items" :key="p.name" class="projects-page__card">
               <div>
-                <div class="proj-stack mono">{{ p.stack }}</div>
-                <h3 class="proj-name">{{ p.name }}</h3>
-                <p class="proj-desc">{{ p.description }}</p>
+                <div class="projects-page__stack mono">{{ p.stack }}</div>
+                <h3 class="projects-page__card-title">{{ p.name }}</h3>
+                <p class="projects-page__description">{{ p.description }}</p>
               </div>
               <a
                   v-if="p.href"
-                  class="proj-link mono"
+                  class="projects-page__link mono"
                   :href="resolveHref(p.href)"
                   :target="isExternal(p.href) ? '_blank' : undefined"
                   :rel="isExternal(p.href) ? 'noopener noreferrer' : undefined"
               >{{ isExternal(p.href) ? "GitHub" : chrome.open }} →</a>
-              <span v-else class="proj-link proj-link_muted mono">{{ chrome.soon }}</span>
-            </div>
+              <span v-else class="projects-page__link projects-page__link_muted mono">{{ chrome.soon }}</span>
+            </article>
           </div>
         </div>
       </section>
       <div v-if="gi === groups.length - 1" class="rd-divider" />
     </template>
 
-    <section class="rd-section">
+    <section class="rd-section projects-page__section">
       <div class="rd-wrap">
-        <a class="back-link mono" :href="localePath('/')">← {{ locale === 'en' ? 'Back to home' : 'На главную' }}</a>
+        <a class="projects-page__back-link mono" :href="localePath('/')">← {{ locale === 'en' ? 'Back to home' : 'На главную' }}</a>
       </div>
     </section>
   </div>
 </template>
 
 <style scoped lang="scss">
-.eyebrow {
+.projects-page__eyebrow {
   font-size: 12.5px;
   color: var(--text-muted);
   margin-bottom: 12px;
 }
-.projects-hero {
+.projects-page__hero {
   padding-top: 56px;
 }
-.projects-hero h1 {
+.projects-page__title {
   font-size: clamp(30px, 5vw, 44px);
   font-weight: 600;
   letter-spacing: -0.015em;
   margin-bottom: 18px;
 }
-.projects-hero .lead {
+.projects-page__lead {
   color: var(--text-muted);
   font-size: 16px;
   max-width: 640px;
   line-height: 1.65;
 }
-.group-title {
+.projects-page__group-title {
   font-size: 22px;
   font-weight: 500;
   letter-spacing: -0.01em;
   margin-bottom: 22px;
 }
-.proj-grid {
+.projects-page__grid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
   gap: 1px;
   background: var(--line);
   border: 1px solid var(--line);
 }
-.proj-card {
+.projects-page__card {
   background: var(--bg-deep);
   padding: 24px;
   display: flex;
@@ -129,43 +129,43 @@ useSeoMeta({
   gap: 14px;
   min-height: 168px;
 }
-.proj-stack {
+.projects-page__stack {
   font-size: 11px;
   color: var(--text-muted);
   margin-bottom: 12px;
 }
-.proj-name {
+.projects-page__card-title {
   font-size: 16px;
   font-weight: 400;
   margin-bottom: 8px;
   color: var(--text-primary);
 }
-.proj-desc {
+.projects-page__description {
   font-size: 13.5px;
   color: var(--text-muted);
   line-height: 1.55;
 }
-.proj-link {
+.projects-page__link {
   margin-top: 14px;
   font-size: 12.5px;
   color: var(--text-muted);
   align-self: flex-start;
 }
-a.proj-link:hover {
+a.projects-page__link:hover {
   color: var(--accent-pink);
 }
-.proj-link_muted {
+.projects-page__link_muted {
   opacity: 0.65;
 }
-.back-link {
+.projects-page__back-link {
   font-size: 13px;
   color: var(--text-muted);
 }
-.back-link:hover {
+.projects-page__back-link:hover {
   color: var(--accent-pink);
 }
 @media (max-width: 760px) {
-  .proj-grid {
+  .projects-page__grid {
     grid-template-columns: 1fr;
   }
 }

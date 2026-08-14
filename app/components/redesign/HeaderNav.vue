@@ -27,27 +27,27 @@ const mobileOpen = ref(false);
 </script>
 
 <template>
-  <header class="site">
-    <div class="header-inner">
-      <a class="logo" :href="resolveHref('/')" @click="mobileOpen = false">
+  <header class="site-header">
+    <div class="site-header__inner">
+      <a class="site-header__logo" :href="resolveHref('/')" @click="mobileOpen = false">
         <redesign-emoji cp="1f988" :size="20" alt="акула" />
         WhitesLove
       </a>
 
-      <nav class="primary">
-        <a class="nav-link" :href="resolveHref('#profile-skills')">{{ nav.skills }}</a>
-        <a class="nav-link" :href="resolveHref('#experience')">{{ nav.experience }}</a>
+      <nav class="site-header__nav">
+        <a class="site-header__link" :href="resolveHref('#profile-skills')">{{ nav.skills }}</a>
+        <a class="site-header__link" :href="resolveHref('#experience')">{{ nav.experience }}</a>
 
-        <div class="has-dropdown">
-          <a class="nav-link" :href="resolveHref('#pet-projects')" tabindex="0">{{ nav.petProjects }} ▾</a>
-          <div class="dropdown-panel">
-            <div class="dropdown-col">
+        <div class="site-header__dropdown-wrap">
+          <a class="site-header__link" :href="resolveHref('#pet-projects')" tabindex="0">{{ nav.petProjects }} ▾</a>
+          <div class="site-header__dropdown">
+            <div class="site-header__dropdown-column">
               <h6 class="mono">{{ nav.dropdown.petTitle }}</h6>
               <a v-for="it in nav.dropdown.pet" :key="it.label" :href="resolveHref(it.href)">
                 {{ it.label }}<span>{{ it.sub }}</span>
               </a>
             </div>
-            <div class="dropdown-col">
+            <div class="site-header__dropdown-column">
               <h6 class="mono">{{ nav.dropdown.pagesTitle }}</h6>
               <a v-for="it in nav.dropdown.pages" :key="it.label" :href="resolveHref(it.href)">
                 {{ it.label }}<span>{{ it.sub }}</span>
@@ -56,47 +56,47 @@ const mobileOpen = ref(false);
           </div>
         </div>
 
-        <a class="nav-link" :href="resolveHref('#tools')">{{ nav.tools }}</a>
-        <a class="nav-link" :href="resolveHref('/cv')">{{ nav.cv }}</a>
-        <a class="nav-link highlight" :href="resolveHref('/about')">{{ nav.aboutMe }}</a>
+        <a class="site-header__link" :href="resolveHref('#tools')">{{ nav.tools }}</a>
+        <a class="site-header__link" :href="resolveHref('/cv')">{{ nav.cv }}</a>
+        <a class="site-header__link site-header__link_highlight" :href="resolveHref('/about')">{{ nav.aboutMe }}</a>
       </nav>
 
-      <div class="header-right">
-        <button type="button" class="lang-pill mono" @click="toggleLocale" :aria-label="`Switch language (${locale})`">
+      <div class="site-header__actions">
+        <button type="button" class="site-header__language mono" @click="toggleLocale" :aria-label="`Switch language (${locale})`">
           {{ String(locale).toUpperCase() }}
         </button>
-        <a class="cta-btn" :href="resolveHref('#contact')">{{ nav.contact }}</a>
+        <a class="site-header__cta" :href="resolveHref('#contact')">{{ nav.contact }}</a>
       </div>
 
       <button
           type="button"
-          class="burger"
-          :class="{ open: mobileOpen }"
+          class="site-header__burger"
+          :class="{ 'site-header__burger_open': mobileOpen }"
           :aria-expanded="mobileOpen"
           aria-label="Меню"
           @click="mobileOpen = !mobileOpen"
       >
-        <span class="bar" /><span class="bar" /><span class="bar" />
+        <span class="site-header__bar" /><span class="site-header__bar" /><span class="site-header__bar" />
       </button>
     </div>
 
-    <div v-show="mobileOpen" class="mobile-panel">
-      <a class="m-link" :href="resolveHref('#profile-skills')" @click="mobileOpen = false">{{ nav.skills }}</a>
-      <a class="m-link" :href="resolveHref('#experience')" @click="mobileOpen = false">{{ nav.experience }}</a>
-      <a class="m-link" :href="resolveHref('#pet-projects')" @click="mobileOpen = false">{{ nav.petProjects }}</a>
-      <a class="m-link" :href="resolveHref('#tools')" @click="mobileOpen = false">{{ nav.tools }}</a>
-      <a class="m-link" :href="resolveHref('/cv')" @click="mobileOpen = false">{{ nav.cv }}</a>
-      <a class="m-link highlight" :href="resolveHref('/about')" @click="mobileOpen = false">{{ nav.aboutMe }}</a>
-      <div class="m-row">
-        <button type="button" class="lang-pill mono" @click="toggleLocale">{{ String(locale).toUpperCase() }}</button>
-        <a class="cta-btn" :href="resolveHref('#contact')" @click="mobileOpen = false">{{ nav.contact }}</a>
+    <div v-show="mobileOpen" class="site-header__mobile-panel">
+      <a class="site-header__mobile-link" :href="resolveHref('#profile-skills')" @click="mobileOpen = false">{{ nav.skills }}</a>
+      <a class="site-header__mobile-link" :href="resolveHref('#experience')" @click="mobileOpen = false">{{ nav.experience }}</a>
+      <a class="site-header__mobile-link" :href="resolveHref('#pet-projects')" @click="mobileOpen = false">{{ nav.petProjects }}</a>
+      <a class="site-header__mobile-link" :href="resolveHref('#tools')" @click="mobileOpen = false">{{ nav.tools }}</a>
+      <a class="site-header__mobile-link" :href="resolveHref('/cv')" @click="mobileOpen = false">{{ nav.cv }}</a>
+      <a class="site-header__mobile-link site-header__mobile-link_highlight" :href="resolveHref('/about')" @click="mobileOpen = false">{{ nav.aboutMe }}</a>
+      <div class="site-header__mobile-actions">
+        <button type="button" class="site-header__language mono" @click="toggleLocale">{{ String(locale).toUpperCase() }}</button>
+        <a class="site-header__cta" :href="resolveHref('#contact')" @click="mobileOpen = false">{{ nav.contact }}</a>
       </div>
     </div>
   </header>
 </template>
 
 <style scoped lang="scss">
-.site {
+.site-header {
   position: sticky;
   top: 0;
   z-index: 50;
@@ -104,7 +104,7 @@ const mobileOpen = ref(false);
   backdrop-filter: blur(6px);
   border-bottom: 1px solid var(--line);
 }
-.header-inner {
+.site-header__inner {
   max-width: 1140px;
   margin: 0 auto;
   padding: 16px 32px;
@@ -112,7 +112,7 @@ const mobileOpen = ref(false);
   align-items: center;
   gap: 32px;
 }
-.logo {
+.site-header__logo {
   display: flex;
   align-items: center;
   gap: 9px;
@@ -122,13 +122,13 @@ const mobileOpen = ref(false);
   color: var(--text-primary);
   white-space: nowrap;
 }
-.primary {
+.site-header__nav {
   display: flex;
   align-items: center;
   gap: 26px;
   flex: 1;
 }
-.nav-link {
+.site-header__link {
   font-size: 14px;
   color: var(--text-muted);
   transition: color 0.15s;
@@ -136,22 +136,22 @@ const mobileOpen = ref(false);
   padding: 8px 0;
   cursor: pointer;
 }
-.nav-link:hover,
-.nav-link:focus-visible {
+.site-header__link:hover,
+.site-header__link:focus-visible {
   color: var(--text-primary);
 }
-.nav-link.highlight {
+.site-header__link_highlight {
   color: var(--accent-pink);
   border-bottom: 1px solid currentColor;
   padding-bottom: 6px;
 }
-.header-right {
+.site-header__actions {
   display: flex;
   align-items: center;
   gap: 18px;
   margin-left: auto;
 }
-.lang-pill {
+.site-header__language {
   font-size: 13px;
   color: var(--text-muted);
   background: none;
@@ -159,10 +159,10 @@ const mobileOpen = ref(false);
   cursor: pointer;
   padding: 4px;
 }
-.lang-pill:hover {
+.site-header__language:hover {
   color: var(--text-primary);
 }
-.cta-btn {
+.site-header__cta {
   border: 1px solid var(--line);
   color: var(--text-primary);
   font-size: 13.5px;
@@ -171,15 +171,15 @@ const mobileOpen = ref(false);
   white-space: nowrap;
   transition: border-color 0.15s;
 }
-.cta-btn:hover {
+.site-header__cta:hover {
   border-color: var(--accent-pink);
 }
 
 /* dropdown */
-.has-dropdown {
+.site-header__dropdown-wrap {
   position: relative;
 }
-.dropdown-panel {
+.site-header__dropdown {
   position: absolute;
   top: 100%;
   left: -16px;
@@ -197,13 +197,13 @@ const mobileOpen = ref(false);
   transform: translateY(-6px);
   transition: opacity 0.15s, transform 0.15s, visibility 0.15s;
 }
-.has-dropdown:hover .dropdown-panel,
-.has-dropdown:focus-within .dropdown-panel {
+.site-header__dropdown-wrap:hover .site-header__dropdown,
+.site-header__dropdown-wrap:focus-within .site-header__dropdown {
   opacity: 1;
   visibility: visible;
   transform: translateY(0);
 }
-.dropdown-col h6 {
+.site-header__dropdown-column h6 {
   font-size: 10.5px;
   color: var(--text-muted);
   font-weight: 400;
@@ -211,18 +211,18 @@ const mobileOpen = ref(false);
   text-transform: uppercase;
   letter-spacing: 0.03em;
 }
-.dropdown-col a {
+.site-header__dropdown-column a {
   display: block;
   font-size: 13.5px;
   color: var(--text-primary);
   padding: 6px 0;
   opacity: 0.85;
 }
-.dropdown-col a:hover {
+.site-header__dropdown-column a:hover {
   opacity: 1;
   color: var(--accent-pink);
 }
-.dropdown-col a span {
+.site-header__dropdown-column a span {
   display: block;
   font-size: 11.5px;
   color: var(--text-muted);
@@ -230,7 +230,7 @@ const mobileOpen = ref(false);
 }
 
 /* burger + mobile */
-.burger {
+.site-header__burger {
   display: none;
   flex-direction: column;
   gap: 4px;
@@ -244,22 +244,22 @@ const mobileOpen = ref(false);
   cursor: pointer;
   margin-left: auto;
 }
-.burger .bar {
+.site-header__bar {
   width: 15px;
   height: 1.5px;
   background: var(--text-muted);
   transition: all 0.2s;
 }
-.burger.open .bar:nth-child(1) {
+.site-header__burger_open .site-header__bar:nth-child(1) {
   transform: translateY(5.5px) rotate(45deg);
 }
-.burger.open .bar:nth-child(2) {
+.site-header__burger_open .site-header__bar:nth-child(2) {
   opacity: 0;
 }
-.burger.open .bar:nth-child(3) {
+.site-header__burger_open .site-header__bar:nth-child(3) {
   transform: translateY(-5.5px) rotate(-45deg);
 }
-.mobile-panel {
+.site-header__mobile-panel {
   display: none;
   flex-direction: column;
   gap: 4px;
@@ -267,15 +267,15 @@ const mobileOpen = ref(false);
   border-top: 1px solid var(--line);
   background: rgba(13, 17, 40, 0.98);
 }
-.m-link {
+.site-header__mobile-link {
   padding: 10px 0;
   color: var(--text-muted);
   font-size: 15px;
 }
-.m-link.highlight {
+.site-header__mobile-link_highlight {
   color: var(--accent-pink);
 }
-.m-row {
+.site-header__mobile-actions {
   display: flex;
   align-items: center;
   gap: 16px;
@@ -283,14 +283,14 @@ const mobileOpen = ref(false);
 }
 
 @media (max-width: 960px) {
-  .primary,
-  .header-right {
+  .site-header__nav,
+  .site-header__actions {
     display: none;
   }
-  .burger {
+  .site-header__burger {
     display: flex;
   }
-  .mobile-panel {
+  .site-header__mobile-panel {
     display: flex;
   }
 }
