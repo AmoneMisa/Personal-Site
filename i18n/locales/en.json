@@ -1,1007 +1,20 @@
 {
-  "header": {
-    "button": {
-      "changeTheme": "Change theme"
+  "adminPanel": {
+    "title": "Own Admin Panel"
+  },
+  "animatedText": {
+    "156911e0-c9f4-4308-85df-9a1369a0fd78": {
+      "title": "Developer"
+    },
+    "39f4ca45-cc12-49a5-ab89-09e6e88746f6": {
+      "title": "Marharyta"
+    },
+    "6267a8ad-ced6-4651-8ce8-ab4ae19bbeda": {
+      "title": "Developer"
+    },
+    "c9e85b9e-39c5-4b17-b3fd-db2f44db049c": {
+      "title": "Marharyta"
     }
-  },
-  "common": {
-    "add": "Add",
-    "remove": "Remove",
-    "noData": "No Data"
-  },
-  "quizzes": {
-    "headline": "Quizzes",
-    "title": "Pick a quiz",
-    "subtitle": "Short quizzes to help you choose a country, lifestyle, and priorities.",
-    "searchPlaceHolder": "Search quizzes…",
-    "empty": {
-      "title": "Nothing found",
-      "text": "Try changing your search or pick another quiz."
-    },
-    "howTitle": "How it works",
-    "how": {
-      "step1": {
-        "title": "Choose a quiz",
-        "text": "Open the quiz that matches your goal."
-      },
-      "step2": {
-        "title": "Answer questions",
-        "text": "Pick options — we build your preference profile."
-      },
-      "step3": {
-        "title": "Get results",
-        "text": "We compare your answers with data and show the best matches."
-      }
-    },
-    "countryFit": {
-      "compareTitle": "Comparison",
-      "manualUsaCompareTitle": "States to compare",
-      "manualCountriesCompareTitle": "Countries to compare",
-      "addUsaStatePlaceholder": "Select a state",
-      "addCountryPlaceholder": "Select a country",
-      "manualUsaEmpty": "Select states you want to compare.",
-      "manualCountriesEmpty": "Select countries you want to compare.",
-      "usaCompareTitle": "Compare USA states",
-      "loadingIndices": "Loading indices…",
-      "bestUsStateTitle": "Best US state for your profile",
-      "bestUsStateHint": "Based on your answers and budget",
-      "prices": {
-        "title": "Prices & Living Costs",
-        "salaryNetMonthly": "Average net salary",
-        "rent1brCenter": "1-bedroom apartment rent (city center)",
-        "rent1brOutside": "1-bedroom apartment rent (outside center)",
-        "rent3brCenter": "3-bedroom apartment rent (city center)",
-        "rent3brOutside": "3-bedroom apartment rent (outside center)",
-        "utilities85": "Utilities (≈85 m² apartment)",
-        "mobilePlan": "Mobile phone plan",
-        "internet60": "Home internet",
-        "sqmCenter": "Apartment purchase price (city center, per m²)",
-        "sqmOutside": "Apartment purchase price (outside center, per m²)"
-      },
-      "rating": {
-        "match": "Preference match",
-        "live": "Living rating"
-      },
-      "indices": {
-        "internet": "Internet access",
-        "unemployment": "Employment",
-        "air": "Air quality",
-        "inequality": "Equality",
-        "health": "Healthcare",
-        "aria": "Show country indices",
-        "title": "Country indices",
-        "income": "Income",
-        "education": "Education",
-        "quality": "Quality of life",
-        "safety": "Safety",
-        "updated": "Updated"
-      },
-      "title": "Which country suits you best?",
-      "headline": "Personalized country recommendations",
-      "description": "Answer a few questions — we’ll suggest countries and regions that best fit your preferences and constraints.",
-      "constraintsTitle": "Your situation",
-      "constraints": {
-        "isShowUSA": {
-          "label": "Show USA states"
-        },
-        "isShowCountries": {
-          "label": "Show countries"
-        },
-        "showedCountriesCount": {
-          "label": "Count of countries for showing (up to 40)"
-        },
-        "job": {
-          "label": "Type of work",
-          "remote": "Remote",
-          "local": "Local",
-          "mixed": "Mixed",
-          "hint": "Affects job availability, infrastructure and comfort when relocating."
-        },
-        "budget": {
-          "label": "Monthly budget (USD)",
-          "placeholder": "e.g. 2500",
-          "hint": "Includes rent, food and basic living expenses."
-        },
-        "languageRu": {
-          "label": "Russian level",
-          "hint": "Used to estimate comfort in Russian-speaking environments."
-        },
-        "languageEn": {
-          "label": "English level",
-          "hint": "Used to estimate comfort in international / English-friendly environments."
-        },
-        "family": {
-          "label": "Family status",
-          "single": "Single",
-          "couple": "Couple",
-          "coupleWithKids": "Couple with kids",
-          "singleParent": "Single parent",
-          "hint": "Affects housing and monthly cost estimation."
-        },
-        "kids": {
-          "label": "Number of children",
-          "placeholder": "0",
-          "hint": "Used for monthly cost estimation (per child)."
-        }
-      },
-      "langLevels": {
-        "native": "Native",
-        "fluent": "Fluent",
-        "intermediate": "Intermediate",
-        "basic": "Basic",
-        "none": "None"
-      },
-      "resultsTitle": "Results",
-      "noResults": "No matches found for your current settings. Try increasing the budget or changing answers.",
-      "cityBlockTitle": "Main city (open data)",
-      "medianBlockTitle": "Median (state / country)",
-      "loadingTeleport": "Loading city data…",
-      "tpUnavailable": "No open data available for this city.",
-      "tp": {
-        "note": "City indices are based on open data and may differ from real-life expenses.",
-        "housing": "Housing",
-        "costOfLiving": "Cost of living",
-        "safety": "Safety",
-        "internet": "Internet",
-        "commute": "Commute",
-        "tolerance": "Tolerance"
-      },
-      "tpTooltip": {
-        "aria": "Show city coefficients",
-        "title": "City coefficients",
-        "multiplier": "Budget multiplier",
-        "note": "Multiplier is calculated using the “Housing” and “Cost of living” indices."
-      },
-      "q1": {
-        "title": "Climate",
-        "desc": "What weather feels comfortable most of the year?",
-        "o1": "Warm / mild winter",
-        "o2": "Clear seasons",
-        "o3": "Cold / I like winter"
-      },
-      "q2": {
-        "title": "Heat and humidity",
-        "desc": "How well do you tolerate heat and humidity?",
-        "o1": "Heat is fine, humidity is fine",
-        "o2": "Moderate tolerance",
-        "o3": "Hard to tolerate"
-      },
-      "q3": {
-        "title": "Safety",
-        "desc": "How important is a high level of safety?",
-        "o1": "Very important",
-        "o2": "Somewhat important",
-        "o3": "Not critical"
-      },
-      "q4": {
-        "title": "Cost of living",
-        "desc": "What matters more: cheaper or more comfortable (but pricier)?",
-        "o1": "Cheaper",
-        "o2": "Balance",
-        "o3": "Comfort, even if expensive"
-      },
-      "q5": {
-        "title": "Size of the place",
-        "desc": "Do you prefer a large area or a compact one?",
-        "o1": "Large",
-        "o2": "Doesn’t matter",
-        "o3": "Compact"
-      },
-      "q6": {
-        "title": "Water nearby",
-        "desc": "How important is it to live near the sea/ocean/rivers?",
-        "o1": "Very important",
-        "o2": "Nice to have",
-        "o3": "Not important"
-      },
-      "q7": {
-        "title": "Mountains and forests",
-        "desc": "How important is nature (forests/mountains) nearby?",
-        "o1": "Very important",
-        "o2": "Somewhat important",
-        "o3": "Not important"
-      },
-      "q8": {
-        "title": "Transportation style",
-        "desc": "What type of mobility feels best for you?",
-        "o1": "Walk / public transport",
-        "o2": "Mixed",
-        "o3": "Car-focused"
-      },
-      "q9": {
-        "title": "Cities",
-        "desc": "What kind of cities do you enjoy most?",
-        "o1": "Tall megacities",
-        "o2": "Mid-sized cities",
-        "o3": "Small towns / suburbs"
-      },
-      "q10": {
-        "title": "Rules and bureaucracy",
-        "desc": "How okay are you with a structured, regulated environment?",
-        "o1": "I like order",
-        "o2": "Neutral",
-        "o3": "Prefer simpler"
-      },
-      "q11": {
-        "title": "Social support",
-        "desc": "How important are social guarantees and support systems?",
-        "o1": "Very important",
-        "o2": "Somewhat important",
-        "o3": "Not important"
-      },
-      "q12": {
-        "title": "International environment",
-        "desc": "Do you want a more international environment around you?",
-        "o1": "Yes, very much",
-        "o2": "Not critical",
-        "o3": "Prefer less"
-      },
-      "q13": {
-        "title": "Taxes",
-        "desc": "How important are low taxes?",
-        "o1": "Very important",
-        "o2": "Somewhat important",
-        "o3": "Not important"
-      },
-      "q14": {
-        "title": "Income growth",
-        "desc": "How important are opportunities for income/career growth?",
-        "o1": "Very important",
-        "o2": "Somewhat important",
-        "o3": "Not important"
-      },
-      "q15": {
-        "title": "Openness and freedom",
-        "desc": "How important is an open, liberal environment for you?",
-        "o1": "Very important",
-        "o2": "Somewhat important",
-        "o3": "Not important"
-      },
-      "q16": {
-        "title": "Cultural change",
-        "desc": "How easily do you adapt to a different culture?",
-        "o1": "Easy",
-        "o2": "Moderate",
-        "o3": "Hard"
-      },
-      "q17": {
-        "title": "Travel convenience",
-        "desc": "How important is it to travel to other countries easily?",
-        "o1": "Very important",
-        "o2": "Nice sometimes",
-        "o3": "Not important"
-      },
-      "q18": {
-        "title": "Healthcare quality",
-        "desc": "How important is strong and accessible healthcare?",
-        "o1": "Very important",
-        "o2": "Somewhat important",
-        "o3": "Not important"
-      },
-      "q19": {
-        "title": "Russian language around you",
-        "desc": "How important is it that Russian is common in daily life?",
-        "o1": "Important",
-        "o2": "Nice to have",
-        "o3": "Not important"
-      },
-      "q20": {
-        "title": "English language around you",
-        "desc": "How important is it to live comfortably in English?",
-        "o1": "Very important",
-        "o2": "Somewhat important",
-        "o3": "Not important"
-      },
-      "q21": {
-        "title": "Surroundings",
-        "desc": "What kind of surroundings do you prefer?",
-        "o1": "Sea/ocean/rivers",
-        "o2": "Forests/mountains/nature",
-        "o3": "Urban environment"
-      }
-    }
-  },
-  "chat": {
-    "title": "Chat with developer",
-    "a11y": {
-      "open": "Open chat",
-      "close": "Close chat",
-      "endSession": "End conversation"
-    },
-    "loading": "Loading messages…",
-    "send": "Send",
-    "input": {
-      "placeholder": "Type a message…"
-    },
-    "attach": {
-      "label": "File"
-    },
-    "status": {
-      "online": "Online",
-      "connecting": "Connecting…"
-    },
-    "system": {
-      "language_notice": "Please note that a real person speaks only Russian, English and Ukrainian. Kazakh is supported via a translator.",
-      "choose_language": "Would you like to continue in the current language ({language}) or choose another one?",
-      "choose_channel": "Where would you like to continue chatting with the developer?",
-      "channel_site": "Stay on the website",
-      "channel_telegram": "Switch to Telegram",
-      "enter_tg": "Please enter your Telegram username starting with @ so the developer can contact you directly.",
-      "telegram_done": "Thank you. The developer will contact you as soon as possible from @WhitesLove.",
-      "session_closed": "The conversation has been closed. You can start a new one at any time.",
-      "site_started": "Alright! Write a message — I'll pass it on to the developer.",
-      "invalid_tg": "The username must be in @username format (5–32 characters).",
-      "new_dialog": "Start a new conversation"
-    },
-    "errors": {
-      "empty": "Message cannot be empty",
-      "closed": "The conversation is already closed"
-    }
-  },
-  "errors": {
-    "kicker": {
-      "notFound": "Page not found",
-      "server": "Server error"
-    },
-    "404": {
-      "title": "Page not found",
-      "text": "It looks like this page doesn’t exist or has been removed."
-    },
-    "500": {
-      "title": "Something went wrong",
-      "text": "A server error occurred. We are already working on fixing it."
-    },
-    "actions": {
-      "home": "Go to home",
-      "retry": "Try again"
-    },
-    "details": "Technical details",
-    "links": {
-      "main": "Home",
-      "services": "Services"
-    }
-  },
-  "services": {
-    "svgEditor": {
-      "title": "SVG Editor",
-      "subtitle": "Upload a file or paste SVG code. Preview updates instantly, clean up and edit colors/stroke.",
-      "sections": {
-        "input": {
-          "title": "Input"
-        },
-        "preview": {
-          "title": "Preview"
-        }
-      },
-      "inputs": {
-        "file": "SVG file",
-        "code": "SVG code",
-        "codePlaceholder": "Paste SVG markup here..."
-      },
-      "outputs": {
-        "normalized": "Current SVG",
-        "normalizedPlaceholder": "Result will appear here..."
-      },
-      "actions": {
-        "apply": "Apply",
-        "minify": "Minify",
-        "removeDimensions": "Remove size",
-        "replaceColors": "Replace colors",
-        "editStroke": "Edit stroke"
-      },
-      "titles": {
-        "apply": "Apply code to preview",
-        "minify": "Remove extra tags and comments",
-        "removeDimensions": "Remove width and height from root <svg>",
-        "replaceColors": "Replace fill/stroke colors (including currentColor)",
-        "editStroke": "Add/remove/edit stroke and stroke-width"
-      },
-      "preview": {
-        "emptyTitle": "No SVG yet",
-        "emptySubtitle": "Upload a file or paste code and click Apply."
-      },
-      "errors": {
-        "empty": "SVG code is empty.",
-        "noSvgRoot": "SVG root element <svg> not found.",
-        "parse": "Unable to parse SVG. Please check the markup.",
-        "fileNotSvg": "Selected file is not an .svg file.",
-        "fileRead": "Failed to read file.",
-        "fileTooLarge": "File is too large."
-      },
-      "modals": {
-        "common": {
-          "close": "Close",
-          "apply": "Apply"
-        },
-        "colors": {
-          "title": "Replace colors",
-          "empty": "No colors found.",
-          "from": "From",
-          "to": "To",
-          "count": "Occurrences",
-          "pick": "Pick",
-          "useCurrentColor": "Use currentColor",
-          "currentColor": "currentColor",
-          "placeholders": {
-            "color": "e.g. #AABBCC or rgb(...)"
-          },
-          "titles": {
-            "pickColor": "Pick replacement color",
-            "nativePicker": "Pick color"
-          },
-          "errors": {
-            "invalidColor": "Invalid color."
-          }
-        },
-        "stroke": {
-          "title": "Stroke editor",
-          "elements": "Elements",
-          "edit": "Edit",
-          "strokeWidth": "stroke-width",
-          "strokeColor": "stroke",
-          "useCurrentColor": "Use currentColor",
-          "saveElement": "Save element",
-          "placeholders": {
-            "strokeWidth": "e.g. 2",
-            "strokeColor": "e.g. #FF00AA or rgb(...)"
-          },
-          "titles": {
-            "pickColor": "Pick stroke color",
-            "nativePicker": "Pick stroke color",
-            "saveElement": "Save changes for selected element"
-          },
-          "errors": {
-            "strokeWidth": "stroke-width must be a non-negative number.",
-            "invalidColor": "Invalid color."
-          }
-        }
-      }
-    },
-    "emailEditor": {
-      "title": "Email editor",
-      "subtitle": "Create, validate and preview HTML emails compatible with major email clients.",
-      "actions": {
-        "moveInlineStylesToStyle": "Move inline styles to <style>",
-        "insertImage": "Insert image",
-        "insertLink": "Insert link",
-        "insertTemplate": "Insert template"
-      },
-      "fakeData": {
-        "toggle": "Fake data",
-        "edit": "Edit fake data",
-        "title": "Fake data",
-        "intro": "Provide sample values for the template variables detected below. Each entry is shown by its variable path and is substituted into the preview.",
-        "valuePlaceholder": "Sample value",
-        "custom": "Custom",
-        "remove": "Remove variable",
-        "empty": "No variables detected yet. Add a variable path to your template, or create one manually below.",
-        "addLabel": "Add a variable path",
-        "addPlaceholder": "e.g. user.name",
-        "add": "Add",
-        "done": "Done"
-      },
-      "template": {
-        "label": "Template engine",
-        "cleanHtml": "Clean HTML",
-        "freemarker": "Freemarker",
-        "velocity": "Velocity"
-      },
-      "preview": {
-        "label": "Preview client",
-        "gmail": "Gmail",
-        "yandex": "Yandex Mail",
-        "outlook": "Outlook",
-        "hint": "Preview is approximate. Real email clients may differ."
-      },
-      "diagnostics": {
-        "line": "line",
-        "title": "Diagnostics",
-        "noIssues": "No issues found.",
-        "tip": "Tip: double click an item to jump to its location.",
-        "severity": {
-          "error": "Error",
-          "warning": "Warning"
-        },
-        "lineUnknown": "line unknown",
-        "messages": {
-          "html": {
-            "unexpectedClosingTag": "Unexpected closing tag </{tag}>.",
-            "tagNotClosed": "Tag <{tag}> is not closed.",
-            "imgMissingAlt": "<img> tag must include alt attribute.",
-            "imgMissingSrc": "<img> tag must include src attribute.",
-            "linkMissingHref": "<a> tag must include href attribute.",
-            "tableShouldHaveRolePresentation": "Email table should include role=\"presentation\".",
-            "tableShouldHaveCellspacing0": "Email table should include cellspacing=\"0\".",
-            "tableShouldHaveCellpadding0": "Email table should include cellpadding=\"0\".",
-            "tableShouldHaveBorder0": "Email table should include border=\"0\".",
-            "missingMetaCharset": "Missing <meta charset=\"...\">.",
-            "missingMetaViewport": "Missing <meta name=\"viewport\" ...>.",
-            "missingRootPresentationTable": "Missing root layout table: <table role=\"presentation\" width=\"100%\">.",
-            "outlookAvoidDiv": "Outlook profile: avoid <div> in email layout. Prefer tables."
-          },
-          "css": {
-            "duplicateClassSelector": "Duplicate class selector in <style>: {selector}.",
-            "duplicateClassSelectorHint": "Pseudo-classes/elements and selectors inside @media are not considered duplicates."
-          },
-          "template": {
-            "unexpectedEnd": "Unexpected end of template block.",
-            "unclosedIf": "Unclosed conditional block (if).",
-            "unclosedLoop": "Unclosed loop block (loop/foreach/list).",
-            "unclosedExpression": "Unclosed template expression.",
-            "invalidSyntax": "Invalid template syntax."
-          },
-          "images": {
-            "badFormat": "Image format \"{ext}\" may be poorly supported by email clients."
-          }
-        }
-      },
-      "modals": {
-        "common": {
-          "close": "Close"
-        },
-        "insertImage": {
-          "placeholders": {
-            "url": "https://...",
-            "alt": "Description",
-            "width": "e.g. 600",
-            "height": "e.g. 300"
-          },
-          "title": "Insert image",
-          "url": "Image URL",
-          "alt": "Alt text",
-          "width": "Width",
-          "height": "Height",
-          "insert": "Insert",
-          "cancel": "Cancel"
-        },
-        "insertLink": {
-          "title": "Insert link",
-          "url": "URL",
-          "text": "Link text",
-          "insert": "Insert",
-          "cancel": "Cancel",
-          "placeholders": {
-            "url": "https://...",
-            "text": "Link text"
-          }
-        },
-        "insertTemplate": {
-          "title": "Insert template construct",
-          "notice": "Switch template mode to Freemarker or Velocity.",
-          "kind": {
-            "if": "If condition",
-            "variable": "Variable output",
-            "loop": "Loop",
-            "declare": "Declare variable"
-          },
-          "fields": {
-            "condition": "Condition",
-            "variableName": "Variable name",
-            "collection": "Collection",
-            "itemName": "Item name",
-            "declareType": "Variable type"
-          },
-          "types": {
-            "string": "String",
-            "number": "Number",
-            "object": "Object",
-            "array": "Array"
-          },
-          "insert": "Insert",
-          "cancel": "Cancel"
-        },
-        "colorPicker": {
-          "title": "Color",
-          "hex": "HEX color",
-          "preferHex": "Prefer HEX when applying",
-          "apply": "Apply",
-          "close": "Close",
-          "code": "Color code",
-          "formats": {
-            "hex": "HEX",
-            "rgb": "RGB",
-            "rgba": "RGBA"
-          },
-          "lightness": "Lightness",
-          "opacity": "Opacity",
-          "titles": {
-            "nativePicker": "Open system color picker",
-            "eyedropper": "Eyedropper: pick a color from the screen",
-            "darker": "Make darker by 1 step",
-            "lighter": "Make lighter by 1 step",
-            "moreTransparent": "Make more transparent by 0.05",
-            "lessTransparent": "Make less transparent by 0.05"
-          },
-          "placeholders": {
-            "code": "#RRGGBB or rgb(...) or rgba(...)"
-          },
-          "errors": {
-            "invalidColorCode": "Invalid color code."
-          }
-        }
-      }
-    },
-    "markdownEditor": {
-      "title": "Markdown Editor",
-      "headline": "Text formatting for messengers",
-      "subtitle": "Prepare text for Telegram, WhatsApp, and TikTok with preview",
-      "editor": {
-        "placeholder": "Enter your text here...",
-        "hotkeysHint": "Use Ctrl / Cmd shortcuts for formatting"
-      },
-      "actions": {
-        "emoji": "Emoji",
-        "spellcheck": "Spellcheck",
-        "clearAll": "Clear all",
-        "copy": "Copy",
-        "copied": "Copied!",
-        "cancel": "Cancel",
-        "insert": "Insert",
-        "check": "Check text",
-        "checking": "Checking…"
-      },
-      "format": {
-        "bold": "Bold",
-        "italic": "Italic",
-        "underline": "Underline",
-        "strike": "Strikethrough",
-        "spoiler": "Spoiler",
-        "inlineCode": "Inline code",
-        "codeBlock": "Code block",
-        "quote": "Quote",
-        "link": "Link"
-      },
-      "lists": {
-        "ul": "Bullet list",
-        "ol": "Numbered list",
-        "format": "Format list"
-      },
-      "right": {
-        "title": "Result",
-        "modeMarkdown": "Markdown",
-        "modePreview": "Preview"
-      },
-      "platforms": {
-        "telegram": "Telegram",
-        "whatsapp": "WhatsApp",
-        "tiktok": "TikTok"
-      },
-      "platformHints": {
-        "telegram": "Telegram supports Markdown formatting",
-        "whatsapp": "WhatsApp uses its own formatting rules",
-        "tiktok": "TikTok supports plain text only"
-      },
-      "link": {
-        "title": "Insert link",
-        "text": "Link text",
-        "textPh": "Enter link text",
-        "url": "Link URL",
-        "urlPh": "https://example.com"
-      },
-      "limit": {
-        "exceeded": "Text exceeds the maximum length"
-      },
-      "preview": {
-        "empty": "Nothing to preview yet"
-      },
-      "storage": {
-        "restored": "Draft restored"
-      },
-      "hotkeys": {
-        "title": "Keyboard shortcuts",
-        "bold": "Bold — Ctrl/Cmd + B",
-        "italic": "Italic — Ctrl/Cmd + I",
-        "underline": "Underline — Ctrl/Cmd + U",
-        "link": "Insert link — Ctrl/Cmd + K",
-        "spoiler": "Spoiler — Ctrl/Cmd + Shift + S",
-        "code": "Code block — Ctrl/Cmd + Shift + C",
-        "quote": "Quote — Ctrl/Cmd + Shift + Q",
-        "ul": "Bullet list — Ctrl/Cmd + Shift + 8",
-        "ol": "Numbered list — Ctrl/Cmd + Shift + 7",
-        "formatList": "Format list — Ctrl/Cmd + Shift + L",
-        "emoji": "Emoji picker — Ctrl/Cmd + Shift + E"
-      }
-    },
-    "pdfEditor": {
-      "text": {
-        "title": "Add text",
-        "valueLabel": "Text",
-        "valuePlaceholder": "Enter text",
-        "fontLabel": "Font",
-        "fontSizeLabel": "Size",
-        "colorLabel": "Color",
-        "opacityLabel": "Opacity",
-        "alignLabel": "Alignment",
-        "styleLabel": "Style",
-        "bold": "Bold",
-        "italic": "Italic",
-        "underline": "Underline",
-        "applyLabel": "Apply",
-        "hintDrag": "Drag the text to position it"
-      },
-      "signature": {
-        "strokeWidthLabel": "Stroke width",
-        "opacityLabel": "Opacity",
-        "actionsLabel": "Actions",
-        "applyLabel": "Apply",
-        "hintDraw": "Draw inside the box and place it on the page",
-        "title": "Draw signature",
-        "clear": "Clear"
-      },
-      "toolbar": {
-        "pageLabel": "Page",
-        "dpiLabel": "DPI",
-        "backgroundLabel": "Background"
-      },
-      "background": {
-        "transparent": "Transparent",
-        "white": "White",
-        "black": "Black"
-      },
-      "title": "Online PDF Editor",
-      "headline": "Edit PDF files online",
-      "subtitle": "Add text, signatures and download your edited PDF in seconds.",
-      "upload": {
-        "title": "Upload PDF",
-        "add": "Add file",
-        "start": "Start editing",
-        "replace": "Replace file",
-        "clear": "Clear list",
-        "hint": "Upload a PDF file to start editing.",
-        "singleHelp": "Only one PDF can be uploaded.",
-        "new": "Upload new file"
-      },
-      "pages": "Pages",
-      "page": "Page",
-      "addPage": "Add page",
-      "addPageFailed": "Could not add a page.",
-      "preview": "Preview",
-      "previewHint": "Upload a file to see preview.",
-      "actions": {
-        "undo": "Undo",
-        "redo": "Redo",
-        "download": "Download"
-      },
-      "editor": {
-        "saveDocument": "Save document",
-        "toolSettings": "Tool settings",
-        "moveModeHelp": "Move mode lets you resize and move objects. Drawing modes paint directly on the page. Draft is saved automatically."
-      },
-      "toolstrip": {
-        "fullMode": "Full editor",
-        "move": "Move",
-        "pen": "Pen",
-        "highlighter": "Highlighter",
-        "signature": "Signature",
-        "rect": "Rectangle",
-        "circle": "Circle",
-        "text": "Text",
-        "image": "Image",
-        "undo": "Undo",
-        "redo": "Redo",
-        "remove": "Remove",
-        "clearPage": "Clear page"
-      },
-      "full": {
-        "title": "Full editor",
-        "loadText": "Load page text",
-        "replaceImage": "Replace image",
-        "noText": "No editable text could be extracted from this page.",
-        "selectHint": "Select an object on the page to edit its text, size, position, style and fonts.",
-        "textContent": "Text",
-        "font": "Font",
-        "fontSize": "Font size",
-        "color": "Color",
-        "opacity": "Opacity",
-        "style": "Style & alignment",
-        "posX": "X",
-        "posY": "Y",
-        "width": "Width",
-        "height": "Height",
-        "rotation": "Rotation",
-        "help": "Edit the selected object directly. Double-click text to edit inline, or drag handles to resize and move. Changes are saved automatically.",
-        "preparing": "Preparing document…"
-      },
-      "fields": {
-        "color": "Color",
-        "opacity": "Opacity",
-        "size": "Size",
-        "shape": "Shape",
-        "shapeRound": "Round",
-        "shapeSquare": "Square",
-        "shapeHelp": "Square shape applies to objects. Brush remains round.",
-        "textDefaults": "Default text settings",
-        "textPlaceholder": "Enter text...",
-        "fontPlaceholder": "Font (e.g. Helvetica)",
-        "signatureThickness": "Signature thickness"
-      }
-    },
-    "converter": {
-      "hero": {
-        "titleLine1": "File Converter",
-        "titleLine2": "fast, clean, and without unnecessary magic ✨",
-        "description": "Upload a file, choose a format — and get the result. For images, you can upload up to 20 files at once."
-      },
-      "modes": {
-        "media": {
-          "title": "Images",
-          "desc": "PNG/JPG/WebP/GIF/BMP/TIFF/AVIF. Up to 20 files, ZIP output."
-        },
-        "data": {
-          "title": "Data",
-          "desc": "CSV/JSON/XML/XLSX/YAML/TSV. One file at a time."
-        },
-        "docs": {
-          "title": "Documents",
-          "desc": "PDF/DOCX/TXT/HTML/MD/ODT/RTF. One file at a time."
-        }
-      },
-      "panel": {
-        "title": {
-          "media": "Images",
-          "data": "Data",
-          "docs": "Documents"
-        },
-        "description": {
-          "media": "Supported: png, jpg/jpeg, webp, gif, bmp, tiff, avif. Up to 20 files. If more than one — ZIP output.",
-          "data": "Supported: csv, json, xml, xlsx, yaml, tsv. Single file.",
-          "docs": "Supported: pdf, docx, txt, html, md, odt, rtf. Conversion via LibreOffice; complex layouts are best effort."
-        }
-      },
-      "controls": {
-        "targetFormat": "Output format",
-        "convert": "Convert",
-        "converting": "Converting…"
-      },
-      "messages": {
-        "noFiles": "Add file(s) to convert.",
-        "singleOnly": "Only one file can be uploaded in this mode.",
-        "mediaMax": "Maximum 20 files for images.",
-        "unsupported": "Unsupported file: {name}",
-        "tookFirst": "Took the first {count} files 🙂",
-        "httpError": "Error: {status}",
-        "success": "Done! File downloaded 👌",
-        "failed": "Conversion failed."
-      },
-      "dropzone": {
-        "title": "Drop file here",
-        "orPick": "or select manually",
-        "support": "Supported:",
-        "limit": "Limit:",
-        "filesWord": "file(s)",
-        "pick": "Upload",
-        "clear": "Clear"
-      },
-      "files": {
-        "title": "Files",
-        "zipHintMedia": "If more than one file — result will be ZIP."
-      },
-      "tips": {
-        "pngToJpeg": "PNG → JPEG: transparency will be replaced with white background.",
-        "pdfToDocx": "PDF → DOCX: layout may differ from the original — this is normal."
-      }
-    },
-    "dockerSearch": {
-      "tabs": {
-        "simple": "Simple search",
-        "advanced": "Advanced search"
-      },
-      "simple": {
-        "queryLabel": "Query",
-        "queryPlaceholder": "For example: alpine, slim, debian…",
-        "queryHint": "We will show main tags like “alpine”, “17-alpine”, “18-alpine”…",
-        "resultsTitle": "Main tags",
-        "resultsCount": "Found",
-        "mainTags": "Select a tag",
-        "emptyHint": "Enter a query and click “Search”",
-        "sort": {
-          "label": "Sort",
-          "lenAsc": "By length (short → long)",
-          "lenDesc": "By length (long → short)"
-        }
-      },
-      "title": "Docker tags",
-      "headline": "Find the best tag and see aliases",
-      "subtitle": "Search Docker Hub tags by major version and (optionally) distro variant. We’ll try to pick the most general tag and show all tags pointing to the same image digest.",
-      "fields": {
-        "repo": "Repository",
-        "major": "Major version",
-        "variant": "Variant"
-      },
-      "placeholders": {
-        "repo": "Example: library/amazoncorretto",
-        "major": "Example: 17"
-      },
-      "hints": {
-        "repo": "Use format namespace/name (e.g. library/amazoncorretto or myorg/myimage)."
-      },
-      "variant": {
-        "any": "Any",
-        "alpine": "Alpine",
-        "al2": "Amazon Linux (al2)",
-        "debian": "Debian",
-        "ubuntu": "Ubuntu"
-      },
-      "actions": {
-        "search": "Search",
-        "reset": "Reset",
-        "aliases": "Show aliases"
-      },
-      "errors": {
-        "title": "Something went wrong",
-        "generic": "Failed to load data. Please try again."
-      },
-      "result": {
-        "title": "Results",
-        "matched": "Matched tags",
-        "reason": "Reason",
-        "bestTag": "Best tag",
-        "noBest": "No matching tag found",
-        "fallbacks": "Available tags",
-        "noFallbacks": "No tags found for this query.",
-        "selected": "Selected",
-        "aliasesTitle": "Aliases (same image)",
-        "aliasesHint": "Pick a tag and click “Show aliases”.",
-        "digest": "Digest",
-        "aliasCount": "Aliases",
-        "noAliases": "No aliases found for this digest."
-      },
-      "howTitle": "How it works",
-      "how": {
-        "step1": {
-          "title": "Enter repo and major version",
-          "text": "We request tags from Docker Hub and filter them by your major version."
-        },
-        "step2": {
-          "title": "Pick the best tag",
-          "text": "We prefer general aliases like “17-alpine” or “17”. If they don’t exist, we fall back to the closest available tag."
-        },
-        "step3": {
-          "title": "Check aliases by digest",
-          "text": "We fetch the manifest digest and show all tags that point to the same image."
-        }
-      }
-    },
-    "title": "Services",
-    "headline": "Find the right service in just a few clicks",
-    "subtitle": "Pick a category, use search, and open the service that gets the job done faster and easier.",
-    "searchPlaceholder": "Search services…",
-    "empty": {
-      "title": "No results found",
-      "text": "Try changing the category or refining your search."
-    },
-    "howTitle": "How it works",
-    "how": {
-      "step1": {
-        "title": "Choose a service",
-        "text": "Browse a category or find what you need using search."
-      },
-      "step2": {
-        "title": "Set it up",
-        "text": "Enter your data and pick options — everything is guided and clear."
-      },
-      "step3": {
-        "title": "Get the result",
-        "text": "Run the service and get a ready result in seconds."
-      }
-    },
-    "filters": {
-      "all": "All"
-    }
-  },
-  "menu": {
-    "home": "Home",
-    "tools": "Tools",
-    "pages": "Pages",
-    "innerPages": "Inner Pages",
-    "dashboard": "Dashboard",
-    "textGenerator": "Text Generator",
-    "imageGenerator": "Image Generator",
-    "codeGenerator": "Code Generator",
-    "blog": "Blog",
-    "pricing": "Pricing",
-    "profile": "Profile",
-    "sessions": "Sessions"
   },
   "badge": {
     "cool": "Cool",
@@ -1011,222 +24,430 @@
   "button": {
     "getStart": "Get started"
   },
-  "hero": {
-    "title": "Examine the Potential of",
-    "title2": "AI Hack",
-    "subtitle": "Unleash Brainwave's AI potential. Use the open AI conversation app Pixcels Themes",
-    "cta": "Start with AI",
-    "rotated1": "AI Chatting",
-    "rotated2": "AI Writing"
-  },
-  "form": {
-    "placeholder": "Type something to prompt AI...",
-    "button": "Start with AI"
-  },
-  "trust": {
-    "title": "Trusted by 800,000+ highly productive companies"
-  },
-  "tabs": {
-    "headline": "Rainbow unlocks the potential of AI",
-    "title": "Generative AI made for creators.",
-    "audio": {
-      "label": "Audio",
-      "title": "AI Audio Generation",
-      "text": "Audio generating AI refers to artificial intelligence that creates sound from text or data.",
-      "features": [
-        "Transformer Models",
-        "Conditional Generative Models",
-        "Pre-trained Models",
-        "Variational Autoencoders"
-      ],
-      "cta": "Start Exploring Now →"
+  "cards": {
+    "ask": {
+      "description": "If necessary, I will help, explain, and search for information together with my colleague. We need to support each other.",
+      "title": "Ask anything"
     },
-    "code": {
-      "label": "Code",
-      "title": "AI Code Generation",
-      "text": "Generate clean, functional code from natural language prompts using advanced models.",
-      "features": [
-        "Syntax-aware transformers",
-        "Contextual completion",
-        "Multi-language support",
-        "Secure-by-default scaffolding"
-      ],
-      "cta": "Start Exploring Now →"
+    "connect": {
+      "description": "Preferred method of communication: Telegram. Secondary: email. Always available, within reason.",
+      "title": "Connect"
     },
-    "photo": {
-      "label": "Photo",
-      "title": "AI Photo Generation",
-      "text": "Produce high-quality visuals from text prompts using generative diffusion models.",
-      "features": [
-        "Stable Diffusion",
-        "Style Transfer",
-        "Inpainting & Outpainting",
-        "Prompt-to-image pipelines"
-      ],
-      "cta": "Start Exploring Now →"
-    },
-    "video": {
-      "label": "Video",
-      "title": "AI Video Generation",
-      "text": "Create dynamic video content from scripts, storyboards, or voice input.",
-      "features": [
-        "Scene synthesis",
-        "Lip-syncing",
-        "Motion interpolation",
-        "Multi-modal rendering"
-      ],
-      "cta": "Start Exploring Now →"
+    "fast": {
+      "description": "I quickly find common ground with the team. After two weeks, we start sending each other memes with colleagues between discussions of tasks.",
+      "title": "Quick adaptation"
     }
   },
   "carousel": {
-    "headline": "Assisting Individuals",
-    "title": "Chat Smarter, Not Harder with"
+    "headline": "Communication with colleagues",
+    "title": "I pet cats 😻, I love sharks 🦈"
   },
-  "cards": {
-    "ask": {
-      "title": "Ask anything",
-      "description": "Lets users quickly find answers to their questions without having to search through multiple sources."
+  "chat": {
+    "a11y": {
+      "close": "Close chat",
+      "endSession": "End conversation",
+      "open": "Open chat"
     },
-    "connect": {
-      "title": "Connect everywhere",
-      "description": "Lets users quickly find answers to their questions without having to search through multiple sources."
+    "attach": {
+      "label": "File"
     },
-    "fast": {
-      "title": "Fast responding",
-      "description": "Lets users quickly find answers to their questions without having to search through multiple sources."
-    }
-  },
-  "tabs2": {
-    "connect": {
-      "label": "Connect with AI",
-      "title": "Connect with AI chatbot",
-      "description": "Identify the platform or interface through which you can access the chatbot. This could be a website, a messaging app, or a dedicated application.",
-      "headline": "How it works"
+    "errors": {
+      "closed": "The conversation is already closed",
+      "empty": "Message cannot be empty"
     },
-    "workflow": {
-      "label": "Streamline Workflow",
-      "title": "Streamline Your Workflow",
-      "description": "Discover tools and techniques to optimize your workflow, making your tasks more efficient and manageable.",
-      "headline": "Exploring Efficiency"
+    "input": {
+      "placeholder": "Type a message…"
     },
-    "cyber": {
-      "label": "Cybersecurity",
-      "title": "Protecting Your Digital Presence",
-      "description": "Gain insights into cybersecurity measures and strategies to safeguard your online identity and sensitive information.",
-      "headline": "Navigating Cybersecurity"
+    "loading": "Loading messages…",
+    "send": "Send",
+    "status": {
+      "connecting": "Connecting…",
+      "online": "Online"
     },
-    "data": {
-      "label": "Data Analysis",
-      "title": "Demystifying Data Analytics",
-      "description": "Learn the fundamentals of data analysis, including tools and methodologies, to extract meaningful insights from raw data.",
-      "headline": "Mastering Data Analysis"
+    "system": {
+      "channel_site": "Stay on the website",
+      "channel_telegram": "Switch to Telegram",
+      "choose_channel": "Where would you like to continue chatting with the developer?",
+      "choose_language": "Would you like to continue in the current language ({language}) or choose another one?",
+      "enter_tg": "Please enter your Telegram username starting with @ so the developer can contact you directly.",
+      "invalid_tg": "The username must be in @username format (5–32 characters).",
+      "language_notice": "Please note that a real person speaks only Russian, English and Ukrainian. Kazakh is supported via a translator.",
+      "new_dialog": "Start a new conversation",
+      "session_closed": "The conversation has been closed.",
+      "site_started": "Alright! Write a message — I'll pass it on to the developer.",
+      "telegram_done": "Thank you. The developer will contact you as soon as possible from @WhitesLove."
     },
-    "cta": "Try It Now →"
+    "title": "Chat with developer"
   },
   "collaboration": {
-    "headline": "AI Collaboration",
-    "title": "AI Chat app for seamless collaboration",
-    "cta": "Try it now →"
+    "cta": "Try it now →",
+    "headline": "Skills",
+    "title": "Learning new things, improving old ones"
+  },
+  "common": {
+    "add": "Add",
+    "noData": "No Data",
+    "pin": "Pin",
+    "pinned": "Pinned",
+    "remove": "Remove"
   },
   "community": {
-    "title": "Join our AI Experts community",
-    "description": "Meet and learn from 80+ creators & companies who share how they use AI to create better content at lightning speed."
+    "description": "Meet and learn from 80+ creators & companies who share how they use AI to create better content at lightning speed.",
+    "title": "Join our AI Experts community"
   },
-  "testimonials": {
-    "headline": "Assisting Individuals",
-    "title": "The opinions of the community",
-    "item": {
-      "role": "Nursing Assistant",
-      "quote": "Pixcels-Themes has become such an integral part of our work!"
+  "contacts": {
+    "address": {
+      "35fe860c-2dfb-407e-94fc-906a6b9fb9c0": {
+        "label": "Address"
+      },
+      "51e13d6c-a6a1-4f10-b1fc-c30f9efb9479": {
+        "label": "Address"
+      },
+      "61331a0f-4830-4b5c-abf1-6b0b6ab56451": {
+        "label": "Location:"
+      }
+    },
+    "email": {
+      "a1926fb4-c8cc-4fd8-8023-09c934fcc6e5": {
+        "label": "Contact email:"
+      },
+      "de5f301b-31ea-41a9-a27a-1e41d446e234": {
+        "label": "Email:"
+      }
+    },
+    "other": {
+      "2c181ada-46d9-4180-b909-65ad2c5ceb16": {
+        "label": "©"
+      }
+    },
+    "phone": {
+      "64065628-d306-4d4f-a045-6e3662769ad2": {
+        "label": "Phone:"
+      }
+    },
+    "social": {
+      "75c7816d-5303-428a-97fe-fa862603456f": {
+        "label": "Telegram:"
+      },
+      "a6c5bf7e-3f1e-45a6-9c1e-7bc1da1d11c3": {
+        "label": "GitHub"
+      },
+      "b96cff2f-c396-4296-a4b7-f36f5e62c501": {
+        "label": "WhatsApp"
+      },
+      "dc6c423c-2ef1-4edd-bfde-50f4d7286638": {
+        "label": "Telegram"
+      }
+    }
+  },
+  "download": {
+    "description": "Works only on Android OS. Install the APK, launch Rustic Price Converter. Find out the necessary currencies on the fly, compare prices.",
+    "headline": "Mobile application",
+    "title": "Try the app for free"
+  },
+  "errors": {
+    "404": {
+      "text": "It looks like this page doesn’t exist or has been removed.",
+      "title": "Page not found"
+    },
+    "500": {
+      "text": "A server error occurred. We are already working on fixing it.",
+      "title": "Something went wrong"
+    },
+    "actions": {
+      "home": "Go to home",
+      "retry": "Try again"
+    },
+    "details": "Technical details",
+    "kicker": {
+      "notFound": "Page not found",
+      "server": "Server error"
+    },
+    "links": {
+      "main": "Home",
+      "services": "Services"
+    }
+  },
+  "featureCard": {
+    "aaf94220-0df1-455c-9b70-bfcc41d657b3": {
+      "description": "Fast, Responsive",
+      "title": "Templating"
     }
   },
   "features": {
     "button": "Explore More →"
   },
-  "reviews": {
-    "title": "Based on 20,000+ reviews"
+  "footer": {
+    "about": "Selachii nunquam dormiunt 🦈",
+    "block": {
+      "dfe3d950-5105-46c1-a319-595644bdcdaa": {
+        "contacts": {
+          "title": "Contacts"
+        }
+      }
+    },
+    "contact": {
+      "address": "Romania, Bucarest",
+      "phone": "📞 +38063-88-77-209"
+    },
+    "contactTitle": "Contact",
+    "menu": {
+      "blocks": {
+        "c321aa78-14a7-4009-8ca5-94d9f7c1a27d": {
+          "links": {
+            "c3f270c3-c76c-42f8-b4c2-6e76c2bafaf2": {
+              "label": "List of services"
+            }
+          },
+          "title": "Services"
+        }
+      }
+    },
+    "newsletter": {
+      "placeholder": "Enter Your Email Here",
+      "title": "Join a Newsletter"
+    },
+    "quickLinks": {
+      "blog": "Blog",
+      "contact": "Contact",
+      "howToUse": "How to use",
+      "pages": "Pages",
+      "roadmap": "Roadmap"
+    },
+    "quickLinksTitle": "Quick Links",
+    "services": {
+      "codeGenerator": "Code Generator",
+      "educationFeedback": "Education Feedback",
+      "imageGenerator": "Image Generator",
+      "textGenerator": "Text Generator",
+      "videoGenerator": "Video Generator"
+    },
+    "servicesTitle": "Services"
   },
-  "download": {
-    "headline": "Get Started With Pixcels",
-    "title": "Experience Products in AI",
-    "description": "Based on the conversation with the AI chatbot, you will receive personalized recommendations."
+  "form": {
+    "button": "Contact me",
+    "placeholder": "Enter text. When you click the button, it will be inserted into the chat with me on Telegram..."
+  },
+  "header": {
+    "button": {
+      "changeTheme": "Change theme"
+    }
+  },
+  "headerMenu": {
+    "495004e9-8c1b-4834-9eb0-b168fb096807": {
+      "dropdown-simple": {
+        "item": {
+          "0": {
+            "title": "Main"
+          }
+        }
+      }
+    },
+    "5a06eb44-ce07-43f1-b6ea-e2a0d6ad8b24": {
+      "simple": {
+        "label": "Job finder"
+      }
+    },
+    "6e62a478-0842-461b-b5a1-6a458b7289aa": {
+      "simple": {
+        "label": "Country selection"
+      }
+    },
+    "975c7aac-cf05-49e2-85ac-521965e63441": {
+      "simple": {
+        "label": "Main"
+      }
+    },
+    "a852492f-0eec-45bf-ab4a-4ec39447bda0": {
+      "dropdown-simple": {
+        "item": {
+          "0": {
+            "title": "PDF editor"
+          },
+          "1": {
+            "title": "Services"
+          },
+          "2": {
+            "title": "Converter"
+          },
+          "3": {
+            "title": "DockerHub search"
+          },
+          "4": {
+            "title": "Markdown editor"
+          },
+          "5": {
+            "title": "JSON Editor"
+          },
+          "6": {
+            "title": "Email editor"
+          },
+          "7": {
+            "title": "SVG editor"
+          }
+        },
+        "label": "Services"
+      },
+      "simple": {
+        "label": "Services"
+      }
+    }
+  },
+  "hero": {
+    "cta": "Contact me",
+    "rotated1": "AI Chatting",
+    "rotated2": "AI Writing",
+    "subtitle": "On this resource, you can learn about my skills, contact me, or use some useful services",
+    "title": "Hello! I am",
+    "title2": "AI Hack"
+  },
+  "menu": {
+    "blog": "Blog",
+    "codeGenerator": "Code Generator",
+    "dashboard": "Dashboard",
+    "home": "Home",
+    "imageGenerator": "Image Generator",
+    "innerPages": "Inner Pages",
+    "pages": "Pages",
+    "pricing": "Pricing",
+    "profile": "Profile",
+    "sessions": "Sessions",
+    "textGenerator": "Text Generator",
+    "tools": "Tools"
+  },
+  "offerCard": {
+    "099a4dab-ff5c-4ea7-bc57-6ca84a3c1d8c": {
+      "description": "Test",
+      "feature": {
+        "869cb497-eca0-41a6-8fc6-1f5da13a5a1d": {
+          "title": "Test"
+        }
+      },
+      "name": "Test"
+    },
+    "2e861d3f-0de8-49a1-b357-d386164dfde2": {
+      "description": "test",
+      "feature": {
+        "2cdab68d-79bd-489d-82b0-d2994ed9a89d": {
+          "title": "tst"
+        }
+      },
+      "name": ""
+    },
+    "623e8fad-f119-4eac-aa50-cf747e7534cc": {
+      "description": "Test",
+      "feature": {
+        "fa03e6cd-0b2b-4eb9-a2c1-388e0e524862": {
+          "title": "Test"
+        }
+      },
+      "name": "Test"
+    },
+    "b02ec408-55e7-43f0-a95b-e2d34aca2070": {
+      "description": "We will listen, evaluate, and act accordingly.",
+      "feature": {
+        "48d29dae-e31e-4aca-b3f8-ef3d6da2f447": {
+          "title": "On time"
+        },
+        "7942d9b6-0d9a-4dbd-9d6e-3a4666733689": {
+          "title": "Easy"
+        },
+        "9df0a4da-80b2-496f-9b60-109137972a5e": {
+          "title": "On time"
+        },
+        "a752bd73-2bfd-4c7d-8241-8d66555d6087": {
+          "title": "On time"
+        },
+        "dadf8a48-41e3-40dd-bc92-39351f76903a": {
+          "title": "Easy"
+        },
+        "e47185a8-a2b1-472a-bb0b-c4a013504aab": {
+          "title": "Quickly"
+        }
+      },
+      "name": "Great Deal"
+    }
   },
   "page": {
-    "tabsWithBackground": {
-      "title": "Generative AI made for creators.",
-      "headline": "Rainbow unlocks the potential of AI"
+    "collaboration": {
+      "cta": "Try it now →",
+      "headline": "Skills",
+      "title": "Learning new things, improving old ones"
+    },
+    "community": {
+      "cta": "Get acquainted",
+      "description": "You can check out some of my pet projects",
+      "title": "My GitHub"
+    },
+    "featureCards": {
+      "free": {
+        "description": "Refunds will be issued within period of 14 days from the purchase date",
+        "title": "Not sure yet? Try the free version"
+      },
+      "noRisk": {
+        "description": "Refunds will be issued within period of 14 days from the purchase date",
+        "title": "100% No-Risk, Money Back Guarantee!"
+      },
+      "upgrade": {
+        "description": "Passages there are many variations of Lorem Ipsum available.",
+        "title": "Upgrade or Cancel Anytime"
+      }
     },
     "featuresCarousel": {
       "button": "Explore More →"
     },
+    "reviewLogos": {
+      "title": "Favorite tools"
+    },
+    "tabsWithBackground": {
+      "headline": "What I can do",
+      "title": "What can I offer you?"
+    },
     "tabsWithUnderButtons": {
       "button": "Try It Now →"
-    },
-    "collaboration": {
-      "headline": "AI Collaboration",
-      "title": "AI Chat app for seamless collaboration",
-      "cta": "Try it now →"
-    },
-    "community": {
-      "title": "Join our AI Experts community",
-      "description": "Meet and learn from 80+ creators & companies who share how they use AI to create better content at lightning speed.",
-      "cta": "Join Now Today Free"
-    },
-    "featureCards": {
-      "noRisk": {
-        "title": "100% No-Risk, Money Back Guarantee!",
-        "description": "Refunds will be issued within period of 14 days from the purchase date"
-      },
-      "upgrade": {
-        "title": "Upgrade or Cancel Anytime",
-        "description": "Passages there are many variations of Lorem Ipsum available."
-      },
-      "free": {
-        "title": "Not sure yet? Try the free version",
-        "description": "Refunds will be issued within period of 14 days from the purchase date"
-      }
-    },
-    "reviewLogos": {
-      "title": "Based on 20,000+ reviews on"
     }
   },
   "pricing": {
-    "headline": "Pricing",
-    "title": "Pricing plans for everyone",
-    "switcher": {
-      "monthly": "Monthly",
-      "yearly": "Yearly",
-      "discountBadge": "–10%"
+    "actions": {
+      "getStarted": "Get Started",
+      "showLess": "Show Less",
+      "showMore": "Show More"
     },
     "badge": {
       "bestOffer": "Best Offer"
     },
     "featuresTitle": "Features",
-    "actions": {
-      "showLess": "Show Less",
-      "showMore": "Show More",
-      "getStarted": "Get Started"
-    },
+    "headline": "Advantages",
     "limitedOffer": "Limited Offer",
     "plans": {
       "basic": {
-        "name": "Basic",
         "description": "For large teams & corporations",
-        "monthly": "Free",
-        "yearly": "Free",
         "features": [
           "7,700 3–5 day turnaround",
           "6+ Naive development",
           "5+ Task delivered one-by-one",
           "AI Blog Updates via dashboard & slack",
           "Advance Updates via dashboard & slack"
-        ]
+        ],
+        "monthly": "Free",
+        "name": "Basic",
+        "yearly": "Free"
+      },
+      "enterprise": {
+        "description": "For large teams & corporations",
+        "features": [
+          "15,700 15–30 day turnaround",
+          "6+ Naive development",
+          "5+ Task delivered one-by-one",
+          "7,700 3–5 day turnaround",
+          "6+ Naive development"
+        ],
+        "monthly": "$79.00 /Per Month",
+        "name": "Enterprise",
+        "yearly": "$599.00 /Per Year"
       },
       "premium": {
-        "name": "Premium",
         "description": "For large teams & corporations",
-        "monthly": "$59.00 /Per Month",
-        "yearly": "$499.00 /Per Year",
         "features": [
           "12,700 7–9 day turnaround",
           "6+ Naive development",
@@ -1234,143 +455,1439 @@
           "7,700 3–5 day turnaround",
           "AI Blog Updates via dashboard & slack",
           "Advance Updates via dashboard & slack"
-        ]
-      },
-      "enterprise": {
-        "name": "Enterprise",
-        "description": "For large teams & corporations",
-        "monthly": "$79.00 /Per Month",
-        "yearly": "$599.00 /Per Year",
-        "features": [
-          "15,700 15–30 day turnaround",
-          "6+ Naive development",
-          "5+ Task delivered one-by-one",
-          "7,700 3–5 day turnaround",
-          "6+ Naive development"
-        ]
+        ],
+        "monthly": "$59.00 /Per Month",
+        "name": "Premium",
+        "yearly": "$499.00 /Per Year"
       }
-    }
+    },
+    "switcher": {
+      "discountBadge": "–10%",
+      "monthly": "Monthly",
+      "yearly": "Yearly"
+    },
+    "title": "If I know how, I do it. If I don't know how, I learn and do it. "
   },
-  "footer": {
-    "about": "It has long been known that a reader's attention will be diverted from",
-    "quickLinksTitle": "Quick Links",
-    "servicesTitle": "Services",
-    "contactTitle": "Contact",
-    "quickLinks": {
-      "pages": "Pages",
-      "blog": "Blog",
-      "contact": "Contact",
-      "howToUse": "How to use",
-      "roadmap": "Roadmap"
+  "quizzes": {
+    "countryFit": {
+      "addCountryPlaceholder": "Select a country",
+      "addUsaStatePlaceholder": "Select a state",
+      "bestUsStateHint": "Based on your answers and budget",
+      "bestUsStateTitle": "Best US state for your profile",
+      "cityBlockTitle": "Main city (open data)",
+      "compareTitle": "Comparison",
+      "constraints": {
+        "budget": {
+          "hint": "Includes rent, food and basic living expenses.",
+          "label": "Monthly budget (USD)",
+          "placeholder": "e.g. 2500"
+        },
+        "family": {
+          "couple": "Couple",
+          "coupleWithKids": "Couple with kids",
+          "hint": "Affects housing and monthly cost estimation.",
+          "label": "Family status",
+          "single": "Single",
+          "singleParent": "Single parent"
+        },
+        "isShowCountries": {
+          "label": "Show countries"
+        },
+        "isShowUSA": {
+          "label": "Show USA states"
+        },
+        "job": {
+          "hint": "Affects job availability, infrastructure and legal constraints.",
+          "label": "Type of work",
+          "local": "Local",
+          "mixed": "Remote + local",
+          "remote": "Remote"
+        },
+        "kids": {
+          "hint": "Used for education and housing cost estimation.",
+          "label": "Number of children",
+          "placeholder": "0"
+        },
+        "languageEn": {
+          "hint": "Used to estimate comfort in international or English-speaking environments.",
+          "label": "English language level"
+        },
+        "languageRu": {
+          "hint": "Used to estimate comfort in Russian-speaking environments.",
+          "label": "Russian language level"
+        },
+        "showedCountriesCount": {
+          "label": "Count of countries for showing (up to 40)"
+        }
+      },
+      "constraintsTitle": "Your situation",
+      "description": "Answer a few questions and we’ll suggest countries and regions that best match your lifestyle, budget and preferences.",
+      "headline": "Personalized country recommendation",
+      "indices": {
+        "air": "Air quality",
+        "aria": "Show country indices",
+        "education": "Education",
+        "health": "Healthcare",
+        "income": "Income potential",
+        "inequality": "Equality",
+        "internet": "Internet access",
+        "quality": "Quality of life",
+        "safety": "Safety",
+        "title": "Country indices",
+        "unemployment": "Employment",
+        "updated": "Updated"
+      },
+      "langLevels": {
+        "basic": "Basic",
+        "fluent": "Fluent",
+        "intermediate": "Intermediate",
+        "native": "Native",
+        "none": "None"
+      },
+      "loadingIndices": "Loading indices…",
+      "loadingTeleport": "Loading city data…",
+      "manualCountriesCompareTitle": "Countries to compare",
+      "manualCountriesEmpty": "Select countries you want to compare.",
+      "manualUsaCompareTitle": "States to compare",
+      "manualUsaEmpty": "Select states you want to compare.",
+      "medianBlockTitle": "Median (state / country)",
+      "noResults": "No suitable countries found for the selected criteria.",
+      "prices": {
+        "internet60": "Home internet",
+        "mobilePlan": "Mobile phone plan",
+        "rent1brCenter": "1-bedroom apartment rent (city center)",
+        "rent1brOutside": "1-bedroom apartment rent (outside center)",
+        "rent3brCenter": "3-bedroom apartment rent (city center)",
+        "rent3brOutside": "3-bedroom apartment rent (outside center)",
+        "salaryNetMonthly": "Average net salary",
+        "sqmCenter": "Apartment purchase price (city center, per m²)",
+        "sqmOutside": "Apartment purchase price (outside center, per m²)",
+        "title": "Prices & Living Costs",
+        "utilities85": "Utilities (≈85 m² apartment)"
+      },
+      "q1": {
+        "desc": "What weather feels comfortable most of the year?",
+        "o1": "Warm / mild winter",
+        "o2": "Clear seasons",
+        "o3": "Cold / I like winter",
+        "title": "Climate"
+      },
+      "q10": {
+        "desc": "How okay are you with a structured, regulated environment?",
+        "o1": "I like order",
+        "o2": "Neutral",
+        "o3": "Prefer simpler",
+        "title": "Rules and bureaucracy"
+      },
+      "q11": {
+        "desc": "How important are social guarantees and support systems?",
+        "o1": "Very important",
+        "o2": "Somewhat important",
+        "o3": "Not important",
+        "title": "Social support"
+      },
+      "q12": {
+        "desc": "Do you want a more international environment around you?",
+        "o1": "Yes, very much",
+        "o2": "Not critical",
+        "o3": "Prefer less",
+        "title": "International environment"
+      },
+      "q13": {
+        "desc": "How important are low taxes?",
+        "o1": "Very important",
+        "o2": "Somewhat important",
+        "o3": "Not important",
+        "title": "Taxes"
+      },
+      "q14": {
+        "desc": "How important are opportunities for income/career growth?",
+        "o1": "Very important",
+        "o2": "Somewhat important",
+        "o3": "Not important",
+        "title": "Income growth"
+      },
+      "q15": {
+        "desc": "How important is an open, liberal environment for you?",
+        "o1": "Very important",
+        "o2": "Somewhat important",
+        "o3": "Not important",
+        "title": "Openness and freedom"
+      },
+      "q16": {
+        "desc": "How easily do you adapt to a different culture?",
+        "o1": "Easy",
+        "o2": "Moderate",
+        "o3": "Hard",
+        "title": "Cultural change"
+      },
+      "q17": {
+        "desc": "How important is it to travel to other countries easily?",
+        "o1": "Very important",
+        "o2": "Nice sometimes",
+        "o3": "Not important",
+        "title": "Travel convenience"
+      },
+      "q18": {
+        "desc": "How important is strong and accessible healthcare?",
+        "o1": "Very important",
+        "o2": "Somewhat important",
+        "o3": "Not important",
+        "title": "Healthcare quality"
+      },
+      "q19": {
+        "desc": "How important is it that Russian is common in daily life?",
+        "o1": "Important",
+        "o2": "Nice to have",
+        "o3": "Not important",
+        "title": "Russian language around you"
+      },
+      "q2": {
+        "desc": "How well do you tolerate heat and humidity?",
+        "o1": "Heat is fine, humidity is fine",
+        "o2": "Moderate tolerance",
+        "o3": "Hard to tolerate",
+        "title": "Heat and humidity"
+      },
+      "q20": {
+        "desc": "How important is it to live comfortably in English?",
+        "o1": "Very important",
+        "o2": "Somewhat important",
+        "o3": "Not important",
+        "title": "English language around you"
+      },
+      "q21": {
+        "desc": "What kind of surroundings do you prefer?",
+        "o1": "Sea/ocean/rivers",
+        "o2": "Forests/mountains/nature",
+        "o3": "Urban environment",
+        "title": "Surroundings"
+      },
+      "q3": {
+        "desc": "How important is a high level of safety?",
+        "o1": "Very important",
+        "o2": "Somewhat important",
+        "o3": "Not critical",
+        "title": "Safety"
+      },
+      "q4": {
+        "desc": "What matters more: cheaper or more comfortable (but pricier)?",
+        "o1": "Cheaper",
+        "o2": "Balance",
+        "o3": "Comfort, even if expensive",
+        "title": "Cost of living"
+      },
+      "q5": {
+        "desc": "Do you prefer a large area or a compact one?",
+        "o1": "Large",
+        "o2": "Doesn’t matter",
+        "o3": "Compact",
+        "title": "Size of the place"
+      },
+      "q6": {
+        "desc": "How important is it to live near the sea/ocean/rivers?",
+        "o1": "Very important",
+        "o2": "Nice to have",
+        "o3": "Not important",
+        "title": "Water nearby"
+      },
+      "q7": {
+        "desc": "How important is nature (forests/mountains) nearby?",
+        "o1": "Very important",
+        "o2": "Somewhat important",
+        "o3": "Not important",
+        "title": "Mountains and forests"
+      },
+      "q8": {
+        "desc": "What type of mobility feels best for you?",
+        "o1": "Walk / public transport",
+        "o2": "Mixed",
+        "o3": "Car-focused",
+        "title": "Transportation style"
+      },
+      "q9": {
+        "desc": "What kind of cities do you enjoy most?",
+        "o1": "Tall megacities",
+        "o2": "Mid-sized cities",
+        "o3": "Small towns / suburbs",
+        "title": "Cities"
+      },
+      "rating": {
+        "live": "Living rating",
+        "match": "Preference match"
+      },
+      "resultsTitle": "Best matches",
+      "title": "Which country suits you best?",
+      "tp": {
+        "commute": "Commute",
+        "costOfLiving": "Cost of living",
+        "housing": "Housing",
+        "internet": "Internet",
+        "note": "City indices are based on open data and may differ from real-life expenses.",
+        "safety": "Safety",
+        "tolerance": "Tolerance"
+      },
+      "tpTooltip": {
+        "aria": "Show city modifiers",
+        "multiplier": "Budget multiplier",
+        "note": "Calculated from open city indices: Housing + Cost of living.",
+        "title": "City modifiers"
+      },
+      "tpUnavailable": "No open data available for this city yet.",
+      "usaCompareTitle": "Compare USA states"
     },
-    "services": {
-      "imageGenerator": "Image Generator",
-      "videoGenerator": "Video Generator",
-      "textGenerator": "Text Generator",
-      "codeGenerator": "Code Generator",
-      "educationFeedback": "Education Feedback"
+    "empty": {
+      "text": "Try changing your search or pick another quiz.",
+      "title": "Nothing found"
     },
-    "contact": {
-      "address": "8819 Ohio St. South Gate, North America, USA",
-      "phone": "📞 +1 386-688-3295"
+    "headline": "Quizzes",
+    "how": {
+      "step1": {
+        "text": "Open the quiz that matches your goal.",
+        "title": "Choose a quiz"
+      },
+      "step2": {
+        "text": "Pick options — we build your preference profile.",
+        "title": "Answer questions"
+      },
+      "step3": {
+        "text": "We compare your answers with data and show the best matches.",
+        "title": "Get results"
+      }
     },
-    "newsletter": {
-      "title": "Join a Newsletter",
-      "placeholder": "Enter Your Email Here"
-    }
+    "howTitle": "How it works",
+    "searchPlaceHolder": "Search quizzes…",
+    "subtitle": "Short quizzes to help you choose a country, lifestyle, and priorities.",
+    "title": "Pick a quiz"
+  },
+  "reviews": {
+    "title": "Based on 20,000+ reviews"
   },
   "seo": {
     "common": {
-      "siteName": "WhitesLove Services",
-      "robots": "index, follow",
       "ogType": "website",
+      "robots": "index, follow",
+      "siteName": "WhitesLove - Kubai Marharyta Developer",
       "twitterCard": "summary_large_image"
     },
     "pages": {
-      "countryFit": {
-        "title": "Country fit quiz",
-        "description": "Find out which country fits your lifestyle, budget and preferences best."
-      },
-      "home": {
-        "title": "WhitesLove — Online tools for daily tasks",
-        "description": "Homepage of WhitesLove platform with practical online services for content, data, and documents.",
-        "ogTitle": "WhitesLove — Online tools for daily tasks",
-        "ogDescription": "Choose the right service: converters, editors, and productivity utilities.",
-        "twitterTitle": "WhitesLove — Online tools for daily tasks",
-        "twitterDescription": "Convert files, edit content, and automate routine workflows online."
-      },
-      "services": {
-        "title": "All services — WhitesLove tools catalog",
-        "description": "Browse all WhitesLove services, filter by category, and find the right tool in seconds.",
-        "ogTitle": "WhitesLove services catalog",
-        "ogDescription": "One place for file, content, and automation tools.",
-        "twitterTitle": "WhitesLove services catalog",
-        "twitterDescription": "Fast access to online tools for development and daily work."
-      },
-      "emailEditor": {
-        "title": "HTML Email Editor",
-        "description": "Online HTML email editor with validation, templates, and preview for Gmail, Outlook, and Yandex Mail.",
-        "ogTitle": "HTML Email Editor",
-        "ogDescription": "Create and validate HTML emails with template support and real-client previews.",
-        "twitterTitle": "HTML Email Editor",
-        "twitterDescription": "Build and preview HTML emails for Gmail, Outlook, and Yandex Mail."
-      },
-      "svgEditor": {
-        "title": "SVG Editor",
-        "description": "Edit SVG: live preview, minify, replace colors, manage stroke.",
-        "ogTitle": "SVG Editor",
-        "ogDescription": "Edit SVG: live preview, minify, replace colors, manage stroke.",
-        "twitterTitle": "SVG Editor",
-        "twitterDescription": "Edit SVG: live preview, minify, replace colors, manage stroke."
-      },
       "converter": {
-        "title": "Online file converter — media, data, and documents",
         "description": "Convert images, tabular data, and documents into target formats directly in your browser.",
-        "ogTitle": "WhitesLove online file converter",
         "ogDescription": "Support for popular media, data, and document formats with minimal steps.",
-        "twitterTitle": "WhitesLove online file converter",
-        "twitterDescription": "Upload a file, choose output format, and get the result in a few clicks."
+        "ogTitle": "WhitesLove online file converter",
+        "title": "Online file converter — media, data, and documents",
+        "twitterDescription": "Upload a file, choose output format, and get the result in a few clicks.",
+        "twitterTitle": "WhitesLove online file converter"
+      },
+      "countryFit": {
+        "description": "Find out which country fits your lifestyle, budget and preferences best.",
+        "title": "Country fit quiz"
       },
       "dockerSearch": {
-        "title": "Docker tags and aliases search",
         "description": "Find relevant Docker tags, aliases, and best-fit image variants for your use case.",
-        "ogTitle": "Docker tag search tool",
         "ogDescription": "Speed up image selection with simple and advanced Docker search.",
-        "twitterTitle": "Docker tags and aliases search",
-        "twitterDescription": "Convenient utility for Docker tag analysis and image selection."
+        "ogTitle": "Docker tag search tool",
+        "title": "Docker tags and aliases search",
+        "twitterDescription": "Convenient utility for Docker tag analysis and image selection.",
+        "twitterTitle": "Docker tags and aliases search"
+      },
+      "emailEditor": {
+        "description": "Online HTML email editor with validation, templates, and preview for Gmail, Outlook, and Yandex Mail.",
+        "ogDescription": "Create and validate HTML emails with template support and real-client previews.",
+        "ogTitle": "HTML Email Editor",
+        "title": "HTML Email Editor",
+        "twitterDescription": "Build and preview HTML emails for Gmail, Outlook, and Yandex Mail.",
+        "twitterTitle": "HTML Email Editor"
+      },
+      "home": {
+        "description": "Frontend developer Kubai Marharyta's website. Contains basic information about the specialist, as well as some useful services: searching for the necessary docker image, json merging, pdf editor, and others.",
+        "ogDescription": "Meet and contact the developer. Also, take advantage of the following services: converters, editors, and utilities for teamwork.",
+        "ogTitle": "WhitesLove — Front-end developer",
+        "title": "WhitesLove — Front-end developer",
+        "twitterDescription": "Meet front-end developer Marharyta Kubai. Also, on the resource: convert files, edit content.",
+        "twitterTitle": "WhitesLove — Front-end developer"
       },
       "markdownEditor": {
-        "title": "Markdown editor for messengers",
         "description": "Prepare formatted text for Telegram, WhatsApp, and other platforms with live preview.",
-        "ogTitle": "WhitesLove online Markdown editor",
         "ogDescription": "Edit, validate, and export text with markdown formatting support.",
-        "twitterTitle": "Markdown editor for messengers",
-        "twitterDescription": "Create clean, readable messages with a fast markdown workflow."
+        "ogTitle": "WhitesLove online Markdown editor",
+        "title": "Markdown editor for messengers",
+        "twitterDescription": "Create clean, readable messages with a fast markdown workflow.",
+        "twitterTitle": "Markdown editor for messengers"
       },
       "mergeJson": {
-        "title": "Merge JSON online — compare and combine translations",
         "description": "Compare JSON files, merge keys, and download a valid result in minutes.",
-        "ogTitle": "WhitesLove Merge JSON service",
         "ogDescription": "A practical tool for localization workflows and structured data merges.",
-        "twitterTitle": "Merge JSON online",
-        "twitterDescription": "Combine and validate JSON structures in a few clicks."
+        "ogTitle": "WhitesLove Merge JSON service",
+        "title": "Merge JSON online — compare and combine translations",
+        "twitterDescription": "Combine and validate JSON structures in a few clicks.",
+        "twitterTitle": "Merge JSON online"
       },
       "pdfEditor": {
-        "title": "Online PDF editor — upload and prepare your document",
         "description": "Upload a PDF and start editing: text, signature, annotations, and export.",
-        "ogTitle": "WhitesLove online PDF editor",
         "ogDescription": "Quickly start editing PDF files in browser without installing software.",
-        "twitterTitle": "Online PDF editor",
-        "twitterDescription": "Add notes and export updated PDF files directly from browser."
+        "ogTitle": "WhitesLove online PDF editor",
+        "title": "Online PDF editor — upload and prepare your document",
+        "twitterDescription": "Add notes and export updated PDF files directly from browser.",
+        "twitterTitle": "Online PDF editor"
       },
       "pdfEditorDoc": {
-        "title": "Edit PDF document online",
         "description": "Modify a specific PDF document with text, shapes, signatures, and export.",
-        "ogTitle": "Edit PDF document in WhitesLove",
         "ogDescription": "A full editing workspace for real-time PDF page updates.",
-        "twitterTitle": "Edit PDF document online",
-        "twitterDescription": "Work with PDF pages and download the final file after edits."
+        "ogTitle": "Edit PDF document in WhitesLove",
+        "title": "Edit PDF document online",
+        "twitterDescription": "Work with PDF pages and download the final file after edits.",
+        "twitterTitle": "Edit PDF document online"
+      },
+      "services": {
+        "description": "Browse all WhitesLove services, filter by category, and find the right tool in seconds.",
+        "ogDescription": "One place for file, content, and automation tools.",
+        "ogTitle": "WhitesLove services catalog",
+        "title": "All services — WhitesLove tools catalog",
+        "twitterDescription": "Fast access to online tools for development and daily work.",
+        "twitterTitle": "WhitesLove services catalog"
+      },
+      "svgEditor": {
+        "description": "Edit SVG: live preview, minify, replace colors, manage stroke.",
+        "ogDescription": "Edit SVG: live preview, minify, replace colors, manage stroke.",
+        "ogTitle": "SVG Editor",
+        "title": "SVG Editor",
+        "twitterDescription": "Edit SVG: live preview, minify, replace colors, manage stroke.",
+        "twitterTitle": "SVG Editor"
       }
     }
+  },
+  "service": {
+    "28df750f-1161-48eb-a03b-dea8ff512b0c": {
+      "description": "Конвертер популярных расширений",
+      "title": "Converter"
+    },
+    "5e216290-e271-4edc-b9cd-bb352d74474b": {
+      "description": "Editor for emails with clean HTML validation, templates: Freemarker, Velocity",
+      "title": "Email editor"
+    },
+    "630c12eb-1402-4e2f-931f-a90e2196738b": {
+      "description": "Edit SVG: live preview, minify, replace colors, manage stroke.",
+      "title": "SVG Editor"
+    },
+    "7c1959b7-bd18-45f4-a606-67d8344654f9": {
+      "description": "Markdown editors for Telegram, TikTok",
+      "title": "Markdown editor"
+    },
+    "b2b90dc7-fca4-48a8-8f0e-aa6ea0bc224f": {
+      "description": "An editor that allows you to merge two JSON files, edit and minify the resulting file.",
+      "title": "JSON Editor"
+    },
+    "c51e8d12-a9ab-4cf6-b7c2-d68db9941a28": {
+      "description": "Поиск по тегам необходимого образа",
+      "title": "DockerHub search"
+    },
+    "cad18371-a574-448b-b7f6-c288defb56a1": {
+      "description": "Upload two JSON files, compare the differences, select sources for keys, and download the final result.",
+      "title": "JSON Merge"
+    },
+    "da437937-daa7-48b6-b6e7-6bde9039baad": {
+      "description": "PDF editor",
+      "title": "PDF editor"
+    },
+    "eb79a0fb-3269-442f-b281-e036eeb61762": {
+      "description": "Service description",
+      "title": "Service title"
+    }
+  },
+  "serviceCategory": {
+    "86c766a8-20a7-40bf-b023-0793e6006222": {
+      "description": "Online editors",
+      "title": "Editor"
+    },
+    "e737784b-9b07-4496-8f5f-8611b048b13d": {
+      "description": "Converter",
+      "title": "Converter"
+    },
+    "fee4fd29-6a96-4959-bfd1-c544a2bdf9ac": {
+      "description": "Search",
+      "title": "Search"
+    }
+  },
+  "services": {
+    "converter": {
+      "controls": {
+        "convert": "Convert",
+        "converting": "Converting…",
+        "formatLabel": "Output format",
+        "targetFormat": "Output format"
+      },
+      "description": "Upload a file, choose a format, and get the result. Images can be uploaded in batches of up to 20.",
+      "dropzone": {
+        "clear": "Clear",
+        "filesWord": "file(s)",
+        "limit": "Limit:",
+        "manual": "or choose manually",
+        "orPick": "or select manually",
+        "pick": "Upload",
+        "support": "Supported:",
+        "title": "Drop file here",
+        "upload": "Upload"
+      },
+      "files": {
+        "title": "Files",
+        "zipHint": "If more than one file is uploaded, the result will be a ZIP.",
+        "zipHintMedia": "If more than one file — result will be ZIP."
+      },
+      "hero": {
+        "description": "Upload a file, choose a format — and get the result. For images, you can upload up to 20 files at once.",
+        "titleLine1": "File Converter",
+        "titleLine2": "fast, clean, and without unnecessary magic ✨"
+      },
+      "messages": {
+        "error": "Conversion failed.",
+        "failed": "Conversion failed.",
+        "httpError": "Error: {status}",
+        "maxFiles": "Maximum 20 images allowed.",
+        "mediaMax": "Maximum 20 files for images.",
+        "noFiles": "Please add file(s) to convert.",
+        "singleOnly": "Only one file is allowed in this mode.",
+        "success": "Done! Your file has been downloaded 👌",
+        "tookFirst": "Took the first {count} files 🙂",
+        "unsupported": "Unsupported file"
+      },
+      "modes": {
+        "data": {
+          "desc": "CSV/JSON/XML → CSV/JSON/XML/XLSX. One file at a time.",
+          "description": "CSV/JSON/XML → CSV/JSON/XML/XLSX. Single file.",
+          "title": "Data"
+        },
+        "docs": {
+          "desc": "DOCX ↔ PDF. PDF→DOCX is best effort.",
+          "title": "Documents"
+        },
+        "document": {
+          "description": "DOCX ↔ PDF (best effort for PDF→DOCX). Single file.",
+          "title": "Documents"
+        },
+        "media": {
+          "desc": "Convert PNG/JPG/WebP. Up to 20 files.",
+          "description": "PNG/JPEG/WEBP → single format. Up to 20 files, returns ZIP.",
+          "title": "Images"
+        }
+      },
+      "panel": {
+        "data": {
+          "description": "Supported: csv, json, xml. Targets: csv/json/xml/xlsx.",
+          "title": "Data"
+        },
+        "description": {
+          "data": "Supported: csv, json, xml. Targets: csv/json/xml/xlsx. Single file.",
+          "docs": "Supported: docx and pdf. DOCX→PDF via LibreOffice, PDF→DOCX best effort.",
+          "media": "Supported: png, jpg/jpeg, webp. Up to 20 files. If more than one — ZIP output."
+        },
+        "documents": {
+          "description": "Supported: docx and pdf. DOCX→PDF stable, PDF→DOCX best effort.",
+          "title": "Documents"
+        },
+        "images": {
+          "description": "Supported: png, jpg/jpeg, webp. If more than one file — ZIP.",
+          "title": "Images"
+        },
+        "title": {
+          "data": "Data",
+          "docs": "Documents",
+          "media": "Images"
+        }
+      },
+      "promo": {
+        "cta": "Send feedback",
+        "description": "We can add task queues, progress bar, auto-zip, and quality presets.",
+        "title": "Need more formats?"
+      },
+      "subtitle": "fast, clean, and without unnecessary magic ✨",
+      "tips": {
+        "imageAlpha": "PNG → JPEG: transparency will be replaced with white background.",
+        "pdfDocx": "PDF → DOCX: layout may differ from the original.",
+        "pdfToDocx": "PDF → DOCX: layout may differ from the original — this is normal.",
+        "pngToJpeg": "PNG → JPEG: transparency will be replaced with white background."
+      },
+      "title": "File Converter"
+    },
+    "dockerSearch": {
+      "actions": {
+        "aliases": "Show aliases",
+        "reset": "Reset",
+        "search": "Search"
+      },
+      "errors": {
+        "generic": "Failed to load data. Please try again.",
+        "title": "Something went wrong"
+      },
+      "fields": {
+        "major": "Major version",
+        "repo": "Repository",
+        "variant": "Variant"
+      },
+      "headline": "Find the best tag and see aliases",
+      "hints": {
+        "repo": "Use format namespace/name (e.g. library/amazoncorretto or myorg/myimage)."
+      },
+      "how": {
+        "step1": {
+          "text": "We request tags from Docker Hub and filter them by your major version.",
+          "title": "Enter repo and major version"
+        },
+        "step2": {
+          "text": "We prefer general aliases like “17-alpine” or “17”. If they don’t exist, we fall back to the closest available tag.",
+          "title": "Pick the best tag"
+        },
+        "step3": {
+          "text": "We fetch the manifest digest and show all tags that point to the same image.",
+          "title": "Check aliases by digest"
+        }
+      },
+      "howTitle": "How it works",
+      "placeholders": {
+        "major": "Example: 17",
+        "repo": "Example: library/amazoncorretto"
+      },
+      "result": {
+        "aliasCount": "Aliases",
+        "aliasesHint": "Pick a tag and click “Show aliases”.",
+        "aliasesTitle": "Aliases (same image)",
+        "bestTag": "Best tag",
+        "digest": "Digest",
+        "fallbacks": "Available tags",
+        "matched": "Matched tags",
+        "noAliases": "No aliases found for this digest.",
+        "noBest": "No matching tag found",
+        "noFallbacks": "No tags found for this query.",
+        "reason": "Reason",
+        "selected": "Selected",
+        "title": "Results"
+      },
+      "simple": {
+        "emptyHint": "Enter a query and click “Search”",
+        "mainTags": "Select a tag",
+        "queryHint": "We will show main tags like “alpine”, “17-alpine”, “18-alpine”…",
+        "queryLabel": "Query",
+        "queryPlaceholder": "For example: alpine, slim, debian…",
+        "resultsCount": "Found",
+        "resultsTitle": "Main tags",
+        "sort": {
+          "label": "Sort",
+          "lenAsc": "By length (short → long)",
+          "lenDesc": "By length (long → short)"
+        }
+      },
+      "subtitle": "Search Docker Hub tags by major version and (optionally) distro variant. We’ll try to pick the most general tag and show all tags pointing to the same image digest.",
+      "tabs": {
+        "advanced": "Advanced search",
+        "simple": "Simple search"
+      },
+      "title": "Docker tags",
+      "variant": {
+        "al2": "Amazon Linux (al2)",
+        "alpine": "Alpine",
+        "any": "Any",
+        "debian": "Debian",
+        "ubuntu": "Ubuntu"
+      }
+    },
+    "emailEditor": {
+      "actions": {
+        "insertImage": "Insert image",
+        "insertLink": "Insert link",
+        "insertTemplate": "Insert template",
+        "moveInlineStylesToStyle": "Move inline styles to <style>"
+      },
+      "diagnostics": {
+        "line": "line",
+        "lineUnknown": "line unknown",
+        "messages": {
+          "css": {
+            "duplicateClassSelector": "Duplicate class selector in <style>: {selector}.",
+            "duplicateClassSelectorHint": "Pseudo-classes/elements and selectors inside @media are not considered duplicates."
+          },
+          "html": {
+            "imgMissingAlt": "<img> tag must include alt attribute.",
+            "imgMissingSrc": "<img> tag must include src attribute.",
+            "linkMissingHref": "<a> tag must include href attribute.",
+            "missingMetaCharset": "Missing <meta charset=\"...\">.",
+            "missingMetaViewport": "Missing <meta name=\"viewport\" ...>.",
+            "missingRootPresentationTable": "Missing root layout table: <table role=\"presentation\" width=\"100%\">.",
+            "outlookAvoidDiv": "Outlook profile: avoid <div> in email layout. Prefer tables.",
+            "tableShouldHaveBorder0": "Email table should include border=\"0\".",
+            "tableShouldHaveCellpadding0": "Email table should include cellpadding=\"0\".",
+            "tableShouldHaveCellspacing0": "Email table should include cellspacing=\"0\".",
+            "tableShouldHaveRolePresentation": "Email table should include role=\"presentation\".",
+            "tagNotClosed": "Tag <{tag}> is not closed.",
+            "unexpectedClosingTag": "Unexpected closing tag </{tag}>."
+          },
+          "images": {
+            "badFormat": "Image format \"{ext}\" may be poorly supported by email clients."
+          },
+          "template": {
+            "invalidSyntax": "Invalid template syntax.",
+            "unclosedExpression": "Unclosed template expression.",
+            "unclosedIf": "Unclosed conditional block (if).",
+            "unclosedLoop": "Unclosed loop block (loop/foreach/list).",
+            "unexpectedEnd": "Unexpected end of template block."
+          }
+        },
+        "noIssues": "No issues found.",
+        "severity": {
+          "error": "Error",
+          "warning": "Warning"
+        },
+        "tip": "Tip: double click an item to jump to its location.",
+        "title": "Diagnostics"
+      },
+      "fakeData": {
+        "add": "Add",
+        "addLabel": "Add a variable path",
+        "addPlaceholder": "e.g. user.name",
+        "custom": "Custom",
+        "done": "Done",
+        "edit": "Edit fake data",
+        "empty": "No variables detected yet. Add a variable path to your template, or create one manually below.",
+        "intro": "Provide sample values for the template variables detected below. Each entry is shown by its variable path and is substituted into the preview.",
+        "remove": "Remove variable",
+        "title": "Fake data",
+        "toggle": "Fake data",
+        "valuePlaceholder": "Sample value"
+      },
+      "modals": {
+        "colorPicker": {
+          "apply": "Apply",
+          "close": "Close",
+          "code": "Color code",
+          "errors": {
+            "invalidColorCode": "Invalid color code."
+          },
+          "formats": {
+            "hex": "HEX",
+            "rgb": "RGB",
+            "rgba": "RGBA"
+          },
+          "hex": "HEX color",
+          "lightness": "Lightness",
+          "opacity": "Opacity",
+          "placeholders": {
+            "code": "#RRGGBB or rgb(...) or rgba(...)"
+          },
+          "preferHex": "Prefer HEX when applying",
+          "title": "Color",
+          "titles": {
+            "darker": "Make darker by 1 step",
+            "eyedropper": "Eyedropper: pick a color from the screen",
+            "lessTransparent": "Make less transparent by 0.05",
+            "lighter": "Make lighter by 1 step",
+            "moreTransparent": "Make more transparent by 0.05",
+            "nativePicker": "Open system color picker"
+          }
+        },
+        "common": {
+          "close": "Close"
+        },
+        "insertImage": {
+          "alt": "Alt text",
+          "cancel": "Cancel",
+          "height": "Height",
+          "insert": "Insert",
+          "placeholders": {
+            "alt": "Description",
+            "height": "e.g. 300",
+            "url": "https://...",
+            "width": "e.g. 600"
+          },
+          "title": "Insert image",
+          "url": "Image URL",
+          "width": "Width"
+        },
+        "insertLink": {
+          "cancel": "Cancel",
+          "insert": "Insert",
+          "placeholders": {
+            "text": "Link text",
+            "url": "https://..."
+          },
+          "text": "Link text",
+          "title": "Insert link",
+          "url": "URL"
+        },
+        "insertTemplate": {
+          "cancel": "Cancel",
+          "fields": {
+            "collection": "Collection",
+            "condition": "Condition",
+            "declareType": "Variable type",
+            "itemName": "Item name",
+            "variableName": "Variable name"
+          },
+          "insert": "Insert",
+          "kind": {
+            "declare": "Declare variable",
+            "if": "If condition",
+            "loop": "Loop",
+            "variable": "Variable output"
+          },
+          "notice": "Switch template mode to Freemarker or Velocity.",
+          "title": "Insert template construct",
+          "types": {
+            "array": "Array",
+            "number": "Number",
+            "object": "Object",
+            "string": "String"
+          }
+        }
+      },
+      "preview": {
+        "gmail": "Gmail",
+        "hint": "Preview is approximate. Real email clients may differ.",
+        "label": "Preview client",
+        "outlook": "Outlook",
+        "yandex": "Yandex Mail"
+      },
+      "subtitle": "Create, validate and preview HTML emails compatible with major email clients.",
+      "template": {
+        "cleanHtml": "Clean HTML",
+        "freemarker": "Freemarker",
+        "label": "Template engine",
+        "velocity": "Velocity"
+      },
+      "title": "Email editor"
+    },
+    "empty": {
+      "text": "Try changing the category or refining your search.",
+      "title": "No results found"
+    },
+    "filters": {
+      "all": "All"
+    },
+    "headline": "Find the right service in just a few clicks",
+    "how": {
+      "step1": {
+        "text": "Browse a category or find what you need using search.",
+        "title": "Choose a service"
+      },
+      "step2": {
+        "text": "Enter your data and pick options — everything is guided and clear.",
+        "title": "Set it up"
+      },
+      "step3": {
+        "text": "Run the service and get a ready result in seconds.",
+        "title": "Get the result"
+      }
+    },
+    "howTitle": "How it works",
+    "markdownEditor": {
+      "actions": {
+        "cancel": "Cancel",
+        "check": "Check text",
+        "checking": "Checking…",
+        "clearAll": "Clear all",
+        "copied": "Copied!",
+        "copy": "Copy",
+        "emoji": "Emoji",
+        "insert": "Insert",
+        "spellcheck": "Spellcheck"
+      },
+      "editor": {
+        "hotkeysHint": "Use Ctrl / Cmd shortcuts for formatting",
+        "placeholder": "Enter your text here..."
+      },
+      "format": {
+        "bold": "Bold",
+        "codeBlock": "Code block",
+        "inlineCode": "Inline code",
+        "italic": "Italic",
+        "link": "Link",
+        "quote": "Quote",
+        "spoiler": "Spoiler",
+        "strike": "Strikethrough",
+        "underline": "Underline"
+      },
+      "headline": "Text formatting for messengers",
+      "hotkeys": {
+        "bold": "Bold — Ctrl/Cmd + B",
+        "code": "Code block — Ctrl/Cmd + Shift + C",
+        "emoji": "Emoji picker — Ctrl/Cmd + Shift + E",
+        "formatList": "Format list — Ctrl/Cmd + Shift + L",
+        "italic": "Italic — Ctrl/Cmd + I",
+        "link": "Insert link — Ctrl/Cmd + K",
+        "ol": "Numbered list — Ctrl/Cmd + Shift + 7",
+        "quote": "Quote — Ctrl/Cmd + Shift + Q",
+        "spoiler": "Spoiler — Ctrl/Cmd + Shift + S",
+        "title": "Keyboard shortcuts",
+        "ul": "Bullet list — Ctrl/Cmd + Shift + 8",
+        "underline": "Underline — Ctrl/Cmd + U"
+      },
+      "limit": {
+        "exceeded": "Text exceeds the maximum length"
+      },
+      "link": {
+        "text": "Link text",
+        "textPh": "Enter link text",
+        "title": "Insert link",
+        "url": "Link URL",
+        "urlPh": "https://example.com"
+      },
+      "lists": {
+        "format": "Format list",
+        "ol": "Numbered list",
+        "ul": "Bullet list"
+      },
+      "platformHints": {
+        "telegram": "Telegram supports Markdown formatting",
+        "tiktok": "TikTok supports plain text only",
+        "whatsapp": "WhatsApp uses its own formatting rules"
+      },
+      "platforms": {
+        "telegram": "Telegram",
+        "tiktok": "TikTok",
+        "whatsapp": "WhatsApp"
+      },
+      "preview": {
+        "empty": "Nothing to preview yet"
+      },
+      "right": {
+        "modeMarkdown": "Markdown",
+        "modePreview": "Preview",
+        "title": "Result"
+      },
+      "storage": {
+        "restored": "Draft restored"
+      },
+      "subtitle": "Prepare text for Telegram, WhatsApp, and TikTok with preview",
+      "title": "Markdown Editor"
+    },
+    "mergeJson": {
+      "actions": {
+        "addKey": "Add key",
+        "downloadJson": "Download JSON"
+      },
+      "controls": {
+        "keyTruth": "Key source",
+        "keyTruthA": "Always A",
+        "keyTruthAuto": "Auto",
+        "keyTruthB": "Always B",
+        "minify": "Collapse",
+        "onlyDiff": "Only differences",
+        "search": "Search",
+        "searchInValue": "By values",
+        "searchPh": "Search by keywords",
+        "sort": "Sorting",
+        "sortAsc": "A → Z",
+        "sortDesc": "Z → A",
+        "sync": "Synchronize",
+        "truth": "Base",
+        "truthA": "Base: A",
+        "truthB": "Base: B",
+        "view": "Mode",
+        "viewFlat": "Flat keys",
+        "viewJson": "JSON",
+        "viewTree": "Tree"
+      },
+      "errors": {
+        "invalidFile": "The file could not be read. Please check the format and try again.",
+        "invalidJson": "Incorrect JSON."
+      },
+      "headline": "Comparison and merging of translations",
+      "inputs": {
+        "fileA": "File A",
+        "fileB": "File B",
+        "hint": "Supported formats include .json (as well as .csv/.xml, if converted to JSON).",
+        "noFile": "No file selected",
+        "pickFile": "Select file"
+      },
+      "row": {
+        "reset": "Reset",
+        "useA": "Take from A",
+        "useB": "Take from B"
+      },
+      "subtitle": "Upload two JSON files, compare the differences, select sources for keys, and download the final result.",
+      "table": {
+        "colA": "A",
+        "colB": "B",
+        "colResult": "Result"
+      },
+      "title": "JSON merging",
+      "titles": {
+        "addKey": "Add a new key manually to the result.",
+        "download": "Download the final combined JSON file.",
+        "keyTruthA": "Always take this key from A.",
+        "keyTruthAuto": "Auto selection of source for key (by availability/base).",
+        "keyTruthB": "Always take this key from B.",
+        "minify": "Collapse JSON into a single line (compact view/export).",
+        "onlyDiff": "Show only keys where the values differ or the key is present on only one side.",
+        "reset": "Reset manual changes to the result for the selected key.",
+        "searchInValue": "Search not only by keywords, but also by values.",
+        "sortAsc": "Sort keys alphabetically (A → Z).",
+        "sortDesc": "Sort keys alphabetically (Z → A).",
+        "sync": "Synchronize highlighting/transition based on matches between columns.",
+        "truthA": "Make A the main base: take matching keys from A, missing keys from B.",
+        "truthB": "Make B the main base: take matching keys from B, missing keys from A.",
+        "useA": "Substitute the value from A into the result for the selected key.",
+        "useB": "Substitute the value from B into the result for the selected key."
+      }
+    },
+    "pdfEditor": {
+      "actions": {
+        "download": "Download",
+        "redo": "Redo",
+        "undo": "Undo"
+      },
+      "addPage": "Add page",
+      "addPageFailed": "Could not add a page.",
+      "applySignature": "Apply signature",
+      "applyText": "Apply text",
+      "background": {
+        "black": "Black",
+        "transparent": "Transparent",
+        "white": "White"
+      },
+      "dpi": "DPI",
+      "editor": {
+        "moveModeHelp": "Move mode lets you resize and move objects. Drawing modes paint directly on the page. Draft is saved automatically.",
+        "saveDocument": "Save document",
+        "toolSettings": "Tool settings"
+      },
+      "errors": {
+        "applySignature": "Failed to apply signature.",
+        "applyText": "Failed to apply text.",
+        "create": "Failed to create PDF job.",
+        "download": "Failed to download file.",
+        "redo": "Failed to redo.",
+        "undo": "Failed to undo."
+      },
+      "fields": {
+        "color": "Color",
+        "fontPlaceholder": "Font (e.g. Helvetica)",
+        "opacity": "Opacity",
+        "shape": "Shape",
+        "shapeHelp": "Square shape applies to objects. Brush remains round.",
+        "shapeRound": "Round",
+        "shapeSquare": "Square",
+        "signatureThickness": "Signature thickness",
+        "size": "Size",
+        "textDefaults": "Default text settings",
+        "textPlaceholder": "Enter text..."
+      },
+      "full": {
+        "color": "Color",
+        "font": "Font",
+        "fontSize": "Font size",
+        "height": "Height",
+        "help": "Edit the selected object directly. Double-click text to edit inline, or drag handles to resize and move. Changes are saved automatically.",
+        "loadText": "Load page text",
+        "noText": "No editable text could be extracted from this page.",
+        "opacity": "Opacity",
+        "posX": "X",
+        "posY": "Y",
+        "replaceImage": "Replace image",
+        "rotation": "Rotation",
+        "selectHint": "Select an object on the page to edit its text, size, position, style and fonts.",
+        "style": "Style & alignment",
+        "textContent": "Text",
+        "title": "Full editor",
+        "width": "Width"
+      },
+      "headline": "Edit PDF files online",
+      "page": "Page",
+      "pages": "Pages",
+      "preview": "Preview",
+      "previewHint": "Upload a file to see preview.",
+      "signature": {
+        "actionsLabel": "Actions",
+        "applyLabel": "Apply",
+        "clear": "Clear",
+        "hintDraw": "Draw inside the box and place it on the page",
+        "opacityLabel": "Opacity",
+        "strokeWidthLabel": "Stroke width",
+        "title": "Draw signature"
+      },
+      "subtitle": "Add text, signatures and download your edited PDF in seconds.",
+      "text": {
+        "alignLabel": "Alignment",
+        "applyLabel": "Apply",
+        "bold": "Bold",
+        "colorLabel": "Color",
+        "fontLabel": "Font",
+        "fontSizeLabel": "Size",
+        "hintDrag": "Drag the text to position it",
+        "italic": "Italic",
+        "opacityLabel": "Opacity",
+        "styleLabel": "Style",
+        "title": "Add text",
+        "underline": "Underline",
+        "valueLabel": "Text",
+        "valuePlaceholder": "Enter text"
+      },
+      "title": "Online PDF Editor",
+      "toolbar": {
+        "backgroundLabel": "Background",
+        "dpiLabel": "DPI",
+        "pageLabel": "Page"
+      },
+      "tools": {
+        "signature": "Signature",
+        "text": "Text"
+      },
+      "toolstrip": {
+        "circle": "Circle",
+        "clearPage": "Clear page",
+        "fullMode": "Full editor",
+        "highlighter": "Highlighter",
+        "image": "Image",
+        "move": "Move",
+        "pen": "Pen",
+        "rect": "Rectangle",
+        "redo": "Redo",
+        "remove": "Remove",
+        "signature": "Signature",
+        "text": "Text",
+        "undo": "Undo"
+      },
+      "upload": {
+        "add": "Add file",
+        "clear": "Clear list",
+        "hint": "Upload a PDF file to start editing.",
+        "new": "Upload new file",
+        "replace": "Replace file",
+        "singleHelp": "Only one PDF can be uploaded.",
+        "start": "Start editing",
+        "title": "Upload PDF"
+      },
+      "version": "Version"
+    },
+    "searchPlaceholder": "Search services…",
+    "subtitle": "Pick a category, use search, and open the service that gets the job done faster and easier.",
+    "svgEditor": {
+      "actions": {
+        "apply": "Apply",
+        "editStroke": "Edit stroke",
+        "minify": "Minify",
+        "removeDimensions": "Remove size",
+        "replaceColors": "Replace colors"
+      },
+      "errors": {
+        "empty": "SVG code is empty.",
+        "fileNotSvg": "Selected file is not an .svg file.",
+        "fileRead": "Failed to read file.",
+        "fileTooLarge": "File is too large.",
+        "noSvgRoot": "SVG root element <svg> not found.",
+        "parse": "Unable to parse SVG. Please check the markup."
+      },
+      "inputs": {
+        "code": "SVG code",
+        "codePlaceholder": "Paste SVG markup here...",
+        "file": "SVG file"
+      },
+      "modals": {
+        "colors": {
+          "count": "Occurrences",
+          "currentColor": "currentColor",
+          "empty": "No colors found.",
+          "errors": {
+            "invalidColor": "Invalid color."
+          },
+          "from": "From",
+          "pick": "Pick",
+          "placeholders": {
+            "color": "e.g. #AABBCC or rgb(...)"
+          },
+          "title": "Replace colors",
+          "titles": {
+            "nativePicker": "Pick color",
+            "pickColor": "Pick replacement color"
+          },
+          "to": "To",
+          "useCurrentColor": "Use currentColor"
+        },
+        "common": {
+          "apply": "Apply",
+          "close": "Close"
+        },
+        "stroke": {
+          "edit": "Edit",
+          "elements": "Elements",
+          "errors": {
+            "invalidColor": "Invalid color.",
+            "strokeWidth": "stroke-width must be a non-negative number."
+          },
+          "placeholders": {
+            "strokeColor": "e.g. #FF00AA or rgb(...)",
+            "strokeWidth": "e.g. 2"
+          },
+          "saveElement": "Save element",
+          "strokeColor": "stroke",
+          "strokeWidth": "stroke-width",
+          "title": "Stroke editor",
+          "titles": {
+            "nativePicker": "Pick stroke color",
+            "pickColor": "Pick stroke color",
+            "saveElement": "Save changes for selected element"
+          },
+          "useCurrentColor": "Use currentColor"
+        }
+      },
+      "outputs": {
+        "normalized": "Current SVG",
+        "normalizedPlaceholder": "Result will appear here..."
+      },
+      "preview": {
+        "emptySubtitle": "Upload a file or paste code and click Apply.",
+        "emptyTitle": "No SVG yet"
+      },
+      "sections": {
+        "input": {
+          "title": "Input"
+        },
+        "preview": {
+          "title": "Preview"
+        }
+      },
+      "subtitle": "Upload a file or paste SVG code. Preview updates instantly, clean up and edit colors/stroke.",
+      "title": "SVG Editor",
+      "titles": {
+        "apply": "Apply code to preview",
+        "editStroke": "Add/remove/edit stroke and stroke-width",
+        "minify": "Remove extra tags and comments",
+        "removeDimensions": "Remove width and height from root <svg>",
+        "replaceColors": "Replace fill/stroke colors (including currentColor)"
+      }
+    },
+    "title": "Services"
+  },
+  "tabs": {
+    "audio": {
+      "cta": "Start Exploring Now →",
+      "features": [
+        "Transformer Models",
+        "Conditional Generative Models",
+        "Pre-trained Models",
+        "Variational Autoencoders"
+      ],
+      "label": "Audio",
+      "text": "Audio generating AI refers to artificial intelligence that creates sound from text or data.",
+      "title": "AI Audio Generation"
+    },
+    "code": {
+      "cta": "Start Exploring Now →",
+      "features": [
+        "Syntax-aware transformers",
+        "Contextual completion",
+        "Multi-language support",
+        "Secure-by-default scaffolding"
+      ],
+      "label": "Code",
+      "text": "Generate clean, functional code from natural language prompts using advanced models.",
+      "title": "AI Code Generation"
+    },
+    "headline": "Rainbow unlocks the potential of AI",
+    "photo": {
+      "cta": "Start Exploring Now →",
+      "features": [
+        "Stable Diffusion",
+        "Style Transfer",
+        "Inpainting & Outpainting",
+        "Prompt-to-image pipelines"
+      ],
+      "label": "Photo",
+      "text": "Produce high-quality visuals from text prompts using generative diffusion models.",
+      "title": "AI Photo Generation"
+    },
+    "title": "Generative AI made for creators.",
+    "video": {
+      "cta": "Start Exploring Now →",
+      "features": [
+        "Scene synthesis",
+        "Lip-syncing",
+        "Motion interpolation",
+        "Multi-modal rendering"
+      ],
+      "label": "Video",
+      "text": "Create dynamic video content from scripts, storyboards, or voice input.",
+      "title": "AI Video Generation"
+    },
+    "withBg": {
+      "0f7abbc3-eab0-4eaa-bcdf-22b7ad82c530": {
+        "button": "Learn More",
+        "feature": {
+          "1": "Russian, Ukrainian — native languages",
+          "2": "English — B2",
+          "3": "Turkish — A1",
+          "4": "Communicative, supportive, responsive",
+          "5": "Sense of humor, friendliness",
+          "6": "Politeness, respect"
+        },
+        "label": "Soft skills",
+        "text": "Soft skills that I would like to highlight",
+        "title": "Soft skills"
+      },
+      "6b597624-b5fe-470d-932f-7d9605ed9246": {
+        "button": "Learn more",
+        "feature": {
+          "1": "Telegram Bot API, Discord bot API",
+          "2": "JSON, CSV",
+          "3": "Node fs",
+          "4": "Adaptive, cross-browser layout",
+          "5": "Figma",
+          "6": "Strapi"
+        },
+        "label": "Additionally",
+        "text": "Additional skills I possess",
+        "title": "Additional skills"
+      },
+      "8cc7a721-386b-496a-b92c-7047525a7627": {
+        "button": "Learn More",
+        "feature": {
+          "1": "MySQL / MariaDB, PostgreSQL",
+          "2": "MongoDB, Redis",
+          "3": "Prisma ORM",
+          "4": "JWT, OAuth2, Roles",
+          "5": "Migrations"
+        },
+        "label": "Databases",
+        "text": "Databases I have worked with or am currently working with, as well as related tools",
+        "title": "Databases"
+      },
+      "8f81ac7b-f39a-468a-806e-078d9ec93457": {
+        "button": "Learn More",
+        "feature": {
+          "1": "Javascript, Typescript, Python, Kotlin, Java",
+          "2": "Node.js, Electron.js",
+          "3": "Express.js, Axios, FastAPI",
+          "4": "Rest Api"
+        },
+        "label": "Backend",
+        "text": "Tools, platforms, and languages I am familiar with in terms of backend development",
+        "title": "Backend skills"
+      },
+      "d9a4f948-2266-424b-94f2-0b74ff65c7b7": {
+        "button": "Learn More",
+        "feature": {
+          "1": "Vanilla JS, CSS, HTML",
+          "2": "Vue, React",
+          "3": "Nuxt, Vite",
+          "4": "Vuex, Pinia",
+          "5": "Vue Router, React Router",
+          "6": "Vuetify, Tailwind, NuxtUI",
+          "7": "SCSS",
+          "8": "Freemarker, Velocity, Nunjucks, Liquid"
+        },
+        "label": "Frontend",
+        "text": "Tools I am proficient in and familiar with in front-end development",
+        "title": "Frontend Skills"
+      },
+      "ea34a152-303e-4d2e-a2ee-7aefcdc75e81": {
+        "button": "Learn More",
+        "feature": {
+          "1": "IntelliJ IDEA, PyCharm, VSCode, WebStorm",
+          "10": "Swagger",
+          "2": "Dockerfile, Docker Compose",
+          "3": "Git, GitHub, GitLab",
+          "4": "GitHub Workflow, CI / CD",
+          "5": ".env, yaml, xml",
+          "6": "ChatGPT, Copilot, MetaAI",
+          "7": "Jenkins, Jira, Confluence",
+          "8": "Nginx",
+          "9": "Ngrok"
+        },
+        "label": "Utilities",
+        "text": "Utilities and environments that are actively used in development, as well as those with which I have experience and familiarity",
+        "title": "Utilities and environment"
+      }
+    }
+  },
+  "tabs2": {
+    "42aa8134-27e2-4dce-bdbd-67dfea8c6b1c": {
+      "button": "Learn More",
+      "description": "A PC application written using electron.js and Vue.js.  It was developed for managing characters in the game Lost Ark. It can automatically pull up characters using HTML parsing.  It allows you to mark which activities have been completed (weekly and daily) with automatic reset on the day of the update.  It can be customized from the choice of theme and font to the type of some tools (general or advanced).",
+      "headline": "Electron.js, Vue.js",
+      "label": "PC",
+      "title": "PC application"
+    },
+    "57c08ae0-2598-4b55-80bc-edac8e30ccac": {
+      "button": "Learn More",
+      "description": "Telegram bot written using JavaScript, the node-telegram-bot-api library, and Telegram Bot API.  Currently, the bot is an RPG game bot. You can play simple games: 21 points, soccer, roulette, — as well as more complex ones: character leveling, gacha, boss battles, building leveling, arena, class change.",
+      "headline": "Javascript, node-telegram-bot-api, Telegram Bot Api",
+      "label": "Telegram",
+      "title": "Telegram Bot"
+    },
+    "connect": {
+      "description": "Identify the platform or interface through which you can access the chatbot. This could be a website, a messaging app, or a dedicated application.",
+      "headline": "How it works",
+      "label": "Connect with AI",
+      "title": "Connect with AI chatbot"
+    },
+    "cta": "Try It Now →",
+    "cyber": {
+      "description": "Gain insights into cybersecurity measures and strategies to safeguard your online identity and sensitive information.",
+      "headline": "Navigating Cybersecurity",
+      "label": "Cybersecurity",
+      "title": "Protecting Your Digital Presence"
+    },
+    "d96f0087-d9ad-4a4e-90df-3b6b34368fcc": {
+      "button": "Learn More",
+      "description": "A mobile application written in Kotlin using Gradle. It uses an external API to obtain current exchange rates.  Allows you to quickly obtain information: what is the conversion from the current currency (taking into account the amount of currency) to another currency (up to five at a time).  You can also compare the cost of goods, depending on their weight, volume, or quantity, in order to find out which product is more profitable.",
+      "headline": "Kotlin, Gradle, Android Studio",
+      "label": "Mobile",
+      "title": "Mobile application"
+    },
+    "data": {
+      "description": "Learn the fundamentals of data analysis, including tools and methodologies, to extract meaningful insights from raw data.",
+      "headline": "Mastering Data Analysis",
+      "label": "Data Analysis",
+      "title": "Demystifying Data Analytics"
+    },
+    "f97e70b1-cde8-4258-81d3-f4c6ca9f2fd9": {
+      "button": "Learn More",
+      "description": "Discord bot written in JavaScript for a single server in Discord. It was created with the aim of increasing the number of features available on the server.  It can keep statistics, display raffle results, conduct raffles, and draw a block with characters (the user must specify their nickname in the profile, and this nickname will be used to pull characters from the site using HTML parsing. The image is drawn using the canvas library).",
+      "headline": "javascript, discord bot API",
+      "label": "Discord Bot",
+      "title": "Discord Bot"
+    },
+    "workflow": {
+      "description": "Discover tools and techniques to optimize your workflow, making your tasks more efficient and manageable.",
+      "headline": "Exploring Efficiency",
+      "label": "Streamline Workflow",
+      "title": "Streamline Your Workflow"
+    }
+  },
+  "testimonial": {
+    "4f0348a9-76bb-4c58-bace-7306c3bbd53c": {
+      "name": "Workplace",
+      "quote": "Preferably remote work. I am also considering an office/hybrid option.",
+      "role": "Location"
+    },
+    "cf5efc43-1af8-48ee-b1e9-8569fd6100e3": {
+      "name": "Payment frequency",
+      "quote": "Preferably twice a month, but once a month or, conversely, more often is also acceptable.",
+      "role": "Formalization"
+    },
+    "d667dbad-3abb-45e2-8a3e-6b0729822ed7": {
+      "name": "Team",
+      "quote": "Ready to cooperate in Russian, English, and Ukrainian.",
+      "role": "Language"
+    },
+    "db6b3838-a57d-49c0-a03b-7ea39d952962": {
+      "name": "Position",
+      "quote": "Ready to take on the role of Frontend, and Fullstack Developer",
+      "role": "Formalization"
+    },
+    "e6945984-bd80-49f4-aaa7-8513eeb9736c": {
+      "name": "Team",
+      "quote": "Ready to cooperate in Russian, English, and Ukrainian.",
+      "role": "Language"
+    }
+  },
+  "testimonials": {
+    "headline": "Sociability",
+    "item": {
+      "quote": "Pixcels-Themes has become such an integral part of our work!",
+      "role": "Nursing Assistant"
+    },
+    "title": "Workplace preferences"
+  },
+  "trust": {
+    "title": "Tools for work"
   }
 }

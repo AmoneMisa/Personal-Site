@@ -10,14 +10,14 @@ export default defineNuxtConfig({
                 {
                     rel: "preload",
                     as: "font",
-                    href: "/fonts/PT Root UI_Regular.woff2",
+                    href: "/fonts/redesign/golos-text-400-cyrillic.woff2",
                     type: "font/woff2",
                     crossorigin: "anonymous"
                 },
                 {
                     rel: "preload",
                     as: "font",
-                    href: "/fonts/PT Root UI_Bold.woff2",
+                    href: "/fonts/redesign/inter-400-cyrillic.woff2",
                     type: "font/woff2",
                     crossorigin: "anonymous"
                 }
@@ -45,17 +45,19 @@ export default defineNuxtConfig({
     i18n: {
         baseUrl: 'https://whiteslove.me',
         defaultLocale: 'ru',
-        langDir: null,
+        // Messages are now static JSON in i18n/locales (was DB-driven). Lazy-loaded
+        // per locale; missing keys fall back to ru (see i18n.config.ts).
+        langDir: 'locales',
+        lazy: true,
+        vueI18n: './i18n.config.ts',
         locales: [
-            {code: 'en', language: 'en-US', name: 'English'},
-            {code: 'ru', language: 'ru-RU', name: 'Русский'},
-            // {code: 'kk', language: 'kk-KZ', name: 'Қазақша'}
+            {code: 'en', language: 'en-US', name: 'English', file: 'en.json'},
+            {code: 'ru', language: 'ru-RU', name: 'Русский', file: 'ru.json'},
         ],
         // Russian is the default and stays unprefixed at "/"; other locales get a
         // path prefix ("/en/..."). This gives every language a distinct, indexable
         // URL so hreflang alternates and the per-locale sitemap actually mean
-        // something to search engines. Live messages still load from the backend
-        // DB keyed off $i18n.locale, which the route prefix sets automatically.
+        // something to search engines.
         strategy: 'prefix_except_default',
         detectBrowserLanguage: {
             useCookie: true, // Crucial: This tells i18n to use a cookie
@@ -77,7 +79,6 @@ export default defineNuxtConfig({
         // JS and SVGs ship smaller without relying on the proxy to compress.
         compressPublicAssets: {gzip: true, brotli: true},
         experimental: {
-            websocket: true,
             tasks: true // enable Nitro tasks (jobs:refresh vacancy worker)
         },
         // Daily worker: refresh the Redis vacancy store + prune closed/old postings.

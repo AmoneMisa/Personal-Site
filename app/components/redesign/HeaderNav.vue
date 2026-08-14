@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import RedesignEmoji from "~/components/redesign/RedesignEmoji.vue";
-import { reloadLocaleData } from "~/composables/useLocaleReload";
 import { useHomeContent } from "~/composables/useHomeContent";
 
 const content = useHomeContent();
@@ -16,16 +15,12 @@ function resolveHref(href: string) {
   return href;
 }
 
-// ---- Locale toggle (keeps DB-backed pages in sync via reloadLocaleData) ----
-const { locale, locales, setLocale, setLocaleCookie } = useI18n();
-const nuxtApp = useNuxtApp();
+// ---- Locale toggle (static i18n: setLocale swaps messages + persists cookie) ----
+const { locale, locales, setLocale } = useI18n();
 async function toggleLocale() {
   const codes = (locales.value ?? []).map((l: any) => (typeof l === "string" ? l : l.code));
   const next = codes.find((c: string) => c !== locale.value) ?? locale.value;
-  if (next === locale.value) return;
-  setLocaleCookie(next);
-  await reloadLocaleData(nuxtApp, next);
-  await setLocale(next);
+  if (next !== locale.value) await setLocale(next);
 }
 
 const mobileOpen = ref(false);

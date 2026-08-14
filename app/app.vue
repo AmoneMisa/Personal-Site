@@ -5,13 +5,11 @@
       <NuxtPage/>
     </u-main>
     <site-footer/>
-    <i18n-loader-overlay/>
   </u-app>
 </template>
 <script setup lang="ts">
 import HeaderNav from "~/components/redesign/HeaderNav.vue";
 import SiteFooter from "~/components/redesign/SiteFooter.vue";
-import I18nLoaderOverlay from "~/components/common/I18nLoaderOverlay.vue";
 
 const SITE_URL = "https://whiteslove.me";
 
