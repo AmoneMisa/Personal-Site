@@ -50,6 +50,12 @@ export default defineNuxtConfig({
         langDir: 'locales',
         lazy: true,
         vueI18n: './i18n.config.ts',
+        // Some messages legitimately contain literal HTML tags as text (email-editor
+        // diagnostics mention <style>, <{tag}>, ...). They're trusted and rendered
+        // via {{ }} (auto-escaped), so allow them past the strict compile check.
+        compilation: {
+            strictMessage: false,
+        },
         locales: [
             {code: 'en', language: 'en-US', name: 'English', file: 'en.json'},
             {code: 'ru', language: 'ru-RU', name: 'Русский', file: 'ru.json'},

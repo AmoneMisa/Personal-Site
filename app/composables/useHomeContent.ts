@@ -112,8 +112,8 @@ const RU = {
     subtitle: "Реальная последовательность проектов — от первых верстальных задач до полноценных фронтенд-решений для маркетплейсов.",
     items: [
       { period: "2021 — сейчас", title: "Frontend Developer, BPC", meta: "Remote · Vue.js, Freemarker",
-        description: "Разработка и поддержка фронтенда маркетплейса: вёрстка на Freemarker-шаблонах, адаптивность на разных устройствах, email-шаблоны, доработки на основе бизнес-требований.",
-        tags: ["Vue.js", "Freemarker"] },
+        description: "Разработка и поддержка фронтенда маркетплейса под high-load: вёрстка на Freemarker- и Velocity-шаблонах, адаптивность на разных устройствах, продакшн email-шаблоны, доработки на основе бизнес-требований. Тесная работа с бэкендом, тестировщиками и дизайнером.",
+        tags: ["Vue.js", "Freemarker", "Velocity", "Email-шаблоны", "High-load", "Docker", "CI/CD"] },
       { period: "2020 — 2021", title: "Junior Frontend Developer, ITSUA", meta: "Харьков · Vue.js, Shopify, Liquid",
         description: "Приложение для Shopify на Vue.js: кастомизация и поддержка тем на Liquid, интеграция в экосистему Shopify, поддержка существующих e-commerce решений.",
         tags: ["Vue.js", "Shopify", "Liquid"] },
@@ -246,8 +246,8 @@ const EN: typeof RU = {
     subtitle: "The real sequence of projects — from first markup tasks to full frontend solutions for marketplaces.",
     items: [
       { period: "2021 — present", title: "Frontend Developer, BPC", meta: "Remote · Vue.js, Freemarker",
-        description: "Development and support of a marketplace frontend: markup on Freemarker templates, responsiveness across devices, email templates, business-driven changes.",
-        tags: ["Vue.js", "Freemarker"] },
+        description: "Development and support of a high-load marketplace frontend: markup on Freemarker and Velocity templates, responsiveness across devices, production email templates, business-driven changes. Close work with the backend, testers and the designer.",
+        tags: ["Vue.js", "Freemarker", "Velocity", "Email templates", "High-load", "Docker", "CI/CD"] },
       { period: "2020 — 2021", title: "Junior Frontend Developer, ITSUA", meta: "Kharkiv · Vue.js, Shopify, Liquid",
         description: "A Shopify app in Vue.js: theme customization and support on Liquid, integration into the Shopify ecosystem, support of existing e-commerce solutions.",
         tags: ["Vue.js", "Shopify", "Liquid"] },
