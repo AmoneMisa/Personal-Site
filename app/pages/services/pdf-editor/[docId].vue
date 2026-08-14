@@ -2450,9 +2450,9 @@ onBeforeUnmount(() => {
   height: 40px;
   padding: 0 14px;
   border-radius: 999px;
-  border: 1px solid var(--ui-border);
+  border: 1px solid var(--line);
   background: rgba(255, 255, 255, 0.03);
-  font-weight: 900;
+  font-weight: 600;
 }
 
 .pdf__top-actions {
@@ -2510,7 +2510,7 @@ onBeforeUnmount(() => {
   height: 36px;
   padding: 0 14px;
   border-radius: 999px;
-  border: 1px solid var(--ui-border);
+  border: 1px solid var(--line);
   background: rgba(255, 255, 255, 0.03);
   color: var(--ui-text-muted);
   font-weight: 700;
@@ -2553,7 +2553,7 @@ onBeforeUnmount(() => {
   width: 40px;
   height: 40px;
   border-radius: 999px;
-  border: 1px solid var(--ui-border);
+  border: 1px solid var(--line);
   background: rgba(255, 255, 255, 0.03);
   color: rgba(255, 255, 255, 0.85);
   cursor: pointer;
@@ -2581,13 +2581,13 @@ onBeforeUnmount(() => {
 .pdf__tool-section {
   margin-top: 12px;
   padding: 12px;
-  border-radius: 16px;
+  border-radius: 10px;
   background: rgba(255, 255, 255, 0.03);
   border: 1px solid rgba(255, 255, 255, 0.06);
 }
 
 .pdf__tool-title {
-  font-weight: 900;
+  font-weight: 600;
   margin-bottom: 10px;
   color: rgba(255, 255, 255, 0.9);
 }
@@ -2643,7 +2643,7 @@ onBeforeUnmount(() => {
 }
 
 .pdf__label {
-  font-weight: 900;
+  font-weight: 600;
   font-size: 12px;
   color: rgba(255, 255, 255, 0.88);
 }
@@ -2671,7 +2671,7 @@ onBeforeUnmount(() => {
   border: 1px solid rgba(255, 255, 255, 0.1);
   background: rgba(255, 255, 255, 0.04);
   color: rgba(255, 255, 255, 0.9);
-  font-weight: 900;
+  font-weight: 600;
 }
 
 .pdf__chip_active {
@@ -2686,7 +2686,7 @@ onBeforeUnmount(() => {
 .pdf__stage {
   position: relative;
   width: 100%;
-  border-radius: 18px;
+  border-radius: 10px;
   overflow: hidden;
   border: 1px solid rgba(255, 255, 255, 0.06);
   background: rgba(255, 255, 255, 0.02);

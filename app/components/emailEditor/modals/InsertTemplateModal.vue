@@ -170,7 +170,7 @@ function buildSnippet(input: any) {
 
 .email-editor-template__notice {
   padding: 10px 12px;
-  border-radius: 14px;
+  border-radius: 8px;
   background: rgba(255, 190, 90, 0.12);
   border: 1px solid rgba(255, 190, 90, 0.18);
 }

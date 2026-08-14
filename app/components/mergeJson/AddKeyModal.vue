@@ -69,7 +69,7 @@ function confirm() {
   display: flex;
   flex-direction: column;
   gap: 8px;
-  font-weight: 900;
+  font-weight: 600;
   font-size: 12px;
   opacity: 0.95;
 }
@@ -77,7 +77,7 @@ function confirm() {
 .akm__ta {
   width: 100%;
   border-radius: 12px;
-  border: 1px solid var(--ui-border);
+  border: 1px solid var(--line);
   background: rgba(255, 255, 255, 0.04);
   color: var(--ui-text);
   padding: 10px 12px;

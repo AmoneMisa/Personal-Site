@@ -395,17 +395,17 @@ watch(
 }
 
 .svg-stroke-modal__title {
-  font-weight: 900;
+  font-weight: 600;
   font-size: 16px;
 }
 
 .svg-stroke-modal__error {
   padding: 12px;
-  border-radius: 14px;
+  border-radius: 8px;
   border: 1px solid rgba(239, 68, 68, 0.35);
   background: rgba(239, 68, 68, 0.06);
   color: var(--ui-text);
-  font-weight: 900;
+  font-weight: 600;
   font-size: 12px;
 }
 
@@ -416,7 +416,7 @@ watch(
 }
 
 .svg-stroke-modal__subtitle {
-  font-weight: 900;
+  font-weight: 600;
   font-size: 12px;
   color: var(--ui-text-muted);
   margin-bottom: 8px;
@@ -432,8 +432,8 @@ watch(
 
 .svg-stroke-modal__item {
   text-align: left;
-  border-radius: 14px;
-  border: 1px solid var(--ui-border);
+  border-radius: 8px;
+  border: 1px solid var(--line);
   background: rgba(255, 255, 255, 0.02);
   padding: 10px;
   cursor: pointer;
@@ -445,7 +445,7 @@ watch(
 }
 
 .svg-stroke-modal__item-text {
-  font-weight: 900;
+  font-weight: 600;
   font-size: 12px;
   color: var(--ui-text);
   overflow: hidden;
@@ -470,8 +470,8 @@ watch(
 .svg-stroke-modal__pick {
   height: 44px;
   width: 44px;
-  border-radius: 14px;
-  border: 1px solid var(--ui-border);
+  border-radius: 8px;
+  border: 1px solid var(--line);
   background: rgba(255, 255, 255, 0.02);
   color: var(--ui-text);
   display: grid;
@@ -499,8 +499,8 @@ watch(
 .svg-stroke-modal__native {
   width: 44px;
   height: 44px;
-  border-radius: 14px;
-  border: 1px solid var(--ui-border);
+  border-radius: 8px;
+  border: 1px solid var(--line);
   background: transparent;
   padding: 0;
   overflow: hidden;

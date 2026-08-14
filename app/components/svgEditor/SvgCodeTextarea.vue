@@ -54,14 +54,14 @@ function onInput(e: Event) {
 }
 
 .svg-textarea__label {
-  font-weight: 900;
+  font-weight: 600;
   font-size: 12px;
   color: var(--ui-text-muted);
 }
 
 .svg-textarea__box {
-  border-radius: 14px;
-  border: 1px solid var(--ui-border);
+  border-radius: 8px;
+  border: 1px solid var(--line);
   background: rgba(255, 255, 255, 0.02);
   padding: 10px;
 }
@@ -80,7 +80,7 @@ function onInput(e: Event) {
 
 .svg-textarea__error {
   font-size: 12px;
-  font-weight: 900;
+  font-weight: 600;
   color: var(--color-error, #ef4444);
 }
 

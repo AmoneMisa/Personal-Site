@@ -349,8 +349,8 @@ function onDownload() {
 .merge__card {
   margin-top: 18px;
   padding: 16px;
-  border-radius: 18px;
-  border: 1px solid var(--ui-border);
+  border-radius: 10px;
+  border: 1px solid var(--line);
   background: rgba(255, 255, 255, 0.03);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
 }
@@ -397,13 +397,13 @@ function onDownload() {
   flex-direction: column;
   gap: 6px;
   padding: 8px 10px;
-  border-radius: 14px;
-  border: 1px solid var(--ui-border);
+  border-radius: 8px;
+  border: 1px solid var(--line);
   background: rgba(255, 255, 255, 0.02);
 }
 
 .merge__group-label {
-  font-weight: 900;
+  font-weight: 600;
   font-size: 12px;
   color: var(--ui-text-muted);
 }
@@ -427,8 +427,8 @@ function onDownload() {
 }
 
 .merge__pane {
-  border-radius: 16px;
-  border: 1px solid var(--ui-border);
+  border-radius: 10px;
+  border: 1px solid var(--line);
   background: rgba(0, 0, 0, 0.12);
   padding: 10px;
   min-width: 0;
@@ -449,14 +449,14 @@ function onDownload() {
 }
 
 .merge__pane-title {
-  font-weight: 900;
+  font-weight: 600;
   font-size: 12px;
   color: var(--ui-text-muted);
 }
 
 .merge__pane-sub {
   font-size: 12px;
-  font-weight: 900;
+  font-weight: 600;
   opacity: 0.75;
   min-width: 0;
 }
@@ -477,7 +477,7 @@ function onDownload() {
 .merge__err {
   margin-top: 10px;
   font-size: 12px;
-  font-weight: 900;
+  font-weight: 600;
   color: var(--color-error);
   opacity: 0.95;
 }
@@ -505,7 +505,7 @@ function onDownload() {
 
 .merge__matches {
   font-size: 12px;
-  font-weight: 900;
+  font-weight: 600;
   opacity: .75;
   padding-bottom: 6px;
 }

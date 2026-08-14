@@ -734,7 +734,7 @@ function chooseAdvancedTag(tag: string) {
 }
 
 .docker-search__label {
-  font-weight: 900;
+  font-weight: 600;
   font-size: 13px;
 }
 
@@ -766,11 +766,11 @@ function chooseAdvancedTag(tag: string) {
 .docker-search__btn {
   height: 40px;
   padding: 0 14px;
-  border-radius: 14px;
-  border: 1px solid var(--ui-border);
+  border-radius: 8px;
+  border: 1px solid var(--line);
   background: rgba(255, 255, 255, 0.03);
   color: var(--text-white);
-  font-weight: 900;
+  font-weight: 600;
   font-size: 13px;
   cursor: pointer;
   transition: filter 180ms ease, transform 140ms ease, opacity 180ms ease;
@@ -825,7 +825,7 @@ function chooseAdvancedTag(tag: string) {
 }
 
 .docker-search__result-title {
-  font-weight: 900;
+  font-weight: 600;
   font-size: 18px;
   margin-bottom: 4px;
 }
@@ -845,8 +845,8 @@ function chooseAdvancedTag(tag: string) {
   justify-content: space-between;
   align-items: center;
   padding: 16px;
-  border-radius: 18px;
-  border: 1px solid var(--ui-border);
+  border-radius: 10px;
+  border: 1px solid var(--line);
   background: rgba(255, 255, 255, 0.03);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
   margin-bottom: 14px;
@@ -858,15 +858,15 @@ function chooseAdvancedTag(tag: string) {
   align-items: center;
   height: 26px;
   padding: 0 10px;
-  border-radius: 999px;
+  border-radius: 6px;
   border: 1px solid rgba(224, 103, 154, 0.35);
   background: rgba(224, 103, 154, 0.12);
-  font-weight: 900;
+  font-weight: 600;
   font-size: 12px;
 }
 
 .docker-search__best-tag {
-  font-weight: 900;
+  font-weight: 600;
   font-size: 18px;
   margin-top: 6px;
 }
@@ -889,14 +889,14 @@ function chooseAdvancedTag(tag: string) {
 
 .docker-search__panel {
   padding: 16px;
-  border-radius: 18px;
-  border: 1px solid var(--ui-border);
+  border-radius: 10px;
+  border: 1px solid var(--line);
   background: rgba(255, 255, 255, 0.03);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
 }
 
 .docker-search__panel-title {
-  font-weight: 900;
+  font-weight: 600;
   margin-bottom: 10px;
 }
 
@@ -910,8 +910,8 @@ function chooseAdvancedTag(tag: string) {
   width: 100%;
   text-align: left;
   padding: 12px 12px;
-  border-radius: 14px;
-  border: 1px solid var(--ui-border);
+  border-radius: 8px;
+  border: 1px solid var(--line);
   background: rgba(255, 255, 255, 0.02);
   cursor: pointer;
   transition: filter 180ms ease, transform 140ms ease, color 180ms ease;
@@ -935,17 +935,17 @@ function chooseAdvancedTag(tag: string) {
 }
 
 .docker-search__tag-text {
-  font-weight: 900;
+  font-weight: 600;
   font-size: 13px;
   word-break: break-word;
 }
 
 .docker-search__tag-badge {
   font-size: 11px;
-  font-weight: 900;
+  font-weight: 600;
   opacity: 0.9;
   padding: 4px 8px;
-  border-radius: 999px;
+  border-radius: 6px;
   border: 1px solid rgba(224, 103, 154, 0.35);
   background: rgba(224, 103, 154, 0.10);
 }
@@ -971,8 +971,8 @@ function chooseAdvancedTag(tag: string) {
 
 .docker-search__alias {
   padding: 10px 12px;
-  border-radius: 14px;
-  border: 1px solid var(--ui-border);
+  border-radius: 8px;
+  border: 1px solid var(--line);
   background: rgba(255, 255, 255, 0.02);
 }
 
@@ -985,13 +985,13 @@ function chooseAdvancedTag(tag: string) {
   margin-top: 18px;
   text-align: center;
   padding: 18px;
-  border-radius: 18px;
-  border: 1px solid var(--ui-border);
+  border-radius: 10px;
+  border: 1px solid var(--line);
   background: rgba(255, 255, 255, 0.03);
 }
 
 .docker-search__empty-title {
-  font-weight: 900;
+  font-weight: 600;
   margin-bottom: 6px;
 }
 
@@ -1003,7 +1003,7 @@ function chooseAdvancedTag(tag: string) {
 
 .docker-search__h2 {
   font-size: 28px;
-  font-weight: 900;
+  font-weight: 600;
   margin-bottom: 18px;
 }
 
@@ -1019,8 +1019,8 @@ function chooseAdvancedTag(tag: string) {
 
 .how-card {
   padding: 18px;
-  border-radius: 18px;
-  border: 1px solid var(--ui-border);
+  border-radius: 10px;
+  border: 1px solid var(--line);
   background: rgba(255, 255, 255, 0.03);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
 }
@@ -1032,7 +1032,7 @@ function chooseAdvancedTag(tag: string) {
 }
 
 .how-card__title {
-  font-weight: 900;
+  font-weight: 600;
   margin-bottom: 6px;
 }
 </style>

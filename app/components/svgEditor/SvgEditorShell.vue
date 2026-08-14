@@ -431,7 +431,7 @@ function onApplyStrokeEdits(payload: { svg: string }) {
 
 .svg-editor-shell__card {
   border-radius: 20px;
-  border: 1px solid var(--ui-border);
+  border: 1px solid var(--line);
   background: rgba(14, 12, 21, 0.55);
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.05);
 }
@@ -452,7 +452,7 @@ function onApplyStrokeEdits(payload: { svg: string }) {
 }
 
 .svg-editor-shell__section-title {
-  font-weight: 900;
+  font-weight: 600;
   font-size: 14px;
   color: rgba(255, 255, 255, 0.92);
 }
@@ -469,10 +469,10 @@ function onApplyStrokeEdits(payload: { svg: string }) {
 
 .svg-editor-shell__btn {
   height: 44px;
-  border-radius: 14px;
-  border: 1px solid var(--ui-border);
+  border-radius: 8px;
+  border: 1px solid var(--line);
   background: rgba(255, 255, 255, 0.02);
-  font-weight: 900;
+  font-weight: 600;
 }
 
 .svg-editor-shell__btn:hover {
@@ -480,8 +480,8 @@ function onApplyStrokeEdits(payload: { svg: string }) {
 }
 
 .svg-editor-shell__preview-box {
-  border-radius: 18px;
-  border: 1px solid var(--ui-border);
+  border-radius: 10px;
+  border: 1px solid var(--line);
   background: rgba(255, 255, 255, 0.02);
   padding: 14px;
   overflow: auto;
@@ -501,8 +501,8 @@ function onApplyStrokeEdits(payload: { svg: string }) {
 }
 
 .svg-editor-shell__empty {
-  border-radius: 18px;
-  border: 1px dashed var(--ui-border);
+  border-radius: 10px;
+  border: 1px dashed var(--line);
   background: rgba(255, 255, 255, 0.02);
   padding: 18px;
   display: grid;
@@ -519,7 +519,7 @@ function onApplyStrokeEdits(payload: { svg: string }) {
 }
 
 .svg-editor-shell__empty-title {
-  font-weight: 900;
+  font-weight: 600;
   font-size: 13px;
   color: var(--ui-text);
 }

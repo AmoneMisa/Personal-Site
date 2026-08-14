@@ -226,11 +226,11 @@ function doApply() {
 
 .svg-colors-modal__empty {
   padding: 14px;
-  border-radius: 14px;
-  border: 1px dashed var(--ui-border);
+  border-radius: 8px;
+  border: 1px dashed var(--line);
   background: rgba(255, 255, 255, 0.02);
   color: var(--ui-text-muted);
-  font-weight: 900;
+  font-weight: 600;
   font-size: 12px;
 }
 
@@ -240,8 +240,8 @@ function doApply() {
 }
 
 .svg-colors-modal__row {
-  border-radius: 16px;
-  border: 1px solid var(--ui-border);
+  border-radius: 10px;
+  border: 1px solid var(--line);
   background: rgba(255, 255, 255, 0.02);
   padding: 12px;
   display: grid;
@@ -259,8 +259,8 @@ function doApply() {
 .svg-colors-modal__badge {
   width: 42px;
   height: 42px;
-  border-radius: 14px;
-  border: 1px solid var(--ui-border);
+  border-radius: 8px;
+  border: 1px solid var(--line);
   box-shadow: var(--shadow-light);
   flex: 0 0 auto;
 }
@@ -279,13 +279,13 @@ function doApply() {
 }
 
 .svg-colors-modal__label {
-  font-weight: 900;
+  font-weight: 600;
   font-size: 12px;
   color: var(--ui-text-muted);
 }
 
 .svg-colors-modal__code {
-  font-weight: 900;
+  font-weight: 600;
   font-size: 12px;
   color: var(--ui-text);
   overflow: hidden;
@@ -314,10 +314,10 @@ function doApply() {
   height: 38px;
   padding: 0 12px;
   border-radius: 999px;
-  border: 1px solid var(--ui-border);
+  border: 1px solid var(--line);
   background: rgba(0, 0, 0, 0.12);
   color: var(--ui-text);
-  font-weight: 900;
+  font-weight: 600;
   font-size: 12px;
   display: inline-flex;
   align-items: center;
@@ -333,8 +333,8 @@ function doApply() {
 .svg-colors-modal__preview {
   width: 42px;
   height: 38px;
-  border-radius: 14px;
-  border: 1px solid var(--ui-border);
+  border-radius: 8px;
+  border: 1px solid var(--line);
 }
 
 .svg-colors-modal__preview_disabled {
@@ -357,8 +357,8 @@ function doApply() {
 .svg-colors-modal__native {
   width: 44px;
   height: 44px;
-  border-radius: 14px;
-  border: 1px solid var(--ui-border);
+  border-radius: 8px;
+  border: 1px solid var(--line);
   background: transparent;
   padding: 0;
   overflow: hidden;

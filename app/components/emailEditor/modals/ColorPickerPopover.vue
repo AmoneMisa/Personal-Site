@@ -411,8 +411,8 @@ watch(
   position: fixed;
   width: 360px;
   max-width: calc(100vw - 24px);
-  border-radius: 18px;
-  border: 1px solid var(--ui-border);
+  border-radius: 10px;
+  border: 1px solid var(--line);
   background: rgba(14, 12, 21, 0.92);
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.05);
   padding: 12px;
@@ -440,7 +440,7 @@ watch(
   display: inline-flex;
   align-items: center;
   gap: 10px;
-  font-weight: 900;
+  font-weight: 600;
   font-size: 14px;
   color: rgba(255, 255, 255, 0.92);
 }
@@ -495,8 +495,8 @@ watch(
 .color-picker-popover__native {
   width: 44px;
   height: 44px;
-  border-radius: 14px;
-  border: 1px solid var(--ui-border);
+  border-radius: 8px;
+  border: 1px solid var(--line);
   background: transparent;
   padding: 0;
   overflow: hidden;
@@ -505,16 +505,16 @@ watch(
 .color-picker-popover__preview {
   width: 44px;
   height: 44px;
-  border-radius: 14px;
-  border: 1px solid var(--ui-border);
+  border-radius: 8px;
+  border: 1px solid var(--line);
   box-shadow: var(--shadow-light);
 }
 
 .color-picker-popover__tool {
   height: 44px;
   width: 44px;
-  border-radius: 14px;
-  border: 1px solid var(--ui-border);
+  border-radius: 8px;
+  border: 1px solid var(--line);
   background: rgba(255, 255, 255, 0.02);
   color: rgba(255, 255, 255, 0.9);
   display: grid;
@@ -551,8 +551,8 @@ watch(
   gap: 10px;
   align-items: center;
   padding: 10px;
-  border-radius: 14px;
-  border: 1px solid var(--ui-border);
+  border-radius: 8px;
+  border: 1px solid var(--line);
   background: rgba(255, 255, 255, 0.02);
 }
 
@@ -564,8 +564,8 @@ watch(
 .color-picker-popover__mini {
   height: 38px;
   width: 44px;
-  border-radius: 14px;
-  border: 1px solid var(--ui-border);
+  border-radius: 8px;
+  border: 1px solid var(--line);
   background: rgba(255, 255, 255, 0.02);
   color: rgba(255, 255, 255, 0.9);
   display: grid;
@@ -588,7 +588,7 @@ watch(
 }
 
 .color-picker-popover__control-label {
-  font-weight: 900;
+  font-weight: 600;
   font-size: 12px;
   color: var(--ui-text-muted);
 }

@@ -890,8 +890,8 @@ onBeforeUnmount(() => {
 .markdown-editor__card {
   margin-top: 18px;
   padding: 16px;
-  border-radius: 18px;
-  border: 1px solid var(--ui-border);
+  border-radius: 10px;
+  border: 1px solid var(--line);
   background: rgba(255, 255, 255, 0.03);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
 }
@@ -915,10 +915,10 @@ onBeforeUnmount(() => {
   height: 34px;
   padding: 0 10px;
   border-radius: 12px;
-  border: 1px solid var(--ui-border);
+  border: 1px solid var(--line);
   background: rgba(255, 255, 255, 0.02);
   color: var(--ui-text);
-  font-weight: 900;
+  font-weight: 600;
   font-size: 13px;
   cursor: pointer;
   transition: filter 160ms ease, transform 140ms ease, opacity 160ms ease;
@@ -957,10 +957,10 @@ onBeforeUnmount(() => {
 .markdown-editor__counter {
   font-size: 12px;
   color: var(--ui-text-muted);
-  font-weight: 900;
+  font-weight: 600;
   padding: 8px 12px;
   border-radius: 999px;
-  border: 1px solid var(--ui-border);
+  border: 1px solid var(--line);
   background: rgba(255, 255, 255, 0.02);
 }
 
@@ -972,8 +972,8 @@ onBeforeUnmount(() => {
 
 .markdown-editor__emoji {
   margin-top: 10px;
-  border: 1px solid var(--ui-border);
-  border-radius: 16px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
   overflow: hidden;
   background: rgba(255, 255, 255, 0.02);
 }
@@ -984,9 +984,9 @@ onBeforeUnmount(() => {
 
 .markdown-editor__editor {
   width: 100%;
-  border-radius: 16px;
+  border-radius: 10px;
   padding: 12px 12px;
-  border: 1px solid var(--ui-border);
+  border: 1px solid var(--line);
   background: rgba(0, 0, 0, 0.12);
   color: var(--ui-text);
   outline: none;
@@ -1003,7 +1003,7 @@ onBeforeUnmount(() => {
 .markdown-editor__warning {
   margin-top: 10px;
   color: var(--color-error, #ef4444);
-  font-weight: 800;
+  font-weight: 600;
   font-size: 13px;
 }
 
@@ -1021,7 +1021,7 @@ onBeforeUnmount(() => {
 }
 
 .markdown-editor__output-title {
-  font-weight: 900;
+  font-weight: 600;
 }
 
 .markdown-editor__output-actions {
@@ -1103,7 +1103,7 @@ onBeforeUnmount(() => {
   color: rgba(255, 255, 255, .88);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, .04), inset 0 -10px 20px rgba(0, 0, 0, .25);
   transition: background .2s ease, color .2s ease, box-shadow .2s ease;
-  font-weight: 900;
+  font-weight: 600;
 }
 
 :deep(.tabs__trigger::before) {
@@ -1151,9 +1151,9 @@ onBeforeUnmount(() => {
 .markdown-editor__preview {
   margin-top: 12px;
   width: 100%;
-  border-radius: 16px;
+  border-radius: 10px;
   padding: 12px 12px;
-  border: 1px solid var(--ui-border);
+  border: 1px solid var(--line);
   background: rgba(0, 0, 0, 0.12);
   color: var(--ui-text);
   outline: none;
@@ -1193,7 +1193,7 @@ onBeforeUnmount(() => {
 .markdown-editor__preview :deep(.pv-pre) {
   margin: 8px 0;
   padding: 10px 12px;
-  border-radius: 14px;
+  border-radius: 8px;
   border: 1px solid rgba(255, 255, 255, 0.10);
   background: rgba(255, 255, 255, 0.06);
   overflow: auto;
@@ -1222,15 +1222,15 @@ onBeforeUnmount(() => {
 }
 
 :deep(.markdown-editor__modal) {
-  border-radius: 18px;
-  border: 1px solid var(--ui-border);
+  border-radius: 10px;
+  border: 1px solid var(--line);
   background: rgba(14, 12, 21, 0.92);
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.05);
   padding: 16px;
 }
 
 .markdown-editor__modal-title {
-  font-weight: 900;
+  font-weight: 600;
   font-size: 16px;
   margin-bottom: 12px;
 }
@@ -1241,7 +1241,7 @@ onBeforeUnmount(() => {
 }
 
 .markdown-editor__modal-label {
-  font-weight: 900;
+  font-weight: 600;
   font-size: 12px;
   margin-bottom: 6px;
 }
@@ -1322,7 +1322,7 @@ onBeforeUnmount(() => {
 }
 
 .markdown-editor__modal-label {
-  font-weight: 900;
+  font-weight: 600;
   font-size: 12px;
   color: var(--ui-text-muted);
 }

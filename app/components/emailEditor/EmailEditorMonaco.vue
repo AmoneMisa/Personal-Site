@@ -181,9 +181,9 @@ onBeforeUnmount(() => {
 .email-editor-monaco {
   width: 100%;
   height: 520px;
-  border-radius: 16px;
+  border-radius: 10px;
   overflow: hidden;
-  border: 1px solid var(--ui-border);
+  border: 1px solid var(--line);
   background: rgba(0, 0, 0, 0.12);
 }
 

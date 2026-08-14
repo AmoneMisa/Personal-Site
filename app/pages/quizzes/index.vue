@@ -183,7 +183,7 @@ const howSteps = [
   height: 36px;
   padding: 0 14px;
   border-radius: 999px;
-  border: 1px solid var(--ui-border);
+  border: 1px solid var(--line);
   background: rgba(255, 255, 255, 0.03);
   color: var(--ui-text-muted);
   font-weight: 700;
@@ -217,13 +217,13 @@ const howSteps = [
   margin-top: 18px;
   text-align: center;
   padding: 18px;
-  border-radius: 18px;
-  border: 1px solid var(--ui-border);
+  border-radius: 10px;
+  border: 1px solid var(--line);
   background: rgba(255, 255, 255, 0.03);
 }
 
 .quizzes__empty-title {
-  font-weight: 900;
+  font-weight: 600;
   margin-bottom: 6px;
 }
 
@@ -234,7 +234,7 @@ const howSteps = [
 
 .quizzes__h2 {
   font-size: 28px;
-  font-weight: 900;
+  font-weight: 600;
   margin-bottom: 18px;
 }
 
@@ -250,8 +250,8 @@ const howSteps = [
 
 .how-card {
   padding: 18px;
-  border-radius: 18px;
-  border: 1px solid var(--ui-border);
+  border-radius: 10px;
+  border: 1px solid var(--line);
   background: rgba(255, 255, 255, 0.03);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
 }
@@ -263,7 +263,7 @@ const howSteps = [
 }
 
 .how-card__title {
-  font-weight: 900;
+  font-weight: 600;
   margin-bottom: 6px;
 }
 </style>

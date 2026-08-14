@@ -93,11 +93,11 @@ const actions = useEmailEditorActions(state);
 
 <style lang="scss">
 .email-editor {
-  border-radius: 18px;
+  border-radius: 10px;
 }
 
 .email-editor__inner {
-  border-radius: 16px;
+  border-radius: 10px;
   padding: 16px;
 }
 
@@ -113,7 +113,7 @@ const actions = useEmailEditorActions(state);
   display: inline-flex;
   align-items: center;
   gap: 10px;
-  font-weight: 900;
+  font-weight: 600;
   color: rgba(255, 255, 255, 0.9);
 }
 

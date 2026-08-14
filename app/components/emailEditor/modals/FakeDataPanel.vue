@@ -163,13 +163,13 @@ function addPath() {
 
 .email-editor-fake__badge {
   font-size: 10px;
-  font-weight: 900;
+  font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.03em;
   padding: 1px 6px;
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.06);
-  border: 1px solid var(--ui-border);
+  border: 1px solid var(--line);
   opacity: 0.8;
 }
 
@@ -195,8 +195,8 @@ function addPath() {
 
 .email-editor-fake__empty {
   padding: 14px;
-  border-radius: 14px;
-  border: 1px dashed var(--ui-border);
+  border-radius: 8px;
+  border: 1px dashed var(--line);
   text-align: center;
   font-size: 12px;
 }
@@ -207,6 +207,6 @@ function addPath() {
   align-items: end;
   gap: 10px;
   padding-top: 8px;
-  border-top: 1px solid var(--ui-border);
+  border-top: 1px solid var(--line);
 }
 </style>

@@ -500,7 +500,7 @@ const targetItems = computed(() =>
 .mode-card {
   text-align: left;
   padding: 18px 18px 16px;
-  border-radius: 16px;
+  border-radius: 10px;
   border: 1px solid var(--color-border);
   background: var(--secondary-bg-gradient);
   box-shadow: var(--shadow-light);
@@ -543,7 +543,7 @@ const targetItems = computed(() =>
   height: 40px;
   border-radius: 12px;
   background: rgba(224, 103, 154, 0.14);
-  border: 1px solid var(--ui-border);
+  border: 1px solid var(--line);
 }
 
 .mode-card__title {
@@ -558,7 +558,7 @@ const targetItems = computed(() =>
 }
 
 .panel {
-  border-radius: 18px;
+  border-radius: 10px;
   border: 1px solid var(--color-border);
   background: var(--secondary-bg-gradient);
   box-shadow: var(--shadow-light);
@@ -629,7 +629,7 @@ const targetItems = computed(() =>
 
 :deep(.format-select [data-slot="content"]) {
   /* keep your global .ui-locale styles; this is just a safety net */
-  border-radius: 14px;
+  border-radius: 8px;
 }
 
 .control__btn {
@@ -643,7 +643,7 @@ const targetItems = computed(() =>
 
 .dropzone {
   margin-top: 18px;
-  border-radius: 16px;
+  border-radius: 10px;
   border: 1px dashed rgba(224, 103, 154, 0.45);
   background: rgba(224, 103, 154, 0.08);
   padding: 16px;
@@ -675,7 +675,7 @@ const targetItems = computed(() =>
 .dropzone__badge {
   width: 54px;
   height: 54px;
-  border-radius: 16px;
+  border-radius: 10px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -689,7 +689,7 @@ const targetItems = computed(() =>
 }
 
 .dropzone__title {
-  font-weight: 800;
+  font-weight: 600;
   font-size: 16px;
   color: var(--text-white);
 
@@ -745,7 +745,7 @@ const targetItems = computed(() =>
 
 .msg {
   margin-top: 14px;
-  border-radius: 14px;
+  border-radius: 8px;
   padding: 12px 14px;
   display: flex;
   gap: 10px;
@@ -783,7 +783,7 @@ const targetItems = computed(() =>
 }
 
 .files__title {
-  font-weight: 800;
+  font-weight: 600;
   color: var(--text-white);
 
   .light & {
@@ -809,7 +809,7 @@ const targetItems = computed(() =>
   justify-content: space-between;
   gap: 12px;
   padding: 12px 12px;
-  border-radius: 14px;
+  border-radius: 8px;
   border: 1px solid var(--color-border);
   background: rgba(0, 0, 0, 0.16);
 
@@ -880,7 +880,7 @@ const targetItems = computed(() =>
   gap: 10px;
   align-items: flex-start;
   padding: 12px 14px;
-  border-radius: 14px;
+  border-radius: 8px;
   border: 1px solid var(--color-border);
   color: var(--ui-text-muted);
   background: rgba(0, 0, 0, 0.10);

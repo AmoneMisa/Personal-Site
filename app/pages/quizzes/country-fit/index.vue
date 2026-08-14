@@ -345,7 +345,7 @@ watch(user, (v) => lsSet(LS_KEYS.user, v), {deep: true});
       {{ t(countryFitQuiz.descriptionKey) }}
     </div>
 
-    <div class="p-4 rounded-xl border border-[var(--ui-border)] mb-8 bg-[rgba(255,255,255,0.03)]">
+    <div class="p-4 rounded-xl border border-[var(--line)] mb-8 bg-[rgba(255,255,255,0.03)]">
       <div class="font-black mb-3">{{ t("quizzes.countryFit.constraintsTitle") }}</div>
       <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div class="field">
@@ -467,7 +467,7 @@ watch(user, (v) => lsSet(LS_KEYS.user, v), {deep: true});
       <div
           v-for="q in [...countryFitQuiz.questions].sort((a, b) => a.order - b.order)"
           :key="q.id"
-          class="p-4 rounded-xl border border-[var(--ui-border)] bg-[rgba(255,255,255,0.03)]"
+          class="p-4 rounded-xl border border-[var(--line)] bg-[rgba(255,255,255,0.03)]"
       >
         <div class="font-black mb-2">{{ t(q.titleKey) }}</div>
         <div class="text-muted mb-3">{{ t(q.descriptionKey) }}</div>
@@ -477,7 +477,7 @@ watch(user, (v) => lsSet(LS_KEYS.user, v), {deep: true});
               v-for="opt in q.options"
               :key="opt.id"
               type="button"
-              class="px-4 py-3 rounded-xl border border-[var(--ui-border)] text-left transition"
+              class="px-4 py-3 rounded-xl border border-[var(--line)] text-left transition"
               :class="
               answers[q.id] === opt.id
                 ? 'bg-[rgba(224, 103, 154,0.18)] border-[rgba(224, 103, 154,0.35)]'
@@ -501,7 +501,7 @@ watch(user, (v) => lsSet(LS_KEYS.user, v), {deep: true});
       </div>
 
       <!-- Compare block -->
-      <div class="p-4 rounded-xl border border-[var(--ui-border)] mb-8 bg-[rgba(255,255,255,0.03)]">
+      <div class="p-4 rounded-xl border border-[var(--line)] mb-8 bg-[rgba(255,255,255,0.03)]">
         <div class="font-black mb-3">
           {{ t("quizzes.countryFit.compareTitle") }}
         </div>
@@ -636,7 +636,7 @@ watch(user, (v) => lsSet(LS_KEYS.user, v), {deep: true});
 }
 
 .field__label {
-  font-weight: 900;
+  font-weight: 600;
   font-size: 13px;
   color: var(--text-white);
 }

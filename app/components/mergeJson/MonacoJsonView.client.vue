@@ -327,9 +327,9 @@ onBeforeUnmount(() => {
 .jm {
   width: 100%;
   height: 100%;
-  border-radius: 16px;
+  border-radius: 10px;
   overflow: hidden;
-  border: 1px solid var(--ui-border);
+  border: 1px solid var(--line);
   background: rgba(0, 0, 0, 0.12);
 }
 </style>

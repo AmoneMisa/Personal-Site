@@ -76,11 +76,11 @@ function metaText(d: any) {
 
 <style lang="scss">
 .email-editor-diagnostics {
-  border-radius: 18px;
+  border-radius: 10px;
 }
 
 .email-editor-diagnostics__inner {
-  border-radius: 16px;
+  border-radius: 10px;
   padding: 12px;
 }
 
@@ -88,7 +88,7 @@ function metaText(d: any) {
   display: inline-flex;
   align-items: center;
   gap: 10px;
-  font-weight: 900;
+  font-weight: 600;
   color: rgba(255, 255, 255, 0.9);
   margin-bottom: 10px;
 }
@@ -107,7 +107,7 @@ function metaText(d: any) {
   gap: 10px;
   align-items: flex-start;
   padding: 10px;
-  border-radius: 14px;
+  border-radius: 8px;
   background: rgba(255, 255, 255, 0.03);
   border: 1px solid rgba(255, 255, 255, 0.06);
   cursor: pointer;
@@ -123,7 +123,7 @@ function metaText(d: any) {
 }
 
 .email-editor-diagnostics__item-message {
-  font-weight: 800;
+  font-weight: 600;
   color: rgba(255, 255, 255, 0.88);
 }
 
@@ -138,7 +138,7 @@ function metaText(d: any) {
 
 .email-editor-diagnostics__empty {
   padding: 10px 12px;
-  border-radius: 14px;
+  border-radius: 8px;
   background: rgba(255, 255, 255, 0.03);
   border: 1px solid rgba(255, 255, 255, 0.06);
 }

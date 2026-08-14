@@ -86,8 +86,8 @@ function confirm() {
   top: 50%;
   transform: translate(-50%, -50%);
   width: min(560px, calc(100vw - 24px));
-  border-radius: 18px;
-  border: 1px solid var(--ui-border);
+  border-radius: 10px;
+  border: 1px solid var(--line);
   background: rgba(20, 20, 22, .95);
   box-shadow: 0 20px 80px rgba(0, 0, 0, .5);
   padding: 14px;
@@ -98,7 +98,7 @@ function confirm() {
 }
 
 .ms__title {
-  font-weight: 900;
+  font-weight: 600;
   font-size: 14px;
 }
 
@@ -123,10 +123,10 @@ function confirm() {
   height: 34px;
   border-radius: 12px;
   padding: 0 12px;
-  border: 1px solid var(--ui-border);
+  border: 1px solid var(--line);
   background: rgba(255, 255, 255, .06);
   color: var(--ui-text);
-  font-weight: 900;
+  font-weight: 600;
   font-size: 12px;
 }
 

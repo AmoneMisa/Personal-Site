@@ -56,20 +56,19 @@ const alignText = computed(() => (props.isCentered ? 'mx-auto text-center' : 'mx
 const headlineClass = computed(() => [
   baseWidth.value,
   props.isCentered ? 'justify-center text-center' : 'text-left',
-  'gradient-text whitespace-normal break-words [overflow-wrap:anywhere]',
-  !customHeadlineSize.value ? 'text-md' : '',
+  'page-eyebrow whitespace-normal break-words [overflow-wrap:anywhere]',
   props.headLineClasses,
   props.ui.headline
 ].filter(Boolean).join(' '));
 
 const titleSizeClass = computed(() =>
     props.titleSize === '48'
-        ? 'text-3xl sm:text-4xl lg:text-5xl'
-        : 'text-2xl sm:text-3xl lg:text-4xl'
+        ? 'text-3xl sm:text-4xl'
+        : 'text-2xl sm:text-3xl'
 );
 
 const titleClass = computed(() => [
-  'whitespace-normal break-words [overflow-wrap:anywhere] leading-tight font-bold text-highlighted',
+  'whitespace-normal break-words [overflow-wrap:anywhere] leading-tight font-semibold text-highlighted',
   baseWidth.value,
   alignText.value,
   !customTitleSize.value ? titleSizeClass.value : '',

@@ -194,11 +194,11 @@ async function createDoc() {
 }
 
 .pdf__panel {
-  border-radius: 18px;
+  border-radius: 10px;
 }
 
 .pdf__panel-inner {
-  border-radius: 16px;
+  border-radius: 10px;
   padding: 16px;
 }
 
@@ -215,7 +215,7 @@ async function createDoc() {
   display: inline-flex;
   align-items: center;
   gap: 10px;
-  font-weight: 900;
+  font-weight: 600;
   color: rgba(255, 255, 255, 0.9);
 }
 
@@ -238,7 +238,7 @@ async function createDoc() {
   justify-content: space-between;
   gap: 10px;
   padding: 10px;
-  border-radius: 14px;
+  border-radius: 8px;
   background: rgba(255, 255, 255, 0.03);
   border: 1px solid rgba(255, 255, 255, 0.06);
 }
@@ -261,7 +261,7 @@ async function createDoc() {
 }
 
 .pdf__file-name {
-  font-weight: 800;
+  font-weight: 600;
   color: rgba(255, 255, 255, 0.88);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -323,7 +323,7 @@ async function createDoc() {
 .pdf__run-btn {
   min-width: 200px;
   height: 40px !important;
-  border-radius: 14px !important;
+  border-radius: 8px !important;
   display: inline-flex !important;
   align-items: center;
   justify-content: center !important;
@@ -333,14 +333,14 @@ async function createDoc() {
 .pdf__error {
   margin-top: 12px;
   padding: 10px 12px;
-  border-radius: 14px;
+  border-radius: 8px;
   background: rgba(255, 80, 120, 0.1);
   border: 1px solid rgba(255, 80, 120, 0.18);
 }
 
 .pdf__hint {
   padding: 12px;
-  border-radius: 16px;
+  border-radius: 10px;
   background: rgba(255, 255, 255, 0.03);
   border: 1px solid rgba(255, 255, 255, 0.06);
 }
