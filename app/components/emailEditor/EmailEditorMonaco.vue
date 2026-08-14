@@ -187,10 +187,6 @@ onBeforeUnmount(() => {
   background: rgba(0, 0, 0, 0.12);
 }
 
-.light .email-editor-monaco {
-  background: rgba(21, 22, 42, 0.03);
-}
-
 :global(.email-editor-monaco__line_error) {
   background: rgba(255, 80, 120, 0.14);
 }
@@ -209,8 +205,5 @@ onBeforeUnmount(() => {
   margin-right: 6px;
   border: 1px solid rgba(0,0,0,0.25);
   transform: translateY(1px);
-}
-.light :global(.email-editor-monaco__inline_color_chip) {
-  border-color: rgba(21, 22, 42, 0.35);
 }
 </style>

@@ -1258,52 +1258,6 @@ onBeforeUnmount(() => {
   height: 40px;
 }
 
-.light .markdown-editor__card {
-  background: rgba(255, 255, 255, 0.55);
-  backdrop-filter: blur(12px) saturate(180%);
-  box-shadow: 0 12px 35px rgba(0, 0, 0, 0.12),
-  inset 0 1px 0 rgba(255, 255, 255, 0.65),
-  inset 0 -4px 12px rgba(0, 0, 0, 0.06),
-  inset 0 0 0 1px rgba(255, 255, 255, 0.35);
-}
-
-.light .markdown-editor__editor,
-.light .markdown-editor__output,
-.light .markdown-editor__preview {
-  background: rgba(255, 255, 255, 0.65);
-  color: rgba(21, 22, 42, 0.88);
-  border-color: rgba(0, 0, 0, 0.08);
-}
-
-.light .markdown-editor__counter {
-  background: rgba(255, 255, 255, 0.65);
-  border-color: rgba(0, 0, 0, 0.08);
-  color: rgba(21, 22, 42, 0.72);
-}
-
-.light :deep(.tabs__trigger) {
-  background: rgba(255, 255, 255, 0.75);
-  color: rgba(0, 0, 0, 0.75);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.9),
-  inset 0 -10px 18px rgba(0, 0, 0, 0.08),
-  inset 0 0 0 1px rgba(0, 0, 0, 0.06);
-}
-
-.light :deep(.tabs__trigger::before) {
-  background: rgba(0, 0, 0, 0.06);
-}
-
-.light :deep(.tabs__trigger[data-state="active"]) {
-  background: rgba(255, 255, 255, 0.95);
-  color: rgba(0, 0, 0, 0.9);
-}
-
-.light :deep(.markdown-editor__modal) {
-  background: rgba(255, 255, 255, 0.75);
-  backdrop-filter: blur(12px) saturate(180%);
-  border-color: rgba(0, 0, 0, 0.08);
-}
-
 .markdown-editor__modal-grid {
   display: grid;
   gap: 12px;

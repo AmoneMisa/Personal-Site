@@ -44,10 +44,6 @@ const srcDoc = computed(() =>
   background: rgba(255, 255, 255, 0.02);
 }
 
-.light .email-editor-preview__frame {
-  background: rgba(255, 255, 255, 0.9);
-}
-
 .email-editor-preview__hint {
   margin-top: 10px;
   font-size: 12px;

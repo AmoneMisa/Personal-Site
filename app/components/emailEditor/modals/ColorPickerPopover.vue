@@ -418,16 +418,6 @@ watch(
   padding: 12px;
 }
 
-.light .color-picker-popover__panel {
-  background: rgba(255, 255, 255, 0.78);
-  backdrop-filter: blur(12px) saturate(180%);
-  border-color: rgba(0, 0, 0, 0.08);
-  box-shadow: 0 12px 35px rgba(0, 0, 0, 0.12),
-  inset 0 1px 0 rgba(255, 255, 255, 0.65),
-  inset 0 -4px 12px rgba(0, 0, 0, 0.06),
-  inset 0 0 0 1px rgba(255, 255, 255, 0.35);
-}
-
 .color-picker-popover__header {
   display: flex;
   align-items: flex-start;
@@ -445,10 +435,6 @@ watch(
   color: rgba(255, 255, 255, 0.92);
 }
 
-.light .color-picker-popover__title {
-  color: rgba(21, 22, 42, 0.86);
-}
-
 .color-picker-popover__close {
   height: 34px;
   width: 34px;
@@ -460,10 +446,6 @@ watch(
   cursor: pointer;
   transition: filter 160ms ease, transform 140ms ease;
   color: rgba(255, 255, 255, 0.9);
-}
-
-.light .color-picker-popover__close {
-  color: rgba(21, 22, 42, 0.86);
 }
 
 .color-picker-popover__close:hover {
@@ -523,11 +505,6 @@ watch(
   transition: filter 160ms ease, transform 140ms ease;
 }
 
-.light .color-picker-popover__tool {
-  background: rgba(255, 255, 255, 0.85);
-  color: rgba(21, 22, 42, 0.86);
-}
-
 .color-picker-popover__tool:hover {
   filter: brightness(1.06);
 }
@@ -556,11 +533,6 @@ watch(
   background: rgba(255, 255, 255, 0.02);
 }
 
-.light .color-picker-popover__control {
-  background: rgba(21, 22, 42, 0.03);
-  border-color: rgba(21, 22, 42, 0.08);
-}
-
 .color-picker-popover__mini {
   height: 38px;
   width: 44px;
@@ -572,11 +544,6 @@ watch(
   place-items: center;
   cursor: pointer;
   transition: filter 160ms ease, transform 140ms ease;
-}
-
-.light .color-picker-popover__mini {
-  background: rgba(255, 255, 255, 0.85);
-  color: rgba(21, 22, 42, 0.86);
 }
 
 .color-picker-popover__mini:hover {

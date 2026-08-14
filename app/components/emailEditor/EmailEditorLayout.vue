@@ -109,10 +109,6 @@ const emit = defineEmits<{
   color: rgba(255, 255, 255, 0.9);
 }
 
-.light .email-editor-layout__panel-title {
-  color: rgba(21, 22, 42, 0.85);
-}
-
 .email-editor-layout__diagnostics {
   margin-top: 12px;
 }

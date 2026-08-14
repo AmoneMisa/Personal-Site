@@ -117,7 +117,4 @@ const actions = useEmailEditorActions(state);
   color: rgba(255, 255, 255, 0.9);
 }
 
-.light .email-editor__title {
-  color: rgba(21, 22, 42, 0.85);
-}
 </style>

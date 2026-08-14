@@ -523,9 +523,6 @@ const targetItems = computed(() =>
     }
   }
 
-  .light & {
-    background: var(--surface-1);
-  }
 }
 
 .mode-card__top {
@@ -563,10 +560,6 @@ const targetItems = computed(() =>
   background: var(--secondary-bg-gradient);
   box-shadow: var(--shadow-light);
   padding: 18px;
-
-  .light & {
-    background: var(--surface-1);
-  }
 
   @media (min-width: 1024px) {
     padding: 22px;
@@ -623,10 +616,6 @@ const targetItems = computed(() =>
   color: rgba(255, 255, 255, 0.9) !important;
 }
 
-.light :deep(.format-select [data-slot="trigger"]) {
-  color: var(--ui-text) !important;
-}
-
 :deep(.format-select [data-slot="content"]) {
   /* keep your global .ui-locale styles; this is just a safety net */
   border-radius: 8px;
@@ -648,10 +637,6 @@ const targetItems = computed(() =>
   background: rgba(224, 103, 154, 0.08);
   padding: 16px;
   transition: transform 120ms ease, background 120ms ease, border-color 120ms ease;
-
-  .light & {
-    background: rgba(224, 103, 154, 0.06);
-  }
 
   &.is-dragging {
     transform: translateY(-2px);
@@ -693,9 +678,6 @@ const targetItems = computed(() =>
   font-size: 16px;
   color: var(--text-white);
 
-  .light & {
-    color: var(--ui-text);
-  }
 }
 
 .dropzone__muted {
@@ -715,9 +697,6 @@ const targetItems = computed(() =>
   b {
     color: var(--text-white);
 
-    .light & {
-      color: var(--ui-text);
-    }
   }
 }
 
@@ -786,9 +765,6 @@ const targetItems = computed(() =>
   font-weight: 600;
   color: var(--text-white);
 
-  .light & {
-    color: var(--ui-text);
-  }
 }
 
 .files__hint {
@@ -813,9 +789,6 @@ const targetItems = computed(() =>
   border: 1px solid var(--color-border);
   background: rgba(0, 0, 0, 0.16);
 
-  .light & {
-    background: var(--surface-2);
-  }
 }
 
 .file__meta {
@@ -832,10 +805,6 @@ const targetItems = computed(() =>
   text-overflow: ellipsis;
   white-space: nowrap;
   max-width: 70vw;
-
-  .light & {
-    color: var(--ui-text);
-  }
 
   @media (min-width: 1024px) {
     max-width: 520px;
@@ -885,9 +854,6 @@ const targetItems = computed(() =>
   color: var(--ui-text-muted);
   background: rgba(0, 0, 0, 0.10);
 
-  .light & {
-    background: var(--surface-2);
-  }
 }
 
 .tip__icon {

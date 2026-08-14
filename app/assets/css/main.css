@@ -132,9 +132,8 @@ h1, h2, h3, h4, h5, h6 {
     --text-white: #FFFFFF;
 }
 
-/* The site is dark-only. The former .light palette override was removed so a
-   stray .light class can never repaint the page — tokens always resolve to the
-   dark :root values above. Theme is locked to dark in nuxt.config. */
+/* The site is dark-only: tokens always resolve to the values above and the
+   color mode is locked in Nuxt configuration. */
 
 body {
     background-color: var(--background-color);

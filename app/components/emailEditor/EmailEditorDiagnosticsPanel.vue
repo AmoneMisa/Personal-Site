@@ -93,10 +93,6 @@ function metaText(d: any) {
   margin-bottom: 10px;
 }
 
-.light .email-editor-diagnostics__title {
-  color: rgba(21, 22, 42, 0.85);
-}
-
 .email-editor-diagnostics__list {
   display: grid;
   gap: 8px;
@@ -113,11 +109,6 @@ function metaText(d: any) {
   cursor: pointer;
 }
 
-.light .email-editor-diagnostics__item {
-  background: rgba(21, 22, 42, 0.03);
-  border-color: rgba(21, 22, 42, 0.08);
-}
-
 .email-editor-diagnostics__item_active {
   outline: 1px solid rgba(120, 190, 255, 0.55);
 }
@@ -125,10 +116,6 @@ function metaText(d: any) {
 .email-editor-diagnostics__item-message {
   font-weight: 600;
   color: rgba(255, 255, 255, 0.88);
-}
-
-.light .email-editor-diagnostics__item-message {
-  color: rgba(21, 22, 42, 0.86);
 }
 
 .email-editor-diagnostics__item-meta {
@@ -141,11 +128,6 @@ function metaText(d: any) {
   border-radius: 8px;
   background: rgba(255, 255, 255, 0.03);
   border: 1px solid rgba(255, 255, 255, 0.06);
-}
-
-.light .email-editor-diagnostics__empty {
-  background: rgba(21, 22, 42, 0.03);
-  border-color: rgba(21, 22, 42, 0.08);
 }
 
 .email-editor-diagnostics__help {

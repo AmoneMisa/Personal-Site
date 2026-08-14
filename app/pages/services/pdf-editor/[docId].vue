@@ -2615,10 +2615,6 @@ onBeforeUnmount(() => {
   gap: 10px;
 }
 
-.light .pdf__tool-title {
-  color: rgba(21, 22, 42, 0.86);
-}
-
 .pdf__tool-grid4 {
   display: grid;
   grid-template-columns: 1fr;
@@ -2646,10 +2642,6 @@ onBeforeUnmount(() => {
   font-weight: 600;
   font-size: 12px;
   color: rgba(255, 255, 255, 0.88);
-}
-
-.light .pdf__label {
-  color: rgba(21, 22, 42, 0.86);
 }
 
 .pdf__help {

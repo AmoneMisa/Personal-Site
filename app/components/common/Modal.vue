@@ -108,18 +108,4 @@ const props = defineProps<{
   filter: brightness(1.06);
 }
 
-.light .app-modal {
-  background: rgba(255, 255, 255, 0.78);
-  backdrop-filter: blur(12px) saturate(180%);
-  border-color: rgba(0, 0, 0, 0.08);
-  box-shadow: 0 12px 35px rgba(0, 0, 0, 0.12),
-  inset 0 1px 0 rgba(255, 255, 255, 0.65),
-  inset 0 -4px 12px rgba(0, 0, 0, 0.06),
-  inset 0 0 0 1px rgba(255, 255, 255, 0.35);
-}
-
-.light .app-modal__close {
-  background: rgba(255, 255, 255, 0.85);
-  border-color: rgba(0, 0, 0, 0.08);
-}
 </style>

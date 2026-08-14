@@ -219,10 +219,6 @@ async function createDoc() {
   color: rgba(255, 255, 255, 0.9);
 }
 
-.light .pdf__panel-title {
-  color: rgba(21, 22, 42, 0.85);
-}
-
 .pdf__files {
   margin-top: 6px;
 }
@@ -267,10 +263,6 @@ async function createDoc() {
   text-overflow: ellipsis;
   white-space: nowrap;
   max-width: 36ch;
-}
-
-.light .pdf__file-name {
-  color: rgba(21, 22, 42, 0.86);
 }
 
 .pdf__icon-btn {

@@ -436,15 +436,6 @@ function onApplyStrokeEdits(payload: { svg: string }) {
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.05);
 }
 
-.light .svg-editor-shell__card {
-  background: rgba(255, 255, 255, 0.75);
-  border-color: rgba(0, 0, 0, 0.08);
-  box-shadow: 0 12px 35px rgba(0, 0, 0, 0.10),
-  inset 0 1px 0 rgba(255, 255, 255, 0.65),
-  inset 0 -4px 12px rgba(0, 0, 0, 0.06),
-  inset 0 0 0 1px rgba(255, 255, 255, 0.35);
-}
-
 .svg-editor-shell__section {
   padding: 14px;
   display: grid;
@@ -455,10 +446,6 @@ function onApplyStrokeEdits(payload: { svg: string }) {
   font-weight: 600;
   font-size: 14px;
   color: rgba(255, 255, 255, 0.92);
-}
-
-.light .svg-editor-shell__section-title {
-  color: rgba(21, 22, 42, 0.88);
 }
 
 .svg-editor-shell__actions {

@@ -175,8 +175,4 @@ function buildSnippet(input: any) {
   border: 1px solid rgba(255, 190, 90, 0.18);
 }
 
-.light .email-editor-template__notice {
-  background: rgba(255, 190, 90, 0.16);
-  border-color: rgba(255, 190, 90, 0.22);
-}
 </style>
