@@ -3,56 +3,21 @@
 // global middleware that runs before file routes), so an /api/* handler would be
 // forwarded to FastAPI and 404. Living at /jobs-feed keeps it served by Nitro.
 //
-// Aggregates many job boards, caches each pull in Redis (5 min), then filters/
-// sorts/paginates. Optional sources activate only when their env keys are set.
+// Reads the progressively populated vacancy store, then filters/sorts/paginates
+// its current snapshot. Optional sources activate only when their env keys are set.
 // Shared contract for the web page + Android app.
 
-import { useRedis } from '~~/server/utils/redis'
 import {
   ALL_SOURCES,
   FREE_SOURCES,
-  type Job,
   type JobSource,
   type Relocation,
   type SortKey,
   type WorkMode,
 } from '../utils/jobTypes'
-import {
-  fetchAdzuna,
-  fetchArbeitnow,
-  fetchCompanies,
-  fetchDevKg,
-  fetchIshGo,
-  fetchItJobsUz,
-  fetchJobicy,
-  fetchJooble,
-  fetchOlx,
-  fetchRemoteOk,
-  fetchRemotive,
-  fetchRss,
-  fetchTheMuse,
-  fetchTelegram,
-} from '../utils/sources'
 import { filterAndPaginate } from '../utils/aggregate'
-import { getStoredJobs, refreshJobStore } from '../utils/jobsStore'
+import { getJobRefreshState, getStoredJobs, refreshJobStore } from '../utils/jobsStore'
 import { getRates, loadRates } from '../utils/currency'
-
-const FETCHERS: Record<JobSource, (q: string) => Promise<Job[]>> = {
-  remotive: fetchRemotive,
-  remoteok: fetchRemoteOk,
-  arbeitnow: fetchArbeitnow,
-  themuse: fetchTheMuse,
-  jobicy: fetchJobicy,
-  adzuna: fetchAdzuna,
-  jooble: fetchJooble,
-  rss: fetchRss,
-  companies: fetchCompanies,
-  devkg: fetchDevKg,
-  ishgo: fetchIshGo,
-  itjobsuz: fetchItJobsUz,
-  telegram: fetchTelegram,
-  olx: fetchOlx,
-}
 
 // Optional sources are only queried when configured, to avoid wasted calls.
 function isConfigured(source: JobSource): boolean {
@@ -84,61 +49,27 @@ function isConfigured(source: JobSource): boolean {
   }
 }
 
-const CACHE_TTL_SECONDS = 300
-const sourceMemoryCache = new Map<JobSource, { expiresAt: number; jobs: Job[] }>()
 const SORT_KEYS: SortKey[] = ['date', 'oldest', 'title', 'company', 'salary']
 const WORK_MODES: WorkMode[] = ['remote', 'hybrid', 'office', 'unknown']
 const RELOCATIONS: Relocation[] = ['offered', 'none', 'unknown']
 
-async function getSource(source: JobSource, q: string): Promise<Job[]> {
-  const redis = useRedis()
-  // Cache the full (query-less) pull; per-request search is applied locally.
-  const cacheable = q === ''
-  const key = `jobs:src:${source}`
-
-  if (cacheable) {
-    const memory = sourceMemoryCache.get(source)
-    if (memory && memory.expiresAt > Date.now()) return memory.jobs
-    try {
-      const cached = await redis.get(key)
-      if (cached) {
-        const jobs = JSON.parse(cached) as Job[]
-        sourceMemoryCache.set(source, {
-          expiresAt: Date.now() + CACHE_TTL_SECONDS * 1000,
-          jobs,
-        })
-        return jobs
-      }
-    } catch {
-      /* redis down — fetch live */
-    }
-  }
-
-  let jobs: Job[] = []
-  try {
-    jobs = await FETCHERS[source](q)
-  } catch (err) {
-    console.error(`[jobs] source "${source}" failed:`, (err as Error).message)
-    return []
-  }
-
-  if (cacheable) {
-    sourceMemoryCache.set(source, {
-      expiresAt: Date.now() + CACHE_TTL_SECONDS * 1000,
-      jobs,
-    })
-    try {
-      await redis.set(key, JSON.stringify(jobs), 'EX', CACHE_TTL_SECONDS)
-    } catch {
-      /* best-effort */
-    }
-  }
-  return jobs
-}
-
 function clampInt(value: unknown, def: number, min: number, max: number): number {
   const n = parseInt(String(value ?? ''), 10)
   return Number.isNaN(n) ? def : Math.min(max, Math.max(min, n))
+}
+
+async function getStoredSnapshot(): Promise<Awaited<ReturnType<typeof getStoredJobs>>> {
+  let timer: ReturnType<typeof setTimeout> | undefined
+  try {
+    return await Promise.race([
+      getStoredJobs(),
+      new Promise<Awaited<ReturnType<typeof getStoredJobs>>>((resolve) => {
+        timer = setTimeout(() => resolve([]), 750)
+      }),
+    ])
+  } finally {
+    if (timer) clearTimeout(timer)
+  }
 }
 
 export default defineEventHandler(async (event) => {
@@ -203,43 +134,22 @@ export default defineEventHandler(async (event) => {
     .map((s) => s.trim())
     .filter(Boolean)
 
-  // Ensure the FX rate table is in memory before enrichment normalizes salaries
-  // to USD, and so the response can hand the live rates to the client.
-  await loadRates()
+  // Populate live FX rates opportunistically. The static fallback is already in
+  // memory, so a Redis/network issue must never hold the feed response open.
+  loadRates().catch(() => {})
 
-  // Primary path: read the pre-aggregated store the scheduled worker maintains,
-  // so requests never block on (or get geo-blocked by) upstream boards. Cold
-  // fallback: pull live once and kick a background refresh to warm the store.
-  let pool = await getStoredJobs()
-  if (!pool.length) {
-    if (requested.length) {
-      // A cold, explicitly selected source should not wait for every configured
-      // board. Pull only that source and warm the complete store in background.
-      pool = (await Promise.all(finalSources.map((source) => getSource(source, '')))).flat()
-      refreshJobStore().catch(() => {})
-    } else {
-      // The initial all-source page still needs the complete store. The refresh
-      // promise is deduplicated with the deployment warmup task.
-      await refreshJobStore()
-      pool = await getStoredJobs()
-    }
-  } else if (requested.length) {
-    // A store written before a newly deployed source existed can be non-empty
-    // yet contain no rows for that explicitly selected source. Fetch only the
-    // missing selection now instead of returning a misleading zero until cron.
-    const freshnessCutoff = Date.now() - 14 * 86_400_000
-    const present = new Set(
-      pool
-        .filter((job) => new Date(job.postedAt).getTime() >= freshnessCutoff)
-        .map((job) => job.source),
-    )
-    const missing = finalSources.filter((source) => !present.has(source))
-    if (missing.length) {
-      const live = (await Promise.all(missing.map((source) => getSource(source, search)))).flat()
-      pool = [...pool, ...live]
-      refreshJobStore().catch(() => {})
-    }
+  // Read only the current snapshot. A cold or newly added source starts the
+  // deduplicated refresh in the background and returns partial data immediately.
+  // Redis is normally local and fast, but a broken container/network must not
+  // turn this endpoint into another gateway timeout. Continue with an empty
+  // snapshot after a short budget; getStoredJobs handles its own late failure.
+  const pool = await getStoredSnapshot()
+  if (!pool.length && finalSources.length) {
+    refreshJobStore().catch(() => {})
   }
+
+  const refresh = getJobRefreshState()
+  setResponseHeader(event, 'Cache-Control', refresh.inProgress ? 'no-store' : 'private, max-age=30')
 
   return {
     ...filterAndPaginate(pool, {
@@ -265,5 +175,9 @@ export default defineEventHandler(async (event) => {
       pageSize: clampInt(q.pageSize, 20, 1, 100),
     }),
     rates: getRates(),
+    warming: refresh.inProgress,
+    loadedSources: refresh.loadedSources,
+    pendingSources: refresh.pendingSources,
+    failedSources: refresh.failedSources,
   }
 })

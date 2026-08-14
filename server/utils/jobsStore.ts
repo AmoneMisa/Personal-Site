@@ -33,6 +33,7 @@ const STORE_TTL_SECONDS = 15 * 86_400 // safety net: store self-expires if the w
 const MEMORY_TTL_MS = 5 * 60_000
 const MAX_AGE_DAYS = 14 // never retain postings older than this (mirrors the read-side cap)
 const STALE_DAYS = 4 // drop postings not seen in the last N days (treated as closed)
+const SOURCE_TIMEOUT_MS = 30_000
 
 const FETCHERS: Record<JobSource, (q: string) => Promise<Job[]>> = {
   remotive: fetchRemotive,
@@ -85,12 +86,44 @@ type RefreshSummary = {
   perSource: Partial<Record<JobSource, number>>
 }
 
+export type JobRefreshState = {
+  inProgress: boolean
+  loadedSources: JobSource[]
+  pendingSources: JobSource[]
+  failedSources: JobSource[]
+  startedAt?: string
+  completedAt?: string
+}
+
 let memoryStore: StoredJob[] = []
 let memoryValidUntil = 0
 let refreshInFlight: Promise<RefreshSummary> | undefined
+let refreshState: JobRefreshState = {
+  inProgress: false,
+  loadedSources: [],
+  pendingSources: [],
+  failedSources: [],
+}
 
 function dedupKey(job: Job): string {
   return job.url || job.id
+}
+
+async function fetchSource(source: JobSource): Promise<Job[]> {
+  let timer: ReturnType<typeof setTimeout> | undefined
+  try {
+    return await Promise.race([
+      FETCHERS[source](''),
+      new Promise<Job[]>((_, reject) => {
+        timer = setTimeout(
+          () => reject(new Error(`timed out after ${SOURCE_TIMEOUT_MS / 1000}s`)),
+          SOURCE_TIMEOUT_MS,
+        )
+      }),
+    ])
+  } finally {
+    if (timer) clearTimeout(timer)
+  }
 }
 
 /** All stored vacancies (lastSeen stripped). Empty on a cold cache or Redis error. */
@@ -113,11 +146,50 @@ export async function getStoredJobs(): Promise<Job[]> {
 }
 
 async function loadStored(): Promise<StoredJob[]> {
+  let timer: ReturnType<typeof setTimeout> | undefined
   try {
-    const raw = await useRedis().get(STORE_KEY)
+    const raw = await Promise.race([
+      useRedis().get(STORE_KEY),
+      new Promise<null>((resolve) => {
+        timer = setTimeout(() => resolve(null), 750)
+      }),
+    ])
     return raw ? (JSON.parse(raw) as StoredJob[]) : memoryStore
   } catch {
     return memoryStore
+  } finally {
+    if (timer) clearTimeout(timer)
+  }
+}
+
+function pruneStore(byKey: Map<string, StoredJob>, now: number): StoredJob[] {
+  const oldestPosted = now - MAX_AGE_DAYS * 86_400_000
+  const stalest = now - STALE_DAYS * 86_400_000
+  const kept: StoredJob[] = []
+  for (const job of byKey.values()) {
+    const posted = new Date(job.postedAt).getTime()
+    const seen = new Date(job.lastSeen).getTime()
+    if (Number.isNaN(posted) || posted < oldestPosted) continue
+    if (Number.isNaN(seen) || seen < stalest) continue
+    kept.push(job)
+  }
+  return kept
+}
+
+function publishMemoryStore(byKey: Map<string, StoredJob>, now: number): StoredJob[] {
+  const kept = pruneStore(byKey, now)
+  memoryStore = kept
+  memoryValidUntil = Date.now() + MEMORY_TTL_MS
+  return kept
+}
+
+/** Current progressive refresh state for non-blocking feed responses. */
+export function getJobRefreshState(): JobRefreshState {
+  return {
+    ...refreshState,
+    loadedSources: [...refreshState.loadedSources],
+    pendingSources: [...refreshState.pendingSources],
+    failedSources: [...refreshState.failedSources],
   }
 }
 
@@ -129,47 +201,61 @@ async function loadStored(): Promise<StoredJob[]> {
 async function performJobStoreRefresh(): Promise<RefreshSummary> {
   const now = Date.now()
   const nowIso = new Date(now).toISOString()
-
-  // Refresh live FX rates on the same daily cadence as the vacancy pull.
-  await refreshRates()
-
   const sources = ALL_SOURCES.filter(isConfigured)
-  const results = await Promise.all(
-    sources.map((s) =>
-      FETCHERS[s]('').catch((err) => {
-        console.error(`[jobs:refresh] source "${s}" failed:`, (err as Error).message)
-        return [] as Job[]
-      }),
-    ),
-  )
-  const fetched = results.flat()
+
+  refreshState = {
+    inProgress: true,
+    loadedSources: [],
+    pendingSources: [...sources],
+    failedSources: [],
+    startedAt: nowIso,
+  }
+
+  // FX and vacancy requests run concurrently. Neither one delays the first
+  // source becoming visible in the in-process store.
+  refreshRates().catch(() => {})
 
   // Start from what we already have so a transient source failure doesn't drop data.
   const byKey = new Map<string, StoredJob>()
   for (const job of await loadStored()) byKey.set(dedupKey(job), job)
-  // Upsert freshly-seen postings, refreshing their lastSeen stamp.
   const perSource: Partial<Record<JobSource, number>> = {}
-  for (const job of fetched) {
-    const enriched = enrichJob(job)
-    byKey.set(dedupKey(enriched), { ...enriched, lastSeen: nowIso })
-    perSource[job.source] = (perSource[job.source] || 0) + 1
-  }
+  let fetched = 0
 
-  const oldestPosted = now - MAX_AGE_DAYS * 86_400_000
-  const stalest = now - STALE_DAYS * 86_400_000
-  const kept: StoredJob[] = []
-  for (const job of byKey.values()) {
-    const posted = new Date(job.postedAt).getTime()
-    const seen = new Date(job.lastSeen).getTime()
-    if (Number.isNaN(posted) || posted < oldestPosted) continue // too old
-    if (Number.isNaN(seen) || seen < stalest) continue // not seen recently → closed
-    kept.push(job)
-  }
+  await Promise.all(sources.map(async (source) => {
+    try {
+      const jobs = await fetchSource(source)
+      fetched += jobs.length
+      perSource[source] = jobs.length
 
-  // Always retain the refreshed store in-process. This keeps search/filtering
-  // fast in local development and during a temporary Redis outage.
-  memoryStore = kept
-  memoryValidUntil = Date.now() + MEMORY_TTL_MS
+      // Skill/language extraction is regex-heavy and multiple source promises
+      // can resume in the same event-loop turn. Yield after every vacancy so a
+      // cold refresh never starves page, filter, or icon requests.
+      for (const job of jobs) {
+        const enriched = enrichJob(job)
+        byKey.set(dedupKey(enriched), { ...enriched, lastSeen: nowIso })
+        await new Promise<void>((resolve) => setTimeout(resolve, 0))
+      }
+
+      refreshState.loadedSources.push(source)
+    } catch (err) {
+      refreshState.failedSources.push(source)
+      console.error(`[jobs:refresh] source "${source}" failed:`, (err as Error).message)
+    } finally {
+      refreshState.pendingSources = refreshState.pendingSources.filter((item) => item !== source)
+      publishMemoryStore(byKey, now)
+    }
+  }))
+
+  const kept = publishMemoryStore(byKey, now)
+
+  // The current in-memory result is complete now. Redis persistence below is
+  // best-effort and must not keep clients polling a finished vacancy refresh.
+  refreshState = {
+    ...refreshState,
+    inProgress: false,
+    pendingSources: [],
+    completedAt: new Date().toISOString(),
+  }
 
   try {
     await useRedis().set(STORE_KEY, JSON.stringify(kept), 'EX', STORE_TTL_SECONDS)
@@ -177,7 +263,7 @@ async function performJobStoreRefresh(): Promise<RefreshSummary> {
     console.error('[jobs:refresh] failed to persist store:', (err as Error).message)
   }
 
-  return { fetched: fetched.length, stored: kept.length, perSource }
+  return { fetched, stored: kept.length, perSource }
 }
 
 export function refreshJobStore(): Promise<RefreshSummary> {

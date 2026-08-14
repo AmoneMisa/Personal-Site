@@ -58,6 +58,10 @@ interface JobResult {
   sources: Record<string, number>;
   stats: JobStats;
   rates?: Record<string, number>;
+  warming?: boolean;
+  loadedSources?: string[];
+  pendingSources?: string[];
+  failedSources?: string[];
 }
 
 const { t: translate } = useI18n();
@@ -218,11 +222,35 @@ const page = ref(1);
 const pageSize = ref(20);
 const stats = ref<JobStats | null>(null);
 const loading = ref(false);
+const loadingMore = ref(false);
 const failed = ref(false);
+const warming = ref(false);
+const loadedSourceCount = ref(0);
+const pendingSourceCount = ref(0);
+const loadMoreSentinel = ref<HTMLElement | null>(null);
 let loadSequence = 0;
 let loadTimer: ReturnType<typeof setTimeout> | undefined;
+let warmTimer: ReturnType<typeof setTimeout> | undefined;
+let loadMoreObserver: IntersectionObserver | undefined;
 
 const totalPages = computed(() => Math.max(1, Math.ceil(total.value / pageSize.value)));
+const hasMore = computed(() => sort.value !== "ats" && page.value < totalPages.value);
+const canLoadMore = computed(() =>
+  hasMore.value
+  && !warming.value
+  && !loading.value
+  && !loadingMore.value
+  && page.value < totalPages.value,
+);
+
+function scheduleWarmPoll() {
+  if (warmTimer) clearTimeout(warmTimer);
+  if (!warming.value) return;
+  warmTimer = setTimeout(() => {
+    warmTimer = undefined;
+    void load(1, { background: true });
+  }, 1800);
+}
 
 function scheduleLoad(delay = 250) {
   if (loadTimer) clearTimeout(loadTimer);
@@ -259,10 +287,17 @@ const scored = computed(() => {
 const countryLabel = (code: string) =>
   countryOptions.find((c) => c.value === code)?.label ?? code;
 
-async function load(toPage = 1) {
+async function load(
+  toPage = 1,
+  options: { append?: boolean; background?: boolean } = {},
+) {
   const requestId = ++loadSequence;
-  loading.value = true;
-  failed.value = false;
+  if (!options.background) {
+    if (warmTimer) clearTimeout(warmTimer);
+    if (options.append) loadingMore.value = true;
+    else loading.value = true;
+    failed.value = false;
+  }
   const serverSort = sort.value === "ats" ? "date" : sort.value; // ATS sorts client-side
   const params: Record<string, string> = {
     page: String(toPage), pageSize: String(cvProfile.value ? 50 : pageSize.value), sort: serverSort,
@@ -292,13 +327,33 @@ async function load(toPage = 1) {
   // A slower previous request must never overwrite a newer filter selection.
   if (requestId !== loadSequence) return;
   if (error || !data) {
-    failed.value = true; jobs.value = []; total.value = 0; stats.value = null;
+    if (!options.background) {
+      failed.value = true;
+      if (!options.append) {
+        jobs.value = []; total.value = 0; stats.value = null;
+      }
+    }
   } else {
     if (data.rates && data.rates.USD) usdRates.value = data.rates;
-    jobs.value = data.jobs; total.value = data.total; page.value = data.page;
+    if (options.append) {
+      const known = new Set(jobs.value.map((job) => job.url || job.id));
+      jobs.value = [...jobs.value, ...data.jobs.filter((job) => !known.has(job.url || job.id))];
+    } else {
+      jobs.value = data.jobs;
+    }
+    total.value = data.total; page.value = data.page;
     pageSize.value = data.pageSize; stats.value = data.stats;
+    warming.value = !!data.warming;
+    loadedSourceCount.value = data.loadedSources?.length ?? 0;
+    pendingSourceCount.value = data.pendingSources?.length ?? 0;
   }
   loading.value = false;
+  loadingMore.value = false;
+  scheduleWarmPoll();
+}
+
+function loadMore() {
+  if (canLoadMore.value) void load(page.value + 1, { append: true });
 }
 
 function resetFilters() {
@@ -468,10 +523,22 @@ const levelItems = computed<Item[]>(() => [
 // take several seconds while upstream boards time out; keeping that request at
 // top level leaves all filters rendered but inert until it finishes.
 onMounted(() => {
+  loadMoreObserver = new IntersectionObserver(
+    ([entry]) => {
+      if (entry?.isIntersecting) loadMore();
+    },
+    { rootMargin: "300px 0px" },
+  );
   void load(1);
+});
+watch(loadMoreSentinel, (element, previous) => {
+  if (previous) loadMoreObserver?.unobserve(previous);
+  if (element) loadMoreObserver?.observe(element);
 });
 onBeforeUnmount(() => {
   if (loadTimer) clearTimeout(loadTimer);
+  if (warmTimer) clearTimeout(warmTimer);
+  loadMoreObserver?.disconnect();
 });
 </script>
 
@@ -644,6 +711,10 @@ onBeforeUnmount(() => {
     </form>
 
     <p v-if="failed" class="jobs__error">{{ t("error") }}</p>
+    <p v-else-if="warming" class="jobs__warming" role="status" aria-live="polite">
+      <span class="jobs__warming-dot" aria-hidden="true"></span>
+      {{ t("warming", { loaded: loadedSourceCount, pending: pendingSourceCount }) }}
+    </p>
     <p v-else class="jobs__count text-muted">{{ t("jobsFound", { n: total }) }}</p>
 
     <!-- Statistics panel -->
@@ -772,19 +843,22 @@ onBeforeUnmount(() => {
      </div>
     </div>
 
-    <div v-if="!loading && !jobs.length && !failed" class="jobs__empty">
+    <div v-if="!loading && !warming && !jobs.length && !failed" class="jobs__empty">
       <div class="text-muted">{{ t("empty") }}</div>
     </div>
 
-    <nav v-if="totalPages > 1 && sort !== 'ats'" class="jobs__pager">
-      <u-button variant="outline" :disabled="page <= 1 || loading" icon="i-lucide-chevron-left" @click="load(page - 1)">
-        {{ t("prev") }}
+    <div v-if="sort !== 'ats' && jobs.length" ref="loadMoreSentinel" class="jobs__load-more">
+      <u-button
+        v-if="hasMore && !warming"
+        variant="outline"
+        :loading="loadingMore"
+        :disabled="!canLoadMore"
+        @click="loadMore"
+      >
+        {{ t("loadMore") }}
       </u-button>
-      <span class="text-muted">{{ t("page", { page, total: totalPages }) }}</span>
-      <u-button variant="outline" :disabled="page >= totalPages || loading" trailing-icon="i-lucide-chevron-right" @click="load(page + 1)">
-        {{ t("next") }}
-      </u-button>
-    </nav>
+      <span class="text-muted">{{ t("shown", { shown: jobs.length, total }) }}</span>
+    </div>
   </u-container>
 </template>
 
@@ -840,6 +914,15 @@ onBeforeUnmount(() => {
 .jobs__remote { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 700; }
 .jobs__error { color: var(--ui-error, #f87171); }
 .jobs__count { font-size: 13px; margin-bottom: 12px; }
+.jobs__warming {
+  display: flex; align-items: center; gap: 8px; margin-bottom: 12px;
+  color: var(--ui-text-muted); font-size: 13px;
+}
+.jobs__warming-dot {
+  width: 8px; height: 8px; border-radius: 2px; background: var(--accent-pink, #e0679a);
+  animation: jobs-warming 1s ease-in-out infinite alternate;
+}
+@keyframes jobs-warming { to { opacity: 0.35; } }
 
 .jobs__adv-toggle { margin-top: -2px; }
 .jobs__advbtn {
@@ -946,5 +1029,8 @@ onBeforeUnmount(() => {
 .job-card__tag_match { border-color: rgba(52,211,153,0.45); color: #34d399; background: rgba(52,211,153,0.10); }
 .job-card__tag_miss { border-color: rgba(248,113,113,0.4); color: #f87171; }
 .jobs__empty { margin-top: 18px; text-align: center; padding: 18px; border-radius: 10px; border: 1px solid var(--line); background: rgba(255,255,255,0.03); }
-.jobs__pager { display: flex; align-items: center; justify-content: center; gap: 16px; margin-top: 24px; }
+.jobs__load-more {
+  min-height: 76px; display: flex; flex-direction: column; align-items: center;
+  justify-content: center; gap: 8px; margin-top: 16px; font-size: 12px;
+}
 </style>
