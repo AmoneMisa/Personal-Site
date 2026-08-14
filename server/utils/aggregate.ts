@@ -4,7 +4,7 @@
 // structured filters and stats can operate on derived fields.
 
 import { enrichJob, resolveCountry } from './enrich'
-import { canonicalSkillName } from '../../shared/jobSkills'
+import { canonicalSkillName } from '~~/shared/jobSkills'
 import type {
   Job,
   JobQuery,

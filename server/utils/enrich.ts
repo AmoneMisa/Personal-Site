@@ -10,7 +10,7 @@ import {
   extractSkillNames,
   getSkillMeta,
   type SkillDetail,
-} from '../../shared/jobSkills'
+} from '~~/shared/jobSkills'
 
 // ---- HTML → plain text ----
 // Many boards return HTML (sometimes HTML-encoded, occasionally double-encoded)

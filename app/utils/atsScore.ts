@@ -1,4 +1,4 @@
-import { canonicalSkillName, extractSkillNames } from '../../shared/jobSkills'
+import { canonicalSkillName, extractSkillNames } from '~~/shared/jobSkills'
 
 // Client-side ATS (Applicant Tracking System) match scoring.
 // The CV never leaves the browser: text is extracted locally and matched against
