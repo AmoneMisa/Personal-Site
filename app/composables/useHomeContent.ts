@@ -42,7 +42,7 @@ const RU = {
         { label: "Каталог инструментов", sub: "Vue.js / Nuxt.js сервисы", href: "/services" },
         { label: "i18n Properties Manager", sub: "Electron.js · работа с Freemarker", href: "https://github.com/AmoneMisa/i18nPropertiesManager" },
         { label: "Менеджер персонажей", sub: "Lost Ark · Electron.js", href: "#pet-projects" },
-        { label: "Все проекты на GitHub", sub: "github.com/AmoneMisa", href: "https://github.com/AmoneMisa" },
+        { label: "Все проекты", sub: "полный список с описаниями", href: "/projects" },
       ] as DropdownItem[],
       pagesTitle: "Полезные страницы",
       pages: [
@@ -124,6 +124,7 @@ const RU = {
     eyebrow: "вне работы, но по-серьёзному",
     title: "Pet-проекты",
     subtitle: "По убыванию близости к основному стеку — от Vue.js-сервисов до нативного Android.",
+    allLabel: "Все проекты",
     items: [
       { kind: "Web-утилиты · Vue.js / Nuxt.js", title: "Каталог инструментов", span2: true,
         description: "PDF-редактор, JSON merge, DockerHub поиск и другие небольшие сервисы — те же технологии, что и в основной работе.",
@@ -156,7 +157,7 @@ const RU = {
       { label: "Резюме", href: "/cv" },
       { label: "Обо мне", href: "/about" },
       { label: "Опыт", href: "#experience" },
-      { label: "Pet-проекты", href: "#pet-projects" },
+      { label: "Проекты", href: "/projects" },
     ] as NavLinkT[],
     contactsTitle: "Контакты",
     copyright: "Kubai Marharyta. Front-end Developer. 2026 ©",
@@ -179,7 +180,7 @@ const EN: typeof RU = {
         { label: "Tools catalog", sub: "Vue.js / Nuxt.js services", href: "/services" },
         { label: "i18n Properties Manager", sub: "Electron.js · Freemarker files", href: "https://github.com/AmoneMisa/i18nPropertiesManager" },
         { label: "Character manager", sub: "Lost Ark · Electron.js", href: "#pet-projects" },
-        { label: "All projects on GitHub", sub: "github.com/AmoneMisa", href: "https://github.com/AmoneMisa" },
+        { label: "All projects", sub: "full list with descriptions", href: "/projects" },
       ],
       pagesTitle: "Useful pages",
       pages: [
@@ -261,6 +262,7 @@ const EN: typeof RU = {
     eyebrow: "outside work, but seriously",
     title: "Pet projects",
     subtitle: "By decreasing closeness to my main stack — from Vue.js services to native Android.",
+    allLabel: "All projects",
     items: [
       { kind: "Web utilities · Vue.js / Nuxt.js", title: "Tools catalog", span2: true,
         description: "PDF editor, JSON merge, DockerHub search and other small services — the same tech as my main work.",
@@ -293,7 +295,7 @@ const EN: typeof RU = {
       { label: "CV", href: "/cv" },
       { label: "About", href: "/about" },
       { label: "Experience", href: "#experience" },
-      { label: "Pet projects", href: "#pet-projects" },
+      { label: "Projects", href: "/projects" },
     ],
     contactsTitle: "Contacts",
     copyright: "Kubai Marharyta. Front-end Developer. 2026 ©",

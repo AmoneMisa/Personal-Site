@@ -39,6 +39,8 @@ function isExternal(href: string | null) {
           <span v-else class="p-link p-link_muted mono">{{ proj.linkLabel }}</span>
         </div>
       </div>
+
+      <a class="all-projects mono" :href="localePath('/projects')">{{ p.allLabel }} →</a>
     </div>
   </section>
 </template>
@@ -109,6 +111,15 @@ a.p-link:hover {
 }
 .p-link_muted {
   opacity: 0.7;
+}
+.all-projects {
+  display: inline-block;
+  margin-top: 20px;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+.all-projects:hover {
+  color: var(--accent-pink);
 }
 
 @media (max-width: 960px) {
