@@ -59,6 +59,7 @@
     "error": "Could not load jobs. Please try again.",
     "excludeLangPlaceholder": "None",
     "excludeLanguage": "Exclude languages",
+    "experienceYears": "{n}+ years experience",
     "foreigner": "Foreigner-friendly",
     "headline": "Vacancies from many sources, no older than 14 days",
     "includeBy": "Include Belarus",

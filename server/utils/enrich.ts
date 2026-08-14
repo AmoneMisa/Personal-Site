@@ -5,6 +5,12 @@
 
 import type { Job, LanguageReq, Relocation, SalaryPeriod, WorkMode } from './jobTypes'
 import { toUsd } from './currency'
+import {
+  extractSkillDetails,
+  extractSkillNames,
+  getSkillMeta,
+  type SkillDetail,
+} from '../../shared/jobSkills'
 
 // ---- HTML → plain text ----
 // Many boards return HTML (sometimes HTML-encoded, occasionally double-encoded)
@@ -67,6 +73,90 @@ export const PER_YEAR: Record<SalaryPeriod, number> = {
   year: 1,
 }
 
+type ExtractedSalary = Pick<
+  Job,
+  'salaryMin' | 'salaryMax' | 'salaryCurrency' | 'salaryPeriod'
+>
+
+const SALARY_CONTEXT_RE =
+  /salary|compensation|pay range|base pay|remuneration|зарплат|оплат[аы]|оклад|доход|вилка|ставка|maosh|маош/i
+const MONEY_RE =
+  /([$€£₴])?\s*(\d{1,3}(?:[,\s.]\d{3})+(?:[.,]\d+)?|\d+(?:[.,]\d+)?\s*[kк]|\d{4,9})(?:\s*(USD|EUR|GBP|UAH|UZS|KZT|KGS|TJS|TMT|PLN|RON|MDL|GEL|AMD|AZN|TRY|CAD|CHF))?/gi
+
+function salaryCurrency(text: string): string | undefined {
+  const aliases: [RegExp, string][] = [
+    [/\bUSD\b|\$|доллар/i, 'USD'],
+    [/\bEUR\b|€/i, 'EUR'],
+    [/\bGBP\b|£/i, 'GBP'],
+    [/\bUAH\b|₴|грн/i, 'UAH'],
+    [/\bUZS\b|с[уў]м|so['’]?m/i, 'UZS'],
+    [/\bKZT\b|тенге/i, 'KZT'],
+    [/\bKGS\b|киргизск\w*\s+сом/i, 'KGS'],
+    [/\bTJS\b|сомон/i, 'TJS'],
+    [/\bTMT\b|манат/i, 'TMT'],
+    [/\bPLN\b|zł/i, 'PLN'],
+    [/\bRON\b|\blei\b/i, 'RON'],
+  ]
+  return aliases.find(([pattern]) => pattern.test(text))?.[1]
+}
+
+function salaryAmount(raw: string): number | undefined {
+  const compact = raw.replace(/\s+/g, '').toLowerCase()
+  const thousands = /[kк]$/.test(compact)
+  const numeric = compact.replace(/[kк]$/, '')
+  let parsed: number
+  if (thousands) {
+    parsed = Number.parseFloat(numeric.replace(',', '.')) * 1000
+  } else if (/^\d{1,3}([,.])\d{3}(?:\1\d{3})*(?:[,.]\d+)?$/.test(numeric)) {
+    parsed = Number(numeric.replace(/[,.]/g, ''))
+  } else {
+    parsed = Number(numeric.replace(',', '.'))
+  }
+  return Number.isFinite(parsed) && parsed > 0 ? Math.round(parsed) : undefined
+}
+
+function explicitSalaryPeriod(text: string): SalaryPeriod | undefined {
+  if (/per hour|\/\s?h(ou)?r\b|hourly|\bp\/h\b|в час|за час|годину|годин\b/i.test(text)) return 'hour'
+  if (/per month|monthly|\/\s?mo(nth)?\b|в месяц|на месяц|в мес\b|у місяць/i.test(text)) return 'month'
+  if (/per year|yearly|annual(ly)?|per annum|\bp\.?a\.?\b|\/\s?y(ea)?r\b|в год|на год|у рік|за рік/i.test(text)) {
+    return 'year'
+  }
+  return undefined
+}
+
+/** Infer a salary range from salary/compensation sentences in a description. */
+export function extractSalaryFromText(raw: string | undefined): ExtractedSalary {
+  if (!raw) return {}
+  const text = cleanText(raw)
+  const segments = text.split(/(?<=[.!?])\s+/).filter((segment) => SALARY_CONTEXT_RE.test(segment))
+
+  for (const segment of segments) {
+    const currency = salaryCurrency(segment)
+    if (!currency) continue
+    const amounts = [...segment.matchAll(MONEY_RE)]
+      .map((match) => salaryAmount(match[2] || ''))
+      .filter((amount): amount is number => amount !== undefined)
+    if (!amounts.length) continue
+
+    const first = amounts[0]!
+    const second = amounts[1]
+    const period = explicitSalaryPeriod(segment)
+    if (second !== undefined) {
+      return {
+        salaryMin: Math.min(first, second),
+        salaryMax: Math.max(first, second),
+        salaryCurrency: currency,
+        salaryPeriod: period,
+      }
+    }
+    if (/up to|maximum|max\.?|до\s/i.test(segment)) {
+      return { salaryMax: first, salaryCurrency: currency, salaryPeriod: period }
+    }
+    return { salaryMin: first, salaryCurrency: currency, salaryPeriod: period }
+  }
+  return {}
+}
+
 // Sources that quote monthly salaries by convention (CIS boards) when text gives
 // no explicit period. Everything else defaults to yearly (typical for remote/EU/US).
 const MONTHLY_SOURCES = new Set<Job['source']>([
@@ -80,11 +170,8 @@ const MONTHLY_SOURCES = new Set<Job['source']>([
 ])
 
 function detectSalaryPeriod(job: Job, text: string): SalaryPeriod {
-  if (/per hour|\/\s?h(ou)?r\b|hourly|\bp\/h\b|в час|за час|годину|годин\b/i.test(text)) return 'hour'
-  if (/per month|monthly|\/\s?mo(nth)?\b|в месяц|на месяц|в мес\b|у місяць/i.test(text)) return 'month'
-  if (/per year|yearly|annual(ly)?|per annum|\bp\.?a\.?\b|\/\s?y(ea)?r\b|в год|на год|у рік|за рік/i.test(text)) {
-    return 'year'
-  }
+  const explicit = explicitSalaryPeriod(text)
+  if (explicit) return explicit
   return MONTHLY_SOURCES.has(job.source) ? 'month' : 'year'
 }
 
@@ -151,7 +238,7 @@ function detectWorkMode(text: string, job: Job): WorkMode {
     if (/on[- ]?site|in[- ]?office|в офис|в офіс/i.test(text) && !job.remote) return 'hybrid'
     return 'remote'
   }
-  if (/on[- ]?site|in[- ]?office|\boffice\b|в офисе|в офіс|офіс|офис/i.test(text)) return 'office'
+  if (/on[- ]?site|in[- ]?office|\boffice\b|в офисе|в офіс|офіс|офис|с рабочего места|иш жойидан|ish joyidan/i.test(text)) return 'office'
   return 'unknown'
 }
 
@@ -188,6 +275,23 @@ function detectNoExperience(text: string): boolean {
   )
 }
 
+function detectExperienceMinYears(text: string): number | undefined {
+  const years: number[] = []
+  const patterns = [
+    /\b(\d{1,2}(?:[.,]\d)?)\s*(?:[-–]\s*\d{1,2}(?:[.,]\d)?)?\s*\+?\s*(?:years?|yrs?)\s+(?:of\s+)?[^.;\n]{0,60}\bexperience\b/gi,
+    /\b(?:at least|minimum of|min\.?)\s*(\d{1,2}(?:[.,]\d)?)\s*(?:years?|yrs?)\b/gi,
+    /(?:опыт|досвід)\s+(?:работы\s+)?(?:от\s+)?(\d{1,2}(?:[.,]\d)?)\s*(?:[-–]\s*\d{1,2}(?:[.,]\d)?)?\s*(?:лет|год[а]?|рок[иів]?)/gi,
+    /\b(\d{1,2}(?:[.,]\d)?)\s*(?:[-–]\s*\d{1,2}(?:[.,]\d)?)?\s*(?:йил|yil)(?:дан)?[^.;\n]{0,32}(?:тажриб|tajriba)/gi,
+  ]
+  for (const pattern of patterns) {
+    for (const match of text.matchAll(pattern)) {
+      const value = Number(String(match[1]).replace(',', '.'))
+      if (Number.isFinite(value) && value >= 0 && value <= 40) years.push(value)
+    }
+  }
+  return years.length ? Math.max(...years) : undefined
+}
+
 // ---- Languages + levels ----
 const LANGUAGES: [string, RegExp][] = [
   ['English', /english|англий|англ\.|англійськ/i],
@@ -195,14 +299,13 @@ const LANGUAGES: [string, RegExp][] = [
   ['Russian', /russian|русск|російськ/i],
   ['Ukrainian', /ukrainian|українськ|украинск/i],
   ['Uzbek', /uzbek|узбекск|o'zbek/i],
+  ['Kazakh', /kazakh|қазақ|казахск/i],
   ['French', /french|français|французск/i],
   ['Spanish', /spanish|español|испанск/i],
   ['Polish', /polish|polski|польск/i],
   ['Turkish', /turkish|türkçe|турецк/i],
+  ['Japanese', /japanese|日本語|японск/i],
 ]
-
-const LEVEL_RE =
-  /\b(a1|a2|b1|b2|c1|c2|pre-?intermediate|upper[- ]?intermediate|intermediate|elementary|advanced|proficient|fluent|native|beginner|basic|conversational|свободн|разговорн|базов|начальн|средн)\b/i
 
 function normalizeLevel(raw: string): string {
   const s = raw.toLowerCase()
@@ -213,6 +316,7 @@ function normalizeLevel(raw: string): string {
   if (/advanc|proficient|свободн/.test(s)) return 'Advanced'
   if (/fluent/.test(s)) return 'Fluent'
   if (/native/.test(s)) return 'Native'
+  if (/business/.test(s)) return 'Business'
   if (/element|basic|beginner|базов|начальн/.test(s)) return 'Basic'
   return raw
 }
@@ -222,52 +326,59 @@ function detectLanguages(text: string): LanguageReq[] {
   for (const [name, re] of LANGUAGES) {
     const m = re.exec(text)
     if (!m) continue
-    // Look for a level within ~40 chars around the language mention.
-    const start = Math.max(0, m.index - 40)
-    const window = text.slice(start, m.index + 40)
-    const lvl = LEVEL_RE.exec(window)
-    out.push({ language: name, level: lvl?.[1] ? normalizeLevel(lvl[1]) : undefined })
+    // Prefer a level directly adjacent to the language. This distinguishes
+    // "Business level English and native level Japanese" correctly.
+    const before = text.slice(Math.max(0, m.index - 40), m.index)
+    const after = text.slice(m.index + m[0].length, m.index + m[0].length + 30)
+    const beforeLevel = before.match(
+      /\b(a1|a2|b1|b2|c1|c2|pre-?intermediate|upper[- ]?intermediate|intermediate|elementary|advanced|proficient|fluent|native|business|beginner|basic|conversational)\s*(?:level|proficiency)?\s*$/i,
+    )
+    const afterLevel = after.match(
+      /^\s*(?:[-:(),]|at|level|proficiency)*\s*(a1|a2|b1|b2|c1|c2|pre-?intermediate|upper[- ]?intermediate|intermediate|elementary|advanced|proficient|fluent|native|business|beginner|basic|conversational)\b/i,
+    )
+    const listLevel = /\bfluent\s+in\s+[^.;\n]{0,100}$/i.test(before) ? 'fluent' : undefined
+    const rawLevel = beforeLevel?.[1] || afterLevel?.[1] || listLevel
+    out.push({ language: name, level: rawLevel ? normalizeLevel(rawLevel) : undefined })
   }
   return out
 }
 
-// ---- Skills dictionary (extend freely) ----
-export const SKILLS: string[] = [
-  'javascript', 'typescript', 'react', 'vue', 'nuxt', 'next.js', 'angular', 'svelte',
-  'node.js', 'python', 'django', 'flask', 'fastapi', 'java', 'spring', 'kotlin', 'go',
-  'golang', 'rust', 'c++', 'c#', '.net', 'php', 'laravel', 'ruby', 'rails', 'scala',
-  'swift', 'objective-c', 'flutter', 'dart', 'android', 'ios', 'react native',
-  'sql', 'postgresql', 'mysql', 'mariadb', 'mongodb', 'redis', 'elasticsearch', 'clickhouse',
-  'graphql', 'rest', 'grpc', 'kafka', 'rabbitmq', 'docker', 'kubernetes', 'terraform',
-  'ansible', 'aws', 'gcp', 'azure', 'ci/cd', 'jenkins', 'git', 'gitlab', 'github', 'bitbucket',
-  'linux', 'bash', 'nginx', 'tomcat', 'microservices',
-  'html', 'css', 'sass', 'tailwind', 'webpack', 'vite', 'redux', 'jest', 'cypress',
-  'playwright', 'selenium', 'pandas', 'numpy', 'tensorflow', 'pytorch', 'spark',
-  'machine learning', 'data science', 'nlp', 'devops', 'power bi', 'tableau', 'airflow', 'hadoop',
-  'figma', 'jira', 'confluence', 'agile', 'scrum', 'kanban', 'sdlc', 'tdd', 'bdd', 'excel',
-]
+// Most skills use literal Unicode-aware aliases from shared/jobSkills. A small
+// contextual layer handles grammatical phrases where important words are not
+// adjacent (for example, "analyse onboarding funnel data").
+function contextualSkillNames(text: string): string[] {
+  const patterns: [string, RegExp][] = [
+    ['Corporate Governance', /\b(?:group|company|corporate) governance\b/i],
+    ['Data Analysis', /\banalys(?:e|is|ing)\b[^.;\n]{0,60}\b(?:data|metrics?|funnels?)\b|\b(?:data|metrics?|funnels?)\b[^.;\n]{0,60}\banalys(?:e|is|ing)\b/i],
+    ['Conversion Funnel', /\b(?:conversion|onboarding|registration)[- ](?:to[- ]\w+\s+)?funnel\b|\bonboarding funnel\b/i],
+    ['Cross-functional Collaboration', /\bcross[- ]function(?:al|ally)\b/i],
+  ]
+  return patterns.filter(([, pattern]) => pattern.test(text)).map(([name]) => name)
+}
 
-function matchSkills(text: string): string[] {
-  const hay = ' ' + text.toLowerCase() + ' '
-  const found = new Set<string>()
-  for (const skill of SKILLS) {
-    // Word-ish boundary match; skills may contain . + # / so escape.
-    const esc = skill.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-    if (new RegExp(`(^|[^a-z0-9])${esc}([^a-z0-9]|$)`, 'i').test(hay)) found.add(skill)
+function matchSkillDetails(text: string): SkillDetail[] {
+  const details = extractSkillDetails(text)
+  const names = new Set(details.map(({ name }) => name))
+  for (const name of contextualSkillNames(text)) {
+    if (names.has(name)) continue
+    const meta = getSkillMeta(name)
+    if (!meta) continue
+    details.push({ name, ...meta })
+    names.add(name)
   }
-  return [...found]
+  return details
 }
 
 // ---- "Will be a plus" (nice to have) ----
 const PLUS_MARKERS =
   /(will be a plus|is a plus|as a plus|nice to have|would be a plus|plus:|плюсом|будет плюсом|буде плюсом|перевагою|преимуществом|will be an advantage)/i
 
-function detectNiceToHave(text: string, skills: string[]): string[] {
+function detectNiceToHave(text: string): string[] {
   const m = PLUS_MARKERS.exec(text)
   if (!m) return []
   // Take a window after the marker and match skills within it.
   const seg = text.slice(m.index, m.index + 220)
-  const inSeg = matchSkills(seg)
+  const inSeg = extractSkillNames(seg)
   // Only skills that appear in the plus-segment (nice-to-have, not core).
   return inSeg
 }
@@ -276,23 +387,41 @@ export function enrichJob(job: Job): Job {
   if (job.workMode !== undefined) return job // already enriched
   const title = cleanText(job.title) || job.title
   const description = cleanText(job.description)
-  const clean = { ...job, title, description: description || undefined }
+  const extractedSalary = extractSalaryFromText(description)
+  const clean = {
+    ...job,
+    title,
+    description: description || undefined,
+    salaryMin: job.salaryMin ?? extractedSalary.salaryMin,
+    salaryMax: job.salaryMax ?? extractedSalary.salaryMax,
+    salaryCurrency: job.salaryCurrency ?? extractedSalary.salaryCurrency,
+  }
   const text = `${title} \n ${job.tags.join(' ')} \n ${description}`
-  const skills = matchSkills(text)
-  const niceToHave = detectNiceToHave(text, skills)
-  const core = skills.filter((s) => !niceToHave.includes(s))
-  const salaryPeriod = detectSalaryPeriod(clean, text)
+  const allSkillDetails = matchSkillDetails(text)
+  const skills = allSkillDetails.map(({ name }) => name)
+  const niceToHave = detectNiceToHave(text)
+  const coreDetails = allSkillDetails.filter(({ name }) => !niceToHave.includes(name))
+  const niceToHaveDetails = allSkillDetails.filter(({ name }) => niceToHave.includes(name))
+  const core = coreDetails.map(({ name }) => name)
+  const hasSalary = clean.salaryMin !== undefined || clean.salaryMax !== undefined
+  const experienceMinYears = detectExperienceMinYears(text)
+  const salaryPeriod = hasSalary
+    ? job.salaryPeriod ?? extractedSalary.salaryPeriod ?? detectSalaryPeriod(clean, text)
+    : undefined
   return {
     ...clean,
     country: detectCountry(clean),
     workMode: detectWorkMode(text, job),
     relocation: detectRelocation(text),
     foreignerFriendly: detectForeignerFriendly(text),
-    noExperience: detectNoExperience(text),
+    noExperience: detectNoExperience(text) || experienceMinYears === 0,
+    experienceMinYears,
     languages: detectLanguages(text),
     skills: core,
     niceToHave,
+    skillDetails: coreDetails,
+    niceToHaveDetails,
     salaryPeriod,
-    salaryUsd: salaryUsd(job, salaryPeriod),
+    salaryUsd: salaryPeriod ? salaryUsd(clean, salaryPeriod) : undefined,
   }
 }

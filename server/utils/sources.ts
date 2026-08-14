@@ -3,6 +3,7 @@
 
 import { XMLParser } from 'fast-xml-parser'
 import type { Job } from './jobTypes'
+import { extractSalaryFromText } from './enrich'
 
 const UA = 'jobFinder/1.0 (job aggregator; contact: admin@whiteslove.me)'
 
@@ -709,7 +710,8 @@ async function fetchWorkdayJobs(html: string, pageUrl: string, label: string): P
   const [, tenant, wd, site] = m
   if (!site || site === 'wday') return []
   const base = `https://${tenant}.${wd}.myworkdayjobs.com`
-  const out: Job[] = []
+  const summaries: { job: Job; externalPath: string }[] = []
+  const oldestAllowed = Date.now() - 14 * 86_400_000
   for (let offset = 0; offset < 60; offset += 20) {
     const data = await fetchJson<any>(`${base}/wday/cxs/${tenant}/${site}/jobs`, {
       method: 'POST',
@@ -721,19 +723,53 @@ async function fetchWorkdayJobs(html: string, pageUrl: string, label: string): P
     for (const p of posts) {
       if (!p?.title || !p?.externalPath) continue
       const loc = p.locationsText || 'See listing'
-      out.push({
-        id: pageJobId(pageUrl, String(p.bulletFields?.[0] || p.externalPath)),
-        title: p.title,
-        company: label,
-        location: loc,
-        url: `${base}/${site}${p.externalPath}`,
-        source: 'companies' as const,
-        remote: /remote/i.test(`${p.title} ${loc}`),
-        tags: [label],
-        postedAt: workdayPostedAt(p.postedOn),
+      const postedAt = workdayPostedAt(p.postedOn)
+      // The public feed enforces the same 14-day ceiling, so avoid a detail
+      // request for postings that would be discarded immediately afterward.
+      if (new Date(postedAt).getTime() < oldestAllowed) continue
+      summaries.push({
+        externalPath: p.externalPath,
+        job: {
+          id: pageJobId(pageUrl, String(p.bulletFields?.[0] || p.externalPath)),
+          title: p.title,
+          company: label,
+          location: loc,
+          url: `${base}/${site}${p.externalPath}`,
+          source: 'companies' as const,
+          remote: /remote/i.test(`${p.title} ${loc}`),
+          tags: [label],
+          postedAt,
+        },
       })
     }
     if (posts.length < 20) break
+  }
+
+  const out: Job[] = []
+  for (let start = 0; start < summaries.length; start += 6) {
+    const batch = summaries.slice(start, start + 6)
+    const detailed = await Promise.all(
+      batch.map(async ({ job, externalPath }) => {
+        try {
+          const data = await fetchJson<any>(
+            `${base}/wday/cxs/${tenant}/${site}${externalPath}`,
+            { signal: AbortSignal.timeout(PAGE_TIMEOUT_MS) },
+          )
+          const info = data?.jobPostingInfo || {}
+          const fullDescription = stripHtml(info.jobDescription || info.description || '')
+          return {
+            ...job,
+            employmentType: info.timeType || info.workerType || job.employmentType,
+            description: fullDescription.slice(0, DESC_MAX) || undefined,
+            ...extractSalaryFromText(fullDescription),
+          }
+        } catch (err) {
+          console.error(`[jobs] workday detail ${label} failed:`, (err as Error).message)
+          return job
+        }
+      }),
+    )
+    out.push(...detailed)
   }
   return out
 }
@@ -1257,7 +1293,7 @@ function normalizeSchemaPosting(
   if (!posting?.title || !posting?.datePosted) return undefined
   const date = new Date(posting.datePosted)
   if (Number.isNaN(date.getTime())) return undefined
-  const description = stripHtml(posting.description).slice(0, 2000)
+  const description = stripHtml(posting.description).slice(0, DESC_MAX)
   const employment = Array.isArray(posting.employmentType)
     ? posting.employmentType.map(String)
     : posting.employmentType

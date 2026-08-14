@@ -9,6 +9,7 @@ import { extractCvText } from "~/utils/cvExtract";
 // an ATS match score for each vacancy from a CV that stays in the browser.
 
 interface LanguageReq { language: string; level?: string }
+interface JobSkillDetail { name: string; category: string; subcategory: string }
 interface Job {
   id: string;
   title: string;
@@ -33,6 +34,9 @@ interface Job {
   languages?: LanguageReq[];
   skills?: string[];
   niceToHave?: string[];
+  skillDetails?: JobSkillDetail[];
+  niceToHaveDetails?: JobSkillDetail[];
+  experienceMinYears?: number;
   salaryPeriod?: "hour" | "month" | "year";
   salaryUsd?: number; // normalized ANNUAL midpoint in USD
 }
@@ -110,7 +114,7 @@ const countryOptions = [
   { value: "KR", label: "South Korea" },
 ];
 
-const languageOptions = ["English", "German", "Russian", "Ukrainian", "Uzbek", "French", "Spanish", "Polish", "Turkish"];
+const languageOptions = ["English", "German", "Russian", "Ukrainian", "Uzbek", "Kazakh", "French", "Spanish", "Polish", "Turkish", "Japanese"];
 const levelOptions = ["A1", "A2", "B1", "B2", "C1", "C2", "Intermediate", "Upper-Intermediate", "Advanced", "Fluent", "Native"];
 
 // Rates are supplied by /jobs-feed from the shared server FX cache. Keep USD as
@@ -216,13 +220,22 @@ const stats = ref<JobStats | null>(null);
 const loading = ref(false);
 const failed = ref(false);
 let loadSequence = 0;
+let loadTimer: ReturnType<typeof setTimeout> | undefined;
 
 const totalPages = computed(() => Math.max(1, Math.ceil(total.value / pageSize.value)));
+
+function scheduleLoad(delay = 250) {
+  if (loadTimer) clearTimeout(loadTimer);
+  loadTimer = setTimeout(() => {
+    loadTimer = undefined;
+    void load(1);
+  }, delay);
+}
 
 function selectSource(value: string) {
   if (source.value === value) return;
   source.value = value;
-  void load(1);
+  scheduleLoad(100);
 }
 
 // ---- ATS ----
@@ -293,7 +306,7 @@ function resetFilters() {
   workMode.value = ""; relocation.value = "";
   foreignerOnly.value = false; noExperience.value = false; language.value = ""; languageLevel.value = "";
   excludeLanguages.value = []; skills.value = "";
-  load(1);
+  scheduleLoad(100);
 }
 
 async function onCvFile(e: Event) {
@@ -334,8 +347,9 @@ function formatSalary(job: Job): string | null {
   if (!job.salaryMin && !job.salaryMax) return null;
   const cur = job.salaryCurrency || "";
   const fmt = (n?: number) => (n ? n.toLocaleString() : "");
-  if (job.salaryMin && job.salaryMax) return `${fmt(job.salaryMin)}–${fmt(job.salaryMax)} ${cur}`.trim();
-  return `${fmt(job.salaryMin || job.salaryMax)} ${cur}`.trim();
+  const period = job.salaryPeriod ? `/${periodLabel(job.salaryPeriod)}` : "";
+  if (job.salaryMin && job.salaryMax) return `${fmt(job.salaryMin)}–${fmt(job.salaryMax)} ${cur}${period}`.trim();
+  return `${fmt(job.salaryMin || job.salaryMax)} ${cur}${period}`.trim();
 }
 
 const periodLabel = (p: Period) => t("per" + p.charAt(0).toUpperCase() + p.slice(1));
@@ -456,6 +470,9 @@ const levelItems = computed<Item[]>(() => [
 onMounted(() => {
   void load(1);
 });
+onBeforeUnmount(() => {
+  if (loadTimer) clearTimeout(loadTimer);
+});
 </script>
 
 <template>
@@ -512,7 +529,7 @@ onMounted(() => {
             :search-input="false"
             class="jobs__select"
             :aria-label="t('sortLabel')"
-            @update:model-value="(v: string) => v !== 'ats' && load(1)"
+            @update:model-value="(v: string) => v !== 'ats' && scheduleLoad()"
         />
       </div>
 
@@ -547,49 +564,49 @@ onMounted(() => {
           <u-select-menu
               v-model="countries" :items="countryItems" value-key="value" label-key="label"
               multiple :placeholder="t('countryPlaceholder')"
-              class="jobs__select" @update:model-value="load(1)"
+              class="jobs__select" @update:model-value="scheduleLoad()"
           />
         </label>
         <label class="jobs__field">
           <span class="jobs__field-label">{{ t("currency") }}</span>
           <u-select-menu
               v-model="displayCurrency" :items="currencyItems" value-key="value" label-key="label"
-              class="jobs__select" @update:model-value="salaryMin && load(1)"
+              class="jobs__select" @update:model-value="salaryMin && scheduleLoad()"
           />
         </label>
         <label class="jobs__field">
           <span class="jobs__field-label">{{ t("period") }}</span>
           <u-select-menu
               v-model="displayPeriod" :items="periodItems" value-key="value" label-key="label"
-              :search-input="false" class="jobs__select" @update:model-value="salaryMin && load(1)"
+              :search-input="false" class="jobs__select" @update:model-value="salaryMin && scheduleLoad()"
           />
         </label>
         <label class="jobs__field">
           <span class="jobs__field-label">{{ t("workMode") }}</span>
           <u-select-menu
               v-model="workModeSelect" :items="workModeItems" value-key="value" label-key="label"
-              :search-input="false" class="jobs__select" @update:model-value="load(1)"
+              :search-input="false" class="jobs__select" @update:model-value="scheduleLoad()"
           />
         </label>
         <label class="jobs__field">
           <span class="jobs__field-label">{{ t("relocation") }}</span>
           <u-select-menu
               v-model="relocationSelect" :items="relocationItems" value-key="value" label-key="label"
-              :search-input="false" class="jobs__select" @update:model-value="load(1)"
+              :search-input="false" class="jobs__select" @update:model-value="scheduleLoad()"
           />
         </label>
         <label class="jobs__field">
           <span class="jobs__field-label">{{ t("language") }}</span>
           <u-select-menu
               v-model="languageSelect" :items="languageItems" value-key="value" label-key="label"
-              class="jobs__select" @update:model-value="load(1)"
+              class="jobs__select" @update:model-value="scheduleLoad()"
           />
         </label>
         <label class="jobs__field">
           <span class="jobs__field-label">{{ t("languageLevel") }}</span>
           <u-select-menu
               v-model="languageLevelSelect" :items="levelItems" value-key="value" label-key="label"
-              :search-input="false" :disabled="!language" class="jobs__select" @update:model-value="load(1)"
+              :search-input="false" :disabled="!language" class="jobs__select" @update:model-value="scheduleLoad()"
           />
         </label>
         <label class="jobs__field">
@@ -597,7 +614,7 @@ onMounted(() => {
           <u-select-menu
               v-model="excludeLanguages" :items="excludeLanguageItems" value-key="value" label-key="label"
               multiple :placeholder="t('excludeLangPlaceholder')"
-              class="jobs__select" @update:model-value="load(1)"
+              class="jobs__select" @update:model-value="scheduleLoad()"
           />
         </label>
         <label class="jobs__field jobs__field_wide">
@@ -605,19 +622,19 @@ onMounted(() => {
           <u-input v-model="skills" icon="i-lucide-wrench" :placeholder="t('skillsPlaceholder')" @keyup.enter="load(1)" />
         </label>
         <label class="jobs__remote jobs__field_inline">
-          <u-switch v-model="foreignerOnly" @update:model-value="load(1)" />
+          <u-switch v-model="foreignerOnly" @update:model-value="scheduleLoad()" />
           <span>{{ t("foreigner") }}</span>
         </label>
         <label class="jobs__remote jobs__field_inline">
-          <u-switch v-model="noExperience" @update:model-value="load(1)" />
+          <u-switch v-model="noExperience" @update:model-value="scheduleLoad()" />
           <span>{{ t("noExperience") }}</span>
         </label>
         <label class="jobs__remote jobs__field_inline">
-          <u-switch v-model="includeRu" @update:model-value="load(1)" />
+          <u-switch v-model="includeRu" @update:model-value="scheduleLoad()" />
           <span>{{ t("includeRu") }}</span>
         </label>
         <label class="jobs__remote jobs__field_inline">
-          <u-switch v-model="includeBy" @update:model-value="load(1)" />
+          <u-switch v-model="includeBy" @update:model-value="scheduleLoad()" />
           <span>{{ t("includeBy") }}</span>
         </label>
         <u-button type="button" variant="ghost" color="neutral" size="sm" icon="i-lucide-rotate-ccw" @click="resetFilters">
@@ -714,6 +731,7 @@ onMounted(() => {
           <span>{{ timeAgo(job.postedAt) }}</span>
           <span v-if="job.workMode && job.workMode !== 'unknown'" class="job-card__badge job-card__badge_mode">{{ t("wm" + job.workMode.charAt(0).toUpperCase() + job.workMode.slice(1)) }}</span>
           <span v-else-if="job.remote" class="job-card__badge">{{ t("remote") }}</span>
+          <span v-if="job.experienceMinYears !== undefined && job.experienceMinYears > 0" class="job-card__badge job-card__badge_exp">{{ t("experienceYears", { n: job.experienceMinYears }) }}</span>
           <span v-if="job.foreignerFriendly" class="job-card__badge job-card__badge_visa">{{ t("cardForeigner") }}</span>
           <span v-if="job.relocation === 'offered'" class="job-card__badge job-card__badge_reloc">{{ t("cardReloc") }}</span>
           <span v-if="formatSalary(job)" class="job-card__salary">{{ formatSalary(job) }}</span>
@@ -888,18 +906,26 @@ onMounted(() => {
 /* Tags/skills sink to the bottom so cards line up regardless of body length. */
 .job-card__tags, .job-card__skills:last-child { margin-top: auto; }
 .job-card:hover { transform: translateY(-2px); border-color: rgba(224, 103, 154,0.40); }
-.job-card__head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
-.job-card__title { font-weight: 600; font-size: 16px; text-decoration: none; color: var(--text-white, inherit); }
+.job-card__head {
+  display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between;
+  column-gap: 10px; row-gap: 6px;
+}
+.job-card__title {
+  flex: 1 1 210px; min-width: 0; overflow-wrap: anywhere;
+  font-weight: 600; font-size: 16px; line-height: 1.35;
+  text-decoration: none; color: var(--text-white, inherit);
+}
 .job-card__title:hover { color: var(--color-primary, #e0679a); }
 .job-card__src { font-size: 11px; text-transform: capitalize; opacity: 0.6; white-space: nowrap; }
 .job-card__ats {
+  flex: 0 0 auto; max-width: 100%; margin-left: auto;
   font-size: 12px; font-weight: 600; white-space: nowrap; padding: 1px 8px;
   border: 1px solid; border-radius: 6px;
 }
 .job-card__meta { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: 12px; margin-top: 4px; }
 .job-card__company { font-weight: 600; }
 .job-card__dot { opacity: 0.5; }
-.job-card__badge { border-radius: 6px; padding: 1px 7px; font-size: 11px; color: #34d399; background: rgba(52,211,153,0.14); }
+.job-card__badge { flex: 0 0 auto; white-space: nowrap; border-radius: 6px; padding: 1px 7px; font-size: 11px; color: #34d399; background: rgba(52,211,153,0.14); }
 .job-card__badge_mode { color: #38bdf8; background: rgba(56,189,248,0.14); }
 .job-card__badge_visa { color: #fbbf24; background: rgba(251,191,36,0.14); }
 .job-card__badge_reloc { color: #f472b6; background: rgba(244,114,182,0.14); }

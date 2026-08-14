@@ -59,6 +59,7 @@
     "error": "Не удалось загрузить вакансии.",
     "excludeLangPlaceholder": "Нет",
     "excludeLanguage": "Исключить языки",
+    "experienceYears": "{n}+ лет опыта",
     "foreigner": "Для иностранцев",
     "headline": "Вакансии из множества источников, не старше 14 дней",
     "includeBy": "Включить Беларусь",

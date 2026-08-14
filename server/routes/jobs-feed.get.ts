@@ -85,6 +85,7 @@ function isConfigured(source: JobSource): boolean {
 }
 
 const CACHE_TTL_SECONDS = 300
+const sourceMemoryCache = new Map<JobSource, { expiresAt: number; jobs: Job[] }>()
 const SORT_KEYS: SortKey[] = ['date', 'oldest', 'title', 'company', 'salary']
 const WORK_MODES: WorkMode[] = ['remote', 'hybrid', 'office', 'unknown']
 const RELOCATIONS: Relocation[] = ['offered', 'none', 'unknown']
@@ -96,9 +97,18 @@ async function getSource(source: JobSource, q: string): Promise<Job[]> {
   const key = `jobs:src:${source}`
 
   if (cacheable) {
+    const memory = sourceMemoryCache.get(source)
+    if (memory && memory.expiresAt > Date.now()) return memory.jobs
     try {
       const cached = await redis.get(key)
-      if (cached) return JSON.parse(cached) as Job[]
+      if (cached) {
+        const jobs = JSON.parse(cached) as Job[]
+        sourceMemoryCache.set(source, {
+          expiresAt: Date.now() + CACHE_TTL_SECONDS * 1000,
+          jobs,
+        })
+        return jobs
+      }
     } catch {
       /* redis down — fetch live */
     }
@@ -113,6 +123,10 @@ async function getSource(source: JobSource, q: string): Promise<Job[]> {
   }
 
   if (cacheable) {
+    sourceMemoryCache.set(source, {
+      expiresAt: Date.now() + CACHE_TTL_SECONDS * 1000,
+      jobs,
+    })
     try {
       await redis.set(key, JSON.stringify(jobs), 'EX', CACHE_TTL_SECONDS)
     } catch {
@@ -198,8 +212,33 @@ export default defineEventHandler(async (event) => {
   // fallback: pull live once and kick a background refresh to warm the store.
   let pool = await getStoredJobs()
   if (!pool.length) {
-    pool = (await Promise.all(finalSources.map((s) => getSource(s, search)))).flat()
-    refreshJobStore().catch(() => {})
+    if (requested.length) {
+      // A cold, explicitly selected source should not wait for every configured
+      // board. Pull only that source and warm the complete store in background.
+      pool = (await Promise.all(finalSources.map((source) => getSource(source, '')))).flat()
+      refreshJobStore().catch(() => {})
+    } else {
+      // The initial all-source page still needs the complete store. The refresh
+      // promise is deduplicated with the deployment warmup task.
+      await refreshJobStore()
+      pool = await getStoredJobs()
+    }
+  } else if (requested.length) {
+    // A store written before a newly deployed source existed can be non-empty
+    // yet contain no rows for that explicitly selected source. Fetch only the
+    // missing selection now instead of returning a misleading zero until cron.
+    const freshnessCutoff = Date.now() - 14 * 86_400_000
+    const present = new Set(
+      pool
+        .filter((job) => new Date(job.postedAt).getTime() >= freshnessCutoff)
+        .map((job) => job.source),
+    )
+    const missing = finalSources.filter((source) => !present.has(source))
+    if (missing.length) {
+      const live = (await Promise.all(missing.map((source) => getSource(source, search)))).flat()
+      pool = [...pool, ...live]
+      refreshJobStore().catch(() => {})
+    }
   }
 
   return {

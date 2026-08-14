@@ -4,6 +4,7 @@
 // structured filters and stats can operate on derived fields.
 
 import { enrichJob, resolveCountry } from './enrich'
+import { canonicalSkillName } from '../../shared/jobSkills'
 import type {
   Job,
   JobQuery,
@@ -14,6 +15,24 @@ import type {
   SortKey,
   WorkMode,
 } from './jobTypes'
+
+const ENRICHMENT_CACHE_MAX = 20_000
+const enrichmentCache = new Map<string, { fingerprint: string; job: Job }>()
+
+function cachedEnrichment(raw: Job): Job {
+  if (raw.workMode !== undefined && raw.skillDetails !== undefined) return raw
+  const key = raw.url || raw.id
+  const fingerprint = `${raw.postedAt}|${raw.title}|${raw.description?.length || 0}`
+  const cached = enrichmentCache.get(key)
+  if (cached?.fingerprint === fingerprint) return cached.job
+  const job = enrichJob(raw)
+  enrichmentCache.set(key, { fingerprint, job })
+  if (enrichmentCache.size > ENRICHMENT_CACHE_MAX) {
+    const oldest = enrichmentCache.keys().next().value
+    if (oldest) enrichmentCache.delete(oldest)
+  }
+  return job
+}
 
 // User preference: favor CIS but exclude Russia & Belarus by default. Each country
 // has its own matcher so the two can be toggled back on independently via the
@@ -66,7 +85,15 @@ function matches(job: Job, query: JobQuery, oldestAllowed: number): boolean {
     if (pay === undefined || pay < query.salaryMin) return false
   }
   if (query.q) {
-    const hay = `${job.title} ${job.company} ${job.tags.join(' ')}`.toLowerCase()
+    const hay = [
+      job.title,
+      job.company,
+      job.location,
+      job.tags.join(' '),
+      job.description || '',
+      ...(job.skills || []),
+      ...(job.niceToHave || []),
+    ].join(' ').toLowerCase()
     if (!hay.includes(query.q.toLowerCase())) return false
   }
 
@@ -94,8 +121,15 @@ function matches(job: Job, query: JobQuery, oldestAllowed: number): boolean {
     for (const ex of query.excludeLanguages) if (have.has(ex.toLowerCase())) return false
   }
   if (query.skills.length) {
-    const have = new Set([...(job.skills || []), ...(job.niceToHave || [])].map((s) => s.toLowerCase()))
-    for (const s of query.skills) if (!have.has(s.toLowerCase())) return false
+    const have = new Set(
+      [...(job.skills || []), ...(job.niceToHave || [])]
+        .map((skill) => canonicalSkillName(skill) || skill)
+        .map((skill) => skill.toLocaleLowerCase('en')),
+    )
+    for (const requested of query.skills) {
+      const canonical = canonicalSkillName(requested) || requested
+      if (!have.has(canonical.toLocaleLowerCase('en'))) return false
+    }
   }
   return true
 }
@@ -195,7 +229,7 @@ export function filterAndPaginate(all: Job[], query: JobQuery): JobResponse {
 
   for (const raw of all) {
     if (!query.sources.includes(raw.source)) continue
-    const job = enrichJob(raw)
+    const job = cachedEnrichment(raw)
     if (!matches(job, query, oldestAllowed)) continue
     const key = job.url || job.id
     if (seen.has(key)) continue

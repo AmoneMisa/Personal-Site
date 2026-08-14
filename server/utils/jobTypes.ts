@@ -9,6 +9,12 @@ export interface LanguageReq {
   level?: string // e.g. "B2", "Fluent"
 }
 
+export interface JobSkillDetail {
+  name: string
+  category: string
+  subcategory: string
+}
+
 export interface Job {
   id: string
   title: string
@@ -34,6 +40,9 @@ export interface Job {
   languages?: LanguageReq[]
   skills?: string[]
   niceToHave?: string[] // "will be a plus"
+  skillDetails?: JobSkillDetail[]
+  niceToHaveDetails?: JobSkillDetail[]
+  experienceMinYears?: number // minimum required professional experience
   salaryPeriod?: SalaryPeriod // detected pay period of salaryMin/salaryMax (best-effort)
   salaryUsd?: number // normalized ANNUAL midpoint in USD for stats/sort (undefined if no salary)
 }

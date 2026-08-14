@@ -3,22 +3,15 @@
 // the first visitor isn't served an empty list. Fire-and-forget — never blocks
 // startup, and the daily scheduled task keeps it fresh thereafter.
 
-import { getStoredJobs, refreshJobStore } from '~~/server/utils/jobsStore'
-import { refreshRates } from '~~/server/utils/currency'
+import { refreshJobStore } from '~~/server/utils/jobsStore'
 
 export default defineNitroPlugin(() => {
-  // Defer slightly so boot completes first; then only refresh a cold store.
+  // Defer slightly so boot completes first. Refresh on every deployment: the
+  // configured source set may have changed even when an older store exists.
   setTimeout(async () => {
     try {
-      const existing = await getStoredJobs()
-      // A cold job refresh already refreshes FX first. With a warm store, refresh
-      // FX directly so rates are still seeded once on every deployment.
-      if (existing.length) {
-        await refreshRates()
-        return
-      }
       const summary = await refreshJobStore()
-      console.log(`[jobs:warmup] cold store populated: stored=${summary.stored}`)
+      console.log(`[jobs:warmup] store refreshed: stored=${summary.stored}`)
     } catch (err) {
       console.error('[jobs:warmup] failed:', (err as Error).message)
     }
