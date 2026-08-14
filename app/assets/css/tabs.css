@@ -101,7 +101,7 @@
     width: 12px;
     border-radius: 999px;
     background: linear-gradient(90deg, var(--color-primary-gradient-start), var(--color-primary-gradient-end));
-    box-shadow: 0 8px 20px rgba(128, 90, 245, .25);
+    box-shadow: 0 8px 20px rgba(224, 103, 154, .25);
     transform: translateX(0);
     transition: transform .22s ease;
     will-change: transform;
@@ -121,12 +121,8 @@
 .tabs-card__inner {
     border-radius: 26px;
     padding: 18px;
-    background: radial-gradient(900px 380px at 15% 0%, rgba(128, 90, 245, .18), transparent 60%),
-    radial-gradient(900px 380px at 85% 0%, rgba(205, 153, 255, .12), transparent 60%),
-    rgba(14, 12, 21, .92);
-
-    box-shadow: 0 20px 60px rgba(0, 0, 0, .45),
-    inset 0 1px 0 rgba(255, 255, 255, .05);
+    background: var(--bg-panel);
+    border: 1px solid var(--line);
 }
 
 .tabs-card__inner {

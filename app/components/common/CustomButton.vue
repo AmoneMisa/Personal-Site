@@ -56,78 +56,60 @@ const resolved = computed<Variant>(() => {
 </template>
 
 <style scoped lang="scss">
+/* Flat buttons, synced with the home design system: solid pink primary, 1px
+   line secondary, no glows/gradients/backdrop-blur. */
 .btn {
-  height: 48px;
-  padding: 0 18px;
-  border-radius: 14px;
-  font-weight: 650;
+  height: 46px;
+  padding: 0 20px;
+  border-radius: 8px;
+  font-weight: 600;
   letter-spacing: 0.2px;
-  transition: 0.25s ease;
+  transition: 0.2s ease;
 }
 
-:global(.btn_primary){
-  color: white !important;
-  border: 1px solid rgba(255, 255, 255, 0.10);
-  background: var(--color-primary);
-  box-shadow: 0 18px 55px rgba(0, 0, 0, 0.35);
-  backdrop-filter: blur(10px);
+:global(.btn_primary) {
+  color: #1a0e14 !important;
+  border: 1px solid transparent;
+  background: var(--accent-pink);
 }
 
 .btn_primary:hover {
-  filter: brightness(1.12);
-  box-shadow: 0 20px 70px rgba(0, 0, 0, 0.45);
+  filter: brightness(1.06);
 }
 
 .btn_black {
-  color: white !important;
-  border: 1px solid rgba(255, 255, 255, 0.10);
-  background: radial-gradient(120% 120% at 20% 0%, rgba(128, 90, 245, 0.20) 0%, rgba(128, 90, 245, 0) 60%),
-  var(--secondary-bg-gradient);
-  box-shadow: 0 18px 55px rgba(0, 0, 0, 0.35);
-  backdrop-filter: blur(10px);
+  color: var(--text-primary) !important;
+  border: 1px solid var(--line);
+  background: var(--bg-panel);
 }
 
 .btn_black:hover {
-  filter: brightness(1.12);
-  box-shadow: 0 20px 70px rgba(0, 0, 0, 0.45);
+  border-color: var(--accent-pink);
 }
 
 .btn_secondary {
-  color: rgba(255, 255, 255, 0.92);
-  background: rgba(255, 255, 255, 0.02);
-  border: 1px solid var(--ui-border);
-  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.28);
-  backdrop-filter: blur(10px);
+  color: var(--text-primary);
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--line);
 }
 
 .btn_secondary:hover {
-  background: rgba(255, 255, 255, 0.04);
+  border-color: var(--accent-pink);
 }
 
 .btn_ghost {
-  color: rgba(255, 255, 255, 0.90);
+  color: var(--text-primary);
   padding: 0;
   height: auto;
-  border-radius: 10px;
+  border-radius: 8px;
 }
 
 .btn_ghost:hover {
-  background-image: linear-gradient(to right, var(--color-primary-gradient-start), var(--color-primary-gradient-end));
-  -webkit-background-clip: text;
-  background-clip: text;
-  -webkit-text-fill-color: transparent;
-  color: transparent;
+  color: var(--accent-pink);
 }
 
 .btn_link {
-  color: var(--color-primary);
+  color: var(--accent-pink);
   padding: 0 !important;
-}
-
-.light {
-  .btn_secondary,
-  .btn_ghost {
-    color: var(--ui-text);
-  }
 }
 </style>

@@ -414,10 +414,7 @@ useHead({
 }
 
 .cv__role {
-  background: linear-gradient(90deg, var(--accent-pink), var(--accent-blue));
-  -webkit-background-clip: text;
-  background-clip: text;
-  -webkit-text-fill-color: transparent;
+  color: var(--accent-pink);
 }
 
 .cv__tagline {

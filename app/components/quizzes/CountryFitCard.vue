@@ -355,7 +355,7 @@ const priceColumns = computed(() => {
 }
 
 .indices__trigger:focus-visible {
-  outline: 2px solid rgba(128, 90, 245, 0.55);
+  outline: 2px solid rgba(224, 103, 154, 0.55);
   outline-offset: 2px;
 }
 

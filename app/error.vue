@@ -108,12 +108,8 @@ function retry() {
   z-index: 0;
   pointer-events: none;
 
-  background:
-      radial-gradient(35% 35% at 30% 30%, rgba(128, 90, 245, 0.28), transparent 60%),
-      radial-gradient(30% 30% at 70% 65%, rgba(205, 153, 255, 0.18), transparent 60%),
-      radial-gradient(40% 40% at 60% 20%, rgba(255, 255, 255, 0.06), transparent 65%);
-
-  filter: blur(14px);
+  background: none;
+  filter: none;
   animation: errFloat 10s ease-in-out infinite;
   opacity: 0.9;
 }
@@ -142,15 +138,7 @@ function retry() {
   border-radius: 20px;
   overflow: hidden;
 
-  background: linear-gradient(
-      90deg,
-      rgba(128, 90, 245, 0.75),
-      rgba(255, 255, 255, 0.10),
-      rgba(205, 153, 255, 0.65),
-      rgba(128, 90, 245, 0.75)
-  );
-  background-size: 300% 100%;
-  animation: uiBorderFlow 6.2s linear infinite;
+  background: var(--line);
 
   clip-path: polygon(0 0, calc(100% - 44px) 0, 100% 38px, 100% 100%, 0 100%);
 
@@ -282,7 +270,7 @@ function retry() {
 
 .err-card__link:hover {
   filter: brightness(1.08);
-  border-color: rgba(128, 90, 245, 0.55);
+  border-color: rgba(224, 103, 154, 0.55);
 }
 
 @media (max-width: 640px) {

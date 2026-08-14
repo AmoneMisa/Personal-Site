@@ -792,10 +792,10 @@ await load(1);
   padding: 16px;
   border-radius: 18px;
   border: 1px solid var(--ui-border);
-  background: rgba(128, 90, 245, 0.06);
+  background: rgba(224, 103, 154, 0.06);
 }
 .ats__head { display: flex; gap: 12px; align-items: flex-start; }
-.ats__icon { font-size: 22px; color: var(--color-primary, #a78bfa); margin-top: 2px; }
+.ats__icon { font-size: 22px; color: var(--color-primary, #e0679a); margin-top: 2px; }
 .ats__title { font-weight: 900; }
 .ats__intro { font-size: 13px; }
 .ats__body {
@@ -806,7 +806,7 @@ await load(1);
 .ats__upload {
   display: inline-flex; align-items: center; gap: 8px; white-space: nowrap;
   height: 40px; padding: 0 14px; border-radius: 10px; cursor: pointer;
-  border: 1px dashed rgba(128, 90, 245, 0.5); color: var(--text-white, inherit); font-weight: 700; font-size: 13px;
+  border: 1px dashed rgba(224, 103, 154, 0.5); color: var(--text-white, inherit); font-weight: 700; font-size: 13px;
 }
 .ats__paste { width: 100%; }
 .ats__actions { display: flex; justify-content: flex-end; }
@@ -829,7 +829,7 @@ await load(1);
   cursor: pointer; transition: filter 180ms ease, color 180ms ease;
 }
 .jobs__pill:hover { filter: brightness(1.06); color: var(--text-white); }
-.jobs__pill_active { color: var(--text-white); border-color: rgba(128,90,245,0.40); background: rgba(128,90,245,0.18); }
+.jobs__pill_active { color: var(--text-white); border-color: rgba(224, 103, 154,0.40); background: rgba(224, 103, 154,0.18); }
 .jobs__remote { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 700; }
 .jobs__error { color: var(--ui-error, #f87171); }
 .jobs__count { font-size: 13px; margin-bottom: 12px; }
@@ -872,7 +872,7 @@ await load(1);
 .stats__row-val em { font-weight: 500; font-style: normal; font-size: 11px; }
 .stats__chips { display: flex; flex-wrap: wrap; gap: 6px; }
 .stats__chip { font-size: 12px; padding: 2px 9px; border-radius: 999px; border: 1px solid var(--ui-border); color: var(--ui-text-muted); }
-.stats__chip_skill { border-color: rgba(128,90,245,0.35); color: #c4b5fd; }
+.stats__chip_skill { border-color: rgba(224, 103, 154,0.35); color: #e79ec0; }
 
 .jobs__results { position: relative; }
 .jobs__grid {
@@ -898,10 +898,10 @@ await load(1);
 }
 /* Tags/skills sink to the bottom so cards line up regardless of body length. */
 .job-card__tags, .job-card__skills:last-child { margin-top: auto; }
-.job-card:hover { transform: translateY(-2px); border-color: rgba(128,90,245,0.40); }
+.job-card:hover { transform: translateY(-2px); border-color: rgba(224, 103, 154,0.40); }
 .job-card__head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
 .job-card__title { font-weight: 800; font-size: 16px; text-decoration: none; color: var(--text-white, inherit); }
-.job-card__title:hover { color: var(--color-primary, #a78bfa); }
+.job-card__title:hover { color: var(--color-primary, #e0679a); }
 .job-card__src { font-size: 11px; text-transform: capitalize; opacity: 0.6; white-space: nowrap; }
 .job-card__ats {
   font-size: 12px; font-weight: 800; white-space: nowrap; padding: 1px 8px;
@@ -914,7 +914,7 @@ await load(1);
 .job-card__badge_mode { color: #38bdf8; background: rgba(56,189,248,0.14); }
 .job-card__badge_visa { color: #fbbf24; background: rgba(251,191,36,0.14); }
 .job-card__badge_reloc { color: #f472b6; background: rgba(244,114,182,0.14); }
-.job-card__salary { border-radius: 6px; padding: 1px 7px; font-size: 11px; color: #a78bfa; background: rgba(128,90,245,0.14); }
+.job-card__salary { border-radius: 6px; padding: 1px 7px; font-size: 11px; color: #e0679a; background: rgba(224, 103, 154,0.14); }
 .job-card__salary_conv { color: #94a3b8; background: rgba(148,163,184,0.12); font-weight: 600; }
 .job-card__langs { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: 12px; margin-top: 6px; }
 .job-card__lang-icon { font-size: 14px; opacity: 0.7; }
@@ -926,7 +926,7 @@ await load(1);
 .job-card__tags, .job-card__skills { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; align-items: center; }
 .job-card__skills-label { font-size: 11px; opacity: 0.7; }
 .job-card__tag { border-radius: 6px; padding: 2px 8px; font-size: 11px; border: 1px solid var(--ui-border); color: var(--ui-text-muted); }
-.job-card__tag_skill { border-color: rgba(128,90,245,0.3); color: #c4b5fd; }
+.job-card__tag_skill { border-color: rgba(224, 103, 154,0.3); color: #e79ec0; }
 .job-card__tag_plus { border-color: rgba(52,211,153,0.35); color: #6ee7b7; }
 .job-card__tag_match { border-color: rgba(52,211,153,0.45); color: #34d399; background: rgba(52,211,153,0.10); }
 .job-card__tag_miss { border-color: rgba(248,113,113,0.4); color: #f87171; }

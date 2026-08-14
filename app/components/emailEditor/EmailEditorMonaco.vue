@@ -198,7 +198,7 @@ onBeforeUnmount(() => {
   background: rgba(255, 190, 90, 0.14);
 }
 :global(.email-editor-monaco__line_active) {
-  outline: 1px solid rgba(128, 90, 245, 0.55);
+  outline: 1px solid rgba(224, 103, 154, 0.55);
 }
 
 :global(.email-editor-monaco__inline_color_chip) {

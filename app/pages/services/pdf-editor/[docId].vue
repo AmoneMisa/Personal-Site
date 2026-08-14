@@ -2530,7 +2530,7 @@ onBeforeUnmount(() => {
 
 .services__pill:focus-visible {
   outline: none;
-  box-shadow: 0 0 0 2px rgba(128, 90, 245, 0.3), 0 0 0 6px rgba(128, 90, 245, 0.14);
+  box-shadow: 0 0 0 2px rgba(224, 103, 154, 0.3), 0 0 0 6px rgba(224, 103, 154, 0.14);
 }
 
 .services__pill:disabled {
@@ -2540,8 +2540,8 @@ onBeforeUnmount(() => {
 
 .services__pill_active {
   color: var(--text-white);
-  border-color: rgba(128, 90, 245, 0.4);
-  background: rgba(128, 90, 245, 0.18);
+  border-color: rgba(224, 103, 154, 0.4);
+  background: rgba(224, 103, 154, 0.18);
 }
 
 /* Round icon buttons in the top actions row (page nav / download). Sized to
@@ -2593,8 +2593,8 @@ onBeforeUnmount(() => {
 }
 
 .pdf__inspector {
-  border-color: rgba(128, 90, 245, 0.28);
-  background: rgba(128, 90, 245, 0.06);
+  border-color: rgba(224, 103, 154, 0.28);
+  background: rgba(224, 103, 154, 0.06);
 }
 
 .pdf__inspector-head {
@@ -2675,8 +2675,8 @@ onBeforeUnmount(() => {
 }
 
 .pdf__chip_active {
-  border-color: rgba(128, 90, 245, 0.35);
-  background: rgba(128, 90, 245, 0.18);
+  border-color: rgba(224, 103, 154, 0.35);
+  background: rgba(224, 103, 154, 0.18);
 }
 
 .pdf__canvas-wrap {
@@ -2812,7 +2812,7 @@ onBeforeUnmount(() => {
 }
 
 .pdf__links_armed .pdf__link-hotspot {
-  background: rgba(128, 90, 245, 0.18);
-  outline: 1px solid rgba(128, 90, 245, 0.55);
+  background: rgba(224, 103, 154, 0.18);
+  outline: 1px solid rgba(224, 103, 154, 0.55);
 }
 </style>

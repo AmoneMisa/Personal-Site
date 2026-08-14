@@ -480,7 +480,7 @@ watch(user, (v) => lsSet(LS_KEYS.user, v), {deep: true});
               class="px-4 py-3 rounded-xl border border-[var(--ui-border)] text-left transition"
               :class="
               answers[q.id] === opt.id
-                ? 'bg-[rgba(128,90,245,0.18)] border-[rgba(128,90,245,0.35)]'
+                ? 'bg-[rgba(224, 103, 154,0.18)] border-[rgba(224, 103, 154,0.35)]'
                 : 'bg-[rgba(255,255,255,0.02)] hover:brightness-[1.05]'
             "
               @click="answers[q.id] = opt.id"

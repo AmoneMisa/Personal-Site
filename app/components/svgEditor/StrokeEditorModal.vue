@@ -440,8 +440,8 @@ watch(
 }
 
 .svg-stroke-modal__item_active {
-  background: rgba(128, 90, 245, 0.16);
-  border-color: rgba(128, 90, 245, 0.28);
+  background: rgba(224, 103, 154, 0.16);
+  border-color: rgba(224, 103, 154, 0.28);
 }
 
 .svg-stroke-modal__item-text {

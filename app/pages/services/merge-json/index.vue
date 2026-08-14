@@ -437,7 +437,7 @@ function onDownload() {
 }
 
 .merge__pane_center {
-  box-shadow: 0 0 0 1px rgba(128, 90, 245, 0.18) inset;
+  box-shadow: 0 0 0 1px rgba(224, 103, 154, 0.18) inset;
 }
 
 .merge__pane-head {

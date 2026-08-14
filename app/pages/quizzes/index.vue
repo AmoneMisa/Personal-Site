@@ -203,14 +203,14 @@ const howSteps = [
 
 .quizzes__pill:focus-visible {
   outline: none;
-  box-shadow: 0 0 0 2px rgba(128, 90, 245, 0.30),
-  0 0 0 6px rgba(128, 90, 245, 0.14);
+  box-shadow: 0 0 0 2px rgba(224, 103, 154, 0.30),
+  0 0 0 6px rgba(224, 103, 154, 0.14);
 }
 
 .quizzes__pill_active {
   color: var(--text-white);
-  border-color: rgba(128, 90, 245, 0.40);
-  background: rgba(128, 90, 245, 0.18);
+  border-color: rgba(224, 103, 154, 0.40);
+  background: rgba(224, 103, 154, 0.18);
 }
 
 .quizzes__empty {

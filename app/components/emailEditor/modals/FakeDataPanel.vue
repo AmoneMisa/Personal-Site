@@ -157,8 +157,8 @@ function addPath() {
   white-space: nowrap;
   padding: 2px 6px;
   border-radius: 8px;
-  background: rgba(128, 90, 245, 0.14);
-  border: 1px solid rgba(128, 90, 245, 0.22);
+  background: rgba(224, 103, 154, 0.14);
+  border: 1px solid rgba(224, 103, 154, 0.22);
 }
 
 .email-editor-fake__badge {

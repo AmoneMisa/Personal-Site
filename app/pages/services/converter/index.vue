@@ -510,11 +510,11 @@ const targetItems = computed(() =>
   &:hover {
     transform: translateY(-2px);
     box-shadow: var(--shadow-primary);
-    border-color: rgba(128, 90, 245, 0.38);
+    border-color: rgba(224, 103, 154, 0.38);
   }
 
   &.is-active {
-    border-color: rgba(128, 90, 245, 0.55);
+    border-color: rgba(224, 103, 154, 0.55);
     box-shadow: var(--shadow-primary);
 
     .mode-card__icon {
@@ -542,7 +542,7 @@ const targetItems = computed(() =>
   width: 40px;
   height: 40px;
   border-radius: 12px;
-  background: rgba(128, 90, 245, 0.14);
+  background: rgba(224, 103, 154, 0.14);
   border: 1px solid var(--ui-border);
 }
 
@@ -644,19 +644,19 @@ const targetItems = computed(() =>
 .dropzone {
   margin-top: 18px;
   border-radius: 16px;
-  border: 1px dashed rgba(128, 90, 245, 0.45);
-  background: rgba(128, 90, 245, 0.08);
+  border: 1px dashed rgba(224, 103, 154, 0.45);
+  background: rgba(224, 103, 154, 0.08);
   padding: 16px;
   transition: transform 120ms ease, background 120ms ease, border-color 120ms ease;
 
   .light & {
-    background: rgba(128, 90, 245, 0.06);
+    background: rgba(224, 103, 154, 0.06);
   }
 
   &.is-dragging {
     transform: translateY(-2px);
-    border-color: rgba(128, 90, 245, 0.8);
-    background: rgba(128, 90, 245, 0.12);
+    border-color: rgba(224, 103, 154, 0.8);
+    background: rgba(224, 103, 154, 0.12);
   }
 }
 
@@ -893,7 +893,7 @@ const targetItems = computed(() =>
 .tip__icon {
   font-size: 18px;
   margin-top: 2px;
-  color: rgba(128, 90, 245, 0.95);
+  color: rgba(224, 103, 154, 0.95);
 }
 
 :deep(.format-select [data-slot="trigger"]) {

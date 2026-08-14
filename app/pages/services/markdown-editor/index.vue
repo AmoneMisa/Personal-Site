@@ -997,7 +997,7 @@ onBeforeUnmount(() => {
 }
 
 .markdown-editor__editor:focus {
-  box-shadow: 0 0 0 2px rgba(128, 90, 245, 0.30), 0 0 0 6px rgba(128, 90, 245, 0.14);
+  box-shadow: 0 0 0 2px rgba(224, 103, 154, 0.30), 0 0 0 6px rgba(224, 103, 154, 0.14);
 }
 
 .markdown-editor__warning {
@@ -1074,7 +1074,7 @@ onBeforeUnmount(() => {
   width: 12px;
   border-radius: 999px;
   background: linear-gradient(90deg, var(--color-primary-gradient-start), var(--color-primary-gradient-end));
-  box-shadow: 0 8px 20px rgba(128, 90, 245, .25);
+  box-shadow: 0 8px 20px rgba(224, 103, 154, .25);
   transform: translateX(0);
   transition: transform .22s ease;
   will-change: transform;
@@ -1202,8 +1202,8 @@ onBeforeUnmount(() => {
 .markdown-editor__preview :deep(.pv-quote) {
   margin: 8px 0;
   padding: 8px 10px;
-  border-left: 3px solid rgba(128, 90, 245, 0.65);
-  background: rgba(128, 90, 245, 0.08);
+  border-left: 3px solid rgba(224, 103, 154, 0.65);
+  background: rgba(224, 103, 154, 0.08);
   border-radius: 12px;
 }
 

@@ -859,8 +859,8 @@ function chooseAdvancedTag(tag: string) {
   height: 26px;
   padding: 0 10px;
   border-radius: 999px;
-  border: 1px solid rgba(128, 90, 245, 0.35);
-  background: rgba(128, 90, 245, 0.12);
+  border: 1px solid rgba(224, 103, 154, 0.35);
+  background: rgba(224, 103, 154, 0.12);
   font-weight: 900;
   font-size: 12px;
 }
@@ -930,8 +930,8 @@ function chooseAdvancedTag(tag: string) {
 }
 
 .docker-search__tag_active {
-  border-color: rgba(128, 90, 245, 0.40);
-  background: rgba(128, 90, 245, 0.14);
+  border-color: rgba(224, 103, 154, 0.40);
+  background: rgba(224, 103, 154, 0.14);
 }
 
 .docker-search__tag-text {
@@ -946,8 +946,8 @@ function chooseAdvancedTag(tag: string) {
   opacity: 0.9;
   padding: 4px 8px;
   border-radius: 999px;
-  border: 1px solid rgba(128, 90, 245, 0.35);
-  background: rgba(128, 90, 245, 0.10);
+  border: 1px solid rgba(224, 103, 154, 0.35);
+  background: rgba(224, 103, 154, 0.10);
 }
 
 /* Aliases */

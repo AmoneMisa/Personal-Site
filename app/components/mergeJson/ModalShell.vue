@@ -135,8 +135,8 @@ function confirm() {
 }
 
 .ms__btn_primary {
-  background: rgba(128, 90, 245, .25);
-  border-color: rgba(128, 90, 245, .45);
+  background: rgba(224, 103, 154, .25);
+  border-color: rgba(224, 103, 154, .45);
 }
 
 .ms__btn_danger {
