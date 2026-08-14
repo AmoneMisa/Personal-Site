@@ -26,19 +26,6 @@ services:
         condition:
           service_healthy
 
-  admin-frontend:
-    build:
-      context: ./admin-frontend
-      args:
-        REACT_APP_API_URL: "/api"
-    restart: unless-stopped
-    environment:
-      REACT_APP_API_URL: "/api"
-    depends_on:
-      - backend
-    ports:
-      - "127.0.0.1:8081:80"
-
   frontend:
     build:
       context: ./frontend
