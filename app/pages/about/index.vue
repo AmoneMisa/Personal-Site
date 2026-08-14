@@ -26,6 +26,16 @@ const RU = {
   heroEyebrow: "обо мне подробнее",
   heroTitle: "Подробнее обо мне",
   heroLead: "Главная — про работу за десять секунд. Здесь — то, что интереснее читать, когда уже зацепило: как я хочу работать, что делаю вне работы и откуда пришла в разработку.",
+  personEyebrow: "что я за человек",
+  personTitle: "Что я за человек",
+  personIntro: "Украинка, сейчас живу в Бухаресте. Немного о том, как я работаю и что мне важно — помимо строчек в резюме.",
+  person: [
+    "Беру задачу целиком — мне спокойнее довести фичу от макета до продакшена и деплоя, чем передавать её по кусочкам.",
+    "Не паникую на пожаре: баги и регрессии в проде под нагрузкой — это про «сфокусироваться и починить», а не про стресс.",
+    "Учусь через практику — осваиваю новое, собирая пет-проекты: от Electron-приложений до ботов и мобильных.",
+    "Люблю понятность: чужой легаси разбираю аккуратно и оставляю код чище, чем нашла.",
+    "Командный человек — спокойно работаю с бэкендом, тестировщиками и дизайнером, подключаюсь к клиенту, когда нужна техническая сторона.",
+  ],
   workEyebrow: "как я хочу работать",
   workTitle: "Формат работы и логистика",
   work: [
@@ -66,6 +76,16 @@ const EN: typeof RU = {
   heroEyebrow: "more about me",
   heroTitle: "More about me",
   heroLead: "The home page is the ten-second version. This is the part that's nicer to read once you're interested: how I want to work, what I do outside work, and how I got into development.",
+  personEyebrow: "what kind of person I am",
+  personTitle: "What kind of person I am",
+  personIntro: "Ukrainian citizen, currently living in Bucharest. A bit about how I work and what matters to me — beyond the resume bullets.",
+  person: [
+    "I take the whole task — I'd rather carry a feature from mockup to production and deploy than hand it off in pieces.",
+    "I don't panic when things are on fire: prod bugs and regressions under load are about focusing and fixing, not stress.",
+    "I learn by building — I pick up new things through pet projects, from Electron apps to bots and mobile.",
+    "I like clarity: I untangle other people's legacy carefully and leave the code cleaner than I found it.",
+    "I'm a team person — I work easily with backend, testers and the designer, and step in with clients when the technical side is needed.",
+  ],
   workEyebrow: "how I want to work",
   workTitle: "Work format & logistics",
   work: [
@@ -123,6 +143,22 @@ useSeoMeta({
         <div class="eyebrow mono">{{ c.heroEyebrow }}</div>
         <h1>{{ c.heroTitle }}</h1>
         <p class="lead">{{ c.heroLead }}</p>
+      </div>
+    </section>
+
+    <div class="rd-divider" />
+
+    <!-- What kind of person -->
+    <section class="rd-section" id="person">
+      <div class="rd-wrap">
+        <div class="section-head">
+          <div class="eyebrow mono">{{ c.personEyebrow }}</div>
+          <h2>{{ c.personTitle }}</h2>
+          <p>{{ c.personIntro }}</p>
+        </div>
+        <ul class="work-list">
+          <li v-for="(trait, i) in c.person" :key="i"><span class="dash" />{{ trait }}</li>
+        </ul>
       </div>
     </section>
 
