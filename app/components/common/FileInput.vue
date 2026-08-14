@@ -148,7 +148,7 @@ function onChange(e: Event) {
   gap: 8px;
   height: 34px;
   padding: 0 12px;
-  border-radius: 999px;
+  border-radius: 8px;
   border: 1px solid var(--ui-border);
   background: rgba(0, 0, 0, 0.12);
   color: var(--ui-text);

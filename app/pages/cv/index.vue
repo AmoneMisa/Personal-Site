@@ -398,7 +398,7 @@ useHead({
 .cv__badge {
   align-self: flex-start;
   padding: 6px 14px;
-  border-radius: 100px;
+  border-radius: 8px;
   border: 1px solid var(--line);
   background: var(--bg-panel);
   color: var(--text-muted);

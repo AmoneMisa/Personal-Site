@@ -385,7 +385,7 @@ function onDownload() {
 .merge__chip {
   height: 32px;
   padding: 0 12px;
-  border-radius: 999px;
+  border-radius: 6px;
 }
 
 .merge__chip_active {

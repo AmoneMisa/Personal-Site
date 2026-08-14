@@ -959,7 +959,7 @@ onBeforeUnmount(() => {
   color: var(--ui-text-muted);
   font-weight: 600;
   padding: 8px 12px;
-  border-radius: 999px;
+  border-radius: 6px;
   border: 1px solid var(--line);
   background: rgba(255, 255, 255, 0.02);
 }
@@ -1086,7 +1086,7 @@ onBeforeUnmount(() => {
   justify-content: center;
   gap: 10px;
   padding: 4px;
-  border-radius: 999px;
+  border-radius: 8px;
   background: transparent;
 }
 
@@ -1098,7 +1098,7 @@ onBeforeUnmount(() => {
   gap: 10px;
   height: 44px;
   padding: 0 18px;
-  border-radius: 999px;
+  border-radius: 8px;
   background: rgba(22, 24, 30, .75);
   color: rgba(255, 255, 255, .88);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, .04), inset 0 -10px 20px rgba(0, 0, 0, .25);

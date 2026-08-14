@@ -346,7 +346,7 @@ const priceColumns = computed(() => {
   gap: 8px;
   font-size: 12px;
   padding: 6px 10px;
-  border-radius: 999px;
+  border-radius: 6px;
   border: 1px solid var(--ui-border);
   background: rgba(255, 255, 255, 0.03);
   color: var(--ui-text-muted);
@@ -424,7 +424,7 @@ const priceColumns = computed(() => {
   gap: 6px;
   font-size: 12px;
   padding: 6px 10px;
-  border-radius: 999px;
+  border-radius: 6px;
   border: 1px solid var(--ui-border);
   background: rgba(255, 255, 255, 0.03);
   color: var(--ui-text-muted);

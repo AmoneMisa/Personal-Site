@@ -824,7 +824,7 @@ await load(1);
 .jobs__row { grid-column: 1 / -1; display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
 .jobs__filters { display: flex; flex-wrap: wrap; gap: 8px; }
 .jobs__pill {
-  height: 34px; padding: 0 13px; border-radius: 999px; border: 1px solid var(--line);
+  height: 34px; padding: 0 13px; border-radius: 8px; border: 1px solid var(--line);
   background: rgba(255,255,255,0.03); color: var(--ui-text-muted); font-weight: 700; font-size: 12px;
   cursor: pointer; transition: filter 180ms ease, color 180ms ease;
 }
@@ -871,7 +871,7 @@ await load(1);
 .stats__row-val { font-weight: 600; white-space: nowrap; }
 .stats__row-val em { font-weight: 500; font-style: normal; font-size: 11px; }
 .stats__chips { display: flex; flex-wrap: wrap; gap: 6px; }
-.stats__chip { font-size: 12px; padding: 2px 9px; border-radius: 999px; border: 1px solid var(--line); color: var(--ui-text-muted); }
+.stats__chip { font-size: 12px; padding: 2px 9px; border-radius: 6px; border: 1px solid var(--line); color: var(--ui-text-muted); }
 .stats__chip_skill { border-color: rgba(224, 103, 154,0.35); color: #e79ec0; }
 
 .jobs__results { position: relative; }
@@ -905,7 +905,7 @@ await load(1);
 .job-card__src { font-size: 11px; text-transform: capitalize; opacity: 0.6; white-space: nowrap; }
 .job-card__ats {
   font-size: 12px; font-weight: 600; white-space: nowrap; padding: 1px 8px;
-  border: 1px solid; border-radius: 999px;
+  border: 1px solid; border-radius: 6px;
 }
 .job-card__meta { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: 12px; margin-top: 4px; }
 .job-card__company { font-weight: 600; }

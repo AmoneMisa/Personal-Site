@@ -167,7 +167,7 @@ function addPath() {
   text-transform: uppercase;
   letter-spacing: 0.03em;
   padding: 1px 6px;
-  border-radius: 999px;
+  border-radius: 6px;
   background: rgba(255, 255, 255, 0.06);
   border: 1px solid var(--line);
   opacity: 0.8;

@@ -182,7 +182,7 @@ const howSteps = [
 .quizzes__pill {
   height: 36px;
   padding: 0 14px;
-  border-radius: 999px;
+  border-radius: 8px;
   border: 1px solid var(--line);
   background: rgba(255, 255, 255, 0.03);
   color: var(--ui-text-muted);
