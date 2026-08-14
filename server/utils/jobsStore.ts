@@ -14,6 +14,9 @@ import {
   fetchAdzuna,
   fetchArbeitnow,
   fetchCompanies,
+  fetchDevKg,
+  fetchIshGo,
+  fetchItJobsUz,
   fetchJobicy,
   fetchJooble,
   fetchOlx,
@@ -21,6 +24,7 @@ import {
   fetchRemotive,
   fetchRss,
   fetchTheMuse,
+  fetchTelegram,
 } from './sources'
 
 const STORE_KEY = 'jobs:store:v1'
@@ -38,6 +42,10 @@ const FETCHERS: Record<JobSource, (q: string) => Promise<Job[]>> = {
   jooble: fetchJooble,
   rss: fetchRss,
   companies: fetchCompanies,
+  devkg: fetchDevKg,
+  ishgo: fetchIshGo,
+  itjobsuz: fetchItJobsUz,
+  telegram: fetchTelegram,
   olx: fetchOlx,
 }
 
@@ -52,8 +60,16 @@ function isConfigured(source: JobSource): boolean {
       return process.env.RSS_DEFAULTS !== 'off' || !!process.env.RSS_FEEDS
     case 'companies':
       return process.env.COMPANIES_SOURCE !== 'off'
+    case 'devkg':
+      return process.env.DEVKG_SOURCE !== 'off'
+    case 'ishgo':
+      return process.env.ISHGO_SOURCE !== 'off'
+    case 'itjobsuz':
+      return process.env.ITJOBS_UZ_SOURCE !== 'off'
+    case 'telegram':
+      return process.env.TELEGRAM_SOURCE !== 'off'
     case 'olx':
-      return process.env.OLX_SOURCE !== 'off'
+      return process.env.OLX_SOURCE === 'on'
     default:
       return true
   }

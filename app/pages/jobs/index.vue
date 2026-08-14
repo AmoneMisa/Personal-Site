@@ -78,6 +78,10 @@ const sourceOptions = [
   { value: "arbeitnow", label: "Arbeitnow" },
   { value: "adzuna", label: "Adzuna" },
   { value: "companies", label: "Companies" },
+  { value: "devkg", label: "DevKG (Kyrgyzstan)" },
+  { value: "itjobsuz", label: "IT-Jobs.uz" },
+  { value: "ishgo", label: "ishGO.uz" },
+  { value: "telegram", label: "Telegram" },
   { value: "olx", label: "OLX" },
 ];
 
@@ -94,6 +98,7 @@ const countryOptions = [
   { value: "AM", label: "Armenia" },
   { value: "KG", label: "Kyrgyzstan" },
   { value: "MD", label: "Moldova" },
+  { value: "RO", label: "Romania" },
   { value: "TJ", label: "Tajikistan" },
   { value: "TM", label: "Turkmenistan" },
   { value: "PL", label: "Poland" },
@@ -111,7 +116,17 @@ const levelOptions = ["A1", "A2", "B1", "B2", "C1", "C2", "Intermediate", "Upper
 // Rates are supplied by /jobs-feed from the shared server FX cache. Keep USD as
 // the cold/error fallback; the first successful response expands this to every
 // three-letter currency returned by the live provider.
-const usdRates = ref<Record<string, number>>({ USD: 1 });
+// Keep the controls useful before the first /jobs-feed response arrives. Live
+// API rates replace these values as soon as the server answers.
+const usdRates = ref<Record<string, number>>({
+  USD: 1,
+  EUR: 1.09,
+  UZS: 0.000079,
+  UAH: 0.024,
+  KZT: 0.0019,
+  PLN: 0.25,
+  GBP: 1.27,
+});
 const preferredCurrencies = ["USD", "EUR", "UZS", "UAH", "KZT", "PLN", "GBP"];
 const currencyOptions = computed(() => {
   const available = Object.keys(usdRates.value)
@@ -170,6 +185,29 @@ const excludeLanguages = ref<string[]>([]);
 const skills = ref("");
 const showAdvanced = ref(true);
 
+// Reka UI reserves an empty string for clearing a combobox and throws when an
+// item itself has value="". Keep the API-facing refs empty for "any", while
+// exposing a non-empty sentinel to USelectMenu.
+const ANY_SELECT_VALUE = "__any__";
+function withAnyOption(model: { value: string }) {
+  return computed<string>({
+    get: () => model.value || ANY_SELECT_VALUE,
+    set: (value) => {
+      model.value = value === ANY_SELECT_VALUE ? "" : value;
+    },
+  });
+}
+const workModeSelect = withAnyOption(workMode);
+const relocationSelect = withAnyOption(relocation);
+const languageSelect = computed<string>({
+  get: () => language.value || ANY_SELECT_VALUE,
+  set: (value) => {
+    language.value = value === ANY_SELECT_VALUE ? "" : value;
+    if (!language.value) languageLevel.value = "";
+  },
+});
+const languageLevelSelect = withAnyOption(languageLevel);
+
 const jobs = ref<Job[]>([]);
 const total = ref(0);
 const page = ref(1);
@@ -177,8 +215,15 @@ const pageSize = ref(20);
 const stats = ref<JobStats | null>(null);
 const loading = ref(false);
 const failed = ref(false);
+let loadSequence = 0;
 
 const totalPages = computed(() => Math.max(1, Math.ceil(total.value / pageSize.value)));
+
+function selectSource(value: string) {
+  if (source.value === value) return;
+  source.value = value;
+  void load(1);
+}
 
 // ---- ATS ----
 const cvProfile = ref<CvProfile | null>(null);
@@ -202,6 +247,7 @@ const countryLabel = (code: string) =>
   countryOptions.find((c) => c.value === code)?.label ?? code;
 
 async function load(toPage = 1) {
+  const requestId = ++loadSequence;
   loading.value = true;
   failed.value = false;
   const serverSort = sort.value === "ats" ? "date" : sort.value; // ATS sorts client-side
@@ -230,6 +276,8 @@ async function load(toPage = 1) {
 
   // Served by Nitro at /jobs-feed (NOT under /api, which the host site proxies to FastAPI).
   const { data, error } = await safeFetch<JobResult>("/jobs-feed", { params });
+  // A slower previous request must never overwrite a newer filter selection.
+  if (requestId !== loadSequence) return;
   if (error || !data) {
     failed.value = true; jobs.value = []; total.value = 0; stats.value = null;
   } else {
@@ -379,18 +427,18 @@ const countryItems = computed<Item[]>(() =>
 const currencyItems = computed<Item[]>(() => currencyOptions.value.map((c) => ({ label: c, value: c })));
 const periodItems = computed<Item[]>(() => periodOptions.map((p) => ({ label: periodLabel(p), value: p })));
 const workModeItems = computed<Item[]>(() => [
-  { label: t("any"), value: "" },
+  { label: t("any"), value: ANY_SELECT_VALUE },
   { label: t("wmRemote"), value: "remote" },
   { label: t("wmHybrid"), value: "hybrid" },
   { label: t("wmOffice"), value: "office" },
 ]);
 const relocationItems = computed<Item[]>(() => [
-  { label: t("any"), value: "" },
+  { label: t("any"), value: ANY_SELECT_VALUE },
   { label: t("relYes"), value: "offered" },
   { label: t("relNo"), value: "none" },
 ]);
 const languageItems = computed<Item[]>(() => [
-  { label: t("any"), value: "" },
+  { label: t("any"), value: ANY_SELECT_VALUE },
   ...languageOptions.map((l) => ({ label: l, value: l })),
 ]);
 // Multi-select of languages to exclude (no "any" pseudo-option).
@@ -398,11 +446,16 @@ const excludeLanguageItems = computed<Item[]>(() =>
   languageOptions.map((l) => ({ label: l, value: l })),
 );
 const levelItems = computed<Item[]>(() => [
-  { label: t("any"), value: "" },
+  { label: t("any"), value: ANY_SELECT_VALUE },
   ...levelOptions.map((l) => ({ label: l, value: l })),
 ]);
 
-await load(1);
+// Do not suspend SSR/hydration on the aggregated feed. A cold job store can
+// take several seconds while upstream boards time out; keeping that request at
+// top level leaves all filters rendered but inert until it finishes.
+onMounted(() => {
+  void load(1);
+});
 </script>
 
 <template>
@@ -471,7 +524,7 @@ await load(1);
               type="button"
               class="jobs__pill"
               :class="{ 'jobs__pill_active': source === opt.value }"
-              @click="source = opt.value"
+              @click="selectSource(opt.value)"
           >
             {{ opt.label ?? t(opt.labelKey!) }}
           </button>
@@ -514,28 +567,28 @@ await load(1);
         <label class="jobs__field">
           <span class="jobs__field-label">{{ t("workMode") }}</span>
           <u-select-menu
-              v-model="workMode" :items="workModeItems" value-key="value" label-key="label"
+              v-model="workModeSelect" :items="workModeItems" value-key="value" label-key="label"
               :search-input="false" class="jobs__select" @update:model-value="load(1)"
           />
         </label>
         <label class="jobs__field">
           <span class="jobs__field-label">{{ t("relocation") }}</span>
           <u-select-menu
-              v-model="relocation" :items="relocationItems" value-key="value" label-key="label"
+              v-model="relocationSelect" :items="relocationItems" value-key="value" label-key="label"
               :search-input="false" class="jobs__select" @update:model-value="load(1)"
           />
         </label>
         <label class="jobs__field">
           <span class="jobs__field-label">{{ t("language") }}</span>
           <u-select-menu
-              v-model="language" :items="languageItems" value-key="value" label-key="label"
+              v-model="languageSelect" :items="languageItems" value-key="value" label-key="label"
               class="jobs__select" @update:model-value="load(1)"
           />
         </label>
         <label class="jobs__field">
           <span class="jobs__field-label">{{ t("languageLevel") }}</span>
           <u-select-menu
-              v-model="languageLevel" :items="levelItems" value-key="value" label-key="label"
+              v-model="languageLevelSelect" :items="levelItems" value-key="value" label-key="label"
               :search-input="false" :disabled="!language" class="jobs__select" @update:model-value="load(1)"
           />
         </label>

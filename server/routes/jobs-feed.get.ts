@@ -21,6 +21,9 @@ import {
   fetchAdzuna,
   fetchArbeitnow,
   fetchCompanies,
+  fetchDevKg,
+  fetchIshGo,
+  fetchItJobsUz,
   fetchJobicy,
   fetchJooble,
   fetchOlx,
@@ -28,6 +31,7 @@ import {
   fetchRemotive,
   fetchRss,
   fetchTheMuse,
+  fetchTelegram,
 } from '../utils/sources'
 import { filterAndPaginate } from '../utils/aggregate'
 import { getStoredJobs, refreshJobStore } from '../utils/jobsStore'
@@ -43,6 +47,10 @@ const FETCHERS: Record<JobSource, (q: string) => Promise<Job[]>> = {
   jooble: fetchJooble,
   rss: fetchRss,
   companies: fetchCompanies,
+  devkg: fetchDevKg,
+  ishgo: fetchIshGo,
+  itjobsuz: fetchItJobsUz,
+  telegram: fetchTelegram,
   olx: fetchOlx,
 }
 
@@ -59,9 +67,18 @@ function isConfigured(source: JobSource): boolean {
     case 'companies':
       // On by default thanks to the built-in Greenhouse/Lever seed boards.
       return process.env.COMPANIES_SOURCE !== 'off'
+    case 'devkg':
+      // On by default — DevKG's public vacancies RSS feed, no key required.
+      return process.env.DEVKG_SOURCE !== 'off'
+    case 'ishgo':
+      return process.env.ISHGO_SOURCE !== 'off'
+    case 'itjobsuz':
+      return process.env.ITJOBS_UZ_SOURCE !== 'off'
+    case 'telegram':
+      return process.env.TELEGRAM_SOURCE !== 'off'
     case 'olx':
-      // On by default — public OLX UZ/KZ jobs API, no key required.
-      return process.env.OLX_SOURCE !== 'off'
+      // Explicit opt-in: OLX currently blocks the public endpoint on some IPs.
+      return process.env.OLX_SOURCE === 'on'
     default:
       return true
   }
@@ -126,10 +143,18 @@ export default defineEventHandler(async (event) => {
         'jooble' as JobSource,
         'rss' as JobSource,
         'companies' as JobSource,
+        'ishgo' as JobSource,
+        'itjobsuz' as JobSource,
         'olx' as JobSource,
       ]
   const activeSources = chosen.filter(isConfigured)
-  const finalSources = activeSources.length ? activeSources : FREE_SOURCES
+  // An explicitly selected but disabled/unconfigured source must return an
+  // empty result, not silently fall back to unrelated boards.
+  const finalSources = activeSources.length
+    ? activeSources
+    : requested.length
+      ? []
+      : FREE_SOURCES
 
   let remote: boolean | undefined
   if (q.remote === 'true') remote = true

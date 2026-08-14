@@ -29,7 +29,17 @@ async function fetchJson<T>(url: string, init?: RequestInit): Promise<T> {
     ...init,
     headers: { 'User-Agent': UA, Accept: 'application/json', ...(init?.headers || {}) },
   })
-  if (!res.ok) throw new Error(`${url} -> ${res.status}`)
+  if (!res.ok) {
+    // URLs may contain API credentials in path/query (Jooble, Adzuna). Keep
+    // failures observable without leaking those secrets into application logs.
+    let host = 'upstream'
+    try {
+      host = new URL(url).host
+    } catch {
+      // Keep the generic label for malformed URLs.
+    }
+    throw new Error(`${host} -> ${res.status}`)
+  }
   return (await res.json()) as T
 }
 
@@ -83,19 +93,23 @@ export async function fetchRemoteOk(_q: string): Promise<Job[]> {
 // ---------- Arbeitnow (no key) ----------
 export async function fetchArbeitnow(_q: string): Promise<Job[]> {
   const data = await fetchJson<{ data: any[] }>('https://www.arbeitnow.com/api/job-board-api')
-  return (data.data || []).map((j) => ({
-    id: `arbeitnow-${j.slug}`,
-    title: j.title,
-    company: j.company_name,
-    location: j.location || (j.remote ? 'Remote' : 'Unknown'),
-    url: j.url,
-    source: 'arbeitnow' as const,
-    remote: !!j.remote,
-    tags: [...(j.tags || []), ...(j.job_types || [])].slice(0, 8),
-    postedAt: new Date((j.created_at || 0) * 1000).toISOString(),
-    employmentType: (j.job_types || [])[0],
-    description: stripHtml(j.description).slice(0, DESC_MAX),
-  }))
+  return (data.data || []).map((j) => {
+    const tags = Array.isArray(j.tags) ? j.tags : j.tags ? [j.tags] : []
+    const jobTypes = Array.isArray(j.job_types) ? j.job_types : j.job_types ? [j.job_types] : []
+    return {
+      id: `arbeitnow-${j.slug}`,
+      title: j.title,
+      company: j.company_name,
+      location: j.location || (j.remote ? 'Remote' : 'Unknown'),
+      url: j.url,
+      source: 'arbeitnow' as const,
+      remote: !!j.remote,
+      tags: [...tags, ...jobTypes].slice(0, 8),
+      postedAt: new Date((j.created_at || 0) * 1000).toISOString(),
+      employmentType: jobTypes[0],
+      description: stripHtml(j.description).slice(0, DESC_MAX),
+    }
+  })
 }
 
 // ---------- The Muse (no key; optional MUSE_API_KEY) ----------
@@ -181,32 +195,97 @@ export async function fetchAdzuna(q: string): Promise<Job[]> {
   }))
 }
 
-// ---------- Jooble (env: JOOBLE_KEY, optional JOOBLE_LOCATION) ----------
-// Default location tuned for Ukraine (Jooble originates in Ukraine, strong UA coverage).
+// ---------- Jooble (env: JOOBLE_KEY, optional JOOBLE_LOCATIONS) ----------
+// One API call is required per location. Defaults cover Central Asia + Ukraine;
+// override with a comma-separated JOOBLE_LOCATIONS list to conserve quota or
+// target cities. Legacy JOOBLE_LOCATION is still accepted.
+const JOOBLE_DEFAULT_LOCATIONS = [
+  'Uzbekistan',
+  'Kazakhstan',
+  'Kyrgyzstan',
+  'Tajikistan',
+  'Turkmenistan',
+  'Ukraine',
+]
+
+function parseJoobleSalary(value: unknown): Pick<Job, 'salaryMin' | 'salaryMax' | 'salaryCurrency'> {
+  if (typeof value !== 'string' || !value.trim()) return {}
+  const text = value.replace(/\u00a0/g, ' ')
+  const amounts = [...text.matchAll(/\d[\d\s]*(?:[.,]\d+)?/g)]
+    .map((match) => parseDevKgAmount(match[0]))
+    .filter((amount): amount is number => amount !== undefined)
+  if (!amounts.length) return {}
+
+  const currencyAliases: [RegExp, string][] = [
+    [/\bUSD\b|\$/i, 'USD'],
+    [/\bEUR\b|€/i, 'EUR'],
+    [/\bUZS\b|сум/i, 'UZS'],
+    [/\bKZT\b|тенге/i, 'KZT'],
+    [/\bKGS\b|сом/i, 'KGS'],
+    [/\bTJS\b|сомон/i, 'TJS'],
+    [/\bTMT\b|манат/i, 'TMT'],
+    [/\bUAH\b|грн|₴/i, 'UAH'],
+  ]
+  const salaryCurrency = currencyAliases.find(([pattern]) => pattern.test(text))?.[1]
+  if (!salaryCurrency) return {}
+
+  return {
+    salaryMin: amounts[0],
+    salaryMax: amounts[1],
+    salaryCurrency,
+  }
+}
+
 export async function fetchJooble(q: string): Promise<Job[]> {
   const key = process.env.JOOBLE_KEY
   if (!key) return []
-  const body = JSON.stringify({
-    keywords: q || 'developer',
-    location: process.env.JOOBLE_LOCATION || 'Ukraine',
-  })
-  const data = await fetchJson<{ jobs: any[] }>(`https://jooble.org/api/${key}`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body,
-  })
-  return (data.jobs || []).map((j, i) => ({
-    id: `jooble-${j.id || i}-${Date.parse(j.updated || '') || i}`,
-    title: j.title,
-    company: j.company || 'Unknown',
-    location: j.location || 'Unknown',
-    url: j.link,
-    source: 'jooble' as const,
-    remote: /remote/i.test(j.title + ' ' + (j.location || '')),
-    tags: j.type ? [j.type] : [],
-    postedAt: j.updated ? new Date(j.updated).toISOString() : new Date().toISOString(),
-    description: stripHtml(j.snippet).slice(0, DESC_MAX),
-  }))
+  const configured = process.env.JOOBLE_LOCATIONS || process.env.JOOBLE_LOCATION
+  const locations = (configured ? configured.split(',') : JOOBLE_DEFAULT_LOCATIONS)
+    .map((location) => location.trim())
+    .filter(Boolean)
+
+  const results = await Promise.all(
+    locations.map(async (location) => {
+      try {
+        const data = await fetchJson<{ jobs: any[] }>(`https://jooble.org/api/${key}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            keywords: q || 'developer',
+            location,
+            page: '1',
+            ResultOnPage: '50',
+            companysearch: 'false',
+          }),
+        })
+        return data.jobs || []
+      } catch (err) {
+        console.error(`[jobs] jooble location "${location}" failed:`, (err as Error).message)
+        return []
+      }
+    }),
+  )
+
+  const deduped = new Map<string, Job>()
+  for (const [index, j] of results.flat().entries()) {
+    const description = stripHtml(j.snippet).slice(0, DESC_MAX)
+    const job: Job = {
+      id: `jooble-${j.id || index}`,
+      title: j.title,
+      company: j.company || 'Unknown',
+      location: j.location || 'Unknown',
+      url: j.link,
+      source: 'jooble',
+      remote: /remote|удал[её]н|дистанцион/i.test(`${j.title} ${j.location || ''} ${description}`),
+      tags: [j.type, j.source].filter(Boolean).slice(0, 6),
+      postedAt: j.updated ? new Date(j.updated).toISOString() : new Date().toISOString(),
+      employmentType: j.type || undefined,
+      ...parseJoobleSalary(j.salary),
+      description,
+    }
+    deduped.set(String(j.id || j.link || job.id), job)
+  }
+  return [...deduped.values()]
 }
 
 // ---------- Company career sites (Greenhouse + Lever + SmartRecruiters + Ashby) --
@@ -964,12 +1043,458 @@ export async function fetchRss(q: string): Promise<Job[]> {
   return all.filter((j) => `${j.title} ${j.company}`.toLowerCase().includes(needle))
 }
 
+// ---------- DevKG (no key) — Kyrgyzstan ----------
+// DevKG advertises this RSS feed in the <head> of its vacancies page. Using the
+// published feed keeps this adapter stable and avoids scraping presentation HTML.
+// The feed exposes employer in the title and work type / salary in description.
+// Disable with DEVKG_SOURCE=off.
+const DEVKG_RSS_URL = 'https://devkg.com/rss/jobs.xml'
+
+function parseDevKgAmount(value: string | undefined): number | undefined {
+  if (!value) return undefined
+  const normalized = value.replace(/\s/g, '').replace(',', '.')
+  const amount = Number(normalized)
+  return Number.isFinite(amount) ? amount : undefined
+}
+
+function parseDevKgSalary(text: string): Pick<Job, 'salaryMin' | 'salaryMax' | 'salaryCurrency'> {
+  const match = text.match(
+    /\b(от|до)?\s*([\d\s]+(?:[.,]\d+)?)\s*(?:[-–—]\s*([\d\s]+(?:[.,]\d+)?))?\s*(KGS|USD|EUR)\b/i,
+  )
+  if (!match) return {}
+
+  const qualifier = match[1]?.toLowerCase()
+  const first = parseDevKgAmount(match[2])
+  const second = parseDevKgAmount(match[3])
+  return {
+    salaryMin: qualifier === 'до' ? undefined : first,
+    salaryMax: second ?? (qualifier === 'до' ? first : undefined),
+    salaryCurrency: match[4].toUpperCase(),
+  }
+}
+
+export async function fetchDevKg(q: string): Promise<Job[]> {
+  if (process.env.DEVKG_SOURCE === 'off') return []
+
+  const xml = await fetchText(DEVKG_RSS_URL)
+  const parsed = new XMLParser({ ignoreAttributes: false }).parse(xml)
+  const rawItems = parsed?.rss?.channel?.item || []
+  const items = Array.isArray(rawItems) ? rawItems : [rawItems]
+
+  const jobs = items.map((item: any, index: number): Job => {
+    const fullTitle = String(item.title?.['#text'] || item.title || '').trim()
+    const separator = fullTitle.lastIndexOf(' - ')
+    const title = separator > 0 ? fullTitle.slice(0, separator).trim() : fullTitle
+    const company = separator > 0 ? fullTitle.slice(separator + 3).trim() : 'DevKG employer'
+    const rawDescription = String(item.description?.['#text'] || item.description || '')
+    const description = stripHtml(rawDescription)
+    const typeMatch = description.match(/\bТип:\s*(.+?)(?=\s+(?:от|до|\d)\s*[\d\s]*\s*(?:KGS|USD|EUR)\b)/i)
+    const employmentType = typeMatch?.[1]?.trim()
+    const url = String(item.link?.['#text'] || item.link || '')
+    const guid = String(item.guid?.['#text'] || item.guid || url || `${title}-${index}`)
+
+    return {
+      id: `devkg-${guid}`,
+      title: title || 'Untitled vacancy',
+      company,
+      location: 'Kyrgyzstan',
+      url,
+      source: 'devkg',
+      remote: /удал[её]н|remote|дистанцион/i.test(`${employmentType || ''} ${description}`),
+      tags: ['DevKG', 'Kyrgyzstan'],
+      postedAt: item.pubDate ? new Date(item.pubDate).toISOString() : new Date().toISOString(),
+      employmentType,
+      ...parseDevKgSalary(description),
+      salaryPeriod: /в месяц|monthly|per month/i.test(description) ? 'month' : undefined,
+      description: description.slice(0, DESC_MAX),
+    }
+  })
+
+  if (!q) return jobs
+  const needle = q.toLocaleLowerCase('ru')
+  return jobs.filter((job) =>
+    `${job.title} ${job.company} ${job.description || ''}`.toLocaleLowerCase('ru').includes(needle),
+  )
+}
+
+// ---------- Uzbekistan boards (no key) — ishGO + IT-Jobs.uz ----------
+// Both boards permit public vacancy/search indexing and publish each detail page
+// as standard Schema.org JobPosting JSON-LD. Read a bounded number of current
+// links from the public listing, then normalize those first-party records. This
+// avoids private APIs and brittle visual-card parsing.
+type UzbekBoardSource = 'ishgo' | 'itjobsuz'
+
+interface UzbekBoardConfig {
+  source: UzbekBoardSource
+  label: string
+  listingUrl: string
+  detailPrefix: string
+  envFlag: 'ISHGO_SOURCE' | 'ITJOBS_UZ_SOURCE'
+}
+
+const UZBEK_BOARDS: Record<UzbekBoardSource, UzbekBoardConfig> = {
+  ishgo: {
+    source: 'ishgo',
+    label: 'ishGO.uz',
+    listingUrl: 'https://ishgo.uz/ru/vacancies',
+    detailPrefix: '/ru/vacancies/',
+    envFlag: 'ISHGO_SOURCE',
+  },
+  itjobsuz: {
+    source: 'itjobsuz',
+    label: 'IT-Jobs.uz',
+    listingUrl: 'https://it-jobs.uz/ru/jobs',
+    detailPrefix: '/ru/jobs/',
+    envFlag: 'ITJOBS_UZ_SOURCE',
+  },
+}
+
+const UZBEK_BOARD_MAX_DETAILS = 24
+const UZBEK_BOARD_BATCH_SIZE = 6
+
+interface UzbekBoardLink {
+  url: string
+  localizedTitle?: string
+}
+
+function extractDetailLinks(html: string, config: UzbekBoardConfig): UzbekBoardLink[] {
+  const origin = new URL(config.listingUrl).origin
+  const links = new Map<string, UzbekBoardLink>()
+  for (const match of html.matchAll(/<a\b[^>]*href=["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>/gi)) {
+    try {
+      const url = new URL(match[1].replace(/&amp;/g, '&'), origin)
+      if (url.origin !== origin || !url.pathname.startsWith(config.detailPrefix)) continue
+      if (url.pathname === config.detailPrefix) continue
+      const canonical = `${url.origin}${url.pathname}`
+      const heading = match[2].match(/<h[1-6][^>]*>([\s\S]*?)<\/h[1-6]>/i)?.[1]
+      links.set(canonical, {
+        url: canonical,
+        localizedTitle: heading ? stripHtml(heading) : undefined,
+      })
+      if (links.size >= UZBEK_BOARD_MAX_DETAILS) break
+    } catch {
+      // Ignore malformed hrefs from unrelated page markup.
+    }
+  }
+  return [...links.values()]
+}
+
+function findJobPosting(value: any): any | undefined {
+  if (!value || typeof value !== 'object') return undefined
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      const found = findJobPosting(item)
+      if (found) return found
+    }
+    return undefined
+  }
+  const types = Array.isArray(value['@type']) ? value['@type'] : [value['@type']]
+  if (types.includes('JobPosting')) return value
+  return findJobPosting(value['@graph'])
+}
+
+function extractJobPosting(html: string): any | undefined {
+  for (const match of html.matchAll(
+    /<script[^>]*type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi,
+  )) {
+    try {
+      const found = findJobPosting(JSON.parse(match[1]))
+      if (found) return found
+    } catch {
+      // A page may contain unrelated malformed JSON-LD; keep looking.
+    }
+  }
+  return undefined
+}
+
+function schemaSalary(posting: any): Pick<Job, 'salaryMin' | 'salaryMax' | 'salaryCurrency' | 'salaryPeriod'> {
+  const salary = Array.isArray(posting.baseSalary) ? posting.baseSalary[0] : posting.baseSalary
+  const value = salary?.value
+  const min = Number(value?.minValue ?? value?.value)
+  const max = Number(value?.maxValue)
+  const unit = String(value?.unitText || '').toLowerCase()
+  const salaryPeriod = /hour/.test(unit)
+    ? 'hour'
+    : /month/.test(unit)
+      ? 'month'
+      : /year/.test(unit)
+        ? 'year'
+        : undefined
+  return {
+    salaryMin: Number.isFinite(min) ? min : undefined,
+    salaryMax: Number.isFinite(max) ? max : undefined,
+    salaryCurrency: salary?.currency ? String(salary.currency).toUpperCase() : undefined,
+    salaryPeriod,
+  }
+}
+
+function schemaLocation(posting: any): string {
+  const locations = Array.isArray(posting.jobLocation) ? posting.jobLocation : [posting.jobLocation]
+  const parts = locations
+    .map((location: any) => {
+      const address = location?.address || {}
+      const country = typeof address.addressCountry === 'object'
+        ? address.addressCountry.name
+        : address.addressCountry
+      const unique = new Map<string, string>()
+      for (const part of [address.addressLocality, address.addressRegion, country].filter(Boolean)) {
+        const text = String(part).trim()
+        unique.set(text.toLocaleLowerCase('ru'), text)
+      }
+      return [...unique.values()].join(', ')
+    })
+    .filter(Boolean)
+  return [...new Set(parts)].join(' / ') || 'Uzbekistan'
+}
+
+function normalizeSchemaPosting(
+  posting: any,
+  url: string,
+  config: UzbekBoardConfig,
+  html: string,
+  titleOverride?: string,
+): Job | undefined {
+  if (!posting?.title || !posting?.datePosted) return undefined
+  const date = new Date(posting.datePosted)
+  if (Number.isNaN(date.getTime())) return undefined
+  const description = stripHtml(posting.description).slice(0, 2000)
+  const employment = Array.isArray(posting.employmentType)
+    ? posting.employmentType.map(String)
+    : posting.employmentType
+      ? [String(posting.employmentType)]
+      : []
+  const company = posting.hiringOrganization?.name || 'Unknown'
+  const slug = new URL(url).pathname.split('/').filter(Boolean).pop() || url
+  const documentTitle = stripHtml(html.match(/<title[^>]*>([\s\S]*?)<\/title>/i)?.[1])
+  const localizedIshGoTitle = config.source === 'ishgo'
+    ? documentTitle.match(/^Вакансия\s+(.+?),\s+работа\s+в\b/i)?.[1]
+    : undefined
+
+  return {
+    id: `${config.source}-${slug}`,
+    title: titleOverride || localizedIshGoTitle || stripHtml(String(posting.title)),
+    company: stripHtml(String(company)),
+    location: schemaLocation(posting),
+    url,
+    source: config.source,
+    remote: posting.jobLocationType === 'TELECOMMUTE'
+      || /remote|удал[её]н|дистанцион|masofaviy/i.test(`${description} ${employment.join(' ')}`),
+    tags: [config.label, ...employment].slice(0, 6),
+    postedAt: date.toISOString(),
+    employmentType: employment[0],
+    ...schemaSalary(posting),
+    description,
+  }
+}
+
+async function fetchUzbekBoard(q: string, source: UzbekBoardSource): Promise<Job[]> {
+  const config = UZBEK_BOARDS[source]
+  if (process.env[config.envFlag] === 'off') return []
+
+  const listing = await fetchText(config.listingUrl)
+  const links = extractDetailLinks(listing, config)
+  const jobs: Job[] = []
+  for (let start = 0; start < links.length; start += UZBEK_BOARD_BATCH_SIZE) {
+    const batch = links.slice(start, start + UZBEK_BOARD_BATCH_SIZE)
+    const parsed = await Promise.all(
+      batch.map(async ({ url, localizedTitle }) => {
+        try {
+          const html = await fetchText(url)
+          const posting = extractJobPosting(html)
+          return posting
+            ? normalizeSchemaPosting(posting, url, config, html, localizedTitle)
+            : undefined
+        } catch (err) {
+          console.error(`[jobs] ${config.source} detail failed:`, (err as Error).message)
+          return undefined
+        }
+      }),
+    )
+    jobs.push(...parsed.filter((job): job is Job => job !== undefined))
+  }
+
+  if (!q) return jobs
+  const needle = q.toLocaleLowerCase('ru')
+  return jobs.filter((job) =>
+    `${job.title} ${job.company} ${job.description || ''}`.toLocaleLowerCase('ru').includes(needle),
+  )
+}
+
+export async function fetchIshGo(q: string): Promise<Job[]> {
+  return fetchUzbekBoard(q, 'ishgo')
+}
+
+export async function fetchItJobsUz(q: string): Promise<Job[]> {
+  return fetchUzbekBoard(q, 'itjobsuz')
+}
+
+// ---------- Telegram public channels (no bot token) ----------
+// Telegram exposes a read-only preview for public channels at /s/<handle>.
+// This adapter reads only that public HTML; it never joins channels, uses a
+// user account, or requires Telegram Bot API credentials.
+interface TelegramChannel {
+  handle: string
+  label: string
+  country: string
+  location: string
+  priority: 1 | 2 | 3
+  tags: string[]
+}
+
+const TELEGRAM_CHANNELS: TelegramChannel[] = [
+  // Uzbekistan — primary IT/general/banking feeds.
+  { handle: 'UzDev_Jobs', label: 'UzDev Jobs', country: 'UZ', location: 'Uzbekistan', priority: 1, tags: ['IT'] },
+  { handle: 'itcloz', label: 'IT Cloz', country: 'UZ', location: 'Uzbekistan', priority: 1, tags: ['IT'] },
+  { handle: 'clozjobs', label: 'Cloz Jobs', country: 'UZ', location: 'Uzbekistan', priority: 1, tags: ['Jobs'] },
+  { handle: 'Ish_Toshkent', label: 'Ish Toshkent', country: 'UZ', location: 'Tashkent, Uzbekistan', priority: 1, tags: ['General'] },
+  { handle: 'ish_bor_vakansiyalaruz', label: 'Ish Bor Vakansiyalar', country: 'UZ', location: 'Uzbekistan', priority: 1, tags: ['General'] },
+  { handle: 'ishbank', label: 'Ishbank', country: 'UZ', location: 'Uzbekistan', priority: 1, tags: ['Banking', 'Finance'] },
+  { handle: 'vacancyuzairports', label: 'Uzbekistan Airports Careers', country: 'UZ', location: 'Uzbekistan', priority: 2, tags: ['Aviation'] },
+  { handle: 'careerTBC', label: 'TBC Uzbekistan Careers', country: 'UZ', location: 'Uzbekistan', priority: 2, tags: ['Banking', 'Fintech'] },
+  { handle: 'tatu_karyera_markazi', label: 'TATU Career Center', country: 'UZ', location: 'Tashkent, Uzbekistan', priority: 2, tags: ['IT', 'Junior'] },
+  { handle: 'tdtu_karyera_markaz', label: 'TDTU Career Center', country: 'UZ', location: 'Tashkent, Uzbekistan', priority: 2, tags: ['Engineering'] },
+  // Duplicate mirrors / very narrow feeds are opt-in via TELEGRAM_INCLUDE_LOW_PRIORITY=on.
+  { handle: 'linkedinjobsuzbekistan', label: 'LinkedIn Jobs Uzbekistan mirror', country: 'UZ', location: 'Uzbekistan', priority: 3, tags: ['Mirror'] },
+  { handle: 'uzjobsuz', label: 'UzJobs mirror', country: 'UZ', location: 'Uzbekistan', priority: 3, tags: ['Mirror'] },
+  { handle: 'android_jobs_for_future_tashkent', label: 'Android Jobs Tashkent', country: 'UZ', location: 'Tashkent, Uzbekistan', priority: 3, tags: ['Android'] },
+
+  // Kazakhstan.
+  { handle: 'jobkz_1', label: 'JobKZ', country: 'KZ', location: 'Kazakhstan', priority: 1, tags: ['General'] },
+  { handle: 'devkz_jobs', label: 'DevKZ Jobs', country: 'KZ', location: 'Kazakhstan', priority: 1, tags: ['IT'] },
+  { handle: 'almaty_rabota_work', label: 'Almaty Rabota', country: 'KZ', location: 'Almaty, Kazakhstan', priority: 2, tags: ['General'] },
+
+  // Kyrgyzstan.
+  { handle: 'findwork', label: 'Find Work KG', country: 'KG', location: 'Kyrgyzstan', priority: 1, tags: ['General'] },
+  { handle: 'jobkg_official', label: 'Job KG', country: 'KG', location: 'Kyrgyzstan', priority: 1, tags: ['General'] },
+  { handle: 'jobslbish', label: 'Jobs Lbish', country: 'KG', location: 'Kyrgyzstan', priority: 2, tags: ['General'] },
+  { handle: 'jumush312kg', label: 'Jumush 312 KG', country: 'KG', location: 'Bishkek, Kyrgyzstan', priority: 2, tags: ['General'] },
+
+  // Ukraine and Romania.
+  { handle: 'robotaua_now_remote', label: 'Robota UA Remote', country: 'UA', location: 'Ukraine', priority: 1, tags: ['Remote'] },
+  { handle: 'jobs_kyiv', label: 'Jobs Kyiv', country: 'UA', location: 'Kyiv, Ukraine', priority: 2, tags: ['General'] },
+  { handle: 'devjobro', label: 'DevJob Romania', country: 'RO', location: 'Romania', priority: 1, tags: ['IT'] },
+  { handle: 'jobs4ukrinromania', label: 'Jobs for Ukrainians in Romania', country: 'RO', location: 'Romania', priority: 1, tags: ['For Ukrainians'] },
+]
+
+function decodeTelegramEntities(text: string): string {
+  const named: Record<string, string> = {
+    amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", nbsp: ' ', ndash: '–', mdash: '—', bull: '•',
+  }
+  return text.replace(/&(#x?[0-9a-f]+|[a-z]+);/gi, (match, entity: string) => {
+    if (entity.startsWith('#')) {
+      const hex = entity[1]?.toLowerCase() === 'x'
+      const value = Number.parseInt(entity.slice(hex ? 2 : 1), hex ? 16 : 10)
+      return Number.isFinite(value) ? String.fromCodePoint(value) : match
+    }
+    return named[entity.toLowerCase()] ?? match
+  })
+}
+
+function telegramText(html: string): string {
+  return decodeTelegramEntities(
+    html
+      .replace(/<br\s*\/?>/gi, '\n')
+      .replace(/<\/(?:p|div|li|h[1-6])>/gi, '\n')
+      .replace(/<[^>]*>/g, ' '),
+  )
+    .split('\n')
+    .map((line) => line.replace(/\s+/g, ' ').trim())
+    .filter(Boolean)
+    .join('\n')
+    .trim()
+}
+
+function telegramField(text: string, names: string): string | undefined {
+  const match = text.match(new RegExp(`(?:^|\\n)[^\\p{L}\\p{N}\\n]{0,6}(?:${names})\\s*[:—-]\\s*([^\\n]{2,100})`, 'iu'))
+  return match?.[1]?.trim()
+}
+
+function telegramTitle(text: string, channel: TelegramChannel): string {
+  const lines = text.split('\n').map((line) => line.trim()).filter(Boolean)
+  const explicit = telegramField(text, 'vacancy|position|role|вакансия|позиция|посада|lavozim')
+  const useful = lines.find((line) =>
+    !/^(?:#\w+\s*)+$/.test(line)
+    && !/^(?:vacancy|вакансия|иш|ish|работа|job)\s*[:.!-]*$/i.test(line)
+    && /developer|engineer|designer|manager|analyst|qa|tester|devops|frontend|backend|android|ios|разработ|инженер|дизайнер|менеджер|аналитик|тестиров|бухгалтер|оператор|специалист|mutaxassis|dasturchi/i.test(line),
+  )
+  const title = explicit || useful || lines.find((line) => !/^#/.test(line)) || `Vacancy from ${channel.label}`
+  return title.replace(/^[\p{Extended_Pictographic}\p{Emoji_Presentation}\s#*_-]+/gu, '').slice(0, 180)
+    || `Vacancy from ${channel.label}`
+}
+
+function parseTelegramChannelHtml(html: string, channel: TelegramChannel, q: string): Job[] {
+  const jobs: Job[] = []
+  const chunks = html.split(/<div class="tgme_widget_message_wrap\b[^>]*>/i).slice(1)
+  const needle = q.trim().toLocaleLowerCase('ru')
+
+  for (const chunk of chunks) {
+    const post = chunk.match(/data-post="([^"]+)"/i)?.[1]
+    const body = chunk.match(/<div class="tgme_widget_message_text[^"]*"[^>]*>([\s\S]*?)<\/div>/i)?.[1]
+    if (!post || !body) continue
+    const text = telegramText(body)
+    if (text.length < 20) continue
+    if (!/vacan|ваканс|робот|работ|ish\b|job\b|career|lavozim|maosh|зарплат|developer|manager|engineer|дизайнер|менеджер|инженер/i.test(text)) continue
+
+    const title = telegramTitle(text, channel)
+    const company = telegramField(text, 'company|employer|компания|работодатель|роботодавець|компанія|tashkilot|ish beruvchi') || channel.label
+    const location = telegramField(text, 'location|city|локация|город|місто|manzil|shahar') || channel.location
+    if (needle && !`${title} ${company} ${text}`.toLocaleLowerCase('ru').includes(needle)) continue
+
+    const datetime = chunk.match(/<time[^>]+datetime="([^"]+)"/i)?.[1]
+    const salary = parseJoobleSalary(text)
+    const hashtags = [...text.matchAll(/(?:^|\s)#([\p{L}\p{N}_-]{2,40})/gu)].map((match) => match[1]!)
+    jobs.push({
+      id: `telegram-${post.replace(/[^a-z0-9_-]+/gi, '-')}`,
+      title,
+      company,
+      location,
+      url: `https://t.me/${post}`,
+      source: 'telegram',
+      remote: /remote|удал[её]н|віддален|masofaviy|онлайн|online/i.test(`${title} ${text}`),
+      tags: [...channel.tags, channel.country, `@${channel.handle}`, ...hashtags].slice(0, 8),
+      postedAt: datetime && !Number.isNaN(Date.parse(datetime)) ? new Date(datetime).toISOString() : new Date().toISOString(),
+      description: text.slice(0, DESC_MAX),
+      ...salary,
+    })
+  }
+  return jobs
+}
+
+async function fetchTelegramChannel(channel: TelegramChannel, q: string): Promise<Job[]> {
+  const url = `https://t.me/s/${encodeURIComponent(channel.handle)}`
+  const res = await fetch(url, {
+    headers: { 'User-Agent': UA, Accept: 'text/html,application/xhtml+xml' },
+    signal: AbortSignal.timeout(10_000),
+  })
+  if (!res.ok) throw new Error(`t.me/@${channel.handle} -> ${res.status}`)
+  return parseTelegramChannelHtml(await res.text(), channel, q)
+}
+
+export async function fetchTelegram(q: string): Promise<Job[]> {
+  if (process.env.TELEGRAM_SOURCE === 'off') return []
+  const includeLowPriority = process.env.TELEGRAM_INCLUDE_LOW_PRIORITY === 'on'
+  const channels = TELEGRAM_CHANNELS.filter((channel) => includeLowPriority || channel.priority < 3)
+  const jobs: Job[] = []
+
+  // Small batches avoid hammering Telegram and reduce the chance of a 429.
+  for (let start = 0; start < channels.length; start += 4) {
+    const batch = channels.slice(start, start + 4)
+    const results = await Promise.all(
+      batch.map((channel) => fetchTelegramChannel(channel, q).catch((err) => {
+        console.error(`[jobs] telegram @${channel.handle} failed:`, (err as Error).message)
+        return [] as Job[]
+      })),
+    )
+    jobs.push(...results.flat())
+  }
+  return jobs
+}
+
 // ---------- OLX (no key) — Uzbekistan + Kazakhstan classifieds ----------
 // OLX exposes a public offers JSON API (the same one its own site calls). It is
-// the primary keyless UZ/KZ source; most regional career sites are bespoke, SPA,
-// geo-blocked, or robots-forbidden. OLX's robots.txt permits /api/v1/offers/
-// (only */ajax/, */search/ and specific sub-endpoints are disallowed), so this
-// uses the allowed listing endpoint — an official API, not HTML scraping.
+// Kept as an explicit opt-in fallback because the public endpoint may be blocked
+// by OLX at infrastructure level (403 in the production-like smoke test). Enable
+// only after verifying the deployment IP with OLX: OLX_SOURCE=on.
 //
 // category_id=6 is "Работа" (Jobs). Ads carry created_time AND last_refresh_time;
 // we use last_refresh_time as postedAt because an OLX ad that was re-activated is
@@ -1023,7 +1548,7 @@ async function fetchOlxHost(
 }
 
 export async function fetchOlx(q: string): Promise<Job[]> {
-  if (process.env.OLX_SOURCE === 'off') return []
+  if (process.env.OLX_SOURCE !== 'on') return []
   const tasks: Promise<Job[]>[] = []
   for (const { host, countryName } of OLX_HOSTS) {
     for (let page = 0; page < OLX_PAGES; page++) {

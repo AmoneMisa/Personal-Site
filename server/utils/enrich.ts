@@ -69,7 +69,15 @@ export const PER_YEAR: Record<SalaryPeriod, number> = {
 
 // Sources that quote monthly salaries by convention (CIS boards) when text gives
 // no explicit period. Everything else defaults to yearly (typical for remote/EU/US).
-const MONTHLY_SOURCES = new Set<Job['source']>(['jooble', 'rss', 'olx'])
+const MONTHLY_SOURCES = new Set<Job['source']>([
+  'jooble',
+  'rss',
+  'devkg',
+  'ishgo',
+  'itjobsuz',
+  'telegram',
+  'olx',
+])
 
 function detectSalaryPeriod(job: Job, text: string): SalaryPeriod {
   if (/per hour|\/\s?h(ou)?r\b|hourly|\bp\/h\b|в час|за час|годину|годин\b/i.test(text)) return 'hour'
@@ -99,6 +107,7 @@ const COUNTRY_PATTERNS: [string, RegExp][] = [
   ['AM', /armenia|yerevan|армен|ереван/i],
   ['KG', /kyrgyz|bishkek|киргиз|кыргыз|бишкек/i],
   ['MD', /moldova|chisinau|молдов|кишин/i],
+  ['RO', /romania|bucharest|bucurești|bucuresti|румын|румун|бухарест/i],
   ['TJ', /tajik|dushanbe|таджик|душанбе/i],
   ['TM', /turkmen|ashgabat|туркмен|ашхабад/i],
   ['PL', /poland|warsaw|krak|polska|польш|варшав|краков/i],
