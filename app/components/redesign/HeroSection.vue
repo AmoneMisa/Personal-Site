@@ -5,7 +5,7 @@ import { useExperienceYears } from "~/composables/useExperienceYears";
 
 const content = useHomeContent();
 const hero = computed(() => content.value.hero);
-const { label: expLabel } = useExperienceYears();
+const { labelYM } = useExperienceYears();
 </script>
 
 <template>
@@ -22,7 +22,7 @@ const { label: expLabel } = useExperienceYears();
           </div>
           <div class="stat-row">
             <div class="stat">
-              <b>{{ expLabel }}</b>
+              <b>{{ labelYM }}</b>
               <span class="mono">{{ hero.statPracticeLabel }}</span>
             </div>
             <div class="stat">
@@ -34,8 +34,18 @@ const { label: expLabel } = useExperienceYears();
 
         <div class="hero-portrait">
           <div class="portrait-frame">
-            <redesign-emoji cp="1f988" :size="44" alt="акула" />
-            <div class="portrait-placeholder">{{ hero.portraitPlaceholder }}</div>
+            <nuxt-img
+                class="portrait-img"
+                src="/images/photo.png"
+                alt="Marharyta Kubai"
+                width="896"
+                height="1195"
+                sizes="(max-width: 960px) 88vw, 420px"
+                format="webp"
+                :quality="80"
+                fetchpriority="high"
+                preload
+            />
           </div>
           <div class="portrait-caption">
             <redesign-emoji cp="1f63b" :size="15" alt="кот" />
@@ -126,22 +136,18 @@ h1 .accent {
   position: relative;
 }
 .portrait-frame {
-  aspect-ratio: 1 / 1;
+  aspect-ratio: 4 / 5;
   border-radius: 16px;
   overflow: hidden;
   background: var(--bg-panel);
   border: 1px solid var(--line);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-direction: column;
-  gap: 14px;
 }
-.portrait-placeholder {
-  font-size: 13.5px;
-  color: var(--text-muted);
-  text-align: center;
-  padding: 0 24px;
+.portrait-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center top;
+  display: block;
 }
 .portrait-caption {
   margin-top: 14px;

@@ -28,7 +28,7 @@ const links = {
 const skills = {
   core: ["JavaScript", "TypeScript", "HTML", "CSS / SCSS", "Responsive layout", "React"],
   frameworks: ["Vue", "Nuxt", "Vite", "Pinia", "Vuex"],
-  ui: ["Tailwind", "Nuxt UI", "Vuetify", "Email template coding", "Liquid (Shopify)", "Freemarker"],
+  ui: ["Tailwind", "Nuxt UI", "Vuetify", "Email template coding", "Liquid (Shopify)", "Freemarker", "Velocity"],
   platform: ["Node.js", "Python", "FastAPI", "REST APIs", "Cron jobs", "HTML parsing", "Electron", "Telegram / Discord Bot API"],
   tooling: ["Git", "Docker", "CI/CD", "Swagger", "PostgreSQL", "MySQL", "MongoDB", "Redis", "Jira", "Figma"],
 };
@@ -75,20 +75,22 @@ const experience = [
     start: "2021-06",
     end: null, // present
     ru: [
-      "Разработка и поддержка frontend-функций маркетплейса.",
-      "Реализация и поддержка UI на шаблонах Freemarker.",
+      "Разработка и поддержка frontend-функций маркетплейса под high-load.",
+      "Реализация и поддержка UI на шаблонах Freemarker и Velocity.",
       "Улучшение и исправление адаптивной вёрстки под разные устройства.",
       "Создание и поддержка продакшн-шаблонов email.",
+      "Docker и CI/CD в повседневной работе; деплой и релизы наравне с разработкой.",
       "Работа с существующей кодовой базой и бизнес-ориентированными изменениями UI.",
-      "Поддержка и развитие существующих e-commerce решений.",
+      "Тесное взаимодействие с бэкендом, тестировщиками и дизайнером.",
     ],
     en: [
-      "Development and support of marketplace frontend features.",
-      "Implementation and maintenance of UI using Freemarker templates.",
+      "Development and support of high-load marketplace frontend features.",
+      "Implementation and maintenance of UI using Freemarker and Velocity templates.",
       "Improving and fixing responsive layouts across different devices.",
       "Creating and maintaining production email templates.",
+      "Docker and CI/CD day to day; deploys and releases alongside development.",
       "Working with an existing codebase and business-driven UI changes.",
-      "Supporting and extending existing e-commerce solutions.",
+      "Close work with the backend, testers and the designer.",
     ],
   },
   {
