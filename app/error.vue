@@ -169,12 +169,12 @@ function retry() {
   justify-content: center;
   height: 34px;
   padding: 0 12px;
-  border-radius: 999px;
+  border-radius: 8px;
 
   background: rgba(14, 12, 21, 0.70);
-  border: 1px solid rgba(255, 255, 255, 0.10);
+  border: 1px solid var(--line);
   color: rgba(255, 255, 255, 0.88);
-  font-weight: 900;
+  font-weight: 600;
   letter-spacing: 0.6px;
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
   backdrop-filter: blur(10px);
