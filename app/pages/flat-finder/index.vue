@@ -20,6 +20,8 @@ interface Listing {
   city: string;
   district?: string | null;
   metro?: string | null;
+  address?: string | null;
+  roomOnly?: boolean;
   lat: number | null;
   lng: number | null;
   photo: string | null;
@@ -435,7 +437,8 @@ function specLine(l: Listing): string {
   return parts.join(" · ");
 }
 function locLine(l: Listing): string {
-  return [l.city, l.district].filter(Boolean).join(", ");
+  // Broad -> specific: city, district, metro station (when known).
+  return [l.city, l.district, l.metro].filter(Boolean).join(", ");
 }
 function timeAgo(iso: string | null): string {
   if (!iso) return "";
@@ -608,6 +611,7 @@ onBeforeUnmount(() => {
           />
           <div v-else class="flat-card__no-photo">{{ t("noPhoto") }}</div>
           <span v-if="dealLabel(l.dealType)" class="flat-card__deal">{{ dealLabel(l.dealType) }}</span>
+          <span v-if="l.roomOnly" class="flat-card__room">{{ t("roomShare") }}</span>
         </div>
         <div class="flat-card__body">
           <div class="flat-card__actions">
@@ -656,12 +660,13 @@ onBeforeUnmount(() => {
                 @click="lightbox = p"
             />
           </div>
-          <div class="flat-modal__price">{{ priceLabel(active) }}<span v-if="dealLabel(active.dealType)" class="flat-modal__deal"> · {{ dealLabel(active.dealType) }}</span></div>
+          <div class="flat-modal__price">{{ priceLabel(active) }}<span v-if="dealLabel(active.dealType)" class="flat-modal__deal"> · {{ dealLabel(active.dealType) }}</span><span v-if="active.roomOnly" class="flat-modal__deal"> · {{ t("roomShare") }}</span></div>
           <div class="flat-modal__meta text-muted">
             <span v-if="specLine(active)">{{ specLine(active) }}</span>
             <span v-if="locLine(active)"> · {{ locLine(active) }}</span>
             <span v-if="active.buildingYear"> · {{ t("built") }} {{ active.buildingYear }}</span>
           </div>
+          <div v-if="active.address" class="flat-modal__addr text-muted">📍 {{ active.address }}</div>
           <p v-if="active.description" class="flat-modal__desc">{{ active.description }}</p>
           <div v-if="active.tags && active.tags.length" class="flat-modal__tags">
             <span v-for="tag in active.tags" :key="tag" class="flat-modal__tag">{{ tag }}</span>
@@ -766,6 +771,8 @@ onBeforeUnmount(() => {
 .flat-card__photo img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .flat-card__no-photo { display: flex; align-items: center; justify-content: center; height: 100%; color: var(--text-muted); font-size: 12px; }
 .flat-card__deal { position: absolute; top: 8px; left: 8px; font-size: 11px; padding: 2px 8px; border-radius: 6px; background: rgba(13,17,40,0.8); color: #e0679a; }
+.flat-card__room { position: absolute; top: 8px; right: 8px; font-size: 11px; padding: 2px 8px; border-radius: 6px; background: rgba(13,17,40,0.8); color: #7189d9; }
+.flat-modal__addr { font-size: 13px; }
 .flat-card__body { position: relative; padding: 12px 14px; display: flex; flex-direction: column; gap: 4px; }
 .flat-card__actions { position: absolute; top: 10px; right: 10px; display: flex; gap: 5px; }
 .flat-card__action {

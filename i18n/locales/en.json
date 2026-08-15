@@ -59,6 +59,7 @@
     "empty": "No listings match your search.",
     "error": "Could not load listings. Please try again.",
     "noPhoto": "No photo",
+    "roomShare": "Room share",
     "priceNA": "Price N/D",
     "roomsN": "{n} rooms",
     "sqm": "m²",
