@@ -36,6 +36,7 @@ interface Listing {
 interface FeedResult {
   count: number;
   listings: Listing[];
+  warming?: boolean;
   sourceCounts?: Record<string, number>;
   sourceErrors?: Array<{ source?: string; country?: string; error?: string }>;
   error?: string;
@@ -85,6 +86,7 @@ const listings = ref<Listing[]>([]);
 const total = ref(0);
 const loading = ref(false);
 const loadingMore = ref(false);
+const warming = ref(false);
 const failed = ref(false);
 const sourceErrors = ref<FeedResult["sourceErrors"]>([]);
 const failedPhotoUrls = ref<Set<string>>(new Set());
@@ -101,6 +103,7 @@ const loadMoreSentinel = ref<HTMLElement | null>(null);
 const drawnArea = ref<Array<{ lat: number; lng: number }>>([]);
 let loadSeq = 0;
 let loadTimer: ReturnType<typeof setTimeout> | undefined;
+let warmTimer: ReturnType<typeof setTimeout> | undefined;
 let infiniteObserver: IntersectionObserver | undefined;
 
 function photoCandidates(listing: Listing): string[] {
@@ -290,11 +293,22 @@ async function loadMeta() {
   }
 }
 
-async function load(append = false) {
+function scheduleWarmPoll() {
+  if (warmTimer) clearTimeout(warmTimer);
+  if (!warming.value) return;
+  warmTimer = setTimeout(() => {
+    warmTimer = undefined;
+    void load(false, true);
+  }, 1800);
+}
+
+async function load(append = false, background = false) {
   const seq = ++loadSeq;
-  if (append) loadingMore.value = true;
-  else loading.value = true;
-  failed.value = false;
+  if (!background) {
+    if (append) loadingMore.value = true;
+    else loading.value = true;
+    failed.value = false;
+  }
   const params: Record<string, string> = { limit: String(PAGE_SIZE), offset: append ? String(listings.value.length) : "0" };
   if (countries.value.length) params.countries = countries.value.join(",");
   if (city.value) params.city = city.value;
@@ -313,12 +327,14 @@ async function load(append = false) {
     return;
   }
   if (error || !data || data.error) {
-    failed.value = true;
-    if (!append) {
-      listings.value = [];
-      total.value = 0;
+    if (!background) {
+      failed.value = true;
+      if (!append) {
+        listings.value = [];
+        total.value = 0;
+      }
+      sourceErrors.value = [];
     }
-    sourceErrors.value = [];
   } else {
     const next = data.listings || [];
     listings.value = append
@@ -326,10 +342,14 @@ async function load(append = false) {
       : next;
     total.value = data.count ?? listings.value.length;
     sourceErrors.value = data.sourceErrors || [];
+    warming.value = !!data.warming;
   }
-  loading.value = false;
-  loadingMore.value = false;
-  if (!append) void syncQueryParams();
+  if (!background) {
+    loading.value = false;
+    loadingMore.value = false;
+  }
+  if (!append && !background) void syncQueryParams();
+  scheduleWarmPoll();
 }
 
 function scheduleLoad(delay = 250) {
@@ -447,6 +467,7 @@ watch(loadMoreSentinel, (current, previous) => {
 
 onBeforeUnmount(() => {
   if (loadTimer) clearTimeout(loadTimer);
+  if (warmTimer) clearTimeout(warmTimer);
   infiniteObserver?.disconnect();
 });
 </script>

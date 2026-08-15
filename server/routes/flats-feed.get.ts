@@ -43,7 +43,11 @@ function refreshFeed(key: string, url: string): Promise<any> {
   if (current) return current
   const request = $fetch<any>(url, { timeout: 15_000 })
     .then((data) => {
-      feedCache.set(key, { at: Date.now(), data })
+      // A cold backend returns immediately with `warming: true`. Keep that
+      // response only as stale so the client's next poll reaches upstream
+      // instead of replaying an empty snapshot for the normal 30-second TTL.
+      const at = data?.warming ? Date.now() - FEED_FRESH_MS : Date.now()
+      feedCache.set(key, { at, data })
       return data
     })
     .finally(() => feedRefreshes.delete(key))
@@ -58,9 +62,9 @@ export default defineEventHandler(async (event) => {
     .map((source) => source.trim().toLowerCase())
     .filter((source) => source === 'olx' || source === 'telegram')
 
-  // The flat backend keeps one warmed all-source scrape per filter set and
-  // applies this source selection after the cache read. Forward the selection
-  // so filtering happens before backend pagination.
+  // The flat backend keeps one complete warmed snapshot per country and applies
+  // all UI filters after the cache read. Forward filters so they are evaluated
+  // in memory before backend pagination, never by launching another scrape.
   const upstreamParams = new URLSearchParams(incoming.searchParams)
   const url = `${FLAT_API_URL}/api/listings?${upstreamParams}`
   const key = upstreamParams.toString()
@@ -74,7 +78,7 @@ export default defineEventHandler(async (event) => {
   })
   const shapeWithCombinedFallback = async (raw: any) => {
     const shaped = shapeResponse(raw, requestedSources)
-    if (requestedSources.length !== 1 || shaped.listings.length || Number(raw?.sourceCounts?.[requestedSources[0]!]) > 0) {
+    if (raw?.warming || requestedSources.length !== 1 || shaped.listings.length || Number(raw?.sourceCounts?.[requestedSources[0]!]) > 0) {
       return enforcePage(shaped)
     }
 
