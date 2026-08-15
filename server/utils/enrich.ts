@@ -224,6 +224,7 @@ const COUNTRY_PATTERNS: [string, RegExp][] = [
   ['CN', /\bchina\b|beijing|shanghai|shenzhen|guangzhou|hangzhou|китай|пекин|шанхай/i],
   ['JP', /\bjapan\b|tokyo|osaka|kyoto|япони|токио|осака/i],
   ['KR', /south korea|\bkorea\b|seoul|busan|коре|сеул/i],
+  ['TW', /taiwan|taipei|kaohsiung|taichung|тайван|тайбэй|臺灣|台灣|台北/i],
 ]
 
 // Resolve a free-text blob (EN/RU/UK; country name OR capital city) to an ISO-2

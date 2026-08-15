@@ -117,6 +117,7 @@ const countryOptions = [
   { value: "CN", label: "China" },
   { value: "JP", label: "Japan" },
   { value: "KR", label: "South Korea" },
+  { value: "TW", label: "Taiwan" },
 ];
 
 const languageOptions = ["English", "German", "Russian", "Ukrainian", "Uzbek", "Kazakh", "French", "Spanish", "Polish", "Turkish", "Japanese"];
@@ -1256,7 +1257,8 @@ onBeforeUnmount(() => {
   height: 100%; min-height: 210px; display: flex; flex-direction: column;
 }
 /* Tags/skills sink to the bottom so cards line up regardless of body length. */
-.job-card__tags, .job-card__skills:last-child { margin-top: auto; }
+/* Bottom group (details button + tags/skills) is pushed down via the
+   details button's margin-top:auto, so every card's footer sits at the bottom. */
 .job-card:hover { transform: translateY(-2px); border-color: rgba(224, 103, 154,0.40); }
 .job-card__head {
   display: grid; grid-template-columns: minmax(0, 1fr) auto;
@@ -1303,7 +1305,7 @@ onBeforeUnmount(() => {
   justify-content: center; gap: 8px; margin-top: 16px; font-size: 12px;
 }
 .job-card__details-btn {
-  align-self: flex-start; margin-top: 8px; padding: 0; background: none; border: none;
+  align-self: flex-start; margin-top: auto; padding: 0; background: none; border: none;
   color: var(--accent-pink, #e0679a); font-size: 12px; font-weight: 600; cursor: pointer;
 }
 .job-card__details-btn:hover { text-decoration: underline; }
