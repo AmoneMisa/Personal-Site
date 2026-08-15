@@ -26,6 +26,7 @@ import {
   fetchRss,
   fetchTheMuse,
   fetchTelegram,
+  isLikelyTelegramVacancy,
 } from './sources'
 
 const STORE_KEY = 'jobs:store:v3'
@@ -109,6 +110,17 @@ function dedupKey(job: Job): string {
   return job.url || job.id
 }
 
+function isVisibleStoredJob(job: StoredJob): boolean {
+  return job.source !== 'telegram'
+    || isLikelyTelegramVacancy(`${job.title}\n${job.description || ''}`)
+}
+
+function publicJobs(list: StoredJob[]): Job[] {
+  return list
+    .filter(isVisibleStoredJob)
+    .map(({ lastSeen: _lastSeen, ...job }) => job)
+}
+
 async function fetchSource(source: JobSource): Promise<Job[]> {
   let timer: ReturnType<typeof setTimeout> | undefined
   try {
@@ -129,19 +141,19 @@ async function fetchSource(source: JobSource): Promise<Job[]> {
 /** All stored vacancies (lastSeen stripped). Empty on a cold cache or Redis error. */
 export async function getStoredJobs(): Promise<Job[]> {
   if (memoryStore.length && Date.now() < memoryValidUntil) {
-    return memoryStore.map(({ lastSeen: _lastSeen, ...job }) => job)
+    return publicJobs(memoryStore)
   }
   try {
     const raw = await useRedis().get(STORE_KEY)
     if (!raw) {
-      return memoryStore.map(({ lastSeen: _lastSeen, ...job }) => job)
+      return publicJobs(memoryStore)
     }
     const list = JSON.parse(raw) as StoredJob[]
     memoryStore = list
     memoryValidUntil = Date.now() + MEMORY_TTL_MS
-    return list.map(({ lastSeen: _lastSeen, ...job }) => job)
+    return publicJobs(list)
   } catch {
-    return memoryStore.map(({ lastSeen: _lastSeen, ...job }) => job)
+    return publicJobs(memoryStore)
   }
 }
 
@@ -167,6 +179,7 @@ function pruneStore(byKey: Map<string, StoredJob>, now: number): StoredJob[] {
   const stalest = now - STALE_DAYS * 86_400_000
   const kept: StoredJob[] = []
   for (const job of byKey.values()) {
+    if (!isVisibleStoredJob(job)) continue
     const posted = new Date(job.postedAt).getTime()
     const seen = new Date(job.lastSeen).getTime()
     if (Number.isNaN(posted) || posted < oldestPosted) continue

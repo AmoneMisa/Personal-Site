@@ -239,6 +239,62 @@ const activeJob = ref<Job | null>(null);
 const jobModalOpen = ref(false);
 const shareCopied = ref(false);
 
+// ---- Personal vacancy lists (localStorage; no account or backend required) ----
+type SavedJobsView = "active" | "favorites" | "hidden";
+const HIDDEN_JOBS_KEY = "jobs:hidden:v1";
+const FAVORITE_JOBS_KEY = "jobs:favorites:v1";
+const MAX_SAVED_JOBS = 200;
+const savedView = ref<SavedJobsView>("active");
+const hiddenJobs = ref<Job[]>([]);
+const favoriteJobs = ref<Job[]>([]);
+const hiddenIds = computed(() => new Set(hiddenJobs.value.map((job) => job.id)));
+const favoriteIds = computed(() => new Set(favoriteJobs.value.map((job) => job.id)));
+const isHidden = (id: string) => hiddenIds.value.has(id);
+const isFavorite = (id: string) => favoriteIds.value.has(id);
+
+function loadSavedJobs() {
+  if (!import.meta.client) return;
+  try { hiddenJobs.value = JSON.parse(localStorage.getItem(HIDDEN_JOBS_KEY) || "[]"); } catch { /* ignore */ }
+  try { favoriteJobs.value = JSON.parse(localStorage.getItem(FAVORITE_JOBS_KEY) || "[]"); } catch { /* ignore */ }
+}
+
+function persistSavedJobs() {
+  if (!import.meta.client) return;
+  try {
+    localStorage.setItem(HIDDEN_JOBS_KEY, JSON.stringify(hiddenJobs.value));
+    localStorage.setItem(FAVORITE_JOBS_KEY, JSON.stringify(favoriteJobs.value));
+  } catch { /* storage full/disabled */ }
+}
+
+function upsertSaved(list: Job[], job: Job): Job[] {
+  return [job, ...list.filter((item) => item.id !== job.id)].slice(0, MAX_SAVED_JOBS);
+}
+
+function toggleHidden(job: Job) {
+  if (isHidden(job.id)) {
+    hiddenJobs.value = hiddenJobs.value.filter((item) => item.id !== job.id);
+  } else {
+    hiddenJobs.value = upsertSaved(hiddenJobs.value, job);
+    favoriteJobs.value = favoriteJobs.value.filter((item) => item.id !== job.id);
+    if (activeJob.value?.id === job.id) jobModalOpen.value = false;
+  }
+  persistSavedJobs();
+}
+
+function toggleFavorite(job: Job) {
+  if (isFavorite(job.id)) {
+    favoriteJobs.value = favoriteJobs.value.filter((item) => item.id !== job.id);
+  } else {
+    favoriteJobs.value = upsertSaved(favoriteJobs.value, job);
+    hiddenJobs.value = hiddenJobs.value.filter((item) => item.id !== job.id);
+  }
+  persistSavedJobs();
+}
+
+function selectSavedView(view: SavedJobsView) {
+  savedView.value = view;
+}
+
 // ---- Seen / recently-viewed (localStorage) ----
 type RecentJob = { id: string; title: string; company: string; url: string; source: string };
 const SEEN_KEY = "jobs:seen:v1";
@@ -307,7 +363,7 @@ let warmTimer: ReturnType<typeof setTimeout> | undefined;
 let loadMoreObserver: IntersectionObserver | undefined;
 
 const totalPages = computed(() => Math.max(1, Math.ceil(total.value / pageSize.value)));
-const hasMore = computed(() => sort.value !== "ats" && page.value < totalPages.value);
+const hasMore = computed(() => savedView.value === "active" && sort.value !== "ats" && page.value < totalPages.value);
 const canLoadMore = computed(() =>
   hasMore.value
   && !warming.value
@@ -335,6 +391,7 @@ function scheduleLoad(delay = 250) {
 
 function selectSource(value: string) {
   if (source.value === value) return;
+  savedView.value = "active";
   source.value = value;
   scheduleLoad(100);
 }
@@ -345,9 +402,16 @@ const cvPaste = ref("");
 const cvError = ref<string | null>(null);
 const cvLoading = ref(false);
 
+const displayedJobs = computed(() => {
+  if (savedView.value === "favorites") return favoriteJobs.value;
+  if (savedView.value === "hidden") return hiddenJobs.value;
+  return jobs.value.filter((job) => !isHidden(job.id));
+});
+const displayedTotal = computed(() => savedView.value === "active" ? total.value : displayedJobs.value.length);
+
 const scored = computed(() => {
   const profile = cvProfile.value;
-  const list = jobs.value.map((job) => ({
+  const list = displayedJobs.value.map((job) => ({
     job,
     ats: profile ? scoreJob(profile, job) : null,
   }));
@@ -437,6 +501,7 @@ function loadMore() {
 }
 
 function resetFilters() {
+  savedView.value = "active";
   countries.value = []; cities.value = ""; includeRu.value = false; includeBy.value = false;
   workMode.value = ""; relocation.value = "";
   employmentKind.value = ""; hasSalary.value = false; maxExperience.value = undefined;
@@ -703,6 +768,7 @@ onMounted(() => {
     { rootMargin: "300px 0px" },
   );
   loadSeen(); // restore "seen"/recently-viewed marks
+  loadSavedJobs();
   const sharedJobId = new URLSearchParams(window.location.search).get("job");
   restoreState(); // hydrate filters from the URL query, else last-saved localStorage
   void load(1);
@@ -789,6 +855,26 @@ onBeforeUnmount(() => {
           >
             {{ opt.label ?? t(opt.labelKey!) }}
           </button>
+        </div>
+        <div class="jobs__saved-filters" :aria-label="t('savedFilters')">
+          <button
+              type="button"
+              class="jobs__pill"
+              :class="{ 'jobs__pill_active': savedView === 'active' }"
+              @click="selectSavedView('active')"
+          >{{ t("activeVacancies") }}</button>
+          <button
+              type="button"
+              class="jobs__pill"
+              :class="{ 'jobs__pill_active': savedView === 'favorites' }"
+              @click="selectSavedView('favorites')"
+          >{{ t("favoriteVacancies") }} · {{ favoriteJobs.length }}</button>
+          <button
+              type="button"
+              class="jobs__pill"
+              :class="{ 'jobs__pill_active': savedView === 'hidden' }"
+              @click="selectSavedView('hidden')"
+          >{{ t("hiddenVacancies") }} · {{ hiddenJobs.length }}</button>
         </div>
         <u-button type="submit" :loading="loading" icon="i-lucide-search">
           {{ loading ? t("searching") : t("search") }}
@@ -914,14 +1000,14 @@ onBeforeUnmount(() => {
     </form>
 
     <p v-if="failed" class="jobs__error">{{ t("error") }}</p>
-    <p v-else-if="warming" class="jobs__warming" role="status" aria-live="polite">
+    <p v-else-if="warming && savedView === 'active'" class="jobs__warming" role="status" aria-live="polite">
       <span class="jobs__warming-dot" aria-hidden="true"></span>
       {{ t("warming", { loaded: loadedSourceCount, pending: pendingSourceCount }) }}
     </p>
-    <p v-else class="jobs__count text-muted">{{ t("jobsFound", { n: total }) }}</p>
+    <p v-else class="jobs__count text-muted">{{ t("jobsFound", { n: displayedTotal }) }}</p>
 
     <!-- Statistics panel -->
-    <section v-if="stats && total" class="stats">
+    <section v-if="savedView === 'active' && stats && total" class="stats">
       <div class="stats__head">
         <u-icon name="i-lucide-bar-chart-3" class="stats__icon" />
         <span class="stats__title">{{ t("statsTitle") }}</span>
@@ -996,17 +1082,43 @@ onBeforeUnmount(() => {
     </section>
 
     <div class="jobs__results">
-     <div class="jobs__grid" :class="{ 'jobs__grid_loading': loading }">
-      <div v-for="{ job, ats } in scored" :key="job.id" class="job-card" :class="{ 'job-card_seen': isSeen(job.id) }">
+     <div class="jobs__grid" :class="{ 'jobs__grid_loading': loading && savedView === 'active' }">
+      <div
+          v-for="{ job, ats } in scored"
+          :key="job.id"
+          class="job-card"
+          :class="{
+            'job-card_seen': isSeen(job.id),
+            'job-card_favorite': isFavorite(job.id),
+            'job-card_hidden': isHidden(job.id),
+          }"
+      >
         <div class="job-card__head">
           <a :href="job.url" target="_blank" rel="noopener noreferrer" class="job-card__title">{{ job.title }}</a>
-          <span
-              v-if="ats"
-              class="job-card__ats"
-              :style="{ color: scoreColor(ats.score), borderColor: scoreColor(ats.score) }"
-              :title="ats.missing.length ? t('atsMissing') + ': ' + ats.missing.join(', ') : ''"
-          >{{ ats.score }}% {{ t("atsMatch") }}</span>
-          <span v-else class="job-card__src">{{ job.source }}</span>
+          <div class="job-card__actions">
+            <span
+                v-if="ats"
+                class="job-card__ats"
+                :style="{ color: scoreColor(ats.score), borderColor: scoreColor(ats.score) }"
+                :title="ats.missing.length ? t('atsMissing') + ': ' + ats.missing.join(', ') : ''"
+            >{{ ats.score }}% {{ t("atsMatch") }}</span>
+            <span v-else class="job-card__src">{{ job.source }}</span>
+            <button
+                type="button"
+                class="job-card__action"
+                :class="{ 'job-card__action_active': isFavorite(job.id) }"
+                :aria-label="isFavorite(job.id) ? t('removeFavorite') : t('addFavorite')"
+                :title="isFavorite(job.id) ? t('removeFavorite') : t('addFavorite')"
+                @click="toggleFavorite(job)"
+            ><u-icon name="i-lucide-heart" /></button>
+            <button
+                type="button"
+                class="job-card__action"
+                :aria-label="isHidden(job.id) ? t('restoreVacancy') : t('hideVacancy')"
+                :title="isHidden(job.id) ? t('restoreVacancy') : t('hideVacancy')"
+                @click="toggleHidden(job)"
+            ><u-icon :name="isHidden(job.id) ? 'i-lucide-eye' : 'i-lucide-eye-off'" /></button>
+          </div>
         </div>
         <div class="job-card__meta text-muted">
           <span class="job-card__company">{{ job.company }}</span>
@@ -1059,11 +1171,11 @@ onBeforeUnmount(() => {
      </div>
     </div>
 
-    <div v-if="!loading && !warming && !jobs.length && !failed" class="jobs__empty">
+    <div v-if="!loading && !(warming && savedView === 'active') && !displayedJobs.length && !failed" class="jobs__empty">
       <div class="text-muted">{{ t("empty") }}</div>
     </div>
 
-    <div v-if="sort !== 'ats' && jobs.length" ref="loadMoreSentinel" class="jobs__load-more">
+    <div v-if="savedView === 'active' && sort !== 'ats' && displayedJobs.length" ref="loadMoreSentinel" class="jobs__load-more">
       <u-button
         v-if="hasMore && !warming"
         variant="outline"
@@ -1073,7 +1185,7 @@ onBeforeUnmount(() => {
       >
         {{ t("loadMore") }}
       </u-button>
-      <span class="text-muted">{{ t("shown", { shown: jobs.length, total }) }}</span>
+      <span class="text-muted">{{ t("shown", { shown: displayedJobs.length, total }) }}</span>
     </div>
 
     <!-- Full vacancy popup -->
@@ -1113,6 +1225,20 @@ onBeforeUnmount(() => {
         </div>
       </template>
       <template #footer>
+        <u-button
+            v-if="activeJob"
+            variant="outline"
+            color="neutral"
+            icon="i-lucide-heart"
+            @click="toggleFavorite(activeJob)"
+        >{{ isFavorite(activeJob.id) ? t("removeFavorite") : t("addFavorite") }}</u-button>
+        <u-button
+            v-if="activeJob"
+            variant="outline"
+            color="neutral"
+            :icon="isHidden(activeJob.id) ? 'i-lucide-eye' : 'i-lucide-eye-off'"
+            @click="toggleHidden(activeJob)"
+        >{{ isHidden(activeJob.id) ? t("restoreVacancy") : t("hideVacancy") }}</u-button>
         <a
             v-if="activeJob"
             class="job-modal__apply"
@@ -1173,6 +1299,10 @@ onBeforeUnmount(() => {
 .jobs__select :deep(button) { width: 100%; }
 .jobs__row { grid-column: 1 / -1; display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
 .jobs__filters { display: flex; flex-wrap: wrap; gap: 8px; }
+.jobs__saved-filters {
+  display: flex; flex-wrap: wrap; gap: 8px; padding-left: 12px;
+  border-left: 1px solid var(--line);
+}
 .jobs__pill {
   height: 34px; padding: 0 13px; border-radius: 8px; border: 1px solid var(--line);
   background: rgba(255,255,255,0.03); color: var(--ui-text-muted); font-weight: 700; font-size: 12px;
@@ -1264,6 +1394,17 @@ onBeforeUnmount(() => {
   display: grid; grid-template-columns: minmax(0, 1fr) auto;
   align-items: start; column-gap: 10px; row-gap: 4px;
 }
+.job-card__actions {
+  justify-self: end; display: flex; flex-wrap: wrap; justify-content: flex-end;
+  align-items: center; gap: 5px; max-width: 100%;
+}
+.job-card__action {
+  width: 28px; height: 28px; display: inline-grid; place-items: center;
+  padding: 0; border: 1px solid var(--line); border-radius: 6px;
+  background: transparent; color: var(--ui-text-muted); cursor: pointer;
+}
+.job-card__action:hover { color: var(--accent-pink, #e0679a); border-color: rgba(224,103,154,0.45); }
+.job-card__action_active { color: var(--accent-pink, #e0679a); background: rgba(224,103,154,0.12); }
 .job-card__title {
   min-width: 0; overflow-wrap: anywhere;
   font-weight: 600; font-size: 16px; line-height: 1.35;
@@ -1325,6 +1466,8 @@ onBeforeUnmount(() => {
 .job-modal__apply:hover { filter: brightness(1.06); }
 .job-card_seen { opacity: 0.72; }
 .job-card_seen:hover { opacity: 1; }
+.job-card_favorite { border-color: rgba(224,103,154,0.48); }
+.job-card_hidden { opacity: 0.62; border-style: dashed; }
 .job-card__badge_seen { color: #94a3b8; background: rgba(148,163,184,0.14); }
 .recent { margin: 4px 0 18px; }
 .recent__title {

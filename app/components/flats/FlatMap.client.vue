@@ -6,16 +6,28 @@
 import { onBeforeUnmount, onMounted, ref, watch } from "vue";
 
 interface FlatPoint { id: string; lat: number; lng: number; title: string; priceLabel?: string }
-const props = defineProps<{ points: FlatPoint[] }>();
-const emit = defineEmits<{ (e: "select", id: string): void }>();
+const props = defineProps<{
+  points: FlatPoint[];
+  drawLabel?: string;
+  doneLabel?: string;
+  clearLabel?: string;
+  drawHint?: string;
+}>();
+const emit = defineEmits<{
+  (e: "select", id: string): void;
+  (e: "area-change", points: Array<{ lat: number; lng: number }>): void;
+}>();
 
 const LEAFLET_JS = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.js";
 const LEAFLET_CSS = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.css";
 
 const el = ref<HTMLElement | null>(null);
 const failed = ref(false);
+const drawing = ref(false);
+const area = ref<Array<{ lat: number; lng: number }>>([]);
 let map: any = null;
 let layer: any = null;
+let areaLayer: any = null;
 
 function loadLeaflet(): Promise<any> {
   const w = window as any;
@@ -67,6 +79,33 @@ function render() {
   if (bounds.length) map.fitBounds(bounds, { padding: [30, 30], maxZoom: 13 });
 }
 
+function renderArea() {
+  const L = (window as any).L;
+  if (!areaLayer || !L) return;
+  areaLayer.clearLayers();
+  if (area.value.length >= 2) {
+    const points = area.value.map((point) => [point.lat, point.lng]);
+    if (area.value.length >= 3) {
+      L.polygon(points, { color: "#e0679a", weight: 2, fillColor: "#e0679a", fillOpacity: 0.16 }).addTo(areaLayer);
+    } else {
+      L.polyline(points, { color: "#e0679a", weight: 2 }).addTo(areaLayer);
+    }
+  }
+  for (const point of area.value) {
+    L.circleMarker([point.lat, point.lng], { radius: 5, color: "#fff", weight: 2, fillColor: "#e0679a", fillOpacity: 1 }).addTo(areaLayer);
+  }
+}
+
+function toggleDrawing() {
+  drawing.value = !drawing.value;
+}
+
+function clearArea() {
+  area.value = [];
+  renderArea();
+  emit("area-change", []);
+}
+
 onMounted(async () => {
   if (!el.value) return;
   let L: any;
@@ -83,6 +122,13 @@ onMounted(async () => {
     maxZoom: 19,
   }).addTo(map);
   layer = L.layerGroup().addTo(map);
+  areaLayer = L.layerGroup().addTo(map);
+  map.on("click", (event: any) => {
+    if (!drawing.value) return;
+    area.value = [...area.value, { lat: event.latlng.lat, lng: event.latlng.lng }];
+    renderArea();
+    emit("area-change", area.value.length >= 3 ? area.value : []);
+  });
   render();
 });
 watch(() => props.points, render, { deep: true });
@@ -90,20 +136,42 @@ onBeforeUnmount(() => {
   map?.remove?.();
   map = null;
   layer = null;
+  areaLayer = null;
 });
 </script>
 
 <template>
-  <div v-show="!failed" ref="el" class="flat-map" />
+  <div v-show="!failed" class="flat-map-shell">
+    <div ref="el" class="flat-map" />
+    <div class="flat-map__tools">
+      <button type="button" class="flat-map__tool" :class="{ 'flat-map__tool_active': drawing }" @click="toggleDrawing">
+        {{ drawing ? "✓" : "⌁" }} <span>{{ drawing ? (props.doneLabel || "Done") : (props.drawLabel || "Draw area") }}</span>
+      </button>
+      <button v-if="area.length" type="button" class="flat-map__tool" @click="clearArea">× <span>{{ props.clearLabel || "Clear" }}</span></button>
+    </div>
+    <div v-if="drawing" class="flat-map__hint">{{ props.drawHint || "Click points on the map to outline an area." }}</div>
+  </div>
 </template>
 
 <style scoped>
+.flat-map-shell { position: relative; z-index: 0; isolation: isolate; }
 .flat-map {
   width: 100%;
   height: 420px;
   border-radius: 10px;
   overflow: hidden;
   border: 1px solid var(--line);
+}
+.flat-map__tools { position: absolute; z-index: 500; top: 12px; right: 12px; display: flex; gap: 7px; }
+.flat-map__tool {
+  min-height: 34px; padding: 0 10px; border: 1px solid var(--line); border-radius: 6px;
+  background: rgba(13,17,40,0.94); color: var(--text-primary); cursor: pointer;
+}
+.flat-map__tool_active { color: var(--accent-pink); border-color: var(--accent-pink); }
+.flat-map__hint {
+  position: absolute; z-index: 500; left: 50%; bottom: 12px; transform: translateX(-50%);
+  padding: 7px 10px; border: 1px solid var(--line); border-radius: 6px;
+  background: rgba(13,17,40,0.94); color: var(--text-primary); font-size: 12px;
 }
 :deep(.leaflet-container) { background: var(--bg-panel); font-family: inherit; }
 :deep(.leaflet-popup-content) { font-size: 13px; }

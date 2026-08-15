@@ -233,27 +233,29 @@ function parseAmountLoose(numStr: string, suffix?: string): number | undefined {
 // next to a currency symbol/word, so stray numbers (phone numbers, "1 year
 // experience", URL ids) are never mistaken for salary. Handles "$60,000 USD",
 // "6 000 000 сум", "від 6кк до 10кк сум", "6 000 - 10 000 KGS", etc.
-const SYMBOL_CUR: Record<string, string> = { '$': 'USD', '€': 'EUR', '£': 'GBP', '₴': 'UAH' }
+const SYMBOL_CUR: Record<string, string> = { '$': 'USD', '€': 'EUR', '£': 'GBP', '₴': 'UAH', '₸': 'KZT' }
 const WORD_CUR: [RegExp, string][] = [
   [/^(USD|доллар\w*|у\.?е\.?)$/i, 'USD'], [/^(EUR|евро)$/i, 'EUR'], [/^GBP$/i, 'GBP'],
   [/^(UAH|грн\w*|гривн\w*)$/i, 'UAH'], [/^(UZS|сум\w*|so['’]?m)$/i, 'UZS'],
-  [/^(KZT|тенге)$/i, 'KZT'], [/^(KGS|сом)$/i, 'KGS'], [/^(TJS|сомони)$/i, 'TJS'],
+  [/^(KZT|тенге|тг\.?)$/i, 'KZT'], [/^(KGS|сом)$/i, 'KGS'], [/^(TJS|сомони)$/i, 'TJS'],
   [/^(TMT|манат\w*)$/i, 'TMT'], [/^(PLN|zł|злот\w*)$/i, 'PLN'], [/^(RON|lei)$/i, 'RON'],
 ]
-function wordToCur(word: string | undefined): string | undefined {
-  if (!word) return undefined
-  for (const [re, code] of WORD_CUR) if (re.test(word)) return code
+// Resolve a matched currency token (symbol or word) to its ISO code.
+function curOf(token: string | undefined): string | undefined {
+  if (!token) return undefined
+  if (SYMBOL_CUR[token]) return SYMBOL_CUR[token]
+  for (const [re, code] of WORD_CUR) if (re.test(token)) return code
   return undefined
 }
 // symbol? num [suffix] [ (-|—|до|to) num [suffix] ] currency-word?
 const SALARY_MONEY_RE =
-  /(?:([$€£₴])\s*)?(\d[\d\s.,]*\d|\d)(?:\s*(кк|kk|млн|mln|к|k|тыс|ming)(?![A-Za-z]))?(?:\s*(?:[-–—…]{1,3}|до|to)\s*(\d[\d\s.,]*\d|\d)(?:\s*(кк|kk|млн|mln|к|k|тыс|ming)(?![A-Za-z]))?)?\s*(USD|EUR|GBP|UAH|UZS|KZT|KGS|TJS|TMT|PLN|RON|сум\w*|so['’]?m|тенге|сомони|сом|манат\w*|грн\w*|гривн\w*|zł|злот\w*|lei|евро|доллар\w*|у\.?е\.?)?/gi
+  /(?:([$€£₴₸])\s*)?(\d[\d\s.,]*\d|\d)(?:\s*(кк|kk|млн|mln|к|k|тыс|ming)(?![A-Za-z]))?(?:\s*(?:[-–—…]{1,3}|до|to)\s*(\d[\d\s.,]*\d|\d)(?:\s*(кк|kk|млн|mln|к|k|тыс|ming)(?![A-Za-z]))?)?\s*(USD|EUR|GBP|UAH|UZS|KZT|KGS|TJS|TMT|PLN|RON|сум\w*|so['’]?m|тенге|тг\.?|сомони|сом|манат\w*|грн\w*|гривн\w*|zł|злот\w*|lei|евро|доллар\w*|у\.?е\.?|[$€£₴₸])?/gi
 
 function parseJoobleSalary(value: unknown): Pick<Job, 'salaryMin' | 'salaryMax' | 'salaryCurrency'> {
   if (typeof value !== 'string' || !value.trim()) return {}
   const text = value.replace(/\u00a0/g, ' ')
   for (const m of text.matchAll(SALARY_MONEY_RE)) {
-    const currency = (m[1] && SYMBOL_CUR[m[1]]) || wordToCur(m[6])
+    const currency = curOf(m[1] || m[6])
     if (!currency) continue // a number with no currency anchor is not a salary
     const lo = parseAmountLoose(m[2]!, m[3])
     const hi = m[4] ? parseAmountLoose(m[4], m[5]) : undefined
@@ -1471,13 +1473,38 @@ function telegramField(text: string, names: string): string | undefined {
   return match?.[1]?.trim()
 }
 
+const TELEGRAM_ROLE_RE = /\b(?:developer|engineer|designer|manager|analyst|consultant|specialist|associate|assistant|administrator|accountant|auditor|recruiter|copywriter|marketer|sales|support|operator|courier|driver|chef|waiter|qa|tester|devops|frontend|backend|android|ios)\b|разработ|инженер|дизайнер|менеджер|аналитик|консультант|специалист|ассистент|администратор|бухгалтер|аудитор|рекрутер|копирайтер|маркетолог|продав|кассир|оператор|курьер|водител|повар|официант|сварщик|электрик|mutaxassis|dasturchi|menejer|sotuv|haydovchi|oshpaz/iu
+
+const TELEGRAM_PROMOTION_RE = /t\.me\/addlist\b|(?:telegram[- ]?)?канал\w*\s+(?:в\s+)?(?:одн\w+\s+)?папк|папк\w*\s+(?:telegram[- ]?)?канал|добав(?:ить|ьте|ляй)\s+(?:свой\s+)?канал\s+в\s+папк|добав(?:ить|ьте)\s+папк|до\s+закрытия\s+доступа|пока\s+ты\s+листаешь\s+ленту|лучшие\s+офферы\s+разлетаются|вакансии\s+сами\s+приходят|карьерн\w+\s+лайфхак/iu
+
+/**
+ * Reject channel advertising, digest/folder promotions and other posts that
+ * mention jobs without describing one concrete opening. Shared with the store
+ * read/prune path so already-cached trash disappears immediately after deploy.
+ */
+export function isLikelyTelegramVacancy(text: string): boolean {
+  const value = text.replace(/\s+/g, ' ').trim()
+  if (value.length < 20 || TELEGRAM_PROMOTION_RE.test(value)) return false
+
+  const explicitPosition = /(?:vacancy|position|role|вакансия|позиция|посада|lavozim)\s*[:—-]\s*[\p{L}\p{N}]/iu.test(value)
+  const hiringPhrase = /(?:we(?:'re| are)?\s+(?:hiring|looking\s+for)|ищем|требуется|шукаємо|потрібен|kerak)\s+(?:[\p{L}\p{N}][\p{L}\p{N}+.#/-]*\s*){1,8}/iu.test(value)
+  const role = TELEGRAM_ROLE_RE.test(value)
+  const requirements = /requirements?|responsibilit|qualifications?|обязанност|требован|условия|вазиф|талаб|міндет|талап/iu.test(value)
+  const employment = /full[- ]?time|part[- ]?time|employment|график|занятост|офис|гибрид|удал[её]н|remote|ish vaqti|bandlik/iu.test(value)
+  const application = /(?:apply|отклик|резюме|cv\b|hr\b|contact|контакт|мурожаат|bog['’]?lan)/iu.test(value)
+  const concreteSalary = /\d[\d\s.,]*(?:USD|EUR|GBP|UAH|UZS|KZT|KGS|TJS|TMT|PLN|RON|[$€£₴₸]|сум|so['’]?m|тенге|тг\.?|сом|грн)/iu.test(value)
+
+  if (explicitPosition || hiringPhrase) return role || requirements || employment || application || concreteSalary
+  return role && [requirements, employment, application, concreteSalary].filter(Boolean).length >= 1
+}
+
 function telegramTitle(text: string, channel: TelegramChannel): string {
   const lines = text.split('\n').map((line) => line.trim()).filter(Boolean)
   const explicit = telegramField(text, 'vacancy|position|role|вакансия|позиция|посада|lavozim')
   const useful = lines.find((line) =>
     !/^(?:#\w+\s*)+$/.test(line)
     && !/^(?:vacancy|вакансия|иш|ish|работа|job)\s*[:.!-]*$/i.test(line)
-    && /developer|engineer|designer|manager|analyst|qa|tester|devops|frontend|backend|android|ios|разработ|инженер|дизайнер|менеджер|аналитик|тестиров|бухгалтер|оператор|специалист|mutaxassis|dasturchi/i.test(line),
+    && TELEGRAM_ROLE_RE.test(line),
   )
   const title = explicit || useful || lines.find((line) => !/^#/.test(line)) || `Vacancy from ${channel.label}`
   return title.replace(/^[\p{Extended_Pictographic}\p{Emoji_Presentation}\s#*_-]+/gu, '').slice(0, 180)
@@ -1493,10 +1520,7 @@ function telegramTextToJob(
   channel: TelegramChannel,
   needle: string,
 ): Job | null {
-  if (text.length < 20) return null
-  if (!/vacan|ваканс|робот|работ|ish\b|job\b|career|lavozim|maosh|зарплат|developer|manager|engineer|дизайнер|менеджер|инженер/i.test(text)) {
-    return null
-  }
+  if (!isLikelyTelegramVacancy(text)) return null
   const title = telegramTitle(text, channel)
   const company = telegramField(text, 'company|employer|компания|работодатель|роботодавець|компанія|tashkilot|ish beruvchi') || channel.label
   const location = telegramField(text, 'location|city|локация|город|місто|manzil|shahar') || channel.location
