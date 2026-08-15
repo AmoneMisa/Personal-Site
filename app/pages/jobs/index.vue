@@ -233,6 +233,16 @@ const warming = ref(false);
 const loadedSourceCount = ref(0);
 const pendingSourceCount = ref(0);
 const loadMoreSentinel = ref<HTMLElement | null>(null);
+const activeJob = ref<Job | null>(null);
+const jobModalOpen = ref(false);
+function openJob(job: Job) {
+  activeJob.value = job;
+  jobModalOpen.value = true;
+}
+const empLabel = (kind?: string) =>
+  kind ? t("emp" + kind.charAt(0).toUpperCase() + kind.slice(1)) : "";
+const modeLabel = (mode?: string) =>
+  mode && mode !== "unknown" ? t("wm" + mode.charAt(0).toUpperCase() + mode.slice(1)) : "";
 let loadSequence = 0;
 let loadTimer: ReturnType<typeof setTimeout> | undefined;
 let warmTimer: ReturnType<typeof setTimeout> | undefined;
@@ -358,6 +368,9 @@ async function load(
   }
   loading.value = false;
   loadingMore.value = false;
+  // Persist the filters that produced this result (foreground loads only, so a
+  // background warm-poll or a "load more" page doesn't rewrite the URL).
+  if (!options.append && !options.background) persistState();
   scheduleWarmPoll();
 }
 
@@ -372,6 +385,88 @@ function resetFilters() {
   foreignerOnly.value = false; noExperience.value = false; language.value = ""; languageLevel.value = "";
   excludeLanguages.value = []; skills.value = "";
   scheduleLoad(100);
+}
+
+// ---- Shareable + persisted search state ----
+// The current filters are mirrored to the URL query (so a search is shareable via
+// the address bar) AND to localStorage (so a reload restores the last search).
+const SEARCH_STATE_KEY = "jobs:last-search:v1";
+
+function currentState(): Record<string, string> {
+  const s: Record<string, string> = {};
+  if (query.value.trim()) s.q = query.value.trim();
+  if (source.value) s.source = source.value;
+  if (salaryMin.value != null) s.salaryMin = String(salaryMin.value);
+  if (displayCurrency.value !== "USD") s.currency = displayCurrency.value;
+  if (displayPeriod.value !== "month") s.period = displayPeriod.value;
+  if (sort.value !== "date") s.sort = sort.value;
+  if (countries.value.length) s.country = countries.value.join(",");
+  if (cities.value.trim()) s.cities = cities.value.trim();
+  if (includeRu.value) s.includeRu = "1";
+  if (includeBy.value) s.includeBy = "1";
+  if (workMode.value) s.workMode = workMode.value;
+  if (relocation.value) s.relocation = relocation.value;
+  if (employmentKind.value) s.employment = employmentKind.value;
+  if (hasSalary.value) s.hasSalary = "1";
+  if (maxExperience.value != null) s.maxExp = String(maxExperience.value);
+  if (foreignerOnly.value) s.foreigner = "1";
+  if (noExperience.value) s.noExp = "1";
+  if (language.value) s.language = language.value;
+  if (languageLevel.value) s.level = languageLevel.value;
+  if (excludeLanguages.value.length) s.exclLang = excludeLanguages.value.join(",");
+  if (skills.value.trim()) s.skills = skills.value.trim();
+  return s;
+}
+
+function applyState(s: Record<string, string>) {
+  if (!s || typeof s !== "object") return;
+  query.value = s.q ?? "";
+  source.value = s.source ?? "";
+  salaryMin.value = s.salaryMin ? Number(s.salaryMin) : undefined;
+  displayCurrency.value = s.currency ?? "USD";
+  displayPeriod.value = periodOptions.includes(s.period as Period) ? (s.period as Period) : "month";
+  sort.value = s.sort ?? "date";
+  countries.value = s.country ? s.country.split(",").filter(Boolean) : [];
+  cities.value = s.cities ?? "";
+  includeRu.value = s.includeRu === "1";
+  includeBy.value = s.includeBy === "1";
+  workMode.value = s.workMode ?? "";
+  relocation.value = s.relocation ?? "";
+  employmentKind.value = s.employment ?? "";
+  hasSalary.value = s.hasSalary === "1";
+  maxExperience.value = s.maxExp ? Number(s.maxExp) : undefined;
+  foreignerOnly.value = s.foreigner === "1";
+  noExperience.value = s.noExp === "1";
+  language.value = s.language ?? "";
+  languageLevel.value = s.level ?? "";
+  excludeLanguages.value = s.exclLang ? s.exclLang.split(",").filter(Boolean) : [];
+  skills.value = s.skills ?? "";
+  // ATS sort needs a CV, which is never persisted — fall back to newest.
+  if (sort.value === "ats") sort.value = "date";
+}
+
+function persistState() {
+  if (!import.meta.client) return;
+  const s = currentState();
+  try {
+    localStorage.setItem(SEARCH_STATE_KEY, JSON.stringify(s));
+  } catch { /* storage full / disabled */ }
+  const qs = new URLSearchParams(s).toString();
+  // replaceState (not push) so the back button isn't spammed on every filter change.
+  window.history.replaceState(window.history.state, "", qs ? `?${qs}` : window.location.pathname);
+}
+
+function restoreState() {
+  if (!import.meta.client) return;
+  const fromUrl = new URLSearchParams(window.location.search);
+  if ([...fromUrl.keys()].length) {
+    applyState(Object.fromEntries(fromUrl.entries()));
+    return;
+  }
+  try {
+    const raw = localStorage.getItem(SEARCH_STATE_KEY);
+    if (raw) applyState(JSON.parse(raw));
+  } catch { /* ignore corrupt state */ }
 }
 
 async function onCvFile(e: Event) {
@@ -547,6 +642,7 @@ onMounted(() => {
     },
     { rootMargin: "300px 0px" },
   );
+  restoreState(); // hydrate filters from the URL query, else last-saved localStorage
   void load(1);
 });
 watch(loadMoreSentinel, (element, previous) => {
@@ -859,6 +955,7 @@ onBeforeUnmount(() => {
           </span>
         </div>
         <p v-if="job.description" class="job-card__desc text-muted">{{ job.description }}</p>
+        <button type="button" class="job-card__details-btn" @click="openJob(job)">{{ t("details") }}</button>
         <template v-if="ats">
           <div v-if="ats.matched.length" class="job-card__skills">
             <span class="job-card__skills-label">{{ t("atsMatched") }}:</span>
@@ -903,6 +1000,53 @@ onBeforeUnmount(() => {
       </u-button>
       <span class="text-muted">{{ t("shown", { shown: jobs.length, total }) }}</span>
     </div>
+
+    <!-- Full vacancy popup -->
+    <u-modal v-model:open="jobModalOpen" :title="activeJob?.title || ''" :ui="{ content: 'max-w-2xl' }">
+      <template #body>
+        <div v-if="activeJob" class="job-modal">
+          <div class="job-modal__meta text-muted">
+            <span class="job-card__company">{{ activeJob.company }}</span>
+            <span class="job-card__dot">·</span>
+            <span>{{ activeJob.location }}</span>
+            <span class="job-card__dot">·</span>
+            <span>{{ timeAgo(activeJob.postedAt) }}</span>
+            <span class="job-card__src">{{ activeJob.source }}</span>
+          </div>
+          <div class="job-modal__badges">
+            <span v-if="empLabel(activeJob.employmentKind)" class="job-card__badge job-card__badge_mode">{{ empLabel(activeJob.employmentKind) }}</span>
+            <span v-if="modeLabel(activeJob.workMode)" class="job-card__badge">{{ modeLabel(activeJob.workMode) }}</span>
+            <span v-else-if="activeJob.remote" class="job-card__badge">{{ t("remote") }}</span>
+            <span v-if="activeJob.experienceMinYears !== undefined && activeJob.experienceMinYears > 0" class="job-card__badge job-card__badge_exp">{{ t("experienceYears", { n: activeJob.experienceMinYears }) }}</span>
+            <span v-if="activeJob.foreignerFriendly" class="job-card__badge job-card__badge_visa">{{ t("cardForeigner") }}</span>
+            <span v-if="activeJob.relocation === 'offered'" class="job-card__badge job-card__badge_reloc">{{ t("cardReloc") }}</span>
+            <span v-if="formatSalary(activeJob)" class="job-card__salary">{{ formatSalary(activeJob) }}</span>
+            <span v-if="convertedSalary(activeJob)" class="job-card__salary job-card__salary_conv">{{ convertedSalary(activeJob) }}</span>
+          </div>
+          <div v-if="activeJob.languages && activeJob.languages.length" class="job-card__langs text-muted job-modal__langs">
+            <u-icon name="i-lucide-languages" class="job-card__lang-icon" />
+            <span v-for="l in activeJob.languages" :key="l.language" class="job-card__lang">
+              {{ l.language }}<template v-if="l.level"> ({{ l.level }})</template>
+            </span>
+          </div>
+          <p v-if="activeJob.description" class="job-modal__desc">{{ activeJob.description }}</p>
+          <p v-else class="text-muted">{{ t("noDescription") }}</p>
+          <div v-if="activeJob.skills && activeJob.skills.length" class="job-card__tags job-modal__tags">
+            <span v-for="s in activeJob.skills" :key="s" class="job-card__tag job-card__tag_skill">{{ s }}</span>
+            <span v-for="s in (activeJob.niceToHave || [])" :key="'plus-' + s" class="job-card__tag job-card__tag_plus">+{{ s }}</span>
+          </div>
+        </div>
+      </template>
+      <template #footer>
+        <a
+            v-if="activeJob"
+            class="job-modal__apply"
+            :href="activeJob.url"
+            target="_blank"
+            rel="noopener noreferrer"
+        >{{ t("apply") }} →</a>
+      </template>
+    </u-modal>
   </u-container>
 </template>
 
@@ -1077,4 +1221,23 @@ onBeforeUnmount(() => {
   min-height: 76px; display: flex; flex-direction: column; align-items: center;
   justify-content: center; gap: 8px; margin-top: 16px; font-size: 12px;
 }
+.job-card__details-btn {
+  align-self: flex-start; margin-top: 8px; padding: 0; background: none; border: none;
+  color: var(--accent-pink, #e0679a); font-size: 12px; font-weight: 600; cursor: pointer;
+}
+.job-card__details-btn:hover { text-decoration: underline; }
+.job-modal { display: flex; flex-direction: column; gap: 12px; }
+.job-modal__meta { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: 12.5px; }
+.job-modal__badges { display: flex; flex-wrap: wrap; gap: 6px; }
+.job-modal__langs { margin: 0; }
+.job-modal__desc {
+  font-size: 13.5px; line-height: 1.55; white-space: pre-wrap;
+  color: var(--text-soft, inherit); max-height: 52vh; overflow-y: auto;
+}
+.job-modal__tags { margin-top: 4px; }
+.job-modal__apply {
+  display: inline-flex; align-items: center; height: 36px; padding: 0 16px; border-radius: 8px;
+  background: var(--accent-pink, #e0679a); color: #1a0e14; font-weight: 600; font-size: 13.5px;
+}
+.job-modal__apply:hover { filter: brightness(1.06); }
 </style>
