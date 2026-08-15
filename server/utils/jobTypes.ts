@@ -100,6 +100,7 @@ export interface JobQuery {
 
   // --- new advanced filters ---
   countries: string[] // ISO-2 codes (any-of); empty = any country
+  cities: string[] // free-text city/location terms (any-of), may span countries
   includeRu?: boolean // opt-in to Russia postings (excluded by default)
   includeBy?: boolean // opt-in to Belarus postings (excluded by default)
   workMode?: WorkMode

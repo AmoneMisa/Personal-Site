@@ -113,6 +113,10 @@ export default defineEventHandler(async (event) => {
     .split(',')
     .map((s) => s.trim().toUpperCase())
     .filter(Boolean)
+  const cities = String(q.cities ?? '')
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean)
   const includeRu = q.includeRu === 'true'
   const includeBy = q.includeBy === 'true'
   const workMode = WORK_MODES.includes(q.workMode as WorkMode) ? (q.workMode as WorkMode) : undefined
@@ -161,6 +165,7 @@ export default defineEventHandler(async (event) => {
       maxAgeDays: clampInt(q.maxAgeDays, 14, 1, 14),
       salaryMin,
       countries,
+      cities,
       includeRu,
       includeBy,
       workMode,

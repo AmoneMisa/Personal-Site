@@ -181,6 +181,7 @@ const sort = ref("date"); // date | oldest | title | company | salary | ats
 // heuristic guess from job text, so pinning it to a single CIS country hides
 // almost every vacancy; users can multi-select the countries they care about.
 const countries = ref<string[]>([]);
+const cities = ref(""); // free-text, comma-separated cities (any-of), may span countries
 const includeRu = ref(false); // Russia is excluded by the backend unless opted-in
 const includeBy = ref(false); // Belarus is excluded by the backend unless opted-in
 const workMode = ref("");
@@ -311,6 +312,7 @@ async function load(
     if (inUsd) params.salaryMin = String(convertPeriod(inUsd, displayPeriod.value, "year"));
   }
   if (countries.value.length) params.country = countries.value.join(",");
+  if (cities.value.trim()) params.cities = cities.value.trim();
   if (includeRu.value) params.includeRu = "true";
   if (includeBy.value) params.includeBy = "true";
   if (workMode.value) params.workMode = workMode.value;
@@ -357,7 +359,7 @@ function loadMore() {
 }
 
 function resetFilters() {
-  countries.value = []; includeRu.value = false; includeBy.value = false;
+  countries.value = []; cities.value = ""; includeRu.value = false; includeBy.value = false;
   workMode.value = ""; relocation.value = "";
   foreignerOnly.value = false; noExperience.value = false; language.value = ""; languageLevel.value = "";
   excludeLanguages.value = []; skills.value = "";
@@ -632,6 +634,13 @@ onBeforeUnmount(() => {
               v-model="countries" :items="countryItems" value-key="value" label-key="label"
               multiple :placeholder="t('countryPlaceholder')"
               class="jobs__select" @update:model-value="scheduleLoad()"
+          />
+        </label>
+        <label class="jobs__field jobs__field_wide">
+          <span class="jobs__field-label">{{ t("cities") }}</span>
+          <u-input
+              v-model="cities" icon="i-lucide-map-pin" :placeholder="t('citiesPlaceholder')"
+              @keyup.enter="load(1)" @change="scheduleLoad()"
           />
         </label>
         <label class="jobs__field">

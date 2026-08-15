@@ -80,6 +80,20 @@ function matches(job: Job, query: JobQuery, oldestAllowed: number): boolean {
     const hitCode = wantCode !== undefined && job.country === wantCode
     if (!hitText && !hitCode) return false
   }
+  // City filter (any-of): a job passes if it matches ANY of the listed cities.
+  // Terms may span countries (e.g. "Tashkent, Kharkiv, Miami"). Each term is
+  // matched against the location text + title (the city is often only in the
+  // title), or — when the term names a country/known city — the detected country.
+  if (query.cities.length) {
+    const hay = `${job.location} ${job.title}`.toLowerCase()
+    const hit = query.cities.some((term) => {
+      const needle = term.toLowerCase()
+      if (needle && hay.includes(needle)) return true
+      const code = resolveCountry(term)
+      return code !== undefined && job.country === code
+    })
+    if (!hit) return false
+  }
   if (query.salaryMin !== undefined) {
     const pay = job.salaryUsd ?? job.salaryMax ?? job.salaryMin
     if (pay === undefined || pay < query.salaryMin) return false

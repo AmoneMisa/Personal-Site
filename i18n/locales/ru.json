@@ -53,6 +53,8 @@
     "cardReloc": "релокация",
     "country": "Страны",
     "countryPlaceholder": "Любая страна",
+    "cities": "Города",
+    "citiesPlaceholder": "Tashkent, Kharkiv, Miami",
     "currency": "Валюта",
     "daysAgo": "{n} дн. назад",
     "empty": "Ничего не найдено.",

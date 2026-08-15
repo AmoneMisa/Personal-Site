@@ -53,6 +53,8 @@
     "cardReloc": "relocation",
     "country": "Countries",
     "countryPlaceholder": "Any country",
+    "cities": "Cities",
+    "citiesPlaceholder": "Tashkent, Kharkiv, Miami",
     "currency": "Currency",
     "daysAgo": "{n}d ago",
     "empty": "No jobs match your search.",
