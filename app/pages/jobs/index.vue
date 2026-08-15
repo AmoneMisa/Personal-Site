@@ -67,6 +67,7 @@ interface JobResult {
 const { t: translate } = useI18n();
 const t = (key: string, params: Record<string, unknown> = {}) =>
   translate(`jobs.${key}`, params);
+const localePath = useLocalePath();
 
 useSeoMeta({
   title: () => t("seoTitle"), description: () => t("seoDescription"),
@@ -235,10 +236,66 @@ const pendingSourceCount = ref(0);
 const loadMoreSentinel = ref<HTMLElement | null>(null);
 const activeJob = ref<Job | null>(null);
 const jobModalOpen = ref(false);
+const shareCopied = ref(false);
+
+// ---- Seen / recently-viewed (localStorage) ----
+type RecentJob = { id: string; title: string; company: string; url: string; source: string };
+const SEEN_KEY = "jobs:seen:v1";
+const RECENT_KEY = "jobs:recent:v1";
+const MAX_SEEN = 500;
+const MAX_RECENT = 4; // "last seen" strip: up to 4 in a row
+const seenIds = ref<Set<string>>(new Set());
+const recentlyViewed = ref<RecentJob[]>([]);
+const isSeen = (id: string) => seenIds.value.has(id);
+
+function loadSeen() {
+  if (!import.meta.client) return;
+  try { seenIds.value = new Set(JSON.parse(localStorage.getItem(SEEN_KEY) || "[]")); } catch { /* ignore */ }
+  try { recentlyViewed.value = JSON.parse(localStorage.getItem(RECENT_KEY) || "[]"); } catch { /* ignore */ }
+}
+
+function markSeen(job: Job | RecentJob) {
+  const next = new Set(seenIds.value);
+  next.add(job.id);
+  seenIds.value = next.size > MAX_SEEN ? new Set([...next].slice(-MAX_SEEN)) : next;
+  const snap: RecentJob = { id: job.id, title: job.title, company: job.company, url: job.url, source: job.source };
+  recentlyViewed.value = [snap, ...recentlyViewed.value.filter((r) => r.id !== job.id)].slice(0, MAX_RECENT);
+  if (!import.meta.client) return;
+  try {
+    localStorage.setItem(SEEN_KEY, JSON.stringify([...seenIds.value]));
+    localStorage.setItem(RECENT_KEY, JSON.stringify(recentlyViewed.value));
+  } catch { /* storage full/disabled */ }
+}
+
 function openJob(job: Job) {
   activeJob.value = job;
   jobModalOpen.value = true;
+  shareCopied.value = false;
+  markSeen(job);
 }
+
+// Fetch a single vacancy by id and open it — used by shared links and the
+// recently-viewed strip, which must open a posting outside the current results.
+async function openSharedJob(id: string) {
+  const { data } = await safeFetch<{ job: Job | null }>("/jobs-vacancy", { params: { id } });
+  if (data?.job) openJob(data.job);
+}
+
+function jobShareLink(job: Job | RecentJob): string {
+  const base = import.meta.client ? window.location.origin : "https://whiteslove.me";
+  return `${base}${localePath("/jobs")}?job=${encodeURIComponent(job.id)}`;
+}
+
+async function shareActiveJob() {
+  if (!activeJob.value) return;
+  const link = jobShareLink(activeJob.value);
+  try {
+    await navigator.clipboard.writeText(link);
+    shareCopied.value = true;
+    setTimeout(() => (shareCopied.value = false), 2000);
+  } catch { /* clipboard blocked — no-op */ }
+}
+
 const empLabel = (kind?: string) =>
   kind ? t("emp" + kind.charAt(0).toUpperCase() + kind.slice(1)) : "";
 const modeLabel = (mode?: string) =>
@@ -459,7 +516,9 @@ function persistState() {
 function restoreState() {
   if (!import.meta.client) return;
   const fromUrl = new URLSearchParams(window.location.search);
-  if ([...fromUrl.keys()].length) {
+  // `job` is a share target, not a filter — it must not count as "URL has filters"
+  // (otherwise a bare ?job=… link would wipe the visitor's saved search).
+  if ([...fromUrl.keys()].some((k) => k !== "job")) {
     applyState(Object.fromEntries(fromUrl.entries()));
     return;
   }
@@ -642,8 +701,11 @@ onMounted(() => {
     },
     { rootMargin: "300px 0px" },
   );
+  loadSeen(); // restore "seen"/recently-viewed marks
+  const sharedJobId = new URLSearchParams(window.location.search).get("job");
   restoreState(); // hydrate filters from the URL query, else last-saved localStorage
   void load(1);
+  if (sharedJobId) void openSharedJob(sharedJobId); // a shared link opens the vacancy popup
 });
 watch(loadMoreSentinel, (element, previous) => {
   if (previous) loadMoreObserver?.unobserve(previous);
@@ -921,9 +983,20 @@ onBeforeUnmount(() => {
       </div>
     </section>
 
+    <!-- Recently viewed (last up to 4) -->
+    <section v-if="recentlyViewed.length" class="recent">
+      <div class="recent__title">{{ t("recentlyViewed") }}</div>
+      <div class="recent__row">
+        <button v-for="r in recentlyViewed" :key="r.id" type="button" class="recent__chip" @click="openSharedJob(r.id)">
+          <span class="recent__chip-title">{{ r.title }}</span>
+          <span class="recent__chip-company">{{ r.company }}</span>
+        </button>
+      </div>
+    </section>
+
     <div class="jobs__results">
      <div class="jobs__grid" :class="{ 'jobs__grid_loading': loading }">
-      <div v-for="{ job, ats } in scored" :key="job.id" class="job-card">
+      <div v-for="{ job, ats } in scored" :key="job.id" class="job-card" :class="{ 'job-card_seen': isSeen(job.id) }">
         <div class="job-card__head">
           <a :href="job.url" target="_blank" rel="noopener noreferrer" class="job-card__title">{{ job.title }}</a>
           <span
@@ -940,6 +1013,7 @@ onBeforeUnmount(() => {
           <span>{{ job.location }}</span>
           <span class="job-card__dot">·</span>
           <span>{{ timeAgo(job.postedAt) }}</span>
+          <span v-if="isSeen(job.id)" class="job-card__badge job-card__badge_seen">{{ t("seen") }}</span>
           <span v-if="job.workMode && job.workMode !== 'unknown'" class="job-card__badge job-card__badge_mode">{{ t("wm" + job.workMode.charAt(0).toUpperCase() + job.workMode.slice(1)) }}</span>
           <span v-else-if="job.remote" class="job-card__badge">{{ t("remote") }}</span>
           <span v-if="job.experienceMinYears !== undefined && job.experienceMinYears > 0" class="job-card__badge job-card__badge_exp">{{ t("experienceYears", { n: job.experienceMinYears }) }}</span>
@@ -1045,6 +1119,12 @@ onBeforeUnmount(() => {
             target="_blank"
             rel="noopener noreferrer"
         >{{ t("apply") }} →</a>
+        <u-button
+            variant="outline"
+            color="neutral"
+            :icon="shareCopied ? 'i-lucide-check' : 'i-lucide-share-2'"
+            @click="shareActiveJob"
+        >{{ shareCopied ? t("shareCopied") : t("share") }}</u-button>
       </template>
     </u-modal>
   </u-container>
@@ -1178,19 +1258,19 @@ onBeforeUnmount(() => {
 .job-card__tags, .job-card__skills:last-child { margin-top: auto; }
 .job-card:hover { transform: translateY(-2px); border-color: rgba(224, 103, 154,0.40); }
 .job-card__head {
-  display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between;
-  column-gap: 10px; row-gap: 6px;
+  display: grid; grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start; column-gap: 10px; row-gap: 4px;
 }
 .job-card__title {
-  flex: 1 1 210px; min-width: 0; overflow-wrap: anywhere;
+  min-width: 0; overflow-wrap: anywhere;
   font-weight: 600; font-size: 16px; line-height: 1.35;
   text-decoration: none; color: var(--text-white, inherit);
 }
 .job-card__title:hover { color: var(--color-primary, #e0679a); }
-.job-card__src { font-size: 11px; text-transform: capitalize; opacity: 0.6; white-space: nowrap; }
+.job-card__src { justify-self: end; font-size: 11px; text-transform: capitalize; opacity: 0.6; white-space: nowrap; }
 .job-card__ats {
-  flex: 0 0 auto; max-width: 100%; margin-left: auto;
-  font-size: 12px; font-weight: 600; white-space: nowrap; padding: 1px 8px;
+  justify-self: end; white-space: nowrap;
+  font-size: 12px; font-weight: 600; padding: 1px 8px;
   border: 1px solid; border-radius: 6px;
 }
 .job-card__meta { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: 12px; margin-top: 4px; }
@@ -1240,4 +1320,24 @@ onBeforeUnmount(() => {
   background: var(--accent-pink, #e0679a); color: #1a0e14; font-weight: 600; font-size: 13.5px;
 }
 .job-modal__apply:hover { filter: brightness(1.06); }
+.job-card_seen { opacity: 0.72; }
+.job-card_seen:hover { opacity: 1; }
+.job-card__badge_seen { color: #94a3b8; background: rgba(148,163,184,0.14); }
+.recent { margin: 4px 0 18px; }
+.recent__title {
+  font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em;
+  opacity: 0.7; margin-bottom: 8px;
+}
+.recent__row { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 8px; }
+.recent__chip {
+  display: flex; flex-direction: column; gap: 2px; text-align: left; min-width: 0;
+  padding: 8px 12px; border-radius: 8px; border: 1px solid var(--line);
+  background: rgba(255,255,255,0.03); cursor: pointer; transition: border-color 160ms ease;
+}
+.recent__chip:hover { border-color: rgba(224,103,154,0.4); }
+.recent__chip-title {
+  font-size: 12.5px; font-weight: 600; color: var(--text-white, inherit);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.recent__chip-company { font-size: 11px; color: var(--ui-text-muted); }
 </style>
