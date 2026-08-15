@@ -14,6 +14,10 @@ services:
       context: ./frontend
     environment:
       REDIS_URL: "redis://redis:6379"
+      # URL of the Telegram MTProto worker (on the dedicated VPS, via its tunnel).
+      # Read from the deploy env/.env so the ephemeral tunnel URL isn't baked in;
+      # empty -> the jobs Telegram source falls back to the t.me/s scrape.
+      TELEGRAM_WORKER_URL: "${TELEGRAM_WORKER_URL:-}"
     restart: unless-stopped
     depends_on:
       - backend
