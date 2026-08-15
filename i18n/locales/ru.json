@@ -39,6 +39,8 @@
     "countryAny": "Любая страна",
     "city": "Город",
     "cityAny": "Любой город",
+    "district": "Район",
+    "districtAny": "Любой район",
     "propertyType": "Тип жилья",
     "ptAny": "Любой",
     "ptFlat": "Квартира",

@@ -43,7 +43,7 @@ interface FeedResult {
   sourceErrors?: Array<{ source?: string; country?: string; error?: string }>;
   error?: string;
 }
-interface CountryMeta { code: string; name: string; currency: string; cities?: string[] }
+interface CountryMeta { code: string; name: string; currency: string; cities?: string[]; locations?: Record<string, { districts?: string[]; metro?: string[] }> }
 type FlatView = "active" | "favorites" | "recent" | "hidden";
 type SearchPreset = { name: string; query: Record<string, string> };
 
@@ -74,6 +74,7 @@ useSeoMeta({
 // ---- filters ----
 const countries = ref<string[]>([]);
 const city = ref("");
+const district = ref("");
 const propertyType = ref("any"); // any | flat | house
 const dealType = ref("any"); // any | sale | longRent | shortRent
 const agency = ref("any"); // any | owner | agency
@@ -136,6 +137,18 @@ const cityOptions = computed(() => {
   const picked = countries.value.length ? meta.value.filter((c) => countries.value.includes(c.code)) : meta.value;
   return [...new Set(picked.flatMap((c) => c.cities ?? []))].sort();
 });
+// Districts for the chosen city (or all cities in the selected countries).
+const districtOptions = computed(() => {
+  const picked = countries.value.length ? meta.value.filter((c) => countries.value.includes(c.code)) : meta.value;
+  const set = new Set<string>();
+  for (const c of picked) {
+    for (const [cityName, loc] of Object.entries(c.locations ?? {})) {
+      if (city.value && cityName !== city.value) continue;
+      for (const d of loc?.districts ?? []) set.add(d);
+    }
+  }
+  return [...set].sort();
+});
 
 const SOURCES = ["olx", "telegram"];
 const sourceOptions = computed(() => [{ value: "", label: t("all") }, ...SOURCES.map((s) => ({ value: s, label: s }))]);
@@ -158,6 +171,8 @@ const agencySel = computed<string>({ get: () => agency.value, set: (v) => (agenc
 const countryItems = computed<Item[]>(() => meta.value.map((c) => ({ value: c.code, label: c.name })));
 const cityItems = computed<Item[]>(() => [{ label: t("cityAny"), value: ANY }, ...cityOptions.value.map((c) => ({ label: c, value: c }))]);
 const citySel = computed<string>({ get: () => city.value || ANY, set: (v) => (city.value = v === ANY ? "" : v) });
+const districtItems = computed<Item[]>(() => [{ label: t("districtAny"), value: ANY }, ...districtOptions.value.map((d) => ({ label: d, value: d }))]);
+const districtSel = computed<string>({ get: () => district.value || ANY, set: (v) => (district.value = v === ANY ? "" : v) });
 const propertyTypeItems = computed<Item[]>(() => [
   { label: t("ptAny"), value: "any" }, { label: t("ptFlat"), value: "flat" }, { label: t("ptHouse"), value: "house" },
 ]);
@@ -249,6 +264,7 @@ function applyQueryParams(params: Record<string, unknown>) {
   const countryParam = queryString(params.countries);
   if (countryParam) countries.value = countryParam.split(",").filter(Boolean);
   city.value = queryString(params.city);
+  district.value = queryString(params.district);
   propertyType.value = ["flat", "house"].includes(queryString(params.propertyType)) ? queryString(params.propertyType) : "any";
   dealType.value = ["sale", "longRent", "shortRent"].includes(queryString(params.dealType)) ? queryString(params.dealType) : "any";
   agency.value = ["owner", "agency"].includes(queryString(params.agency)) ? queryString(params.agency) : "any";
@@ -319,6 +335,7 @@ async function load(append = false, background = false) {
   const params: Record<string, string> = { limit: String(PAGE_SIZE), offset: append ? String(listings.value.length) : "0" };
   if (countries.value.length) params.countries = countries.value.join(",");
   if (city.value) params.city = city.value;
+  if (district.value) params.district = district.value;
   if (propertyType.value !== "any") params.propertyType = propertyType.value;
   if (dealType.value !== "any") params.dealType = dealType.value;
   if (agency.value !== "any") params.agency = agency.value;
@@ -369,7 +386,7 @@ function selectSource(v: string) {
   scheduleLoad(80);
 }
 function resetFilters() {
-  city.value = ""; propertyType.value = "any"; dealType.value = "any"; agency.value = "any";
+  city.value = ""; district.value = ""; propertyType.value = "any"; dealType.value = "any"; agency.value = "any";
   priceMin.value = undefined; priceMax.value = undefined; roomsMin.value = undefined; query.value = "";
   scheduleLoad(80);
 }
@@ -541,6 +558,11 @@ onBeforeUnmount(() => {
         <label class="flats__field">
           <span class="flats__field-label">{{ t("city") }}</span>
           <u-select-menu v-model="citySel" :items="cityItems" value-key="value" label-key="label"
+              class="flats__select" @update:model-value="scheduleLoad()" />
+        </label>
+        <label v-if="districtOptions.length" class="flats__field">
+          <span class="flats__field-label">{{ t("district") }}</span>
+          <u-select-menu v-model="districtSel" :items="districtItems" value-key="value" label-key="label"
               class="flats__select" @update:model-value="scheduleLoad()" />
         </label>
         <label class="flats__field">

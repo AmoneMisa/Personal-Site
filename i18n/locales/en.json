@@ -39,6 +39,8 @@
     "countryAny": "Any country",
     "city": "City",
     "cityAny": "Any city",
+    "district": "District",
+    "districtAny": "Any district",
     "propertyType": "Property",
     "ptAny": "Any",
     "ptFlat": "Flat",
