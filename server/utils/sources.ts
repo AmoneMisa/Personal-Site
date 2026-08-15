@@ -1458,6 +1458,43 @@ function telegramTitle(text: string, channel: TelegramChannel): string {
     || `Vacancy from ${channel.label}`
 }
 
+// Build a Job from one channel post's plain text. Shared by both transports:
+// the t.me/s HTML scrape and the MTProto worker (which returns text directly).
+// Returns null for non-job posts (too short / no vacancy keywords / filtered out).
+function telegramTextToJob(
+  text: string,
+  opts: { id: string; url: string; dateIso: string | null | undefined },
+  channel: TelegramChannel,
+  needle: string,
+): Job | null {
+  if (text.length < 20) return null
+  if (!/vacan|ваканс|робот|работ|ish\b|job\b|career|lavozim|maosh|зарплат|developer|manager|engineer|дизайнер|менеджер|инженер/i.test(text)) {
+    return null
+  }
+  const title = telegramTitle(text, channel)
+  const company = telegramField(text, 'company|employer|компания|работодатель|роботодавець|компанія|tashkilot|ish beruvchi') || channel.label
+  const location = telegramField(text, 'location|city|локация|город|місто|manzil|shahar') || channel.location
+  if (needle && !`${title} ${company} ${text}`.toLocaleLowerCase('ru').includes(needle)) return null
+
+  const salary = parseJoobleSalary(text)
+  const hashtags = [...text.matchAll(/(?:^|\s)#([\p{L}\p{N}_-]{2,40})/gu)].map((match) => match[1]!)
+  return {
+    id: opts.id,
+    title,
+    company,
+    location,
+    url: opts.url,
+    source: 'telegram',
+    remote: /remote|удал[её]н|віддален|masofaviy|онлайн|online/i.test(`${title} ${text}`),
+    tags: [...channel.tags, channel.country, `@${channel.handle}`, ...hashtags].slice(0, 8),
+    postedAt: opts.dateIso && !Number.isNaN(Date.parse(opts.dateIso))
+      ? new Date(opts.dateIso).toISOString()
+      : new Date().toISOString(),
+    description: text.slice(0, DESC_MAX),
+    ...salary,
+  }
+}
+
 function parseTelegramChannelHtml(html: string, channel: TelegramChannel, q: string): Job[] {
   const jobs: Job[] = []
   const chunks = html.split(/<div class="tgme_widget_message_wrap\b[^>]*>/i).slice(1)
@@ -1467,36 +1504,52 @@ function parseTelegramChannelHtml(html: string, channel: TelegramChannel, q: str
     const post = chunk.match(/data-post="([^"]+)"/i)?.[1]
     const body = chunk.match(/<div class="tgme_widget_message_text[^"]*"[^>]*>([\s\S]*?)<\/div>/i)?.[1]
     if (!post || !body) continue
-    const text = telegramText(body)
-    if (text.length < 20) continue
-    if (!/vacan|ваканс|робот|работ|ish\b|job\b|career|lavozim|maosh|зарплат|developer|manager|engineer|дизайнер|менеджер|инженер/i.test(text)) continue
-
-    const title = telegramTitle(text, channel)
-    const company = telegramField(text, 'company|employer|компания|работодатель|роботодавець|компанія|tashkilot|ish beruvchi') || channel.label
-    const location = telegramField(text, 'location|city|локация|город|місто|manzil|shahar') || channel.location
-    if (needle && !`${title} ${company} ${text}`.toLocaleLowerCase('ru').includes(needle)) continue
-
     const datetime = chunk.match(/<time[^>]+datetime="([^"]+)"/i)?.[1]
-    const salary = parseJoobleSalary(text)
-    const hashtags = [...text.matchAll(/(?:^|\s)#([\p{L}\p{N}_-]{2,40})/gu)].map((match) => match[1]!)
-    jobs.push({
+    const job = telegramTextToJob(telegramText(body), {
       id: `telegram-${post.replace(/[^a-z0-9_-]+/gi, '-')}`,
-      title,
-      company,
-      location,
       url: `https://t.me/${post}`,
-      source: 'telegram',
-      remote: /remote|удал[её]н|віддален|masofaviy|онлайн|online/i.test(`${title} ${text}`),
-      tags: [...channel.tags, channel.country, `@${channel.handle}`, ...hashtags].slice(0, 8),
-      postedAt: datetime && !Number.isNaN(Date.parse(datetime)) ? new Date(datetime).toISOString() : new Date().toISOString(),
-      description: text.slice(0, DESC_MAX),
-      ...salary,
-    })
+      dateIso: datetime,
+    }, channel, needle)
+    if (job) jobs.push(job)
+  }
+  return jobs
+}
+
+// MTProto sidecar transport (shared with the flat-finder telegram-worker). When
+// TELEGRAM_WORKER_URL is set, channel history comes from that worker's /history
+// endpoint (a real user session that isn't datacenter-IP throttled like t.me/s).
+interface TelegramWorkerMessage { id: number; text: string; date: string | null }
+async function fetchTelegramChannelViaWorker(
+  base: string,
+  channel: TelegramChannel,
+  q: string,
+): Promise<Job[]> {
+  const url = `${base.replace(/\/+$/, '')}/history?channel=${encodeURIComponent(channel.handle)}&limit=100`
+  const res = await fetch(url, { signal: AbortSignal.timeout(15_000) })
+  if (!res.ok) throw new Error(`tg-worker @${channel.handle} -> ${res.status}`)
+  const data = (await res.json()) as { ok?: boolean; messages?: TelegramWorkerMessage[] }
+  if (!data.ok || !Array.isArray(data.messages)) throw new Error(`tg-worker @${channel.handle} bad payload`)
+  const needle = q.trim().toLocaleLowerCase('ru')
+  const jobs: Job[] = []
+  for (const m of data.messages) {
+    const text = (m.text || '').trim()
+    if (!text) continue
+    const job = telegramTextToJob(text, {
+      id: `telegram-${channel.handle}-${m.id}`,
+      url: `https://t.me/${channel.handle}/${m.id}`,
+      dateIso: m.date,
+    }, channel, needle)
+    if (job) jobs.push(job)
   }
   return jobs
 }
 
 async function fetchTelegramChannel(channel: TelegramChannel, q: string): Promise<Job[]> {
+  // Preferred: the MTProto worker (real user session, not IP-throttled). Falls
+  // back to the t.me/s web preview when TELEGRAM_WORKER_URL is not configured.
+  const workerUrl = process.env.TELEGRAM_WORKER_URL
+  if (workerUrl) return fetchTelegramChannelViaWorker(workerUrl, channel, q)
+
   const url = `https://t.me/s/${encodeURIComponent(channel.handle)}`
   const res = await fetch(url, {
     headers: { 'User-Agent': UA, Accept: 'text/html,application/xhtml+xml' },
