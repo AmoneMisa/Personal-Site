@@ -209,11 +209,31 @@ const JOOBLE_DEFAULT_LOCATIONS = [
   'Ukraine',
 ]
 
+// Parse one money token + optional multiplier suffix into an absolute number.
+// CIS salary posts quote whole amounts, so "." "," and spaces are THOUSANDS
+// separators ("6,000,000" / "6 000 000" -> 6000000). "к"/"k"/"тыс" = x1e3,
+// "кк"/"kk"/"млн" = x1e6 ("6кк" -> 6000000). "1,5 млн" is treated as decimal.
+function parseAmountLoose(numStr: string, suffix?: string): number | undefined {
+  const s = (suffix ?? '').toLowerCase()
+  const mult = /^(кк|kk|млн|mln)$/.test(s) ? 1_000_000 : /^(к|k|тыс|ming)$/.test(s) ? 1_000 : 1
+  const digits = numStr.replace(/\s/g, '')
+  let base: number
+  if (/^\d{1,3}([.,])\d{3}(?:\1\d{3})*$/.test(digits)) {
+    base = Number(digits.replace(/[.,]/g, '')) // grouped thousands
+  } else if (mult > 1 && /^\d+[.,]\d{1,2}$/.test(digits)) {
+    base = Number(digits.replace(',', '.')) // "1,5 млн" -> 1.5
+  } else {
+    base = Number(digits.replace(/[.,]/g, ''))
+  }
+  const n = Math.round(base * mult)
+  return Number.isFinite(n) && n > 0 ? n : undefined
+}
+
 function parseJoobleSalary(value: unknown): Pick<Job, 'salaryMin' | 'salaryMax' | 'salaryCurrency'> {
   if (typeof value !== 'string' || !value.trim()) return {}
   const text = value.replace(/\u00a0/g, ' ')
-  const amounts = [...text.matchAll(/\d[\d\s]*(?:[.,]\d+)?/g)]
-    .map((match) => parseDevKgAmount(match[0]))
+  const amounts = [...text.matchAll(/(\d[\d\s.,]*\d|\d)\s*(кк|kk|млн|mln|к|k|тыс|ming)?/gi)]
+    .map((match) => parseAmountLoose(match[1]!, match[2]))
     .filter((amount): amount is number => amount !== undefined)
   if (!amounts.length) return {}
 
@@ -1476,7 +1496,12 @@ function telegramTextToJob(
   const location = telegramField(text, 'location|city|локация|город|місто|manzil|shahar') || channel.location
   if (needle && !`${title} ${company} ${text}`.toLocaleLowerCase('ru').includes(needle)) return null
 
-  const salary = parseJoobleSalary(text)
+  // Parse salary from the salary line only (💰 / зарплата / maosh / ...), so a
+  // phone number or a URL's digits elsewhere in the post can't be mistaken for pay.
+  const salaryLine = text.split('\n').find((line) =>
+    /💰|зарплат|заработн|оклад|оплата|\bsalary\b|maosh|маош|ish haqi|ойлик/i.test(line),
+  )
+  const salary = parseJoobleSalary(salaryLine ?? text)
   const hashtags = [...text.matchAll(/(?:^|\s)#([\p{L}\p{N}_-]{2,40})/gu)].map((match) => match[1]!)
   return {
     id: opts.id,
