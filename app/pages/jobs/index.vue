@@ -186,6 +186,9 @@ const includeRu = ref(false); // Russia is excluded by the backend unless opted-
 const includeBy = ref(false); // Belarus is excluded by the backend unless opted-in
 const workMode = ref("");
 const relocation = ref("");
+const employmentKind = ref("");
+const hasSalary = ref(false);
+const maxExperience = ref<number | undefined>(undefined);
 const foreignerOnly = ref(false);
 const noExperience = ref(false);
 const language = ref("");
@@ -208,6 +211,7 @@ function withAnyOption(model: { value: string }) {
 }
 const workModeSelect = withAnyOption(workMode);
 const relocationSelect = withAnyOption(relocation);
+const employmentKindSelect = withAnyOption(employmentKind);
 const languageSelect = computed<string>({
   get: () => language.value || ANY_SELECT_VALUE,
   set: (value) => {
@@ -317,6 +321,9 @@ async function load(
   if (includeBy.value) params.includeBy = "true";
   if (workMode.value) params.workMode = workMode.value;
   if (relocation.value) params.relocation = relocation.value;
+  if (employmentKind.value) params.employmentKind = employmentKind.value;
+  if (hasSalary.value) params.hasSalary = "true";
+  if (maxExperience.value != null) params.maxExperienceYears = String(maxExperience.value);
   if (foreignerOnly.value) params.foreignerFriendly = "true";
   if (noExperience.value) params.noExperience = "true";
   if (language.value) params.language = language.value;
@@ -361,6 +368,7 @@ function loadMore() {
 function resetFilters() {
   countries.value = []; cities.value = ""; includeRu.value = false; includeBy.value = false;
   workMode.value = ""; relocation.value = "";
+  employmentKind.value = ""; hasSalary.value = false; maxExperience.value = undefined;
   foreignerOnly.value = false; noExperience.value = false; language.value = ""; languageLevel.value = "";
   excludeLanguages.value = []; skills.value = "";
   scheduleLoad(100);
@@ -507,6 +515,14 @@ const relocationItems = computed<Item[]>(() => [
   { label: t("any"), value: ANY_SELECT_VALUE },
   { label: t("relYes"), value: "offered" },
   { label: t("relNo"), value: "none" },
+]);
+const employmentKindItems = computed<Item[]>(() => [
+  { label: t("any"), value: ANY_SELECT_VALUE },
+  { label: t("empFulltime"), value: "fulltime" },
+  { label: t("empParttime"), value: "parttime" },
+  { label: t("empContract"), value: "contract" },
+  { label: t("empInternship"), value: "internship" },
+  { label: t("empTemporary"), value: "temporary" },
 ]);
 const languageItems = computed<Item[]>(() => [
   { label: t("any"), value: ANY_SELECT_VALUE },
@@ -672,6 +688,21 @@ onBeforeUnmount(() => {
           />
         </label>
         <label class="jobs__field">
+          <span class="jobs__field-label">{{ t("employment") }}</span>
+          <u-select-menu
+              v-model="employmentKindSelect" :items="employmentKindItems" value-key="value" label-key="label"
+              :search-input="false" class="jobs__select" @update:model-value="scheduleLoad()"
+          />
+        </label>
+        <label class="jobs__field">
+          <span class="jobs__field-label">{{ t("experienceMax") }}</span>
+          <u-input
+              v-model.number="maxExperience" type="number" min="0" max="40"
+              icon="i-lucide-briefcase" :placeholder="t('experienceMaxPlaceholder')"
+              @keyup.enter="load(1)" @change="scheduleLoad()"
+          />
+        </label>
+        <label class="jobs__field">
           <span class="jobs__field-label">{{ t("language") }}</span>
           <u-select-menu
               v-model="languageSelect" :items="languageItems" value-key="value" label-key="label"
@@ -696,6 +727,10 @@ onBeforeUnmount(() => {
         <label class="jobs__field jobs__field_wide">
           <span class="jobs__field-label">{{ t("skills") }}</span>
           <u-input v-model="skills" icon="i-lucide-wrench" :placeholder="t('skillsPlaceholder')" @keyup.enter="load(1)" />
+        </label>
+        <label class="jobs__remote jobs__field_inline">
+          <u-switch v-model="hasSalary" @update:model-value="scheduleLoad()" />
+          <span>{{ t("hasSalary") }}</span>
         </label>
         <label class="jobs__remote jobs__field_inline">
           <u-switch v-model="foreignerOnly" @update:model-value="scheduleLoad()" />

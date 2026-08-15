@@ -3,7 +3,7 @@
 // from title + description + tags (EN/RU/UK/UZ keywords). Results are approximate
 // and meant to power filtering and statistics, not to be authoritative.
 
-import type { Job, LanguageReq, Relocation, SalaryPeriod, WorkMode } from './jobTypes'
+import type { EmploymentKind, Job, LanguageReq, Relocation, SalaryPeriod, WorkMode } from './jobTypes'
 import { toUsd } from './currency'
 import {
   extractSkillDetails,
@@ -292,6 +292,20 @@ function detectExperienceMinYears(text: string): number | undefined {
   return years.length ? Math.max(...years) : undefined
 }
 
+// ---- Employment type (full-time / part-time / contract / internship / temporary) ----
+// Normalizes the source's raw employmentType plus title/description wording across
+// EN/RU/UK/UZ. "project"/freelance/B2B/outstaff collapse into 'contract'. Order
+// matters: part-time is checked before full-time so "part-time" never reads as full.
+function detectEmploymentKind(job: Job, text: string): EmploymentKind | undefined {
+  const hay = `${job.employmentType || ''} ${text}`.toLowerCase()
+  if (/part[\s._-]?time|неполн\w*|неполный день|yarim stavka|yarim kunlik|part[\s-]?time/.test(hay)) return 'parttime'
+  if (/\bintern(ship)?\b|\btrainee\b|стаж(ир|ер|ёр|ув)\w*|стажировк\w*|amaliyot/.test(hay)) return 'internship'
+  if (/\bcontract\b|freelanc\w*|\bb2b\b|contractor|проектн\w*|\bпроект\b|\bgig\b|outstaff|фриланс/.test(hay)) return 'contract'
+  if (/temporary|\btemp\b|seasonal|времен\w*|тимчасов\w*/.test(hay)) return 'temporary'
+  if (/full[\s._-]?time|permanent|полн\w*\s+занятост\w*|полный день|to['’]?liq stavka|to['’]?liq kunlik/.test(hay)) return 'fulltime'
+  return undefined
+}
+
 // ---- Languages + levels ----
 const LANGUAGES: [string, RegExp][] = [
   ['English', /english|англий|англ\.|англійськ/i],
@@ -413,6 +427,7 @@ export function enrichJob(job: Job): Job {
     country: detectCountry(clean),
     workMode: detectWorkMode(text, job),
     relocation: detectRelocation(text),
+    employmentKind: detectEmploymentKind(clean, text),
     foreignerFriendly: detectForeignerFriendly(text),
     noExperience: detectNoExperience(text) || experienceMinYears === 0,
     experienceMinYears,

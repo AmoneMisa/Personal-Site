@@ -117,6 +117,18 @@ function matches(job: Job, query: JobQuery, oldestAllowed: number): boolean {
   if (query.countries.length && !query.countries.includes(job.country || '')) return false
   if (query.workMode && job.workMode !== query.workMode) return false
   if (query.relocation && job.relocation !== query.relocation) return false
+  if (query.employmentKind && job.employmentKind !== query.employmentKind) return false
+  // "Has shown salary": keep only postings that carry an actual salary figure.
+  if (query.hasSalary && job.salaryMin === undefined && job.salaryMax === undefined) return false
+  // Experience ceiling: drop roles that require MORE than the given years. Postings
+  // with no detected requirement are kept (unknown ≠ over the limit).
+  if (
+    query.maxExperienceYears !== undefined
+    && job.experienceMinYears !== undefined
+    && job.experienceMinYears > query.maxExperienceYears
+  ) {
+    return false
+  }
   if (query.foreignerFriendly !== undefined && job.foreignerFriendly !== query.foreignerFriendly) {
     return false
   }

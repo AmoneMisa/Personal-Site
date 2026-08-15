@@ -9,7 +9,9 @@
 
 import {
   ALL_SOURCES,
+  EMPLOYMENT_KINDS,
   FREE_SOURCES,
+  type EmploymentKind,
   type JobSource,
   type Relocation,
   type SortKey,
@@ -123,6 +125,11 @@ export default defineEventHandler(async (event) => {
   const relocation = RELOCATIONS.includes(q.relocation as Relocation)
     ? (q.relocation as Relocation)
     : undefined
+  const employmentKind = EMPLOYMENT_KINDS.includes(q.employmentKind as EmploymentKind)
+    ? (q.employmentKind as EmploymentKind)
+    : undefined
+  const hasSalary = q.hasSalary === 'true'
+  const maxExperienceYears = q.maxExperienceYears ? clampInt(q.maxExperienceYears, 0, 0, 40) : undefined
   let foreignerFriendly: boolean | undefined
   if (q.foreignerFriendly === 'true') foreignerFriendly = true
   else if (q.foreignerFriendly === 'false') foreignerFriendly = false
@@ -170,6 +177,9 @@ export default defineEventHandler(async (event) => {
       includeBy,
       workMode,
       relocation,
+      employmentKind,
+      hasSalary,
+      maxExperienceYears,
       foreignerFriendly,
       noExperience,
       language,

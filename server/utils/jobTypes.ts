@@ -3,6 +3,15 @@
 export type WorkMode = 'remote' | 'hybrid' | 'office' | 'unknown'
 export type Relocation = 'offered' | 'none' | 'unknown'
 export type SalaryPeriod = 'hour' | 'month' | 'year'
+// Normalized employment type. "project"/freelance/B2B collapse into 'contract'.
+export type EmploymentKind = 'fulltime' | 'parttime' | 'contract' | 'internship' | 'temporary'
+export const EMPLOYMENT_KINDS: EmploymentKind[] = [
+  'fulltime',
+  'parttime',
+  'contract',
+  'internship',
+  'temporary',
+]
 
 export interface LanguageReq {
   language: string // e.g. "English"
@@ -37,6 +46,7 @@ export interface Job {
   relocation?: Relocation
   foreignerFriendly?: boolean // visa sponsorship / open to foreigners
   noExperience?: boolean // entry-level: no prior experience required (trainee/intern/junior/"без опыта")
+  employmentKind?: EmploymentKind // normalized from employmentType + text
   languages?: LanguageReq[]
   skills?: string[]
   niceToHave?: string[] // "will be a plus"
@@ -105,6 +115,9 @@ export interface JobQuery {
   includeBy?: boolean // opt-in to Belarus postings (excluded by default)
   workMode?: WorkMode
   relocation?: Relocation
+  employmentKind?: EmploymentKind // full-time / part-time / contract(project) / internship / temporary
+  hasSalary?: boolean // only vacancies that show a salary
+  maxExperienceYears?: number // drop roles requiring MORE than this many years
   foreignerFriendly?: boolean
   noExperience?: boolean // only entry-level / no-experience-required roles
   language?: string // e.g. "english"
