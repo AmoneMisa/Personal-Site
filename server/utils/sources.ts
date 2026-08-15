@@ -1549,7 +1549,7 @@ function parseTelegramChannelHtml(html: string, channel: TelegramChannel, q: str
 // MTProto sidecar transport (shared with the flat-finder telegram-worker). When
 // TELEGRAM_WORKER_URL is set, channel history comes from that worker's /history
 // endpoint (a real user session that isn't datacenter-IP throttled like t.me/s).
-interface TelegramWorkerMessage { id: number; text: string; date: string | null }
+interface TelegramWorkerMessage { id: number; text: string; date: string | null; preview?: string | null }
 async function fetchTelegramChannelViaWorker(
   base: string,
   channel: TelegramChannel,
@@ -1563,7 +1563,9 @@ async function fetchTelegramChannelViaWorker(
   const needle = q.trim().toLocaleLowerCase('ru')
   const jobs: Job[] = []
   for (const m of data.messages) {
-    const text = (m.text || '').trim()
+    // Fold the link-preview (webpage title/description) into the text so salary,
+    // skills and requirements that only appear on the linked job page are parsed.
+    const text = [(m.text || '').trim(), (m.preview || '').trim()].filter(Boolean).join('\n')
     if (!text) continue
     const job = telegramTextToJob(text, {
       id: `telegram-${channel.handle}-${m.id}`,
