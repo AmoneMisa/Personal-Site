@@ -1235,6 +1235,7 @@ onBeforeUnmount(() => {
 .jobs__results { position: relative; }
 .jobs__grid {
   display: grid; gap: 12px; grid-template-columns: 1fr; align-items: stretch;
+  grid-auto-rows: 1fr; /* every card the same height across all rows */
   @media (min-width: 640px) { grid-template-columns: repeat(2, 1fr); }
   @media (min-width: 1024px) { grid-template-columns: repeat(3, 1fr); }
 }

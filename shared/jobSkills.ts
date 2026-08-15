@@ -77,7 +77,7 @@ export const SKILL_CATALOG: SkillDefinition[] = [
     ['Tauri'], ['Qt'], ['WPF'], ['WinForms'], ['Unity', ['unity3d']], ['Unreal Engine', ['ue4', 'ue5']], ['Godot'],
   ]),
   ...group('IT', 'Databases', [
-    ['SQL'], ['PostgreSQL', ['postgres', 'psql']], ['MySQL'], ['MariaDB', ['maria db']], ['SQLite'],
+    ['SQL'], ['NoSQL', ['no sql', 'no-sql']], ['PostgreSQL', ['postgres', 'psql']], ['MySQL'], ['MariaDB', ['maria db']], ['SQLite'],
     ['Microsoft SQL Server', ['mssql', 'sql server']], ['Oracle Database', ['oracle db']],
     ['MongoDB', ['mongo db', 'mongo']], ['Redis'], ['Elasticsearch', ['elastic search']], ['OpenSearch'],
     ['ClickHouse', ['click house']], ['DynamoDB'], ['Firestore'], ['Firebase'], ['Neo4j'],

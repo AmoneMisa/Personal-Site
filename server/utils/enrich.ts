@@ -154,6 +154,26 @@ export function extractSalaryFromText(raw: string | undefined): ExtractedSalary 
     }
     return { salaryMin: first, salaryCurrency: currency, salaryPeriod: period }
   }
+
+  // Fallback: an explicit currency range like "$155,600 - $306,800" is almost
+  // always pay even without a salary keyword nearby. Require two grouped/4+ digit
+  // amounts sharing a currency symbol so ordinary money mentions don't match.
+  const range = text.match(
+    /([$€£])\s?(\d{1,3}(?:,\d{3})+|\d{4,})(?:\.\d+)?\s*(?:[-–—]|to)\s*\$?\s?(\d{1,3}(?:,\d{3})+|\d{4,})(?:\.\d+)?/,
+  )
+  if (range) {
+    const currency = range[1] === '$' ? 'USD' : range[1] === '€' ? 'EUR' : 'GBP'
+    const lo = salaryAmount(range[2]!)
+    const hi = salaryAmount(range[3]!)
+    if (lo && hi) {
+      return {
+        salaryMin: Math.min(lo, hi),
+        salaryMax: Math.max(lo, hi),
+        salaryCurrency: currency,
+        salaryPeriod: explicitSalaryPeriod(text),
+      }
+    }
+  }
   return {}
 }
 
@@ -253,7 +273,17 @@ function detectRelocation(text: string): Relocation {
 
 // ---- Foreigner-friendly (visa sponsorship / open to foreigners) ----
 function detectForeignerFriendly(text: string): boolean {
-  return /visa sponsor|visa support|work permit|sponsorship|for foreigners|open to foreigner|иностранц|для иностран|іноземц|relocation package|work visa/i.test(
+  // Explicit "no sponsorship / must already be authorized" beats any bare mention
+  // of the word "sponsorship" (e.g. "without the need for employer sponsorship",
+  // "must be legally authorized to work in the United States").
+  if (
+    /\bno (?:visa )?sponsorship\b|without (?:the need for )?(?:employer |visa )?sponsorship|not (?:able|eligible) to sponsor|do(?:es)? not (?:offer |provide )?sponsor|sponsorship (?:is )?not (?:available|provided|offered)|must be (?:legally )?authoriz\w+ to work|legally authoriz\w+ to work in the (?:us\b|u\.s|united states)/i.test(
+      text,
+    )
+  ) {
+    return false
+  }
+  return /visa sponsor|visa support|will sponsor|sponsorship (?:available|provided|offered|possible)|work permit|for foreigners|open to foreigner|иностранц|для иностран|іноземц|relocation package|work visa|relocation (?:support|assistance|help)|help(?:s|ing)? (?:with )?relocat|спонсорство виз|виз[ауы]\s*(?:поддержк|спонсор)/i.test(
     text,
   )
 }
@@ -278,10 +308,12 @@ function detectNoExperience(text: string): boolean {
 function detectExperienceMinYears(text: string): number | undefined {
   const years: number[] = []
   const patterns = [
-    /\b(\d{1,2}(?:[.,]\d)?)\s*(?:[-–]\s*\d{1,2}(?:[.,]\d)?)?\s*\+?\s*(?:years?|yrs?)\s+(?:of\s+)?[^.;\n]{0,60}\bexperience\b/gi,
+    /\b(\d{1,2}(?:[.,]\d)?)\s*(?:[-–]\s*\d{1,2}(?:[.,]\d)?)?\s*\+?\s*(?:years?|yrs?)\s+(?:of\s+)?[^.;\n]{0,120}\bexperience\b/gi,
     /\b(?:at least|minimum of|min\.?)\s*(\d{1,2}(?:[.,]\d)?)\s*(?:years?|yrs?)\b/gi,
     /(?:опыт|досвід)\s+(?:работы\s+)?(?:от\s+)?(\d{1,2}(?:[.,]\d)?)\s*(?:[-–]\s*\d{1,2}(?:[.,]\d)?)?\s*(?:лет|год[а]?|рок[иів]?)/gi,
     /\b(\d{1,2}(?:[.,]\d)?)\s*(?:[-–]\s*\d{1,2}(?:[.,]\d)?)?\s*(?:йил|yil)(?:дан)?[^.;\n]{0,32}(?:тажриб|tajriba)/gi,
+    // RU/UK, number-first: "від 1 року досвіду", "3 роки досвіду", "2 года опыта".
+    /\b(\d{1,2}(?:[.,]\d)?)\s*(?:[-–]\s*\d{1,2}(?:[.,]\d)?)?\s*(?:рок\w*|рік|год\w*|лет)[^.;\n]{0,25}(?:досвід\w*|опыт\w*)/gi,
   ]
   for (const pattern of patterns) {
     for (const match of text.matchAll(pattern)) {

@@ -157,7 +157,7 @@ export async function fetchJobicy(_q: string): Promise<Job[]> {
     tags: [j.jobIndustry, j.jobLevel].flat().filter(Boolean).slice(0, 6),
     postedAt: j.pubDate ? new Date(j.pubDate).toISOString() : new Date().toISOString(),
     employmentType: Array.isArray(j.jobType) ? j.jobType[0] : j.jobType,
-    description: stripHtml(j.jobExcerpt || j.jobDescription).slice(0, DESC_MAX),
+    description: stripHtml(j.jobDescription || j.jobExcerpt).slice(0, DESC_MAX),
   }))
 }
 
@@ -229,32 +229,38 @@ function parseAmountLoose(numStr: string, suffix?: string): number | undefined {
   return Number.isFinite(n) && n > 0 ? n : undefined
 }
 
+// Currency-anchored salary extraction. A number counts as pay only when it sits
+// next to a currency symbol/word, so stray numbers (phone numbers, "1 year
+// experience", URL ids) are never mistaken for salary. Handles "$60,000 USD",
+// "6 000 000 сум", "від 6кк до 10кк сум", "6 000 - 10 000 KGS", etc.
+const SYMBOL_CUR: Record<string, string> = { '$': 'USD', '€': 'EUR', '£': 'GBP', '₴': 'UAH' }
+const WORD_CUR: [RegExp, string][] = [
+  [/^(USD|доллар\w*|у\.?е\.?)$/i, 'USD'], [/^(EUR|евро)$/i, 'EUR'], [/^GBP$/i, 'GBP'],
+  [/^(UAH|грн\w*|гривн\w*)$/i, 'UAH'], [/^(UZS|сум\w*|so['’]?m)$/i, 'UZS'],
+  [/^(KZT|тенге)$/i, 'KZT'], [/^(KGS|сом)$/i, 'KGS'], [/^(TJS|сомони)$/i, 'TJS'],
+  [/^(TMT|манат\w*)$/i, 'TMT'], [/^(PLN|zł|злот\w*)$/i, 'PLN'], [/^(RON|lei)$/i, 'RON'],
+]
+function wordToCur(word: string | undefined): string | undefined {
+  if (!word) return undefined
+  for (const [re, code] of WORD_CUR) if (re.test(word)) return code
+  return undefined
+}
+// symbol? num [suffix] [ (-|—|до|to) num [suffix] ] currency-word?
+const SALARY_MONEY_RE =
+  /(?:([$€£₴])\s*)?(\d[\d\s.,]*\d|\d)(?:\s*(кк|kk|млн|mln|к|k|тыс|ming)(?![A-Za-z]))?(?:\s*(?:[-–—…]{1,3}|до|to)\s*(\d[\d\s.,]*\d|\d)(?:\s*(кк|kk|млн|mln|к|k|тыс|ming)(?![A-Za-z]))?)?\s*(USD|EUR|GBP|UAH|UZS|KZT|KGS|TJS|TMT|PLN|RON|сум\w*|so['’]?m|тенге|сомони|сом|манат\w*|грн\w*|гривн\w*|zł|злот\w*|lei|евро|доллар\w*|у\.?е\.?)?/gi
+
 function parseJoobleSalary(value: unknown): Pick<Job, 'salaryMin' | 'salaryMax' | 'salaryCurrency'> {
   if (typeof value !== 'string' || !value.trim()) return {}
   const text = value.replace(/\u00a0/g, ' ')
-  const amounts = [...text.matchAll(/(\d[\d\s.,]*\d|\d)\s*(кк|kk|млн|mln|к|k|тыс|ming)?/gi)]
-    .map((match) => parseAmountLoose(match[1]!, match[2]))
-    .filter((amount): amount is number => amount !== undefined)
-  if (!amounts.length) return {}
-
-  const currencyAliases: [RegExp, string][] = [
-    [/\bUSD\b|\$/i, 'USD'],
-    [/\bEUR\b|€/i, 'EUR'],
-    [/\bUZS\b|сум/i, 'UZS'],
-    [/\bKZT\b|тенге/i, 'KZT'],
-    [/\bKGS\b|сом/i, 'KGS'],
-    [/\bTJS\b|сомон/i, 'TJS'],
-    [/\bTMT\b|манат/i, 'TMT'],
-    [/\bUAH\b|грн|₴/i, 'UAH'],
-  ]
-  const salaryCurrency = currencyAliases.find(([pattern]) => pattern.test(text))?.[1]
-  if (!salaryCurrency) return {}
-
-  return {
-    salaryMin: amounts[0],
-    salaryMax: amounts[1],
-    salaryCurrency,
+  for (const m of text.matchAll(SALARY_MONEY_RE)) {
+    const currency = (m[1] && SYMBOL_CUR[m[1]]) || wordToCur(m[6])
+    if (!currency) continue // a number with no currency anchor is not a salary
+    const lo = parseAmountLoose(m[2]!, m[3])
+    const hi = m[4] ? parseAmountLoose(m[4], m[5]) : undefined
+    if (lo === undefined && hi === undefined) continue
+    return { salaryMin: lo, salaryMax: hi, salaryCurrency: currency }
   }
+  return {}
 }
 
 export async function fetchJooble(q: string): Promise<Job[]> {
