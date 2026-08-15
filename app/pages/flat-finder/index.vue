@@ -114,6 +114,11 @@ function listingPhoto(listing: Listing): string | null {
   return photoCandidates(listing).find((url) => !failedPhotoUrls.value.has(url)) || null;
 }
 
+// All still-loadable photos (for the modal gallery); failed ones drop out reactively.
+function visiblePhotos(listing: Listing): string[] {
+  return photoCandidates(listing).filter((url) => !failedPhotoUrls.value.has(url));
+}
+
 function markPhotoFailed(url: string | null) {
   if (!url) return;
   failedPhotoUrls.value = new Set([...failedPhotoUrls.value, url]);
@@ -403,6 +408,7 @@ const mapPoints = computed(() =>
 // ---- details modal ----
 const active = ref<Listing | null>(null);
 const modalOpen = ref(false);
+const lightbox = ref<string | null>(null); // full-screen photo, or null
 function openListing(l: Listing) {
   active.value = l;
   modalOpen.value = true;
@@ -575,7 +581,7 @@ onBeforeUnmount(() => {
     <p v-else class="flats__count text-muted">{{ t("found", { n: view === 'active' ? total : displayedListings.length }) }}</p>
 
     <!-- Map -->
-    <section v-if="mapPoints.length" class="flats__map-wrap">
+    <section v-if="listings.length" class="flats__map-wrap">
       <flat-map
           :points="mapPoints"
           :draw-label="t('drawArea')"
@@ -636,14 +642,20 @@ onBeforeUnmount(() => {
     <u-modal v-model:open="modalOpen" :title="active?.title || ''" :ui="{ content: 'max-w-2xl' }">
       <template #body>
         <div v-if="active" class="flat-modal">
-          <img
-              v-if="listingPhoto(active)"
-              :src="listingPhoto(active) || ''"
-              :alt="active.title"
-              class="flat-modal__photo"
-              referrerpolicy="no-referrer"
-              @error="markPhotoFailedFromEvent"
-          />
+          <div v-if="visiblePhotos(active).length" class="flat-modal__gallery">
+            <img
+                v-for="(p, i) in visiblePhotos(active)"
+                :key="p"
+                :src="p"
+                :alt="`${active.title} (${i + 1})`"
+                class="flat-modal__thumb"
+                loading="lazy"
+                decoding="async"
+                referrerpolicy="no-referrer"
+                @error="markPhotoFailedFromEvent"
+                @click="lightbox = p"
+            />
+          </div>
           <div class="flat-modal__price">{{ priceLabel(active) }}<span v-if="dealLabel(active.dealType)" class="flat-modal__deal"> · {{ dealLabel(active.dealType) }}</span></div>
           <div class="flat-modal__meta text-muted">
             <span v-if="specLine(active)">{{ specLine(active) }}</span>
@@ -666,6 +678,14 @@ onBeforeUnmount(() => {
         <a v-if="active" class="flat-modal__open" :href="active.url" target="_blank" rel="noopener noreferrer">{{ t("open") }} →</a>
       </template>
     </u-modal>
+
+    <!-- Full-screen photo viewer (click any gallery thumbnail) -->
+    <teleport to="body">
+      <div v-if="lightbox" class="flat-lightbox" @click="lightbox = null">
+        <img :src="lightbox" alt="" referrerpolicy="no-referrer" @click.stop @error="lightbox = null" />
+        <button type="button" class="flat-lightbox__close" aria-label="Close" @click="lightbox = null">×</button>
+      </div>
+    </teleport>
 
     <u-modal v-model:open="presetModalOpen" :title="t('savePreset')">
       <template #body>
@@ -729,14 +749,15 @@ onBeforeUnmount(() => {
 .flats__source-warning { color: #f6c177; font-size: 13px; margin-bottom: 12px; }
 .flats__count { font-size: 13px; margin-bottom: 12px; }
 .flats__map-wrap { position: relative; z-index: 0; isolation: isolate; margin-bottom: 18px; scroll-margin-top: 90px; }
-.flats__grid { display: grid; gap: 14px; grid-template-columns: 1fr; align-items: start; }
+.flats__grid { display: grid; gap: 14px; grid-template-columns: 1fr; align-items: stretch; grid-auto-rows: 1fr; }
 @media (min-width: 640px) { .flats__grid { grid-template-columns: repeat(2, 1fr); } }
 @media (min-width: 1024px) { .flats__grid { grid-template-columns: repeat(3, 1fr); } }
 .flats__grid_loading { opacity: 0.4; pointer-events: none; }
 .flat-card {
-  border: 1px solid var(--line); border-radius: 12px; overflow: hidden; background: rgba(255,255,255,0.03);
+  height: 100%; border: 1px solid var(--line); border-radius: 12px; overflow: hidden; background: rgba(255,255,255,0.03);
   cursor: pointer; transition: transform 140ms ease, border-color 180ms ease; display: flex; flex-direction: column;
 }
+.flat-card__body { flex: 1 1 auto; }
 .flat-card:hover { transform: translateY(-2px); border-color: rgba(224,103,154,0.4); }
 .flat-card__photo {
   position: relative; width: 100%; height: clamp(220px, 25vw, 310px);
@@ -764,6 +785,24 @@ onBeforeUnmount(() => {
 .flat-card_hidden { opacity: 0.64; border-style: dashed; }
 .flat-modal { display: flex; flex-direction: column; gap: 12px; }
 .flat-modal__photo { width: 100%; max-height: 320px; object-fit: cover; border-radius: 10px; }
+.flat-modal__gallery {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 6px;
+  max-height: 46vh; overflow-y: auto;
+}
+.flat-modal__thumb {
+  width: 100%; aspect-ratio: 4 / 3; object-fit: cover; border-radius: 8px; cursor: zoom-in;
+  border: 1px solid var(--line); transition: border-color 140ms ease;
+}
+.flat-modal__thumb:hover { border-color: var(--accent-pink); }
+.flat-lightbox {
+  position: fixed; inset: 0; z-index: 3000; display: grid; place-items: center;
+  background: rgba(0,0,0,0.9); padding: 24px; cursor: zoom-out;
+}
+.flat-lightbox img { max-width: 96vw; max-height: 92vh; object-fit: contain; border-radius: 8px; cursor: default; }
+.flat-lightbox__close {
+  position: fixed; top: 16px; right: 20px; width: 40px; height: 40px; border-radius: 8px;
+  background: rgba(13,17,40,0.9); color: #fff; border: 1px solid var(--line); font-size: 22px; cursor: pointer;
+}
 .flat-modal__price { font-weight: 700; font-size: 20px; }
 .flat-modal__deal { color: #e0679a; font-weight: 500; }
 .flat-modal__meta { font-size: 13px; }
