@@ -237,6 +237,10 @@ function pointInPolygon(point: { lat: number; lng: number }, polygon: Array<{ la
 
 function applyDrawnArea(items: Listing[]) {
   if (drawnArea.value.length < 3) return items;
+  // An area can only filter geocoded listings. If nothing in the set has
+  // coordinates (e.g. geocoding not yet available), the polygon can't apply —
+  // treat it as a no-op instead of silently hiding every result.
+  if (!items.some((item) => item.lat != null && item.lng != null)) return items;
   return items.filter((item) => item.lat != null && item.lng != null
     && pointInPolygon({ lat: item.lat, lng: item.lng }, drawnArea.value));
 }
@@ -707,6 +711,7 @@ onBeforeUnmount(() => {
 
     <div v-if="!loading && !displayedListings.length && !failed" class="flats__empty">
       <div class="text-muted">{{ t("empty") }}</div>
+      <div v-if="drawnArea.length >= 3 && listings.length" class="text-muted">{{ t("emptyArea") }}</div>
     </div>
 
     <!-- Details popup -->

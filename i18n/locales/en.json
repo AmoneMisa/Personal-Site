@@ -60,6 +60,7 @@
     "roomsMin": "Rooms from",
     "found": "{n} listings",
     "empty": "No listings match your search.",
+    "emptyArea": "A drawn area is active — clear it on the map to see the other results.",
     "error": "Could not load listings. Please try again.",
     "noPhoto": "No photo",
     "roomShare": "Room share",
