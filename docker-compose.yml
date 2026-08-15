@@ -17,7 +17,7 @@ services:
       # URL of the Telegram MTProto worker (on the dedicated VPS, via its tunnel).
       # Read from the deploy env/.env so the ephemeral tunnel URL isn't baked in;
       # empty -> the jobs Telegram source falls back to the t.me/s scrape.
-      TELEGRAM_WORKER_URL: "${TELEGRAM_WORKER_URL:-}"
+      TELEGRAM_WORKER_URL: "http://5.175.234.79:4100"
     restart: unless-stopped
     depends_on:
       - backend
