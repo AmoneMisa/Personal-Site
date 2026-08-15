@@ -46,6 +46,7 @@ const RU = {
       pages: [
         { label: "Подбор страны", sub: "квиз: куда переехать", href: "/quizzes/country-fit" },
         { label: "Поиск вакансий", sub: "подборка под ваш стек", href: "/jobs" },
+        { label: "Поиск жилья", sub: "аренда и продажа на карте", href: "/flat-finder" },
         { label: "Все сервисы", sub: "PDF, JSON, Docker-поиск и др.", href: "/services" },
       ] as DropdownItem[],
     },
@@ -184,6 +185,7 @@ const EN: typeof RU = {
       pages: [
         { label: "Country fit", sub: "quiz: where to relocate", href: "/quizzes/country-fit" },
         { label: "Job finder", sub: "picks for your stack", href: "/jobs" },
+        { label: "Flat finder", sub: "rentals & sales on a map", href: "/flat-finder" },
         { label: "All services", sub: "PDF, JSON, Docker search & more", href: "/services" },
       ],
     },
