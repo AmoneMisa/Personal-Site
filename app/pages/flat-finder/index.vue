@@ -81,6 +81,8 @@ const agency = ref("any"); // any | owner | agency
 const priceMin = ref<number | undefined>(undefined);
 const priceMax = ref<number | undefined>(undefined);
 const roomsMin = ref<number | undefined>(undefined);
+const displayCurrency = ref("USD"); // currency for price display + the min/max filter
+const rates = ref<Record<string, number>>({ USD: 1 }); // units per 1 USD, from /flats-rates
 const query = ref("");
 const source = ref(""); // "" = all
 const showAdvanced = ref(true);
@@ -172,6 +174,13 @@ const countryItems = computed<Item[]>(() => meta.value.map((c) => ({ value: c.co
 const cityItems = computed<Item[]>(() => [{ label: t("cityAny"), value: ANY }, ...cityOptions.value.map((c) => ({ label: c, value: c }))]);
 const citySel = computed<string>({ get: () => city.value || ANY, set: (v) => (city.value = v === ANY ? "" : v) });
 const districtItems = computed<Item[]>(() => [{ label: t("districtAny"), value: ANY }, ...districtOptions.value.map((d) => ({ label: d, value: d }))]);
+const CURRENCY_PRIORITY = ["USD", "EUR", "UZS", "KZT", "UAH", "RON", "GBP", "KGS", "TJS", "TMT", "PLN"];
+const currencyItems = computed<Item[]>(() => {
+  const keys = Object.keys(rates.value).filter((c) => /^[A-Z]{3}$/.test(c) && rates.value[c]! > 0);
+  const preferred = CURRENCY_PRIORITY.filter((c) => keys.includes(c));
+  const rest = keys.filter((c) => !CURRENCY_PRIORITY.includes(c)).sort();
+  return [...preferred, ...rest].map((c) => ({ label: c, value: c }));
+});
 const districtSel = computed<string>({ get: () => district.value || ANY, set: (v) => (district.value = v === ANY ? "" : v) });
 const propertyTypeItems = computed<Item[]>(() => [
   { label: t("ptAny"), value: "any" }, { label: t("ptFlat"), value: "flat" }, { label: t("ptHouse"), value: "house" },
@@ -250,6 +259,7 @@ function currentFilterQuery(): Record<string, string> {
   if (agency.value !== "any") queryParams.agency = agency.value;
   if (priceMin.value != null) queryParams.priceMin = String(priceMin.value);
   if (priceMax.value != null) queryParams.priceMax = String(priceMax.value);
+  if (displayCurrency.value !== "USD") queryParams.currency = displayCurrency.value;
   if (roomsMin.value != null) queryParams.roomsMin = String(roomsMin.value);
   if (query.value.trim()) queryParams.query = query.value.trim();
   if (source.value) queryParams.sources = source.value;
@@ -270,6 +280,7 @@ function applyQueryParams(params: Record<string, unknown>) {
   agency.value = ["owner", "agency"].includes(queryString(params.agency)) ? queryString(params.agency) : "any";
   priceMin.value = Number(queryString(params.priceMin)) || undefined;
   priceMax.value = Number(queryString(params.priceMax)) || undefined;
+  if (queryString(params.currency)) displayCurrency.value = queryString(params.currency);
   roomsMin.value = Number(queryString(params.roomsMin)) || undefined;
   query.value = queryString(params.query);
   const sourceParam = queryString(params.sources);
@@ -316,6 +327,11 @@ async function loadMeta() {
   }
 }
 
+async function loadRates() {
+  const { data } = await safeFetch<{ rates?: Record<string, number> }>("/flats-rates");
+  if (data?.rates && data.rates.USD) rates.value = data.rates;
+}
+
 function scheduleWarmPoll() {
   if (warmTimer) clearTimeout(warmTimer);
   if (!warming.value) return;
@@ -341,6 +357,9 @@ async function load(append = false, background = false) {
   if (agency.value !== "any") params.agency = agency.value;
   if (priceMin.value != null) params.priceMin = String(priceMin.value);
   if (priceMax.value != null) params.priceMax = String(priceMax.value);
+  // The min/max are entered in the display currency; tell the backend so it can
+  // compare across listings priced in other currencies (USD-normalized).
+  if (priceMin.value != null || priceMax.value != null) params.priceCurrency = displayCurrency.value;
   if (roomsMin.value != null) params.roomsMin = String(roomsMin.value);
   if (query.value.trim()) params.query = query.value.trim();
   params.sources = source.value || SOURCES.join(",");
@@ -444,6 +463,22 @@ function priceLabel(l: Listing): string {
   if (l.price == null) return t("priceNA");
   return `${l.price.toLocaleString()} ${l.currency}`.trim();
 }
+// Convert an amount between two currencies via the USD-based rates table.
+function convert(amount: number, from: string, to: string): number | undefined {
+  const rf = rates.value[(from || "USD").toUpperCase()];
+  const rt = rates.value[(to || "USD").toUpperCase()];
+  if (!rf || !rt) return undefined;
+  return (amount * rt) / rf;
+}
+// "≈ 5,700,000 UZS" — shown only when the listing's currency differs from the
+// chosen display currency and both rates are known.
+function convertedLabel(l: Listing): string | null {
+  if (l.price == null || !l.currency) return null;
+  if (l.currency.toUpperCase() === displayCurrency.value.toUpperCase()) return null;
+  const v = convert(l.price, l.currency, displayCurrency.value);
+  if (v === undefined) return null;
+  return `≈ ${Math.round(v).toLocaleString()} ${displayCurrency.value}`;
+}
 const dealLabel = (d: Listing["dealType"]) =>
   d === "sale" ? t("dtSale") : d === "longRent" ? t("dtLongRent") : d === "shortRent" ? t("dtShortRent") : "";
 function specLine(l: Listing): string {
@@ -470,6 +505,7 @@ function timeAgo(iso: string | null): string {
 onMounted(async () => {
   loadPersonalState();
   applyQueryParams(route.query);
+  void loadRates(); // FX rates for price display + conversion (non-blocking)
   await loadMeta();
   if (queryString(route.query.shared) === "1") {
     showAdvanced.value = true;
@@ -589,6 +625,14 @@ onBeforeUnmount(() => {
           <u-input v-model.number="priceMax" type="number" icon="i-lucide-banknote" @change="scheduleLoad()" />
         </label>
         <label class="flats__field">
+          <span class="flats__field-label">{{ t("currency") }}</span>
+          <u-select-menu
+              v-model="displayCurrency" :items="currencyItems" value-key="value" label-key="label"
+              class="flats__select"
+              @update:model-value="(priceMin != null || priceMax != null) && scheduleLoad()"
+          />
+        </label>
+        <label class="flats__field">
           <span class="flats__field-label">{{ t("roomsMin") }}</span>
           <u-input v-model.number="roomsMin" type="number" icon="i-lucide-bed-double" @change="scheduleLoad()" />
         </label>
@@ -645,6 +689,7 @@ onBeforeUnmount(() => {
             </button>
           </div>
           <div class="flat-card__price">{{ priceLabel(l) }}</div>
+          <div v-if="convertedLabel(l)" class="flat-card__price-conv text-muted">{{ convertedLabel(l) }}</div>
           <h3 class="flat-card__title">{{ l.title }}</h3>
           <div v-if="specLine(l)" class="flat-card__spec text-muted">{{ specLine(l) }}</div>
           <div class="flat-card__meta text-muted">
@@ -682,7 +727,7 @@ onBeforeUnmount(() => {
                 @click="lightbox = p"
             />
           </div>
-          <div class="flat-modal__price">{{ priceLabel(active) }}<span v-if="dealLabel(active.dealType)" class="flat-modal__deal"> · {{ dealLabel(active.dealType) }}</span><span v-if="active.roomOnly" class="flat-modal__deal"> · {{ t("roomShare") }}</span></div>
+          <div class="flat-modal__price">{{ priceLabel(active) }}<span v-if="convertedLabel(active)" class="flat-modal__price-conv"> ({{ convertedLabel(active) }})</span><span v-if="dealLabel(active.dealType)" class="flat-modal__deal"> · {{ dealLabel(active.dealType) }}</span><span v-if="active.roomOnly" class="flat-modal__deal"> · {{ t("roomShare") }}</span></div>
           <div class="flat-modal__meta text-muted">
             <span v-if="specLine(active)">{{ specLine(active) }}</span>
             <span v-if="locLine(active)"> · {{ locLine(active) }}</span>
@@ -804,6 +849,7 @@ onBeforeUnmount(() => {
 .flat-card__action:hover, .flat-card__action_active { color: var(--accent-pink); border-color: rgba(224,103,154,0.48); }
 .flat-card__price { padding-right: 70px; }
 .flat-card__price { font-weight: 700; font-size: 16px; color: var(--text-white, inherit); }
+.flat-card__price-conv { font-size: 12px; font-weight: 500; margin-top: 1px; }
 .flat-card__title { font-size: 13.5px; font-weight: 500; line-height: 1.35; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 .flat-card__spec { font-size: 12.5px; }
 .flat-card__meta { display: flex; flex-wrap: wrap; gap: 6px; font-size: 11.5px; margin-top: 2px; }
@@ -833,6 +879,7 @@ onBeforeUnmount(() => {
   background: rgba(13,17,40,0.9); color: #fff; border: 1px solid var(--line); font-size: 22px; cursor: pointer;
 }
 .flat-modal__price { font-weight: 700; font-size: 20px; }
+.flat-modal__price-conv { font-weight: 500; font-size: 14px; color: var(--text-muted); }
 .flat-modal__deal { color: #e0679a; font-weight: 500; }
 .flat-modal__meta { font-size: 13px; }
 .flat-modal__desc { font-size: 13.5px; line-height: 1.55; white-space: pre-wrap; color: var(--text-soft, inherit); max-height: 40vh; overflow-y: auto; }
