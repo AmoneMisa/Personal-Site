@@ -1431,7 +1431,6 @@ onBeforeUnmount(() => {
 .flat-card__no-photo-icon { width: 34px; height: 34px; opacity: 0.48; }
 .flat-card__deal { position: absolute; top: 8px; left: 8px; font-size: 11px; padding: 2px 8px; border-radius: 6px; background: rgba(13,17,40,0.8); color: #e0679a; }
 .flat-card__room { position: absolute; top: 8px; right: 8px; font-size: 11px; padding: 2px 8px; border-radius: 6px; background: rgba(13,17,40,0.8); color: #7189d9; }
-.flat-modal__addr { font-size: 13px; }
 .flat-card__body { position: relative; padding: 12px 14px; display: flex; flex-direction: column; gap: 4px; }
 .flat-card__actions { position: absolute; top: 10px; right: 10px; display: flex; gap: 5px; }
 .flat-card__action {
@@ -1462,7 +1461,6 @@ onBeforeUnmount(() => {
   -webkit-box-orient: vertical; -webkit-line-clamp: 2;
   overflow-wrap: anywhere; font-size: 18px; font-weight: 700; line-height: 1.35;
 }
-.flat-modal__photo { width: 100%; max-height: 320px; object-fit: cover; border-radius: 10px; }
 .flat-modal__gallery {
   display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 6px;
   max-height: 46vh; overflow-y: auto;
