@@ -1477,9 +1477,21 @@ onBeforeUnmount(() => {
   background: #080b1a; padding: clamp(12px, 2vw, 28px); cursor: zoom-out;
 }
 .flat-lightbox__stage {
-  width: min(84vw, 1320px); height: min(80vh, 820px); display: grid; place-items: center; cursor: default;
+  width: min(92vw, 1320px);
+  height: min(88vh, 820px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: default;
 }
-.flat-lightbox__stage img { width: 100%; height: 100%; object-fit: contain; border-radius: 8px; }
+.flat-lightbox__stage img {
+  width: auto;
+  height: auto;
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  border-radius: 8px;
+}
 .flat-lightbox__nav,
 .flat-lightbox__close {
   position: fixed; z-index: 1; display: grid; place-items: center; border: 1px solid #343a62;
