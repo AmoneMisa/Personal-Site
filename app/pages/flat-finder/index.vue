@@ -33,6 +33,24 @@ interface Listing {
   floor?: number | null;
   totalFloors?: number | null;
   buildingYear?: number | null;
+  bedrooms?: number | null;
+  bathrooms?: number | null;
+  balcony?: boolean | null;
+  airConditioner?: boolean | null;
+  gas?: boolean | null;
+  newBuilding?: boolean | null;
+  communalSeparated?: boolean | null;
+  kvartal?: string | null;
+  nearbyShops?: string[];
+  nearby?: string[];
+  residenceComplex?: string | null;
+  petsAllowed?: boolean | null;
+  childrenAllowed?: boolean | null;
+  audience?: "women" | "men" | "family" | null;
+  deposit?: boolean | null;
+  depositAmount?: number | null;
+  commission?: boolean | null;
+  commissionPercent?: number | null;
   tags?: string[];
 }
 interface FeedResult {
@@ -504,6 +522,68 @@ function locLine(l: Listing): string {
   // Broad -> specific: city, district, metro station (when known).
   return [l.city, l.district, l.metro].filter(Boolean).join(", ");
 }
+
+// ---- normalized spec table (popup) ----
+// Every field rendered with a consistent style; missing data shows "n/d".
+const fmtBool = (v?: boolean | null) => (v === true ? t("yes") : v === false ? t("no") : t("nd"));
+const numOr = (v?: number | null, unit = "") => (v != null ? `${v}${unit ? " " + unit : ""}` : t("nd"));
+const strOr = (v?: string | null) => (v ? v : t("nd"));
+const listOr = (v?: string[] | null) => (v && v.length ? v.join(", ") : t("nd"));
+const ptLabel = (p: Listing["propertyType"]) => (p === "house" ? t("ptHouse") : t("ptFlat"));
+const audienceLabel = (a?: Listing["audience"]) =>
+  a === "women" ? t("audWomen") : a === "men" ? t("audMen") : a === "family" ? t("audFamily") : t("nd");
+function floorLabel(l: Listing) {
+  if (l.floor != null && l.totalFloors != null) return `${l.floor} / ${l.totalFloors}`;
+  return l.floor != null || l.totalFloors != null ? String(l.floor ?? l.totalFloors) : t("nd");
+}
+function depositLabel(l: Listing) {
+  if (l.depositAmount != null) return `${l.depositAmount.toLocaleString()} ${l.currency}`;
+  return fmtBool(l.deposit);
+}
+function commissionLabel(l: Listing) {
+  if (l.commissionPercent != null) return `${l.commissionPercent}%`;
+  return fmtBool(l.commission);
+}
+// UZ convention: utilities are usually included when the post says nothing.
+function communalLabel(l: Listing) {
+  if (l.communalSeparated === true) return t("communalSeparate");
+  if (l.communalSeparated === false) return t("communalIncluded");
+  return l.country === "UZ" ? t("communalUsual") : t("nd");
+}
+const specRows = computed<Array<{ label: string; value: string }>>(() => {
+  const l = active.value;
+  if (!l) return [];
+  return [
+    { label: t("specDeal"), value: dealLabel(l.dealType) || t("nd") },
+    { label: t("specType"), value: ptLabel(l.propertyType) },
+    { label: t("specRooms"), value: numOr(l.rooms) },
+    { label: t("specBedrooms"), value: numOr(l.bedrooms) },
+    { label: t("specArea"), value: l.areaSqm != null ? `${l.areaSqm} ${t("sqm")}` : t("nd") },
+    { label: t("specFloor"), value: floorLabel(l) },
+    { label: t("specNewBuilding"), value: fmtBool(l.newBuilding) },
+    { label: t("specYear"), value: numOr(l.buildingYear) },
+    { label: t("specComplex"), value: strOr(l.residenceComplex) },
+    { label: t("specCity"), value: strOr(l.city) },
+    { label: t("specDistrict"), value: strOr(l.district) },
+    { label: t("specKvartal"), value: strOr(l.kvartal) },
+    { label: t("specMetro"), value: strOr(l.metro) },
+    { label: t("specAddress"), value: strOr(l.address) },
+    { label: t("specBalcony"), value: fmtBool(l.balcony) },
+    { label: t("specAC"), value: fmtBool(l.airConditioner) },
+    { label: t("specGas"), value: fmtBool(l.gas) },
+    { label: t("specBathrooms"), value: numOr(l.bathrooms) },
+    { label: t("specPets"), value: fmtBool(l.petsAllowed) },
+    { label: t("specChildren"), value: fmtBool(l.childrenAllowed) },
+    { label: t("specAudience"), value: l.audience ? audienceLabel(l.audience) : t("nd") },
+    { label: t("specRoomShare"), value: fmtBool(l.roomOnly) },
+    { label: t("specDeposit"), value: depositLabel(l) },
+    { label: t("specCommission"), value: commissionLabel(l) },
+    { label: t("specCommunal"), value: communalLabel(l) },
+    { label: t("specSeller"), value: l.byAgency ? t("agAgency") : t("agOwner") },
+    { label: t("specShops"), value: listOr(l.nearbyShops) },
+    { label: t("specNearby"), value: listOr(l.nearby) },
+  ];
+});
 function timeAgo(iso: string | null): string {
   if (!iso) return "";
   const days = Math.floor((Date.now() - new Date(iso).getTime()) / 86_400_000);
@@ -741,13 +821,18 @@ onBeforeUnmount(() => {
             />
           </div>
           <div class="flat-modal__price">{{ priceLabel(active) }}<span v-if="convertedLabel(active)" class="flat-modal__price-conv"> ({{ convertedLabel(active) }})</span><span v-if="dealLabel(active.dealType)" class="flat-modal__deal"> · {{ dealLabel(active.dealType) }}</span><span v-if="active.roomOnly" class="flat-modal__deal"> · {{ t("roomShare") }}</span></div>
-          <div class="flat-modal__meta text-muted">
-            <span v-if="specLine(active)">{{ specLine(active) }}</span>
-            <span v-if="locLine(active)"> · {{ locLine(active) }}</span>
-            <span v-if="active.buildingYear"> · {{ t("built") }} {{ active.buildingYear }}</span>
-          </div>
-          <div v-if="active.address" class="flat-modal__addr text-muted">📍 {{ active.address }}</div>
-          <p v-if="active.description" class="flat-modal__desc">{{ active.description }}</p>
+          <table class="flat-modal__spec">
+            <tbody>
+              <tr v-for="row in specRows" :key="row.label">
+                <th>{{ row.label }}</th>
+                <td>{{ row.value }}</td>
+              </tr>
+            </tbody>
+          </table>
+          <details v-if="active.description" class="flat-modal__descbox">
+            <summary>{{ t("origDescription") }}</summary>
+            <p class="flat-modal__desc">{{ active.description }}</p>
+          </details>
           <div v-if="active.tags && active.tags.length" class="flat-modal__tags">
             <span v-for="tag in active.tags" :key="tag" class="flat-modal__tag">{{ tag }}</span>
           </div>
@@ -895,7 +980,17 @@ onBeforeUnmount(() => {
 .flat-modal__price-conv { font-weight: 500; font-size: 14px; color: var(--text-muted); }
 .flat-modal__deal { color: #e0679a; font-weight: 500; }
 .flat-modal__meta { font-size: 13px; }
-.flat-modal__desc { font-size: 13.5px; line-height: 1.55; white-space: pre-wrap; color: var(--text-soft, inherit); max-height: 40vh; overflow-y: auto; }
+.flat-modal__spec { width: 100%; border-collapse: collapse; font-size: 13px; margin: 4px 0 10px; }
+.flat-modal__spec tr { border-bottom: 1px solid var(--line); }
+.flat-modal__spec tr:last-child { border-bottom: none; }
+.flat-modal__spec th {
+  text-align: left; font-weight: 600; padding: 6px 12px 6px 0; white-space: nowrap;
+  color: var(--text-muted, inherit); opacity: 0.75; width: 44%; vertical-align: top;
+}
+.flat-modal__spec td { padding: 6px 0; vertical-align: top; }
+.flat-modal__descbox { margin-top: 6px; }
+.flat-modal__descbox summary { cursor: pointer; font-size: 12px; font-weight: 600; opacity: 0.7; user-select: none; }
+.flat-modal__desc { font-size: 13.5px; line-height: 1.55; white-space: pre-wrap; color: var(--text-soft, inherit); max-height: 40vh; overflow-y: auto; margin-top: 8px; }
 .flat-modal__tags { display: flex; flex-wrap: wrap; gap: 6px; }
 .flat-modal__tag { font-size: 11px; padding: 2px 8px; border-radius: 6px; border: 1px solid var(--line); color: var(--ui-text-muted); }
 .flat-modal__open {
