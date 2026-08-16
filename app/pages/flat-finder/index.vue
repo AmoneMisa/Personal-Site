@@ -54,6 +54,13 @@ interface Listing {
   furnished?: boolean | null;
   condition?: "needs_renovation" | "basic" | "good" | "modern" | "luxury" | null;
   amenities?: string[];
+  parking?: boolean | null;
+  elevator?: boolean | null;
+  heating?: boolean | null;
+  hotWater?: boolean | null;
+  internet?: boolean | null;
+  smokingAllowed?: boolean | null;
+  negotiable?: boolean | null;
   tags?: string[];
 }
 interface FeedResult {
@@ -550,6 +557,10 @@ function cardBadges(l: Listing): string[] {
   if (l.furnished) b.push(t("badgeFurnished"));
   if (l.airConditioner) b.push(t("badgeAC"));
   if (l.balcony) b.push(t("badgeBalcony"));
+  if (l.parking) b.push(t("badgeParking"));
+  if (l.elevator) b.push(t("badgeElevator"));
+  if (l.internet) b.push(t("badgeInternet"));
+  if (l.negotiable) b.push(t("badgeNegotiable"));
   if (l.petsAllowed) b.push(t("badgePet"));
   if (l.childrenAllowed) b.push(t("badgeChildren"));
   if (l.communalSeparated === false) b.push(t("badgeUtilIncl"));
@@ -601,14 +612,21 @@ const specRows = computed<Array<{ label: string; value: string }>>(() => {
     { label: t("specKvartal"), value: strOr(l.kvartal) },
     { label: t("specMetro"), value: strOr(l.metro) },
     { label: t("specAddress"), value: strOr(l.address) },
+    { label: t("specParking"), value: fmtBool(l.parking) },
+    { label: t("specElevator"), value: fmtBool(l.elevator) },
     { label: t("specFurnished"), value: fmtBool(l.furnished) },
     { label: t("specBalcony"), value: fmtBool(l.balcony) },
     { label: t("specAC"), value: fmtBool(l.airConditioner) },
     { label: t("specGas"), value: fmtBool(l.gas) },
+    { label: t("specHeating"), value: fmtBool(l.heating) },
+    { label: t("specHotWater"), value: fmtBool(l.hotWater) },
+    { label: t("specInternet"), value: fmtBool(l.internet) },
     { label: t("specPets"), value: fmtBool(l.petsAllowed) },
     { label: t("specChildren"), value: fmtBool(l.childrenAllowed) },
+    { label: t("specSmoking"), value: fmtBool(l.smokingAllowed) },
     { label: t("specAudience"), value: audienceLabel(l.audience) },
     { label: t("specRoomShare"), value: fmtBool(l.roomOnly) },
+    { label: t("specNegotiable"), value: fmtBool(l.negotiable) },
     { label: t("specDeposit"), value: depositLabel(l) },
     { label: t("specCommission"), value: commissionLabel(l) },
     { label: t("specCommunal"), value: communalLabel(l) },
