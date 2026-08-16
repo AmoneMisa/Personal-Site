@@ -540,6 +540,27 @@ const conditionLabel = (c?: Listing["condition"]) =>
   c === "needs_renovation" ? t("condNeeds") : c === "basic" ? t("condBasic") : c === "good" ? t("condGood")
     : c === "modern" ? t("condModern") : c === "luxury" ? t("condLuxury") : t("notSpecified");
 const sourceLabel = (s?: string) => (s === "olx" ? "OLX" : s === "telegram" ? "Telegram" : strOr(s));
+// Compact card badges: positive/important facts only. Missing/false data never
+// shows a badge (unlike the details table). "Pet-friendly" here vs "Pets allowed:
+// Yes/No" in the table, per the canonical spec.
+function cardBadges(l: Listing): string[] {
+  const b: string[] = [];
+  b.push(l.byAgency ? t("badgeAgency") : t("badgeOwner"));
+  if (l.newBuilding) b.push(t("badgeNew"));
+  if (l.furnished) b.push(t("badgeFurnished"));
+  if (l.airConditioner) b.push(t("badgeAC"));
+  if (l.balcony) b.push(t("badgeBalcony"));
+  if (l.petsAllowed) b.push(t("badgePet"));
+  if (l.childrenAllowed) b.push(t("badgeChildren"));
+  if (l.communalSeparated === false) b.push(t("badgeUtilIncl"));
+  if (l.commission === false) b.push(t("badgeNoCommission"));
+  if (l.deposit === true) b.push(t("badgeDeposit"));
+  if (l.roomOnly) b.push(t("badgeRoomOnly"));
+  if (l.audience === "family") b.push(t("badgeFamily"));
+  if (l.audience === "women") b.push(t("badgeWomen"));
+  if (l.audience === "men") b.push(t("badgeMen"));
+  return b;
+}
 function floorLabel(l: Listing) {
   if (l.floor != null && l.totalFloors != null) return `${l.floor} / ${l.totalFloors}`;
   return l.floor != null || l.totalFloors != null ? String(l.floor ?? l.totalFloors) : t("nd");
@@ -798,6 +819,9 @@ onBeforeUnmount(() => {
           <div v-if="convertedLabel(l)" class="flat-card__price-conv text-muted">{{ convertedLabel(l) }}</div>
           <h3 class="flat-card__title">{{ l.title }}</h3>
           <div v-if="specLine(l)" class="flat-card__spec text-muted">{{ specLine(l) }}</div>
+          <div v-if="cardBadges(l).length" class="flat-card__badges">
+            <span v-for="b in cardBadges(l)" :key="b" class="flat-card__badge">{{ b }}</span>
+          </div>
           <div class="flat-card__meta text-muted">
             <span v-if="locLine(l)">{{ locLine(l) }}</span>
             <span class="flat-card__src">{{ l.source }}</span>
@@ -965,6 +989,12 @@ onBeforeUnmount(() => {
 .flat-card__price-conv { font-size: 12px; font-weight: 500; margin-top: 1px; }
 .flat-card__title { font-size: 13.5px; font-weight: 500; line-height: 1.35; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 .flat-card__spec { font-size: 12.5px; }
+.flat-card__badges { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 7px; }
+.flat-card__badge {
+  font-size: 10.5px; font-weight: 600; line-height: 1; padding: 4px 7px; border-radius: 999px;
+  border: 1px solid var(--line); background: rgba(255,255,255,0.05); color: var(--text-primary);
+  white-space: nowrap;
+}
 .flat-card__meta { display: flex; flex-wrap: wrap; gap: 6px; font-size: 11.5px; margin-top: 2px; }
 .flat-card__src { text-transform: capitalize; opacity: 0.7; }
 .flats__empty { margin-top: 18px; text-align: center; padding: 18px; border-radius: 10px; border: 1px solid var(--line); background: rgba(255,255,255,0.03); }
