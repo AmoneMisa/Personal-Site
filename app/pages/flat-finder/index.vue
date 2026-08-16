@@ -771,6 +771,11 @@ const nearbyTranslationKeys: Record<string, string> = {
   "Alay Bazaar": "nearbyAlayBazaar",
   Darkhan: "nearbyDarkhan",
   Novomoskovskaya: "nearbyNovomoskovskaya",
+  "Farhod Bazaar": "nearbyFarhodBazaar",
+  "Nizami Pedagogical University": "nearbyNizamiUniversity",
+  "World Languages University": "nearbyWorldLanguagesUniversity",
+  "Yangi Choshtepa": "nearbyYangiChoshtepa",
+  "Sergeli Car Bazaar": "nearbySergeliCarBazaar",
   Park: "nearbyPark",
   "Bus stop": "nearbyBusStop",
   Clinic: "nearbyClinic",
@@ -781,6 +786,10 @@ const nearbyTranslationKeys: Record<string, string> = {
   Dishwasher: "amenityDishwasher",
   dishwasher: "amenityDishwasher",
   "Separate rooms": "amenitySeparateRooms",
+  "Washing machine": "amenityWashingMachine",
+  Television: "amenityTelevision",
+  "Bed linen": "amenityBedLinen",
+  Towels: "amenityTowels",
 };
 const nearbyItemLabel = (value: string) => nearbyTranslationKeys[value] ? t(nearbyTranslationKeys[value]) : value;
 const nearbyListOr = (values?: string[] | null) =>
