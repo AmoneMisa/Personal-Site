@@ -35,9 +35,14 @@ const LEAFLET_CSS = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.css";
 
 // Listings within this many screen pixels of each other merge into one cluster.
 const CLUSTER_PX = 38;
-// Above this many listings a cluster zooms in instead of fanning out (a radial
-// menu with too many tablets is unreadable).
-const MAX_RADIAL = 10;
+// Max tablets we'll fan out (across concentric rings). Beyond this a cluster
+// zooms in instead — but only if its points are actually spread out; a big
+// cluster stacked on one spot always fans, since zooming can't separate it.
+const MAX_RADIAL = 24;
+// Fan out (don't zoom) unless the cluster spans at least this many screen pixels.
+const SPREAD_PX = 50;
+// Tablets per ring before starting the next, larger ring.
+const RING_SIZE = 9;
 
 const el = ref<HTMLElement | null>(null);
 const failed = ref(false);
@@ -127,20 +132,34 @@ function renderMarkers() {
   }
 }
 
+// Max pixel distance between any two items in the cluster at the current zoom.
+// ~0 means they're stacked on one spot (zooming won't separate them).
+function clusterSpreadPx(c: Cluster) {
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  for (const p of c.items) {
+    const pt = map.latLngToContainerPoint([p.lat, p.lng]);
+    minX = Math.min(minX, pt.x); maxX = Math.max(maxX, pt.x);
+    minY = Math.min(minY, pt.y); maxY = Math.max(maxY, pt.y);
+  }
+  return Math.hypot(maxX - minX, maxY - minY);
+}
+
 function openCluster(c: Cluster) {
   const L = (window as any).L;
   if (c.items.length === 1) {
     emit("select", c.items[0].id);
     return;
   }
-  if (c.items.length > MAX_RADIAL) {
-    // Too many to fan out — zoom to the cluster so it splits into smaller groups.
+  // Only zoom when there are a lot AND they're genuinely spread out enough that
+  // zooming will split them. Otherwise fan out (rings) — including big clusters
+  // stacked on a single point, which zooming could never separate.
+  if (c.items.length > MAX_RADIAL && clusterSpreadPx(c) > SPREAD_PX) {
     const bounds = c.items.map((p) => [p.lat, p.lng]) as [number, number][];
     map.fitBounds(L.latLngBounds(bounds), { padding: [40, 40], maxZoom: 17 });
     return;
   }
   const pt = map.latLngToContainerPoint([c.lat, c.lng]);
-  radial.value = { x: pt.x, y: pt.y, items: c.items };
+  radial.value = { x: pt.x, y: pt.y, items: c.items.slice(0, MAX_RADIAL) };
 }
 
 function closeRadial() {
@@ -152,15 +171,19 @@ function pick(id: string) {
   emit("select", id);
 }
 
-// Position each tablet on a ring around the cluster center.
+// Position each tablet on one of several concentric rings around the center, so
+// large clusters (e.g. 13) fan out readably instead of crowding one ring.
 function slotStyle(i: number, n: number) {
-  const radius = Math.min(160, 78 + n * 8);
-  const angle = (-90 + (360 / n) * i) * (Math.PI / 180);
+  const ring = Math.floor(i / RING_SIZE);
+  const inRing = i % RING_SIZE;
+  const countThisRing = Math.min(RING_SIZE, n - ring * RING_SIZE);
+  const radius = 76 + ring * 74;
+  const angle = (-90 + (360 / countThisRing) * inRing) * (Math.PI / 180);
   const x = Math.cos(angle) * radius;
   const y = Math.sin(angle) * radius;
   return {
     transform: `translate(-50%, -50%) translate(${x}px, ${y}px)`,
-    animationDelay: `${i * 28}ms`,
+    animationDelay: `${i * 22}ms`,
   };
 }
 
