@@ -61,6 +61,9 @@ interface Listing {
   internet?: boolean | null;
   smokingAllowed?: boolean | null;
   negotiable?: boolean | null;
+  utilitiesAmount?: number | null;
+  minLeaseTerm?: string | null;
+  availableFrom?: string | null;
   tags?: string[];
 }
 interface FeedResult {
@@ -630,6 +633,9 @@ const specRows = computed<Array<{ label: string; value: string }>>(() => {
     { label: t("specDeposit"), value: depositLabel(l) },
     { label: t("specCommission"), value: commissionLabel(l) },
     { label: t("specCommunal"), value: communalLabel(l) },
+    { label: t("specUtilAmount"), value: l.utilitiesAmount != null ? `${l.utilitiesAmount.toLocaleString()} ${l.currency}` : t("notSpecified") },
+    { label: t("specMinLease"), value: strOr(l.minLeaseTerm) },
+    { label: t("specAvailable"), value: strOr(l.availableFrom) },
     { label: t("specShops"), value: listOr(l.nearbyShops) },
     { label: t("specNearby"), value: listOr(l.nearby) },
     { label: t("specAmenities"), value: listOr(l.amenities) },
