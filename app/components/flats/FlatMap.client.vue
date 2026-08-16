@@ -286,7 +286,7 @@ onBeforeUnmount(() => {
           <button type="button" class="flat-radial__tab" @click="pick(item.id)">
             <span class="flat-radial__thumb">
               <img v-if="item.photo" :src="item.photo" :alt="item.title" loading="lazy" decoding="async" referrerpolicy="no-referrer" />
-              <span v-else class="flat-radial__thumb-empty">🏠</span>
+              <img v-else src="/svg/shark.svg" alt="" class="flat-radial__thumb-empty" loading="lazy" />
             </span>
             <span v-if="item.priceLabel" class="flat-radial__price">{{ item.priceLabel }}</span>
           </button>
@@ -365,7 +365,7 @@ onBeforeUnmount(() => {
 .flat-radial__tab:hover { transform: translateY(-2px) scale(1.05); border-color: var(--accent-pink, #e0679a); }
 .flat-radial__thumb { display: block; width: 100%; height: 60px; background: rgba(255,255,255,0.05); }
 .flat-radial__thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
-.flat-radial__thumb-empty { display: flex; align-items: center; justify-content: center; width: 100%; height: 100%; font-size: 22px; opacity: 0.6; }
+.flat-radial__thumb-empty { display: block; width: 60%; height: 60%; margin: 20% auto; object-fit: contain; opacity: 0.4; }
 .flat-radial__price { padding: 4px 6px; font-size: 12px; font-weight: 600; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
 :deep(.leaflet-container) { background: var(--bg-panel); font-family: inherit; }

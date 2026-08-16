@@ -767,7 +767,9 @@ onBeforeUnmount(() => {
               referrerpolicy="no-referrer"
               @error="markPhotoFailedFromEvent"
           />
-          <div v-else class="flat-card__no-photo">{{ t("noPhoto") }}</div>
+          <div v-else class="flat-card__no-photo">
+            <img src="/svg/shark.svg" :alt="t('noPhoto')" class="flat-card__no-photo-img" loading="lazy" decoding="async" />
+          </div>
           <span v-if="dealLabel(l.dealType)" class="flat-card__deal">{{ dealLabel(l.dealType) }}</span>
           <span v-if="l.roomOnly" class="flat-card__room">{{ t("roomShare") }}</span>
         </div>
@@ -934,7 +936,8 @@ onBeforeUnmount(() => {
   flex: 0 0 auto; overflow: hidden; background: var(--bg-panel);
 }
 .flat-card__photo img { width: 100%; height: 100%; object-fit: cover; display: block; }
-.flat-card__no-photo { display: flex; align-items: center; justify-content: center; height: 100%; color: var(--text-muted); font-size: 12px; }
+.flat-card__no-photo { display: flex; align-items: center; justify-content: center; height: 100%; color: var(--text-muted); font-size: 12px; background: rgba(255,255,255,0.03); }
+.flat-card__no-photo-img { width: 46%; max-width: 120px; height: auto; opacity: 0.35; }
 .flat-card__deal { position: absolute; top: 8px; left: 8px; font-size: 11px; padding: 2px 8px; border-radius: 6px; background: rgba(13,17,40,0.8); color: #e0679a; }
 .flat-card__room { position: absolute; top: 8px; right: 8px; font-size: 11px; padding: 2px 8px; border-radius: 6px; background: rgba(13,17,40,0.8); color: #7189d9; }
 .flat-modal__addr { font-size: 13px; }
