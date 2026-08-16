@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto'
 
-export type AiKind = 'vacancy' | 'apartment'
+export type AiKind = 'vacancy' | 'apartment' | 'translation'
 
 export type AiExtractionResult<T = Record<string, unknown>> = {
   status: 'completed'
@@ -82,6 +82,13 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   })
   if (!response.ok) throw new Error(`HTTP ${response.status}`)
   return await response.json() as T
+}
+
+// Server routes may proxy an on-demand job without exposing the private worker
+// URL or X-AI-Key to the browser.
+export function requestAiWorker<T>(path: string, init?: RequestInit): Promise<T> {
+  if (!workerUrl) throw new Error('AI worker is not configured')
+  return request<T>(path, init)
 }
 
 async function finish<T>(task: AiTask<T>, result: AiExtractionResult<T>) {

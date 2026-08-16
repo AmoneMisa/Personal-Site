@@ -74,6 +74,12 @@ interface FeedResult {
   sourceErrors?: Array<{ source?: string; country?: string; error?: string }>;
   error?: string;
 }
+interface TranslationResult {
+  status: "pending" | "completed" | "failed" | "disabled" | "not_found";
+  key?: string;
+  data?: { translatedText?: string; sourceLanguage?: string | null };
+  confidence?: number;
+}
 interface CountryMeta { code: string; name: string; currency: string; cities?: string[]; locations?: Record<string, { districts?: string[]; metro?: string[] }> }
 type FlatView = "active" | "favorites" | "recent" | "hidden";
 type SearchPreset = { name: string; query: Record<string, string> };
@@ -88,7 +94,7 @@ const STORAGE = {
   presets: "flats:presets:v1",
 };
 
-const { t: translate } = useI18n();
+const { t: translate, locale } = useI18n();
 const t = (key: string, params: Record<string, unknown> = {}) => translate(`flats.${key}`, params);
 const route = useRoute();
 const router = useRouter();
@@ -490,11 +496,95 @@ const mapPoints = computed(() =>
 const active = ref<Listing | null>(null);
 const modalOpen = ref(false);
 const lightbox = ref<string | null>(null); // full-screen photo, or null
+const translatedDescription = ref("");
+const translatingDescription = ref(false);
+const translationFailed = ref(false);
+const translationCache = new Map<string, string>();
+let translationPollTimer: ReturnType<typeof setTimeout> | undefined;
+let translationRequestId = 0;
+
+function translationCacheKey(listing: Listing, targetLanguage = locale.value.startsWith("en") ? "en" : "ru"): string {
+  return `${listing.id}:${targetLanguage}`;
+}
+
+function stopTranslationPoll() {
+  if (translationPollTimer) clearTimeout(translationPollTimer);
+  translationPollTimer = undefined;
+}
+
 function openListing(l: Listing) {
+  stopTranslationPoll();
+  translationRequestId += 1;
   active.value = l;
+  translatedDescription.value = translationCache.get(translationCacheKey(l)) || "";
+  translatingDescription.value = false;
+  translationFailed.value = false;
   modalOpen.value = true;
   recent.value = [l, ...recent.value.filter((item) => item.id !== l.id)].slice(0, MAX_RECENT_FLATS);
   persistList(STORAGE.recent, recent.value, MAX_RECENT_FLATS);
+}
+
+function acceptTranslation(result: TranslationResult, listing: Listing, requestId: number, cacheKey: string): boolean {
+  if (requestId !== translationRequestId || active.value?.id !== listing.id) return true;
+  if (result.status !== "completed") return false;
+  const text = result.data?.translatedText?.trim() || "";
+  if (!text) {
+    translatingDescription.value = false;
+    translationFailed.value = true;
+    return true;
+  }
+  translationCache.set(cacheKey, text);
+  translatedDescription.value = text;
+  translatingDescription.value = false;
+  translationFailed.value = false;
+  return true;
+}
+
+async function pollTranslation(key: string, listing: Listing, requestId: number, cacheKey: string, attempt = 0) {
+  if (requestId !== translationRequestId || active.value?.id !== listing.id) return;
+  const { data, error } = await safeFetch<TranslationResult>("/flats-translate", { params: { key } });
+  if (requestId !== translationRequestId || active.value?.id !== listing.id) return;
+  if (!error && data && acceptTranslation(data, listing, requestId, cacheKey)) return;
+  if (error || data?.status === "failed" || data?.status === "disabled" || data?.status === "not_found" || attempt >= 39) {
+    translatingDescription.value = false;
+    translationFailed.value = true;
+    return;
+  }
+  translationPollTimer = setTimeout(() => void pollTranslation(key, listing, requestId, cacheKey, attempt + 1), 1500);
+}
+
+async function translateActiveDescription() {
+  const listing = active.value;
+  if (!listing?.description || translatingDescription.value) return;
+  const targetLanguage = locale.value.startsWith("en") ? "en" : "ru";
+  const cacheKey = translationCacheKey(listing, targetLanguage);
+  const cached = translationCache.get(cacheKey);
+  if (cached) {
+    translatedDescription.value = cached;
+    return;
+  }
+
+  stopTranslationPoll();
+  const requestId = ++translationRequestId;
+  translatingDescription.value = true;
+  translationFailed.value = false;
+  const { data, error } = await safeFetch<TranslationResult>("/flats-translate", {
+    method: "POST",
+    body: { text: listing.description, targetLanguage },
+  });
+  if (requestId !== translationRequestId || active.value?.id !== listing.id) return;
+  if (error || !data) {
+    translatingDescription.value = false;
+    translationFailed.value = true;
+    return;
+  }
+  if (acceptTranslation(data, listing, requestId, cacheKey)) return;
+  if (data.status === "pending" && data.key) {
+    translationPollTimer = setTimeout(() => void pollTranslation(data.key!, listing, requestId, cacheKey), 1000);
+    return;
+  }
+  translatingDescription.value = false;
+  translationFailed.value = true;
 }
 function openById(id: string) {
   const found = displayedListings.value.find((l) => l.id === id);
@@ -591,7 +681,7 @@ function commissionLabel(l: Listing) {
 function communalLabel(l: Listing) {
   if (l.communalSeparated === true) return t("communalSeparate");
   if (l.communalSeparated === false) return t("communalIncluded");
-  return l.country === "UZ" ? t("communalUsual") : t("notSpecified");
+  return t("notSpecified");
 }
 const specRows = computed<Array<{ label: string; value: string }>>(() => {
   const l = active.value;
@@ -699,10 +789,18 @@ watch(loadMoreSentinel, (current, previous) => {
   if (current) infiniteObserver?.observe(current);
 });
 
+watch(modalOpen, (open) => {
+  if (open) return;
+  stopTranslationPoll();
+  translationRequestId += 1;
+  translatingDescription.value = false;
+});
+
 onBeforeUnmount(() => {
   if (loadTimer) clearTimeout(loadTimer);
   if (warmTimer) clearTimeout(warmTimer);
   infiniteObserver?.disconnect();
+  stopTranslationPoll();
 });
 </script>
 
@@ -918,6 +1016,22 @@ onBeforeUnmount(() => {
               </tr>
             </tbody>
           </table>
+          <div v-if="active.description" class="flat-modal__translation">
+            <u-button
+                type="button"
+                variant="outline"
+                color="neutral"
+                size="sm"
+                icon="i-lucide-languages"
+                :loading="translatingDescription"
+                @click="translateActiveDescription"
+            >{{ translatingDescription ? t("translatingDescription") : t("translateDescription") }}</u-button>
+            <span v-if="translationFailed" class="flat-modal__translation-error">{{ t("translationFailed") }}</span>
+          </div>
+          <section v-if="translatedDescription" class="flat-modal__translated">
+            <h4 class="flat-modal__translated-title">{{ t("translatedDescription") }}</h4>
+            <p class="flat-modal__desc">{{ translatedDescription }}</p>
+          </section>
           <details v-if="active.description" class="flat-modal__descbox">
             <summary>{{ t("origDescription") }}</summary>
             <p class="flat-modal__desc">{{ active.description }}</p>
@@ -1088,6 +1202,10 @@ onBeforeUnmount(() => {
 }
 .flat-modal__spec td { padding: 6px 0; vertical-align: top; }
 .flat-modal__hide-empty { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text-muted, inherit); cursor: pointer; margin: 2px 0 6px; user-select: none; }
+.flat-modal__translation { display: flex; align-items: center; gap: 10px; margin-top: 14px; }
+.flat-modal__translation-error { color: #f29ab6; font-size: 12px; }
+.flat-modal__translated { margin-top: 12px; padding: 12px; border: 1px solid var(--line, #252a4a); border-radius: var(--radius, 10px); background: var(--bg-panel-2, #171c3a); }
+.flat-modal__translated-title { margin: 0 0 8px; color: var(--text-primary, #e4e5f0); font-size: 13px; font-weight: 600; }
 .flat-modal__descbox { margin-top: 6px; }
 .flat-modal__descbox summary { cursor: pointer; font-size: 12px; font-weight: 600; opacity: 0.7; user-select: none; }
 .flat-modal__desc { font-size: 13.5px; line-height: 1.55; white-space: pre-wrap; color: var(--text-soft, inherit); max-height: 40vh; overflow-y: auto; margin-top: 8px; }
