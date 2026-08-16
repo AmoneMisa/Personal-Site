@@ -502,6 +502,9 @@ const translationFailed = ref(false);
 const translationCache = new Map<string, string>();
 let translationPollTimer: ReturnType<typeof setTimeout> | undefined;
 let translationRequestId = 0;
+// Ollama may legitimately need up to two minutes for one CPU inference. Keep
+// polling beyond that worker timeout, including a little queue/retry margin.
+const TRANSLATION_MAX_POLL_ATTEMPTS = 159;
 
 function translationCacheKey(listing: Listing, targetLanguage = locale.value.startsWith("en") ? "en" : "ru"): string {
   return `${listing.id}:${targetLanguage}`;
@@ -545,7 +548,7 @@ async function pollTranslation(key: string, listing: Listing, requestId: number,
   const { data, error } = await safeFetch<TranslationResult>("/flats-translate", { params: { key } });
   if (requestId !== translationRequestId || active.value?.id !== listing.id) return;
   if (!error && data && acceptTranslation(data, listing, requestId, cacheKey)) return;
-  if (error || data?.status === "failed" || data?.status === "disabled" || data?.status === "not_found" || attempt >= 39) {
+  if (error || data?.status === "failed" || data?.status === "disabled" || data?.status === "not_found" || attempt >= TRANSLATION_MAX_POLL_ATTEMPTS) {
     translatingDescription.value = false;
     translationFailed.value = true;
     return;
@@ -633,6 +636,17 @@ const fmtBool = (v?: boolean | null) => (v === true ? t("yes") : v === false ? t
 const numOr = (v?: number | null, unit = "") => (v != null ? `${v}${unit ? " " + unit : ""}` : t("notSpecified"));
 const strOr = (v?: string | null) => (v ? v : t("notSpecified"));
 const listOr = (v?: string[] | null) => (v && v.length ? v.join(", ") : t("notSpecified"));
+const nearbyTranslationKeys: Record<string, string> = {
+  "Bobur Park": "nearbyBoburPark",
+  Park: "nearbyPark",
+  "Bus stop": "nearbyBusStop",
+  Clinic: "nearbyClinic",
+  School: "nearbySchool",
+  Kindergarten: "nearbyKindergarten",
+};
+const nearbyItemLabel = (value: string) => nearbyTranslationKeys[value] ? t(nearbyTranslationKeys[value]) : value;
+const nearbyListOr = (values?: string[] | null) =>
+  values?.length ? values.map(nearbyItemLabel).join(", ") : t("notSpecified");
 const ptLabel = (p: Listing["propertyType"]) => (p === "house" ? t("ptHouse") : t("ptFlat"));
 const audienceLabel = (a?: Listing["audience"]) =>
   a === "women" ? t("audWomen") : a === "men" ? t("audMen") : a === "family" ? t("audFamily") : t("audAny");
@@ -727,7 +741,7 @@ const specRows = computed<Array<{ label: string; value: string }>>(() => {
     { label: t("specMinLease"), value: strOr(l.minLeaseTerm) },
     { label: t("specAvailable"), value: strOr(l.availableFrom) },
     { label: t("specShops"), value: listOr(l.nearbyShops) },
-    { label: t("specNearby"), value: listOr(l.nearby) },
+    { label: t("specNearby"), value: nearbyListOr(l.nearby) },
     { label: t("specAmenities"), value: listOr(l.amenities) },
   ];
 });
@@ -946,7 +960,8 @@ onBeforeUnmount(() => {
               @error="markPhotoFailedFromEvent"
           />
           <div v-else class="flat-card__no-photo">
-            <img src="/svg/shark.svg" :alt="t('noPhoto')" class="flat-card__no-photo-img" loading="lazy" decoding="async" />
+            <u-icon name="i-lucide-image-off" class="flat-card__no-photo-icon" aria-hidden="true" />
+            <span>{{ t("noPhoto") }}</span>
           </div>
           <span v-if="dealLabel(l.dealType)" class="flat-card__deal">{{ dealLabel(l.dealType) }}</span>
           <span v-if="l.roomOnly" class="flat-card__room">{{ t("roomShare") }}</span>
@@ -1037,21 +1052,23 @@ onBeforeUnmount(() => {
             <p class="flat-modal__desc">{{ active.description }}</p>
           </details>
           <div v-if="active.tags && active.tags.length" class="flat-modal__tags">
-            <span v-for="tag in active.tags" :key="tag" class="flat-modal__tag">{{ tag }}</span>
+            <span v-for="tag in active.tags" :key="tag" class="flat-modal__tag">{{ nearbyItemLabel(tag) }}</span>
           </div>
         </div>
       </template>
       <template #footer>
-        <u-button v-if="active" variant="outline" color="neutral" icon="i-lucide-heart" @click="toggleFavorite(active)">
-          {{ isFavorite(active.id) ? t("removeFavorite") : t("addFavorite") }}
-        </u-button>
-        <u-button v-if="active" variant="outline" color="neutral" :icon="isHidden(active.id) ? 'i-lucide-eye' : 'i-lucide-eye-off'" @click="toggleHidden(active)">
-          {{ isHidden(active.id) ? t("restoreListing") : t("hideListing") }}
-        </u-button>
-        <u-button v-if="active" variant="outline" color="neutral" :icon="shareCopied ? 'i-lucide-check' : 'i-lucide-share-2'" @click="shareFlat(active)">
-          {{ shareCopied ? t("shareCopied") : t("share") }}
-        </u-button>
-        <a v-if="active" class="flat-modal__open" :href="active.url" target="_blank" rel="noopener noreferrer">{{ t("open") }} →</a>
+        <div v-if="active" class="flat-modal__footer-actions">
+          <u-button class="flat-modal__footer-button" variant="outline" color="neutral" icon="i-lucide-heart" @click="toggleFavorite(active)">
+            {{ isFavorite(active.id) ? t("removeFavorite") : t("addFavorite") }}
+          </u-button>
+          <u-button class="flat-modal__footer-button" variant="outline" color="neutral" :icon="isHidden(active.id) ? 'i-lucide-eye' : 'i-lucide-eye-off'" @click="toggleHidden(active)">
+            {{ isHidden(active.id) ? t("restoreListing") : t("hideListing") }}
+          </u-button>
+          <u-button class="flat-modal__footer-button" variant="outline" color="neutral" :icon="shareCopied ? 'i-lucide-check' : 'i-lucide-share-2'" @click="shareFlat(active)">
+            {{ shareCopied ? t("shareCopied") : t("share") }}
+          </u-button>
+          <a class="flat-modal__footer-button flat-modal__footer-button_primary" :href="active.url" target="_blank" rel="noopener noreferrer">{{ t("open") }} →</a>
+        </div>
       </template>
     </u-modal>
 
@@ -1139,9 +1156,12 @@ onBeforeUnmount(() => {
   position: relative; width: 100%; height: clamp(220px, 25vw, 310px);
   flex: 0 0 auto; overflow: hidden; background: var(--bg-panel);
 }
-.flat-card__photo img { width: 100%; height: 100%; object-fit: cover; display: block; }
-.flat-card__no-photo { display: flex; align-items: center; justify-content: center; height: 100%; color: var(--text-muted); font-size: 12px; background: rgba(255,255,255,0.03); }
-.flat-card__no-photo-img { width: 46%; max-width: 120px; height: auto; opacity: 0.35; }
+.flat-card__photo > img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.flat-card__no-photo {
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 9px; height: 100%;
+  color: var(--text-muted); font-size: 12px; background: rgba(255,255,255,0.025);
+}
+.flat-card__no-photo-icon { width: 34px; height: 34px; opacity: 0.48; }
 .flat-card__deal { position: absolute; top: 8px; left: 8px; font-size: 11px; padding: 2px 8px; border-radius: 6px; background: rgba(13,17,40,0.8); color: #e0679a; }
 .flat-card__room { position: absolute; top: 8px; right: 8px; font-size: 11px; padding: 2px 8px; border-radius: 6px; background: rgba(13,17,40,0.8); color: #7189d9; }
 .flat-modal__addr { font-size: 13px; }
@@ -1211,8 +1231,13 @@ onBeforeUnmount(() => {
 .flat-modal__desc { font-size: 13.5px; line-height: 1.55; white-space: pre-wrap; color: var(--text-soft, inherit); max-height: 40vh; overflow-y: auto; margin-top: 8px; }
 .flat-modal__tags { display: flex; flex-wrap: wrap; gap: 6px; }
 .flat-modal__tag { font-size: 11px; padding: 2px 8px; border-radius: 6px; border: 1px solid var(--line); color: var(--ui-text-muted); }
-.flat-modal__open {
-  display: inline-flex; align-items: center; height: 36px; padding: 0 16px; border-radius: 8px;
+.flat-modal__footer-actions { width: 100%; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+.flat-modal__footer-button {
+  width: 100%; min-height: 44px; height: auto; padding: 8px 11px; justify-content: center;
+  text-align: center; white-space: normal; line-height: 1.25;
+}
+.flat-modal__footer-button_primary {
+  display: inline-flex; align-items: center; border: 1px solid var(--accent-pink, #e0679a); border-radius: 8px;
   background: var(--accent-pink, #e0679a); color: #1a0e14; font-weight: 600; font-size: 13.5px;
 }
 .flat-share__hint { margin: 0 0 12px; color: var(--text-muted); font-size: 13px; line-height: 1.5; }
@@ -1221,5 +1246,6 @@ onBeforeUnmount(() => {
   .flats__controls > :deep(button) { width: 100%; }
   .flats__views { padding-left: 0; border-left: 0; }
   .flat-card__photo { height: 250px; }
+  .flat-modal__footer-actions { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 </style>
