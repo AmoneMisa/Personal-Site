@@ -769,6 +769,8 @@ const listOr = (v?: string[] | null) => (v && v.length ? v.join(", ") : t("notSp
 const nearbyTranslationKeys: Record<string, string> = {
   "Bobur Park": "nearbyBoburPark",
   "Alay Bazaar": "nearbyAlayBazaar",
+  Darkhan: "nearbyDarkhan",
+  Novomoskovskaya: "nearbyNovomoskovskaya",
   Park: "nearbyPark",
   "Bus stop": "nearbyBusStop",
   Clinic: "nearbyClinic",
