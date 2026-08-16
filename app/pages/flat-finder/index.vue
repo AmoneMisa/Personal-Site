@@ -51,6 +51,9 @@ interface Listing {
   depositAmount?: number | null;
   commission?: boolean | null;
   commissionPercent?: number | null;
+  furnished?: boolean | null;
+  condition?: "needs_renovation" | "basic" | "good" | "modern" | "luxury" | null;
+  amenities?: string[];
   tags?: string[];
 }
 interface FeedResult {
@@ -525,13 +528,18 @@ function locLine(l: Listing): string {
 
 // ---- normalized spec table (popup) ----
 // Every field rendered with a consistent style; missing data shows "n/d".
-const fmtBool = (v?: boolean | null) => (v === true ? t("yes") : v === false ? t("no") : t("nd"));
-const numOr = (v?: number | null, unit = "") => (v != null ? `${v}${unit ? " " + unit : ""}` : t("nd"));
-const strOr = (v?: string | null) => (v ? v : t("nd"));
-const listOr = (v?: string[] | null) => (v && v.length ? v.join(", ") : t("nd"));
+// Missing data on the details table reads "Not specified" (never a bare "No").
+const fmtBool = (v?: boolean | null) => (v === true ? t("yes") : v === false ? t("no") : t("notSpecified"));
+const numOr = (v?: number | null, unit = "") => (v != null ? `${v}${unit ? " " + unit : ""}` : t("notSpecified"));
+const strOr = (v?: string | null) => (v ? v : t("notSpecified"));
+const listOr = (v?: string[] | null) => (v && v.length ? v.join(", ") : t("notSpecified"));
 const ptLabel = (p: Listing["propertyType"]) => (p === "house" ? t("ptHouse") : t("ptFlat"));
 const audienceLabel = (a?: Listing["audience"]) =>
-  a === "women" ? t("audWomen") : a === "men" ? t("audMen") : a === "family" ? t("audFamily") : t("nd");
+  a === "women" ? t("audWomen") : a === "men" ? t("audMen") : a === "family" ? t("audFamily") : t("audAny");
+const conditionLabel = (c?: Listing["condition"]) =>
+  c === "needs_renovation" ? t("condNeeds") : c === "basic" ? t("condBasic") : c === "good" ? t("condGood")
+    : c === "modern" ? t("condModern") : c === "luxury" ? t("condLuxury") : t("notSpecified");
+const sourceLabel = (s?: string) => (s === "olx" ? "OLX" : s === "telegram" ? "Telegram" : strOr(s));
 function floorLabel(l: Listing) {
   if (l.floor != null && l.totalFloors != null) return `${l.floor} / ${l.totalFloors}`;
   return l.floor != null || l.totalFloors != null ? String(l.floor ?? l.totalFloors) : t("nd");
@@ -548,40 +556,44 @@ function commissionLabel(l: Listing) {
 function communalLabel(l: Listing) {
   if (l.communalSeparated === true) return t("communalSeparate");
   if (l.communalSeparated === false) return t("communalIncluded");
-  return l.country === "UZ" ? t("communalUsual") : t("nd");
+  return l.country === "UZ" ? t("communalUsual") : t("notSpecified");
 }
 const specRows = computed<Array<{ label: string; value: string }>>(() => {
   const l = active.value;
   if (!l) return [];
   return [
-    { label: t("specDeal"), value: dealLabel(l.dealType) || t("nd") },
+    { label: t("specDeal"), value: dealLabel(l.dealType) || t("notSpecified") },
     { label: t("specType"), value: ptLabel(l.propertyType) },
+    { label: t("specListedBy"), value: l.byAgency ? t("agAgency") : t("agOwner") },
+    { label: t("specSource"), value: sourceLabel(l.source) },
     { label: t("specRooms"), value: numOr(l.rooms) },
     { label: t("specBedrooms"), value: numOr(l.bedrooms) },
-    { label: t("specArea"), value: l.areaSqm != null ? `${l.areaSqm} ${t("sqm")}` : t("nd") },
+    { label: t("specBathrooms"), value: numOr(l.bathrooms) },
+    { label: t("specArea"), value: l.areaSqm != null ? `${l.areaSqm} ${t("sqm")}` : t("notSpecified") },
     { label: t("specFloor"), value: floorLabel(l) },
-    { label: t("specNewBuilding"), value: fmtBool(l.newBuilding) },
     { label: t("specYear"), value: numOr(l.buildingYear) },
+    { label: t("specNewBuilding"), value: fmtBool(l.newBuilding) },
+    { label: t("specCondition"), value: conditionLabel(l.condition) },
     { label: t("specComplex"), value: strOr(l.residenceComplex) },
     { label: t("specCity"), value: strOr(l.city) },
     { label: t("specDistrict"), value: strOr(l.district) },
     { label: t("specKvartal"), value: strOr(l.kvartal) },
     { label: t("specMetro"), value: strOr(l.metro) },
     { label: t("specAddress"), value: strOr(l.address) },
+    { label: t("specFurnished"), value: fmtBool(l.furnished) },
     { label: t("specBalcony"), value: fmtBool(l.balcony) },
     { label: t("specAC"), value: fmtBool(l.airConditioner) },
     { label: t("specGas"), value: fmtBool(l.gas) },
-    { label: t("specBathrooms"), value: numOr(l.bathrooms) },
     { label: t("specPets"), value: fmtBool(l.petsAllowed) },
     { label: t("specChildren"), value: fmtBool(l.childrenAllowed) },
-    { label: t("specAudience"), value: l.audience ? audienceLabel(l.audience) : t("nd") },
+    { label: t("specAudience"), value: audienceLabel(l.audience) },
     { label: t("specRoomShare"), value: fmtBool(l.roomOnly) },
     { label: t("specDeposit"), value: depositLabel(l) },
     { label: t("specCommission"), value: commissionLabel(l) },
     { label: t("specCommunal"), value: communalLabel(l) },
-    { label: t("specSeller"), value: l.byAgency ? t("agAgency") : t("agOwner") },
     { label: t("specShops"), value: listOr(l.nearbyShops) },
     { label: t("specNearby"), value: listOr(l.nearby) },
+    { label: t("specAmenities"), value: listOr(l.amenities) },
   ];
 });
 function timeAgo(iso: string | null): string {
