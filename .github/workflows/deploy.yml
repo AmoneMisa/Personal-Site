@@ -1,4 +1,4 @@
-name: Deploy frontend
+name: Deploy Personal Site stack
 
 on:
   push:
@@ -10,7 +10,7 @@ jobs:
     runs-on: ubuntu-latest
     
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - name: Deploy via SSH
         uses: appleboy/ssh-action@v1.0.0
@@ -19,4 +19,4 @@ jobs:
           username: ${{ vars.SERVER_USER }}
           key: ${{ secrets.SERVER_SSH_KEY }}
           script: |
-            bash ~/opt/myproject/deploy.sh frontend
+            bash ~/opt/myproject/deploy.sh

@@ -1,50 +1,31 @@
-# Personal Site Backend
+# FastAPI backend
 
-Backend API powering [whiteslove.me](https://whiteslove.me) — handles data for the site's developer tools and utilities (PDF editor, JSON merger, DockerHub search, and more).
-
-## Tech Stack
-- **Language:** Python
-- **Web server:** Nginx (reverse proxy)
-- **Containerization:** Docker & Docker Compose
-- **CI/CD:** GitHub Actions
+Private tool API for the WhitesLove Personal Site monorepo. Nuxt proxies
+`/api/**` to this service over the internal Compose network.
 
 ## Features
-- REST API serving the frontend (whiteslove.me)
-- Containerized deployment with Docker Compose
-- Nginx configured as a reverse proxy in front of the API
-- Automated build/deploy pipeline via GitHub Actions
 
-## Project Structure
-├── src/ # Application source code
-├── .github/workflows/ # CI/CD pipeline definitions
-├── Dockerfile
-├── docker-compose.yml
-├── nginx.conf
-└── requirements.txt
+- PDF editing and conversion
+- File-format conversion
+- DockerHub tag search
+- Country index datasets
+- Redis-backed temporary state and caches
 
-## Getting Started
+## Development
 
-### Prerequisites
-- Docker & Docker Compose
-- Python 3.x (for local development without Docker)
+From the repository root, use the unified stack:
 
-### Setup
-1. Clone the repository:
 ```bash
-   git clone https://github.com/AmoneMisa/Personal-Site-Backend.git
-   cd Personal-Site-Backend
-```
-2. Copy the example environment file and fill in your values:
-```bash
-   cp sample.env .env
-```
-3. Build and run with Docker Compose:
-```bash
-   docker-compose up --build
+docker compose --env-file db.env up -d --build backend
 ```
 
-## Related
-- Frontend: [whiteslove.me](https://whiteslove.me)
+For Python-only development on Windows:
 
-## License
-Personal project, shared for demonstration purposes.
+```powershell
+python -m venv .venv
+.venv\Scripts\pip install -r backend\requirements.txt
+.venv\Scripts\uvicorn backend.src.main:app --reload --port 8000
+```
+
+Production deployment is owned by the root `deploy.sh`; this directory has no
+independent Compose stack or deployment workflow.

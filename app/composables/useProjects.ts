@@ -46,7 +46,7 @@ const GROUPS: RawGroup[] = [
       {
         name: "Personal Site Backend",
         stack: "Python · FastAPI · PostgreSQL · Redis",
-        href: "https://github.com/AmoneMisa/Personal-Site-Backend",
+        href: "https://github.com/AmoneMisa/Personal-Site/tree/master/backend",
         ru: "Бэкенд для собственных сервисов сайта: REST API на FastAPI, обработка файлов (PDF, конвертация), кэширование в Redis. Питает инструменты из каталога.",
         en: "The backend for the site's own services: a FastAPI REST API, file processing (PDF, conversion), Redis caching. It powers the tools in the catalog.",
       },

@@ -6,7 +6,7 @@ import RedesignEmoji from "~/components/redesign/RedesignEmoji.vue";
 const localePath = useLocalePath();
 
 // Shared structural data (locale-independent).
-const backendHref = "https://github.com/AmoneMisa/Personal-Site-Backend";
+const backendHref = "https://github.com/AmoneMisa/Personal-Site/tree/master/backend";
 const MODS = [
   { title: "Increase Hard Mod — R.E.P.O.", tech: "C# · BepInEx / HarmonyLib", href: "https://github.com/AmoneMisa/Repo-Increase-Difficulty-Mod" },
   { title: "AutoTranslateTexts", tech: "C# · Skyrim SE/AE", href: "https://github.com/AmoneMisa/AutoTranslateTexts" },
