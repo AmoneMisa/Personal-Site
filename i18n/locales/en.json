@@ -75,6 +75,8 @@
     "hideEmpty": "Hide empty fields",
     "share": "Share",
     "shareCopied": "Link copied",
+    "shareListing": "Share listing",
+    "shareListingHint": "Automatic sharing was unavailable. Copy this direct link to the listing.",
     "notSpecified": "Not specified",
     "audWomen": "Women only",
     "audMen": "Men only",

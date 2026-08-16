@@ -141,11 +141,15 @@ const presetName = ref("");
 const presetModalOpen = ref(false);
 const shareModalOpen = ref(false);
 const sharedLinkOpened = ref(false);
+const listingShareModalOpen = ref(false);
+const listingShareUrl = ref("");
+const listingShareCopied = ref(false);
 const loadMoreSentinel = ref<HTMLElement | null>(null);
 const drawnArea = ref<Array<{ lat: number; lng: number }>>([]);
 let loadSeq = 0;
 let loadTimer: ReturnType<typeof setTimeout> | undefined;
 let warmTimer: ReturnType<typeof setTimeout> | undefined;
+let sharedListingTimer: ReturnType<typeof setTimeout> | undefined;
 let infiniteObserver: IntersectionObserver | undefined;
 
 function photoCandidates(listing: Listing): string[] {
@@ -329,7 +333,15 @@ function applyQueryParams(params: Record<string, unknown>) {
 }
 
 async function syncQueryParams() {
-  await router.replace({ query: currentFilterQuery() });
+  // Keep an inbound listing deep-link intact while filters/results synchronize.
+  // The old implementation removed `flat` during the first load, before the
+  // mounted hook tried to open it, so shared links appeared to do nothing.
+  const preserved: Record<string, string> = {};
+  for (const key of ["flat", "flatSource", "flatCountry"] as const) {
+    const value = queryString(route.query[key]);
+    if (value) preserved[key] = value;
+  }
+  await router.replace({ query: { ...currentFilterQuery(), ...preserved } });
 }
 
 const shareUrl = computed(() => {
@@ -337,8 +349,33 @@ const shareUrl = computed(() => {
   return import.meta.client ? new URL(resolved.href, window.location.origin).toString() : resolved.href;
 });
 
+async function copyText(value: string): Promise<boolean> {
+  if (navigator.clipboard?.writeText && window.isSecureContext) {
+    try {
+      await navigator.clipboard.writeText(value);
+      return true;
+    } catch {
+      // Continue to the selection/execCommand fallback below.
+    }
+  }
+  const field = document.createElement("textarea");
+  field.value = value;
+  field.setAttribute("readonly", "");
+  field.style.position = "fixed";
+  field.style.opacity = "0";
+  document.body.appendChild(field);
+  field.select();
+  let copied = false;
+  try {
+    copied = document.execCommand("copy");
+  } finally {
+    field.remove();
+  }
+  return copied;
+}
+
 async function copyShareLink() {
-  await navigator.clipboard.writeText(shareUrl.value);
+  await copyText(shareUrl.value);
 }
 
 function savePreset() {
@@ -751,16 +788,72 @@ const visibleSpecRows = computed(() =>
   hideEmptySpecs.value ? specRows.value.filter((r) => r.value !== t("notSpecified")) : specRows.value,
 );
 // Share the open listing: native share sheet on mobile, clipboard fallback on
-// desktop. The link deep-opens the listing popup on our page (?flat=<id>).
+// desktop. Include source/country so the receiver can perform an exact lookup
+// against the correct warmed snapshot instead of depending on page 1.
 const shareCopied = ref(false);
+function makeListingShareLink(l: Listing): string {
+  const resolved = router.resolve({
+    path: route.path,
+    query: { flat: l.id, flatSource: l.source, flatCountry: l.country },
+  });
+  return new URL(resolved.href, window.location.origin).toString();
+}
+
+function showShareSuccess() {
+  shareCopied.value = true;
+  window.setTimeout(() => { shareCopied.value = false; }, 2000);
+}
+
 async function shareFlat(l: Listing) {
-  const link = `${location.origin}${location.pathname}?flat=${encodeURIComponent(l.id)}`;
-  try {
-    if (navigator.share) { await navigator.share({ title: l.title, text: l.title, url: link }); return; }
-    await navigator.clipboard.writeText(link);
-    shareCopied.value = true;
-    setTimeout(() => { shareCopied.value = false; }, 2000);
-  } catch { /* user cancelled or clipboard blocked */ }
+  const link = makeListingShareLink(l);
+  listingShareUrl.value = link;
+  listingShareCopied.value = false;
+  const payload = { title: l.title, text: l.title, url: link };
+
+  if (navigator.share && (!navigator.canShare || navigator.canShare(payload))) {
+    try {
+      await navigator.share(payload);
+      showShareSuccess();
+      return;
+    } catch (error) {
+      // A cancelled native sheet is intentional. Other failures continue to a
+      // clipboard/manual-copy fallback instead of disappearing silently.
+      if (error instanceof DOMException && error.name === "AbortError") return;
+    }
+  }
+
+  listingShareCopied.value = await copyText(link);
+  if (listingShareCopied.value) showShareSuccess();
+  else listingShareModalOpen.value = true;
+}
+
+async function copyListingShareLink() {
+  listingShareCopied.value = await copyText(listingShareUrl.value);
+  if (listingShareCopied.value) showShareSuccess();
+}
+
+async function openSharedListing(id: string, sourceName = "", countryCode = "", attempt = 0) {
+  const local = listings.value.find((listing) => listing.id === id);
+  if (local) {
+    openListing(local);
+    return;
+  }
+  const params: Record<string, string> = { listingId: id, limit: "1", offset: "0" };
+  if (SOURCES.includes(sourceName)) params.sources = sourceName;
+  if (/^[A-Za-z]{2}$/.test(countryCode)) params.countries = countryCode.toUpperCase();
+  const { data } = await safeFetch<FeedResult>("/flats-feed", { params });
+  const exact = data?.listings?.find((listing) => listing.id === id);
+  if (exact) {
+    openListing(exact);
+    return;
+  }
+  if (data?.warming && attempt < 20) {
+    if (sharedListingTimer) clearTimeout(sharedListingTimer);
+    sharedListingTimer = setTimeout(() => {
+      sharedListingTimer = undefined;
+      void openSharedListing(id, sourceName, countryCode, attempt + 1);
+    }, 1800);
+  }
 }
 function timeAgo(iso: string | null): string {
   if (!iso) return "";
@@ -773,6 +866,11 @@ function timeAgo(iso: string | null): string {
 }
 
 onMounted(async () => {
+  // Capture these before the first async load. Route synchronization used to
+  // remove them while `load(false)` was in progress.
+  const sharedFlatId = queryString(route.query.flat);
+  const sharedFlatSource = queryString(route.query.flatSource);
+  const sharedFlatCountry = queryString(route.query.flatCountry);
   loadPersonalState();
   applyQueryParams(route.query);
   void loadRates(); // FX rates for price display + conversion (non-blocking)
@@ -784,11 +882,7 @@ onMounted(async () => {
   }
   await load(false);
   // Deep link: ?flat=<id> opens that listing's popup if it's in the loaded feed.
-  const flatId = queryString(route.query.flat);
-  if (flatId) {
-    const found = listings.value.find((x) => x.id === flatId);
-    if (found) openListing(found);
-  }
+  if (sharedFlatId) await openSharedListing(sharedFlatId, sharedFlatSource, sharedFlatCountry);
   await nextTick();
   infiniteObserver = new IntersectionObserver((entries) => {
     if (entries.some((entry) => entry.isIntersecting) && hasMore.value && !loading.value && !loadingMore.value) {
@@ -813,6 +907,7 @@ watch(modalOpen, (open) => {
 onBeforeUnmount(() => {
   if (loadTimer) clearTimeout(loadTimer);
   if (warmTimer) clearTimeout(warmTimer);
+  if (sharedListingTimer) clearTimeout(sharedListingTimer);
   infiniteObserver?.disconnect();
   stopTranslationPoll();
 });
@@ -1097,6 +1192,18 @@ onBeforeUnmount(() => {
       </template>
       <template #footer>
         <u-button icon="i-lucide-copy" @click="copyShareLink">{{ t("copyLink") }}</u-button>
+      </template>
+    </u-modal>
+
+    <u-modal v-model:open="listingShareModalOpen" :title="t('shareListing')">
+      <template #body>
+        <p class="flat-share__hint">{{ t("shareListingHint") }}</p>
+        <u-input :model-value="listingShareUrl" readonly />
+      </template>
+      <template #footer>
+        <u-button :icon="listingShareCopied ? 'i-lucide-check' : 'i-lucide-copy'" @click="copyListingShareLink">
+          {{ listingShareCopied ? t("shareCopied") : t("copyLink") }}
+        </u-button>
       </template>
     </u-modal>
   </u-container>
