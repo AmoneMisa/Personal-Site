@@ -532,7 +532,12 @@ const mapPoints = computed(() =>
 // ---- details modal ----
 const active = ref<Listing | null>(null);
 const modalOpen = ref(false);
-const lightbox = ref<string | null>(null); // full-screen photo, or null
+const lightboxIndex = ref<number | null>(null);
+const lightboxPhotos = computed(() => active.value ? visiblePhotos(active.value) : []);
+const lightboxPhoto = computed(() =>
+  lightboxIndex.value == null ? null : lightboxPhotos.value[lightboxIndex.value] || null,
+);
+const lightboxPosition = computed(() => (lightboxIndex.value ?? 0) + 1);
 const translatedDescription = ref("");
 const translatingDescription = ref(false);
 const translationFailed = ref(false);
@@ -555,6 +560,7 @@ function stopTranslationPoll() {
 function openListing(l: Listing) {
   stopTranslationPoll();
   translationRequestId += 1;
+  lightboxIndex.value = null;
   active.value = l;
   translatedDescription.value = translationCache.get(translationCacheKey(l)) || "";
   translatingDescription.value = false;
@@ -562,6 +568,50 @@ function openListing(l: Listing) {
   modalOpen.value = true;
   recent.value = [l, ...recent.value.filter((item) => item.id !== l.id)].slice(0, MAX_RECENT_FLATS);
   persistList(STORAGE.recent, recent.value, MAX_RECENT_FLATS);
+}
+
+function modalTitle(listing: Listing | null): string {
+  if (!listing) return "";
+  const normalized = listing.title.replace(/\s+/g, " ").trim();
+  // OLX titles often append structured area/price fragments with bullets. They
+  // already appear below as normalized fields and make the dialog heading too
+  // long, so keep the human-written portion before the first bullet.
+  const humanTitle = normalized.split(/\s*[•·]\s*/)[0]?.trim() || normalized;
+  return humanTitle.length > 140 ? `${humanTitle.slice(0, 137).trimEnd()}…` : humanTitle;
+}
+
+function openLightbox(index: number) {
+  if (!lightboxPhotos.value.length) return;
+  lightboxIndex.value = Math.max(0, Math.min(index, lightboxPhotos.value.length - 1));
+}
+
+function closeLightbox() {
+  lightboxIndex.value = null;
+}
+
+function moveLightbox(direction: -1 | 1) {
+  const total = lightboxPhotos.value.length;
+  if (!total || lightboxIndex.value == null) return;
+  lightboxIndex.value = (lightboxIndex.value + direction + total) % total;
+}
+
+function lightboxPhotoFailed(event: Event) {
+  markPhotoFailedFromEvent(event);
+  nextTick(() => {
+    if (!lightboxPhotos.value.length) closeLightbox();
+    else if (lightboxIndex.value != null) {
+      lightboxIndex.value = Math.min(lightboxIndex.value, lightboxPhotos.value.length - 1);
+    }
+  });
+}
+
+function onLightboxKeydown(event: KeyboardEvent) {
+  if (lightboxIndex.value == null) return;
+  if (event.key === "Escape") closeLightbox();
+  else if (event.key === "ArrowLeft") moveLightbox(-1);
+  else if (event.key === "ArrowRight") moveLightbox(1);
+  else return;
+  event.preventDefault();
 }
 
 function acceptTranslation(result: TranslationResult, listing: Listing, requestId: number, cacheKey: string): boolean {
@@ -866,6 +916,7 @@ function timeAgo(iso: string | null): string {
 }
 
 onMounted(async () => {
+  window.addEventListener("keydown", onLightboxKeydown);
   // Capture these before the first async load. Route synchronization used to
   // remove them while `load(false)` was in progress.
   const sharedFlatId = queryString(route.query.flat);
@@ -899,12 +950,14 @@ watch(loadMoreSentinel, (current, previous) => {
 
 watch(modalOpen, (open) => {
   if (open) return;
+  closeLightbox();
   stopTranslationPoll();
   translationRequestId += 1;
   translatingDescription.value = false;
 });
 
 onBeforeUnmount(() => {
+  window.removeEventListener("keydown", onLightboxKeydown);
   if (loadTimer) clearTimeout(loadTimer);
   if (warmTimer) clearTimeout(warmTimer);
   if (sharedListingTimer) clearTimeout(sharedListingTimer);
@@ -1096,7 +1149,10 @@ onBeforeUnmount(() => {
     </div>
 
     <!-- Details popup -->
-    <u-modal v-model:open="modalOpen" :title="active?.title || ''" :ui="{ content: 'max-w-2xl' }">
+    <u-modal v-model:open="modalOpen" :title="modalTitle(active)" :ui="{ content: 'max-w-4xl' }">
+      <template #title>
+        <h2 class="flat-modal__title">{{ modalTitle(active) }}</h2>
+      </template>
       <template #body>
         <div v-if="active" class="flat-modal">
           <div v-if="visiblePhotos(active).length" class="flat-modal__gallery">
@@ -1104,13 +1160,13 @@ onBeforeUnmount(() => {
                 v-for="(p, i) in visiblePhotos(active)"
                 :key="p"
                 :src="p"
-                :alt="`${active.title} (${i + 1})`"
+                :alt="`${modalTitle(active)} (${i + 1})`"
                 class="flat-modal__thumb"
                 loading="lazy"
                 decoding="async"
                 referrerpolicy="no-referrer"
                 @error="markPhotoFailedFromEvent"
-                @click="lightbox = p"
+                @click="openLightbox(i)"
             />
           </div>
           <div class="flat-modal__price">{{ priceLabel(active) }}<span v-if="convertedLabel(active)" class="flat-modal__price-conv"> ({{ convertedLabel(active) }})</span><span v-if="dealLabel(active.dealType)" class="flat-modal__deal"> · {{ dealLabel(active.dealType) }}</span><span v-if="active.roomOnly" class="flat-modal__deal"> · {{ t("roomShare") }}</span></div>
@@ -1169,9 +1225,46 @@ onBeforeUnmount(() => {
 
     <!-- Full-screen photo viewer (click any gallery thumbnail) -->
     <teleport to="body">
-      <div v-if="lightbox" class="flat-lightbox" @click="lightbox = null">
-        <img :src="lightbox" alt="" referrerpolicy="no-referrer" @click.stop @error="lightbox = null" />
-        <button type="button" class="flat-lightbox__close" aria-label="Close" @click="lightbox = null">×</button>
+      <div
+          v-if="lightboxPhoto"
+          class="flat-lightbox"
+          role="dialog"
+          aria-modal="true"
+          :aria-label="t('photoViewer')"
+          @click="closeLightbox"
+      >
+        <div class="flat-lightbox__stage" @click.stop>
+          <img
+              :src="lightboxPhoto"
+              :alt="`${modalTitle(active)} (${lightboxPosition}/${lightboxPhotos.length})`"
+              referrerpolicy="no-referrer"
+              @error="lightboxPhotoFailed"
+          />
+        </div>
+        <button
+            v-if="lightboxPhotos.length > 1"
+            type="button"
+            class="flat-lightbox__nav flat-lightbox__nav_left"
+            :aria-label="t('previousPhoto')"
+            @click.stop="moveLightbox(-1)"
+        >
+          <u-icon name="i-lucide-chevron-left" />
+        </button>
+        <button
+            v-if="lightboxPhotos.length > 1"
+            type="button"
+            class="flat-lightbox__nav flat-lightbox__nav_right"
+            :aria-label="t('nextPhoto')"
+            @click.stop="moveLightbox(1)"
+        >
+          <u-icon name="i-lucide-chevron-right" />
+        </button>
+        <span v-if="lightboxPhotos.length > 1" class="flat-lightbox__counter">
+          {{ lightboxPosition }} / {{ lightboxPhotos.length }}
+        </span>
+        <button type="button" class="flat-lightbox__close" :aria-label="t('closePhoto')" @click.stop="closeLightbox">
+          <u-icon name="i-lucide-x" />
+        </button>
       </div>
     </teleport>
 
@@ -1297,6 +1390,11 @@ onBeforeUnmount(() => {
 .flat-card_favorite { border-color: rgba(224,103,154,0.5); }
 .flat-card_hidden { opacity: 0.64; border-style: dashed; }
 .flat-modal { display: flex; flex-direction: column; gap: 12px; }
+.flat-modal__title {
+  display: -webkit-box; overflow: hidden; margin: 0; padding-right: 36px;
+  -webkit-box-orient: vertical; -webkit-line-clamp: 2;
+  overflow-wrap: anywhere; font-size: 18px; font-weight: 700; line-height: 1.35;
+}
 .flat-modal__photo { width: 100%; max-height: 320px; object-fit: cover; border-radius: 10px; }
 .flat-modal__gallery {
   display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 6px;
@@ -1308,13 +1406,30 @@ onBeforeUnmount(() => {
 }
 .flat-modal__thumb:hover { border-color: var(--accent-pink); }
 .flat-lightbox {
-  position: fixed; inset: 0; z-index: 3000; display: grid; place-items: center;
-  background: rgba(0,0,0,0.9); padding: 24px; cursor: zoom-out;
+  position: fixed; inset: 0; z-index: 5000; display: grid; place-items: center; isolation: isolate;
+  background: #080b1a; padding: clamp(12px, 2vw, 28px); cursor: zoom-out;
 }
-.flat-lightbox img { max-width: 96vw; max-height: 92vh; object-fit: contain; border-radius: 8px; cursor: default; }
+.flat-lightbox__stage {
+  width: min(94vw, 1700px); height: min(92vh, 1100px); display: grid; place-items: center; cursor: default;
+}
+.flat-lightbox__stage img { width: 100%; height: 100%; object-fit: contain; border-radius: 8px; }
+.flat-lightbox__nav,
 .flat-lightbox__close {
-  position: fixed; top: 16px; right: 20px; width: 40px; height: 40px; border-radius: 8px;
-  background: rgba(13,17,40,0.9); color: #fff; border: 1px solid var(--line); font-size: 22px; cursor: pointer;
+  position: fixed; z-index: 1; display: grid; place-items: center; border: 1px solid #343a62;
+  border-radius: 8px; background: #131730; color: #fff; cursor: pointer;
+}
+.flat-lightbox__nav { top: 50%; width: 52px; height: 72px; transform: translateY(-50%); font-size: 28px; }
+.flat-lightbox__nav:hover,
+.flat-lightbox__nav:focus-visible,
+.flat-lightbox__close:hover,
+.flat-lightbox__close:focus-visible { border-color: var(--accent-pink); color: var(--accent-pink); }
+.flat-lightbox__nav_left { left: 16px; }
+.flat-lightbox__nav_right { right: 16px; }
+.flat-lightbox__close { top: 16px; right: 20px; width: 44px; height: 44px; font-size: 24px; }
+.flat-lightbox__counter {
+  position: fixed; bottom: 18px; left: 50%; z-index: 1; transform: translateX(-50%);
+  padding: 6px 10px; border: 1px solid #343a62; border-radius: 6px;
+  background: #131730; color: var(--text-primary); font: 500 12px/1.2 "JetBrains Mono", monospace;
 }
 .flat-modal__price { font-weight: 700; font-size: 20px; }
 .flat-modal__price-conv { font-weight: 500; font-size: 14px; color: var(--text-muted); }
@@ -1354,5 +1469,10 @@ onBeforeUnmount(() => {
   .flats__views { padding-left: 0; border-left: 0; }
   .flat-card__photo { height: 250px; }
   .flat-modal__footer-actions { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .flat-lightbox__stage { width: 100vw; height: 88vh; }
+  .flat-lightbox__nav { width: 42px; height: 56px; font-size: 22px; }
+  .flat-lightbox__nav_left { left: 8px; }
+  .flat-lightbox__nav_right { right: 8px; }
+  .flat-lightbox__close { top: 10px; right: 10px; }
 }
 </style>
