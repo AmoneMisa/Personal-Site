@@ -641,6 +641,23 @@ const specRows = computed<Array<{ label: string; value: string }>>(() => {
     { label: t("specAmenities"), value: listOr(l.amenities) },
   ];
 });
+// "Hide empty fields" toggle for the details table.
+const hideEmptySpecs = ref(false);
+const visibleSpecRows = computed(() =>
+  hideEmptySpecs.value ? specRows.value.filter((r) => r.value !== t("notSpecified")) : specRows.value,
+);
+// Share the open listing: native share sheet on mobile, clipboard fallback on
+// desktop. The link deep-opens the listing popup on our page (?flat=<id>).
+const shareCopied = ref(false);
+async function shareFlat(l: Listing) {
+  const link = `${location.origin}${location.pathname}?flat=${encodeURIComponent(l.id)}`;
+  try {
+    if (navigator.share) { await navigator.share({ title: l.title, text: l.title, url: link }); return; }
+    await navigator.clipboard.writeText(link);
+    shareCopied.value = true;
+    setTimeout(() => { shareCopied.value = false; }, 2000);
+  } catch { /* user cancelled or clipboard blocked */ }
+}
 function timeAgo(iso: string | null): string {
   if (!iso) return "";
   const days = Math.floor((Date.now() - new Date(iso).getTime()) / 86_400_000);
@@ -662,6 +679,12 @@ onMounted(async () => {
     shareModalOpen.value = true;
   }
   await load(false);
+  // Deep link: ?flat=<id> opens that listing's popup if it's in the loaded feed.
+  const flatId = queryString(route.query.flat);
+  if (flatId) {
+    const found = listings.value.find((x) => x.id === flatId);
+    if (found) openListing(found);
+  }
   await nextTick();
   infiniteObserver = new IntersectionObserver((entries) => {
     if (entries.some((entry) => entry.isIntersecting) && hasMore.value && !loading.value && !loadingMore.value) {
@@ -883,9 +906,13 @@ onBeforeUnmount(() => {
             />
           </div>
           <div class="flat-modal__price">{{ priceLabel(active) }}<span v-if="convertedLabel(active)" class="flat-modal__price-conv"> ({{ convertedLabel(active) }})</span><span v-if="dealLabel(active.dealType)" class="flat-modal__deal"> · {{ dealLabel(active.dealType) }}</span><span v-if="active.roomOnly" class="flat-modal__deal"> · {{ t("roomShare") }}</span></div>
+          <label class="flat-modal__hide-empty">
+            <input type="checkbox" v-model="hideEmptySpecs" />
+            <span>{{ t("hideEmpty") }}</span>
+          </label>
           <table class="flat-modal__spec">
             <tbody>
-              <tr v-for="row in specRows" :key="row.label">
+              <tr v-for="row in visibleSpecRows" :key="row.label">
                 <th>{{ row.label }}</th>
                 <td>{{ row.value }}</td>
               </tr>
@@ -906,6 +933,9 @@ onBeforeUnmount(() => {
         </u-button>
         <u-button v-if="active" variant="outline" color="neutral" :icon="isHidden(active.id) ? 'i-lucide-eye' : 'i-lucide-eye-off'" @click="toggleHidden(active)">
           {{ isHidden(active.id) ? t("restoreListing") : t("hideListing") }}
+        </u-button>
+        <u-button v-if="active" variant="outline" color="neutral" :icon="shareCopied ? 'i-lucide-check' : 'i-lucide-share-2'" @click="shareFlat(active)">
+          {{ shareCopied ? t("shareCopied") : t("share") }}
         </u-button>
         <a v-if="active" class="flat-modal__open" :href="active.url" target="_blank" rel="noopener noreferrer">{{ t("open") }} →</a>
       </template>
@@ -1057,6 +1087,7 @@ onBeforeUnmount(() => {
   color: var(--text-muted, inherit); opacity: 0.75; width: 44%; vertical-align: top;
 }
 .flat-modal__spec td { padding: 6px 0; vertical-align: top; }
+.flat-modal__hide-empty { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text-muted, inherit); cursor: pointer; margin: 2px 0 6px; user-select: none; }
 .flat-modal__descbox { margin-top: 6px; }
 .flat-modal__descbox summary { cursor: pointer; font-size: 12px; font-weight: 600; opacity: 0.7; user-select: none; }
 .flat-modal__desc { font-size: 13.5px; line-height: 1.55; white-space: pre-wrap; color: var(--text-soft, inherit); max-height: 40vh; overflow-y: auto; margin-top: 8px; }
