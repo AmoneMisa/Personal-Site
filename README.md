@@ -66,22 +66,27 @@ deployments rebuild the whole stack.
 
 ### One-time migration from two repositories
 
-Back up the existing environment and preserve the old checkout before replacing
-it with this monorepo:
+Stop the old two-repository stack, remove orphaned services (including any
+legacy admin frontend), preserve only the required environment file temporarily,
+and replace the checkout in place:
 
 ```bash
-cp ~/opt/myproject/db.env ~/opt/db.env.personal-site
+cd ~/opt/myproject
+docker compose --env-file db.env down --remove-orphans
+docker rm -f myproject-admin-frontend-1 2>/dev/null || true
+mv db.env /tmp/personal-site-db.env
+
 cd ~/opt
-mv myproject myproject.two-repo-backup
+rm -rf myproject
 git clone https://github.com/AmoneMisa/Personal-Site.git myproject
-cp ~/opt/db.env.personal-site ~/opt/myproject/db.env
+mv /tmp/personal-site-db.env ~/opt/myproject/db.env
 cd ~/opt/myproject
 bash deploy.sh
 ```
 
 Using the same `~/opt/myproject` directory preserves the Compose project name
-and therefore reuses the existing Redis volume. Verify the site, `/api` tools,
-jobs and AI connectivity before removing `myproject.two-repo-backup`.
+and therefore reuses the existing Redis volume. `docker compose down` deliberately
+omits `--volumes`, so Redis data survives while obsolete containers are removed.
 
 ## Services
 
