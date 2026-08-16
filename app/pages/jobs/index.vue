@@ -683,6 +683,49 @@ function timeAgo(iso: string): string {
   return t("monthsAgo", { n: Math.floor(days / 30) });
 }
 
+// ---- normalized vacancy spec table (details modal) ----
+// ATS match for the open vacancy (only when a CV profile is loaded).
+const activeAts = computed(() => (cvProfile.value && activeJob.value ? scoreJob(cvProfile.value, activeJob.value) : null));
+const vBool = (v?: boolean) => (v === true ? t("yes") : v === false ? t("no") : t("notSpecified"));
+const vStr = (v?: string | null) => (v ? v : t("notSpecified"));
+function experienceValue(j: Job): string {
+  if (j.experienceMinYears !== undefined && j.experienceMinYears > 0) return t("experienceYears", { n: j.experienceMinYears });
+  if (j.noExperience) return t("noExpRequired");
+  return t("notSpecified");
+}
+function relocationValue(j: Job): string {
+  if (j.relocation === "offered") return t("yes");
+  if (j.relocation === "none") return t("no");
+  return t("notSpecified");
+}
+const vacRows = computed<Array<{ label: string; value: string }>>(() => {
+  const j = activeJob.value;
+  if (!j) return [];
+  const ats = activeAts.value;
+  const langs = (j.languages || []).map((l) => (l.level ? `${l.language} (${l.level})` : l.language)).join(", ");
+  const rows = [
+    { label: t("vCompany"), value: vStr(j.company) },
+    { label: t("vLocation"), value: vStr(j.location) },
+    { label: t("vSource"), value: vStr(j.source) },
+    { label: t("vPublished"), value: timeAgo(j.postedAt) },
+    { label: t("vSalary"), value: formatSalary(j) || t("notSpecified") },
+    { label: t("vSalaryMonthly"), value: convertedSalary(j) || t("notSpecified") },
+    { label: t("vWorkFormat"), value: modeLabel(j.workMode) || (j.remote ? t("remote") : t("notSpecified")) },
+    { label: t("vEmployment"), value: empLabel(j.employmentKind) || t("notSpecified") },
+    { label: t("vExperience"), value: experienceValue(j) },
+    { label: t("vRelocation"), value: relocationValue(j) },
+    { label: t("vVisa"), value: vBool(j.foreignerFriendly) },
+    { label: t("vLanguages"), value: langs || t("notSpecified") },
+    { label: t("vSkills"), value: (j.skills && j.skills.length ? j.skills.join(", ") : t("notSpecified")) },
+  ];
+  if (ats) {
+    rows.push({ label: t("vMatch"), value: `${ats.score}%` });
+    rows.push({ label: t("vMatched"), value: ats.matched.length ? ats.matched.join(", ") : t("notSpecified") });
+    rows.push({ label: t("vMissing"), value: ats.missing.length ? ats.missing.join(", ") : t("notSpecified") });
+  }
+  return rows;
+});
+
 // sorted views over the stats maps for stable rendering
 const countryStats = computed(() =>
   Object.entries(stats.value?.byCountry ?? {})
@@ -1216,6 +1259,14 @@ onBeforeUnmount(() => {
               {{ l.language }}<template v-if="l.level"> ({{ l.level }})</template>
             </span>
           </div>
+          <table class="job-modal__spec">
+            <tbody>
+              <tr v-for="row in vacRows" :key="row.label">
+                <th>{{ row.label }}</th>
+                <td>{{ row.value }}</td>
+              </tr>
+            </tbody>
+          </table>
           <p v-if="activeJob.description" class="job-modal__desc">{{ activeJob.description }}</p>
           <p v-else class="text-muted">{{ t("noDescription") }}</p>
           <div v-if="activeJob.skills && activeJob.skills.length" class="job-card__tags job-modal__tags">
@@ -1454,6 +1505,14 @@ onBeforeUnmount(() => {
 .job-modal__meta { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: 12.5px; }
 .job-modal__badges { display: flex; flex-wrap: wrap; gap: 6px; }
 .job-modal__langs { margin: 0; }
+.job-modal__spec { width: 100%; border-collapse: collapse; font-size: 13px; margin: 4px 0 10px; }
+.job-modal__spec tr { border-bottom: 1px solid var(--line); }
+.job-modal__spec tr:last-child { border-bottom: none; }
+.job-modal__spec th {
+  text-align: left; font-weight: 600; padding: 6px 12px 6px 0; white-space: nowrap;
+  color: var(--text-muted, inherit); opacity: 0.75; width: 42%; vertical-align: top;
+}
+.job-modal__spec td { padding: 6px 0; vertical-align: top; }
 .job-modal__desc {
   font-size: 13.5px; line-height: 1.55; white-space: pre-wrap;
   color: var(--text-soft, inherit); max-height: 52vh; overflow-y: auto;
