@@ -444,7 +444,15 @@ function toggleHidden(item: Listing) {
 const mapPoints = computed(() =>
   displayedListings.value
     .filter((l) => l.lat != null && l.lng != null)
-    .map((l) => ({ id: l.id, lat: l.lat as number, lng: l.lng as number, title: l.title, priceLabel: priceLabel(l) })),
+    .map((l) => ({
+      id: l.id,
+      lat: l.lat as number,
+      lng: l.lng as number,
+      title: l.title,
+      priceLabel: priceLabel(l),
+      photo: listingPhoto(l) || undefined,
+      source: l.source,
+    })),
 );
 
 // ---- details modal ----
