@@ -12,8 +12,11 @@ services:
   frontend:
     build:
       context: ./frontend
+    env_file:
+      - ./db.env
     environment:
       REDIS_URL: "redis://redis:6379"
+      AI_WORKER_URL: "http://ai-worker:4030"
       # URL of the Telegram MTProto worker (on the dedicated VPS, via its tunnel).
       # Read from the deploy env/.env so the ephemeral tunnel URL isn't baked in;
       # empty -> the jobs Telegram source falls back to the t.me/s scrape.
@@ -23,6 +26,9 @@ services:
       - backend
     ports:
       - "127.0.0.1:8080:3000"
+    networks:
+      - default
+      - ai-net
 
   redis:
     image: redis:8.4.0
@@ -33,3 +39,7 @@ services:
 
 volumes:
   redis_data:
+
+networks:
+  ai-net:
+    external: true
