@@ -41,6 +41,10 @@ interface Listing {
   newBuilding?: boolean | null;
   communalSeparated?: boolean | null;
   kvartal?: string | null;
+  area?: string | null;
+  areaAmbiguous?: boolean;
+  locationConfidence?: number | null;
+  requireExactAddress?: boolean;
   nearbyShops?: string[];
   nearby?: string[];
   residenceComplex?: string | null;
@@ -865,7 +869,7 @@ const specRows = computed<Array<{ label: string; value: string }>>(() => {
     { label: t("specComplex"), value: strOr(l.residenceComplex) },
     { label: t("specCity"), value: strOr(l.city) },
     { label: t("specDistrict"), value: strOr(l.district) },
-    { label: t("specKvartal"), value: strOr(l.kvartal) },
+    { label: t("specKvartal"), value: strOr(l.area || l.kvartal) },
     { label: t("specMetro"), value: strOr(l.metro) },
     { label: t("specAddress"), value: strOr(l.address) },
     { label: t("specParking"), value: fmtBool(l.parking) },
