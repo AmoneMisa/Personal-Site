@@ -768,14 +768,20 @@ const strOr = (v?: string | null) => (v ? v : t("notSpecified"));
 const listOr = (v?: string[] | null) => (v && v.length ? v.join(", ") : t("notSpecified"));
 const nearbyTranslationKeys: Record<string, string> = {
   "Bobur Park": "nearbyBoburPark",
+  "Alay Bazaar": "nearbyAlayBazaar",
   Park: "nearbyPark",
   "Bus stop": "nearbyBusStop",
   Clinic: "nearbyClinic",
   School: "nearbySchool",
   Kindergarten: "nearbyKindergarten",
+  Dishwasher: "amenityDishwasher",
+  dishwasher: "amenityDishwasher",
+  "Separate rooms": "amenitySeparateRooms",
 };
 const nearbyItemLabel = (value: string) => nearbyTranslationKeys[value] ? t(nearbyTranslationKeys[value]) : value;
 const nearbyListOr = (values?: string[] | null) =>
+  values?.length ? values.map(nearbyItemLabel).join(", ") : t("notSpecified");
+const amenitiesListOr = (values?: string[] | null) =>
   values?.length ? values.map(nearbyItemLabel).join(", ") : t("notSpecified");
 const ptLabel = (p: Listing["propertyType"]) => (p === "house" ? t("ptHouse") : t("ptFlat"));
 const audienceLabel = (a?: Listing["audience"]) =>
@@ -872,7 +878,7 @@ const specRows = computed<Array<{ label: string; value: string }>>(() => {
     { label: t("specAvailable"), value: strOr(l.availableFrom) },
     { label: t("specShops"), value: listOr(l.nearbyShops) },
     { label: t("specNearby"), value: nearbyListOr(l.nearby) },
-    { label: t("specAmenities"), value: listOr(l.amenities) },
+    { label: t("specAmenities"), value: amenitiesListOr(l.amenities) },
   ];
 });
 // "Hide empty fields" toggle for the details table.
