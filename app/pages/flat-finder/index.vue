@@ -1454,7 +1454,7 @@ onBeforeUnmount(() => {
   background: #080b1a; padding: clamp(12px, 2vw, 28px); cursor: zoom-out;
 }
 .flat-lightbox__stage {
-  width: min(94vw, 1700px); height: min(92vh, 1100px); display: grid; place-items: center; cursor: default;
+  width: min(84vw, 1320px); height: min(80vh, 820px); display: grid; place-items: center; cursor: default;
 }
 .flat-lightbox__stage img { width: 100%; height: 100%; object-fit: contain; border-radius: 8px; }
 .flat-lightbox__nav,
@@ -1513,7 +1513,7 @@ onBeforeUnmount(() => {
   .flats__views { padding-left: 0; border-left: 0; }
   .flat-card__photo { height: 250px; }
   .flat-modal__footer-actions { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .flat-lightbox__stage { width: 100vw; height: 88vh; }
+  .flat-lightbox__stage { width: 92vw; height: 76vh; }
   .flat-lightbox__nav { width: 42px; height: 56px; font-size: 22px; }
   .flat-lightbox__nav_left { left: 8px; }
   .flat-lightbox__nav_right { right: 8px; }
