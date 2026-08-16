@@ -522,7 +522,7 @@ const mapPoints = computed(() =>
       id: l.id,
       lat: l.lat as number,
       lng: l.lng as number,
-      title: l.title,
+      title: displayListingTitle(l),
       priceLabel: priceLabel(l),
       photo: listingPhoto(l) || undefined,
       source: l.source,
@@ -572,13 +572,56 @@ function openListing(l: Listing) {
 
 function modalTitle(listing: Listing | null): string {
   if (!listing) return "";
-  const normalized = listing.title.replace(/\s+/g, " ").trim();
+  const normalized = displayListingTitle(listing).replace(/\s+/g, " ").trim();
   // OLX titles often append structured area/price fragments with bullets. They
   // already appear below as normalized fields and make the dialog heading too
   // long, so keep the human-written portion before the first bullet.
   const humanTitle = normalized.split(/\s*[•·]\s*/)[0]?.trim() || normalized;
   return humanTitle.length > 140 ? `${humanTitle.slice(0, 137).trimEnd()}…` : humanTitle;
 }
+
+function hasMeaningfulTitle(value: string): boolean {
+  const content = value
+    .replace(/[\p{Extended_Pictographic}\p{Emoji_Presentation}\p{Emoji_Modifier}\p{Variation_Selector}\p{Join_Control}]/gu, "")
+    .replace(/[^\p{L}\p{N}]+/gu, "");
+  return content.length >= 3;
+}
+
+function displayListingTitle(listing: Listing): string {
+  const title = listing.title.replace(/\s+/g, " ").trim();
+  if (hasMeaningfulTitle(title)) return title;
+
+  const parts = [
+    dealLabel(listing.dealType),
+    listing.rooms != null ? t("roomsN", { n: listing.rooms }) : "",
+    ptLabel(listing.propertyType),
+    listing.district || listing.city || "",
+  ].filter(Boolean);
+  return parts.join(" · ") || t("listingFallbackTitle");
+}
+
+function descriptionMatchesTargetLanguage(text: string, targetLanguage: "en" | "ru"): boolean {
+  const normalized = text.toLocaleLowerCase();
+  if (targetLanguage === "ru") {
+    // Uzbek Cyrillic has distinctive letters; do not mistake it for Russian.
+    if (/[ўқғҳ]/iu.test(normalized)) return false;
+    const russianSignals = normalized.match(/(?:квартир\p{L}*|комнат\p{L}*|этаж\p{L}*|дом\p{L}*|цен\p{L}*|сда[её]тся|прода[её]тся|аренд\p{L}*|рядом|метро|семейн\p{L}*|коммунальн\p{L}*)/giu) || [];
+    return russianSignals.length >= 2;
+  }
+  const englishVocabulary = new Set([
+    "apartment", "flat", "house", "room", "floor", "price", "rent", "sale",
+    "family", "utilities", "near", "available", "bedroom",
+  ]);
+  const englishSignals = (normalized.match(/[a-z]+/g) || []).filter((word) => englishVocabulary.has(word));
+  return englishSignals.length >= 3;
+}
+
+const descriptionNeedsTranslation = computed(() => {
+  const description = active.value?.description?.trim();
+  if (!description) return false;
+  const targetLanguage = locale.value.startsWith("en") ? "en" : "ru";
+  return !descriptionMatchesTargetLanguage(description, targetLanguage);
+});
 
 function openLightbox(index: number) {
   if (!lightboxPhotos.value.length) return;
@@ -645,7 +688,7 @@ async function pollTranslation(key: string, listing: Listing, requestId: number,
 
 async function translateActiveDescription() {
   const listing = active.value;
-  if (!listing?.description || translatingDescription.value) return;
+  if (!listing?.description || translatingDescription.value || !descriptionNeedsTranslation.value) return;
   const targetLanguage = locale.value.startsWith("en") ? "en" : "ru";
   const cacheKey = translationCacheKey(listing, targetLanguage);
   const cached = translationCache.get(cacheKey);
@@ -833,7 +876,7 @@ const specRows = computed<Array<{ label: string; value: string }>>(() => {
   ];
 });
 // "Hide empty fields" toggle for the details table.
-const hideEmptySpecs = ref(false);
+const hideEmptySpecs = ref(true);
 const visibleSpecRows = computed(() =>
   hideEmptySpecs.value ? specRows.value.filter((r) => r.value !== t("notSpecified")) : specRows.value,
 );
@@ -858,7 +901,8 @@ async function shareFlat(l: Listing) {
   const link = makeListingShareLink(l);
   listingShareUrl.value = link;
   listingShareCopied.value = false;
-  const payload = { title: l.title, text: l.title, url: link };
+  const title = displayListingTitle(l);
+  const payload = { title, text: title, url: link };
 
   if (navigator.share && (!navigator.canShare || navigator.canShare(payload))) {
     try {
@@ -1101,7 +1145,7 @@ onBeforeUnmount(() => {
           <img
               v-if="listingPhoto(l)"
               :src="listingPhoto(l) || ''"
-              :alt="l.title"
+              :alt="displayListingTitle(l)"
               loading="lazy"
               decoding="async"
               referrerpolicy="no-referrer"
@@ -1125,7 +1169,7 @@ onBeforeUnmount(() => {
           </div>
           <div class="flat-card__price">{{ priceLabel(l) }}</div>
           <div v-if="convertedLabel(l)" class="flat-card__price-conv text-muted">{{ convertedLabel(l) }}</div>
-          <h3 class="flat-card__title">{{ l.title }}</h3>
+          <h3 class="flat-card__title">{{ displayListingTitle(l) }}</h3>
           <div v-if="specLine(l)" class="flat-card__spec text-muted">{{ specLine(l) }}</div>
           <div v-if="cardBadges(l).length" class="flat-card__badges">
             <span v-for="b in cardBadges(l)" :key="b" class="flat-card__badge">{{ b }}</span>
@@ -1182,7 +1226,7 @@ onBeforeUnmount(() => {
               </tr>
             </tbody>
           </table>
-          <div v-if="active.description" class="flat-modal__translation">
+          <div v-if="active.description && descriptionNeedsTranslation" class="flat-modal__translation">
             <u-button
                 type="button"
                 variant="outline"
@@ -1450,7 +1494,7 @@ onBeforeUnmount(() => {
 .flat-modal__translated-title { margin: 0 0 8px; color: var(--text-primary, #e4e5f0); font-size: 13px; font-weight: 600; }
 .flat-modal__descbox { margin-top: 6px; }
 .flat-modal__descbox summary { cursor: pointer; font-size: 12px; font-weight: 600; opacity: 0.7; user-select: none; }
-.flat-modal__desc { font-size: 13.5px; line-height: 1.55; white-space: pre-wrap; color: var(--text-soft, inherit); max-height: 40vh; overflow-y: auto; margin-top: 8px; }
+.flat-modal__desc { font-size: 13.5px; line-height: 1.55; white-space: pre-wrap; color: var(--text-soft, inherit); margin-top: 8px; }
 .flat-modal__tags { display: flex; flex-wrap: wrap; gap: 6px; }
 .flat-modal__tag { font-size: 11px; padding: 2px 8px; border-radius: 6px; border: 1px solid var(--line); color: var(--ui-text-muted); }
 .flat-modal__footer-actions { width: 100%; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
