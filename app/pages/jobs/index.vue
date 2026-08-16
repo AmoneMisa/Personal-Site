@@ -25,8 +25,10 @@ interface Job {
   salaryMin?: number;
   salaryMax?: number;
   salaryCurrency?: string;
+  applyUrl?: string;
   // derived
   country?: string;
+  city?: string;
   workMode?: "remote" | "hybrid" | "office" | "unknown";
   relocation?: "offered" | "none" | "unknown";
   foreignerFriendly?: boolean;
@@ -37,8 +39,20 @@ interface Job {
   skillDetails?: JobSkillDetail[];
   niceToHaveDetails?: JobSkillDetail[];
   experienceMinYears?: number;
+  experienceMaxYears?: number;
   salaryPeriod?: "hour" | "month" | "year";
   salaryUsd?: number; // normalized ANNUAL midpoint in USD
+  salaryGross?: boolean;
+  salaryNegotiable?: boolean;
+  seniority?: "junior" | "middle" | "senior" | "lead" | null;
+  managementRole?: boolean;
+  education?: string;
+  schedule?: string;
+  contractType?: string;
+  deadline?: string;
+  tools?: string[];
+  applicationLanguage?: string;
+  employerType?: "direct" | "agency" | "board" | "telegram";
 }
 interface SalaryStat { count: number; medianUsd: number; avgUsd: number; minUsd: number; maxUsd: number }
 interface JobStats {
@@ -238,6 +252,7 @@ const loadMoreSentinel = ref<HTMLElement | null>(null);
 const activeJob = ref<Job | null>(null);
 const jobModalOpen = ref(false);
 const shareCopied = ref(false);
+const shareCopiedJobId = ref<string | null>(null);
 
 // ---- Personal vacancy lists (localStorage; no account or backend required) ----
 type SavedJobsView = "active" | "favorites" | "hidden";
@@ -343,20 +358,37 @@ function jobShareLink(job: Job | RecentJob): string {
   return `${base}${localePath("/jobs")}?job=${encodeURIComponent(job.id)}`;
 }
 
-async function shareActiveJob() {
-  if (!activeJob.value) return;
-  const link = jobShareLink(activeJob.value);
+async function shareJob(job: Job | RecentJob): Promise<boolean> {
+  const link = jobShareLink(job);
   try {
     await navigator.clipboard.writeText(link);
+    shareCopiedJobId.value = job.id;
+    setTimeout(() => {
+      if (shareCopiedJobId.value === job.id) shareCopiedJobId.value = null;
+    }, 2000);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function shareActiveJob() {
+  if (!activeJob.value) return;
+  if (await shareJob(activeJob.value)) {
     shareCopied.value = true;
     setTimeout(() => (shareCopied.value = false), 2000);
-  } catch { /* clipboard blocked — no-op */ }
+  }
 }
 
 const empLabel = (kind?: string) =>
   kind ? t("emp" + kind.charAt(0).toUpperCase() + kind.slice(1)) : "";
 const modeLabel = (mode?: string) =>
   mode && mode !== "unknown" ? t("wm" + mode.charAt(0).toUpperCase() + mode.slice(1)) : "";
+const seniorityLabel = (value?: Job["seniority"]) =>
+  value ? t("seniority" + value.charAt(0).toUpperCase() + value.slice(1)) : "";
+const employerTypeLabel = (value?: Job["employerType"]) =>
+  value ? t("employer" + value.charAt(0).toUpperCase() + value.slice(1)) : "";
+const isToday = (iso: string) => new Date(iso).toDateString() === new Date().toDateString();
 let loadSequence = 0;
 let loadTimer: ReturnType<typeof setTimeout> | undefined;
 let warmTimer: ReturnType<typeof setTimeout> | undefined;
@@ -689,13 +721,22 @@ const activeAts = computed(() => (cvProfile.value && activeJob.value ? scoreJob(
 const vBool = (v?: boolean) => (v === true ? t("yes") : v === false ? t("no") : t("notSpecified"));
 const vStr = (v?: string | null) => (v ? v : t("notSpecified"));
 function experienceValue(j: Job): string {
+  if (j.experienceMinYears !== undefined && j.experienceMaxYears !== undefined && j.experienceMaxYears > j.experienceMinYears) {
+    return t("experienceRange", { min: j.experienceMinYears, max: j.experienceMaxYears });
+  }
   if (j.experienceMinYears !== undefined && j.experienceMinYears > 0) return t("experienceYears", { n: j.experienceMinYears });
+  if (j.experienceMaxYears !== undefined && j.experienceMaxYears > 0) return t("experienceUpTo", { n: j.experienceMaxYears });
   if (j.noExperience) return t("noExpRequired");
   return t("notSpecified");
 }
 function relocationValue(j: Job): string {
   if (j.relocation === "offered") return t("yes");
   if (j.relocation === "none") return t("no");
+  return t("notSpecified");
+}
+function salaryTypeValue(j: Job): string {
+  if (j.salaryGross === true) return t("salaryGross");
+  if (j.salaryGross === false) return t("salaryNet");
   return t("notSpecified");
 }
 const vacRows = computed<Array<{ label: string; value: string }>>(() => {
@@ -706,17 +747,30 @@ const vacRows = computed<Array<{ label: string; value: string }>>(() => {
   const rows = [
     { label: t("vCompany"), value: vStr(j.company) },
     { label: t("vLocation"), value: vStr(j.location) },
+    { label: t("vCountry"), value: j.country && !["OTHER", "REMOTE"].includes(j.country) ? countryLabel(j.country) : t("notSpecified") },
+    { label: t("vCity"), value: vStr(j.city) },
     { label: t("vSource"), value: vStr(j.source) },
     { label: t("vPublished"), value: timeAgo(j.postedAt) },
+    { label: t("vDeadline"), value: vStr(j.deadline) },
     { label: t("vSalary"), value: formatSalary(j) || t("notSpecified") },
     { label: t("vSalaryMonthly"), value: convertedSalary(j) || t("notSpecified") },
+    { label: t("vSalaryType"), value: salaryTypeValue(j) },
+    { label: t("vSalaryNegotiable"), value: vBool(j.salaryNegotiable) },
     { label: t("vWorkFormat"), value: modeLabel(j.workMode) || (j.remote ? t("remote") : t("notSpecified")) },
     { label: t("vEmployment"), value: empLabel(j.employmentKind) || t("notSpecified") },
     { label: t("vExperience"), value: experienceValue(j) },
+    { label: t("vSeniority"), value: seniorityLabel(j.seniority) || t("notSpecified") },
+    { label: t("vManagement"), value: vBool(j.managementRole) },
+    { label: t("vEducation"), value: vStr(j.education) },
+    { label: t("vSchedule"), value: vStr(j.schedule) },
+    { label: t("vContractType"), value: vStr(j.contractType) },
     { label: t("vRelocation"), value: relocationValue(j) },
     { label: t("vVisa"), value: vBool(j.foreignerFriendly) },
     { label: t("vLanguages"), value: langs || t("notSpecified") },
     { label: t("vSkills"), value: (j.skills && j.skills.length ? j.skills.join(", ") : t("notSpecified")) },
+    { label: t("vNiceToHave"), value: (j.niceToHave && j.niceToHave.length ? j.niceToHave.join(", ") : t("notSpecified")) },
+    { label: t("vTools"), value: (j.tools && j.tools.length ? j.tools.join(", ") : t("notSpecified")) },
+    { label: t("vApplicationLanguage"), value: vStr(j.applicationLanguage) },
   ];
   if (ats) {
     rows.push({ label: t("vMatch"), value: `${ats.score}%` });
@@ -1137,7 +1191,7 @@ onBeforeUnmount(() => {
           }"
       >
         <div class="job-card__head">
-          <a :href="job.url" target="_blank" rel="noopener noreferrer" class="job-card__title">{{ job.title }}</a>
+          <button type="button" class="job-card__title" @click="openJob(job)">{{ job.title }}</button>
           <div class="job-card__actions">
             <span
                 v-if="ats"
@@ -1145,7 +1199,22 @@ onBeforeUnmount(() => {
                 :style="{ color: scoreColor(ats.score), borderColor: scoreColor(ats.score) }"
                 :title="ats.missing.length ? t('atsMissing') + ': ' + ats.missing.join(', ') : ''"
             >{{ ats.score }}% {{ t("atsMatch") }}</span>
-            <span v-else class="job-card__src">{{ job.source }}</span>
+            <button
+                type="button"
+                class="job-card__action"
+                :aria-label="t('share')"
+                :title="t('share')"
+                @click="shareJob(job)"
+            ><u-icon :name="shareCopiedJobId === job.id ? 'i-lucide-check' : 'i-lucide-share-2'" /></button>
+            <a
+                :href="job.url"
+                target="_blank"
+                rel="noopener noreferrer"
+                class="job-card__action"
+                :aria-label="t('openSource')"
+                :title="t('openSource')"
+                @click="markSeen(job)"
+            ><u-icon name="i-lucide-external-link" /></a>
             <button
                 type="button"
                 class="job-card__action"
@@ -1169,12 +1238,19 @@ onBeforeUnmount(() => {
           <span>{{ job.location }}</span>
           <span class="job-card__dot">·</span>
           <span>{{ timeAgo(job.postedAt) }}</span>
+          <span v-if="employerTypeLabel(job.employerType)" class="job-card__badge job-card__badge_source">{{ employerTypeLabel(job.employerType) }}</span>
+          <span v-if="isToday(job.postedAt)" class="job-card__badge job-card__badge_new">{{ t("newToday") }}</span>
           <span v-if="isSeen(job.id)" class="job-card__badge job-card__badge_seen">{{ t("seen") }}</span>
           <span v-if="job.workMode && job.workMode !== 'unknown'" class="job-card__badge job-card__badge_mode">{{ t("wm" + job.workMode.charAt(0).toUpperCase() + job.workMode.slice(1)) }}</span>
           <span v-else-if="job.remote" class="job-card__badge">{{ t("remote") }}</span>
+          <span v-if="empLabel(job.employmentKind)" class="job-card__badge job-card__badge_employment">{{ empLabel(job.employmentKind) }}</span>
+          <span v-if="seniorityLabel(job.seniority)" class="job-card__badge job-card__badge_seniority">{{ seniorityLabel(job.seniority) }}</span>
+          <span v-if="job.managementRole" class="job-card__badge job-card__badge_management">{{ t("management") }}</span>
           <span v-if="job.experienceMinYears !== undefined && job.experienceMinYears > 0" class="job-card__badge job-card__badge_exp">{{ t("experienceYears", { n: job.experienceMinYears }) }}</span>
           <span v-if="job.foreignerFriendly" class="job-card__badge job-card__badge_visa">{{ t("cardForeigner") }}</span>
           <span v-if="job.relocation === 'offered'" class="job-card__badge job-card__badge_reloc">{{ t("cardReloc") }}</span>
+          <span v-if="formatSalary(job)" class="job-card__badge job-card__badge_salary">{{ t("salaryDisclosed") }}</span>
+          <span v-if="job.salaryNegotiable" class="job-card__badge job-card__badge_salary">{{ t("salaryNegotiable") }}</span>
           <span v-if="formatSalary(job)" class="job-card__salary">{{ formatSalary(job) }}</span>
           <span v-if="convertedSalary(job)" class="job-card__salary job-card__salary_conv">{{ convertedSalary(job) }}</span>
         </div>
@@ -1185,7 +1261,7 @@ onBeforeUnmount(() => {
           </span>
         </div>
         <p v-if="job.description" class="job-card__desc text-muted">{{ job.description }}</p>
-        <button type="button" class="job-card__details-btn" @click="openJob(job)">{{ t("details") }}</button>
+        <button type="button" class="job-card__details-btn" @click="openJob(job)">{{ t("viewVacancy") }}</button>
         <template v-if="ats">
           <div v-if="ats.matched.length" class="job-card__skills">
             <span class="job-card__skills-label">{{ t("atsMatched") }}:</span>
@@ -1201,7 +1277,7 @@ onBeforeUnmount(() => {
         </template>
         <div v-else-if="job.skills && job.skills.length" class="job-card__tags">
           <span v-for="s in job.skills.slice(0, 8)" :key="s" class="job-card__tag job-card__tag_skill">{{ s }}</span>
-          <span v-for="s in (job.niceToHave || []).slice(0, 4)" :key="'plus-' + s" class="job-card__tag job-card__tag_plus" :title="t('cardReloc')">+{{ s }}</span>
+          <span v-for="s in (job.niceToHave || []).slice(0, 4)" :key="'plus-' + s" class="job-card__tag job-card__tag_plus" :title="t('vNiceToHave')">+{{ s }}</span>
         </div>
         <div v-else-if="job.tags.length" class="job-card__tags">
           <span v-for="tag in job.tags.slice(0, 6)" :key="tag" class="job-card__tag">{{ tag }}</span>
@@ -1241,15 +1317,20 @@ onBeforeUnmount(() => {
             <span>{{ activeJob.location }}</span>
             <span class="job-card__dot">·</span>
             <span>{{ timeAgo(activeJob.postedAt) }}</span>
-            <span class="job-card__src">{{ activeJob.source }}</span>
+            <span v-if="employerTypeLabel(activeJob.employerType)" class="job-card__badge job-card__badge_source">{{ employerTypeLabel(activeJob.employerType) }}</span>
           </div>
           <div class="job-modal__badges">
             <span v-if="empLabel(activeJob.employmentKind)" class="job-card__badge job-card__badge_mode">{{ empLabel(activeJob.employmentKind) }}</span>
             <span v-if="modeLabel(activeJob.workMode)" class="job-card__badge">{{ modeLabel(activeJob.workMode) }}</span>
             <span v-else-if="activeJob.remote" class="job-card__badge">{{ t("remote") }}</span>
+            <span v-if="seniorityLabel(activeJob.seniority)" class="job-card__badge job-card__badge_seniority">{{ seniorityLabel(activeJob.seniority) }}</span>
+            <span v-if="activeJob.managementRole" class="job-card__badge job-card__badge_management">{{ t("management") }}</span>
+            <span v-if="isToday(activeJob.postedAt)" class="job-card__badge job-card__badge_new">{{ t("newToday") }}</span>
             <span v-if="activeJob.experienceMinYears !== undefined && activeJob.experienceMinYears > 0" class="job-card__badge job-card__badge_exp">{{ t("experienceYears", { n: activeJob.experienceMinYears }) }}</span>
             <span v-if="activeJob.foreignerFriendly" class="job-card__badge job-card__badge_visa">{{ t("cardForeigner") }}</span>
             <span v-if="activeJob.relocation === 'offered'" class="job-card__badge job-card__badge_reloc">{{ t("cardReloc") }}</span>
+            <span v-if="formatSalary(activeJob)" class="job-card__badge job-card__badge_salary">{{ t("salaryDisclosed") }}</span>
+            <span v-if="activeJob.salaryNegotiable" class="job-card__badge job-card__badge_salary">{{ t("salaryNegotiable") }}</span>
             <span v-if="formatSalary(activeJob)" class="job-card__salary">{{ formatSalary(activeJob) }}</span>
             <span v-if="convertedSalary(activeJob)" class="job-card__salary job-card__salary_conv">{{ convertedSalary(activeJob) }}</span>
           </div>
@@ -1293,10 +1374,19 @@ onBeforeUnmount(() => {
         <a
             v-if="activeJob"
             class="job-modal__apply"
+            :href="activeJob.applyUrl || activeJob.url"
+            target="_blank"
+            rel="noopener noreferrer"
+            @click="markSeen(activeJob)"
+        >{{ t("apply") }} →</a>
+        <a
+            v-if="activeJob?.applyUrl && activeJob.applyUrl !== activeJob.url"
+            class="job-modal__source"
             :href="activeJob.url"
             target="_blank"
             rel="noopener noreferrer"
-        >{{ t("apply") }} →</a>
+            @click="markSeen(activeJob)"
+        >{{ t("openSource") }} ↗</a>
         <u-button
             variant="outline"
             color="neutral"
@@ -1459,6 +1549,7 @@ onBeforeUnmount(() => {
 .job-card__title {
   min-width: 0; overflow-wrap: anywhere;
   font-weight: 600; font-size: 16px; line-height: 1.35;
+  padding: 0; border: 0; background: transparent; cursor: pointer; text-align: left;
   text-decoration: none; color: var(--text-white, inherit);
 }
 .job-card__title:hover { color: var(--color-primary, #e0679a); }
@@ -1475,6 +1566,12 @@ onBeforeUnmount(() => {
 .job-card__badge_mode { color: #38bdf8; background: rgba(56,189,248,0.14); }
 .job-card__badge_visa { color: #fbbf24; background: rgba(251,191,36,0.14); }
 .job-card__badge_reloc { color: #f472b6; background: rgba(244,114,182,0.14); }
+.job-card__badge_source { color: #c4b5fd; background: rgba(167,139,250,0.14); }
+.job-card__badge_new { color: #6ee7b7; background: rgba(52,211,153,0.14); }
+.job-card__badge_employment { color: #93c5fd; background: rgba(59,130,246,0.13); }
+.job-card__badge_seniority { color: #f9a8d4; background: rgba(236,72,153,0.13); }
+.job-card__badge_management { color: #fcd34d; background: rgba(245,158,11,0.13); }
+.job-card__badge_salary { color: #f0abfc; background: rgba(217,70,239,0.12); }
 .job-card__salary { border-radius: 6px; padding: 1px 7px; font-size: 11px; color: #e0679a; background: rgba(224, 103, 154,0.14); }
 .job-card__salary_conv { color: #94a3b8; background: rgba(148,163,184,0.12); font-weight: 600; }
 .job-card__langs { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: 12px; margin-top: 6px; }
@@ -1523,6 +1620,11 @@ onBeforeUnmount(() => {
   background: var(--accent-pink, #e0679a); color: #1a0e14; font-weight: 600; font-size: 13.5px;
 }
 .job-modal__apply:hover { filter: brightness(1.06); }
+.job-modal__source {
+  display: inline-flex; align-items: center; height: 36px; padding: 0 14px; border-radius: 8px;
+  border: 1px solid var(--line); color: var(--text-white, inherit); font-weight: 600; font-size: 13px;
+}
+.job-modal__source:hover { border-color: rgba(224,103,154,0.45); color: var(--accent-pink, #e0679a); }
 .job-card_seen { opacity: 0.72; }
 .job-card_seen:hover { opacity: 1; }
 .job-card_favorite { border-color: rgba(224,103,154,0.48); }

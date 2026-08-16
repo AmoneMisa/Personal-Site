@@ -37,7 +37,7 @@ import {
   isLikelyTelegramVacancy,
 } from './sources'
 
-const STORE_KEY = 'jobs:store:v3'
+const STORE_KEY = 'jobs:store:v4'
 const STORE_TTL_SECONDS = 15 * 86_400 // safety net: store self-expires if the worker dies
 const MEMORY_TTL_MS = 5 * 60_000
 const MAX_AGE_DAYS = 14 // never retain postings older than this (mirrors the read-side cap)
@@ -101,6 +101,17 @@ type VacancyAiData = {
   visaSponsorship?: boolean | null
   relocationSupport?: boolean | null
   foreignersAccepted?: boolean | null
+  salaryGross?: boolean | null
+  salaryNegotiable?: boolean | null
+  seniority?: 'junior' | 'middle' | 'senior' | 'lead' | null
+  schedule?: string | null
+  contractType?: string | null
+  education?: string | null
+  managementRole?: boolean | null
+  deadline?: string | null
+  niceToHave?: string[]
+  tools?: string[]
+  applicationLanguage?: string | null
 }
 
 type StoredAi = {
@@ -169,6 +180,17 @@ function vacancyAiInput(job: Job) {
     experienceMinYears: job.experienceMinYears ?? null,
     skills: job.skills || [],
     languages: job.languages || [],
+    salaryGross: job.salaryGross ?? null,
+    salaryNegotiable: job.salaryNegotiable ?? null,
+    seniority: job.seniority ?? null,
+    schedule: job.schedule ?? null,
+    contractType: job.contractType ?? null,
+    education: job.education ?? null,
+    managementRole: job.managementRole ?? null,
+    deadline: job.deadline ?? null,
+    niceToHave: job.niceToHave || [],
+    tools: job.tools || [],
+    applicationLanguage: job.applicationLanguage ?? null,
   }
   return {
     rawText,
@@ -186,7 +208,7 @@ function mergeVacancyAi(job: Job, data: VacancyAiData): Job {
   if ((merged.relocation == null || merged.relocation === 'unknown') && data.relocationSupport === true) {
     merged.relocation = 'offered'
   }
-  if (!merged.foreignerFriendly && (data.foreignersAccepted === true || data.visaSponsorship === true)) {
+  if (merged.foreignerFriendly == null && (data.foreignersAccepted === true || data.visaSponsorship === true)) {
     merged.foreignerFriendly = true
   }
   if (merged.experienceMinYears == null && data.experienceMinYears != null) {
@@ -209,6 +231,18 @@ function mergeVacancyAi(job: Job, data: VacancyAiData): Job {
     merged.employmentKind = employmentMap[data.employmentType]
   }
 
+  if (merged.salaryGross == null && data.salaryGross != null) merged.salaryGross = data.salaryGross
+  if (merged.salaryNegotiable == null && data.salaryNegotiable != null) merged.salaryNegotiable = data.salaryNegotiable
+  if (!merged.seniority && data.seniority) merged.seniority = data.seniority
+  if (merged.managementRole == null && data.managementRole != null) merged.managementRole = data.managementRole
+  if (!merged.schedule && data.schedule?.trim()) merged.schedule = data.schedule.trim()
+  if (!merged.contractType && data.contractType?.trim()) merged.contractType = data.contractType.trim()
+  if (!merged.education && data.education?.trim()) merged.education = data.education.trim()
+  if (!merged.deadline && data.deadline?.trim()) merged.deadline = data.deadline.trim()
+  if (!merged.applicationLanguage && data.applicationLanguage?.trim()) {
+    merged.applicationLanguage = data.applicationLanguage.trim()
+  }
+
   const skillNames = [...new Set([...(merged.skills || []), ...(data.skills || [])].map((item) => item.trim()).filter(Boolean))]
   if (skillNames.length) {
     merged.skills = skillNames
@@ -220,6 +254,21 @@ function mergeVacancyAi(job: Job, data: VacancyAiData): Job {
       if (meta) merged.skillDetails.push({ name, ...meta })
     }
   }
+
+  const niceToHave = [...new Set([...(merged.niceToHave || []), ...(data.niceToHave || [])].map((item) => item.trim()).filter(Boolean))]
+  if (niceToHave.length) {
+    merged.niceToHave = niceToHave
+    const detailNames = new Set((merged.niceToHaveDetails || []).map(({ name }) => name))
+    merged.niceToHaveDetails = [...(merged.niceToHaveDetails || [])]
+    for (const name of niceToHave) {
+      if (detailNames.has(name)) continue
+      const meta = getSkillMeta(name)
+      if (meta) merged.niceToHaveDetails.push({ name, ...meta })
+    }
+  }
+
+  const tools = [...new Set([...(merged.tools || []), ...(data.tools || [])].map((item) => item.trim()).filter(Boolean))]
+  if (tools.length) merged.tools = tools
 
   const languages = [...(merged.languages || [])]
   const languageNames = new Set(languages.map(({ language }) => language.toLowerCase()))
@@ -248,6 +297,7 @@ function mergeVacancyAi(job: Job, data: VacancyAiData): Job {
 function vacancyNeedsAi(job: Job): boolean {
   if ((job.description || '').length < 100) return false
   let score = 0
+  if (job.salaryMin == null && job.salaryMax == null && !job.salaryNegotiable) score += 2
   if (!job.skills?.length) score += 3
   if (job.experienceMinYears == null) score += 2
   if (!job.languages?.length) score += 1

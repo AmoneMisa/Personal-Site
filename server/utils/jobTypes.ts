@@ -3,6 +3,8 @@
 export type WorkMode = 'remote' | 'hybrid' | 'office' | 'unknown'
 export type Relocation = 'offered' | 'none' | 'unknown'
 export type SalaryPeriod = 'hour' | 'month' | 'year'
+export type Seniority = 'junior' | 'middle' | 'senior' | 'lead'
+export type EmployerType = 'direct' | 'agency' | 'board' | 'telegram'
 // Normalized employment type. "project"/freelance/B2B collapse into 'contract'.
 export type EmploymentKind = 'fulltime' | 'parttime' | 'contract' | 'internship' | 'temporary'
 export const EMPLOYMENT_KINDS: EmploymentKind[] = [
@@ -39,9 +41,11 @@ export interface Job {
   salaryMin?: number
   salaryMax?: number
   salaryCurrency?: string
+  applyUrl?: string
 
   // --- derived by enrich.ts (best-effort, inferred from text) ---
   country?: string // ISO-2 code, or 'REMOTE' / 'OTHER'
+  city?: string
   workMode?: WorkMode
   relocation?: Relocation
   foreignerFriendly?: boolean // visa sponsorship / open to foreigners
@@ -56,6 +60,17 @@ export interface Job {
   experienceMaxYears?: number // maximum stated experience range, when present
   salaryPeriod?: SalaryPeriod // detected pay period of salaryMin/salaryMax (best-effort)
   salaryUsd?: number // normalized ANNUAL midpoint in USD for stats/sort (undefined if no salary)
+  salaryGross?: boolean // true = gross/before tax, false = net/after tax
+  salaryNegotiable?: boolean
+  seniority?: Seniority | null
+  managementRole?: boolean
+  education?: string
+  schedule?: string
+  contractType?: string
+  deadline?: string
+  tools?: string[]
+  applicationLanguage?: string
+  employerType?: EmployerType
 }
 
 export type JobSource =
