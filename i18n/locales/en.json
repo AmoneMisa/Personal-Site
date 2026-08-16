@@ -136,6 +136,8 @@
     "nearbyClinic": "Clinic",
     "nearbySchool": "School",
     "nearbyKindergarten": "Kindergarten",
+    "nearbyShoppingCenter": "Shopping center",
+    "nearbyMosque": "Mosque",
     "specAmenities": "Other amenities",
     "specParking": "Parking",
     "specElevator": "Elevator",

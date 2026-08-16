@@ -774,6 +774,8 @@ const nearbyTranslationKeys: Record<string, string> = {
   Clinic: "nearbyClinic",
   School: "nearbySchool",
   Kindergarten: "nearbyKindergarten",
+  "Shopping center": "nearbyShoppingCenter",
+  Mosque: "nearbyMosque",
   Dishwasher: "amenityDishwasher",
   dishwasher: "amenityDishwasher",
   "Separate rooms": "amenitySeparateRooms",
