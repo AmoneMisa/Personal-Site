@@ -53,6 +53,7 @@ export interface Job {
   skillDetails?: JobSkillDetail[]
   niceToHaveDetails?: JobSkillDetail[]
   experienceMinYears?: number // minimum required professional experience
+  experienceMaxYears?: number // maximum stated experience range, when present
   salaryPeriod?: SalaryPeriod // detected pay period of salaryMin/salaryMax (best-effort)
   salaryUsd?: number // normalized ANNUAL midpoint in USD for stats/sort (undefined if no salary)
 }
