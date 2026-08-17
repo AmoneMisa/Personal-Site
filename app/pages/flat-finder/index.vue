@@ -155,6 +155,7 @@ let loadTimer: ReturnType<typeof setTimeout> | undefined;
 let warmTimer: ReturnType<typeof setTimeout> | undefined;
 let sharedListingTimer: ReturnType<typeof setTimeout> | undefined;
 let infiniteObserver: IntersectionObserver | undefined;
+let lastPaginationScrollY = 0;
 
 function photoCandidates(listing: Listing): string[] {
   return [...new Set([listing.photo, ...(listing.photos || [])].filter((value): value is string => !!value))];
@@ -426,9 +427,10 @@ function scheduleWarmPoll() {
   warmTimer = setTimeout(() => {
     warmTimer = undefined;
 
-    // Во время прогрева не запрашиваем первую страницу заново.
-    // Берём следующую страницу относительно уже загруженных объявлений.
-    void load(true, true);
+    // Background poll только проверяет состояние backend.
+    // Он НЕ подгружает следующую страницу
+    // и НЕ изменяет уже отображённые квартиры.
+    void load(false, true);
   }, 1800);
 }
 
@@ -436,7 +438,11 @@ async function load(
     append = false,
     background = false,
 ) {
-  const seq = ++loadSeq;
+  // Background poll не должен инвалидировать
+  // пользовательский запрос.
+  const seq = background
+      ? loadSeq
+      : ++loadSeq;
 
   if (!background) {
     if (append) {
@@ -463,11 +469,13 @@ async function load(
   }
 
   if (city.value) {
-    params.city = city.value;
+    params.city =
+        city.value;
   }
 
   if (district.value) {
-    params.district = district.value;
+    params.district =
+        district.value;
   }
 
   if (propertyType.value !== "any") {
@@ -526,14 +534,11 @@ async function load(
       );
 
   // Пока запрос выполнялся, пользователь
-  // мог поменять фильтры.
+  // мог изменить фильтры.
   if (seq !== loadSeq) {
     if (!background) {
-      if (append) {
-        loadingMore.value = false;
-      } else {
-        loading.value = false;
-      }
+      loading.value = false;
+      loadingMore.value = false;
     }
 
     return;
@@ -554,52 +559,104 @@ async function load(
 
       sourceErrors.value = [];
     }
-  } else {
-    const next =
-        Array.isArray(data.listings)
-            ? data.listings
-            : [];
 
-    if (append) {
-      const merged = [
-        ...listings.value,
-        ...next,
-      ];
-
-      // Один OLX/Telegram id теоретически
-      // может совпасть, поэтому ключ включает source/country.
-      listings.value = [
-        ...new Map(
-            merged.map((item) => [
-              `${item.source}:${item.country}:${item.id}`,
-              item,
-            ]),
-        ).values(),
-      ];
-    } else {
-      listings.value = next;
+    if (!background) {
+      loading.value = false;
+      loadingMore.value = false;
     }
 
+    return;
+  }
+
+  /*
+   * Background polling:
+   *
+   * обновляем только metadata.
+   *
+   * listings НЕ трогаем вообще,
+   * поэтому верх страницы не прыгает
+   * и квартиры не перезатираются.
+   */
+  if (background) {
     total.value =
         data.count ??
-        listings.value.length;
+        total.value;
 
     sourceErrors.value =
         data.sourceErrors || [];
 
     warming.value =
         !!data.warming;
+
+    scheduleWarmPoll();
+
+    return;
   }
 
-  if (!background) {
-    loading.value = false;
-    loadingMore.value = false;
+  const next =
+      Array.isArray(data.listings)
+          ? data.listings
+          : [];
+
+  if (append) {
+    const existingKeys =
+        new Set(
+            listings.value.map(
+                (item) =>
+                    `${item.source}:${item.country}:${item.id}`,
+            ),
+        );
+
+    // В append режиме существующие карточки
+    // вообще не заменяем.
+    //
+    // Добавляем ТОЛЬКО объявления,
+    // которых раньше не было.
+    const newListings =
+        next.filter((item) => {
+          const key =
+              `${item.source}:${item.country}:${item.id}`;
+
+          if (existingKeys.has(key)) {
+            return false;
+          }
+
+          existingKeys.add(key);
+
+          return true;
+        });
+
+    listings.value = [
+      ...listings.value,
+      ...newListings,
+    ];
+  } else {
+    // Полная замена допустима только
+    // при настоящем новом поиске/фильтре.
+    listings.value = next;
+
+    // После нового поиска пользователь должен
+    // снова самостоятельно докрутить страницу.
+    if (import.meta.client) {
+      lastPaginationScrollY =
+          window.scrollY;
+    }
   }
 
-  if (
-      !append &&
-      !background
-  ) {
+  total.value =
+      data.count ??
+      listings.value.length;
+
+  sourceErrors.value =
+      data.sourceErrors || [];
+
+  warming.value =
+      !!data.warming;
+
+  loading.value = false;
+  loadingMore.value = false;
+
+  if (!append) {
     void syncQueryParams();
   }
 
@@ -1129,38 +1186,151 @@ function timeAgo(iso: string | null): string {
   return t("monthsAgo", { n: Math.floor(days / 30) });
 }
 
+function setupInfinitePagination() {
+  infiniteObserver?.disconnect();
+
+  infiniteObserver =
+      new IntersectionObserver(
+          (entries) => {
+            const reachedBottom =
+                entries.some(
+                    (entry) =>
+                        entry.isIntersecting,
+                );
+
+            if (!reachedBottom) {
+              return;
+            }
+
+            if (!hasMore.value) {
+              return;
+            }
+
+            if (
+                loading.value ||
+                loadingMore.value
+            ) {
+              return;
+            }
+
+            /*
+             * Не позволяем IntersectionObserver
+             * автоматически загружать подряд
+             * несколько страниц.
+             *
+             * После каждой загрузки пользователь
+             * должен реально прокрутить страницу
+             * дальше.
+             */
+            const currentScrollY =
+                window.scrollY;
+
+            if (
+                currentScrollY <=
+                lastPaginationScrollY + 40
+            ) {
+              return;
+            }
+
+            lastPaginationScrollY =
+                currentScrollY;
+
+            void load(true, false);
+          },
+          {
+            // Раньше было 500px —
+            // поэтому загрузка начиналась сильно
+            // раньше конца страницы.
+            rootMargin: "0px",
+
+            // Sentinel достаточно просто
+            // появиться в viewport.
+            threshold: 0.01,
+          },
+      );
+
+  if (loadMoreSentinel.value) {
+    infiniteObserver.observe(
+        loadMoreSentinel.value,
+    );
+  }
+}
+
 onMounted(async () => {
-  window.addEventListener("keydown", onLightboxKeydown);
-  // Capture these before the first async load. Route synchronization used to
-  // remove them while `load(false)` was in progress.
-  const sharedFlatId = queryString(route.query.flat);
-  const sharedFlatSource = queryString(route.query.flatSource);
-  const sharedFlatCountry = queryString(route.query.flatCountry);
+  window.addEventListener(
+      "keydown",
+      onLightboxKeydown,
+  );
+
+  const sharedFlatId =
+      queryString(route.query.flat);
+
+  const sharedFlatSource =
+      queryString(
+          route.query.flatSource,
+      );
+
+  const sharedFlatCountry =
+      queryString(
+          route.query.flatCountry,
+      );
+
   loadPersonalState();
-  applyQueryParams(route.query);
-  void loadRates(); // FX rates for price display + conversion (non-blocking)
+
+  applyQueryParams(
+      route.query,
+  );
+
+  void loadRates();
+
   await loadMeta();
-  if (queryString(route.query.shared) === "1") {
+
+  if (
+      queryString(
+          route.query.shared,
+      ) === "1"
+  ) {
     showAdvanced.value = true;
     sharedLinkOpened.value = true;
     shareModalOpen.value = true;
   }
+
   await load(false);
-  // Deep link: ?flat=<id> opens that listing's popup if it's in the loaded feed.
-  if (sharedFlatId) await openSharedListing(sharedFlatId, sharedFlatSource, sharedFlatCountry);
+
+  if (sharedFlatId) {
+    await openSharedListing(
+        sharedFlatId,
+        sharedFlatSource,
+        sharedFlatCountry,
+    );
+  }
+
   await nextTick();
-  infiniteObserver = new IntersectionObserver((entries) => {
-    if (entries.some((entry) => entry.isIntersecting) && hasMore.value && !loading.value && !loadingMore.value) {
-      void load(true);
-    }
-  }, { rootMargin: "500px 0px" });
-  if (loadMoreSentinel.value) infiniteObserver.observe(loadMoreSentinel.value);
+
+  // Никакой автоматической пагинации
+  // после initial render.
+  lastPaginationScrollY =
+      window.scrollY;
+
+  setupInfinitePagination();
 });
 
-watch(loadMoreSentinel, (current, previous) => {
-  if (previous) infiniteObserver?.unobserve(previous);
-  if (current) infiniteObserver?.observe(current);
-});
+watch(
+    loadMoreSentinel,
+    (current, previous) => {
+      if (previous) {
+        infiniteObserver?.unobserve(
+            previous,
+        );
+      }
+
+      if (current) {
+        infiniteObserver?.observe(
+            current,
+        );
+      }
+    },
+);
 
 watch(modalOpen, (open) => {
   if (open) return;
