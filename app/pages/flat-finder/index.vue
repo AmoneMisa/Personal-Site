@@ -733,6 +733,24 @@ function priceLabel(l: Listing): string {
   if (l.price == null) return t("priceNA");
   return `${l.price.toLocaleString()} ${l.currency}`.trim();
 }
+
+function updateLightboxZoom(event: MouseEvent) {
+  const image = event.currentTarget as HTMLImageElement;
+  const rect = image.getBoundingClientRect();
+
+  const x = ((event.clientX - rect.left) / rect.width) * 100;
+  const y = ((event.clientY - rect.top) / rect.height) * 100;
+
+  image.style.setProperty("--zoom-x", `${x}%`);
+  image.style.setProperty("--zoom-y", `${y}%`);
+}
+
+function resetLightboxZoom(event: MouseEvent) {
+  const image = event.currentTarget as HTMLImageElement;
+
+  image.style.setProperty("--zoom-x", "50%");
+  image.style.setProperty("--zoom-y", "50%");
+}
 // Convert an amount between two currencies via the USD-based rates table.
 function convert(amount: number, from: string, to: string): number | undefined {
   const rf = rates.value[(from || "USD").toUpperCase()];
@@ -1216,7 +1234,7 @@ onBeforeUnmount(() => {
     </div>
 
     <!-- Details popup -->
-    <u-modal v-model:open="modalOpen" :title="modalTitle(active)" :ui="{ content: 'max-w-4xl' }">
+    <u-modal v-model:open="modalOpen" :title="modalTitle(active)" :ui="{ content: 'max-w-4xl' }" :dismissible="lightboxIndex === null">
       <template #title>
         <h2 class="flat-modal__title">{{ modalTitle(active) }}</h2>
       </template>
@@ -1306,6 +1324,8 @@ onBeforeUnmount(() => {
               :alt="`${modalTitle(active)} (${lightboxPosition}/${lightboxPhotos.length})`"
               referrerpolicy="no-referrer"
               @error="lightboxPhotoFailed"
+              @mousemove="updateLightboxZoom"
+              @mouseleave="resetLightboxZoom"
           />
         </div>
         <button
@@ -1472,28 +1492,43 @@ onBeforeUnmount(() => {
 .flat-modal__thumb:hover { border-color: var(--accent-pink); }
 .flat-lightbox {
   position: fixed; inset: 0; z-index: 5000; display: grid; place-items: center; isolation: isolate;
-  background: #080b1a; padding: clamp(12px, 2vw, 28px); cursor: zoom-out;
+  background: #080b1a; padding: clamp(12px, 2vw, 28px); cursor: zoom-out;  pointer-events: auto;
 }
 .flat-lightbox__stage {
-  width: min(92vw, 1320px);
-  height: min(88vh, 820px);
+  width: min(82vw, 1200px);
+  height: min(76dvh, 720px);
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: default;
+  pointer-events: auto;
 }
+
 .flat-lightbox__stage img {
+  display: block;
   width: auto;
   height: auto;
   max-width: 100%;
   max-height: 100%;
   object-fit: contain;
   border-radius: 8px;
+  transform-origin: var(--zoom-x, 50%) var(--zoom-y, 50%);
+  transition: transform 180ms ease;
+}
+@media (hover: hover) and (pointer: fine) {
+  .flat-lightbox__stage img {
+    cursor: zoom-in;
+  }
+
+  .flat-lightbox__stage img:hover {
+    transform: scale(1.7);
+    cursor: zoom-out;
+  }
 }
 .flat-lightbox__nav,
 .flat-lightbox__close {
   position: fixed; z-index: 1; display: grid; place-items: center; border: 1px solid #343a62;
-  border-radius: 8px; background: #131730; color: #fff; cursor: pointer;
+  border-radius: 8px; background: #131730; color: #fff; cursor: pointer;  pointer-events: auto;
 }
 .flat-lightbox__nav { top: 50%; width: 52px; height: 72px; transform: translateY(-50%); font-size: 28px; }
 .flat-lightbox__nav:hover,
@@ -1507,11 +1542,11 @@ onBeforeUnmount(() => {
   position: fixed; bottom: 18px; left: 50%; z-index: 1; transform: translateX(-50%);
   padding: 6px 10px; border: 1px solid #343a62; border-radius: 6px;
   background: #131730; color: var(--text-primary); font: 500 12px/1.2 "JetBrains Mono", monospace;
+  pointer-events: auto;
 }
 .flat-modal__price { font-weight: 700; font-size: 20px; }
 .flat-modal__price-conv { font-weight: 500; font-size: 14px; color: var(--text-muted); }
 .flat-modal__deal { color: #e0679a; font-weight: 500; }
-.flat-modal__meta { font-size: 13px; }
 .flat-modal__spec { width: 100%; border-collapse: collapse; font-size: 13px; margin: 4px 0 10px; }
 .flat-modal__spec tr { border-bottom: 1px solid var(--line); }
 .flat-modal__spec tr:last-child { border-bottom: none; }
