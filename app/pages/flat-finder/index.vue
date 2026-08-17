@@ -415,65 +415,194 @@ async function loadRates() {
 }
 
 function scheduleWarmPoll() {
-  if (warmTimer) clearTimeout(warmTimer);
-  if (!warming.value) return;
+  if (warmTimer) {
+    clearTimeout(warmTimer);
+  }
+
+  if (!warming.value) {
+    return;
+  }
+
   warmTimer = setTimeout(() => {
     warmTimer = undefined;
-    void load(false, true);
+
+    // Во время прогрева не запрашиваем первую страницу заново.
+    // Берём следующую страницу относительно уже загруженных объявлений.
+    void load(true, true);
   }, 1800);
 }
 
-async function load(append = false, background = false) {
+async function load(
+    append = false,
+    background = false,
+) {
   const seq = ++loadSeq;
+
   if (!background) {
-    if (append) loadingMore.value = true;
-    else loading.value = true;
+    if (append) {
+      loadingMore.value = true;
+    } else {
+      loading.value = true;
+    }
+
     failed.value = false;
   }
-  const params: Record<string, string> = { limit: String(PAGE_SIZE), offset: append ? String(listings.value.length) : "0" };
-  if (countries.value.length) params.countries = countries.value.join(",");
-  if (city.value) params.city = city.value;
-  if (district.value) params.district = district.value;
-  if (propertyType.value !== "any") params.propertyType = propertyType.value;
-  if (dealType.value !== "any") params.dealType = dealType.value;
-  if (agency.value !== "any") params.agency = agency.value;
-  if (priceMin.value != null) params.priceMin = String(priceMin.value);
-  if (priceMax.value != null) params.priceMax = String(priceMax.value);
-  // The min/max are entered in the display currency; tell the backend so it can
-  // compare across listings priced in other currencies (USD-normalized).
-  if (priceMin.value != null || priceMax.value != null) params.priceCurrency = displayCurrency.value;
-  if (roomsMin.value != null) params.roomsMin = String(roomsMin.value);
-  if (query.value.trim()) params.query = query.value.trim();
-  params.sources = source.value || SOURCES.join(",");
 
-  const { data, error } = await safeFetch<FeedResult>("/flats-feed", { params });
+  const offset = append
+      ? listings.value.length
+      : 0;
+
+  const params: Record<string, string> = {
+    limit: String(PAGE_SIZE),
+    offset: String(offset),
+  };
+
+  if (countries.value.length) {
+    params.countries =
+        countries.value.join(",");
+  }
+
+  if (city.value) {
+    params.city = city.value;
+  }
+
+  if (district.value) {
+    params.district = district.value;
+  }
+
+  if (propertyType.value !== "any") {
+    params.propertyType =
+        propertyType.value;
+  }
+
+  if (dealType.value !== "any") {
+    params.dealType =
+        dealType.value;
+  }
+
+  if (agency.value !== "any") {
+    params.agency =
+        agency.value;
+  }
+
+  if (priceMin.value != null) {
+    params.priceMin =
+        String(priceMin.value);
+  }
+
+  if (priceMax.value != null) {
+    params.priceMax =
+        String(priceMax.value);
+  }
+
+  if (
+      priceMin.value != null ||
+      priceMax.value != null
+  ) {
+    params.priceCurrency =
+        displayCurrency.value;
+  }
+
+  if (roomsMin.value != null) {
+    params.roomsMin =
+        String(roomsMin.value);
+  }
+
+  if (query.value.trim()) {
+    params.query =
+        query.value.trim();
+  }
+
+  params.sources =
+      source.value ||
+      SOURCES.join(",");
+
+  const { data, error } =
+      await safeFetch<FeedResult>(
+          "/flats-feed",
+          {
+            params,
+          },
+      );
+
+  // Пока запрос выполнялся, пользователь
+  // мог поменять фильтры.
   if (seq !== loadSeq) {
-    if (append) loadingMore.value = false;
+    if (!background) {
+      if (append) {
+        loadingMore.value = false;
+      } else {
+        loading.value = false;
+      }
+    }
+
     return;
   }
-  if (error || !data || data.error) {
+
+  if (
+      error ||
+      !data ||
+      data.error
+  ) {
     if (!background) {
       failed.value = true;
+
       if (!append) {
         listings.value = [];
         total.value = 0;
       }
+
       sourceErrors.value = [];
     }
   } else {
-    const next = data.listings || [];
-    listings.value = append
-      ? [...new Map([...listings.value, ...next].map((item) => [item.id, item])).values()]
-      : next;
-    total.value = data.count ?? listings.value.length;
-    sourceErrors.value = data.sourceErrors || [];
-    warming.value = !!data.warming;
+    const next =
+        Array.isArray(data.listings)
+            ? data.listings
+            : [];
+
+    if (append) {
+      const merged = [
+        ...listings.value,
+        ...next,
+      ];
+
+      // Один OLX/Telegram id теоретически
+      // может совпасть, поэтому ключ включает source/country.
+      listings.value = [
+        ...new Map(
+            merged.map((item) => [
+              `${item.source}:${item.country}:${item.id}`,
+              item,
+            ]),
+        ).values(),
+      ];
+    } else {
+      listings.value = next;
+    }
+
+    total.value =
+        data.count ??
+        listings.value.length;
+
+    sourceErrors.value =
+        data.sourceErrors || [];
+
+    warming.value =
+        !!data.warming;
   }
+
   if (!background) {
     loading.value = false;
     loadingMore.value = false;
   }
-  if (!append && !background) void syncQueryParams();
+
+  if (
+      !append &&
+      !background
+  ) {
+    void syncQueryParams();
+  }
+
   scheduleWarmPoll();
 }
 
