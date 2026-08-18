@@ -1,3 +1,5 @@
+import { canonicalMetroValue } from '../utils/tashkentMetroLabels'
+
 // GET /flats-feed — server-side proxy to the flat-finder backend's /api/listings.
 // The flat API is plain HTTP and the site is HTTPS, so a direct browser call is
 // blocked as mixed content; proxying here keeps it same-origin + HTTPS. Lives
@@ -9,10 +11,6 @@ const FEED_STALE_MS = 60 * 60_000
 const feedCache = new Map<string, { at: number; data: any }>()
 const feedRefreshes = new Map<string, Promise<any>>()
 
-// Telegram listing photos come back as paths relative to the flat backend
-// (/api/tg-photo/<channel>/<id>); rewrite them through our own /flats-photo proxy
-// so the browser loads them over HTTPS same-origin. OLX photos are absolute https
-// URLs and pass through untouched.
 function rewritePhoto(p: unknown): unknown {
   return typeof p === 'string' && p.startsWith('/api/tg-photo/')
     ? `/flats-photo?path=${encodeURIComponent(p)}`
@@ -43,9 +41,6 @@ function refreshFeed(key: string, url: string): Promise<any> {
   if (current) return current
   const request = $fetch<any>(url, { timeout: 15_000 })
     .then((data) => {
-      // A cold backend returns immediately with `warming: true`. Keep that
-      // response only as stale so the client's next poll reaches upstream
-      // instead of replaying an empty snapshot for the normal 30-second TTL.
       const at = data?.warming ? Date.now() - FEED_FRESH_MS : Date.now()
       feedCache.set(key, { at, data })
       return data
@@ -62,10 +57,10 @@ export default defineEventHandler(async (event) => {
     .map((source) => source.trim().toLowerCase())
     .filter((source) => source === 'olx' || source === 'telegram')
 
-  // The flat backend keeps one complete warmed snapshot per country and applies
-  // all UI filters after the cache read. Forward filters so they are evaluated
-  // in memory before backend pagination, never by launching another scrape.
   const upstreamParams = new URLSearchParams(incoming.searchParams)
+  const metro = upstreamParams.get('metro')
+  if (metro) upstreamParams.set('metro', canonicalMetroValue(metro))
+
   const url = `${FLAT_API_URL}/api/listings?${upstreamParams}`
   const key = upstreamParams.toString()
   const requestedOffset = Math.max(0, Number(upstreamParams.get('offset')) || 0)
@@ -82,10 +77,6 @@ export default defineEventHandler(async (event) => {
       return enforcePage(shaped)
     }
 
-    // Compatibility for the pre-fix backend during staggered deployment: its
-    // source-specific cache can degrade to demo rows while the combined cache
-    // still has the real source. Reuse that warm combined snapshot only when
-    // the selected source explicitly reported zero live rows.
     const combinedParams = new URLSearchParams(upstreamParams)
     combinedParams.delete('sources')
     const combinedKey = `combined:${combinedParams}`
