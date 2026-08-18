@@ -10,16 +10,17 @@
 import {
   ALL_SOURCES,
   EMPLOYMENT_KINDS,
-  FREE_SOURCES,
   type EmploymentKind,
+  FREE_SOURCES,
   type JobSource,
   type Relocation,
   type SortKey,
   type WorkMode,
 } from '../utils/jobTypes'
-import { filterAndPaginate } from '../utils/aggregate'
-import { getJobRefreshState, getStoredJobs, refreshJobStore } from '../utils/jobsStore'
-import { getRates, loadRates } from '../utils/currency'
+import {filterAndPaginate} from '../utils/aggregate'
+import {getJobRefreshState, getStoredJobs, refreshJobStore} from '../utils/jobsStore'
+import {getRates, loadRates} from '../utils/currency'
+import {jobSearchKey, searchJobMatches,} from '../utils/jobsElastic'
 
 // Optional sources are only queried when configured, to avoid wasted calls.
 function isConfigured(source: JobSource): boolean {
@@ -154,7 +155,48 @@ export default defineEventHandler(async (event) => {
   // Redis is normally local and fast, but a broken container/network must not
   // turn this endpoint into another gateway timeout. Continue with an empty
   // snapshot after a short budget; getStoredJobs handles its own late failure.
-  const pool = await getStoredSnapshot()
+  const pool = await getStoredSnapshot();
+  let searchMatches:
+      Awaited<
+          ReturnType<
+              typeof searchJobMatches
+          >
+      > = null
+
+  if (search) {
+    try {
+      searchMatches =
+          await searchJobMatches(
+              search,
+          )
+    } catch (err) {
+      /*
+       * ES недоступен —
+       * /jobs продолжает работать
+       * через старый includes().
+       */
+      console.warn(
+          '[jobs:elasticsearch] search fallback:',
+          (err as Error).message,
+      )
+
+      searchMatches = null
+    }
+  }
+
+  const searchPool =
+      searchMatches
+          ? pool.filter(
+              (job) =>
+                  searchMatches!
+                      .rank
+                      .has(
+                          jobSearchKey(
+                              job,
+                          ),
+                      ),
+          )
+          : pool;
   if (!pool.length && finalSources.length) {
     refreshJobStore().catch(() => {})
   }
@@ -163,8 +205,15 @@ export default defineEventHandler(async (event) => {
   setResponseHeader(event, 'Cache-Control', refresh.inProgress ? 'no-store' : 'private, max-age=30')
 
   return {
-    ...filterAndPaginate(pool, {
-      q: search,
+    ...filterAndPaginate(searchPool, {
+      /*
+       * ES уже выполнил text search.
+       *
+       * Если ES недоступен —
+       * передаём исходный q и остаётся
+       * старый String.includes fallback.
+       */
+      q: searchMatches ? '' : search,
       location: String(q.location ?? '').trim(),
       remote,
       sources: finalSources,

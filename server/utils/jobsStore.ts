@@ -6,7 +6,9 @@
 // Retention: a posting is kept while it is < 14 days old AND was seen in the last
 // STALE_DAYS refreshes (so a vacancy that disappears from its source — i.e. was
 // closed — ages out, while a source failing for a day or two doesn't wipe data).
-
+import {
+  syncJobsSearchIndex,
+} from './jobsElastic'
 import { useRedis } from '~~/server/utils/redis'
 import { ALL_SOURCES, type Job, type JobSource } from './jobTypes'
 import { refreshRates } from './currency'
@@ -520,7 +522,27 @@ async function performJobStoreRefresh(): Promise<RefreshSummary> {
     }
   }))
 
-  const kept = publishMemoryStore(byKey, now)
+  const kept = publishMemoryStore(byKey, now);
+
+  /*
+ * Redis остаётся source of truth.
+ *
+ * Elasticsearch — только производный
+ * поисковый индекс.
+ *
+ * Ошибка ES никогда не должна ломать
+ * обновление вакансий.
+ */
+  try {
+    await syncJobsSearchIndex(
+        kept,
+    )
+  } catch (err) {
+    console.error(
+        '[jobs:elasticsearch] sync failed:',
+        (err as Error).message,
+    )
+  }
 
   // The current in-memory result is complete now. Redis persistence below is
   // best-effort and must not keep clients polling a finished vacancy refresh.

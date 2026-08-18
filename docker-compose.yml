@@ -26,6 +26,8 @@ services:
     environment:
       REDIS_URL: redis://redis:6379
       AI_WORKER_URL: http://ai-worker:4030
+      ELASTICSEARCH_URL: http://flat-finder-elasticsearch:9200
+      JOBS_ELASTICSEARCH_INDEX: job-listings-v1
     depends_on:
       backend:
         condition: service_healthy
