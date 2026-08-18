@@ -1345,6 +1345,12 @@ watch(city, () => {
     },
 );
 
+watch(countries, () => {
+      district.value = "";
+      city.value = "";
+    },
+);
+
 onBeforeUnmount(() => {
   window.removeEventListener("keydown", onLightboxKeydown);
   if (loadTimer) clearTimeout(loadTimer);
