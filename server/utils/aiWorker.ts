@@ -27,9 +27,15 @@ type SubmitResponse<T> = AiExtractionResult<T> & {
   key?: string
 }
 
+type AiWorkerRequestError = Error & { status?: number }
+
 const workerUrl = (process.env.AI_WORKER_URL || '').replace(/\/$/, '')
 const workerKey = process.env.AI_WORKER_KEY || ''
-const requestTimeoutMs = Math.max(500, Number(process.env.AI_WORKER_REQUEST_TIMEOUT_MS) || 3_000)
+// Translation is interactive and a single 3s control-plane timeout used to make
+// the browser abandon an otherwise healthy BullMQ/Ollama job. Keep at least 10s
+// even when an older production .env still contains AI_WORKER_REQUEST_TIMEOUT_MS=3000.
+const requestTimeoutMs = Math.max(10_000, Number(process.env.AI_WORKER_REQUEST_TIMEOUT_MS) || 0)
+const proxyRequestRetries = Math.max(0, Number(process.env.AI_WORKER_PROXY_RETRIES) || 1)
 const pollIntervalMs = Math.max(1_000, Number(process.env.AI_WORKER_POLL_MS) || 5_000)
 const maxQueued = Math.max(1, Number(process.env.AI_WORKER_MAX_PENDING) || 60)
 const submitConcurrency = Math.max(1, Number(process.env.AI_WORKER_SUBMIT_CONCURRENCY) || 4)
@@ -45,6 +51,10 @@ function warn(message: string) {
   if (Date.now() - lastWarningAt < 60_000) return
   lastWarningAt = Date.now()
   console.warn(`[ai-worker] ${message}`)
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms))
 }
 
 function stable(value: unknown): string {
@@ -69,6 +79,16 @@ export function aiWorkerEnabled(): boolean {
   return Boolean(workerUrl)
 }
 
+export function isAiWorkerTransientError(error: unknown): boolean {
+  const requestError = error as AiWorkerRequestError
+  if (typeof requestError?.status === 'number') {
+    return requestError.status === 408 || requestError.status === 429 || requestError.status >= 500
+  }
+  return requestError?.name === 'TimeoutError'
+    || requestError?.name === 'AbortError'
+    || requestError?.name === 'TypeError'
+}
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const headers = new Headers(init?.headers)
   headers.set('accept', 'application/json')
@@ -80,15 +100,31 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     headers,
     signal: AbortSignal.timeout(requestTimeoutMs),
   })
-  if (!response.ok) throw new Error(`HTTP ${response.status}`)
+  if (!response.ok) {
+    const error = new Error(`HTTP ${response.status}`) as AiWorkerRequestError
+    error.status = response.status
+    throw error
+  }
   return await response.json() as T
 }
 
 // Server routes may proxy an on-demand job without exposing the private worker
-// URL or X-AI-Key to the browser.
-export function requestAiWorker<T>(path: string, init?: RequestInit): Promise<T> {
+// URL or X-AI-Key to the browser. Interactive proxy calls get one quick retry on
+// transport/5xx failures; background enrichment keeps its existing queue logic.
+export async function requestAiWorker<T>(path: string, init?: RequestInit): Promise<T> {
   if (!workerUrl) throw new Error('AI worker is not configured')
-  return request<T>(path, init)
+
+  let lastError: unknown
+  for (let attempt = 0; attempt <= proxyRequestRetries; attempt += 1) {
+    try {
+      return await request<T>(path, init)
+    } catch (error) {
+      lastError = error
+      if (!isAiWorkerTransientError(error) || attempt >= proxyRequestRetries) throw error
+      await sleep(250 * (attempt + 1))
+    }
+  }
+  throw lastError
 }
 
 async function finish<T>(task: AiTask<T>, result: AiExtractionResult<T>) {
