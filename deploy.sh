@@ -20,12 +20,17 @@ target="${1:-all}"
 
 case "$target" in
   all)
+    # Frontend is pre-built in GitHub Actions and published to GHCR.
+    # Pull it first, then rebuild only services that still have a local build context.
+    "${compose[@]}" pull frontend
     "${compose[@]}" up -d --build
     ;;
-  frontend|backend)
-    # Retain compatibility with the old two-workflow deploy commands while the
-    # server is migrated. Compose recreates dependencies only when necessary.
-    "${compose[@]}" up -d --build "$target"
+  frontend)
+    "${compose[@]}" pull frontend
+    "${compose[@]}" up -d frontend
+    ;;
+  backend)
+    "${compose[@]}" up -d --build backend
     ;;
   *)
     echo "Usage: $0 [all|frontend|backend]" >&2
