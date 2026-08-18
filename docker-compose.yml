@@ -17,6 +17,8 @@ services:
       start_period: 20s
 
   frontend:
+    build:
+      context: .
     image: ghcr.io/amonemisa/personal-site:latest
     restart: unless-stopped
     env_file:
@@ -26,6 +28,7 @@ services:
       AI_WORKER_URL: http://ai-worker:4030
       ELASTICSEARCH_URL: http://flat-finder-elasticsearch:9200
       JOBS_ELASTICSEARCH_INDEX: job-listings-v1
+      QUEUE_INTERNAL_KEY: ${QUEUE_INTERNAL_KEY:-}
     depends_on:
       backend:
         condition: service_healthy
@@ -42,6 +45,59 @@ services:
       timeout: 5s
       retries: 3
       start_period: 30s
+
+  jobs-queue-dispatcher:
+    build:
+      context: ./jobs-queue-worker
+    restart: unless-stopped
+    environment:
+      QUEUE_MODE: dispatcher
+      RABBITMQ_URL: amqp://${RABBITMQ_USER:-crawler}:${RABBITMQ_PASSWORD:-crawler}@flat-finder-rabbitmq:5672/%2F
+      JOBS_FRONTEND_URL: http://frontend:3000
+      QUEUE_INTERNAL_KEY: ${QUEUE_INTERNAL_KEY:-}
+      QUEUE_REFRESH_SECONDS: ${JOBS_QUEUE_REFRESH_SECONDS:-1800}
+    networks:
+      - default
+      - ai-net
+    depends_on:
+      frontend:
+        condition: service_healthy
+
+  jobs-queue-worker-1:
+    build:
+      context: ./jobs-queue-worker
+    restart: unless-stopped
+    environment:
+      QUEUE_MODE: worker
+      RABBITMQ_URL: amqp://${RABBITMQ_USER:-crawler}:${RABBITMQ_PASSWORD:-crawler}@flat-finder-rabbitmq:5672/%2F
+      JOBS_FRONTEND_URL: http://frontend:3000
+      QUEUE_INTERNAL_KEY: ${QUEUE_INTERNAL_KEY:-}
+      QUEUE_PREFETCH: ${JOBS_QUEUE_PREFETCH:-1}
+      QUEUE_MAX_ATTEMPTS: ${JOBS_QUEUE_MAX_ATTEMPTS:-5}
+    networks:
+      - default
+      - ai-net
+    depends_on:
+      frontend:
+        condition: service_healthy
+
+  jobs-queue-worker-2:
+    build:
+      context: ./jobs-queue-worker
+    restart: unless-stopped
+    environment:
+      QUEUE_MODE: worker
+      RABBITMQ_URL: amqp://${RABBITMQ_USER:-crawler}:${RABBITMQ_PASSWORD:-crawler}@flat-finder-rabbitmq:5672/%2F
+      JOBS_FRONTEND_URL: http://frontend:3000
+      QUEUE_INTERNAL_KEY: ${QUEUE_INTERNAL_KEY:-}
+      QUEUE_PREFETCH: ${JOBS_QUEUE_PREFETCH:-1}
+      QUEUE_MAX_ATTEMPTS: ${JOBS_QUEUE_MAX_ATTEMPTS:-5}
+    networks:
+      - default
+      - ai-net
+    depends_on:
+      frontend:
+        condition: service_healthy
 
   redis:
     image: redis:8.4.0
