@@ -1340,6 +1340,11 @@ watch(modalOpen, (open) => {
   translatingDescription.value = false;
 });
 
+watch(city, () => {
+      district.value = "";
+    },
+);
+
 onBeforeUnmount(() => {
   window.removeEventListener("keydown", onLightboxKeydown);
   if (loadTimer) clearTimeout(loadTimer);
