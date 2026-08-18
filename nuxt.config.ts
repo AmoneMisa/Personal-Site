@@ -50,14 +50,14 @@ export default defineNuxtConfig({
         fallback: 'dark',
     },
     sourcemap: {
-        client: true,
+        client: false,
         server: true
     },
     vite: {
         build: {
-            sourcemap: true,
-            minify: 'esbuild',
-            cssMinify: 'lightningcss'
+            sourcemap: false,
+            cssMinify: 'lightningcss',
+            reportCompressedSize: false
         },
         plugins: [svgLoader()], optimizeDeps: {
             exclude: ["monaco-editor"],
