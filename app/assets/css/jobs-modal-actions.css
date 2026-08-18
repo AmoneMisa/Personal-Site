@@ -1,0 +1,40 @@
+/* Vacancy modal footer actions.
+ * Scope by the apply link so other Nuxt UI modal footers are untouched. */
+:where(div, footer):has(> .job-modal__apply) {
+    display: grid !important;
+    grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+    gap: 8px !important;
+    width: 100%;
+    align-items: stretch !important;
+}
+
+:where(div, footer):has(> .job-modal__apply) > * {
+    box-sizing: border-box;
+    width: 100%;
+    min-width: 0;
+    height: 44px !important;
+    min-height: 44px;
+    justify-content: center;
+    text-align: center;
+    white-space: nowrap;
+}
+
+:where(div, footer):has(> .job-modal__apply) > .job-modal__apply,
+:where(div, footer):has(> .job-modal__apply) > .job-modal__source {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    text-decoration: none;
+}
+
+@media (max-width: 680px) {
+    :where(div, footer):has(> .job-modal__apply) {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
+@media (max-width: 420px) {
+    :where(div, footer):has(> .job-modal__apply) {
+        grid-template-columns: 1fr;
+    }
+}
