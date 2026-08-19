@@ -32,6 +32,9 @@ interface Job {
   workMode?: "remote" | "hybrid" | "office" | "unknown";
   relocation?: "offered" | "none" | "unknown";
   foreignerFriendly?: boolean;
+  suspicious?: boolean;
+  suspicionReasons?: string[];
+  riskCategory?: "gambling" | "adult" | "scam" | null;
   noExperience?: boolean;
   languages?: LanguageReq[];
   skills?: string[];
@@ -206,6 +209,9 @@ const employmentKind = ref("");
 const hasSalary = ref(false);
 const maxExperience = ref<number | undefined>(undefined);
 const foreignerOnly = ref(false);
+// Hide gambling / adult / earnings-bait postings. Default ON; unchecking sends
+// hideRiskyIndustries=false so the backend stops filtering them out.
+const hideRisky = ref(true);
 const noExperience = ref(false);
 const language = ref("");
 const languageLevel = ref("");
@@ -489,6 +495,7 @@ async function load(
   if (hasSalary.value) params.hasSalary = "true";
   if (maxExperience.value != null) params.maxExperienceYears = String(maxExperience.value);
   if (foreignerOnly.value) params.foreignerFriendly = "true";
+  if (!hideRisky.value) params.hideRiskyIndustries = "false";
   if (noExperience.value) params.noExperience = "true";
   if (language.value) params.language = language.value;
   if (languageLevel.value) params.languageLevel = languageLevel.value;
@@ -537,7 +544,7 @@ function resetFilters() {
   countries.value = []; cities.value = ""; includeRu.value = false; includeBy.value = false;
   workMode.value = ""; relocation.value = "";
   employmentKind.value = ""; hasSalary.value = false; maxExperience.value = undefined;
-  foreignerOnly.value = false; noExperience.value = false; language.value = ""; languageLevel.value = "";
+  foreignerOnly.value = false; hideRisky.value = true; noExperience.value = false; language.value = ""; languageLevel.value = "";
   excludeLanguages.value = []; skills.value = "";
   scheduleLoad(100);
 }
@@ -707,6 +714,12 @@ function money(annualUsd: number): string {
   return formatAmount(v, cur);
 }
 
+// Tooltip for the Suspicious badge: spell out WHY, so the warning is auditable
+// rather than an opaque label. Unknown reason codes fall back to their key.
+function suspicionHint(job: Job): string {
+  const reasons = (job.suspicionReasons || []).map((r) => t(`susp_${r.replace(/-/g, "_")}`));
+  return reasons.length ? `${t("suspiciousWhy")}: ${reasons.join("; ")}` : t("suspiciousWhy");
+}
 function timeAgo(iso: string): string {
   const days = Math.floor((Date.now() - new Date(iso).getTime()) / 86_400_000);
   if (days <= 0) return t("today");
@@ -1078,6 +1091,10 @@ onBeforeUnmount(() => {
           <u-switch v-model="foreignerOnly" @update:model-value="scheduleLoad()" />
           <span>{{ t("foreigner") }}</span>
         </label>
+        <label class="jobs__remote jobs__field_inline" :title="t('hideRiskyHint')">
+          <u-switch v-model="hideRisky" @update:model-value="scheduleLoad()" />
+          <span>{{ t("hideRisky") }}</span>
+        </label>
         <label class="jobs__remote jobs__field_inline">
           <u-switch v-model="noExperience" @update:model-value="scheduleLoad()" />
           <span>{{ t("noExperience") }}</span>
@@ -1248,6 +1265,7 @@ onBeforeUnmount(() => {
           <span v-if="job.managementRole" class="job-card__badge job-card__badge_management">{{ t("management") }}</span>
           <span v-if="job.experienceMinYears !== undefined && job.experienceMinYears > 0" class="job-card__badge job-card__badge_exp">{{ t("experienceYears", { n: job.experienceMinYears }) }}</span>
           <span v-if="job.foreignerFriendly" class="job-card__badge job-card__badge_visa">{{ t("cardForeigner") }}</span>
+          <span v-if="job.suspicious" class="job-card__badge job-card__badge_suspicious" :title="suspicionHint(job)">⚠ {{ t("suspicious") }}</span>
           <span v-if="job.relocation === 'offered'" class="job-card__badge job-card__badge_reloc">{{ t("cardReloc") }}</span>
           <span v-if="formatSalary(job)" class="job-card__badge job-card__badge_salary">{{ t("salaryDisclosed") }}</span>
           <span v-if="job.salaryNegotiable" class="job-card__badge job-card__badge_salary">{{ t("salaryNegotiable") }}</span>
@@ -1328,6 +1346,7 @@ onBeforeUnmount(() => {
             <span v-if="isToday(activeJob.postedAt)" class="job-card__badge job-card__badge_new">{{ t("newToday") }}</span>
             <span v-if="activeJob.experienceMinYears !== undefined && activeJob.experienceMinYears > 0" class="job-card__badge job-card__badge_exp">{{ t("experienceYears", { n: activeJob.experienceMinYears }) }}</span>
             <span v-if="activeJob.foreignerFriendly" class="job-card__badge job-card__badge_visa">{{ t("cardForeigner") }}</span>
+            <span v-if="activeJob.suspicious" class="job-card__badge job-card__badge_suspicious" :title="suspicionHint(activeJob)">⚠ {{ t("suspicious") }}</span>
             <span v-if="activeJob.relocation === 'offered'" class="job-card__badge job-card__badge_reloc">{{ t("cardReloc") }}</span>
             <span v-if="formatSalary(activeJob)" class="job-card__badge job-card__badge_salary">{{ t("salaryDisclosed") }}</span>
             <span v-if="activeJob.salaryNegotiable" class="job-card__badge job-card__badge_salary">{{ t("salaryNegotiable") }}</span>
@@ -1565,6 +1584,7 @@ onBeforeUnmount(() => {
 .job-card__badge { flex: 0 0 auto; white-space: nowrap; border-radius: 6px; padding: 1px 7px; font-size: 11px; color: #34d399; background: rgba(52,211,153,0.14); }
 .job-card__badge_mode { color: #38bdf8; background: rgba(56,189,248,0.14); }
 .job-card__badge_visa { color: #fbbf24; background: rgba(251,191,36,0.14); }
+.job-card__badge_suspicious { color: #f87171; background: rgba(248,113,113,0.14); border-color: rgba(248,113,113,0.35); cursor: help; }
 .job-card__badge_reloc { color: #f472b6; background: rgba(244,114,182,0.14); }
 .job-card__badge_source { color: #c4b5fd; background: rgba(167,139,250,0.14); }
 .job-card__badge_new { color: #6ee7b7; background: rgba(52,211,153,0.14); }

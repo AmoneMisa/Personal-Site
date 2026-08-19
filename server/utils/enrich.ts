@@ -3,6 +3,7 @@
 // from title + description + tags (EN/RU/UK/UZ keywords). Results are approximate
 // and meant to power filtering and statistics, not to be authoritative.
 
+import { classifySuspicion } from './suspicious'
 import type {
   EmployerType,
   EmploymentKind,
@@ -591,6 +592,15 @@ export function enrichJob(job: Job): Job {
   const salaryPeriod = hasSalary
     ? job.salaryPeriod ?? extractedSalary.salaryPeriod ?? detectSalaryPeriod(clean, text)
     : undefined
+  // Hard-blocked industry + "this posting never says what you'd do" warning.
+  const suspicion = classifySuspicion({
+    title,
+    company: clean.company,
+    description,
+    salaryMin: clean.salaryMin,
+    salaryMax: clean.salaryMax,
+    salaryCurrency: clean.salaryCurrency,
+  })
   return {
     ...clean,
     country,
@@ -620,5 +630,6 @@ export function enrichJob(job: Job): Job {
     applicationLanguage: detectApplicationLanguage(text),
     salaryPeriod,
     salaryUsd: salaryPeriod ? salaryUsd(clean, salaryPeriod) : undefined,
+    ...suspicion,
   }
 }

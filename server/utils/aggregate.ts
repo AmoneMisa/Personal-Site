@@ -132,6 +132,9 @@ function matches(job: Job, query: JobQuery, oldestAllowed: number): boolean {
   if (query.foreignerFriendly !== undefined && job.foreignerFriendly !== query.foreignerFriendly) {
     return false
   }
+  // Hidden by default: gambling / adult / earnings-bait postings. Only a hard
+  // riskCategory hides a vacancy — the softer `suspicious` flag is a badge only.
+  if (query.hideRiskyIndustries !== false && job.riskCategory) return false
   if (query.noExperience && !job.noExperience) return false
   if (query.language) {
     const langs = job.languages || []

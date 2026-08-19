@@ -54,6 +54,7 @@ interface Listing {
   audience?: "women" | "men" | "family" | null;
   deposit?: boolean | null;
   depositAmount?: number | null;
+  depositCurrency?: string | null;
   commission?: boolean | null;
   commissionPercent?: number | null;
   furnished?: boolean | null;
@@ -1165,7 +1166,9 @@ function floorLabel(l: Listing) {
   return l.floor != null || l.totalFloors != null ? String(l.floor ?? l.totalFloors) : t("nd");
 }
 function depositLabel(l: Listing) {
-  if (l.depositAmount != null) return `${l.depositAmount.toLocaleString()} ${l.currency}`;
+  // The deposit may be quoted in a different currency from the rent, so prefer
+  // the one parsed next to the deposit amount itself.
+  if (l.depositAmount != null) return `${l.depositAmount.toLocaleString()} ${l.depositCurrency || l.currency}`;
   return fmtBool(l.deposit);
 }
 function commissionLabel(l: Listing) {

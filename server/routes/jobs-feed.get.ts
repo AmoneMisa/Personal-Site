@@ -134,6 +134,8 @@ export default defineEventHandler(async (event) => {
   let foreignerFriendly: boolean | undefined
   if (q.foreignerFriendly === 'true') foreignerFriendly = true
   else if (q.foreignerFriendly === 'false') foreignerFriendly = false
+  // Default ON: only an explicit "false" shows gambling/adult/scam postings.
+  const hideRiskyIndustries = q.hideRiskyIndustries !== 'false'
   const noExperience = q.noExperience === 'true'
   const language = String(q.language ?? '').trim() || undefined
   const languageLevel = String(q.languageLevel ?? '').trim() || undefined
@@ -230,6 +232,7 @@ export default defineEventHandler(async (event) => {
       hasSalary,
       maxExperienceYears,
       foreignerFriendly,
+      hideRiskyIndustries,
       noExperience,
       language,
       languageLevel,

@@ -1,5 +1,8 @@
 // Shared job model + query types for the jobFinder aggregator.
 
+import type { RiskCategory } from './suspicious'
+export type { RiskCategory }
+
 export type WorkMode = 'remote' | 'hybrid' | 'office' | 'unknown'
 export type Relocation = 'offered' | 'none' | 'unknown'
 export type SalaryPeriod = 'hour' | 'month' | 'year'
@@ -71,6 +74,14 @@ export interface Job {
   tools?: string[]
   applicationLanguage?: string
   employerType?: EmployerType
+  // Hard-blocked industry (gambling / adult / scam). Hidden by default in the
+  // Job Finder; riskReasons records why, so the decision stays auditable.
+  riskCategory?: RiskCategory | null
+  riskReasons?: string[]
+  // Soft warning: the posting never makes clear what the work actually is.
+  // Shown as a badge only — it never removes the vacancy on its own.
+  suspicious?: boolean
+  suspicionReasons?: string[]
 }
 
 export type JobSource =
@@ -135,6 +146,9 @@ export interface JobQuery {
   hasSalary?: boolean // only vacancies that show a salary
   maxExperienceYears?: number // drop roles requiring MORE than this many years
   foreignerFriendly?: boolean
+  // Hide gambling / adult / scam-bait postings. Defaults to TRUE — the query
+  // parser opts out only on an explicit "false".
+  hideRiskyIndustries?: boolean
   noExperience?: boolean // only entry-level / no-experience-required roles
   language?: string // e.g. "english"
   languageLevel?: string // e.g. "b2"
