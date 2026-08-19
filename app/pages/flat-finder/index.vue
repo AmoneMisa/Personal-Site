@@ -877,11 +877,22 @@ onBeforeUnmount(() => { modalOpen.value = false; lightboxIndex.value = null; rel
 .flat-lightbox__nav_left { left: 16px; } .flat-lightbox__nav_right { right: 16px; } .flat-lightbox__close { top: 16px; right: 20px; width: 44px; height: 44px; font-size: 24px; }
 .flat-lightbox__counter { position: fixed; bottom: 18px; left: 50%; z-index: 1; transform: translateX(-50%); padding: 6px 10px; border: 1px solid #343a62; border-radius: 6px; background: #131730; color: var(--text-primary); font: 500 12px/1.2 "JetBrains Mono", monospace; pointer-events: auto; }
 .flat-modal__price { font-weight: 700; font-size: 20px; } .flat-modal__price-conv { font-weight: 500; font-size: 14px; color: var(--text-muted); } .flat-modal__deal { color: #e0679a; font-weight: 500; }
-.flat-modal__spec { width: 100%; border-collapse: collapse; font-size: 13px; margin: 4px 0 10px; } .flat-modal__spec tr { border-bottom: 1px solid var(--line); } .flat-modal__spec tr:last-child { border-bottom: none; } .flat-modal__spec th { text-align: left; font-weight: 600; padding: 6px 12px 6px 0; white-space: nowrap; color: var(--text-muted, inherit); opacity: 0.75; width: 44%; vertical-align: top; } .flat-modal__spec td { padding: 6px 0; vertical-align: top; }
-.flat-modal__hide-empty { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text-muted, inherit); cursor: pointer; margin: 2px 0 6px; user-select: none; }
+/* The modal body is a flex column with its own gap, so this table must not add
+   margins of its own — stacked margins were what made the spacing between blocks
+   uneven. The label column shrinks to its widest label (width:1% + nowrap)
+   instead of a fixed 44%, which removes the large empty stripe between label and
+   value; on narrow screens it wraps and takes a share of the width instead. */
+.flat-modal__spec { width: 100%; border-collapse: collapse; font-size: 13px; margin: 0; }
+.flat-modal__spec tr { border-bottom: 1px solid var(--line); }
+.flat-modal__spec tr:last-child { border-bottom: none; }
+.flat-modal__spec th { width: 1%; white-space: nowrap; text-align: left; font-weight: 600; padding: 7px 24px 7px 0; color: var(--text-muted, inherit); opacity: 0.75; vertical-align: top; }
+.flat-modal__spec td { padding: 7px 0; vertical-align: top; overflow-wrap: anywhere; }
+@media (max-width: 640px) { .flat-modal__spec th { white-space: normal; width: 42%; padding-right: 12px; } }
+/* No own margins on flex children: .flat-modal already spaces them with gap. */
+.flat-modal__hide-empty { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text-muted, inherit); cursor: pointer; margin: 0; align-self: flex-start; user-select: none; }
 .flat-modal__translation { display: flex; align-items: center; gap: 10px; margin-top: 14px; } .flat-modal__translation-error { color: #f29ab6; font-size: 12px; }
-.flat-modal__translated { margin-top: 12px; padding: 12px; border: 1px solid var(--line, #252a4a); border-radius: var(--radius, 10px); background: var(--bg-panel-2, #171c3a); } .flat-modal__translated-title { margin: 0 0 8px; color: var(--text-primary, #e4e5f0); font-size: 13px; font-weight: 600; }
-.flat-modal__descbox { margin-top: 6px; } .flat-modal__descbox summary { cursor: pointer; font-size: 12px; font-weight: 600; opacity: 0.7; user-select: none; } .flat-modal__desc { font-size: 13.5px; line-height: 1.55; white-space: pre-wrap; color: var(--text-soft, inherit); margin-top: 8px; }
+.flat-modal__translated { margin-top: 0; padding: 12px; border: 1px solid var(--line, #252a4a); border-radius: var(--radius, 10px); background: var(--bg-panel-2, #171c3a); } .flat-modal__translated-title { margin: 0 0 8px; color: var(--text-primary, #e4e5f0); font-size: 13px; font-weight: 600; }
+.flat-modal__descbox { margin-top: 0; } .flat-modal__descbox summary { cursor: pointer; font-size: 12px; font-weight: 600; opacity: 0.7; user-select: none; } .flat-modal__desc { font-size: 13.5px; line-height: 1.55; white-space: pre-wrap; color: var(--text-soft, inherit); margin-top: 8px; }
 .flat-modal__tags { display: flex; flex-wrap: wrap; gap: 6px; } .flat-modal__tag { font-size: 11px; padding: 2px 8px; border-radius: 6px; border: 1px solid var(--line); color: var(--ui-text-muted); }
 .flat-modal__footer-actions { width: 100%; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; } .flat-modal__footer-button { width: 100%; min-height: 44px; height: auto; padding: 8px 11px; justify-content: center; text-align: center; white-space: normal; line-height: 1.25; }
 .flat-modal__footer-button_primary { display: inline-flex; align-items: center; border: 1px solid var(--accent-pink, #e0679a); border-radius: 8px; background: var(--accent-pink, #e0679a); color: #1a0e14; font-weight: 600; font-size: 13.5px; }
