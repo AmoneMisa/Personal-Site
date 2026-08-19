@@ -1,5 +1,5 @@
-@import "tailwindcss";
-@import "@nuxt/ui";
+@import "./ui.css";
+@import "./utilities.css";
 @import "./redesign-fonts.css";
 @import "./tabs.css";
 @import "./jsonEditor.scss";
@@ -85,7 +85,9 @@ h1, h2, h3, h4, h5, h6 {
     }
 }
 
-@theme {
+/* Former Tailwind @theme block: these are plain custom properties, so they
+   live on :root now that Tailwind is gone. */
+:root {
     --color-primary: #e0679a;
     --color-primary-alt: #35316f;
     --color-secondary: #CD99FF;

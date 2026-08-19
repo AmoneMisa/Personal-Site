@@ -41,10 +41,10 @@ export default defineNuxtConfig({
     },
     compatibilityDate: '2025-07-15',
     devtools: {enabled: true},
-    modules: ['@nuxt/ui', '@nuxtjs/i18n', '@nuxt/icon', '@nuxt/image'],
+    modules: ['@nuxtjs/i18n', '@nuxt/icon', '@nuxt/image'],
     css: ['~/assets/css/main.css', '~/assets/css/jobs-modal-actions.css'],
-    // The redesign is a dark-only theme. Force dark so Nuxt UI doesn't paint the
-    // app background white on light-mode devices (which washed out the page).
+    // The redesign is a dark-only theme. Kept for @nuxtjs/color-mode if present;
+    // with Nuxt UI removed the palette is pinned by our own CSS variables.
     colorMode: {
         preference: 'dark',
         fallback: 'dark',
