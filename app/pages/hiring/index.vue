@@ -671,18 +671,18 @@ onBeforeUnmount(() => {
         </div>
       </template>
       <template #footer>
-        <div v-if="active" class="hiring-modal__footer-actions">
-          <u-button class="hiring-modal__footer-button" variant="outline" color="neutral" icon="i-lucide-heart" @click="toggleFavorite(active)">
+        <UiModalFooter v-if="active" class="hiring-modal-footer">
+          <u-button variant="outline" color="neutral" icon="i-lucide-heart" @click="toggleFavorite(active)">
             {{ isFavorite(active.id) ? t("removeFavorite") : t("addFavorite") }}
           </u-button>
-          <u-button class="hiring-modal__footer-button" variant="outline" color="neutral" :icon="isHidden(active.id) ? 'i-lucide-eye' : 'i-lucide-eye-off'" @click="toggleHidden(active)">
+          <u-button variant="outline" color="neutral" :icon="isHidden(active.id) ? 'i-lucide-eye' : 'i-lucide-eye-off'" @click="toggleHidden(active)">
             {{ isHidden(active.id) ? t("restoreListing") : t("hideListing") }}
           </u-button>
-          <u-button class="hiring-modal__footer-button" variant="outline" color="neutral" :icon="shareCopied ? 'i-lucide-check' : 'i-lucide-share-2'" @click="shareCv(active)">
+          <u-button variant="outline" color="neutral" :icon="shareCopied ? 'i-lucide-check' : 'i-lucide-share-2'" @click="shareCv(active)">
             {{ shareCopied ? t("shareCopied") : t("share") }}
           </u-button>
-          <a class="hiring-modal__footer-button hiring-modal__footer-button_primary" :href="active.url" target="_blank" rel="noopener noreferrer">{{ t("open") }} →</a>
-        </div>
+          <a class="modal-footer__primary" :href="active.url" target="_blank" rel="noopener noreferrer">{{ t("open") }} →</a>
+        </UiModalFooter>
       </template>
     </u-modal>
 
@@ -806,20 +806,14 @@ onBeforeUnmount(() => {
 .hiring-modal__desc { font-size: 13.5px; line-height: 1.55; white-space: pre-wrap; color: var(--text-soft, inherit); margin-top: 8px; }
 .hiring-modal__tags { display: flex; flex-wrap: wrap; gap: 6px; }
 .hiring-modal__tag { font-size: 11px; padding: 2px 8px; border-radius: 6px; border: 1px solid var(--line); color: var(--ui-text-muted); }
-.hiring-modal__footer-actions { width: 100%; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
-.hiring-modal__footer-button {
-  width: 100%; min-height: 44px; height: auto; padding: 8px 11px; justify-content: center;
-  text-align: center; white-space: normal; line-height: 1.25;
-}
-.hiring-modal__footer-button_primary {
-  display: inline-flex; align-items: center; justify-content: center; border: 1px solid #7189d9; border-radius: 8px;
-  background: #7189d9; color: #101428; font-weight: 600; font-size: 13.5px; text-decoration: none;
-}
+/* Footer action layout now lives in components/ui/ModalFooter.vue, shared with
+   the flat and vacancy popups. */
+/* Only the accent differs from the other popups; the layout is shared. */
+.hiring-modal-footer { --modal-footer-accent: #7189d9; --modal-footer-accent-text: #101428; }
 .hiring-share__hint { margin: 0 0 12px; color: var(--text-muted); font-size: 13px; line-height: 1.5; }
 @media (max-width: 700px) {
   .hiring__controls { grid-template-columns: 1fr; }
   .hiring__controls > :deep(button) { width: 100%; }
   .hiring__views { padding-left: 0; border-left: 0; }
-  .hiring-modal__footer-actions { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 </style>

@@ -1369,6 +1369,7 @@ onBeforeUnmount(() => {
         </div>
       </template>
       <template #footer>
+        <UiModalFooter>
         <u-button
             v-if="activeJob"
             variant="outline"
@@ -1385,7 +1386,7 @@ onBeforeUnmount(() => {
         >{{ isHidden(activeJob.id) ? t("restoreVacancy") : t("hideVacancy") }}</u-button>
         <a
             v-if="activeJob"
-            class="job-modal__apply"
+            class="modal-footer__primary"
             :href="activeJob.applyUrl || activeJob.url"
             target="_blank"
             rel="noopener noreferrer"
@@ -1393,7 +1394,7 @@ onBeforeUnmount(() => {
         >{{ t("apply") }} →</a>
         <a
             v-if="activeJob?.applyUrl && activeJob.applyUrl !== activeJob.url"
-            class="job-modal__source"
+            class="modal-footer__secondary"
             :href="activeJob.url"
             target="_blank"
             rel="noopener noreferrer"
@@ -1405,6 +1406,7 @@ onBeforeUnmount(() => {
             :icon="shareCopied ? 'i-lucide-check' : 'i-lucide-share-2'"
             @click="shareActiveJob"
         >{{ shareCopied ? t("shareCopied") : t("share") }}</u-button>
+        </UiModalFooter>
       </template>
     </u-modal>
   </u-container>
@@ -1622,16 +1624,9 @@ onBeforeUnmount(() => {
   color: var(--text-soft, inherit); max-height: 52vh; overflow-y: auto;
 }
 .job-modal__tags { margin-top: 4px; }
-.job-modal__apply {
-  display: inline-flex; align-items: center; height: 36px; padding: 0 16px; border-radius: 8px;
-  background: var(--accent-pink, #e0679a); color: #1a0e14; font-weight: 600; font-size: 13.5px;
-}
-.job-modal__apply:hover { filter: brightness(1.06); }
-.job-modal__source {
-  display: inline-flex; align-items: center; height: 36px; padding: 0 14px; border-radius: 8px;
-  border: 1px solid var(--line); color: var(--text-white, inherit); font-weight: 600; font-size: 13px;
-}
-.job-modal__source:hover { border-color: rgba(224,103,154,0.45); color: var(--accent-pink, #e0679a); }
+/* The apply and source links now use the shared footer classes from
+   components/ui/ModalFooter.vue. Their old fixed 36px height was what the
+   global override stylesheet existed to undo. */
 .job-card_seen { opacity: 0.72; }
 .job-card_seen:hover { opacity: 1; }
 .job-card_favorite { border-color: rgba(224,103,154,0.48); }

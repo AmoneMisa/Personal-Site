@@ -42,7 +42,7 @@ export default defineNuxtConfig({
     compatibilityDate: '2025-07-15',
     devtools: {enabled: true},
     modules: ['@nuxtjs/i18n', '@nuxt/icon', '@nuxt/image'],
-    css: ['~/assets/css/main.css', '~/assets/css/jobs-modal-actions.css'],
+    css: ['~/assets/css/main.css'],
     // The redesign is a dark-only theme. Kept for @nuxtjs/color-mode if present;
     // with Nuxt UI removed the palette is pinned by our own CSS variables.
     colorMode: {
