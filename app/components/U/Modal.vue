@@ -185,9 +185,10 @@ onBeforeUnmount(() => {
   border-top: 1px solid var(--line);
 }
 
-/* Phones: use the full screen instead of a small floating card, and let the
-   footer actions span the width so they stay comfortably tappable. */
-@media (max-width: 640px) {
+/* Phones and narrow tablets: use the full width instead of a small floating
+   card with wide gutters, and let the footer actions span the width so they stay
+   comfortably tappable. */
+@media (max-width: 820px) {
   .u-modal { padding: 0; align-items: flex-end; }
   .u-modal__panel {
     max-width: none;

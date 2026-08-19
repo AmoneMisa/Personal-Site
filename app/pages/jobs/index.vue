@@ -1545,7 +1545,9 @@ onBeforeUnmount(() => {
 .job-card:hover { transform: translateY(-2px); border-color: rgba(224, 103, 154,0.40); }
 .job-card__head {
   display: grid; grid-template-columns: minmax(0, 1fr) auto;
-  align-items: start; column-gap: 10px; row-gap: 4px;
+  /* Centred, not start-aligned: the action buttons are taller than the title's
+     line box, so a shared top edge left the title text above the icon centres. */
+  align-items: center; column-gap: 10px; row-gap: 4px;
 }
 .job-card__actions {
   justify-self: end; display: flex; flex-wrap: wrap; justify-content: flex-end;

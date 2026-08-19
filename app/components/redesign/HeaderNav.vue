@@ -84,6 +84,28 @@ const mobileOpen = ref(false);
       <a class="site-header__mobile-link" :href="resolveHref('#profile-skills')" @click="mobileOpen = false">{{ nav.skills }}</a>
       <a class="site-header__mobile-link" :href="resolveHref('#experience')" @click="mobileOpen = false">{{ nav.experience }}</a>
       <a class="site-header__mobile-link" :href="resolveHref('#pet-projects')" @click="mobileOpen = false">{{ nav.petProjects }}</a>
+      <!-- The desktop dropdown's destinations (Flat Finder, quizzes, ...) were
+           unreachable on mobile: the panel only carried the top-level anchors. -->
+      <div class="site-header__mobile-group">
+        <h6 class="site-header__mobile-group-title mono">{{ nav.dropdown.petTitle }}</h6>
+        <a
+            v-for="it in nav.dropdown.pet"
+            :key="it.label"
+            class="site-header__mobile-sublink"
+            :href="resolveHref(it.href)"
+            @click="mobileOpen = false"
+        >{{ it.label }}</a>
+      </div>
+      <div class="site-header__mobile-group">
+        <h6 class="site-header__mobile-group-title mono">{{ nav.dropdown.pagesTitle }}</h6>
+        <a
+            v-for="it in nav.dropdown.pages"
+            :key="it.label"
+            class="site-header__mobile-sublink"
+            :href="resolveHref(it.href)"
+            @click="mobileOpen = false"
+        >{{ it.label }}</a>
+      </div>
       <a class="site-header__mobile-link" :href="resolveHref('#tools')" @click="mobileOpen = false">{{ nav.tools }}</a>
       <a class="site-header__mobile-link" :href="resolveHref('/cv')" @click="mobileOpen = false">{{ nav.cv }}</a>
       <a class="site-header__mobile-link site-header__mobile-link_highlight" :href="resolveHref('/about')" @click="mobileOpen = false">{{ nav.aboutMe }}</a>
@@ -274,6 +296,27 @@ const mobileOpen = ref(false);
 }
 .site-header__mobile-link_highlight {
   color: var(--accent-pink);
+}
+.site-header__mobile-group {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 6px 0 6px 12px;
+  border-left: 1px solid var(--line);
+  margin: 4px 0;
+}
+.site-header__mobile-group-title {
+  margin: 0 0 4px;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+  opacity: 0.75;
+}
+.site-header__mobile-sublink {
+  padding: 8px 0;
+  color: var(--text-soft);
+  font-size: 14px;
 }
 .site-header__mobile-actions {
   display: flex;
