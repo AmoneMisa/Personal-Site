@@ -141,7 +141,7 @@ onBeforeUnmount(() => {
      title sitting above the button's centre. */
   align-items: center;
   gap: 12px;
-  padding: 16px 16px 12px;
+  padding: 18px 20px 14px;
   border-bottom: 1px solid var(--line);
 }
 .u-modal__title { flex: 1 1 auto; margin: 0; font-size: 17px; font-weight: 700; line-height: 1.3; overflow-wrap: anywhere; }
@@ -176,44 +176,48 @@ onBeforeUnmount(() => {
      flick at the end of the list does not scroll the page behind the modal. */
   -webkit-overflow-scrolling: touch;
   overscroll-behavior: contain;
-  padding: 16px;
+  padding: 20px;
 }
 .u-modal__footer {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 8px;
-  padding: 12px 16px;
+  gap: 10px;
+  padding: 14px 20px;
   border-top: 1px solid var(--line);
 }
 
-/* Phones and narrow tablets: use the full width instead of a small floating
-   card with wide gutters, and let the footer actions span the width so they stay
-   comfortably tappable. */
+/* Phones and narrow tablets: keep a clear gutter between the screen edge and
+   the dialog rather than running it edge to edge, and leave room top and bottom
+   (including the safe-area inset) so it never touches the screen edges. */
 @media (max-width: 820px) {
-  .u-modal { padding: 0; align-items: flex-end; }
+  .u-modal {
+    padding: 16px;
+    padding-bottom: calc(16px + env(safe-area-inset-bottom));
+    align-items: center;
+  }
   .u-modal__panel {
     max-width: none;
-    max-height: 95dvh;
-    border-radius: var(--radius, 10px) var(--radius, 10px) 0 0;
-    border-bottom: 0;
+    max-height: calc(100dvh - 32px - env(safe-area-inset-bottom));
+    border-radius: var(--radius, 10px);
   }
-  .u-modal__header { padding: 12px 14px 10px; }
-  .u-modal__body { padding: 14px; }
-  /* Even two-column grid instead of stretched flex items: four actions used to
-     wrap into ragged rows of different heights and ate most of the sheet,
-     leaving very little room for the content above them. */
+  .u-modal__header { padding: 14px 16px 12px; }
+  .u-modal__body { padding: 16px; }
+  /* Even two-column grid: four stretched flex items wrapped into ragged rows
+     and consumed most of the dialog. */
   .u-modal__footer {
     display: grid;
     grid-template-columns: 1fr 1fr;
     gap: 8px;
-    padding: 10px 14px calc(10px + env(safe-area-inset-bottom));
+    padding: 12px 16px;
   }
-  .u-modal__footer > * {
-    min-height: 40px;
-    min-width: 0;
-    justify-self: stretch;
-    text-align: center;
-  }
+  .u-modal__footer > * { min-height: 40px; min-width: 0; justify-self: stretch; text-align: center; }
+}
+
+/* Very small screens still get a gutter, just a tighter one. */
+@media (max-width: 400px) {
+  .u-modal { padding: 10px; padding-bottom: calc(10px + env(safe-area-inset-bottom)); }
+  .u-modal__panel { max-height: calc(100dvh - 20px - env(safe-area-inset-bottom)); }
+  .u-modal__footer { grid-template-columns: 1fr; }
 }
 </style>

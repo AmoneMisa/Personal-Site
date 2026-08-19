@@ -288,6 +288,13 @@ const mobileOpen = ref(false);
   padding: 12px 32px 20px;
   border-top: 1px solid var(--line);
   background: rgba(13, 17, 40, 0.98);
+  /* The panel now lists the dropdown destinations too, so it can be taller than
+     the screen. Keep it inside the viewport (minus the sticky header) and let it
+     scroll on its own instead of clipping the last entries. */
+  max-height: calc(100dvh - 72px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding-bottom: calc(20px + env(safe-area-inset-bottom));
 }
 .site-header__mobile-link {
   padding: 10px 0;
