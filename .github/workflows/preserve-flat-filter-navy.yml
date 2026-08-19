@@ -1,0 +1,68 @@
+name: Preserve flat finder navy colors
+
+on:
+  push:
+    branches: [feat/flat-finder-filter-redesign]
+
+permissions:
+  contents: write
+
+jobs:
+  preserve-colors:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/flat-finder-filter-redesign
+      - name: Keep existing dark navy surfaces
+        shell: python
+        run: |
+          from pathlib import Path
+
+          p = Path('app/pages/flat-finder/index.vue')
+          s = p.read_text()
+
+          # The redesign should reuse the site's established navy tokens instead
+          # of introducing gray/black translucent surfaces.
+          replacements = {
+              '.filter-card, .advanced-card { border: 1px solid var(--line); border-radius: 12px; background: rgba(255,255,255,.018); }':
+              '.filter-card, .advanced-card { border: 1px solid var(--line); border-radius: 12px; background: var(--bg-panel); }',
+              'border: 1px solid var(--line); border-radius: 7px; color: var(--ui-text-muted); font-size: 12px; overflow: hidden; }':
+              'border: 1px solid var(--line); border-radius: 7px; background: var(--bg-panel-2); color: var(--ui-text-muted); font-size: 12px; overflow: hidden; }',
+              'border: 1px solid var(--line); border-radius: 7px; background: rgba(255,255,255,.025); color: var(--text-primary);':
+              'border: 1px solid var(--line); border-radius: 7px; background: var(--bg-panel-2); color: var(--text-primary);',
+          }
+          for old, new in replacements.items():
+              s = s.replace(old, new)
+
+          # Explicitly keep Nuxt UI inputs/selects on the same old dark-blue
+          # surfaces while preserving the pink accent only for focus/currency.
+          navy_override = r'''
+/* Keep Flat Finder controls on the site's original dark-navy palette. */
+.flats__controls_redesign :deep(input),
+.flats__controls_redesign :deep(button[role="combobox"]),
+.flats__controls_redesign .price-input,
+.flats__controls_redesign .filter-chip {
+  background-color: var(--bg-panel-2) !important;
+}
+.filter-card,
+.advanced-card {
+  background-color: var(--bg-panel) !important;
+}
+.currency-select__control :deep(button) {
+  background-color: var(--bg-panel-2) !important;
+}
+'''
+          if '/* Keep Flat Finder controls on the site\'s original dark-navy palette. */' not in s:
+              marker = '</style>'
+              s = s.replace(marker, navy_override + marker, 1)
+
+          p.write_text(s)
+      - name: Commit navy palette preservation
+        run: |
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add app/pages/flat-finder/index.vue
+          git diff --cached --quiet && exit 0
+          git commit -m "style: preserve navy flat finder controls"
+          git push origin feat/flat-finder-filter-redesign
