@@ -824,6 +824,23 @@ onBeforeUnmount(() => { modalOpen.value = false; lightboxIndex.value = null; rel
 .flats__preset { display: inline-flex; align-items: center; gap: 8px; min-height: 32px; padding: 0 8px 0 11px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg-panel); color: var(--text-primary); cursor: pointer; }
 .flats__preset-remove { color: var(--text-muted); font-size: 18px; line-height: 1; }
 .flats__preset-remove:hover { color: var(--accent-pink); }
+/* One control height for every filter input/select. u-input and u-select-menu
+   render different internals, so their natural heights differed and the rows
+   looked ragged; pin the inner control instead of the wrapper. */
+.flats__field :deep(input),
+.flats__field :deep(button),
+.price-input :deep(input),
+.currency-select :deep(button),
+.range-field :deep(input) { min-height: 38px; }
+.range-field :deep(input) { min-height: 32px; }
+
+/* A multi-select with several countries used to wrap onto extra lines and grow
+   the whole row. Keep it to one line and ellipsize instead. */
+.flats__field :deep(button > span),
+.flats__select :deep(button > span) {
+  display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0;
+}
+
 .flats__field { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
 .flats__field-label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; opacity: 0.7; line-height: 1.25; overflow-wrap: anywhere; }
 .flats__select { width: 100%; min-width: 0; }
@@ -908,7 +925,11 @@ onBeforeUnmount(() => { modalOpen.value = false; lightboxIndex.value = null; rel
 .filter-presets__label { margin-right: 4px; white-space: nowrap; }
 .filter-primary-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; }
 .filter-primary-grid :deep(button > span), .advanced-groups :deep(button > span) { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: normal; line-height: 1.25; text-align: left; }
-.filter-price-row { display: grid; grid-template-columns: auto minmax(130px,190px) 12px minmax(130px,190px) minmax(120px,145px); align-items: center; column-gap: 4px; row-gap: 10px; margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--line); }
+/* justify-content:start is what keeps this row sane: the first track is `auto`,
+   so without it every pixel of leftover width inflated the label column and
+   threw the label to the far left with the inputs stranded on the right.
+   column-gap does the spacing now instead of a per-element margin. */
+.filter-price-row { display: grid; grid-template-columns: auto minmax(130px,190px) 12px minmax(130px,190px) minmax(120px,145px); justify-content: start; align-items: center; column-gap: 8px; row-gap: 10px; margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--line); }
 .filter-price-row__label { margin-right: 4px; }
 .price-input { height: 38px; display: grid; grid-template-columns: auto minmax(0,1fr); align-items: center; gap: 5px; padding-left: 9px; border: 1px solid var(--line); border-radius: 7px; background: var(--bg-panel-2); color: var(--ui-text-muted); font-size: 12px; overflow: hidden; }
 .price-input :deep(.price-number-input) { border: 0 !important; box-shadow: none !important; background: transparent !important; min-width: 0; font-size: 13px; font-variant-numeric: tabular-nums; }
@@ -935,7 +956,12 @@ onBeforeUnmount(() => { modalOpen.value = false; lightboxIndex.value = null; rel
 .filter-group .flats__field + .flats__field, .range-field + .range-field { margin-top: 12px; }
 .quick-options { display: grid; gap: 8px; }
 .quick-options :deep(button) { width: 100%; min-height: 38px; justify-content: flex-start; height: auto; padding-block: 8px; white-space: normal; text-align: left; line-height: 1.25; }
-.range-field { display: grid; grid-template-columns: minmax(70px,1fr) minmax(48px,68px) 10px minmax(48px,68px); align-items: center; gap: 4px; font-size: 11px; color: var(--ui-text-muted); }
+/* Every range row is the same height regardless of how many lines its label
+   needs: "Год постройки от" wrapped to three lines while "Этаж от" stayed on
+   one, so the Flat and House columns no longer lined up with each other. A
+   fixed row height plus a balanced label column keeps the two columns in step. */
+.range-field { display: grid; grid-template-columns: minmax(70px,1fr) minmax(48px,68px) 10px minmax(48px,68px); align-items: center; gap: 4px; font-size: 11px; color: var(--ui-text-muted); min-height: 46px; }
+.range-field > span:first-child { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; line-height: 1.25; }
 .range-field > span:first-child { line-height: 1.25; overflow-wrap: anywhere; }
 .range-field :deep(input) { text-align: center; padding-inline: 4px; background: var(--bg-panel-2) !important; }
 .flats__controls_redesign :deep(input), .flats__controls_redesign :deep(button[role="combobox"]) { background-color: var(--bg-panel-2) !important; }
