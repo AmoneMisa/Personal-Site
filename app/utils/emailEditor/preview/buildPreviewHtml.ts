@@ -1,5 +1,6 @@
 import type { PreviewClient, TemplateEngine } from "./clientProfiles";
 import { renderWithFakeData } from "~/utils/emailEditor/fakeData/renderWithFakeData";
+import { stripTemplateSyntax } from "./stripTemplateSyntax";
 
 export function buildPreviewHtml(input: {
     code: string;
@@ -10,9 +11,13 @@ export function buildPreviewHtml(input: {
     let source = String(input.code ?? "");
 
     // When fake data is enabled, substitute variable interpolations with the
-    // user-provided sample values so the preview shows resolved content.
+    // user-provided sample values so the preview shows resolved content, then
+    // drop the remaining template syntax (macros, directives, comments) which
+    // would otherwise be rendered as visible text in the preview. With fake data
+    // off, the raw template is shown as-is so the syntax stays inspectable.
     if (input.fakeData?.enabled) {
         source = renderWithFakeData(source, input.templateEngine, input.fakeData.values);
+        source = stripTemplateSyntax(source, input.templateEngine);
     }
 
     const safe = sanitizeEmailHtml(source);
