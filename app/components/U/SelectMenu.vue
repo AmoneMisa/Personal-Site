@@ -138,7 +138,7 @@ onBeforeUnmount(() => {
   <div ref="root" class="u-select-menu" :class="$attrs.class">
     <button
         type="button"
-        class="u-select-menu__trigger ui-focusable"
+        class="u-select-menu__trigger ui-control ui-focusable"
         :disabled="disabled"
         :aria-expanded="open"
         aria-haspopup="listbox"
@@ -184,23 +184,8 @@ onBeforeUnmount(() => {
 <style scoped>
 .u-select-menu { position: relative; min-width: 0; }
 
-.u-select-menu__trigger {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  width: 100%;
-  min-height: var(--ui-control-h-md);
-  padding-inline: var(--ui-control-px);
-  border: 1px solid var(--ui-control-border);
-  border-radius: var(--ui-control-radius);
-  background: var(--ui-control-bg);
-  color: var(--ui-control-text);
-  font-family: inherit;
-  font-size: var(--ui-control-font);
-  text-align: left;
-  cursor: pointer;
-}
-.u-select-menu__trigger:disabled { opacity: 0.6; cursor: not-allowed; }
+/* Base surface comes from .ui-control. */
+.u-select-menu__trigger { text-align: left; cursor: pointer; }
 
 /* One line + ellipsis: a multi-value selection must never grow the row. */
 .u-select-menu__value {
@@ -246,7 +231,16 @@ onBeforeUnmount(() => {
   outline: none;
 }
 
-.u-select-menu__list { max-height: 260px; overflow-y: auto; margin: 0; padding: 0; list-style: none; }
+.u-select-menu__list {
+  /* Never taller than the space actually available, so on a short viewport the
+     list scrolls instead of running off the bottom of the screen. */
+  max-height: min(260px, 45dvh);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
 
 .u-select-menu__option {
   display: flex;

@@ -39,7 +39,7 @@ const options = computed(() =>
 <template>
   <div class="u-select" :class="$attrs.class">
     <select
-        class="u-select__control ui-focusable"
+        class="u-select__control ui-control ui-focusable"
         :value="modelValue ?? ''"
         :disabled="disabled"
         v-bind="{ ...$attrs, class: undefined }"
@@ -57,22 +57,14 @@ const options = computed(() =>
 <style scoped>
 .u-select { position: relative; display: block; min-width: 0; }
 
+/* Base surface comes from .ui-control; only select-specific bits are here. */
 .u-select__control {
-  width: 100%;
-  min-height: var(--ui-control-h-md);
   /* Room for the chevron drawn on top of the native control. */
-  padding: 0 32px 0 var(--ui-control-px);
-  border: 1px solid var(--ui-control-border);
-  border-radius: var(--ui-control-radius);
-  background: var(--ui-control-bg);
-  color: var(--ui-control-text);
-  font-family: inherit;
-  font-size: var(--ui-control-font);
+  padding-right: 32px;
   appearance: none;
   -webkit-appearance: none;
   cursor: pointer;
 }
-.u-select__control:disabled { opacity: 0.6; cursor: not-allowed; }
 /* The popup is rendered by the OS, so its options need explicit colours. */
 .u-select__control option { background: var(--bg-panel, #131730); color: var(--text-primary, #eef0f7); }
 

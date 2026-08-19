@@ -14,7 +14,7 @@ const emit = defineEmits<{ (e: "update:modelValue", value: string): void }>();
 
 <template>
   <textarea
-      class="u-textarea ui-focusable"
+      class="u-textarea ui-control ui-focusable"
       :class="$attrs.class"
       :value="modelValue ?? ''"
       :rows="rows"
@@ -25,20 +25,15 @@ const emit = defineEmits<{ (e: "update:modelValue", value: string): void }>();
 </template>
 
 <style scoped>
+/* Base surface comes from .ui-control; a textarea only differs in that it grows
+   vertically and aligns its text to the top. */
 .u-textarea {
   display: block;
-  width: 100%;
-  padding: 9px var(--ui-control-px);
-  border: 1px solid var(--ui-control-border);
-  border-radius: var(--ui-control-radius);
-  background: var(--ui-control-bg);
-  color: var(--ui-control-text);
-  font-family: inherit;
-  font-size: var(--ui-control-font);
+  align-items: stretch;
+  padding-block: 9px;
   line-height: 1.5;
   resize: vertical;
   outline: none;
 }
 .u-textarea::placeholder { color: var(--ui-control-placeholder); }
-.u-textarea:disabled { opacity: 0.6; }
 </style>

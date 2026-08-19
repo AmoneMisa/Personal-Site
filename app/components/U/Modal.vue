@@ -141,7 +141,16 @@ onBeforeUnmount(() => {
 }
 .u-modal__close:hover { background: rgba(255, 255, 255, 0.08); }
 
-.u-modal__body { flex: 1 1 auto; min-height: 0; overflow-y: auto; padding: 16px; }
+.u-modal__body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  /* Momentum scrolling inside the panel, and the scroll chain stops here so a
+     flick at the end of the list does not scroll the page behind the modal. */
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+  padding: 16px;
+}
 .u-modal__footer {
   display: flex;
   flex-wrap: wrap;
@@ -149,5 +158,21 @@ onBeforeUnmount(() => {
   gap: 8px;
   padding: 12px 16px;
   border-top: 1px solid var(--line);
+}
+
+/* Phones: use the full screen instead of a small floating card, and let the
+   footer actions span the width so they stay comfortably tappable. */
+@media (max-width: 640px) {
+  .u-modal { padding: 0; align-items: flex-end; }
+  .u-modal__panel {
+    max-width: none;
+    max-height: 92dvh;
+    border-radius: var(--radius, 10px) var(--radius, 10px) 0 0;
+    border-bottom: 0;
+  }
+  .u-modal__header { padding: 14px 14px 10px; }
+  .u-modal__body { padding: 14px; }
+  .u-modal__footer { padding: 10px 14px calc(10px + env(safe-area-inset-bottom)); }
+  .u-modal__footer > * { flex: 1 1 auto; }
 }
 </style>

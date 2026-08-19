@@ -58,6 +58,18 @@ function select(index: number) {
   gap: 6px;
   padding-bottom: 2px;
 }
+/* Narrow screens: scroll the strip sideways rather than stacking triggers into
+   several rows, which pushed the panel far down the page. */
+@media (max-width: 640px) {
+  .u-tabs__list {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    scrollbar-width: none;
+    scroll-snap-type: x proximity;
+  }
+  .u-tabs__list::-webkit-scrollbar { display: none; }
+  .u-tabs__trigger { flex: none; scroll-snap-align: start; }
+}
 .u-tabs__trigger {
   min-height: var(--ui-control-h-sm);
   padding-inline: 12px;

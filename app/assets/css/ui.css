@@ -15,6 +15,10 @@
     --ui-control-px: 12px;
     --ui-control-radius: 8px;
     --ui-control-font: 13px;
+    /* Breakpoints, named once so components stop hard-coding pixel values. */
+    --ui-bp-sm: 640px;
+    --ui-bp-md: 768px;
+    --ui-bp-lg: 1024px;
 
     --ui-focus-ring: 0 0 0 2px rgba(224, 103, 154, 0.45);
     --ui-transition: 120ms ease;
@@ -26,6 +30,41 @@
     --ui-control-text: var(--text-primary, #eef0f7);
     --ui-control-placeholder: var(--text-muted, #9ea4c1);
 }
+
+/* Touch devices get larger controls. Keyed on the pointer type rather than a
+   width breakpoint, so a small laptop keeps compact controls while a large
+   tablet still gets comfortable 44px targets (the accessibility guideline). */
+@media (pointer: coarse) {
+    :root {
+        --ui-control-h-sm: 38px;
+        --ui-control-h-md: 44px;
+        --ui-control-h-lg: 48px;
+        --ui-control-font: 14px; /* also stops iOS zooming the page on focus */
+    }
+}
+
+/* THE shared control surface. Every text-like control (input, select, select
+   trigger, textarea) composes this instead of repeating the same border,
+   background, radius and height — change it here and they all follow. */
+.ui-control {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    width: 100%;
+    min-width: 0;
+    min-height: var(--ui-control-h-md);
+    padding-inline: var(--ui-control-px);
+    border: 1px solid var(--ui-control-border);
+    border-radius: var(--ui-control-radius);
+    background: var(--ui-control-bg);
+    color: var(--ui-control-text);
+    font-family: inherit;
+    font-size: var(--ui-control-font);
+    transition: border-color var(--ui-transition), box-shadow var(--ui-transition);
+}
+.ui-control_sm { min-height: var(--ui-control-h-sm); padding-inline: 9px; }
+.ui-control_lg { min-height: var(--ui-control-h-lg); }
+.ui-control_disabled, .ui-control:disabled { opacity: 0.6; cursor: not-allowed; }
 
 /* Shared focus treatment: one visible, consistent ring for keyboard users on
    every control, instead of each component inventing its own. */

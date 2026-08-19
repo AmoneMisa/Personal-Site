@@ -26,7 +26,7 @@ function onInput(event: Event) {
 </script>
 
 <template>
-  <div class="u-input ui-focusable" :class="[`u-input_${size}`, { 'u-input_disabled': disabled }, $attrs.class]">
+  <div class="u-input ui-control ui-focusable" :class="[`ui-control_${size}`, { 'ui-control_disabled': disabled }, $attrs.class]">
     <UIcon v-if="icon" :name="icon" class="u-input__icon" />
     <input
         v-bind="{ ...$attrs, class: undefined }"
@@ -40,22 +40,8 @@ function onInput(event: Event) {
 </template>
 
 <style scoped>
-.u-input {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  min-height: var(--ui-control-h-md);
-  padding-inline: var(--ui-control-px);
-  border: 1px solid var(--ui-control-border);
-  border-radius: var(--ui-control-radius);
-  background: var(--ui-control-bg);
-  color: var(--ui-control-text);
-  transition: border-color var(--ui-transition), box-shadow var(--ui-transition);
-}
-.u-input_sm { min-height: var(--ui-control-h-sm); padding-inline: 9px; }
-.u-input_lg { min-height: var(--ui-control-h-lg); }
-.u-input_disabled { opacity: 0.6; }
-
+/* Layout and colours come from .ui-control (assets/css/ui.css). Only the parts
+   specific to a text input live here. */
 .u-input__field {
   flex: 1 1 auto;
   min-width: 0;
