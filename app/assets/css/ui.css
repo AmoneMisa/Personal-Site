@@ -15,6 +15,13 @@
     --ui-control-px: 12px;
     --ui-control-radius: 8px;
     --ui-control-font: 13px;
+    /* Floating-label variants; see .ui-control_floating below. */
+    --ui-floating-h-sm: 40px;
+    --ui-floating-h-md: 46px;
+    --ui-floating-h-lg: 54px;
+    /* How far the label shrinks once it sits on the border. The notch is sized
+       from the same number, so they must not drift apart. */
+    --ui-floating-scale: 0.78;
     /* Breakpoints, named once so components stop hard-coding pixel values. */
     --ui-bp-sm: 640px;
     --ui-bp-md: 768px;
@@ -40,6 +47,9 @@
         --ui-control-h-md: 44px;
         --ui-control-h-lg: 48px;
         --ui-control-font: 14px; /* also stops iOS zooming the page on focus */
+        --ui-floating-h-sm: 46px;
+        --ui-floating-h-md: 52px;
+        --ui-floating-h-lg: 58px;
     }
 }
 
@@ -64,6 +74,13 @@
 }
 .ui-control_sm { min-height: var(--ui-control-h-sm); padding-inline: 9px; }
 .ui-control_lg { min-height: var(--ui-control-h-lg); }
+
+/* A control carrying a floating label needs a little more height than a bare
+   one: the label rests on the top border, so the value below it should not sit
+   tight against the edge. Shared with the textarea variant. */
+.ui-control_floating { min-height: var(--ui-floating-h-md); }
+.ui-control_floating.ui-control_sm { min-height: var(--ui-floating-h-sm); }
+.ui-control_floating.ui-control_lg { min-height: var(--ui-floating-h-lg); }
 .ui-control_disabled, .ui-control:disabled { opacity: 0.6; cursor: not-allowed; }
 
 /* Shared focus treatment: one visible, consistent ring for keyboard users on

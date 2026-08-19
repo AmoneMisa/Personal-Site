@@ -44,19 +44,21 @@ const emit = defineEmits<{
   (e: "clear"): void
 }>()
 
-const id = `in_${Math.random().toString(16).slice(2)}`;
-const hasValue = computed(() => (props.modelValue || "").length > 0);
+const { t } = useI18n();
 
-function onInput(e: Event) {
-  const input = e.target as HTMLInputElement;
-  const value = input.value;
+const resolvedLabel = computed(() => (props.labelKey ? t(props.labelKey) : props.label));
+const resolvedPlaceholder = computed(() => (props.placeholderKey ? t(props.placeholderKey) : props.placeholder));
 
+// The clear button is UInput's; a number field never had one here.
+const showClear = computed(() => props.clearable && !props.readonly && !props.disabled && props.type !== "number");
+
+function onInput(value: string | number) {
   if (props.type !== "number") {
-    emit("update:modelValue", value);
+    emit("update:modelValue", String(value));
     return
   }
 
-  const parsed = parseNumber(value);
+  const parsed = parseNumber(String(value));
 
   if (parsed === null) {
     emit("update:modelValue", "");
@@ -64,7 +66,7 @@ function onInput(e: Event) {
   }
 
   const clamped = clamp(parsed);
-  emit("update:modelValue", clamped);
+  emit("update:modelValue", String(clamped));
 }
 
 function onKeydown(e: KeyboardEvent) {
@@ -111,40 +113,27 @@ function clear() {
 
 <template>
   <div class="uii" :class="{ uii_error: !!error, uii_disabled: disabled }">
-    <div v-if="labelKey || label" class="uii__label">
-      <label :for="id">
-        <span v-if="labelKey">{{ $t(labelKey) }}</span>
-        <span v-else>{{ label }}</span>
-      </label>
-    </div>
-
-    <div class="uii__box">
-      <input
-          :id="id"
-          class="uii__input"
-          :type="type"
-          :value="modelValue"
-          :placeholder="placeholderKey ? $t(placeholderKey) : placeholder"
-          :disabled="disabled"
-          :readonly="readonly"
-          :autocomplete="autocomplete"
-          :inputmode="inputmode"
-          @input="onInput"
-          @keydown="onKeydown"
-          :min="type === 'number' ? min : undefined"
-          :max="type === 'number' ? max : undefined"
-      />
-
-      <button
-          v-if="clearable && !readonly && !disabled && hasValue && !(type === 'number')"
-          class="uii__clear"
-          type="button"
-          @click="clear"
-          :title="$t('services.mergeJson.titles.reset')"
-      >
-        <u-icon name="i-lucide-x" class="uii__clear-icon" />
-      </button>
-    </div>
+    <!-- Presentation is UInput's, so this field animates its label and matches
+         every other control in the app. What stays here is what UInput has no
+         opinion about: the i18n key variants, the number clamping, the hint and
+         the error line. -->
+    <u-input
+        :model-value="modelValue"
+        :label="resolvedLabel || undefined"
+        :type="type"
+        :placeholder="resolvedPlaceholder"
+        :disabled="disabled"
+        :readonly="readonly"
+        :autocomplete="autocomplete"
+        :inputmode="inputmode"
+        :clearable="showClear"
+        :clear-label="$t('services.mergeJson.titles.reset')"
+        :min="type === 'number' ? min : undefined"
+        :max="type === 'number' ? max : undefined"
+        @update:model-value="onInput"
+        @keydown="onKeydown"
+        @clear="clear"
+    />
 
     <div v-if="hintKey || hint" class="uii__hint">
       <span v-if="hintKey">{{ $t(hintKey) }}</span>
@@ -163,57 +152,6 @@ function clear() {
   min-width: 220px;
 }
 
-.uii__label {
-  font-weight: 900;
-  font-size: 13px;
-  color: var(--text-white);
-}
-
-.uii__box {
-  position: relative;
-  border-radius: 6px;
-  border: 1px solid var(--ui-border);
-  background: rgba(255, 255, 255, 0.02);
-  padding: 3px 8px;
-}
-
-.uii__input {
-  width: 100%;
-  font-size: 13px;
-  color: var(--ui-text);
-  background: transparent;
-  outline: none;
-  border: 0;
-  padding-right: 28px;
-
-  &[type="number"] {
-    padding-right: 0;
-  }
-}
-
-.uii__clear {
-  position: absolute;
-  top: 50%;
-  right: 8px;
-  transform: translateY(-50%);
-  width: 26px;
-  height: 26px;
-  border-radius: 10px;
-  border: 1px solid var(--ui-border);
-  background: rgba(255, 255, 255, 0.02);
-  color: var(--ui-text);
-  cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.uii__clear-icon {
-  width: 16px;
-  height: 16px;
-  opacity: 0.9;
-}
-
 .uii__hint {
   font-size: 11px;
   color: var(--ui-text-muted);
@@ -225,16 +163,14 @@ function clear() {
   color: var(--color-error, #ef4444);
 }
 
-.uii_error .uii__box {
-  border-color: rgba(239, 68, 68, 0.35);
-  background: rgba(239, 68, 68, 0.06);
+/* The outline and the lifted label both read these, so recolouring the field
+   for an error is a matter of two variables rather than reaching into UInput. */
+.uii_error {
+  --ui-control-border: rgba(239, 68, 68, 0.55);
+  --accent-pink: var(--color-error, #ef4444);
 }
 
 .uii_disabled {
   opacity: 0.65;
-}
-
-.uii_disabled .uii__clear {
-  display: none;
 }
 </style>
