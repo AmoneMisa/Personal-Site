@@ -1359,14 +1359,7 @@ onBeforeUnmount(() => {
               {{ l.language }}<template v-if="l.level"> ({{ l.level }})</template>
             </span>
           </div>
-          <table class="job-modal__spec">
-            <tbody>
-              <tr v-for="row in vacRows" :key="row.label">
-                <th>{{ row.label }}</th>
-                <td>{{ row.value }}</td>
-              </tr>
-            </tbody>
-          </table>
+          <UiSpecTable :rows="vacRows" />
           <p v-if="activeJob.description" class="job-modal__desc">{{ activeJob.description }}</p>
           <p v-else class="text-muted">{{ t("noDescription") }}</p>
           <div v-if="activeJob.skills && activeJob.skills.length" class="job-card__tags job-modal__tags">
@@ -1622,14 +1615,6 @@ onBeforeUnmount(() => {
 .job-modal__meta { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: 12.5px; }
 .job-modal__badges { display: flex; flex-wrap: wrap; gap: 6px; }
 .job-modal__langs { margin: 0; }
-.job-modal__spec { width: 100%; border-collapse: collapse; font-size: 13px; margin: 4px 0 10px; }
-.job-modal__spec tr { border-bottom: 1px solid var(--line); }
-.job-modal__spec tr:last-child { border-bottom: none; }
-.job-modal__spec th {
-  text-align: left; font-weight: 600; padding: 6px 12px 6px 0; white-space: nowrap;
-  color: var(--text-muted, inherit); opacity: 0.75; width: 42%; vertical-align: top;
-}
-.job-modal__spec td { padding: 6px 0; vertical-align: top; }
 .job-modal__desc {
   font-size: 13.5px; line-height: 1.55; white-space: pre-wrap;
   color: var(--text-soft, inherit); max-height: 52vh; overflow-y: auto;

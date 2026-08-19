@@ -360,7 +360,6 @@ function toggleHidden(item: CvProfile) {
 
 const active = ref<CvProfile | null>(null);
 const modalOpen = ref(false);
-const hideEmptySpecs = ref(true);
 
 function openCv(profile: CvProfile) {
   active.value = profile;
@@ -410,9 +409,6 @@ const specRows = computed(() => {
     { label: t("specSource"), value: profile.source === "telegram" ? "Telegram" : profile.source },
   ];
 });
-const visibleSpecRows = computed(() =>
-  hideEmptySpecs.value ? specRows.value.filter((r) => r.value !== t("notSpecified")) : specRows.value,
-);
 
 const shareCopied = ref(false);
 function makeCvShareLink(profile: CvProfile): string {
@@ -664,18 +660,7 @@ onBeforeUnmount(() => {
       </template>
       <template #body>
         <div v-if="active" class="hiring-modal">
-          <label class="hiring-modal__hide-empty">
-            <input type="checkbox" v-model="hideEmptySpecs" />
-            <span>{{ t("hideEmpty") }}</span>
-          </label>
-          <table class="hiring-modal__spec">
-            <tbody>
-              <tr v-for="row in visibleSpecRows" :key="row.label">
-                <th>{{ row.label }}</th>
-                <td>{{ row.value }}</td>
-              </tr>
-            </tbody>
-          </table>
+          <UiSpecTable :rows="specRows" :hide-empty-label="t('hideEmpty')" :empty-value="t('notSpecified')" />
           <details v-if="active.description" class="hiring-modal__descbox" open>
             <summary>{{ t("cvBody") }}</summary>
             <p class="hiring-modal__desc">{{ active.description }}</p>
@@ -817,11 +802,6 @@ onBeforeUnmount(() => {
 .hiring-modal__title { margin: 0; font-size: 18px; font-weight: 700; line-height: 1.35; padding-right: 36px; }
 .hiring-modal__name { font-size: 14px; color: var(--text-muted); }
 .hiring-modal__salary { font-weight: 700; font-size: 18px; }
-.hiring-modal__spec { width: 100%; border-collapse: collapse; font-size: 13px; margin: 4px 0 10px; }
-.hiring-modal__spec tr { border-bottom: 1px solid var(--line); }
-.hiring-modal__spec th { text-align: left; font-weight: 600; padding: 6px 12px 6px 0; color: var(--text-muted); width: 40%; vertical-align: top; }
-.hiring-modal__spec td { padding: 6px 0; vertical-align: top; }
-.hiring-modal__hide-empty { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text-muted); cursor: pointer; user-select: none; }
 .hiring-modal__descbox summary { cursor: pointer; font-size: 12px; font-weight: 600; opacity: 0.8; user-select: none; }
 .hiring-modal__desc { font-size: 13.5px; line-height: 1.55; white-space: pre-wrap; color: var(--text-soft, inherit); margin-top: 8px; }
 .hiring-modal__tags { display: flex; flex-wrap: wrap; gap: 6px; }
