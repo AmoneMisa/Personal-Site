@@ -1393,6 +1393,12 @@ onMounted(async () => {
 
   await loadMeta();
 
+  // Metadata is in and restored filters are settled — let the flush of any
+  // watch(countries)/watch(city) triggered above run while still guarded, then
+  // re-enable the cascade resets for real user interaction.
+  await nextTick();
+  restoring.value = false;
+
   if (
       queryString(
           route.query.shared,
@@ -1448,7 +1454,13 @@ watch(modalOpen, (open) => {
   translatingDescription.value = false;
 });
 
+// While restoring filters from the URL/localStorage on mount, these cascade
+// resets must not run — otherwise loading country metadata (which sets
+// `countries`) fires watch(countries) and wipes the just-restored city.
+const restoring = ref(true);
+
 watch(city, () => {
+      if (restoring.value) return;
       district.value = "";
       metro.value = "";
       query.value = "";
@@ -1456,6 +1468,7 @@ watch(city, () => {
 );
 
 watch(countries, () => {
+      if (restoring.value) return;
       district.value = "";
       metro.value = "";
       city.value = "";
