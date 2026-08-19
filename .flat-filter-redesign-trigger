@@ -1,0 +1,2 @@
+Apply approved flat finder filter redesign to app/pages/flat-finder/index.vue.
+This trigger exists only to execute the branch workflow; remove after the generated code commit lands.
