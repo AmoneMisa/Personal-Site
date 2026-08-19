@@ -110,7 +110,8 @@ export default defineNuxtConfig({
         },
         // Daily worker: refresh the Redis vacancy store + prune closed/old postings.
         scheduledTasks: {
-            '0 3 * * *': ['jobs:refresh']
+            '0 3 * * *': ['jobs:refresh'],
+            '0 4 * * *': ['hiring:refresh'],
         },
         routeRules: {
             '/api/**': {proxy: 'http://backend:8000/**'}, //http://backend:8000/** - prod

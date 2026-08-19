@@ -26,6 +26,8 @@ const ROUTES: { path: string; changefreq: string; priority: number }[] = [
   { path: "/cv", changefreq: "monthly", priority: 0.9 },
   { path: "/services", changefreq: "weekly", priority: 0.9 },
   { path: "/jobs", changefreq: "daily", priority: 0.8 },
+  { path: "/hiring", changefreq: "daily", priority: 0.8 },
+  { path: "/flat-finder", changefreq: "daily", priority: 0.8 },
   { path: "/quizzes", changefreq: "monthly", priority: 0.6 },
   { path: "/quizzes/country-fit", changefreq: "monthly", priority: 0.6 },
   { path: "/services/converter", changefreq: "monthly", priority: 0.7 },
