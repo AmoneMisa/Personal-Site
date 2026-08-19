@@ -20,14 +20,16 @@ target="${1:-all}"
 
 case "$target" in
   all)
-    # Frontend is pre-built in GitHub Actions and published to GHCR.
-    # Pull it first, then rebuild only services that still have a local build context.
+    # Frontend is pre-built in GitHub Actions and published to GHCR; it has no
+    # build context in compose, so `--build` here only rebuilds the services that
+    # genuinely build locally (backend, queue workers) and never re-runs the slow
+    # Nuxt build on this server.
     "${compose[@]}" pull frontend
     "${compose[@]}" up -d --build
     ;;
   frontend)
     "${compose[@]}" pull frontend
-    "${compose[@]}" up -d frontend
+    "${compose[@]}" up -d --no-build frontend
     ;;
   backend)
     "${compose[@]}" up -d --build backend

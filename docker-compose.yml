@@ -17,8 +17,13 @@ services:
       start_period: 20s
 
   frontend:
-    build:
-      context: .
+    # Deliberately NO build context: the Nuxt image is built and pushed by GitHub
+    # Actions (see .github/workflows/deploy.yml, which builds ./Dockerfile
+    # directly and does not use compose). With a build section here, any
+    # `docker compose up -d --build` on the server re-ran the Nuxt build — the
+    # source of the deployment command timeouts — and the jobs-queue-worker
+    # services depend_on frontend, so even building only those triggered it.
+    # To build locally: docker build -t ghcr.io/amonemisa/personal-site:latest .
     image: ghcr.io/amonemisa/personal-site:latest
     restart: unless-stopped
     env_file:
