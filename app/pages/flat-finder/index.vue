@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { safeFetch } from "~/utils/safeFetch";
+import { locationLabel, type LocationKind } from "~/utils/locationLabels";
 import FlatMap from "~/components/flats/FlatMap.client.vue";
 
 // Flat Finder. Auto-routed at /flat-finder. Reuses the flat-finder backend
@@ -250,10 +251,13 @@ const dealTypeSel = computed<string>({ get: () => dealType.value, set: (v) => (d
 const agencySel = computed<string>({ get: () => agency.value, set: (v) => (agency.value = v) });
 
 const countryItems = computed<Item[]>(() => meta.value.map((c) => ({ value: c.code, label: c.name })));
-const cityItems = computed<Item[]>(() => [{ label: t("cityAny"), value: ANY }, ...cityOptions.value.map((c) => ({ label: c, value: c }))]);
+// Dropdowns show localized labels but keep canonical values, so filter state,
+// URL params and API requests are unaffected by the UI language.
+const locName = (v: string | null | undefined, kind: LocationKind = "any") => locationLabel(v, locale.value, kind);
+const cityItems = computed<Item[]>(() => [{ label: t("cityAny"), value: ANY }, ...cityOptions.value.map((c) => ({ label: locName(c, "city"), value: c }))]);
 const citySel = computed<string>({ get: () => city.value || ANY, set: (v) => (city.value = v === ANY ? "" : v) });
-const districtItems = computed<Item[]>(() => [{ label: t("districtAny"), value: ANY }, ...districtOptions.value.map((d) => ({ label: d, value: d }))]);
-const metroItems = computed<Item[]>(() => [{ label: filterLabel("metroAny"), value: ANY }, ...metroOptions.value.map((m) => ({ label: m, value: m }))]);
+const districtItems = computed<Item[]>(() => [{ label: t("districtAny"), value: ANY }, ...districtOptions.value.map((d) => ({ label: locName(d, "district"), value: d }))]);
+const metroItems = computed<Item[]>(() => [{ label: filterLabel("metroAny"), value: ANY }, ...metroOptions.value.map((m) => ({ label: locName(m, "metro"), value: m }))]);
 const CURRENCY_PRIORITY = ["USD", "EUR", "UZS", "KZT", "UAH", "RON", "GBP", "KGS", "TJS", "TMT", "PLN"];
 const currencyItems = computed<Item[]>(() => {
   const keys = Object.keys(rates.value).filter((c) => /^[A-Z]{3}$/.test(c) && rates.value[c]! > 0);
@@ -1081,8 +1085,10 @@ function specLine(l: Listing): string {
   return parts.join(" · ");
 }
 function locLine(l: Listing): string {
-  // Broad -> specific: city, district, metro station (when known).
-  return [l.city, l.district, l.metro].filter(Boolean).join(", ");
+  // Broad -> specific: city, district, metro station (when known), localized.
+  return [locName(l.city, "city"), locName(l.district, "district"), locName(l.metro, "metro")]
+    .filter(Boolean)
+    .join(", ");
 }
 
 // ---- normalized spec table (popup) ----
@@ -1189,10 +1195,10 @@ const specRows = computed<Array<{ label: string; value: string }>>(() => {
     { label: t("specNewBuilding"), value: fmtBool(l.newBuilding) },
     { label: t("specCondition"), value: conditionLabel(l.condition) },
     { label: t("specComplex"), value: strOr(l.residenceComplex) },
-    { label: t("specCity"), value: strOr(l.city) },
-    { label: t("specDistrict"), value: strOr(l.district) },
+    { label: t("specCity"), value: strOr(locName(l.city, "city")) },
+    { label: t("specDistrict"), value: strOr(locName(l.district, "district")) },
     { label: t("specKvartal"), value: strOr(l.area || l.kvartal) },
-    { label: t("specMetro"), value: strOr(l.metro) },
+    { label: t("specMetro"), value: strOr(locName(l.metro, "metro")) },
     { label: t("specAddress"), value: strOr(l.address) },
     { label: t("specParking"), value: fmtBool(l.parking) },
     { label: t("specElevator"), value: fmtBool(l.elevator) },
