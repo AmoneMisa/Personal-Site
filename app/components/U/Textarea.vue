@@ -114,7 +114,12 @@ const floated = computed(() => floating.value && (focused.value || (props.modelV
 
 .u-textarea__outline {
   position: absolute;
-  inset: 0;
+  /* Shifted up by half the legend, for the same reason as UInput's: a fieldset
+     paints its top border through the middle of its legend, not at its edge. */
+  top: calc(var(--ui-notch-h) / -2);
+  right: 0;
+  bottom: 0;
+  left: 0;
   margin: 0;
   padding: 0 calc(var(--ui-control-px) - 5px);
   border: 1px solid var(--ui-control-border);
@@ -134,7 +139,8 @@ const floated = computed(() => floating.value && (focused.value || (props.modelV
 .u-textarea__notch {
   padding: 0;
   font-size: calc(var(--ui-control-font) * var(--ui-floating-scale));
-  line-height: 1;
+  height: var(--ui-notch-h);
+  line-height: var(--ui-notch-h);
   max-width: 0.01px;
   white-space: nowrap;
   visibility: hidden;

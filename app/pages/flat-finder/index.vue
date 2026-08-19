@@ -272,6 +272,19 @@ function filterLabel(key: keyof typeof FILTER_LABELS.en): string {
   return FILTER_LABELS[lang][key];
 }
 
+// A range row labels its two fields "от"/"до" directly, so the caption above the
+// pair carries only the subject — "Комнат от … до" read as a stutter once the
+// fields said "от" and "до" themselves.
+const RANGE_LABELS = {
+  ru: { rooms: "Комнат", bedrooms: "Спален", area: "Площадь, м²", floor: "Этаж", totalFloors: "Этажей в доме", year: "Год постройки" },
+  en: { rooms: "Rooms", bedrooms: "Bedrooms", area: "Area, m²", floor: "Floor", totalFloors: "Building floors", year: "Built" },
+} as const;
+function rangeLabel(key: keyof typeof RANGE_LABELS.en): string {
+  return RANGE_LABELS[locale.value.startsWith("ru") ? "ru" : "en"][key];
+}
+const rangeFrom = computed(() => (locale.value.startsWith("ru") ? "от" : "from"));
+const rangeTo = computed(() => (locale.value.startsWith("ru") ? "до" : "to"));
+
 function readSavedList(key: string, limit = MAX_SAVED_FLATS): Listing[] {
   try {
     const value = JSON.parse(localStorage.getItem(key) || "[]");
@@ -693,7 +706,7 @@ onBeforeUnmount(() => { modalOpen.value = false; lightboxIndex.value = null; rel
 
     <form ref="filtersEl" class="flats__controls flats__controls_redesign" @submit.prevent="load()">
       <div class="flats__searchbar">
-        <u-input v-model="query" clearable icon="i-lucide-search" :placeholder="t('searchPlaceholder')" />
+        <u-input v-model="query" clearable icon="i-lucide-search" :label="t('search')" :placeholder="t('searchPlaceholder')" />
         <u-button type="submit" :loading="loading" icon="i-lucide-search">{{ loading ? t("searching") : t("search") }}</u-button>
       </div>
 
@@ -728,9 +741,9 @@ onBeforeUnmount(() => { modalOpen.value = false; lightboxIndex.value = null; rel
 
         <div class="filter-price-row">
           <span class="flats__field-label filter-price-row__label">{{ locale.startsWith('ru') ? 'Цена' : 'Price' }}</span>
-          <label class="price-input"><span>{{ locale.startsWith('ru') ? 'от' : 'min' }}</span><u-input v-model.number="priceMin" type="number" inputmode="numeric" min="1" max="1000000000" :ui="{ base: 'price-number-input' }" @change="scheduleLoad()" /></label>
+          <u-input v-model.number="priceMin" class="price-input" type="number" inputmode="numeric" min="1" max="1000000000" :label="locale.startsWith('ru') ? 'от' : 'min'" @change="scheduleLoad()" />
           <span class="price-separator">—</span>
-          <label class="price-input"><span>{{ locale.startsWith('ru') ? 'до' : 'max' }}</span><u-input v-model.number="priceMax" type="number" inputmode="numeric" min="1" max="1000000000" :ui="{ base: 'price-number-input' }" @change="scheduleLoad()" /></label>
+          <u-input v-model.number="priceMax" class="price-input" type="number" inputmode="numeric" min="1" max="1000000000" :label="locale.startsWith('ru') ? 'до' : 'max'" @change="scheduleLoad()" />
           <label class="currency-select"><span class="sr-only">{{ t("currency") }}</span><u-select-menu v-model="displayCurrency" :items="currencyItems" value-key="value" label-key="label" class="flats__select currency-select__control" @update:model-value="(priceMin != null || priceMax != null) && scheduleLoad()" /></label>
         </div>
 
@@ -771,7 +784,7 @@ onBeforeUnmount(() => { modalOpen.value = false; lightboxIndex.value = null; rel
           <div class="filter-group"><h3><u-icon name="i-lucide-megaphone" /> {{ locale.startsWith('ru') ? 'Объявление' : 'Listing' }}</h3>
             <label class="flats__field"><span class="flats__field-label">{{ filterLabel("audience") }}</span><u-select-menu v-model="audienceSel" :items="audienceItems" value-key="value" label-key="label" :search-input="false" class="flats__select" @update:model-value="scheduleLoad()" /></label>
             <label class="flats__field"><span class="flats__field-label">{{ t("propertyType") }}</span><u-select-menu v-model="propertyTypeSel" :items="propertyTypeItems" value-key="value" label-key="label" :search-input="false" class="flats__select" @update:model-value="scheduleLoad()" /></label>
-            <label class="flats__field"><span class="flats__field-label">{{ filterLabel("freshDays") }}</span><u-input v-model.number="maxAgeDays" type="number" min="1" max="21" @change="scheduleLoad()" /></label>
+            <div class="flats__field"><u-input v-model.number="maxAgeDays" type="number" min="1" max="21" :label="filterLabel('freshDays')" @change="scheduleLoad()" /></div>
           </div>
         </div>
       </section>
@@ -801,7 +814,7 @@ onBeforeUnmount(() => { modalOpen.value = false; lightboxIndex.value = null; rel
 
     <teleport to="body"><div v-if="lightboxPhoto" class="flat-lightbox" role="dialog" aria-modal="true" :aria-label="t('photoViewer')" @click="closeLightbox"><div class="flat-lightbox__stage" @click.stop @pointerdown="onLightboxPointerDown" @pointerup="onLightboxPointerUp" @pointercancel="onLightboxPointerCancel"><img :src="lightboxPhoto" :alt="`${modalTitle(active)} (${lightboxPosition}/${lightboxPhotos.length})`" referrerpolicy="no-referrer" draggable="false" @error="lightboxPhotoFailed" @mousemove="updateLightboxZoom" @mouseleave="resetLightboxZoom" /></div><button v-if="lightboxPhotos.length > 1" type="button" class="flat-lightbox__nav flat-lightbox__nav_left" :aria-label="t('previousPhoto')" @click.stop="moveLightbox(-1)"><u-icon name="i-lucide-chevron-left" /></button><button v-if="lightboxPhotos.length > 1" type="button" class="flat-lightbox__nav flat-lightbox__nav_right" :aria-label="t('nextPhoto')" @click.stop="moveLightbox(1)"><u-icon name="i-lucide-chevron-right" /></button><span v-if="lightboxPhotos.length > 1" class="flat-lightbox__counter">{{ lightboxPosition }} / {{ lightboxPhotos.length }}</span><button type="button" class="flat-lightbox__close" :aria-label="t('closePhoto')" @click.stop="closeLightbox"><u-icon name="i-lucide-x" /></button></div></teleport>
 
-    <u-modal v-model:open="presetModalOpen" :title="t('savePreset')"><template #body><u-input v-model="presetName" autofocus :placeholder="t('presetName')" @keyup.enter="savePreset" /></template><template #footer><u-button color="neutral" variant="ghost" @click="presetModalOpen = false">{{ t("cancel") }}</u-button><u-button @click="savePreset">{{ t("save") }}</u-button></template></u-modal>
+    <u-modal v-model:open="presetModalOpen" :title="t('savePreset')"><template #body><u-input v-model="presetName" autofocus :label="t('presetName')" @keyup.enter="savePreset" /></template><template #footer><u-button color="neutral" variant="ghost" @click="presetModalOpen = false">{{ t("cancel") }}</u-button><u-button @click="savePreset">{{ t("save") }}</u-button></template></u-modal>
     <u-modal v-model:open="shareModalOpen" :title="sharedLinkOpened ? t('sharedSearchApplied') : t('shareSearch')"><template #body><p class="flat-share__hint">{{ sharedLinkOpened ? t("sharedSearchHint") : t("shareSearchHint") }}</p><u-input :model-value="shareUrl" readonly /></template><template #footer><u-button icon="i-lucide-copy" @click="copyShareLink">{{ t("copyLink") }}</u-button></template></u-modal>
     <button v-if="showBackToTop" type="button" class="flats__back-top" :aria-label="filterLabel('backToTop')" @click="scrollToFilters"><u-icon name="i-lucide-arrow-up" /><span>{{ filterLabel("backToTop") }}</span></button>
     <u-modal v-model:open="listingShareModalOpen" :title="t('shareListing')"><template #body><p class="flat-share__hint">{{ t("shareListingHint") }}</p><u-input :model-value="listingShareUrl" readonly /></template><template #footer><u-button :icon="listingShareCopied ? 'i-lucide-check' : 'i-lucide-copy'" @click="copyListingShareLink">{{ listingShareCopied ? t("shareCopied") : t("copyLink") }}</u-button></template></u-modal>
@@ -923,13 +936,10 @@ onBeforeUnmount(() => { modalOpen.value = false; lightboxIndex.value = null; rel
    column-gap does the spacing now instead of a per-element margin. */
 .filter-price-row { display: grid; grid-template-columns: auto minmax(130px,190px) auto minmax(130px,190px) minmax(120px,145px); justify-content: start; align-items: center; column-gap: 8px; row-gap: 10px; margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--line); }
 .filter-price-row__label { margin: 0; }
-.price-input { min-height: var(--ui-control-h-md); height: var(--ui-control-h-md); display: grid; grid-template-columns: auto minmax(0,1fr); align-items: stretch; gap: 6px; padding-left: 10px; border: 1px solid var(--line); border-radius: 7px; background: var(--bg-panel-2); color: var(--ui-text-muted); font-size: 12px; overflow: hidden; }
-.price-input :deep(.price-number-input) { border: 0 !important; box-shadow: none !important; background: transparent !important; min-width: 0; min-height: 0 !important; height: 100%; padding: 0 !important; font-size: 13px; font-variant-numeric: tabular-nums; }
-.price-input :deep(input) { min-width: 0; padding-inline: 2px; height: 100%; }
-/* The wrapper stretches its children, so the "от"/"до" caption and the field
-   itself each centre their own text — previously the caption sat at the top. */
-.price-input > span { display: flex; align-items: center; line-height: 1; }
-.price-input :deep(.price-number-input) { display: flex; align-items: center; }
+/* "от" / "до" are floating labels on the fields themselves now. The wrapper that
+   used to draw a box around a caption plus a de-bordered input — and all the
+   !important needed to stop that drawing two borders — is gone with it. */
+.price-input :deep(input) { font-variant-numeric: tabular-nums; }
 .price-separator { text-align: center; color: var(--ui-text-muted); }
 .currency-select { min-width: 0; }
 .currency-select__control :deep(button) { min-height: var(--ui-control-h-md); height: var(--ui-control-h-md); background: var(--bg-panel-2) !important; border-color: rgba(224,103,154,.78) !important; color: var(--text-white); font-weight: 800; letter-spacing: .04em; box-shadow: inset 0 0 0 1px rgba(224,103,154,.08); }

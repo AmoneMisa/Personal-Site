@@ -15,13 +15,24 @@
     --ui-control-px: 12px;
     --ui-control-radius: 8px;
     --ui-control-font: 13px;
-    /* Floating-label variants; see .ui-control_floating below. */
-    --ui-floating-h-sm: 40px;
-    --ui-floating-h-md: 46px;
-    --ui-floating-h-lg: 54px;
+    /* Floating-label variants. Deliberately the same heights as every other
+       control: a field with a floating label sits in the same rows as plain
+       selects and inputs, and anything taller reads as a mismatch. The label
+       needs no extra room because it rests on the border, outside the box.
+       Named separately only because the label's lift distance is derived from
+       them. */
+    --ui-floating-h-sm: var(--ui-control-h-sm);
+    --ui-floating-h-md: var(--ui-control-h-md);
+    --ui-floating-h-lg: var(--ui-control-h-lg);
     /* How far the label shrinks once it sits on the border. The notch is sized
        from the same number, so they must not drift apart. */
     --ui-floating-scale: 0.78;
+    /* Height of the notch legend. A fieldset paints its top border through the
+       middle of its legend, so this height is also exactly how far the border
+       gets displaced downward, and the outline is shifted up by half of it to
+       compensate. Fixed rather than derived from the font, so the compensation
+       cannot drift out of step with it. */
+    --ui-notch-h: 11px;
     /* Breakpoints, named once so components stop hard-coding pixel values. */
     --ui-bp-sm: 640px;
     --ui-bp-md: 768px;
@@ -47,9 +58,6 @@
         --ui-control-h-md: 44px;
         --ui-control-h-lg: 48px;
         --ui-control-font: 14px; /* also stops iOS zooming the page on focus */
-        --ui-floating-h-sm: 46px;
-        --ui-floating-h-md: 52px;
-        --ui-floating-h-lg: 58px;
     }
 }
 

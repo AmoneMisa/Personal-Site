@@ -54,6 +54,19 @@ function clear() {
 // :autofill rule in the stylesheet lifts it too.
 const inputId = useId();
 const focused = ref(false);
+const fieldEl = ref<HTMLInputElement | null>(null);
+
+// The control is wider and taller than the input's text box — there is the side
+// padding, and with a floating label the extra height too. Clicking any of that
+// should put the caret in the field, the way clicking a native control does.
+function focusFieldFromPadding(event: MouseEvent) {
+  const target = event.target as HTMLElement | null;
+  if (!target || target === fieldEl.value) return;
+  // Leave the clear button and anything else interactive to handle its own click.
+  if (target.closest("button")) return;
+  event.preventDefault(); // stops the click from clearing the selection
+  fieldEl.value?.focus();
+}
 const floating = computed(() => Boolean(props.label));
 const floated = computed(() => floating.value && (focused.value || hasValue.value));
 </script>
@@ -74,9 +87,11 @@ const floated = computed(() => floating.value && (focused.value || hasValue.valu
         props.ui?.base,
         $attrs.class,
       ]"
+      @mousedown="focusFieldFromPadding"
   >
     <UIcon v-if="icon" :name="icon" class="u-input__icon" />
     <input
+        ref="fieldEl"
         v-bind="{ ...$attrs, class: undefined }"
         :id="floating ? inputId : ($attrs.id as string | undefined)"
         :value="modelValue ?? ''"
@@ -114,6 +129,10 @@ const floated = computed(() => floating.value && (focused.value || hasValue.valu
   flex: 1 1 auto;
   min-width: 0;
   width: 100%;
+  /* Fill the control's height instead of just the text line, so a click
+     anywhere down the field lands on the input. An <input> centres its own
+     value vertically, so this does not move the text. */
+  align-self: stretch;
   border: 0;
   outline: none;
   background: transparent;
@@ -165,7 +184,14 @@ const floated = computed(() => floating.value && (focused.value || hasValue.valu
   position: absolute;
   left: var(--ui-control-px);
   top: 50%;
-  transform: translateY(-50%);
+  /* One transform declaration; the states below only change these three
+     variables. Two competing `transform` rules of equal specificity were
+     fragile — the resting offset for a leading icon was beating the lifted
+     state — and a single declaration cannot be beaten by ordering. */
+  --label-x: 0px;
+  --label-y: -50%;
+  --label-scale: 1;
+  transform: translate(var(--label-x), var(--label-y)) scale(var(--label-scale));
   transform-origin: left center;
   max-width: calc(100% - var(--ui-control-px) * 2);
   overflow: hidden;
@@ -178,14 +204,16 @@ const floated = computed(() => floating.value && (focused.value || hasValue.valu
   pointer-events: none;
   transition: transform var(--ui-transition), color var(--ui-transition);
 }
-/* A leading icon pushes the resting label clear of it. Expressed as a transform
-   so that lifting the label interpolates from here in one motion. */
-.u-input_with-icon .u-input__label { transform: translate(calc(1.05em + 7px), -50%); }
+/* A leading icon pushes the resting label clear of it. */
+.u-input_with-icon .u-input__label { --label-x: calc(1.05em + 7px); }
 
 /* Lifted: centre the label on the top border and shrink it. Scaling about the
-   left edge keeps it anchored where the notch opens. */
+   left edge keeps it anchored where the notch opens, and it returns to x=0
+   because the notch starts at the control's edge, not after the icon. */
 .u-input_floated .u-input__label {
-  transform: translateY(calc(-50% - var(--ui-floating-h-md) / 2)) scale(var(--ui-floating-scale));
+  --label-x: 0px;
+  --label-y: calc(-50% - var(--ui-floating-h-md) / 2);
+  --label-scale: var(--ui-floating-scale);
 }
 .u-input_floating.ui-control_sm .u-input__label { --ui-floating-h-md: var(--ui-floating-h-sm); }
 .u-input_floating.ui-control_lg .u-input__label { --ui-floating-h-md: var(--ui-floating-h-lg); }
@@ -194,8 +222,16 @@ const floated = computed(() => floating.value && (focused.value || hasValue.valu
 .u-input__outline {
   position: absolute;
   /* -1px on every side so the fieldset's border box lands exactly where
-     .ui-control's border would have been. */
-  inset: -1px;
+     .ui-control's border would have been — except at the top, where half the
+     legend's height is subtracted as well. A fieldset paints its top border
+     through the middle of its legend rather than at the edge of its box, so
+     without this the border sits ~5px inside the control: the control's own
+     background edge then showed above it as a second line, and the value looked
+     to be sitting above centre in the box the border described. */
+  top: calc(-1px - var(--ui-notch-h) / 2);
+  right: -1px;
+  bottom: -1px;
+  left: -1px;
   margin: 0;
   padding: 0 calc(var(--ui-control-px) - 5px);
   border: 1px solid var(--ui-control-border);
@@ -220,31 +256,33 @@ const floated = computed(() => floating.value && (focused.value || hasValue.valu
   padding: 0;
   /* Matches the lifted label's size so the gap is neither tight nor loose. */
   font-size: calc(var(--ui-control-font) * var(--ui-floating-scale));
-  line-height: 1;
+  /* Fixed height, because the outline's compensation above is derived from it. */
+  height: var(--ui-notch-h);
+  line-height: var(--ui-notch-h);
   /* Collapsed while the label is down: not 0, because a zero-width legend still
-     cuts a hairline out of the border in some engines. */
-  max-width: 0.01px;
+     cuts a hairline out of the border in some engines. Driven by a variable for
+     the same reason as the label's transform. */
+  --notch-max: 0.01px;
+  --notch-px: 0px;
+  max-width: var(--notch-max);
+  padding-inline: var(--notch-px);
   white-space: nowrap;
   /* The text only reserves the width; the visible copy is the <label>. */
   visibility: hidden;
   transition: max-width var(--ui-transition);
 }
-.u-input_floated .u-input__notch {
-  max-width: 100%;
-  padding: 0 5px;
-}
+.u-input_floated .u-input__notch { --notch-max: 100%; --notch-px: 5px; }
 
 /* A field filled by the browser never fires input, so the component's own state
    does not know it holds a value; without this the label would sit on top of the
    autofilled text. Kept in rules of their own: grouping :autofill with the rules
    above would take those down with it wherever the selector is unsupported. */
 .u-input_floating:has(.u-input__field:autofill) .u-input__label {
-  transform: translateY(calc(-50% - var(--ui-floating-h-md) / 2)) scale(var(--ui-floating-scale));
+  --label-x: 0px;
+  --label-y: calc(-50% - var(--ui-floating-h-md) / 2);
+  --label-scale: var(--ui-floating-scale);
 }
-.u-input_floating:has(.u-input__field:autofill) .u-input__notch {
-  max-width: 100%;
-  padding: 0 5px;
-}
+.u-input_floating:has(.u-input__field:autofill) .u-input__notch { --notch-max: 100%; --notch-px: 5px; }
 
 /* The placeholder would otherwise sit behind the resting label and read as
    doubled text. It appears as the label leaves. */

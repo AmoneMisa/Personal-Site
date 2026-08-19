@@ -937,8 +937,8 @@ onBeforeUnmount(() => {
 
     <!-- Filters + sort -->
     <form class="jobs__controls" @submit.prevent="load(1)">
-      <u-input v-model="query" clearable icon="i-lucide-search" :placeholder="t('searchPlaceholder')" />
-      <u-input v-model.number="salaryMin" type="number" icon="i-lucide-banknote" :placeholder="`${t('salaryMin')} (${displayCurrency}/${periodLabel(displayPeriod)})`" />
+      <u-input v-model="query" clearable icon="i-lucide-search" :label="t('search')" :placeholder="t('searchPlaceholder')" />
+      <u-input v-model.number="salaryMin" type="number" icon="i-lucide-banknote" :label="`${t('salaryMin')} (${displayCurrency}/${periodLabel(displayPeriod)})`" />
       <div class="jobs__sort">
         <u-icon name="i-lucide-arrow-down-wide-narrow" />
         <u-select-menu
@@ -1007,13 +1007,12 @@ onBeforeUnmount(() => {
               class="jobs__select" @update:model-value="scheduleLoad()"
           />
         </label>
-        <label class="jobs__field jobs__field_wide">
-          <span class="jobs__field-label">{{ t("cities") }}</span>
+        <div class="jobs__field jobs__field_wide">
           <u-input
-              v-model="cities" icon="i-lucide-map-pin" :placeholder="t('citiesPlaceholder')"
+              v-model="cities" icon="i-lucide-map-pin" :label="t('cities')" :placeholder="t('citiesPlaceholder')"
               @keyup.enter="load(1)" @change="scheduleLoad()"
           />
-        </label>
+        </div>
         <label class="jobs__field">
           <span class="jobs__field-label">{{ t("currency") }}</span>
           <u-select-menu
@@ -1049,14 +1048,13 @@ onBeforeUnmount(() => {
               :search-input="false" class="jobs__select" @update:model-value="scheduleLoad()"
           />
         </label>
-        <label class="jobs__field">
-          <span class="jobs__field-label">{{ t("experienceMax") }}</span>
+        <div class="jobs__field">
           <u-input
               v-model.number="maxExperience" type="number" min="0" max="40"
-              icon="i-lucide-briefcase" :placeholder="t('experienceMaxPlaceholder')"
+              icon="i-lucide-briefcase" :label="t('experienceMax')" :placeholder="t('experienceMaxPlaceholder')"
               @keyup.enter="load(1)" @change="scheduleLoad()"
           />
-        </label>
+        </div>
         <label class="jobs__field">
           <span class="jobs__field-label">{{ t("language") }}</span>
           <u-select-menu
@@ -1079,10 +1077,9 @@ onBeforeUnmount(() => {
               class="jobs__select" @update:model-value="scheduleLoad()"
           />
         </label>
-        <label class="jobs__field jobs__field_wide">
-          <span class="jobs__field-label">{{ t("skills") }}</span>
-          <u-input v-model="skills" icon="i-lucide-wrench" :placeholder="t('skillsPlaceholder')" @keyup.enter="load(1)" />
-        </label>
+        <div class="jobs__field jobs__field_wide">
+          <u-input v-model="skills" icon="i-lucide-wrench" :label="t('skills')" :placeholder="t('skillsPlaceholder')" @keyup.enter="load(1)" />
+        </div>
         <label class="jobs__remote jobs__field_inline">
           <u-switch v-model="hasSalary" @update:model-value="scheduleLoad()" />
           <span>{{ t("hasSalary") }}</span>

@@ -526,7 +526,7 @@ onBeforeUnmount(() => {
     </div>
 
     <form class="hiring__controls" @submit.prevent="load()">
-      <u-input v-model="query" clearable icon="i-lucide-search" :placeholder="t('searchPlaceholder')" />
+      <u-input v-model="query" clearable icon="i-lucide-search" :label="t('search')" :placeholder="t('searchPlaceholder')" />
       <u-button type="submit" :loading="loading" icon="i-lucide-search">
         {{ loading ? t("searching") : t("search") }}
       </u-button>
@@ -584,19 +584,17 @@ onBeforeUnmount(() => {
           <u-select-menu v-model="remoteSel" :items="remoteItems" value-key="value" label-key="label"
               :search-input="false" class="hiring__select" @update:model-value="scheduleLoad()" />
         </label>
-        <label class="hiring__field">
-          <span class="hiring__field-label">{{ t("experienceMin") }}</span>
-          <u-input v-model.number="experienceMin" type="number" min="0" icon="i-lucide-briefcase" @change="scheduleLoad()" />
-        </label>
+        <div class="hiring__field">
+          <u-input v-model.number="experienceMin" type="number" min="0" icon="i-lucide-briefcase" :label="t('experienceMin')" @change="scheduleLoad()" />
+        </div>
         <label class="hiring__field">
           <span class="hiring__field-label">{{ t("seniority") }}</span>
           <u-select-menu v-model="senioritySel" :items="seniorityItems" value-key="value" label-key="label"
               :search-input="false" class="hiring__select" @update:model-value="scheduleLoad()" />
         </label>
-        <label class="hiring__field">
-          <span class="hiring__field-label">{{ t("skills") }}</span>
-          <u-input v-model="skills" icon="i-lucide-code" :placeholder="t('skillsPlaceholder')" @change="scheduleLoad()" />
-        </label>
+        <div class="hiring__field">
+          <u-input v-model="skills" icon="i-lucide-code" :label="t('skills')" :placeholder="t('skillsPlaceholder')" @change="scheduleLoad()" />
+        </div>
         <u-button type="button" variant="ghost" color="neutral" size="sm" icon="i-lucide-rotate-ccw" @click="resetFilters">
           {{ t("reset") }}
         </u-button>

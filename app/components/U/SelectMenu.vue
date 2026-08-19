@@ -121,16 +121,66 @@ function onKeydown(event: KeyboardEvent) {
 
 function onDocumentPointer(event: PointerEvent) {
   if (!open.value) return;
-  if (root.value && !root.value.contains(event.target as Node)) close();
+  const target = event.target as Node;
+  // The popup is teleported out of `root`, so it has to be checked separately —
+  // otherwise clicking an option would count as an outside click and close the
+  // menu before the option could be chosen.
+  if (root.value?.contains(target) || popupEl.value?.contains(target)) return;
+  close();
 }
 
-watch(open, (isOpen) => {
+// The popup lives on <body> rather than beside the trigger. Any ancestor with
+// `overflow: hidden` — the advanced filter card, a modal body, a scroll area —
+// would otherwise clip it, and there is no way for a component to know which of
+// its ancestors does that. Being on <body> it has to be positioned by hand.
+const popupEl = ref<HTMLElement | null>(null);
+const popupStyle = ref<Record<string, string>>({});
+
+const POPUP_GAP = 4;
+const POPUP_MAX_H = 300;
+
+function updatePosition() {
+  const trigger = root.value?.firstElementChild as HTMLElement | undefined;
+  if (!trigger) return;
+  const rect = trigger.getBoundingClientRect();
+  const below = window.innerHeight - rect.bottom - POPUP_GAP;
+  const above = rect.top - POPUP_GAP;
+  // Flip above the trigger only when that genuinely gives more room, so a menu
+  // near the bottom of the window stays usable instead of being squeezed.
+  const flip = below < Math.min(POPUP_MAX_H, 200) && above > below;
+  popupStyle.value = {
+    position: "fixed",
+    left: `${rect.left}px`,
+    width: `${rect.width}px`,
+    maxHeight: `${Math.max(140, Math.min(POPUP_MAX_H, flip ? above : below))}px`,
+    ...(flip
+      ? { bottom: `${window.innerHeight - rect.top + POPUP_GAP}px` }
+      : { top: `${rect.bottom + POPUP_GAP}px` }),
+  };
+}
+
+watch(open, async (isOpen) => {
   if (import.meta.server) return;
-  if (isOpen) document.addEventListener("pointerdown", onDocumentPointer);
-  else document.removeEventListener("pointerdown", onDocumentPointer);
+  if (isOpen) {
+    updatePosition();
+    await nextTick();
+    updatePosition(); // again once the popup has a size, in case it has to flip
+    document.addEventListener("pointerdown", onDocumentPointer);
+    // Capture phase: the trigger may sit inside a scrolling panel, whose scroll
+    // events do not bubble to window.
+    window.addEventListener("scroll", updatePosition, true);
+    window.addEventListener("resize", updatePosition);
+  } else {
+    document.removeEventListener("pointerdown", onDocumentPointer);
+    window.removeEventListener("scroll", updatePosition, true);
+    window.removeEventListener("resize", updatePosition);
+  }
 });
 onBeforeUnmount(() => {
-  if (!import.meta.server) document.removeEventListener("pointerdown", onDocumentPointer);
+  if (import.meta.server) return;
+  document.removeEventListener("pointerdown", onDocumentPointer);
+  window.removeEventListener("scroll", updatePosition, true);
+  window.removeEventListener("resize", updatePosition);
 });
 </script>
 
@@ -151,7 +201,8 @@ onBeforeUnmount(() => {
       <UIcon name="i-lucide-chevron-down" class="u-select-menu__chevron" :class="{ 'u-select-menu__chevron_open': open }" />
     </button>
 
-    <div v-if="open" class="u-select-menu__popup" role="listbox">
+    <Teleport to="body">
+    <div v-if="open" ref="popupEl" class="u-select-menu__popup" role="listbox" :style="popupStyle">
       <input
           v-if="searchable"
           ref="searchEl"
@@ -178,6 +229,7 @@ onBeforeUnmount(() => {
         </li>
       </ul>
     </div>
+    </Teleport>
   </div>
 </template>
 
@@ -206,11 +258,13 @@ onBeforeUnmount(() => {
 .u-select-menu__chevron_open { transform: rotate(180deg); }
 
 .u-select-menu__popup {
-  position: absolute;
-  z-index: 50;
-  top: calc(100% + 4px);
-  left: 0;
-  right: 0;
+  /* Position comes from `popupStyle` — the popup is on <body>, not beside the
+     trigger. Above the modal's 1000 so a select inside a dialog still opens. */
+  position: fixed;
+  z-index: 1100;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
   padding: 5px;
   border: 1px solid var(--ui-control-border);
   border-radius: var(--ui-control-radius);
@@ -219,6 +273,7 @@ onBeforeUnmount(() => {
 }
 
 .u-select-menu__search {
+  flex: none;
   width: 100%;
   margin-bottom: 5px;
   padding: 6px 8px;
@@ -232,9 +287,10 @@ onBeforeUnmount(() => {
 }
 
 .u-select-menu__list {
-  /* Never taller than the space actually available, so on a short viewport the
-     list scrolls instead of running off the bottom of the screen. */
-  max-height: min(260px, 45dvh);
+  /* The popup's own max-height is measured against the real space beside the
+     trigger; the list just takes what is left of it and scrolls. */
+  flex: 1 1 auto;
+  min-height: 0;
   overflow-y: auto;
   overscroll-behavior: contain;
   margin: 0;
