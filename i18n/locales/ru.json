@@ -73,6 +73,8 @@
     "translatedDescription": "Перевод описания",
     "translationFailed": "Перевод временно недоступен",
     "hideEmpty": "Скрыть пустые поля",
+    "moreFilters": "Больше фильтров",
+    "hideFilters": "Скрыть фильтры",
     "share": "Поделиться",
     "shareCopied": "Ссылка скопирована",
     "shareListing": "Поделиться объявлением",

@@ -144,7 +144,9 @@ const displayCurrency = ref("USD"); // currency for price display + the min/max 
 const rates = ref<Record<string, number>>({ USD: 1 }); // units per 1 USD, from /flats-rates
 const query = ref("");
 const source = ref(""); // "" = all
-const showAdvanced = ref(true);
+// Advanced filters collapse by default to keep the panel compact (especially on
+// mobile); the choice is persisted in loadPersonalState/toggleAdvanced.
+const showAdvanced = ref(false);
 
 const listings = ref<Listing[]>([]);
 const total = ref(0);
@@ -310,6 +312,16 @@ function loadPersonalState() {
   } catch {
     presets.value = [];
   }
+  try {
+    showAdvanced.value = localStorage.getItem("flats:showAdvanced") === "1";
+  } catch { /* storage blocked */ }
+}
+
+function toggleAdvanced() {
+  showAdvanced.value = !showAdvanced.value;
+  try {
+    localStorage.setItem("flats:showAdvanced", showAdvanced.value ? "1" : "0");
+  } catch { /* storage blocked */ }
 }
 
 const hiddenIds = computed(() => new Set(hidden.value.map((item) => item.id)));
@@ -1525,6 +1537,18 @@ onBeforeUnmount(() => {
         </div>
       </div>
 
+      <div class="flats__advanced-toggle">
+        <u-button
+            type="button"
+            variant="ghost"
+            color="neutral"
+            size="sm"
+            :icon="showAdvanced ? 'i-lucide-chevron-up' : 'i-lucide-chevron-down'"
+            :aria-expanded="showAdvanced"
+            @click="toggleAdvanced"
+        >{{ showAdvanced ? t("hideFilters") : t("moreFilters") }}</u-button>
+      </div>
+
       <div v-if="showAdvanced" class="flats__advanced">
         <div class="flats__presets">
           <span class="flats__field-label">{{ t("presets") }}</span>
@@ -1871,6 +1895,7 @@ onBeforeUnmount(() => {
 }
 .flats__pill:hover { color: var(--text-white); }
 .flats__pill_active { color: var(--text-white); border-color: rgba(224,103,154,0.4); background: rgba(224,103,154,0.18); }
+.flats__advanced-toggle { grid-column: 1 / -1; display: flex; justify-content: flex-start; margin: 2px 0 6px; }
 .flats__advanced {
   grid-column: 1 / -1; display: grid; gap: 12px 14px; align-items: end; grid-template-columns: 1fr;
   padding: 14px; border-radius: 8px; border: 1px solid var(--line); background: rgba(255,255,255,0.02);

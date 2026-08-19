@@ -73,6 +73,8 @@
     "translatedDescription": "Translated description",
     "translationFailed": "Translation is temporarily unavailable",
     "hideEmpty": "Hide empty fields",
+    "moreFilters": "More filters",
+    "hideFilters": "Hide filters",
     "share": "Share",
     "shareCopied": "Link copied",
     "shareListing": "Share listing",
