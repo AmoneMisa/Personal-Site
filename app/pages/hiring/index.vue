@@ -69,6 +69,10 @@ const city = ref("");
 const remote = ref("any");
 const experienceMin = ref<number | undefined>(undefined);
 const query = ref("");
+// Canonical seniority + comma-separated canonical skills, mirroring the Job
+// Finder's filter model so both halves of the site behave the same way.
+const seniority = ref("");
+const skills = ref("");
 const source = ref("");
 const showAdvanced = ref(true);
 
@@ -118,6 +122,18 @@ const remoteItems = computed<Item[]>(() => [
   { label: t("remoteNo"), value: "no" },
 ]);
 const remoteSel = computed<string>({ get: () => remote.value, set: (v) => (remote.value = v) });
+const SENIORITY_ANY = "__any__";
+const seniorityItems = computed<Item[]>(() => [
+  { label: t("seniorityAny"), value: SENIORITY_ANY },
+  { label: t("seniorityJunior"), value: "junior" },
+  { label: t("seniorityMiddle"), value: "middle" },
+  { label: t("senioritySenior"), value: "senior" },
+  { label: t("seniorityLead"), value: "lead" },
+]);
+const senioritySel = computed<string>({
+  get: () => seniority.value || SENIORITY_ANY,
+  set: (v) => (seniority.value = v === SENIORITY_ANY ? "" : v),
+});
 
 function readSavedList(key: string, limit = MAX_SAVED): CvProfile[] {
   try {
@@ -267,6 +283,9 @@ async function load(append = false, background = false) {
   if (remote.value === "no") params.remote = "0";
   if (experienceMin.value != null) params.experienceMin = String(experienceMin.value);
   if (query.value.trim()) params.query = query.value.trim();
+  if (seniority.value) params.seniority = seniority.value;
+  const skillList = skills.value.split(",").map((s) => s.trim()).filter(Boolean);
+  if (skillList.length) params.skills = skillList.join(",");
   params.sources = source.value || SOURCES.join(",");
 
   const { data, error } = await safeFetch<FeedResult>("/hiring-feed", { params });
@@ -311,6 +330,8 @@ function resetFilters() {
   remote.value = "any";
   experienceMin.value = undefined;
   query.value = "";
+  seniority.value = "";
+  skills.value = "";
   scheduleLoad(80);
 }
 function setView(next: HiringView) { view.value = next; }
@@ -570,6 +591,15 @@ onBeforeUnmount(() => {
         <label class="hiring__field">
           <span class="hiring__field-label">{{ t("experienceMin") }}</span>
           <u-input v-model.number="experienceMin" type="number" min="0" icon="i-lucide-briefcase" @change="scheduleLoad()" />
+        </label>
+        <label class="hiring__field">
+          <span class="hiring__field-label">{{ t("seniority") }}</span>
+          <u-select-menu v-model="senioritySel" :items="seniorityItems" value-key="value" label-key="label"
+              :search-input="false" class="hiring__select" @update:model-value="scheduleLoad()" />
+        </label>
+        <label class="hiring__field">
+          <span class="hiring__field-label">{{ t("skills") }}</span>
+          <u-input v-model="skills" icon="i-lucide-code" :placeholder="t('skillsPlaceholder')" @change="scheduleLoad()" />
         </label>
         <u-button type="button" variant="ghost" color="neutral" size="sm" icon="i-lucide-rotate-ccw" @click="resetFilters">
           {{ t("reset") }}

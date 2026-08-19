@@ -300,7 +300,15 @@
     "today": "сегодня",
     "yesterday": "вчера",
     "daysAgo": "{n} дн. назад",
-    "monthsAgo": "{n} мес. назад"
+    "monthsAgo": "{n} мес. назад",
+    "seniority": "Уровень",
+    "seniorityAny": "Любой уровень",
+    "seniorityJunior": "Junior",
+    "seniorityMiddle": "Middle",
+    "senioritySenior": "Senior",
+    "seniorityLead": "Lead",
+    "skills": "Навыки",
+    "skillsPlaceholder": "React, TypeScript"
   },
   "jobs": {
     "advanced": "Расширенные фильтры",

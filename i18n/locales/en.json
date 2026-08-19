@@ -300,7 +300,15 @@
     "today": "today",
     "yesterday": "yesterday",
     "daysAgo": "{n} days ago",
-    "monthsAgo": "{n} mo ago"
+    "monthsAgo": "{n} mo ago",
+    "seniority": "Seniority",
+    "seniorityAny": "Any level",
+    "seniorityJunior": "Junior",
+    "seniorityMiddle": "Middle",
+    "senioritySenior": "Senior",
+    "seniorityLead": "Lead",
+    "skills": "Skills",
+    "skillsPlaceholder": "React, TypeScript"
   },
   "jobs": {
     "advanced": "Advanced filters",

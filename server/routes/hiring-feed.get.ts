@@ -1,8 +1,15 @@
 // GET /hiring-feed — candidate CV/resume profiles (not employer vacancies).
 // Same-origin Nitro route; UI follows /flat-finder layout patterns.
+//
+// Search runs through Elasticsearch when it is reachable (relevance ranking,
+// fuzzy + multi-word + transliterated matching) and falls back to in-memory
+// filtering otherwise, so the page keeps working with the cluster down. The
+// store stays the source of truth for display: Elasticsearch only ranks ids.
 
 import { HIRING_COUNTRIES } from '../utils/hiringSources'
 import { getStoredCvProfiles, isHiringStoreCold, refreshHiringStore } from '../utils/hiringStore'
+import { candidateSearchAvailable, searchCandidates } from '../utils/hiringElastic'
+import { dedupeCandidates, normalizeCandidate } from '../utils/hiringNormalize'
 import type { CvProfile } from '../utils/hiringTypes'
 
 const PAGE_MAX = 60
@@ -11,11 +18,15 @@ function normalizeCity(value: string): string {
   return value.trim().toLocaleLowerCase('ru')
 }
 
-function matchesFilters(profile: CvProfile, params: URLSearchParams): boolean {
-  const countries = (params.get('countries') || '')
+function list(params: URLSearchParams, key: string): string[] {
+  return (params.get(key) || '')
     .split(',')
-    .map((code) => code.trim().toUpperCase())
+    .map((item) => item.trim())
     .filter(Boolean)
+}
+
+function matchesFilters(profile: CvProfile, params: URLSearchParams): boolean {
+  const countries = list(params, 'countries').map((code) => code.toUpperCase())
   if (countries.length && !countries.includes((profile.country || '').toUpperCase())) return false
 
   const city = normalizeCity(params.get('city') || '')
@@ -33,16 +44,31 @@ function matchesFilters(profile: CvProfile, params: URLSearchParams): boolean {
     if (profile.experienceYears == null || profile.experienceYears < expMin) return false
   }
 
+  const seniority = (params.get('seniority') || '').trim().toLowerCase()
+  if (seniority && (profile.seniority || '') !== seniority) return false
+
+  // Every requested skill must be present, matching the Job Finder's model.
+  const skills = list(params, 'skills').map((skill) => skill.toLowerCase())
+  if (skills.length) {
+    const owned = new Set((profile.skills || []).map((skill) => skill.toLowerCase()))
+    if (!skills.every((skill) => owned.has(skill))) return false
+  }
+
+  const languages = list(params, 'languages').map((language) => language.toLowerCase())
+  if (languages.length) {
+    const owned = new Set((profile.languages || []).map((language) => language.toLowerCase()))
+    if (!languages.some((language) => owned.has(language))) return false
+  }
+
   const query = (params.get('query') || '').trim().toLocaleLowerCase('ru')
   if (query) {
     const hay = `${profile.name} ${profile.role} ${profile.description} ${(profile.skills || []).join(' ')}`.toLocaleLowerCase('ru')
-    if (!hay.includes(query)) return false
+    // Multi-word queries match when every word appears, so word order and
+    // punctuation between them stop mattering in the fallback too.
+    if (!query.split(/\s+/).every((word) => hay.includes(word))) return false
   }
 
-  const sources = (params.get('sources') || '')
-    .split(',')
-    .map((source) => source.trim().toLowerCase())
-    .filter(Boolean)
+  const sources = list(params, 'sources').map((source) => source.toLowerCase())
   if (sources.length && !sources.includes(profile.source)) return false
 
   const profileId = params.get('profileId') || params.get('listingId')
@@ -66,29 +92,74 @@ export default defineEventHandler(async (event) => {
   const limit = Math.min(PAGE_MAX, Math.max(1, Number(params.get('limit')) || 20))
 
   let warming = false
-  let profiles = await getStoredCvProfiles()
-  if (!profiles.length && isHiringStoreCold()) {
+  const stored = await getStoredCvProfiles()
+  if (!stored.length && isHiringStoreCold()) {
     warming = true
     refreshHiringStore().catch((error) => {
       console.error('[hiring-feed] background refresh failed:', (error as Error).message)
     })
   }
 
-  const filtered = profiles.filter((profile) => matchesFilters(profile, params))
-  filtered.sort((a, b) => Date.parse(b.createdAt || '') - Date.parse(a.createdAt || ''))
+  // Canonical skills/seniority/contacts, then collapse reposts of the same CV.
+  const profiles = dedupeCandidates(stored.map(normalizeCandidate))
+  const byId = new Map(profiles.map((profile) => [profile.id, profile]))
+
+  const query = (params.get('query') || '').trim()
+  let page: CvProfile[] = []
+  let count = 0
+  let engine: 'elasticsearch' | 'memory' = 'memory'
+
+  if (query && (await candidateSearchAvailable())) {
+    const result = await searchCandidates({
+      query,
+      countries: list(params, 'countries').map((code) => code.toUpperCase()),
+      city: params.get('city') || undefined,
+      skills: list(params, 'skills'),
+      languages: list(params, 'languages'),
+      seniority: (params.get('seniority') || '').trim().toLowerCase() || undefined,
+      remote: params.get('remote') === '1' ? true : params.get('remote') === '0' ? false : undefined,
+      experienceMin: Number(params.get('experienceMin')) || undefined,
+      sources: list(params, 'sources'),
+      from: offset,
+      size: limit,
+    })
+    if (result) {
+      engine = 'elasticsearch'
+      count = result.total
+      // Hydrate from the store; an id missing there was removed since the last
+      // sync, so it is simply skipped rather than rendered as a broken card.
+      page = result.hits
+        .map(({ id, score }) => {
+          const profile = byId.get(id)
+          return profile ? { ...profile, score } : null
+        })
+        .filter((profile): profile is CvProfile => profile != null)
+    }
+  }
+
+  if (engine === 'memory') {
+    const filtered = profiles.filter((profile) => matchesFilters(profile, params))
+    filtered.sort((a, b) => Date.parse(b.createdAt || '') - Date.parse(a.createdAt || ''))
+    count = filtered.length
+    page = filtered.slice(offset, offset + limit)
+  }
 
   setResponseHeader(event, 'Cache-Control', 'no-store')
   return {
-    count: filtered.length,
-    profiles: filtered.slice(offset, offset + limit),
+    count,
+    profiles: page,
     sourceCounts: sourceCounts(profiles),
     warming,
+    engine,
     filters: {
       countries: params.get('countries') || '',
       city: params.get('city') || '',
       query: params.get('query') || '',
       remote: params.get('remote') || '',
       experienceMin: params.get('experienceMin') || '',
+      seniority: params.get('seniority') || '',
+      skills: params.get('skills') || '',
+      languages: params.get('languages') || '',
       sources: params.get('sources') || '',
       offset,
       limit,

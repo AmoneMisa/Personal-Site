@@ -3,6 +3,10 @@
 
 export type HiringSource = 'telegram'
 
+// Same vocabulary as the Job Finder, so a candidate and a vacancy can be
+// compared on seniority without translating between two scales.
+export type Seniority = 'junior' | 'middle' | 'senior' | 'lead'
+
 export const HIRING_SOURCES: HiringSource[] = ['telegram']
 
 export interface CvProfile {
@@ -32,6 +36,12 @@ export interface CvProfile {
   tags?: string[]
   contact?: string | null
   employmentType?: string | null
+  // Normalized in hiringNormalize.ts so filtering and ranking work on canonical
+  // values rather than whatever wording the CV author used.
+  seniority?: Seniority | null
+  contacts?: { telegram?: string; email?: string; phone?: string }
+  // Relevance score from Elasticsearch; absent for the in-memory fallback.
+  score?: number
 }
 
 export interface CountryMeta {
