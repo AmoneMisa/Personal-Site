@@ -118,9 +118,9 @@ useSeoMeta({
 const countries = ref<string[]>([]);
 const city = ref("");
 const district = ref("");
-const propertyType = ref("any"); // any | flat | house
-const dealType = ref("any"); // any | sale | longRent | shortRent
-const agency = ref("any"); // any | owner | agency
+const propertyType = ref("any");
+const dealType = ref("any");
+const agency = ref("any");
 const petFriendly = ref(false);
 const roomOnlyFilter = ref(false);
 const childrenRequired = ref(false);
@@ -142,12 +142,10 @@ const totalFloorsMax = ref<number | undefined>(undefined);
 const yearMin = ref<number | undefined>(undefined);
 const yearMax = ref<number | undefined>(undefined);
 const maxAgeDays = ref<number | undefined>(undefined);
-const displayCurrency = ref("USD"); // currency for price display + the min/max filter
-const rates = ref<Record<string, number>>({ USD: 1 }); // units per 1 USD, from /flats-rates
+const displayCurrency = ref("USD");
+const rates = ref<Record<string, number>>({ USD: 1 });
 const query = ref("");
-const source = ref(""); // "" = all
-// Advanced filters collapse by default to keep the panel compact (especially on
-// mobile); the choice is persisted in loadPersonalState/toggleAdvanced.
+const source = ref("");
 const showAdvanced = ref(false);
 
 const listings = ref<Listing[]>([]);
@@ -184,32 +182,25 @@ let lastPaginationScrollY = 0;
 function photoCandidates(listing: Listing): string[] {
   return [...new Set([listing.photo, ...(listing.photos || [])].filter((value): value is string => !!value))];
 }
-
 function listingPhoto(listing: Listing): string | null {
   return photoCandidates(listing).find((url) => !failedPhotoUrls.value.has(url)) || null;
 }
-
-// All still-loadable photos (for the modal gallery); failed ones drop out reactively.
 function visiblePhotos(listing: Listing): string[] {
   return photoCandidates(listing).filter((url) => !failedPhotoUrls.value.has(url));
 }
-
 function markPhotoFailed(url: string | null) {
   if (!url) return;
   failedPhotoUrls.value = new Set([...failedPhotoUrls.value, url]);
 }
-
 function markPhotoFailedFromEvent(event: Event) {
   markPhotoFailed((event.currentTarget as HTMLImageElement | null)?.getAttribute("src") || null);
 }
 
-// ---- country/city metadata ----
 const meta = ref<CountryMeta[]>([]);
 const cityOptions = computed(() => {
   const picked = countries.value.length ? meta.value.filter((c) => countries.value.includes(c.code)) : meta.value;
   return [...new Set(picked.flatMap((c) => c.cities ?? []))].sort();
 });
-// Districts for the chosen city (or all cities in the selected countries).
 const districtOptions = computed(() => {
   const picked = countries.value.length ? meta.value.filter((c) => countries.value.includes(c.code)) : meta.value;
   const set = new Set<string>();
@@ -235,25 +226,12 @@ const metroOptions = computed(() => {
 
 const SOURCES = ["olx", "telegram"];
 const sourceOptions = computed(() => [{ value: "", label: t("all") }, ...SOURCES.map((s) => ({ value: s, label: s }))]);
-
-// Reka UI can't take value="" — use a sentinel for the single-selects.
 const ANY = "__any__";
 type Item = { label: string; value: string };
-function anyModel(model: { value: string }) {
-  return computed<string>({
-    get: () => model.value || ANY,
-    set: (v) => { model.value = v === ANY ? "any" : v; },
-  });
-}
-// propertyType/dealType/agency default to the string "any", not "" — wrap so the
-// menu shows a non-empty value while we send "any" (or omit) to the API.
 const propertyTypeSel = computed<string>({ get: () => propertyType.value, set: (v) => (propertyType.value = v) });
 const dealTypeSel = computed<string>({ get: () => dealType.value, set: (v) => (dealType.value = v) });
 const agencySel = computed<string>({ get: () => agency.value, set: (v) => (agency.value = v) });
-
 const countryItems = computed<Item[]>(() => meta.value.map((c) => ({ value: c.code, label: c.name })));
-// Dropdowns show localized labels but keep canonical values, so filter state,
-// URL params and API requests are unaffected by the UI language.
 const locName = (v: string | null | undefined, kind: LocationKind = "any") => locationLabel(v, locale.value, kind);
 const cityItems = computed<Item[]>(() => [{ label: t("cityAny"), value: ANY }, ...cityOptions.value.map((c) => ({ label: locName(c, "city"), value: c }))]);
 const citySel = computed<string>({ get: () => city.value || ANY, set: (v) => (city.value = v === ANY ? "" : v) });
@@ -298,15 +276,11 @@ function readSavedList(key: string, limit = MAX_SAVED_FLATS): Listing[] {
   try {
     const value = JSON.parse(localStorage.getItem(key) || "[]");
     return Array.isArray(value) ? value.slice(0, limit) : [];
-  } catch {
-    return [];
-  }
+  } catch { return []; }
 }
-
 function persistList(key: string, value: Listing[], limit = MAX_SAVED_FLATS) {
   localStorage.setItem(key, JSON.stringify(value.slice(0, limit)));
 }
-
 function loadPersonalState() {
   favorites.value = readSavedList(STORAGE.favorites);
   hidden.value = readSavedList(STORAGE.hidden);
@@ -314,19 +288,12 @@ function loadPersonalState() {
   try {
     const value = JSON.parse(localStorage.getItem(STORAGE.presets) || "[]");
     presets.value = Array.isArray(value) ? value : [];
-  } catch {
-    presets.value = [];
-  }
-  try {
-    showAdvanced.value = localStorage.getItem("flats:showAdvanced") === "1";
-  } catch { /* storage blocked */ }
+  } catch { presets.value = []; }
+  try { showAdvanced.value = localStorage.getItem("flats:showAdvanced") === "1"; } catch { /* noop */ }
 }
-
 function toggleAdvanced() {
   showAdvanced.value = !showAdvanced.value;
-  try {
-    localStorage.setItem("flats:showAdvanced", showAdvanced.value ? "1" : "0");
-  } catch { /* storage blocked */ }
+  try { localStorage.setItem("flats:showAdvanced", showAdvanced.value ? "1" : "0"); } catch { /* noop */ }
 }
 
 const hiddenIds = computed(() => new Set(hidden.value.map((item) => item.id)));
@@ -339,23 +306,16 @@ function pointInPolygon(point: { lat: number; lng: number }, polygon: Array<{ la
   for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
     const xi = polygon[i]!.lng, yi = polygon[i]!.lat;
     const xj = polygon[j]!.lng, yj = polygon[j]!.lat;
-    const intersects = ((yi > point.lat) !== (yj > point.lat))
-      && point.lng < ((xj - xi) * (point.lat - yi)) / (yj - yi) + xi;
+    const intersects = ((yi > point.lat) !== (yj > point.lat)) && point.lng < ((xj - xi) * (point.lat - yi)) / (yj - yi) + xi;
     if (intersects) inside = !inside;
   }
   return inside;
 }
-
 function applyDrawnArea(items: Listing[]) {
   if (drawnArea.value.length < 3) return items;
-  // An area can only filter geocoded listings. If nothing in the set has
-  // coordinates (e.g. geocoding not yet available), the polygon can't apply —
-  // treat it as a no-op instead of silently hiding every result.
   if (!items.some((item) => item.lat != null && item.lng != null)) return items;
-  return items.filter((item) => item.lat != null && item.lng != null
-    && pointInPolygon({ lat: item.lat, lng: item.lng }, drawnArea.value));
+  return items.filter((item) => item.lat != null && item.lng != null && pointInPolygon({ lat: item.lat, lng: item.lng }, drawnArea.value));
 }
-
 const activeListings = computed(() => applyDrawnArea(listings.value.filter((item) => !hiddenIds.value.has(item.id))));
 const displayedListings = computed(() => {
   if (view.value === "favorites") return applyDrawnArea(favorites.value);
@@ -366,44 +326,40 @@ const displayedListings = computed(() => {
 const hasMore = computed(() => view.value === "active" && listings.value.length < total.value);
 
 function currentFilterQuery(): Record<string, string> {
-  const queryParams: Record<string, string> = {};
-  if (countries.value.length) queryParams.countries = countries.value.join(",");
-  if (city.value) queryParams.city = city.value;
-  if (district.value) queryParams.district = district.value;
-  if (metro.value) queryParams.metro = metro.value;
-  if (propertyType.value !== "any") queryParams.propertyType = propertyType.value;
-  if (dealType.value !== "any") queryParams.dealType = dealType.value;
-  if (agency.value !== "any") queryParams.agency = agency.value;
-  if (audience.value !== "any") queryParams.audience = audience.value;
-  if (petFriendly.value) queryParams.pets = "1";
-  if (roomOnlyFilter.value) queryParams.roomOnly = "1";
-  if (childrenRequired.value) queryParams.children = "1";
-  if (newBuildingOnly.value) queryParams.newBuilding = "1";
-  if (priceMin.value != null) queryParams.priceMin = String(priceMin.value);
-  if (priceMax.value != null) queryParams.priceMax = String(priceMax.value);
-  if (displayCurrency.value !== "USD") queryParams.currency = displayCurrency.value;
-  if (roomsMin.value != null) queryParams.roomsMin = String(roomsMin.value);
-  if (roomsMax.value != null) queryParams.roomsMax = String(roomsMax.value);
-  if (bedroomsMin.value != null) queryParams.bedroomsMin = String(bedroomsMin.value);
-  if (bedroomsMax.value != null) queryParams.bedroomsMax = String(bedroomsMax.value);
-  if (areaMin.value != null) queryParams.areaMin = String(areaMin.value);
-  if (areaMax.value != null) queryParams.areaMax = String(areaMax.value);
-  if (floorMin.value != null) queryParams.floorMin = String(floorMin.value);
-  if (floorMax.value != null) queryParams.floorMax = String(floorMax.value);
-  if (totalFloorsMin.value != null) queryParams.totalFloorsMin = String(totalFloorsMin.value);
-  if (totalFloorsMax.value != null) queryParams.totalFloorsMax = String(totalFloorsMax.value);
-  if (yearMin.value != null) queryParams.yearMin = String(yearMin.value);
-  if (yearMax.value != null) queryParams.yearMax = String(yearMax.value);
-  if (maxAgeDays.value != null) queryParams.maxAgeDays = String(maxAgeDays.value);
-  if (query.value.trim()) queryParams.query = query.value.trim();
-  if (source.value) queryParams.sources = source.value;
-  return queryParams;
+  const q: Record<string, string> = {};
+  if (countries.value.length) q.countries = countries.value.join(",");
+  if (city.value) q.city = city.value;
+  if (district.value) q.district = district.value;
+  if (metro.value) q.metro = metro.value;
+  if (propertyType.value !== "any") q.propertyType = propertyType.value;
+  if (dealType.value !== "any") q.dealType = dealType.value;
+  if (agency.value !== "any") q.agency = agency.value;
+  if (audience.value !== "any") q.audience = audience.value;
+  if (petFriendly.value) q.pets = "1";
+  if (roomOnlyFilter.value) q.roomOnly = "1";
+  if (childrenRequired.value) q.children = "1";
+  if (newBuildingOnly.value) q.newBuilding = "1";
+  if (priceMin.value != null) q.priceMin = String(priceMin.value);
+  if (priceMax.value != null) q.priceMax = String(priceMax.value);
+  if (displayCurrency.value !== "USD") q.currency = displayCurrency.value;
+  if (roomsMin.value != null) q.roomsMin = String(roomsMin.value);
+  if (roomsMax.value != null) q.roomsMax = String(roomsMax.value);
+  if (bedroomsMin.value != null) q.bedroomsMin = String(bedroomsMin.value);
+  if (bedroomsMax.value != null) q.bedroomsMax = String(bedroomsMax.value);
+  if (areaMin.value != null) q.areaMin = String(areaMin.value);
+  if (areaMax.value != null) q.areaMax = String(areaMax.value);
+  if (floorMin.value != null) q.floorMin = String(floorMin.value);
+  if (floorMax.value != null) q.floorMax = String(floorMax.value);
+  if (totalFloorsMin.value != null) q.totalFloorsMin = String(totalFloorsMin.value);
+  if (totalFloorsMax.value != null) q.totalFloorsMax = String(totalFloorsMax.value);
+  if (yearMin.value != null) q.yearMin = String(yearMin.value);
+  if (yearMax.value != null) q.yearMax = String(yearMax.value);
+  if (maxAgeDays.value != null) q.maxAgeDays = String(maxAgeDays.value);
+  if (query.value.trim()) q.query = query.value.trim();
+  if (source.value) q.sources = source.value;
+  return q;
 }
-
-function queryString(value: unknown): string {
-  return Array.isArray(value) ? String(value[0] || "") : String(value || "");
-}
-
+function queryString(value: unknown): string { return Array.isArray(value) ? String(value[0] || "") : String(value || ""); }
 function applyQueryParams(params: Record<string, unknown>) {
   const countryParam = queryString(params.countries);
   if (countryParam) countries.value = countryParam.split(",").filter(Boolean);
@@ -438,11 +394,7 @@ function applyQueryParams(params: Record<string, unknown>) {
   const sourceParam = queryString(params.sources);
   source.value = SOURCES.includes(sourceParam) ? sourceParam : "";
 }
-
 async function syncQueryParams() {
-  // Keep an inbound listing deep-link intact while filters/results synchronize.
-  // The old implementation removed `flat` during the first load, before the
-  // mounted hook tried to open it, so shared links appeared to do nothing.
   const preserved: Record<string, string> = {};
   for (const key of ["flat", "flatSource", "flatCountry"] as const) {
     const value = queryString(route.query[key]);
@@ -450,169 +402,50 @@ async function syncQueryParams() {
   }
   await router.replace({ query: { ...currentFilterQuery(), ...preserved } });
 }
-
 const shareUrl = computed(() => {
   const resolved = router.resolve({ path: route.path, query: { ...currentFilterQuery(), shared: "1" } });
   return import.meta.client ? new URL(resolved.href, window.location.origin).toString() : resolved.href;
 });
-
 async function copyText(value: string): Promise<boolean> {
   if (navigator.clipboard?.writeText && window.isSecureContext) {
-    try {
-      await navigator.clipboard.writeText(value);
-      return true;
-    } catch {
-      // Continue to the selection/execCommand fallback below.
-    }
+    try { await navigator.clipboard.writeText(value); return true; } catch { /* fallback */ }
   }
   const field = document.createElement("textarea");
-  field.value = value;
-  field.setAttribute("readonly", "");
-  field.style.position = "fixed";
-  field.style.opacity = "0";
-  document.body.appendChild(field);
-  field.select();
-  let copied = false;
-  try {
-    copied = document.execCommand("copy");
-  } finally {
-    field.remove();
-  }
+  field.value = value; field.setAttribute("readonly", ""); field.style.position = "fixed"; field.style.opacity = "0";
+  document.body.appendChild(field); field.select();
+  let copied = false; try { copied = document.execCommand("copy"); } finally { field.remove(); }
   return copied;
 }
-
-async function copyShareLink() {
-  await copyText(shareUrl.value);
-}
-
+async function copyShareLink() { await copyText(shareUrl.value); }
 function savePreset() {
   const name = presetName.value.trim();
   if (!name) return;
   presets.value = [...presets.value.filter((item) => item.name.toLowerCase() !== name.toLowerCase()), { name, query: currentFilterQuery() }];
   localStorage.setItem(STORAGE.presets, JSON.stringify(presets.value));
-  presetName.value = "";
-  presetModalOpen.value = false;
+  presetName.value = ""; presetModalOpen.value = false;
 }
-
-function applyPreset(preset: SearchPreset) {
-  applyQueryParams(preset.query);
-  scheduleLoad(0);
-}
-
-function removePreset(name: string) {
-  presets.value = presets.value.filter((item) => item.name !== name);
-  localStorage.setItem(STORAGE.presets, JSON.stringify(presets.value));
-}
-
-async function loadMeta() {
-  const { data } = await safeFetch<CountryMeta[]>("/flats-meta");
-  if (Array.isArray(data)) {
-    meta.value = data;
-    if (!countries.value.length) countries.value = data.map((c) => c.code); // default: all countries
-  }
-}
-
-async function loadRates() {
-  const { data } = await safeFetch<{ rates?: Record<string, number> }>("/flats-rates");
-  if (data?.rates && data.rates.USD) rates.value = data.rates;
-}
-
+function applyPreset(preset: SearchPreset) { applyQueryParams(preset.query); scheduleLoad(0); }
+function removePreset(name: string) { presets.value = presets.value.filter((item) => item.name !== name); localStorage.setItem(STORAGE.presets, JSON.stringify(presets.value)); }
+async function loadMeta() { const { data } = await safeFetch<CountryMeta[]>("/flats-meta"); if (Array.isArray(data)) { meta.value = data; if (!countries.value.length) countries.value = data.map((c) => c.code); } }
+async function loadRates() { const { data } = await safeFetch<{ rates?: Record<string, number> }>("/flats-rates"); if (data?.rates && data.rates.USD) rates.value = data.rates; }
 function scheduleWarmPoll() {
-  if (warmTimer) {
-    clearTimeout(warmTimer);
-  }
-
-  if (!warming.value) {
-    return;
-  }
-
-  warmTimer = setTimeout(() => {
-    warmTimer = undefined;
-
-    // Background poll только проверяет состояние backend.
-    // Он НЕ подгружает следующую страницу
-    // и НЕ изменяет уже отображённые квартиры.
-    void load(false, true);
-  }, 1800);
+  if (warmTimer) clearTimeout(warmTimer);
+  if (!warming.value) return;
+  warmTimer = setTimeout(() => { warmTimer = undefined; void load(false, true); }, 1800);
 }
-
-async function load(
-    append = false,
-    background = false,
-) {
-  // Background poll не должен инвалидировать
-  // пользовательский запрос.
-  const seq = background
-      ? loadSeq
-      : ++loadSeq;
-
-  if (!background) {
-    if (append) {
-      loadingMore.value = true;
-    } else {
-      loading.value = true;
-    }
-
-    failed.value = false;
-  }
-
-  const offset = append
-      ? listings.value.length
-      : 0;
-
-  const params: Record<string, string> = {
-    limit: String(PAGE_SIZE),
-    offset: String(offset),
-  };
-
-  if (countries.value.length) {
-    params.countries =
-        countries.value.join(",");
-  }
-
-  if (city.value) {
-    params.city =
-        city.value;
-  }
-
-  if (district.value) {
-    params.district =
-        district.value;
-  }
-
-  if (propertyType.value !== "any") {
-    params.propertyType =
-        propertyType.value;
-  }
-
-  if (dealType.value !== "any") {
-    params.dealType =
-        dealType.value;
-  }
-
-  if (agency.value !== "any") {
-    params.agency =
-        agency.value;
-  }
-
-  if (priceMin.value != null) {
-    params.priceMin =
-        String(priceMin.value);
-  }
-
-  if (priceMax.value != null) {
-    params.priceMax =
-        String(priceMax.value);
-  }
-
-  if (
-      priceMin.value != null ||
-      priceMax.value != null
-  ) {
-    params.priceCurrency =
-        displayCurrency.value;
-  }
-
+async function load(append = false, background = false) {
+  const seq = background ? loadSeq : ++loadSeq;
+  if (!background) { append ? loadingMore.value = true : loading.value = true; failed.value = false; }
+  const params: Record<string, string> = { limit: String(PAGE_SIZE), offset: String(append ? listings.value.length : 0) };
+  if (countries.value.length) params.countries = countries.value.join(",");
+  if (city.value) params.city = city.value;
+  if (district.value) params.district = district.value;
+  if (propertyType.value !== "any") params.propertyType = propertyType.value;
+  if (dealType.value !== "any") params.dealType = dealType.value;
+  if (agency.value !== "any") params.agency = agency.value;
+  if (priceMin.value != null) params.priceMin = String(priceMin.value);
+  if (priceMax.value != null) params.priceMax = String(priceMax.value);
+  if (priceMin.value != null || priceMax.value != null) params.priceCurrency = displayCurrency.value;
   if (roomsMin.value != null) params.roomsMin = String(roomsMin.value);
   if (roomsMax.value != null) params.roomsMax = String(roomsMax.value);
   if (bedroomsMin.value != null) params.bedroomsMin = String(bedroomsMin.value);
@@ -632,224 +465,64 @@ async function load(
   if (roomOnlyFilter.value) params.roomOnly = "1";
   if (childrenRequired.value) params.children = "1";
   if (newBuildingOnly.value) params.newBuilding = "1";
-
-  if (query.value.trim()) {
-    params.query =
-        query.value.trim();
-  }
-
-  params.sources =
-      source.value ||
-      SOURCES.join(",");
-
-  const { data, error } =
-      await safeFetch<FeedResult>(
-          "/flats-feed",
-          {
-            params,
-          },
-      );
-
-  // Пока запрос выполнялся, пользователь
-  // мог изменить фильтры.
-  if (seq !== loadSeq) {
-    if (!background) {
-      loading.value = false;
-      loadingMore.value = false;
-    }
-
+  if (query.value.trim()) params.query = query.value.trim();
+  params.sources = source.value || SOURCES.join(",");
+  const { data, error } = await safeFetch<FeedResult>("/flats-feed", { params });
+  if (seq !== loadSeq) { if (!background) { loading.value = false; loadingMore.value = false; } return; }
+  if (error || !data || data.error) {
+    if (!background) { failed.value = true; if (!append) { listings.value = []; total.value = 0; } sourceErrors.value = []; loading.value = false; loadingMore.value = false; }
     return;
   }
-
-  if (
-      error ||
-      !data ||
-      data.error
-  ) {
-    if (!background) {
-      failed.value = true;
-
-      if (!append) {
-        listings.value = [];
-        total.value = 0;
-      }
-
-      sourceErrors.value = [];
-    }
-
-    if (!background) {
-      loading.value = false;
-      loadingMore.value = false;
-    }
-
-    return;
-  }
-
-  /*
-   * Background polling:
-   *
-   * обновляем только metadata.
-   *
-   * listings НЕ трогаем вообще,
-   * поэтому верх страницы не прыгает
-   * и квартиры не перезатираются.
-   */
-  if (background) {
-    total.value =
-        data.count ??
-        total.value;
-
-    sourceErrors.value =
-        data.sourceErrors || [];
-
-    warming.value =
-        !!data.warming;
-
-    scheduleWarmPoll();
-
-    return;
-  }
-
-  const next =
-      Array.isArray(data.listings)
-          ? data.listings
-          : [];
-
+  if (background) { total.value = data.count ?? total.value; sourceErrors.value = data.sourceErrors || []; warming.value = !!data.warming; scheduleWarmPoll(); return; }
+  const next = Array.isArray(data.listings) ? data.listings : [];
   if (append) {
-    const existingKeys =
-        new Set(
-            listings.value.map(
-                (item) =>
-                    `${item.source}:${item.country}:${item.id}`,
-            ),
-        );
-
-    // В append режиме существующие карточки
-    // вообще не заменяем.
-    //
-    // Добавляем ТОЛЬКО объявления,
-    // которых раньше не было.
-    const newListings =
-        next.filter((item) => {
-          const key =
-              `${item.source}:${item.country}:${item.id}`;
-
-          if (existingKeys.has(key)) {
-            return false;
-          }
-
-          existingKeys.add(key);
-
-          return true;
-        });
-
-    listings.value = [
-      ...listings.value,
-      ...newListings,
-    ];
+    const existingKeys = new Set(listings.value.map((item) => `${item.source}:${item.country}:${item.id}`));
+    const newListings = next.filter((item) => { const key = `${item.source}:${item.country}:${item.id}`; if (existingKeys.has(key)) return false; existingKeys.add(key); return true; });
+    listings.value = [...listings.value, ...newListings];
   } else {
-    // Полная замена допустима только
-    // при настоящем новом поиске/фильтре.
     listings.value = next;
-
-    // После нового поиска пользователь должен
-    // снова самостоятельно докрутить страницу.
-    if (import.meta.client) {
-      lastPaginationScrollY =
-          window.scrollY;
-    }
+    if (import.meta.client) lastPaginationScrollY = window.scrollY;
   }
-
-  total.value =
-      data.count ??
-      listings.value.length;
-
-  sourceErrors.value =
-      data.sourceErrors || [];
-
-  warming.value =
-      !!data.warming;
-
-  loading.value = false;
-  loadingMore.value = false;
-
-  if (!append) {
-    void syncQueryParams();
-  }
-
+  total.value = data.count ?? listings.value.length;
+  sourceErrors.value = data.sourceErrors || [];
+  warming.value = !!data.warming;
+  loading.value = false; loadingMore.value = false;
+  if (!append) void syncQueryParams();
   scheduleWarmPoll();
 }
-
-function scheduleLoad(delay = 250) {
-  if (loadTimer) clearTimeout(loadTimer);
-  loadTimer = setTimeout(() => { loadTimer = undefined; void load(false); }, delay);
-}
-function selectSource(v: string) {
-  if (source.value === v) return;
-  source.value = v;
-  scheduleLoad(80);
-}
+function scheduleLoad(delay = 250) { if (loadTimer) clearTimeout(loadTimer); loadTimer = setTimeout(() => { loadTimer = undefined; void load(false); }, delay); }
+function selectSource(v: string) { if (source.value === v) return; source.value = v; scheduleLoad(80); }
 function resetFilters() {
+  countries.value = [];
   city.value = ""; district.value = ""; metro.value = ""; propertyType.value = "any"; dealType.value = "any"; agency.value = "any"; audience.value = "any";
   petFriendly.value = false; roomOnlyFilter.value = false; childrenRequired.value = false; newBuildingOnly.value = false;
-  priceMin.value = undefined; priceMax.value = undefined; roomsMin.value = undefined; roomsMax.value = undefined;
-  bedroomsMin.value = undefined; bedroomsMax.value = undefined; areaMin.value = undefined; areaMax.value = undefined;
-  floorMin.value = undefined; floorMax.value = undefined; totalFloorsMin.value = undefined; totalFloorsMax.value = undefined;
-  yearMin.value = undefined; yearMax.value = undefined; maxAgeDays.value = undefined; query.value = "";
+  priceMin.value = undefined; priceMax.value = undefined; displayCurrency.value = "USD";
+  roomsMin.value = undefined; roomsMax.value = undefined; bedroomsMin.value = undefined; bedroomsMax.value = undefined; areaMin.value = undefined; areaMax.value = undefined;
+  floorMin.value = undefined; floorMax.value = undefined; totalFloorsMin.value = undefined; totalFloorsMax.value = undefined; yearMin.value = undefined; yearMax.value = undefined; maxAgeDays.value = undefined;
+  query.value = ""; source.value = ""; drawnArea.value = []; view.value = "active";
   scheduleLoad(80);
 }
 function updateBackToTop() { showBackToTop.value = window.scrollY > 600; }
 function scrollToFilters() { filtersEl.value?.scrollIntoView({ behavior: "smooth", block: "start" }); }
-
-function setView(next: FlatView) {
-  view.value = next;
-}
-
+function setView(next: FlatView) { view.value = next; }
 function toggleFavorite(item: Listing) {
-  favorites.value = isFavorite(item.id)
-    ? favorites.value.filter((saved) => saved.id !== item.id)
-    : [item, ...favorites.value.filter((saved) => saved.id !== item.id)].slice(0, MAX_SAVED_FLATS);
-  if (isHidden(item.id)) {
-    hidden.value = hidden.value.filter((saved) => saved.id !== item.id);
-    persistList(STORAGE.hidden, hidden.value);
-  }
+  favorites.value = isFavorite(item.id) ? favorites.value.filter((saved) => saved.id !== item.id) : [item, ...favorites.value.filter((saved) => saved.id !== item.id)].slice(0, MAX_SAVED_FLATS);
+  if (isHidden(item.id)) { hidden.value = hidden.value.filter((saved) => saved.id !== item.id); persistList(STORAGE.hidden, hidden.value); }
   persistList(STORAGE.favorites, favorites.value);
 }
-
 function toggleHidden(item: Listing) {
-  hidden.value = isHidden(item.id)
-    ? hidden.value.filter((saved) => saved.id !== item.id)
-    : [item, ...hidden.value.filter((saved) => saved.id !== item.id)].slice(0, MAX_SAVED_FLATS);
-  if (isFavorite(item.id)) {
-    favorites.value = favorites.value.filter((saved) => saved.id !== item.id);
-    persistList(STORAGE.favorites, favorites.value);
-  }
+  hidden.value = isHidden(item.id) ? hidden.value.filter((saved) => saved.id !== item.id) : [item, ...hidden.value.filter((saved) => saved.id !== item.id)].slice(0, MAX_SAVED_FLATS);
+  if (isFavorite(item.id)) { favorites.value = favorites.value.filter((saved) => saved.id !== item.id); persistList(STORAGE.favorites, favorites.value); }
   persistList(STORAGE.hidden, hidden.value);
 }
 
-// ---- map points ----
-const mapPoints = computed(() =>
-  displayedListings.value
-    .filter((l) => l.lat != null && l.lng != null)
-    .map((l) => ({
-      id: l.id,
-      lat: l.lat as number,
-      lng: l.lng as number,
-      title: displayListingTitle(l),
-      priceLabel: priceLabel(l),
-      photo: listingPhoto(l) || undefined,
-      source: l.source,
-    })),
-);
+const mapPoints = computed(() => displayedListings.value.filter((l) => l.lat != null && l.lng != null).map((l) => ({ id: l.id, lat: l.lat as number, lng: l.lng as number, title: displayListingTitle(l), priceLabel: priceLabel(l), photo: listingPhoto(l) || undefined, source: l.source })));
 
-// ---- details modal ----
 const active = ref<Listing | null>(null);
 const modalOpen = ref(false);
 const lightboxIndex = ref<number | null>(null);
 const lightboxPhotos = computed(() => active.value ? visiblePhotos(active.value) : []);
-const lightboxPhoto = computed(() =>
-  lightboxIndex.value == null ? null : lightboxPhotos.value[lightboxIndex.value] || null,
-);
+const lightboxPhoto = computed(() => lightboxIndex.value == null ? null : lightboxPhotos.value[lightboxIndex.value] || null);
 const lightboxPosition = computed(() => (lightboxIndex.value ?? 0) + 1);
 const translatedDescription = ref("");
 const translatingDescription = ref(false);
@@ -857,711 +530,160 @@ const translationFailed = ref(false);
 const translationCache = new Map<string, string>();
 let translationPollTimer: ReturnType<typeof setTimeout> | undefined;
 let translationRequestId = 0;
-// Ollama may legitimately need up to two minutes for one CPU inference. Keep
-// polling beyond that worker timeout, including a little queue/retry margin.
 const TRANSLATION_MAX_POLL_ATTEMPTS = 159;
-
-function translationCacheKey(listing: Listing, targetLanguage = locale.value.startsWith("en") ? "en" : "ru"): string {
-  return `${listing.id}:${targetLanguage}`;
-}
-
-function stopTranslationPoll() {
-  if (translationPollTimer) clearTimeout(translationPollTimer);
-  translationPollTimer = undefined;
-}
-
+function translationCacheKey(listing: Listing, targetLanguage = locale.value.startsWith("en") ? "en" : "ru"): string { return `${listing.id}:${targetLanguage}`; }
+function stopTranslationPoll() { if (translationPollTimer) clearTimeout(translationPollTimer); translationPollTimer = undefined; }
 function openListing(l: Listing) {
-  stopTranslationPoll();
-  translationRequestId += 1;
-  lightboxIndex.value = null;
-  active.value = l;
-  translatedDescription.value = translationCache.get(translationCacheKey(l)) || "";
-  translatingDescription.value = false;
-  translationFailed.value = false;
-  modalOpen.value = true;
-  recent.value = [l, ...recent.value.filter((item) => item.id !== l.id)].slice(0, MAX_RECENT_FLATS);
-  persistList(STORAGE.recent, recent.value, MAX_RECENT_FLATS);
+  stopTranslationPoll(); translationRequestId += 1; lightboxIndex.value = null; active.value = l;
+  translatedDescription.value = translationCache.get(translationCacheKey(l)) || ""; translatingDescription.value = false; translationFailed.value = false; modalOpen.value = true;
+  recent.value = [l, ...recent.value.filter((item) => item.id !== l.id)].slice(0, MAX_RECENT_FLATS); persistList(STORAGE.recent, recent.value, MAX_RECENT_FLATS);
 }
-
 function modalTitle(listing: Listing | null): string {
   if (!listing) return "";
   const normalized = displayListingTitle(listing).replace(/\s+/g, " ").trim();
-  // OLX titles often append structured area/price fragments with bullets. They
-  // already appear below as normalized fields and make the dialog heading too
-  // long, so keep the human-written portion before the first bullet.
   const humanTitle = normalized.split(/\s*[•·]\s*/)[0]?.trim() || normalized;
   return humanTitle.length > 140 ? `${humanTitle.slice(0, 137).trimEnd()}…` : humanTitle;
 }
-
 function hasMeaningfulTitle(value: string): boolean {
-  const content = value
-    .replace(/[\p{Extended_Pictographic}\p{Emoji_Presentation}\p{Emoji_Modifier}\p{Variation_Selector}\p{Join_Control}]/gu, "")
-    .replace(/[^\p{L}\p{N}]+/gu, "");
+  const content = value.replace(/[\p{Extended_Pictographic}\p{Emoji_Presentation}\p{Emoji_Modifier}\p{Variation_Selector}\p{Join_Control}]/gu, "").replace(/[^\p{L}\p{N}]+/gu, "");
   return content.length >= 3;
 }
-
 function displayListingTitle(listing: Listing): string {
   const title = listing.title.replace(/\s+/g, " ").trim();
   if (hasMeaningfulTitle(title)) return title;
-
-  const parts = [
-    dealLabel(listing.dealType),
-    listing.rooms != null ? t("roomsN", { n: listing.rooms }) : "",
-    ptLabel(listing.propertyType),
-    listing.district || listing.city || "",
-  ].filter(Boolean);
+  const parts = [dealLabel(listing.dealType), listing.rooms != null ? t("roomsN", { n: listing.rooms }) : "", ptLabel(listing.propertyType), listing.district || listing.city || ""].filter(Boolean);
   return parts.join(" · ") || t("listingFallbackTitle");
 }
-
 function descriptionMatchesTargetLanguage(text: string, targetLanguage: "en" | "ru"): boolean {
   const normalized = text.toLocaleLowerCase();
   if (targetLanguage === "ru") {
-    // Uzbek Cyrillic has distinctive letters; do not mistake it for Russian.
     if (/[ўқғҳ]/iu.test(normalized)) return false;
     const russianSignals = normalized.match(/(?:квартир\p{L}*|комнат\p{L}*|этаж\p{L}*|дом\p{L}*|цен\p{L}*|сда[её]тся|прода[её]тся|аренд\p{L}*|рядом|метро|семейн\p{L}*|коммунальн\p{L}*)/giu) || [];
     return russianSignals.length >= 2;
   }
-  const englishVocabulary = new Set([
-    "apartment", "flat", "house", "room", "floor", "price", "rent", "sale",
-    "family", "utilities", "near", "available", "bedroom",
-  ]);
+  const englishVocabulary = new Set(["apartment", "flat", "house", "room", "floor", "price", "rent", "sale", "family", "utilities", "near", "available", "bedroom"]);
   const englishSignals = (normalized.match(/[a-z]+/g) || []).filter((word) => englishVocabulary.has(word));
   return englishSignals.length >= 3;
 }
-
-const descriptionNeedsTranslation = computed(() => {
-  const description = active.value?.description?.trim();
-  if (!description) return false;
-  const targetLanguage = locale.value.startsWith("en") ? "en" : "ru";
-  return !descriptionMatchesTargetLanguage(description, targetLanguage);
-});
-
-function openLightbox(index: number) {
-  if (!lightboxPhotos.value.length) return;
-  lightboxIndex.value = Math.max(0, Math.min(index, lightboxPhotos.value.length - 1));
-}
-
-function closeLightbox() {
-  lightboxIndex.value = null;
-}
-
-function moveLightbox(direction: -1 | 1) {
-  const total = lightboxPhotos.value.length;
-  if (!total || lightboxIndex.value == null) return;
-  lightboxIndex.value = (lightboxIndex.value + direction + total) % total;
-}
-
-function lightboxPhotoFailed(event: Event) {
-  markPhotoFailedFromEvent(event);
-  nextTick(() => {
-    if (!lightboxPhotos.value.length) closeLightbox();
-    else if (lightboxIndex.value != null) {
-      lightboxIndex.value = Math.min(lightboxIndex.value, lightboxPhotos.value.length - 1);
-    }
-  });
-}
-
-// --- swipe navigation (pointer events cover touch, pen and mouse drag) ---
+const descriptionNeedsTranslation = computed(() => { const description = active.value?.description?.trim(); if (!description) return false; const targetLanguage = locale.value.startsWith("en") ? "en" : "ru"; return !descriptionMatchesTargetLanguage(description, targetLanguage); });
+function openLightbox(index: number) { if (!lightboxPhotos.value.length) return; lightboxIndex.value = Math.max(0, Math.min(index, lightboxPhotos.value.length - 1)); }
+function closeLightbox() { lightboxIndex.value = null; }
+function moveLightbox(direction: -1 | 1) { const total = lightboxPhotos.value.length; if (!total || lightboxIndex.value == null) return; lightboxIndex.value = (lightboxIndex.value + direction + total) % total; }
+function lightboxPhotoFailed(event: Event) { markPhotoFailedFromEvent(event); nextTick(() => { if (!lightboxPhotos.value.length) closeLightbox(); else if (lightboxIndex.value != null) lightboxIndex.value = Math.min(lightboxIndex.value, lightboxPhotos.value.length - 1); }); }
 const SWIPE_MIN_PX = 50;
 let swipeStart: { x: number; y: number; id: number } | null = null;
-
-function onLightboxPointerDown(event: PointerEvent) {
-  if (lightboxPhotos.value.length < 2) return;
-  swipeStart = { x: event.clientX, y: event.clientY, id: event.pointerId };
-}
-
-function onLightboxPointerUp(event: PointerEvent) {
-  if (!swipeStart || event.pointerId !== swipeStart.id) return;
-  const dx = event.clientX - swipeStart.x;
-  const dy = event.clientY - swipeStart.y;
-  swipeStart = null;
-  // Horizontal-dominant gestures only, so a vertical drag or a plain click
-  // (and the desktop hover-zoom pan) never flips the photo.
-  if (Math.abs(dx) < SWIPE_MIN_PX || Math.abs(dx) <= Math.abs(dy)) return;
-  moveLightbox(dx < 0 ? 1 : -1);
-}
-
-function onLightboxPointerCancel() {
-  swipeStart = null;
-}
-
-// Safety net for the mobile scroll lock: the modal library locks body scrolling
-// while an overlay is open, and closing the teleported lightbox and the modal in
-// the wrong order could leave that lock behind, making the page unscrollable.
-// Once nothing is open, clear any leftover inline lock.
+function onLightboxPointerDown(event: PointerEvent) { if (lightboxPhotos.value.length < 2) return; swipeStart = { x: event.clientX, y: event.clientY, id: event.pointerId }; }
+function onLightboxPointerUp(event: PointerEvent) { if (!swipeStart || event.pointerId !== swipeStart.id) return; const dx = event.clientX - swipeStart.x; const dy = event.clientY - swipeStart.y; swipeStart = null; if (Math.abs(dx) < SWIPE_MIN_PX || Math.abs(dx) <= Math.abs(dy)) return; moveLightbox(dx < 0 ? 1 : -1); }
+function onLightboxPointerCancel() { swipeStart = null; }
 function releaseStuckScrollLock() {
-  if (import.meta.server) return;
-  if (modalOpen.value || lightboxIndex.value !== null) return;
+  if (import.meta.server || modalOpen.value || lightboxIndex.value !== null) return;
   const body = document.body;
   if (body.style.overflow === "hidden") body.style.removeProperty("overflow");
-  if (body.style.position === "fixed") {
-    const top = body.style.top;
-    body.style.removeProperty("position");
-    body.style.removeProperty("top");
-    body.style.removeProperty("width");
-    const offset = Math.abs(parseInt(top || "0", 10)) || 0;
-    if (offset) window.scrollTo(0, offset);
-  }
-  body.style.removeProperty("padding-right");
-  document.documentElement.style.removeProperty("overflow");
+  if (body.style.position === "fixed") { const top = body.style.top; body.style.removeProperty("position"); body.style.removeProperty("top"); body.style.removeProperty("width"); const offset = Math.abs(parseInt(top || "0", 10)) || 0; if (offset) window.scrollTo(0, offset); }
+  body.style.removeProperty("padding-right"); document.documentElement.style.removeProperty("overflow");
 }
-
-function onLightboxKeydown(event: KeyboardEvent) {
-  if (lightboxIndex.value == null) return;
-  if (event.key === "Escape") closeLightbox();
-  else if (event.key === "ArrowLeft") moveLightbox(-1);
-  else if (event.key === "ArrowRight") moveLightbox(1);
-  else return;
-  event.preventDefault();
-}
-
+function onLightboxKeydown(event: KeyboardEvent) { if (lightboxIndex.value == null) return; if (event.key === "Escape") closeLightbox(); else if (event.key === "ArrowLeft") moveLightbox(-1); else if (event.key === "ArrowRight") moveLightbox(1); else return; event.preventDefault(); }
 function acceptTranslation(result: TranslationResult, listing: Listing, requestId: number, cacheKey: string): boolean {
   if (requestId !== translationRequestId || active.value?.id !== listing.id) return true;
   if (result.status !== "completed") return false;
   const text = result.data?.translatedText?.trim() || "";
-  if (!text) {
-    translatingDescription.value = false;
-    translationFailed.value = true;
-    return true;
-  }
-  translationCache.set(cacheKey, text);
-  translatedDescription.value = text;
-  translatingDescription.value = false;
-  translationFailed.value = false;
-  return true;
+  if (!text) { translatingDescription.value = false; translationFailed.value = true; return true; }
+  translationCache.set(cacheKey, text); translatedDescription.value = text; translatingDescription.value = false; translationFailed.value = false; return true;
 }
-
 async function pollTranslation(key: string, listing: Listing, requestId: number, cacheKey: string, attempt = 0) {
   if (requestId !== translationRequestId || active.value?.id !== listing.id) return;
   const { data, error } = await safeFetch<TranslationResult>("/flats-translate", { params: { key } });
   if (requestId !== translationRequestId || active.value?.id !== listing.id) return;
   if (!error && data && acceptTranslation(data, listing, requestId, cacheKey)) return;
-  if (error || data?.status === "failed" || data?.status === "disabled" || data?.status === "not_found" || attempt >= TRANSLATION_MAX_POLL_ATTEMPTS) {
-    translatingDescription.value = false;
-    translationFailed.value = true;
-    return;
-  }
+  if (error || data?.status === "failed" || data?.status === "disabled" || data?.status === "not_found" || attempt >= TRANSLATION_MAX_POLL_ATTEMPTS) { translatingDescription.value = false; translationFailed.value = true; return; }
   translationPollTimer = setTimeout(() => void pollTranslation(key, listing, requestId, cacheKey, attempt + 1), 1500);
 }
-
 async function translateActiveDescription() {
   const listing = active.value;
   if (!listing?.description || translatingDescription.value || !descriptionNeedsTranslation.value) return;
   const targetLanguage = locale.value.startsWith("en") ? "en" : "ru";
   const cacheKey = translationCacheKey(listing, targetLanguage);
-  const cached = translationCache.get(cacheKey);
-  if (cached) {
-    translatedDescription.value = cached;
-    return;
-  }
-
-  stopTranslationPoll();
-  const requestId = ++translationRequestId;
-  translatingDescription.value = true;
-  translationFailed.value = false;
-  const { data, error } = await safeFetch<TranslationResult>("/flats-translate", {
-    method: "POST",
-    body: { text: listing.description, targetLanguage },
-  });
+  const cached = translationCache.get(cacheKey); if (cached) { translatedDescription.value = cached; return; }
+  stopTranslationPoll(); const requestId = ++translationRequestId; translatingDescription.value = true; translationFailed.value = false;
+  const { data, error } = await safeFetch<TranslationResult>("/flats-translate", { method: "POST", body: { text: listing.description, targetLanguage } });
   if (requestId !== translationRequestId || active.value?.id !== listing.id) return;
-  if (error || !data) {
-    translatingDescription.value = false;
-    translationFailed.value = true;
-    return;
-  }
+  if (error || !data) { translatingDescription.value = false; translationFailed.value = true; return; }
   if (acceptTranslation(data, listing, requestId, cacheKey)) return;
-  if (data.status === "pending" && data.key) {
-    translationPollTimer = setTimeout(() => void pollTranslation(data.key!, listing, requestId, cacheKey), 1000);
-    return;
-  }
-  translatingDescription.value = false;
-  translationFailed.value = true;
+  if (data.status === "pending" && data.key) { translationPollTimer = setTimeout(() => void pollTranslation(data.key!, listing, requestId, cacheKey), 1000); return; }
+  translatingDescription.value = false; translationFailed.value = true;
 }
-function openById(id: string) {
-  const found = displayedListings.value.find((l) => l.id === id);
-  if (found) openListing(found);
-}
-
-// ---- display helpers ----
-function priceLabel(l: Listing): string {
-  if (l.price == null) return t("priceNA");
-  return `${l.price.toLocaleString()} ${l.currency}`.trim();
-}
-
-function updateLightboxZoom(event: MouseEvent) {
-  const image = event.currentTarget as HTMLImageElement;
-  const rect = image.getBoundingClientRect();
-
-  const x = ((event.clientX - rect.left) / rect.width) * 100;
-  const y = ((event.clientY - rect.top) / rect.height) * 100;
-
-  image.style.setProperty("--zoom-x", `${x}%`);
-  image.style.setProperty("--zoom-y", `${y}%`);
-}
-
-function resetLightboxZoom(event: MouseEvent) {
-  const image = event.currentTarget as HTMLImageElement;
-
-  image.style.setProperty("--zoom-x", "50%");
-  image.style.setProperty("--zoom-y", "50%");
-}
-// Convert an amount between two currencies via the USD-based rates table.
-function convert(amount: number, from: string, to: string): number | undefined {
-  const rf = rates.value[(from || "USD").toUpperCase()];
-  const rt = rates.value[(to || "USD").toUpperCase()];
-  if (!rf || !rt) return undefined;
-  return (amount * rt) / rf;
-}
-// "≈ 5,700,000 UZS" — shown only when the listing's currency differs from the
-// chosen display currency and both rates are known.
-function convertedLabel(l: Listing): string | null {
-  if (l.price == null || !l.currency) return null;
-  if (l.currency.toUpperCase() === displayCurrency.value.toUpperCase()) return null;
-  const v = convert(l.price, l.currency, displayCurrency.value);
-  if (v === undefined) return null;
-  return `≈ ${Math.round(v).toLocaleString()} ${displayCurrency.value}`;
-}
-const dealLabel = (d: Listing["dealType"]) =>
-  d === "sale" ? t("dtSale") : d === "longRent" ? t("dtLongRent") : d === "shortRent" ? t("dtShortRent") : "";
-function specLine(l: Listing): string {
-  const parts: string[] = [];
-  if (l.rooms != null) parts.push(t("roomsN", { n: l.rooms }));
-  if (l.areaSqm != null) parts.push(`${l.areaSqm} ${t("sqm")}`);
-  if (l.floor != null) parts.push(l.totalFloors != null ? `${l.floor}/${l.totalFloors} ${t("floorAbbr")}` : `${l.floor} ${t("floorAbbr")}`);
-  return parts.join(" · ");
-}
-function locLine(l: Listing): string {
-  // Broad -> specific: city, district, metro station (when known), localized.
-  return [locName(l.city, "city"), locName(l.district, "district"), locName(l.metro, "metro")]
-    .filter(Boolean)
-    .join(", ");
-}
-
-// ---- normalized spec table (popup) ----
-// Every field rendered with a consistent style; missing data shows "n/d".
-// Missing data on the details table reads "Not specified" (never a bare "No").
+function openById(id: string) { const found = displayedListings.value.find((l) => l.id === id); if (found) openListing(found); }
+function priceLabel(l: Listing): string { if (l.price == null) return t("priceNA"); return `${l.price.toLocaleString()} ${l.currency}`.trim(); }
+function updateLightboxZoom(event: MouseEvent) { const image = event.currentTarget as HTMLImageElement; const rect = image.getBoundingClientRect(); image.style.setProperty("--zoom-x", `${((event.clientX - rect.left) / rect.width) * 100}%`); image.style.setProperty("--zoom-y", `${((event.clientY - rect.top) / rect.height) * 100}%`); }
+function resetLightboxZoom(event: MouseEvent) { const image = event.currentTarget as HTMLImageElement; image.style.setProperty("--zoom-x", "50%"); image.style.setProperty("--zoom-y", "50%"); }
+function convert(amount: number, from: string, to: string): number | undefined { const rf = rates.value[(from || "USD").toUpperCase()]; const rt = rates.value[(to || "USD").toUpperCase()]; if (!rf || !rt) return undefined; return (amount * rt) / rf; }
+function convertedLabel(l: Listing): string | null { if (l.price == null || !l.currency || l.currency.toUpperCase() === displayCurrency.value.toUpperCase()) return null; const v = convert(l.price, l.currency, displayCurrency.value); return v === undefined ? null : `≈ ${Math.round(v).toLocaleString()} ${displayCurrency.value}`; }
+const dealLabel = (d: Listing["dealType"]) => d === "sale" ? t("dtSale") : d === "longRent" ? t("dtLongRent") : d === "shortRent" ? t("dtShortRent") : "";
+function specLine(l: Listing): string { const parts: string[] = []; if (l.rooms != null) parts.push(t("roomsN", { n: l.rooms })); if (l.areaSqm != null) parts.push(`${l.areaSqm} ${t("sqm")}`); if (l.floor != null) parts.push(l.totalFloors != null ? `${l.floor}/${l.totalFloors} ${t("floorAbbr")}` : `${l.floor} ${t("floorAbbr")}`); return parts.join(" · "); }
+function locLine(l: Listing): string { return [locName(l.city, "city"), locName(l.district, "district"), locName(l.metro, "metro")].filter(Boolean).join(", "); }
 const fmtBool = (v?: boolean | null) => (v === true ? t("yes") : v === false ? t("no") : t("notSpecified"));
 const numOr = (v?: number | null, unit = "") => (v != null ? `${v}${unit ? " " + unit : ""}` : t("notSpecified"));
 const strOr = (v?: string | null) => (v ? v : t("notSpecified"));
 const listOr = (v?: string[] | null) => (v && v.length ? v.join(", ") : t("notSpecified"));
-const nearbyTranslationKeys: Record<string, string> = {
-  "Bobur Park": "nearbyBoburPark",
-  "Alay Bazaar": "nearbyAlayBazaar",
-  Darkhan: "nearbyDarkhan",
-  Novomoskovskaya: "nearbyNovomoskovskaya",
-  "Farhod Bazaar": "nearbyFarhodBazaar",
-  "Nizami Pedagogical University": "nearbyNizamiUniversity",
-  "World Languages University": "nearbyWorldLanguagesUniversity",
-  "Yangi Choshtepa": "nearbyYangiChoshtepa",
-  "Sergeli Car Bazaar": "nearbySergeliCarBazaar",
-  Park: "nearbyPark",
-  "Bus stop": "nearbyBusStop",
-  Clinic: "nearbyClinic",
-  School: "nearbySchool",
-  Kindergarten: "nearbyKindergarten",
-  "Shopping center": "nearbyShoppingCenter",
-  Mosque: "nearbyMosque",
-  Dishwasher: "amenityDishwasher",
-  dishwasher: "amenityDishwasher",
-  "Separate rooms": "amenitySeparateRooms",
-  "Washing machine": "amenityWashingMachine",
-  Television: "amenityTelevision",
-  "Bed linen": "amenityBedLinen",
-  Towels: "amenityTowels",
-};
+const nearbyTranslationKeys: Record<string, string> = { "Bobur Park": "nearbyBoburPark", "Alay Bazaar": "nearbyAlayBazaar", Darkhan: "nearbyDarkhan", Novomoskovskaya: "nearbyNovomoskovskaya", "Farhod Bazaar": "nearbyFarhodBazaar", "Nizami Pedagogical University": "nearbyNizamiUniversity", "World Languages University": "nearbyWorldLanguagesUniversity", "Yangi Choshtepa": "nearbyYangiChoshtepa", "Sergeli Car Bazaar": "nearbySergeliCarBazaar", Park: "nearbyPark", "Bus stop": "nearbyBusStop", Clinic: "nearbyClinic", School: "nearbySchool", Kindergarten: "nearbyKindergarten", "Shopping center": "nearbyShoppingCenter", Mosque: "nearbyMosque", Dishwasher: "amenityDishwasher", dishwasher: "amenityDishwasher", "Separate rooms": "amenitySeparateRooms", "Washing machine": "amenityWashingMachine", Television: "amenityTelevision", "Bed linen": "amenityBedLinen", Towels: "amenityTowels" };
 const nearbyItemLabel = (value: string) => nearbyTranslationKeys[value] ? t(nearbyTranslationKeys[value]) : value;
-const nearbyListOr = (values?: string[] | null) =>
-  values?.length ? values.map(nearbyItemLabel).join(", ") : t("notSpecified");
-const amenitiesListOr = (values?: string[] | null) =>
-  values?.length ? values.map(nearbyItemLabel).join(", ") : t("notSpecified");
+const nearbyListOr = (values?: string[] | null) => values?.length ? values.map(nearbyItemLabel).join(", ") : t("notSpecified");
+const amenitiesListOr = (values?: string[] | null) => values?.length ? values.map(nearbyItemLabel).join(", ") : t("notSpecified");
 const ptLabel = (p: Listing["propertyType"]) => (p === "house" ? t("ptHouse") : t("ptFlat"));
-const audienceLabel = (a?: Listing["audience"]) =>
-  a === "women" ? t("audWomen") : a === "men" ? t("audMen") : a === "family" ? t("audFamily") : t("audAny");
-const conditionLabel = (c?: Listing["condition"]) =>
-  c === "needs_renovation" ? t("condNeeds") : c === "basic" ? t("condBasic") : c === "good" ? t("condGood")
-    : c === "modern" ? t("condModern") : c === "luxury" ? t("condLuxury") : t("notSpecified");
+const audienceLabel = (a?: Listing["audience"]) => a === "women" ? t("audWomen") : a === "men" ? t("audMen") : a === "family" ? t("audFamily") : t("audAny");
+const conditionLabel = (c?: Listing["condition"]) => c === "needs_renovation" ? t("condNeeds") : c === "basic" ? t("condBasic") : c === "good" ? t("condGood") : c === "modern" ? t("condModern") : c === "luxury" ? t("condLuxury") : t("notSpecified");
 const sourceLabel = (s?: string) => (s === "olx" ? "OLX" : s === "telegram" ? "Telegram" : strOr(s));
-// Compact card badges: positive/important facts only. Missing/false data never
-// shows a badge (unlike the details table). "Pet-friendly" here vs "Pets allowed:
-// Yes/No" in the table, per the canonical spec.
-function cardBadges(l: Listing): string[] {
-  const b: string[] = [];
-  b.push(l.byAgency ? t("badgeAgency") : t("badgeOwner"));
-  if (l.newBuilding) b.push(t("badgeNew"));
-  if (l.furnished) b.push(t("badgeFurnished"));
-  if (l.airConditioner) b.push(t("badgeAC"));
-  if (l.balcony) b.push(t("badgeBalcony"));
-  if (l.parking) b.push(t("badgeParking"));
-  if (l.elevator) b.push(t("badgeElevator"));
-  if (l.internet) b.push(t("badgeInternet"));
-  if (l.negotiable) b.push(t("badgeNegotiable"));
-  if (l.petsAllowed) b.push(t("badgePet"));
-  if (l.childrenAllowed) b.push(t("badgeChildren"));
-  if (l.communalSeparated === false) b.push(t("badgeUtilIncl"));
-  if (l.commission === false) b.push(t("badgeNoCommission"));
-  if (l.deposit === true) b.push(t("badgeDeposit"));
-  if (l.roomOnly) b.push(t("badgeRoomOnly"));
-  if (l.audience === "family") b.push(t("badgeFamily"));
-  if (l.audience === "women") b.push(t("badgeWomen"));
-  if (l.audience === "men") b.push(t("badgeMen"));
-  return b;
-}
-function floorLabel(l: Listing) {
-  if (l.floor != null && l.totalFloors != null) return `${l.floor} / ${l.totalFloors}`;
-  return l.floor != null || l.totalFloors != null ? String(l.floor ?? l.totalFloors) : t("nd");
-}
-function depositLabel(l: Listing) {
-  // The deposit may be quoted in a different currency from the rent, so prefer
-  // the one parsed next to the deposit amount itself.
-  if (l.depositAmount != null) return `${l.depositAmount.toLocaleString()} ${l.depositCurrency || l.currency}`;
-  return fmtBool(l.deposit);
-}
-function commissionLabel(l: Listing) {
-  if (l.commissionPercent != null) return `${l.commissionPercent}%`;
-  return fmtBool(l.commission);
-}
-// UZ convention: utilities are usually included when the post says nothing.
-function communalLabel(l: Listing) {
-  if (l.communalSeparated === true) return t("communalSeparate");
-  if (l.communalSeparated === false) return t("communalIncluded");
-  return t("notSpecified");
-}
+function cardBadges(l: Listing): string[] { const b: string[] = []; b.push(l.byAgency ? t("badgeAgency") : t("badgeOwner")); if (l.newBuilding) b.push(t("badgeNew")); if (l.furnished) b.push(t("badgeFurnished")); if (l.airConditioner) b.push(t("badgeAC")); if (l.balcony) b.push(t("badgeBalcony")); if (l.parking) b.push(t("badgeParking")); if (l.elevator) b.push(t("badgeElevator")); if (l.internet) b.push(t("badgeInternet")); if (l.negotiable) b.push(t("badgeNegotiable")); if (l.petsAllowed) b.push(t("badgePet")); if (l.childrenAllowed) b.push(t("badgeChildren")); if (l.communalSeparated === false) b.push(t("badgeUtilIncl")); if (l.commission === false) b.push(t("badgeNoCommission")); if (l.deposit === true) b.push(t("badgeDeposit")); if (l.roomOnly) b.push(t("badgeRoomOnly")); if (l.audience === "family") b.push(t("badgeFamily")); if (l.audience === "women") b.push(t("badgeWomen")); if (l.audience === "men") b.push(t("badgeMen")); return b; }
+function floorLabel(l: Listing) { if (l.floor != null && l.totalFloors != null) return `${l.floor} / ${l.totalFloors}`; return l.floor != null || l.totalFloors != null ? String(l.floor ?? l.totalFloors) : t("nd"); }
+function depositLabel(l: Listing) { if (l.depositAmount != null) return `${l.depositAmount.toLocaleString()} ${l.depositCurrency || l.currency}`; return fmtBool(l.deposit); }
+function commissionLabel(l: Listing) { if (l.commissionPercent != null) return `${l.commissionPercent}%`; return fmtBool(l.commission); }
+function communalLabel(l: Listing) { if (l.communalSeparated === true) return t("communalSeparate"); if (l.communalSeparated === false) return t("communalIncluded"); return t("notSpecified"); }
 const specRows = computed<Array<{ label: string; value: string }>>(() => {
-  const l = active.value;
-  if (!l) return [];
+  const l = active.value; if (!l) return [];
   return [
-    { label: t("specDeal"), value: dealLabel(l.dealType) || t("notSpecified") },
-    { label: t("specType"), value: ptLabel(l.propertyType) },
-    { label: t("specListedBy"), value: l.byAgency ? t("agAgency") : t("agOwner") },
-    { label: t("specSource"), value: sourceLabel(l.source) },
-    { label: t("specRooms"), value: numOr(l.rooms) },
-    { label: t("specBedrooms"), value: numOr(l.bedrooms) },
-    { label: t("specBathrooms"), value: numOr(l.bathrooms) },
-    { label: t("specArea"), value: l.areaSqm != null ? `${l.areaSqm} ${t("sqm")}` : t("notSpecified") },
-    { label: t("specFloor"), value: floorLabel(l) },
-    { label: t("specYear"), value: numOr(l.buildingYear) },
-    { label: t("specNewBuilding"), value: fmtBool(l.newBuilding) },
-    { label: t("specCondition"), value: conditionLabel(l.condition) },
-    { label: t("specComplex"), value: strOr(l.residenceComplex) },
-    { label: t("specCity"), value: strOr(locName(l.city, "city")) },
-    { label: t("specDistrict"), value: strOr(locName(l.district, "district")) },
-    { label: t("specKvartal"), value: strOr(l.area || l.kvartal) },
-    { label: t("specMetro"), value: strOr(locName(l.metro, "metro")) },
-    { label: t("specAddress"), value: strOr(l.address) },
-    { label: t("specParking"), value: fmtBool(l.parking) },
-    { label: t("specElevator"), value: fmtBool(l.elevator) },
-    { label: t("specFurnished"), value: fmtBool(l.furnished) },
-    { label: t("specBalcony"), value: fmtBool(l.balcony) },
-    { label: t("specAC"), value: fmtBool(l.airConditioner) },
-    { label: t("specGas"), value: fmtBool(l.gas) },
-    { label: t("specHeating"), value: fmtBool(l.heating) },
-    { label: t("specHotWater"), value: fmtBool(l.hotWater) },
-    { label: t("specInternet"), value: fmtBool(l.internet) },
-    { label: t("specPets"), value: fmtBool(l.petsAllowed) },
-    { label: t("specChildren"), value: fmtBool(l.childrenAllowed) },
-    { label: t("specSmoking"), value: fmtBool(l.smokingAllowed) },
-    { label: t("specAudience"), value: audienceLabel(l.audience) },
-    { label: t("specRoomShare"), value: fmtBool(l.roomOnly) },
-    { label: t("specNegotiable"), value: fmtBool(l.negotiable) },
-    { label: t("specDeposit"), value: depositLabel(l) },
-    { label: t("specCommission"), value: commissionLabel(l) },
-    { label: t("specCommunal"), value: communalLabel(l) },
-    { label: t("specUtilAmount"), value: l.utilitiesAmount != null ? `${l.utilitiesAmount.toLocaleString()} ${l.currency}` : t("notSpecified") },
-    { label: t("specMinLease"), value: strOr(l.minLeaseTerm) },
-    { label: t("specAvailable"), value: strOr(l.availableFrom) },
-    { label: t("specShops"), value: listOr(l.nearbyShops) },
-    { label: t("specNearby"), value: nearbyListOr(l.nearby) },
-    { label: t("specAmenities"), value: amenitiesListOr(l.amenities) },
+    { label: t("specDeal"), value: dealLabel(l.dealType) || t("notSpecified") }, { label: t("specType"), value: ptLabel(l.propertyType) }, { label: t("specListedBy"), value: l.byAgency ? t("agAgency") : t("agOwner") }, { label: t("specSource"), value: sourceLabel(l.source) },
+    { label: t("specRooms"), value: numOr(l.rooms) }, { label: t("specBedrooms"), value: numOr(l.bedrooms) }, { label: t("specBathrooms"), value: numOr(l.bathrooms) }, { label: t("specArea"), value: l.areaSqm != null ? `${l.areaSqm} ${t("sqm")}` : t("notSpecified") }, { label: t("specFloor"), value: floorLabel(l) }, { label: t("specYear"), value: numOr(l.buildingYear) }, { label: t("specNewBuilding"), value: fmtBool(l.newBuilding) }, { label: t("specCondition"), value: conditionLabel(l.condition) }, { label: t("specComplex"), value: strOr(l.residenceComplex) }, { label: t("specCity"), value: strOr(locName(l.city, "city")) }, { label: t("specDistrict"), value: strOr(locName(l.district, "district")) }, { label: t("specKvartal"), value: strOr(l.area || l.kvartal) }, { label: t("specMetro"), value: strOr(locName(l.metro, "metro")) }, { label: t("specAddress"), value: strOr(l.address) },
+    { label: t("specParking"), value: fmtBool(l.parking) }, { label: t("specElevator"), value: fmtBool(l.elevator) }, { label: t("specFurnished"), value: fmtBool(l.furnished) }, { label: t("specBalcony"), value: fmtBool(l.balcony) }, { label: t("specAC"), value: fmtBool(l.airConditioner) }, { label: t("specGas"), value: fmtBool(l.gas) }, { label: t("specHeating"), value: fmtBool(l.heating) }, { label: t("specHotWater"), value: fmtBool(l.hotWater) }, { label: t("specInternet"), value: fmtBool(l.internet) }, { label: t("specPets"), value: fmtBool(l.petsAllowed) }, { label: t("specChildren"), value: fmtBool(l.childrenAllowed) }, { label: t("specSmoking"), value: fmtBool(l.smokingAllowed) }, { label: t("specAudience"), value: audienceLabel(l.audience) }, { label: t("specRoomShare"), value: fmtBool(l.roomOnly) }, { label: t("specNegotiable"), value: fmtBool(l.negotiable) }, { label: t("specDeposit"), value: depositLabel(l) }, { label: t("specCommission"), value: commissionLabel(l) }, { label: t("specCommunal"), value: communalLabel(l) }, { label: t("specUtilAmount"), value: l.utilitiesAmount != null ? `${l.utilitiesAmount.toLocaleString()} ${l.currency}` : t("notSpecified") }, { label: t("specMinLease"), value: strOr(l.minLeaseTerm) }, { label: t("specAvailable"), value: strOr(l.availableFrom) }, { label: t("specShops"), value: listOr(l.nearbyShops) }, { label: t("specNearby"), value: nearbyListOr(l.nearby) }, { label: t("specAmenities"), value: amenitiesListOr(l.amenities) },
   ];
 });
-// "Hide empty fields" toggle for the details table.
 const hideEmptySpecs = ref(true);
-const visibleSpecRows = computed(() =>
-  hideEmptySpecs.value ? specRows.value.filter((r) => r.value !== t("notSpecified")) : specRows.value,
-);
-// Share the open listing: native share sheet on mobile, clipboard fallback on
-// desktop. Include source/country so the receiver can perform an exact lookup
-// against the correct warmed snapshot instead of depending on page 1.
+const visibleSpecRows = computed(() => hideEmptySpecs.value ? specRows.value.filter((r) => r.value !== t("notSpecified")) : specRows.value);
 const shareCopied = ref(false);
-function makeListingShareLink(l: Listing): string {
-  const resolved = router.resolve({
-    path: route.path,
-    query: { flat: l.id, flatSource: l.source, flatCountry: l.country },
-  });
-  return new URL(resolved.href, window.location.origin).toString();
-}
-
-function showShareSuccess() {
-  shareCopied.value = true;
-  window.setTimeout(() => { shareCopied.value = false; }, 2000);
-}
-
+function makeListingShareLink(l: Listing): string { const resolved = router.resolve({ path: route.path, query: { flat: l.id, flatSource: l.source, flatCountry: l.country } }); return new URL(resolved.href, window.location.origin).toString(); }
+function showShareSuccess() { shareCopied.value = true; window.setTimeout(() => { shareCopied.value = false; }, 2000); }
 async function shareFlat(l: Listing) {
-  const link = makeListingShareLink(l);
-  listingShareUrl.value = link;
-  listingShareCopied.value = false;
-  const title = displayListingTitle(l);
-  const payload = { title, text: title, url: link };
-
-  if (navigator.share && (!navigator.canShare || navigator.canShare(payload))) {
-    try {
-      await navigator.share(payload);
-      showShareSuccess();
-      return;
-    } catch (error) {
-      // A cancelled native sheet is intentional. Other failures continue to a
-      // clipboard/manual-copy fallback instead of disappearing silently.
-      if (error instanceof DOMException && error.name === "AbortError") return;
-    }
-  }
-
-  listingShareCopied.value = await copyText(link);
-  if (listingShareCopied.value) showShareSuccess();
-  else listingShareModalOpen.value = true;
+  const link = makeListingShareLink(l); listingShareUrl.value = link; listingShareCopied.value = false; const title = displayListingTitle(l); const payload = { title, text: title, url: link };
+  if (navigator.share && (!navigator.canShare || navigator.canShare(payload))) { try { await navigator.share(payload); showShareSuccess(); return; } catch (error) { if (error instanceof DOMException && error.name === "AbortError") return; } }
+  listingShareCopied.value = await copyText(link); if (listingShareCopied.value) showShareSuccess(); else listingShareModalOpen.value = true;
 }
-
-async function copyListingShareLink() {
-  listingShareCopied.value = await copyText(listingShareUrl.value);
-  if (listingShareCopied.value) showShareSuccess();
-}
-
+async function copyListingShareLink() { listingShareCopied.value = await copyText(listingShareUrl.value); if (listingShareCopied.value) showShareSuccess(); }
 async function openSharedListing(id: string, sourceName = "", countryCode = "", attempt = 0) {
-  const local = listings.value.find((listing) => listing.id === id);
-  if (local) {
-    openListing(local);
-    return;
-  }
-  const params: Record<string, string> = { listingId: id, limit: "1", offset: "0" };
-  if (SOURCES.includes(sourceName)) params.sources = sourceName;
-  if (/^[A-Za-z]{2}$/.test(countryCode)) params.countries = countryCode.toUpperCase();
-  const { data } = await safeFetch<FeedResult>("/flats-feed", { params });
-  const exact = data?.listings?.find((listing) => listing.id === id);
-  if (exact) {
-    openListing(exact);
-    return;
-  }
-  if (data?.warming && attempt < 20) {
-    if (sharedListingTimer) clearTimeout(sharedListingTimer);
-    sharedListingTimer = setTimeout(() => {
-      sharedListingTimer = undefined;
-      void openSharedListing(id, sourceName, countryCode, attempt + 1);
-    }, 1800);
-  }
+  const local = listings.value.find((listing) => listing.id === id); if (local) { openListing(local); return; }
+  const params: Record<string, string> = { listingId: id, limit: "1", offset: "0" }; if (SOURCES.includes(sourceName)) params.sources = sourceName; if (/^[A-Za-z]{2}$/.test(countryCode)) params.countries = countryCode.toUpperCase();
+  const { data } = await safeFetch<FeedResult>("/flats-feed", { params }); const exact = data?.listings?.find((listing) => listing.id === id); if (exact) { openListing(exact); return; }
+  if (data?.warming && attempt < 20) { if (sharedListingTimer) clearTimeout(sharedListingTimer); sharedListingTimer = setTimeout(() => { sharedListingTimer = undefined; void openSharedListing(id, sourceName, countryCode, attempt + 1); }, 1800); }
 }
-function timeAgo(iso: string | null): string {
-  if (!iso) return "";
-  const days = Math.floor((Date.now() - new Date(iso).getTime()) / 86_400_000);
-  if (Number.isNaN(days)) return "";
-  if (days <= 0) return t("today");
-  if (days === 1) return t("yesterday");
-  if (days < 30) return t("daysAgo", { n: days });
-  return t("monthsAgo", { n: Math.floor(days / 30) });
-}
-
+function timeAgo(iso: string | null): string { if (!iso) return ""; const days = Math.floor((Date.now() - new Date(iso).getTime()) / 86_400_000); if (Number.isNaN(days)) return ""; if (days <= 0) return t("today"); if (days === 1) return t("yesterday"); if (days < 30) return t("daysAgo", { n: days }); return t("monthsAgo", { n: Math.floor(days / 30) }); }
 function setupInfinitePagination() {
   infiniteObserver?.disconnect();
-
-  infiniteObserver =
-      new IntersectionObserver(
-          (entries) => {
-            const reachedBottom =
-                entries.some(
-                    (entry) =>
-                        entry.isIntersecting,
-                );
-
-            if (!reachedBottom) {
-              return;
-            }
-
-            if (!hasMore.value) {
-              return;
-            }
-
-            if (
-                loading.value ||
-                loadingMore.value
-            ) {
-              return;
-            }
-
-            /*
-             * Не позволяем IntersectionObserver
-             * автоматически загружать подряд
-             * несколько страниц.
-             *
-             * После каждой загрузки пользователь
-             * должен реально прокрутить страницу
-             * дальше.
-             */
-            const currentScrollY =
-                window.scrollY;
-
-            if (
-                currentScrollY <=
-                lastPaginationScrollY + 40
-            ) {
-              return;
-            }
-
-            lastPaginationScrollY =
-                currentScrollY;
-
-            void load(true, false);
-          },
-          {
-            // Раньше было 500px —
-            // поэтому загрузка начиналась сильно
-            // раньше конца страницы.
-            rootMargin: "0px",
-
-            // Sentinel достаточно просто
-            // появиться в viewport.
-            threshold: 0.01,
-          },
-      );
-
-  if (loadMoreSentinel.value) {
-    infiniteObserver.observe(
-        loadMoreSentinel.value,
-    );
-  }
+  infiniteObserver = new IntersectionObserver((entries) => { const reachedBottom = entries.some((entry) => entry.isIntersecting); if (!reachedBottom || !hasMore.value || loading.value || loadingMore.value) return; const currentScrollY = window.scrollY; if (currentScrollY <= lastPaginationScrollY + 40) return; lastPaginationScrollY = currentScrollY; void load(true, false); }, { rootMargin: "0px", threshold: 0.01 });
+  if (loadMoreSentinel.value) infiniteObserver.observe(loadMoreSentinel.value);
 }
 
 onMounted(async () => {
-  window.addEventListener(
-      "keydown",
-      onLightboxKeydown,
-  );
-  window.addEventListener("scroll", updateBackToTop, { passive: true });
-  updateBackToTop();
-
-  const sharedFlatId =
-      queryString(route.query.flat);
-
-  const sharedFlatSource =
-      queryString(
-          route.query.flatSource,
-      );
-
-  const sharedFlatCountry =
-      queryString(
-          route.query.flatCountry,
-      );
-
-  loadPersonalState();
-
-  applyQueryParams(
-      route.query,
-  );
-
-  void loadRates();
-
-  await loadMeta();
-
-  // Metadata is in and restored filters are settled — let the flush of any
-  // watch(countries)/watch(city) triggered above run while still guarded, then
-  // re-enable the cascade resets for real user interaction.
-  await nextTick();
-  restoring.value = false;
-
-  if (
-      queryString(
-          route.query.shared,
-      ) === "1"
-  ) {
-    showAdvanced.value = true;
-    sharedLinkOpened.value = true;
-    shareModalOpen.value = true;
-  }
-
-  await load(false);
-
-  if (sharedFlatId) {
-    await openSharedListing(
-        sharedFlatId,
-        sharedFlatSource,
-        sharedFlatCountry,
-    );
-  }
-
-  await nextTick();
-
-  // Никакой автоматической пагинации
-  // после initial render.
-  lastPaginationScrollY =
-      window.scrollY;
-
-  setupInfinitePagination();
+  window.addEventListener("keydown", onLightboxKeydown); window.addEventListener("scroll", updateBackToTop, { passive: true }); updateBackToTop();
+  const sharedFlatId = queryString(route.query.flat); const sharedFlatSource = queryString(route.query.flatSource); const sharedFlatCountry = queryString(route.query.flatCountry);
+  loadPersonalState(); applyQueryParams(route.query); void loadRates(); await loadMeta(); await nextTick(); restoring.value = false;
+  if (queryString(route.query.shared) === "1") { showAdvanced.value = true; sharedLinkOpened.value = true; shareModalOpen.value = true; }
+  await load(false); if (sharedFlatId) await openSharedListing(sharedFlatId, sharedFlatSource, sharedFlatCountry); await nextTick(); lastPaginationScrollY = window.scrollY; setupInfinitePagination();
 });
-
-watch(
-    loadMoreSentinel,
-    (current, previous) => {
-      if (previous) {
-        infiniteObserver?.unobserve(
-            previous,
-        );
-      }
-
-      if (current) {
-        infiniteObserver?.observe(
-            current,
-        );
-      }
-    },
-);
-
-watch(modalOpen, (open) => {
-  if (open) return;
-  closeLightbox();
-  stopTranslationPoll();
-  translationRequestId += 1;
-  translatingDescription.value = false;
-  // Let the modal library run its own teardown first, then clear any lock it
-  // left behind (see releaseStuckScrollLock).
-  nextTick(() => setTimeout(releaseStuckScrollLock, 350));
-});
-
-watch(lightboxIndex, (index) => {
-  if (index === null) nextTick(() => setTimeout(releaseStuckScrollLock, 350));
-});
-
-// While restoring filters from the URL/localStorage on mount, these cascade
-// resets must not run — otherwise loading country metadata (which sets
-// `countries`) fires watch(countries) and wipes the just-restored city.
+watch(loadMoreSentinel, (current, previous) => { if (previous) infiniteObserver?.unobserve(previous); if (current) infiniteObserver?.observe(current); });
+watch(modalOpen, (open) => { if (open) return; closeLightbox(); stopTranslationPoll(); translationRequestId += 1; translatingDescription.value = false; nextTick(() => setTimeout(releaseStuckScrollLock, 350)); });
+watch(lightboxIndex, (index) => { if (index === null) nextTick(() => setTimeout(releaseStuckScrollLock, 350)); });
 const restoring = ref(true);
-
-watch(city, () => {
-      if (restoring.value) return;
-      district.value = "";
-      metro.value = "";
-      query.value = "";
-    },
-);
-
-watch(countries, () => {
-      if (restoring.value) return;
-      district.value = "";
-      metro.value = "";
-      city.value = "";
-      query.value = "";
-    },
-);
-
-onBeforeUnmount(() => {
-  // Leaving the page with an overlay open must never strand a scroll lock.
-  modalOpen.value = false;
-  lightboxIndex.value = null;
-  releaseStuckScrollLock();
-  window.removeEventListener("keydown", onLightboxKeydown);
-  window.removeEventListener("scroll", updateBackToTop);
-  if (loadTimer) clearTimeout(loadTimer);
-  if (warmTimer) clearTimeout(warmTimer);
-  if (sharedListingTimer) clearTimeout(sharedListingTimer);
-  infiniteObserver?.disconnect();
-  stopTranslationPoll();
-});
+watch(city, () => { if (restoring.value) return; district.value = ""; metro.value = ""; query.value = ""; });
+watch(countries, () => { if (restoring.value) return; district.value = ""; metro.value = ""; city.value = ""; query.value = ""; });
+onBeforeUnmount(() => { modalOpen.value = false; lightboxIndex.value = null; releaseStuckScrollLock(); window.removeEventListener("keydown", onLightboxKeydown); window.removeEventListener("scroll", updateBackToTop); if (loadTimer) clearTimeout(loadTimer); if (warmTimer) clearTimeout(warmTimer); if (sharedListingTimer) clearTimeout(sharedListingTimer); infiniteObserver?.disconnect(); stopTranslationPoll(); });
 </script>
 
 <template>
@@ -1571,384 +693,120 @@ onBeforeUnmount(() => {
       <p class="flats__subtitle text-muted mx-auto">{{ t("subtitle") }}</p>
     </div>
 
-    <!-- Filters -->
-    <form ref="filtersEl" class="flats__controls" @submit.prevent="load()">
-      <u-input v-model="query" icon="i-lucide-search" :placeholder="t('searchPlaceholder')" />
-      <u-button type="submit" :loading="loading" icon="i-lucide-search">
-        {{ loading ? t("searching") : t("search") }}
-      </u-button>
+    <form ref="filtersEl" class="flats__controls flats__controls_redesign" @submit.prevent="load()">
+      <div class="flats__searchbar">
+        <u-input v-model="query" icon="i-lucide-search" :placeholder="t('searchPlaceholder')" />
+        <u-button type="submit" :loading="loading" icon="i-lucide-search">{{ loading ? t("searching") : t("search") }}</u-button>
+      </div>
 
-      <div class="flats__row">
+      <div class="flats__row flats__secondary-nav">
         <div class="flats__filters">
-          <button
-              v-for="opt in sourceOptions" :key="opt.value" type="button"
-              class="flats__pill" :class="{ 'flats__pill_active': source === opt.value }"
-              @click="selectSource(opt.value)"
-          >{{ opt.label }}</button>
+          <button v-for="opt in sourceOptions" :key="opt.value" type="button" class="flats__pill" :class="{ 'flats__pill_active': source === opt.value }" @click="selectSource(opt.value)">{{ opt.label }}</button>
         </div>
         <div class="flats__views" :aria-label="t('personalTabs')">
-          <button type="button" class="flats__pill" :class="{ 'flats__pill_active': view === 'active' }" @click="setView('active')">
-            {{ t("allListings") }}
-          </button>
-          <button type="button" class="flats__pill" :class="{ 'flats__pill_active': view === 'favorites' }" @click="setView('favorites')">
-            {{ t("favorites") }} · {{ favorites.length }}
-          </button>
-          <button type="button" class="flats__pill" :class="{ 'flats__pill_active': view === 'recent' }" @click="setView('recent')">
-            {{ t("recent") }} · {{ recent.length }}
-          </button>
-          <button type="button" class="flats__pill" :class="{ 'flats__pill_active': view === 'hidden' }" @click="setView('hidden')">
-            {{ t("hidden") }} · {{ hidden.length }}
-          </button>
+          <button type="button" class="flats__pill" :class="{ 'flats__pill_active': view === 'active' }" @click="setView('active')">{{ t("allListings") }}</button>
+          <button type="button" class="flats__pill" :class="{ 'flats__pill_active': view === 'favorites' }" @click="setView('favorites')">{{ t("favorites") }} · {{ favorites.length }}</button>
+          <button type="button" class="flats__pill" :class="{ 'flats__pill_active': view === 'recent' }" @click="setView('recent')">{{ t("recent") }} · {{ recent.length }}</button>
+          <button type="button" class="flats__pill" :class="{ 'flats__pill_active': view === 'hidden' }" @click="setView('hidden')">{{ t("hidden") }} · {{ hidden.length }}</button>
         </div>
       </div>
 
-      <div class="flats__advanced-toggle">
-        <u-button
-            type="button"
-            variant="ghost"
-            color="neutral"
-            size="sm"
-            :icon="showAdvanced ? 'i-lucide-chevron-up' : 'i-lucide-chevron-down'"
-            :aria-expanded="showAdvanced"
-            @click="toggleAdvanced"
-        >{{ showAdvanced ? t("hideFilters") : t("moreFilters") }}</u-button>
-      </div>
-
-      <div v-if="showAdvanced" class="flats__advanced">
-        <div class="flats__presets">
-          <span class="flats__field-label">{{ t("presets") }}</span>
+      <section class="filter-card">
+        <div class="filter-presets">
+          <span class="flats__field-label filter-presets__label">{{ t("presets") }}</span>
           <button v-for="preset in presets" :key="preset.name" type="button" class="flats__preset" @click="applyPreset(preset)">
-            <span>{{ preset.name }}</span>
-            <span class="flats__preset-remove" role="button" :aria-label="t('deletePreset')" @click.stop="removePreset(preset.name)">×</span>
+            <span>{{ preset.name }}</span><span class="flats__preset-remove" role="button" :aria-label="t('deletePreset')" @click.stop="removePreset(preset.name)">×</span>
           </button>
-          <u-button type="button" variant="outline" color="neutral" size="sm" icon="i-lucide-bookmark-plus" @click="presetModalOpen = true">
-            {{ t("savePreset") }}
-          </u-button>
-          <u-button type="button" variant="outline" color="neutral" size="sm" icon="i-lucide-share-2" @click="sharedLinkOpened = false; shareModalOpen = true">
-            {{ t("shareSearch") }}
-          </u-button>
+          <u-button type="button" variant="outline" color="neutral" size="sm" icon="i-lucide-bookmark-plus" @click="presetModalOpen = true">{{ t("savePreset") }}</u-button>
+          <u-button type="button" variant="outline" color="neutral" size="sm" icon="i-lucide-share-2" @click="sharedLinkOpened = false; shareModalOpen = true">{{ t("shareSearch") }}</u-button>
         </div>
-        <label class="flats__field">
-          <span class="flats__field-label">{{ t("country") }}</span>
-          <u-select-menu v-model="countries" :items="countryItems" value-key="value" label-key="label"
-              multiple :placeholder="t('countryAny')" class="flats__select" @update:model-value="scheduleLoad()" />
-        </label>
-        <label class="flats__field">
-          <span class="flats__field-label">{{ t("city") }}</span>
-          <u-select-menu v-model="citySel" :items="cityItems" value-key="value" label-key="label"
-              class="flats__select" @update:model-value="scheduleLoad()" />
-        </label>
-        <label v-if="districtOptions.length" class="flats__field">
-          <span class="flats__field-label">{{ t("district") }}</span>
-          <u-select-menu v-model="districtSel" :items="districtItems" value-key="value" label-key="label"
-              class="flats__select" @update:model-value="scheduleLoad()" />
-        </label>
-        <label class="flats__field">
-          <span class="flats__field-label">{{ t("propertyType") }}</span>
-          <u-select-menu v-model="propertyTypeSel" :items="propertyTypeItems" value-key="value" label-key="label"
-              :search-input="false" class="flats__select" @update:model-value="scheduleLoad()" />
-        </label>
-        <label class="flats__field">
-          <span class="flats__field-label">{{ t("dealType") }}</span>
-          <u-select-menu v-model="dealTypeSel" :items="dealTypeItems" value-key="value" label-key="label"
-              :search-input="false" class="flats__select" @update:model-value="scheduleLoad()" />
-        </label>
-        <label class="flats__field">
-          <span class="flats__field-label">{{ t("agency") }}</span>
-          <u-select-menu v-model="agencySel" :items="agencyItems" value-key="value" label-key="label"
-              :search-input="false" class="flats__select" @update:model-value="scheduleLoad()" />
-        </label>
-        <label v-if="metroOptions.length" class="flats__field">
-          <span class="flats__field-label">{{ filterLabel("metro") }}</span>
-          <u-select-menu v-model="metroSel" :items="metroItems" value-key="value" label-key="label" class="flats__select" @update:model-value="scheduleLoad()" />
-        </label>
-        <label class="flats__field">
-          <span class="flats__field-label">{{ filterLabel("audience") }}</span>
-          <u-select-menu v-model="audienceSel" :items="audienceItems" value-key="value" label-key="label" :search-input="false" class="flats__select" @update:model-value="scheduleLoad()" />
-        </label>
-        <div class="flats__toggle-grid">
-          <u-button type="button" :variant="petFriendly ? 'solid' : 'outline'" color="neutral" icon="i-lucide-paw-print" :aria-pressed="petFriendly" @click="petFriendly = !petFriendly; scheduleLoad(80)">{{ filterLabel("pets") }}</u-button>
-          <u-button type="button" :variant="roomOnlyFilter ? 'solid' : 'outline'" color="neutral" icon="i-lucide-bed-single" :aria-pressed="roomOnlyFilter" @click="roomOnlyFilter = !roomOnlyFilter; scheduleLoad(80)">{{ filterLabel("roomOnly") }}</u-button>
-          <u-button type="button" :variant="childrenRequired ? 'solid' : 'outline'" color="neutral" icon="i-lucide-baby" :aria-pressed="childrenRequired" @click="childrenRequired = !childrenRequired; scheduleLoad(80)">{{ filterLabel("children") }}</u-button>
-          <u-button type="button" :variant="newBuildingOnly ? 'solid' : 'outline'" color="neutral" icon="i-lucide-building-2" :aria-pressed="newBuildingOnly" @click="newBuildingOnly = !newBuildingOnly; scheduleLoad(80)">{{ filterLabel("newBuilding") }}</u-button>
+
+        <div class="filter-primary-grid">
+          <label class="flats__field"><span class="flats__field-label">{{ t("country") }}</span><u-select-menu v-model="countries" :items="countryItems" value-key="value" label-key="label" multiple :placeholder="t('countryAny')" class="flats__select" @update:model-value="scheduleLoad()" /></label>
+          <label class="flats__field"><span class="flats__field-label">{{ t("city") }}</span><u-select-menu v-model="citySel" :items="cityItems" value-key="value" label-key="label" class="flats__select" @update:model-value="scheduleLoad()" /></label>
+          <label class="flats__field"><span class="flats__field-label">{{ t("dealType") }}</span><u-select-menu v-model="dealTypeSel" :items="dealTypeItems" value-key="value" label-key="label" :search-input="false" class="flats__select" @update:model-value="scheduleLoad()" /></label>
+          <label class="flats__field"><span class="flats__field-label">{{ t("agency") }}</span><u-select-menu v-model="agencySel" :items="agencyItems" value-key="value" label-key="label" :search-input="false" class="flats__select" @update:model-value="scheduleLoad()" /></label>
         </div>
-        <label class="flats__field">
-          <span class="flats__field-label">{{ t("priceMin") }}</span>
-          <u-input v-model.number="priceMin" type="number" icon="i-lucide-banknote" @change="scheduleLoad()" />
-        </label>
-        <label class="flats__field">
-          <span class="flats__field-label">{{ t("priceMax") }}</span>
-          <u-input v-model.number="priceMax" type="number" icon="i-lucide-banknote" @change="scheduleLoad()" />
-        </label>
-        <label class="flats__field">
-          <span class="flats__field-label">{{ t("currency") }}</span>
-          <u-select-menu
-              v-model="displayCurrency" :items="currencyItems" value-key="value" label-key="label"
-              class="flats__select"
-              @update:model-value="(priceMin != null || priceMax != null) && scheduleLoad()"
-          />
-        </label>
-        <label class="flats__field">
-          <span class="flats__field-label">{{ t("roomsMin") }}</span>
-          <u-input v-model.number="roomsMin" type="number" min="0" icon="i-lucide-bed-double" @change="scheduleLoad()" />
-        </label>
-        <label class="flats__field"><span class="flats__field-label">{{ filterLabel("roomsMax") }}</span><u-input v-model.number="roomsMax" type="number" min="0" @change="scheduleLoad()" /></label>
-        <label class="flats__field"><span class="flats__field-label">{{ filterLabel("bedroomsMin") }}</span><u-input v-model.number="bedroomsMin" type="number" min="0" @change="scheduleLoad()" /></label>
-        <label class="flats__field"><span class="flats__field-label">{{ filterLabel("bedroomsMax") }}</span><u-input v-model.number="bedroomsMax" type="number" min="0" @change="scheduleLoad()" /></label>
-        <label class="flats__field"><span class="flats__field-label">{{ filterLabel("areaMin") }}</span><u-input v-model.number="areaMin" type="number" min="0" @change="scheduleLoad()" /></label>
-        <label class="flats__field"><span class="flats__field-label">{{ filterLabel("areaMax") }}</span><u-input v-model.number="areaMax" type="number" min="0" @change="scheduleLoad()" /></label>
-        <label class="flats__field"><span class="flats__field-label">{{ filterLabel("floorMin") }}</span><u-input v-model.number="floorMin" type="number" min="0" @change="scheduleLoad()" /></label>
-        <label class="flats__field"><span class="flats__field-label">{{ filterLabel("floorMax") }}</span><u-input v-model.number="floorMax" type="number" min="0" @change="scheduleLoad()" /></label>
-        <label class="flats__field"><span class="flats__field-label">{{ filterLabel("totalFloorsMin") }}</span><u-input v-model.number="totalFloorsMin" type="number" min="1" @change="scheduleLoad()" /></label>
-        <label class="flats__field"><span class="flats__field-label">{{ filterLabel("totalFloorsMax") }}</span><u-input v-model.number="totalFloorsMax" type="number" min="1" @change="scheduleLoad()" /></label>
-        <label class="flats__field"><span class="flats__field-label">{{ filterLabel("yearMin") }}</span><u-input v-model.number="yearMin" type="number" min="1800" :max="new Date().getFullYear() + 2" @change="scheduleLoad()" /></label>
-        <label class="flats__field"><span class="flats__field-label">{{ filterLabel("yearMax") }}</span><u-input v-model.number="yearMax" type="number" min="1800" :max="new Date().getFullYear() + 2" @change="scheduleLoad()" /></label>
-        <label class="flats__field"><span class="flats__field-label">{{ filterLabel("freshDays") }}</span><u-input v-model.number="maxAgeDays" type="number" min="1" max="21" @change="scheduleLoad()" /></label>
-        <u-button type="button" variant="ghost" color="neutral" size="sm" icon="i-lucide-rotate-ccw" @click="resetFilters">
-          {{ t("reset") }}
-        </u-button>
-      </div>
+
+        <div class="filter-price-row">
+          <span class="flats__field-label filter-price-row__label">{{ locale.startsWith('ru') ? 'Цена' : 'Price' }}</span>
+          <label class="price-input"><span>{{ locale.startsWith('ru') ? 'от' : 'min' }}</span><u-input v-model.number="priceMin" type="number" inputmode="numeric" min="1" max="1000000000" :ui="{ base: 'price-number-input' }" @change="scheduleLoad()" /></label>
+          <span class="price-separator">—</span>
+          <label class="price-input"><span>{{ locale.startsWith('ru') ? 'до' : 'max' }}</span><u-input v-model.number="priceMax" type="number" inputmode="numeric" min="1" max="1000000000" :ui="{ base: 'price-number-input' }" @change="scheduleLoad()" /></label>
+          <label class="currency-select"><span class="sr-only">{{ t("currency") }}</span><u-select-menu v-model="displayCurrency" :items="currencyItems" value-key="value" label-key="label" class="flats__select currency-select__control" @update:model-value="(priceMin != null || priceMax != null) && scheduleLoad()" /></label>
+        </div>
+
+        <div class="filter-actions-row">
+          <u-button type="button" variant="outline" color="neutral" icon="i-lucide-sliders-horizontal" :trailing-icon="showAdvanced ? 'i-lucide-chevron-up' : 'i-lucide-chevron-down'" :aria-expanded="showAdvanced" class="advanced-button" @click="toggleAdvanced">{{ showAdvanced ? t("hideFilters") : t("moreFilters") }}</u-button>
+          <div class="active-filter-chips">
+            <button v-if="district" type="button" class="filter-chip" @click="district = ''; scheduleLoad(80)">{{ t("district") }}: {{ locName(district, 'district') }} <span>×</span></button>
+            <button v-if="roomsMin != null" type="button" class="filter-chip" @click="roomsMin = undefined; scheduleLoad(80)">{{ roomsMin }}+ {{ locale.startsWith('ru') ? 'комнат' : 'rooms' }} <span>×</span></button>
+            <button v-if="petFriendly" type="button" class="filter-chip" @click="petFriendly = false; scheduleLoad(80)"><u-icon name="i-lucide-paw-print" /> {{ filterLabel("pets") }} <span>×</span></button>
+          </div>
+          <u-button type="button" variant="ghost" color="neutral" size="sm" icon="i-lucide-rotate-ccw" class="filter-reset" @click="resetFilters">{{ t("reset") }}</u-button>
+        </div>
+      </section>
+
+      <section v-if="showAdvanced" class="advanced-card">
+        <div class="advanced-card__header"><div><u-icon name="i-lucide-filter" /><strong>{{ t("moreFilters") }}</strong></div><button type="button" @click="toggleAdvanced">{{ t("hideFilters") }} <u-icon name="i-lucide-chevron-up" /></button></div>
+        <div class="advanced-groups">
+          <div class="filter-group filter-group_quick"><h3><u-icon name="i-lucide-sliders-horizontal" /> {{ locale.startsWith('ru') ? 'Быстрые опции' : 'Quick options' }}</h3><div class="quick-options">
+            <u-button type="button" :variant="petFriendly ? 'solid' : 'outline'" color="neutral" icon="i-lucide-paw-print" @click="petFriendly = !petFriendly; scheduleLoad(80)">{{ filterLabel("pets") }}</u-button>
+            <u-button type="button" :variant="childrenRequired ? 'solid' : 'outline'" color="neutral" icon="i-lucide-baby" @click="childrenRequired = !childrenRequired; scheduleLoad(80)">{{ filterLabel("children") }}</u-button>
+            <u-button type="button" :variant="roomOnlyFilter ? 'solid' : 'outline'" color="neutral" icon="i-lucide-bed-single" @click="roomOnlyFilter = !roomOnlyFilter; scheduleLoad(80)">{{ filterLabel("roomOnly") }}</u-button>
+            <u-button type="button" :variant="newBuildingOnly ? 'solid' : 'outline'" color="neutral" icon="i-lucide-building-2" @click="newBuildingOnly = !newBuildingOnly; scheduleLoad(80)">{{ filterLabel("newBuilding") }}</u-button>
+          </div></div>
+          <div class="filter-group"><h3><u-icon name="i-lucide-map-pin" /> {{ locale.startsWith('ru') ? 'Локация' : 'Location' }}</h3>
+            <label v-if="districtOptions.length" class="flats__field"><span class="flats__field-label">{{ t("district") }}</span><u-select-menu v-model="districtSel" :items="districtItems" value-key="value" label-key="label" class="flats__select" @update:model-value="scheduleLoad()" /></label>
+            <label v-if="metroOptions.length" class="flats__field"><span class="flats__field-label">{{ filterLabel("metro") }}</span><u-select-menu v-model="metroSel" :items="metroItems" value-key="value" label-key="label" class="flats__select" @update:model-value="scheduleLoad()" /></label>
+          </div>
+          <div class="filter-group"><h3><u-icon name="i-lucide-house" /> {{ locale.startsWith('ru') ? 'Квартира' : 'Apartment' }}</h3>
+            <div class="range-field"><span>{{ t("roomsMin") }}</span><u-input v-model.number="roomsMin" type="number" min="0" @change="scheduleLoad()" /><span>—</span><u-input v-model.number="roomsMax" type="number" min="0" @change="scheduleLoad()" /></div>
+            <div class="range-field"><span>{{ filterLabel("bedroomsMin") }}</span><u-input v-model.number="bedroomsMin" type="number" min="0" @change="scheduleLoad()" /><span>—</span><u-input v-model.number="bedroomsMax" type="number" min="0" @change="scheduleLoad()" /></div>
+            <div class="range-field"><span>{{ filterLabel("areaMin") }}</span><u-input v-model.number="areaMin" type="number" min="0" @change="scheduleLoad()" /><span>—</span><u-input v-model.number="areaMax" type="number" min="0" @change="scheduleLoad()" /></div>
+          </div>
+          <div class="filter-group"><h3><u-icon name="i-lucide-building-2" /> {{ locale.startsWith('ru') ? 'Дом' : 'Building' }}</h3>
+            <div class="range-field"><span>{{ filterLabel("floorMin") }}</span><u-input v-model.number="floorMin" type="number" min="0" @change="scheduleLoad()" /><span>—</span><u-input v-model.number="floorMax" type="number" min="0" @change="scheduleLoad()" /></div>
+            <div class="range-field"><span>{{ filterLabel("totalFloorsMin") }}</span><u-input v-model.number="totalFloorsMin" type="number" min="1" @change="scheduleLoad()" /><span>—</span><u-input v-model.number="totalFloorsMax" type="number" min="1" @change="scheduleLoad()" /></div>
+            <div class="range-field"><span>{{ filterLabel("yearMin") }}</span><u-input v-model.number="yearMin" type="number" min="1800" :max="new Date().getFullYear() + 2" @change="scheduleLoad()" /><span>—</span><u-input v-model.number="yearMax" type="number" min="1800" :max="new Date().getFullYear() + 2" @change="scheduleLoad()" /></div>
+          </div>
+          <div class="filter-group"><h3><u-icon name="i-lucide-megaphone" /> {{ locale.startsWith('ru') ? 'Объявление' : 'Listing' }}</h3>
+            <label class="flats__field"><span class="flats__field-label">{{ filterLabel("audience") }}</span><u-select-menu v-model="audienceSel" :items="audienceItems" value-key="value" label-key="label" :search-input="false" class="flats__select" @update:model-value="scheduleLoad()" /></label>
+            <label class="flats__field"><span class="flats__field-label">{{ t("propertyType") }}</span><u-select-menu v-model="propertyTypeSel" :items="propertyTypeItems" value-key="value" label-key="label" :search-input="false" class="flats__select" @update:model-value="scheduleLoad()" /></label>
+            <label class="flats__field"><span class="flats__field-label">{{ filterLabel("freshDays") }}</span><u-input v-model.number="maxAgeDays" type="number" min="1" max="21" @change="scheduleLoad()" /></label>
+          </div>
+        </div>
+      </section>
     </form>
 
     <p v-if="failed" class="flats__error">{{ t("error") }}</p>
-    <p
-        v-else-if="source === 'telegram' && !loading && !listings.length && sourceErrors?.some((item) => item.source === 'telegram')"
-        class="flats__source-warning"
-    >{{ t("telegramUnavailable") }}</p>
+    <p v-else-if="source === 'telegram' && !loading && !listings.length && sourceErrors?.some((item) => item.source === 'telegram')" class="flats__source-warning">{{ t("telegramUnavailable") }}</p>
     <p v-else class="flats__count text-muted">{{ t("found", { n: view === 'active' ? total : displayedListings.length }) }}</p>
 
-    <!-- Map -->
-    <section v-if="listings.length" class="flats__map-wrap">
-      <flat-map
-          :points="mapPoints"
-          :draw-label="t('drawArea')"
-          :done-label="t('done')"
-          :clear-label="t('clearArea')"
-          :draw-hint="t('drawHint')"
-          @select="openById"
-          @area-change="drawnArea = $event"
-      />
-    </section>
+    <section v-if="listings.length" class="flats__map-wrap"><flat-map :points="mapPoints" :draw-label="t('drawArea')" :done-label="t('done')" :clear-label="t('clearArea')" :draw-hint="t('drawHint')" @select="openById" @area-change="drawnArea = $event" /></section>
 
-    <!-- Results -->
     <div class="flats__grid" :class="{ 'flats__grid_loading': loading }">
-      <article v-for="l in displayedListings" :key="l.id" class="flat-card" :class="{ 'flat-card_favorite': isFavorite(l.id), 'flat-card_hidden': isHidden(l.id) }" @click="openListing(l)">
-        <div class="flat-card__photo">
-          <img
-              v-if="listingPhoto(l)"
-              :src="listingPhoto(l) || ''"
-              :alt="displayListingTitle(l)"
-              loading="lazy"
-              decoding="async"
-              referrerpolicy="no-referrer"
-              @error="markPhotoFailedFromEvent"
-          />
-          <div v-else class="flat-card__no-photo">
-            <u-icon name="i-lucide-image-off" class="flat-card__no-photo-icon" aria-hidden="true" />
-            <span>{{ t("noPhoto") }}</span>
-          </div>
-          <span v-if="dealLabel(l.dealType)" class="flat-card__deal">{{ dealLabel(l.dealType) }}</span>
-          <span v-if="l.roomOnly" class="flat-card__room">{{ t("roomShare") }}</span>
-        </div>
-        <div class="flat-card__body">
-          <div class="flat-card__actions">
-            <button type="button" class="flat-card__action" :class="{ 'flat-card__action_active': isFavorite(l.id) }" :aria-label="isFavorite(l.id) ? t('removeFavorite') : t('addFavorite')" @click.stop="toggleFavorite(l)">
-              <u-icon name="i-lucide-heart" />
-            </button>
-            <button type="button" class="flat-card__action" :class="{ 'flat-card__action_active': isHidden(l.id) }" :aria-label="isHidden(l.id) ? t('restoreListing') : t('hideListing')" @click.stop="toggleHidden(l)">
-              <u-icon :name="isHidden(l.id) ? 'i-lucide-eye' : 'i-lucide-eye-off'" />
-            </button>
-          </div>
-          <div class="flat-card__price">{{ priceLabel(l) }}</div>
-          <div v-if="convertedLabel(l)" class="flat-card__price-conv text-muted">{{ convertedLabel(l) }}</div>
-          <h3 class="flat-card__title">{{ displayListingTitle(l) }}</h3>
-          <div v-if="specLine(l)" class="flat-card__spec text-muted">{{ specLine(l) }}</div>
-          <div v-if="cardBadges(l).length" class="flat-card__badges">
-            <span v-for="b in cardBadges(l)" :key="b" class="flat-card__badge">{{ b }}</span>
-          </div>
-          <div class="flat-card__meta text-muted">
-            <span v-if="locLine(l)">{{ locLine(l) }}</span>
-            <span class="flat-card__src">{{ l.source }}</span>
-            <span v-if="timeAgo(l.createdAt)">· {{ timeAgo(l.createdAt) }}</span>
-          </div>
-        </div>
+      <article v-for="l in displayedListings" :key="`${l.source}:${l.country}:${l.id}`" class="flat-card" :class="{ 'flat-card_favorite': isFavorite(l.id), 'flat-card_hidden': isHidden(l.id) }" @click="openListing(l)">
+        <div class="flat-card__photo"><img v-if="listingPhoto(l)" :src="listingPhoto(l) || ''" :alt="displayListingTitle(l)" loading="lazy" decoding="async" referrerpolicy="no-referrer" @error="markPhotoFailedFromEvent" /><div v-else class="flat-card__no-photo"><u-icon name="i-lucide-image-off" class="flat-card__no-photo-icon" aria-hidden="true" /><span>{{ t("noPhoto") }}</span></div><span v-if="dealLabel(l.dealType)" class="flat-card__deal">{{ dealLabel(l.dealType) }}</span><span v-if="l.roomOnly" class="flat-card__room">{{ t("roomShare") }}</span></div>
+        <div class="flat-card__body"><div class="flat-card__actions"><button type="button" class="flat-card__action" :class="{ 'flat-card__action_active': isFavorite(l.id) }" :aria-label="isFavorite(l.id) ? t('removeFavorite') : t('addFavorite')" @click.stop="toggleFavorite(l)"><u-icon name="i-lucide-heart" /></button><button type="button" class="flat-card__action" :class="{ 'flat-card__action_active': isHidden(l.id) }" :aria-label="isHidden(l.id) ? t('restoreListing') : t('hideListing')" @click.stop="toggleHidden(l)"><u-icon :name="isHidden(l.id) ? 'i-lucide-eye' : 'i-lucide-eye-off'" /></button></div><div class="flat-card__price">{{ priceLabel(l) }}</div><div v-if="convertedLabel(l)" class="flat-card__price-conv text-muted">{{ convertedLabel(l) }}</div><h3 class="flat-card__title">{{ displayListingTitle(l) }}</h3><div v-if="specLine(l)" class="flat-card__spec text-muted">{{ specLine(l) }}</div><div v-if="cardBadges(l).length" class="flat-card__badges"><span v-for="b in cardBadges(l)" :key="b" class="flat-card__badge">{{ b }}</span></div><div class="flat-card__meta text-muted"><span v-if="locLine(l)">{{ locLine(l) }}</span><span class="flat-card__src">{{ l.source }}</span><span v-if="timeAgo(l.createdAt)">· {{ timeAgo(l.createdAt) }}</span></div></div>
       </article>
     </div>
 
-    <div ref="loadMoreSentinel" v-if="hasMore" class="flats__sentinel">
-      <span v-if="loadingMore" class="text-muted">{{ t("loadingMore") }}</span>
-    </div>
+    <div ref="loadMoreSentinel" v-if="hasMore" class="flats__sentinel"><span v-if="loadingMore" class="text-muted">{{ t("loadingMore") }}</span></div>
+    <div v-if="!loading && !displayedListings.length && !failed" class="flats__empty"><div class="text-muted">{{ t("empty") }}</div><div v-if="drawnArea.length >= 3 && listings.length" class="text-muted">{{ t("emptyArea") }}</div></div>
 
-    <div v-if="!loading && !displayedListings.length && !failed" class="flats__empty">
-      <div class="text-muted">{{ t("empty") }}</div>
-      <div v-if="drawnArea.length >= 3 && listings.length" class="text-muted">{{ t("emptyArea") }}</div>
-    </div>
-
-    <!-- Details popup -->
     <u-modal v-model:open="modalOpen" :title="modalTitle(active)" :ui="{ content: 'max-w-4xl' }" :dismissible="lightboxIndex === null">
-      <template #title>
-        <h2 class="flat-modal__title">{{ modalTitle(active) }}</h2>
-      </template>
-      <template #body>
-        <div v-if="active" class="flat-modal">
-          <div v-if="visiblePhotos(active).length" class="flat-modal__gallery">
-            <img
-                v-for="(p, i) in visiblePhotos(active)"
-                :key="p"
-                :src="p"
-                :alt="`${modalTitle(active)} (${i + 1})`"
-                class="flat-modal__thumb"
-                loading="lazy"
-                decoding="async"
-                referrerpolicy="no-referrer"
-                @error="markPhotoFailedFromEvent"
-                @click="openLightbox(i)"
-            />
-          </div>
-          <div class="flat-modal__price">{{ priceLabel(active) }}<span v-if="convertedLabel(active)" class="flat-modal__price-conv"> ({{ convertedLabel(active) }})</span><span v-if="dealLabel(active.dealType)" class="flat-modal__deal"> · {{ dealLabel(active.dealType) }}</span><span v-if="active.roomOnly" class="flat-modal__deal"> · {{ t("roomShare") }}</span></div>
-          <label class="flat-modal__hide-empty">
-            <input type="checkbox" v-model="hideEmptySpecs" />
-            <span>{{ t("hideEmpty") }}</span>
-          </label>
-          <table class="flat-modal__spec">
-            <tbody>
-              <tr v-for="row in visibleSpecRows" :key="row.label">
-                <th>{{ row.label }}</th>
-                <td>{{ row.value }}</td>
-              </tr>
-            </tbody>
-          </table>
-          <div v-if="active.description && descriptionNeedsTranslation" class="flat-modal__translation">
-            <u-button
-                type="button"
-                variant="outline"
-                color="neutral"
-                size="sm"
-                icon="i-lucide-languages"
-                :loading="translatingDescription"
-                @click="translateActiveDescription"
-            >{{ translatingDescription ? t("translatingDescription") : t("translateDescription") }}</u-button>
-            <span v-if="translationFailed" class="flat-modal__translation-error">{{ t("translationFailed") }}</span>
-          </div>
-          <section v-if="translatedDescription" class="flat-modal__translated">
-            <h4 class="flat-modal__translated-title">{{ t("translatedDescription") }}</h4>
-            <p class="flat-modal__desc">{{ translatedDescription }}</p>
-          </section>
-          <details v-if="active.description" class="flat-modal__descbox">
-            <summary>{{ t("origDescription") }}</summary>
-            <p class="flat-modal__desc">{{ active.description }}</p>
-          </details>
-          <div v-if="active.tags && active.tags.length" class="flat-modal__tags">
-            <span v-for="tag in active.tags" :key="tag" class="flat-modal__tag">{{ nearbyItemLabel(tag) }}</span>
-          </div>
-        </div>
-      </template>
-      <template #footer>
-        <div v-if="active" class="flat-modal__footer-actions">
-          <u-button class="flat-modal__footer-button" variant="outline" color="neutral" icon="i-lucide-heart" @click="toggleFavorite(active)">
-            {{ isFavorite(active.id) ? t("removeFavorite") : t("addFavorite") }}
-          </u-button>
-          <u-button class="flat-modal__footer-button" variant="outline" color="neutral" :icon="isHidden(active.id) ? 'i-lucide-eye' : 'i-lucide-eye-off'" @click="toggleHidden(active)">
-            {{ isHidden(active.id) ? t("restoreListing") : t("hideListing") }}
-          </u-button>
-          <u-button class="flat-modal__footer-button" variant="outline" color="neutral" :icon="shareCopied ? 'i-lucide-check' : 'i-lucide-share-2'" @click="shareFlat(active)">
-            {{ shareCopied ? t("shareCopied") : t("share") }}
-          </u-button>
-          <a class="flat-modal__footer-button flat-modal__footer-button_primary" :href="active.url" target="_blank" rel="noopener noreferrer">{{ t("open") }} →</a>
-        </div>
-      </template>
+      <template #title><h2 class="flat-modal__title">{{ modalTitle(active) }}</h2></template>
+      <template #body><div v-if="active" class="flat-modal"><div v-if="visiblePhotos(active).length" class="flat-modal__gallery"><img v-for="(p, i) in visiblePhotos(active)" :key="p" :src="p" :alt="`${modalTitle(active)} (${i + 1})`" class="flat-modal__thumb" loading="lazy" decoding="async" referrerpolicy="no-referrer" @error="markPhotoFailedFromEvent" @click="openLightbox(i)" /></div><div class="flat-modal__price">{{ priceLabel(active) }}<span v-if="convertedLabel(active)" class="flat-modal__price-conv"> ({{ convertedLabel(active) }})</span><span v-if="dealLabel(active.dealType)" class="flat-modal__deal"> · {{ dealLabel(active.dealType) }}</span><span v-if="active.roomOnly" class="flat-modal__deal"> · {{ t("roomShare") }}</span></div><label class="flat-modal__hide-empty"><input type="checkbox" v-model="hideEmptySpecs" /><span>{{ t("hideEmpty") }}</span></label><table class="flat-modal__spec"><tbody><tr v-for="row in visibleSpecRows" :key="row.label"><th>{{ row.label }}</th><td>{{ row.value }}</td></tr></tbody></table><div v-if="active.description && descriptionNeedsTranslation" class="flat-modal__translation"><u-button type="button" variant="outline" color="neutral" size="sm" icon="i-lucide-languages" :loading="translatingDescription" @click="translateActiveDescription">{{ translatingDescription ? t("translatingDescription") : t("translateDescription") }}</u-button><span v-if="translationFailed" class="flat-modal__translation-error">{{ t("translationFailed") }}</span></div><section v-if="translatedDescription" class="flat-modal__translated"><h4 class="flat-modal__translated-title">{{ t("translatedDescription") }}</h4><p class="flat-modal__desc">{{ translatedDescription }}</p></section><details v-if="active.description" class="flat-modal__descbox"><summary>{{ t("origDescription") }}</summary><p class="flat-modal__desc">{{ active.description }}</p></details><div v-if="active.tags && active.tags.length" class="flat-modal__tags"><span v-for="tag in active.tags" :key="tag" class="flat-modal__tag">{{ nearbyItemLabel(tag) }}</span></div></div></template>
+      <template #footer><div v-if="active" class="flat-modal__footer-actions"><u-button class="flat-modal__footer-button" variant="outline" color="neutral" icon="i-lucide-heart" @click="toggleFavorite(active)">{{ isFavorite(active.id) ? t("removeFavorite") : t("addFavorite") }}</u-button><u-button class="flat-modal__footer-button" variant="outline" color="neutral" :icon="isHidden(active.id) ? 'i-lucide-eye' : 'i-lucide-eye-off'" @click="toggleHidden(active)">{{ isHidden(active.id) ? t("restoreListing") : t("hideListing") }}</u-button><u-button class="flat-modal__footer-button" variant="outline" color="neutral" :icon="shareCopied ? 'i-lucide-check' : 'i-lucide-share-2'" @click="shareFlat(active)">{{ shareCopied ? t("shareCopied") : t("share") }}</u-button><a class="flat-modal__footer-button flat-modal__footer-button_primary" :href="active.url" target="_blank" rel="noopener noreferrer">{{ t("open") }} →</a></div></template>
     </u-modal>
 
-    <!-- Full-screen photo viewer (click any gallery thumbnail) -->
-    <teleport to="body">
-      <div
-          v-if="lightboxPhoto"
-          class="flat-lightbox"
-          role="dialog"
-          aria-modal="true"
-          :aria-label="t('photoViewer')"
-          @click="closeLightbox"
-      >
-        <div
-            class="flat-lightbox__stage"
-            @click.stop
-            @pointerdown="onLightboxPointerDown"
-            @pointerup="onLightboxPointerUp"
-            @pointercancel="onLightboxPointerCancel"
-        >
-          <img
-              :src="lightboxPhoto"
-              :alt="`${modalTitle(active)} (${lightboxPosition}/${lightboxPhotos.length})`"
-              referrerpolicy="no-referrer"
-              draggable="false"
-              @error="lightboxPhotoFailed"
-              @mousemove="updateLightboxZoom"
-              @mouseleave="resetLightboxZoom"
-          />
-        </div>
-        <button
-            v-if="lightboxPhotos.length > 1"
-            type="button"
-            class="flat-lightbox__nav flat-lightbox__nav_left"
-            :aria-label="t('previousPhoto')"
-            @click.stop="moveLightbox(-1)"
-        >
-          <u-icon name="i-lucide-chevron-left" />
-        </button>
-        <button
-            v-if="lightboxPhotos.length > 1"
-            type="button"
-            class="flat-lightbox__nav flat-lightbox__nav_right"
-            :aria-label="t('nextPhoto')"
-            @click.stop="moveLightbox(1)"
-        >
-          <u-icon name="i-lucide-chevron-right" />
-        </button>
-        <span v-if="lightboxPhotos.length > 1" class="flat-lightbox__counter">
-          {{ lightboxPosition }} / {{ lightboxPhotos.length }}
-        </span>
-        <button type="button" class="flat-lightbox__close" :aria-label="t('closePhoto')" @click.stop="closeLightbox">
-          <u-icon name="i-lucide-x" />
-        </button>
-      </div>
-    </teleport>
+    <teleport to="body"><div v-if="lightboxPhoto" class="flat-lightbox" role="dialog" aria-modal="true" :aria-label="t('photoViewer')" @click="closeLightbox"><div class="flat-lightbox__stage" @click.stop @pointerdown="onLightboxPointerDown" @pointerup="onLightboxPointerUp" @pointercancel="onLightboxPointerCancel"><img :src="lightboxPhoto" :alt="`${modalTitle(active)} (${lightboxPosition}/${lightboxPhotos.length})`" referrerpolicy="no-referrer" draggable="false" @error="lightboxPhotoFailed" @mousemove="updateLightboxZoom" @mouseleave="resetLightboxZoom" /></div><button v-if="lightboxPhotos.length > 1" type="button" class="flat-lightbox__nav flat-lightbox__nav_left" :aria-label="t('previousPhoto')" @click.stop="moveLightbox(-1)"><u-icon name="i-lucide-chevron-left" /></button><button v-if="lightboxPhotos.length > 1" type="button" class="flat-lightbox__nav flat-lightbox__nav_right" :aria-label="t('nextPhoto')" @click.stop="moveLightbox(1)"><u-icon name="i-lucide-chevron-right" /></button><span v-if="lightboxPhotos.length > 1" class="flat-lightbox__counter">{{ lightboxPosition }} / {{ lightboxPhotos.length }}</span><button type="button" class="flat-lightbox__close" :aria-label="t('closePhoto')" @click.stop="closeLightbox"><u-icon name="i-lucide-x" /></button></div></teleport>
 
-    <u-modal v-model:open="presetModalOpen" :title="t('savePreset')">
-      <template #body>
-        <u-input v-model="presetName" autofocus :placeholder="t('presetName')" @keyup.enter="savePreset" />
-      </template>
-      <template #footer>
-        <u-button color="neutral" variant="ghost" @click="presetModalOpen = false">{{ t("cancel") }}</u-button>
-        <u-button @click="savePreset">{{ t("save") }}</u-button>
-      </template>
-    </u-modal>
-
-    <u-modal v-model:open="shareModalOpen" :title="sharedLinkOpened ? t('sharedSearchApplied') : t('shareSearch')">
-      <template #body>
-        <p class="flat-share__hint">{{ sharedLinkOpened ? t("sharedSearchHint") : t("shareSearchHint") }}</p>
-        <u-input :model-value="shareUrl" readonly />
-      </template>
-      <template #footer>
-        <u-button icon="i-lucide-copy" @click="copyShareLink">{{ t("copyLink") }}</u-button>
-      </template>
-    </u-modal>
-
-    <button v-if="showBackToTop" type="button" class="flats__back-top" :aria-label="filterLabel('backToTop')" @click="scrollToFilters">
-      <u-icon name="i-lucide-arrow-up" />
-      <span>{{ filterLabel("backToTop") }}</span>
-    </button>
-
-    <u-modal v-model:open="listingShareModalOpen" :title="t('shareListing')">
-      <template #body>
-        <p class="flat-share__hint">{{ t("shareListingHint") }}</p>
-        <u-input :model-value="listingShareUrl" readonly />
-      </template>
-      <template #footer>
-        <u-button :icon="listingShareCopied ? 'i-lucide-check' : 'i-lucide-copy'" @click="copyListingShareLink">
-          {{ listingShareCopied ? t("shareCopied") : t("copyLink") }}
-        </u-button>
-      </template>
-    </u-modal>
+    <u-modal v-model:open="presetModalOpen" :title="t('savePreset')"><template #body><u-input v-model="presetName" autofocus :placeholder="t('presetName')" @keyup.enter="savePreset" /></template><template #footer><u-button color="neutral" variant="ghost" @click="presetModalOpen = false">{{ t("cancel") }}</u-button><u-button @click="savePreset">{{ t("save") }}</u-button></template></u-modal>
+    <u-modal v-model:open="shareModalOpen" :title="sharedLinkOpened ? t('sharedSearchApplied') : t('shareSearch')"><template #body><p class="flat-share__hint">{{ sharedLinkOpened ? t("sharedSearchHint") : t("shareSearchHint") }}</p><u-input :model-value="shareUrl" readonly /></template><template #footer><u-button icon="i-lucide-copy" @click="copyShareLink">{{ t("copyLink") }}</u-button></template></u-modal>
+    <button v-if="showBackToTop" type="button" class="flats__back-top" :aria-label="filterLabel('backToTop')" @click="scrollToFilters"><u-icon name="i-lucide-arrow-up" /><span>{{ filterLabel("backToTop") }}</span></button>
+    <u-modal v-model:open="listingShareModalOpen" :title="t('shareListing')"><template #body><p class="flat-share__hint">{{ t("shareListingHint") }}</p><u-input :model-value="listingShareUrl" readonly /></template><template #footer><u-button :icon="listingShareCopied ? 'i-lucide-check' : 'i-lucide-copy'" @click="copyListingShareLink">{{ listingShareCopied ? t("shareCopied") : t("copyLink") }}</u-button></template></u-modal>
   </u-container>
 </template>
 
@@ -1960,37 +818,16 @@ onBeforeUnmount(() => {
 .flats__row { grid-column: 1 / -1; display: flex; flex-wrap: wrap; justify-content: space-between; gap: 12px; }
 .flats__filters { display: flex; flex-wrap: wrap; gap: 8px; }
 .flats__views { display: flex; flex-wrap: wrap; gap: 8px; padding-left: 12px; border-left: 1px solid var(--line); }
-.flats__pill {
-  height: 34px; padding: 0 13px; border-radius: 8px; border: 1px solid var(--line);
-  background: rgba(255,255,255,0.03); color: var(--ui-text-muted); font-weight: 700; font-size: 12px;
-  text-transform: capitalize; cursor: pointer; transition: filter 180ms ease, color 180ms ease;
-}
+.flats__pill { height: 34px; padding: 0 13px; border-radius: 8px; border: 1px solid var(--line); background: rgba(255,255,255,0.03); color: var(--ui-text-muted); font-weight: 700; font-size: 12px; text-transform: capitalize; cursor: pointer; transition: filter 180ms ease, color 180ms ease; }
 .flats__pill:hover { color: var(--text-white); }
 .flats__pill_active { color: var(--text-white); border-color: rgba(224,103,154,0.4); background: rgba(224,103,154,0.18); }
-.flats__advanced-toggle { grid-column: 1 / -1; display: flex; justify-content: flex-start; margin: 2px 0 6px; }
-.flats__advanced {
-  grid-column: 1 / -1; display: grid; gap: 12px 14px; align-items: end; grid-template-columns: 1fr;
-  padding: 14px; border-radius: 8px; border: 1px solid var(--line); background: rgba(255,255,255,0.02);
-}
-.flats__presets {
-  grid-column: 1 / -1; display: flex; flex-wrap: wrap; align-items: center; gap: 8px;
-  padding-bottom: 12px; border-bottom: 1px solid var(--line);
-}
-.flats__preset {
-  display: inline-flex; align-items: center; gap: 8px; min-height: 32px; padding: 0 8px 0 11px;
-  border: 1px solid var(--line); border-radius: 6px; background: var(--bg-panel); color: var(--text-primary);
-  cursor: pointer;
-}
+.flats__preset { display: inline-flex; align-items: center; gap: 8px; min-height: 32px; padding: 0 8px 0 11px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg-panel); color: var(--text-primary); cursor: pointer; }
 .flats__preset-remove { color: var(--text-muted); font-size: 18px; line-height: 1; }
 .flats__preset-remove:hover { color: var(--accent-pink); }
-@media (min-width: 700px) { .flats__advanced { grid-template-columns: repeat(3, 1fr); } }
-@media (min-width: 1000px) { .flats__advanced { grid-template-columns: repeat(4, 1fr); } }
-.flats__field { display: flex; flex-direction: column; gap: 5px; }
-.flats__field-label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; opacity: 0.7; }
-.flats__select { width: 100%; }
-.flats__select :deep(button) { width: 100%; }
-.flats__toggle-grid { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
-.flats__toggle-grid :deep(button) { width: 100%; justify-content: center; min-height: 38px; }
+.flats__field { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
+.flats__field-label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; opacity: 0.7; line-height: 1.25; overflow-wrap: anywhere; }
+.flats__select { width: 100%; min-width: 0; }
+.flats__select :deep(button) { width: 100%; min-width: 0; }
 .flats__back-top { position: fixed; right: 22px; bottom: 24px; z-index: 60; display: inline-flex; align-items: center; gap: 7px; min-height: 42px; padding: 0 14px; border: 1px solid var(--line); border-radius: 999px; background: var(--bg-panel); color: var(--text-primary); box-shadow: 0 8px 26px rgba(0,0,0,.28); cursor: pointer; }
 .flats__back-top:hover { color: var(--accent-pink); border-color: rgba(224,103,154,.48); }
 .flats__error { color: var(--ui-error, #f87171); }
@@ -2001,42 +838,24 @@ onBeforeUnmount(() => {
 @media (min-width: 640px) { .flats__grid { grid-template-columns: repeat(2, 1fr); } }
 @media (min-width: 1024px) { .flats__grid { grid-template-columns: repeat(3, 1fr); } }
 .flats__grid_loading { opacity: 0.4; pointer-events: none; }
-.flat-card {
-  height: 100%; border: 1px solid var(--line); border-radius: 12px; overflow: hidden; background: rgba(255,255,255,0.03);
-  cursor: pointer; transition: transform 140ms ease, border-color 180ms ease; display: flex; flex-direction: column;
-}
-.flat-card__body { flex: 1 1 auto; }
+.flat-card { height: 100%; border: 1px solid var(--line); border-radius: 12px; overflow: hidden; background: rgba(255,255,255,0.03); cursor: pointer; transition: transform 140ms ease, border-color 180ms ease; display: flex; flex-direction: column; }
+.flat-card__body { flex: 1 1 auto; position: relative; padding: 12px 14px; display: flex; flex-direction: column; gap: 4px; }
 .flat-card:hover { transform: translateY(-2px); border-color: rgba(224,103,154,0.4); }
-.flat-card__photo {
-  position: relative; width: 100%; height: clamp(220px, 25vw, 310px);
-  flex: 0 0 auto; overflow: hidden; background: var(--bg-panel);
-}
+.flat-card__photo { position: relative; width: 100%; height: clamp(220px, 25vw, 310px); flex: 0 0 auto; overflow: hidden; background: var(--bg-panel); }
 .flat-card__photo > img { width: 100%; height: 100%; object-fit: cover; display: block; }
-.flat-card__no-photo {
-  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 9px; height: 100%;
-  color: var(--text-muted); font-size: 12px; background: rgba(255,255,255,0.025);
-}
+.flat-card__no-photo { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 9px; height: 100%; color: var(--text-muted); font-size: 12px; background: rgba(255,255,255,0.025); }
 .flat-card__no-photo-icon { width: 34px; height: 34px; opacity: 0.48; }
 .flat-card__deal { position: absolute; top: 8px; left: 8px; font-size: 11px; padding: 2px 8px; border-radius: 6px; background: rgba(13,17,40,0.8); color: #e0679a; }
 .flat-card__room { position: absolute; top: 8px; right: 8px; font-size: 11px; padding: 2px 8px; border-radius: 6px; background: rgba(13,17,40,0.8); color: #7189d9; }
-.flat-card__body { position: relative; padding: 12px 14px; display: flex; flex-direction: column; gap: 4px; }
 .flat-card__actions { position: absolute; top: 10px; right: 10px; display: flex; gap: 5px; }
-.flat-card__action {
-  width: 29px; height: 29px; display: inline-grid; place-items: center; padding: 0;
-  border: 1px solid var(--line); border-radius: 6px; background: var(--bg-panel); color: var(--text-muted); cursor: pointer;
-}
+.flat-card__action { width: 29px; height: 29px; display: inline-grid; place-items: center; padding: 0; border: 1px solid var(--line); border-radius: 6px; background: var(--bg-panel); color: var(--text-muted); cursor: pointer; }
 .flat-card__action:hover, .flat-card__action_active { color: var(--accent-pink); border-color: rgba(224,103,154,0.48); }
-.flat-card__price { padding-right: 70px; }
-.flat-card__price { font-weight: 700; font-size: 16px; color: var(--text-white, inherit); }
+.flat-card__price { padding-right: 70px; font-weight: 700; font-size: 16px; color: var(--text-white, inherit); }
 .flat-card__price-conv { font-size: 12px; font-weight: 500; margin-top: 1px; }
 .flat-card__title { font-size: 13.5px; font-weight: 500; line-height: 1.35; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 .flat-card__spec { font-size: 12.5px; }
 .flat-card__badges { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 7px; }
-.flat-card__badge {
-  font-size: 10.5px; font-weight: 600; line-height: 1; padding: 4px 7px; border-radius: 999px;
-  border: 1px solid var(--line); background: rgba(255,255,255,0.05); color: var(--text-primary);
-  white-space: nowrap;
-}
+.flat-card__badge { font-size: 10.5px; font-weight: 600; line-height: 1; padding: 4px 7px; border-radius: 999px; border: 1px solid var(--line); background: rgba(255,255,255,0.05); color: var(--text-primary); white-space: nowrap; }
 .flat-card__meta { display: flex; flex-wrap: wrap; gap: 6px; font-size: 11.5px; margin-top: 2px; }
 .flat-card__src { text-transform: capitalize; opacity: 0.7; }
 .flats__empty { margin-top: 18px; text-align: center; padding: 18px; border-radius: 10px; border: 1px solid var(--line); background: rgba(255,255,255,0.03); }
@@ -2044,125 +863,116 @@ onBeforeUnmount(() => {
 .flat-card_favorite { border-color: rgba(224,103,154,0.5); }
 .flat-card_hidden { opacity: 0.64; border-style: dashed; }
 .flat-modal { display: flex; flex-direction: column; gap: 12px; }
-.flat-modal__title {
-  display: -webkit-box; overflow: hidden; margin: 0; padding-right: 36px;
-  -webkit-box-orient: vertical; -webkit-line-clamp: 2;
-  overflow-wrap: anywhere; font-size: 18px; font-weight: 700; line-height: 1.35;
-}
-.flat-modal__gallery {
-  display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 6px;
-  max-height: 46vh; overflow-y: auto;
-}
-.flat-modal__thumb {
-  width: 100%; aspect-ratio: 4 / 3; object-fit: cover; border-radius: 8px; cursor: zoom-in;
-  border: 1px solid var(--line); transition: border-color 140ms ease;
-}
+.flat-modal__title { display: -webkit-box; overflow: hidden; margin: 0; padding-right: 36px; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow-wrap: anywhere; font-size: 18px; font-weight: 700; line-height: 1.35; }
+.flat-modal__gallery { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 6px; max-height: 46vh; overflow-y: auto; }
+.flat-modal__thumb { width: 100%; aspect-ratio: 4 / 3; object-fit: cover; border-radius: 8px; cursor: zoom-in; border: 1px solid var(--line); transition: border-color 140ms ease; }
 .flat-modal__thumb:hover { border-color: var(--accent-pink); }
-.flat-lightbox {
-  position: fixed; inset: 0; z-index: 5000; display: grid; place-items: center; isolation: isolate;
-  background: #080b1a; padding: clamp(12px, 2vw, 28px); cursor: zoom-out;  pointer-events: auto;
-}
-.flat-lightbox__stage {
-  width: min(82vw, 1200px);
-  height: min(76dvh, 720px);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: default;
-  pointer-events: auto;
-  /* Let the browser keep vertical gestures (pinch-zoom / scroll) while
-     horizontal ones reach our swipe handler, and stop the native image-drag
-     ghost from hijacking a mouse swipe. */
-  touch-action: pan-y pinch-zoom;
-  user-select: none;
-  -webkit-user-select: none;
-}
-.flat-lightbox__stage img { -webkit-user-drag: none; user-drag: none; }
-
-.flat-lightbox__stage img {
-  display: block;
-  width: auto;
-  height: auto;
-  max-width: 100%;
-  max-height: 100%;
-  object-fit: contain;
-  border-radius: 8px;
-  transform-origin: var(--zoom-x, 50%) var(--zoom-y, 50%);
-  transition: transform 180ms ease;
-}
-@media (hover: hover) and (pointer: fine) {
-  .flat-lightbox__stage img {
-    cursor: zoom-in;
-  }
-
-  .flat-lightbox__stage img:hover {
-    transform: scale(1.7);
-    cursor: zoom-out;
-  }
-}
-.flat-lightbox__nav,
-.flat-lightbox__close {
-  position: fixed; z-index: 1; display: grid; place-items: center; border: 1px solid #343a62;
-  border-radius: 8px; background: #131730; color: #fff; cursor: pointer;  pointer-events: auto;
-}
+.flat-lightbox { position: fixed; inset: 0; z-index: 5000; display: grid; place-items: center; isolation: isolate; background: #080b1a; padding: clamp(12px, 2vw, 28px); cursor: zoom-out; pointer-events: auto; }
+.flat-lightbox__stage { width: min(82vw, 1200px); height: min(76dvh, 720px); display: flex; align-items: center; justify-content: center; cursor: default; pointer-events: auto; touch-action: pan-y pinch-zoom; user-select: none; -webkit-user-select: none; }
+.flat-lightbox__stage img { -webkit-user-drag: none; display: block; width: auto; height: auto; max-width: 100%; max-height: 100%; object-fit: contain; border-radius: 8px; transform-origin: var(--zoom-x, 50%) var(--zoom-y, 50%); transition: transform 180ms ease; }
+@media (hover: hover) and (pointer: fine) { .flat-lightbox__stage img { cursor: zoom-in; } .flat-lightbox__stage img:hover { transform: scale(1.7); cursor: zoom-out; } }
+.flat-lightbox__nav, .flat-lightbox__close { position: fixed; z-index: 1; display: grid; place-items: center; border: 1px solid #343a62; border-radius: 8px; background: #131730; color: #fff; cursor: pointer; pointer-events: auto; }
 .flat-lightbox__nav { top: 50%; width: 52px; height: 72px; transform: translateY(-50%); font-size: 28px; }
-.flat-lightbox__nav:hover,
-.flat-lightbox__nav:focus-visible,
-.flat-lightbox__close:hover,
-.flat-lightbox__close:focus-visible { border-color: var(--accent-pink); color: var(--accent-pink); }
-.flat-lightbox__nav_left { left: 16px; }
-.flat-lightbox__nav_right { right: 16px; }
-.flat-lightbox__close { top: 16px; right: 20px; width: 44px; height: 44px; font-size: 24px; }
-.flat-lightbox__counter {
-  position: fixed; bottom: 18px; left: 50%; z-index: 1; transform: translateX(-50%);
-  padding: 6px 10px; border: 1px solid #343a62; border-radius: 6px;
-  background: #131730; color: var(--text-primary); font: 500 12px/1.2 "JetBrains Mono", monospace;
-  pointer-events: auto;
-}
-.flat-modal__price { font-weight: 700; font-size: 20px; }
-.flat-modal__price-conv { font-weight: 500; font-size: 14px; color: var(--text-muted); }
-.flat-modal__deal { color: #e0679a; font-weight: 500; }
-.flat-modal__spec { width: 100%; border-collapse: collapse; font-size: 13px; margin: 4px 0 10px; }
-.flat-modal__spec tr { border-bottom: 1px solid var(--line); }
-.flat-modal__spec tr:last-child { border-bottom: none; }
-.flat-modal__spec th {
-  text-align: left; font-weight: 600; padding: 6px 12px 6px 0; white-space: nowrap;
-  color: var(--text-muted, inherit); opacity: 0.75; width: 44%; vertical-align: top;
-}
-.flat-modal__spec td { padding: 6px 0; vertical-align: top; }
+.flat-lightbox__nav:hover, .flat-lightbox__nav:focus-visible, .flat-lightbox__close:hover, .flat-lightbox__close:focus-visible { border-color: var(--accent-pink); color: var(--accent-pink); }
+.flat-lightbox__nav_left { left: 16px; } .flat-lightbox__nav_right { right: 16px; } .flat-lightbox__close { top: 16px; right: 20px; width: 44px; height: 44px; font-size: 24px; }
+.flat-lightbox__counter { position: fixed; bottom: 18px; left: 50%; z-index: 1; transform: translateX(-50%); padding: 6px 10px; border: 1px solid #343a62; border-radius: 6px; background: #131730; color: var(--text-primary); font: 500 12px/1.2 "JetBrains Mono", monospace; pointer-events: auto; }
+.flat-modal__price { font-weight: 700; font-size: 20px; } .flat-modal__price-conv { font-weight: 500; font-size: 14px; color: var(--text-muted); } .flat-modal__deal { color: #e0679a; font-weight: 500; }
+.flat-modal__spec { width: 100%; border-collapse: collapse; font-size: 13px; margin: 4px 0 10px; } .flat-modal__spec tr { border-bottom: 1px solid var(--line); } .flat-modal__spec tr:last-child { border-bottom: none; } .flat-modal__spec th { text-align: left; font-weight: 600; padding: 6px 12px 6px 0; white-space: nowrap; color: var(--text-muted, inherit); opacity: 0.75; width: 44%; vertical-align: top; } .flat-modal__spec td { padding: 6px 0; vertical-align: top; }
 .flat-modal__hide-empty { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text-muted, inherit); cursor: pointer; margin: 2px 0 6px; user-select: none; }
-.flat-modal__translation { display: flex; align-items: center; gap: 10px; margin-top: 14px; }
-.flat-modal__translation-error { color: #f29ab6; font-size: 12px; }
-.flat-modal__translated { margin-top: 12px; padding: 12px; border: 1px solid var(--line, #252a4a); border-radius: var(--radius, 10px); background: var(--bg-panel-2, #171c3a); }
-.flat-modal__translated-title { margin: 0 0 8px; color: var(--text-primary, #e4e5f0); font-size: 13px; font-weight: 600; }
-.flat-modal__descbox { margin-top: 6px; }
-.flat-modal__descbox summary { cursor: pointer; font-size: 12px; font-weight: 600; opacity: 0.7; user-select: none; }
-.flat-modal__desc { font-size: 13.5px; line-height: 1.55; white-space: pre-wrap; color: var(--text-soft, inherit); margin-top: 8px; }
-.flat-modal__tags { display: flex; flex-wrap: wrap; gap: 6px; }
-.flat-modal__tag { font-size: 11px; padding: 2px 8px; border-radius: 6px; border: 1px solid var(--line); color: var(--ui-text-muted); }
-.flat-modal__footer-actions { width: 100%; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
-.flat-modal__footer-button {
-  width: 100%; min-height: 44px; height: auto; padding: 8px 11px; justify-content: center;
-  text-align: center; white-space: normal; line-height: 1.25;
-}
-.flat-modal__footer-button_primary {
-  display: inline-flex; align-items: center; border: 1px solid var(--accent-pink, #e0679a); border-radius: 8px;
-  background: var(--accent-pink, #e0679a); color: #1a0e14; font-weight: 600; font-size: 13.5px;
-}
+.flat-modal__translation { display: flex; align-items: center; gap: 10px; margin-top: 14px; } .flat-modal__translation-error { color: #f29ab6; font-size: 12px; }
+.flat-modal__translated { margin-top: 12px; padding: 12px; border: 1px solid var(--line, #252a4a); border-radius: var(--radius, 10px); background: var(--bg-panel-2, #171c3a); } .flat-modal__translated-title { margin: 0 0 8px; color: var(--text-primary, #e4e5f0); font-size: 13px; font-weight: 600; }
+.flat-modal__descbox { margin-top: 6px; } .flat-modal__descbox summary { cursor: pointer; font-size: 12px; font-weight: 600; opacity: 0.7; user-select: none; } .flat-modal__desc { font-size: 13.5px; line-height: 1.55; white-space: pre-wrap; color: var(--text-soft, inherit); margin-top: 8px; }
+.flat-modal__tags { display: flex; flex-wrap: wrap; gap: 6px; } .flat-modal__tag { font-size: 11px; padding: 2px 8px; border-radius: 6px; border: 1px solid var(--line); color: var(--ui-text-muted); }
+.flat-modal__footer-actions { width: 100%; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; } .flat-modal__footer-button { width: 100%; min-height: 44px; height: auto; padding: 8px 11px; justify-content: center; text-align: center; white-space: normal; line-height: 1.25; }
+.flat-modal__footer-button_primary { display: inline-flex; align-items: center; border: 1px solid var(--accent-pink, #e0679a); border-radius: 8px; background: var(--accent-pink, #e0679a); color: #1a0e14; font-weight: 600; font-size: 13.5px; }
 .flat-share__hint { margin: 0 0 12px; color: var(--text-muted); font-size: 13px; line-height: 1.5; }
-@media (max-width: 700px) {
-  .flats__controls { grid-template-columns: 1fr; }
-  .flats__controls > :deep(button) { width: 100%; }
+
+/* Redesigned compact filters */
+.flats__controls_redesign { display: block; margin: 20px 0; }
+.flats__searchbar { display: grid; grid-template-columns: 1fr auto; gap: 10px; margin-bottom: 12px; }
+.flats__secondary-nav { margin-bottom: 12px; }
+.filter-card, .advanced-card { border: 1px solid var(--line); border-radius: 12px; background: var(--bg-panel); }
+.filter-card { padding: 16px; }
+.filter-presets { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding-bottom: 14px; margin-bottom: 14px; border-bottom: 1px solid var(--line); }
+.filter-presets__label { margin-right: 4px; white-space: nowrap; }
+.filter-primary-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; }
+.filter-primary-grid :deep(button > span), .advanced-groups :deep(button > span) { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: normal; line-height: 1.25; text-align: left; }
+.filter-price-row { display: grid; grid-template-columns: auto minmax(130px,190px) 12px minmax(130px,190px) minmax(120px,145px); align-items: center; column-gap: 4px; row-gap: 10px; margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--line); }
+.filter-price-row__label { margin-right: 4px; }
+.price-input { height: 38px; display: grid; grid-template-columns: auto minmax(0,1fr); align-items: center; gap: 5px; padding-left: 9px; border: 1px solid var(--line); border-radius: 7px; background: var(--bg-panel-2); color: var(--ui-text-muted); font-size: 12px; overflow: hidden; }
+.price-input :deep(.price-number-input) { border: 0 !important; box-shadow: none !important; background: transparent !important; min-width: 0; font-size: 13px; font-variant-numeric: tabular-nums; }
+.price-input :deep(input) { min-width: 0; padding-inline: 2px; }
+.price-separator { text-align: center; color: var(--ui-text-muted); }
+.currency-select { min-width: 0; }
+.currency-select__control :deep(button) { min-height: 38px; background: var(--bg-panel-2) !important; border-color: rgba(224,103,154,.78) !important; color: var(--text-white); font-weight: 800; letter-spacing: .04em; box-shadow: inset 0 0 0 1px rgba(224,103,154,.08); }
+.filter-actions-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--line); }
+.advanced-button { flex: 0 0 auto; }
+.active-filter-chips { display: flex; flex: 1 1 300px; gap: 8px; flex-wrap: wrap; min-width: 0; }
+.filter-chip { display: inline-flex; align-items: center; gap: 7px; max-width: 100%; min-height: 34px; padding: 6px 11px; border: 1px solid var(--line); border-radius: 7px; background: var(--bg-panel-2); color: var(--text-primary); white-space: normal; text-align: left; line-height: 1.25; }
+.filter-chip span { color: var(--ui-text-muted); flex: 0 0 auto; }
+.filter-reset { margin-left: auto; }
+.advanced-card { margin-top: 14px; overflow: hidden; }
+.advanced-card__header { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 14px 16px; border-bottom: 1px solid var(--line); }
+.advanced-card__header > div, .advanced-card__header button { display: inline-flex; align-items: center; gap: 8px; }
+.advanced-card__header button { color: var(--accent-pink); }
+.advanced-groups { display: grid; grid-template-columns: 1.15fr .95fr 1.1fr 1.1fr 1fr; padding: 16px; }
+.filter-group { min-width: 0; padding: 0 16px; border-left: 1px solid var(--line); }
+.filter-group:first-child { padding-left: 0; border-left: 0; }
+.filter-group:last-child { padding-right: 0; }
+.filter-group h3 { display: flex; align-items: center; gap: 7px; margin: 0 0 14px; color: var(--ui-text-muted); font-size: 11px; line-height: 1.3; text-transform: uppercase; letter-spacing: .04em; }
+.filter-group h3 svg { color: var(--accent-pink); flex: 0 0 auto; }
+.filter-group .flats__field + .flats__field, .range-field + .range-field { margin-top: 12px; }
+.quick-options { display: grid; gap: 8px; }
+.quick-options :deep(button) { width: 100%; min-height: 38px; justify-content: flex-start; height: auto; padding-block: 8px; white-space: normal; text-align: left; line-height: 1.25; }
+.range-field { display: grid; grid-template-columns: minmax(70px,1fr) minmax(48px,68px) 10px minmax(48px,68px); align-items: center; gap: 4px; font-size: 11px; color: var(--ui-text-muted); }
+.range-field > span:first-child { line-height: 1.25; overflow-wrap: anywhere; }
+.range-field :deep(input) { text-align: center; padding-inline: 4px; background: var(--bg-panel-2) !important; }
+.flats__controls_redesign :deep(input), .flats__controls_redesign :deep(button[role="combobox"]) { background-color: var(--bg-panel-2) !important; }
+
+@media (max-width: 1100px) {
+  .advanced-groups { grid-template-columns: repeat(2,minmax(0,1fr)); gap: 20px 0; }
+  .filter-group, .filter-group:first-child { padding: 0 16px; border-left: 1px solid var(--line); }
+  .filter-group:nth-child(odd) { border-left: 0; padding-left: 0; }
+  .filter-group:nth-child(even) { padding-right: 0; }
+}
+@media (max-width: 760px) {
+  .flats__controls_redesign { margin-inline: -4px; }
+  .flats__searchbar { grid-template-columns: 1fr; }
+  .flats__secondary-nav { gap: 8px; }
   .flats__views { padding-left: 0; border-left: 0; }
-  .flats__toggle-grid { grid-template-columns: 1fr; }
-  .flats__back-top span { display: none; }
-  .flats__back-top { right: 14px; bottom: 18px; width: 44px; padding: 0; justify-content: center; }
+  .filter-card { padding: 14px 12px; }
+  .filter-presets { align-items: stretch; }
+  .filter-presets__label { flex: 0 0 100%; }
+  .filter-presets :deep(button) { min-height: 38px; }
+  .filter-primary-grid { grid-template-columns: 1fr; gap: 12px; }
+  .filter-price-row { grid-template-columns: minmax(0,1fr) 10px minmax(0,1fr); column-gap: 4px; row-gap: 8px; }
+  .filter-price-row__label { grid-column: 1 / -1; }
+  .currency-select { grid-column: 1 / -1; }
+  .price-input { min-width: 0; padding-left: 7px; gap: 3px; }
+  .price-input :deep(.price-number-input) { font-size: 12px; }
+  .filter-actions-row { align-items: stretch; }
+  .advanced-button { flex: 1 1 100%; justify-content: center; }
+  .active-filter-chips { flex: 1 1 100%; }
+  .filter-reset { width: 100%; margin-left: 0; justify-content: center; }
+  .advanced-card__header { padding: 13px 12px; }
+  .advanced-card__header strong { line-height: 1.25; }
+  .advanced-groups { grid-template-columns: 1fr; padding: 14px 12px; gap: 0; }
+  .filter-group, .filter-group:first-child, .filter-group:nth-child(odd), .filter-group:nth-child(even) { padding: 16px 0; border-left: 0; border-top: 1px solid var(--line); }
+  .filter-group:first-child { padding-top: 0; border-top: 0; }
+  .filter-group:last-child { padding-bottom: 0; }
+  .range-field { grid-template-columns: minmax(82px,1fr) minmax(52px,72px) 10px minmax(52px,72px); }
   .flat-card__photo { height: 250px; }
   .flat-modal__footer-actions { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .flat-lightbox__stage { width: 92vw; height: 76vh; }
   .flat-lightbox__nav { width: 42px; height: 56px; font-size: 22px; }
-  .flat-lightbox__nav_left { left: 8px; }
-  .flat-lightbox__nav_right { right: 8px; }
-  .flat-lightbox__close { top: 10px; right: 10px; }
+  .flat-lightbox__nav_left { left: 8px; } .flat-lightbox__nav_right { right: 8px; } .flat-lightbox__close { top: 10px; right: 10px; }
+  .flats__back-top span { display: none; }
+  .flats__back-top { right: 14px; bottom: 18px; width: 44px; padding: 0; justify-content: center; }
+}
+@media (max-width: 390px) {
+  .filter-price-row { column-gap: 3px; row-gap: 6px; }
+  .price-input :deep(.price-number-input) { font-size: 11px; }
+  .filter-presets .flats__preset { max-width: 100%; }
+  .range-field { grid-template-columns: minmax(70px,1fr) 58px 8px 58px; }
 }
 </style>
