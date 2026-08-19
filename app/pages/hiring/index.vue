@@ -526,7 +526,7 @@ onBeforeUnmount(() => {
     </div>
 
     <form class="hiring__controls" @submit.prevent="load()">
-      <u-input v-model="query" icon="i-lucide-search" :placeholder="t('searchPlaceholder')" />
+      <u-input v-model="query" clearable icon="i-lucide-search" :placeholder="t('searchPlaceholder')" />
       <u-button type="submit" :loading="loading" icon="i-lucide-search">
         {{ loading ? t("searching") : t("search") }}
       </u-button>

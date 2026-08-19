@@ -5,17 +5,36 @@
 // #content / #default slots the app uses. Scroll locking is done here and
 // always released on close or unmount — the previous implementation could
 // strand a locked page on mobile when a nested overlay closed out of order.
-import { onBeforeUnmount, watch } from "vue";
+import { computed, onBeforeUnmount, watch } from "vue";
 
 const props = withDefaults(defineProps<{
   open?: boolean;
   title?: string;
   description?: string;
   dismissible?: boolean;
-  ui?: unknown;
+  // Nuxt UI style-override object. `content` is honoured because call sites use
+  // it to widen the panel (max-w-2xl / 3xl / 4xl); ignoring it made every modal
+  // fall back to the default width.
+  ui?: { content?: string };
 }>(), { dismissible: true });
 
 const emit = defineEmits<{ (e: "update:open", value: boolean): void }>();
+
+// `ui.content` arrives as a class string like "max-w-4xl". A utility class alone
+// would lose to this component's own scoped max-width, so the known width tokens
+// are resolved to an inline value that reliably wins. The class is still applied
+// for anything else the caller put in the string.
+const CONTENT_WIDTHS: Record<string, string> = {
+  "max-w-md": "28rem", "max-w-lg": "32rem", "max-w-xl": "36rem",
+  "max-w-2xl": "42rem", "max-w-3xl": "48rem", "max-w-4xl": "56rem",
+  "max-w-5xl": "64rem", "max-w-6xl": "72rem",
+};
+const panelStyle = computed(() => {
+  for (const token of (props.ui?.content || "").split(/\s+/)) {
+    if (CONTENT_WIDTHS[token]) return { maxWidth: CONTENT_WIDTHS[token] };
+  }
+  return undefined;
+});
 
 let restoreScroll: (() => void) | null = null;
 
@@ -71,7 +90,7 @@ onBeforeUnmount(() => {
   <Teleport v-if="open" to="body">
     <div class="u-modal" role="dialog" aria-modal="true" :aria-label="title || undefined">
       <div class="u-modal__backdrop" @click="close" />
-      <div class="u-modal__panel" :class="$attrs.class">
+      <div class="u-modal__panel" :class="[props.ui?.content, $attrs.class]" :style="panelStyle">
         <!-- #content replaces the whole panel, matching Nuxt UI. -->
         <slot v-if="$slots.content" name="content" />
         <template v-else>

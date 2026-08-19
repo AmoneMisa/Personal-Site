@@ -693,7 +693,7 @@ onBeforeUnmount(() => { modalOpen.value = false; lightboxIndex.value = null; rel
 
     <form ref="filtersEl" class="flats__controls flats__controls_redesign" @submit.prevent="load()">
       <div class="flats__searchbar">
-        <u-input v-model="query" icon="i-lucide-search" :placeholder="t('searchPlaceholder')" />
+        <u-input v-model="query" clearable icon="i-lucide-search" :placeholder="t('searchPlaceholder')" />
         <u-button type="submit" :loading="loading" icon="i-lucide-search">{{ loading ? t("searching") : t("search") }}</u-button>
       </div>
 

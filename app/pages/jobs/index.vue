@@ -937,7 +937,7 @@ onBeforeUnmount(() => {
 
     <!-- Filters + sort -->
     <form class="jobs__controls" @submit.prevent="load(1)">
-      <u-input v-model="query" icon="i-lucide-search" :placeholder="t('searchPlaceholder')" />
+      <u-input v-model="query" clearable icon="i-lucide-search" :placeholder="t('searchPlaceholder')" />
       <u-input v-model.number="salaryMin" type="number" icon="i-lucide-banknote" :placeholder="`${t('salaryMin')} (${displayCurrency}/${periodLabel(displayPeriod)})`" />
       <div class="jobs__sort">
         <u-icon name="i-lucide-arrow-down-wide-narrow" />

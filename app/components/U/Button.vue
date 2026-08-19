@@ -68,6 +68,9 @@ const isDisabled = computed(() => props.disabled || props.loading);
 }
 .u-button:disabled,
 .u-button[aria-disabled="true"] { opacity: 0.55; cursor: not-allowed; }
+/* Grid items stretch by default; a button should hug its label unless it asked
+   to be full width. Only affects grid/flex parents that would stretch it. */
+.u-button:not(.u-button_block) { justify-self: start; align-self: center; }
 
 .u-button_xs { min-height: 26px; padding-inline: 8px; font-size: 11.5px; gap: 5px; }
 .u-button_sm { min-height: var(--ui-control-h-sm); padding-inline: 10px; font-size: 12.5px; }

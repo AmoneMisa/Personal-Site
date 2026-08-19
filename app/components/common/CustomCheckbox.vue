@@ -62,6 +62,9 @@ const id = `cb_${Math.random().toString(16).slice(2)}`
   display: flex;
   flex-direction: column;
   gap: 6px;
+  /* Children of a column flex container stretch by default, which made the
+     checkbox row span the whole field instead of hugging its label. */
+  align-items: flex-start;
 }
 
 .cb__row {

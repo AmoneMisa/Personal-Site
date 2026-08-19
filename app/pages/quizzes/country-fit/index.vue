@@ -349,11 +349,9 @@ watch(user, (v) => lsSet(LS_KEYS.user, v), {deep: true});
       <div class="font-black mb-3">{{ t("quizzes.countryFit.constraintsTitle") }}</div>
       <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div class="field">
-          <label class="field__label" for="cf_job">{{ t("quizzes.countryFit.constraints.isShowUSA.label") }}</label>
           <custom-checkbox id="cf_isShowUSA" v-model="isShowUSA" label-key="quizzes.countryFit.constraints.isShowUSA.label"/>
         </div>
         <div class="field">
-          <label class="field__label" for="cf_job">{{ t("quizzes.countryFit.constraints.isShowCountries.label") }}</label>
           <custom-checkbox id="cf_isShowCountries" v-model="isShowCountries" label-key="quizzes.countryFit.constraints.isShowCountries.label"
           />
         </div>
