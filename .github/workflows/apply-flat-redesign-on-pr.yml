@@ -1,0 +1,86 @@
+name: Apply flat finder redesign on PR
+
+on:
+  pull_request:
+    branches: [master]
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: write
+
+jobs:
+  apply-redesign:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref }}
+          fetch-depth: 0
+      - name: Materialize approved redesign into Vue file
+        shell: python
+        run: |
+          from pathlib import Path
+          import re
+
+          workflow = Path('.github/workflows/apply-flat-filter-redesign.yml').read_text()
+          page = Path('app/pages/flat-finder/index.vue')
+          s = page.read_text()
+
+          block_match = re.search(r"block = r'''(.*?)'''\n\s*s = s\[:start\]", workflow, re.S)
+          css_match = re.search(r"css = r'''(.*?)'''\n\s*s = s\.replace", workflow, re.S)
+          if not block_match or not css_match:
+              raise RuntimeError('Could not extract approved redesign from migration workflow')
+
+          block = block_match.group(1)
+          css = css_match.group(1)
+          start = s.index('    <!-- Filters -->')
+          end = s.index('    <p v-if="failed"', start)
+          s = s[:start] + block + s[end:]
+          s = s.replace('<style scoped>', '<style scoped>' + css, 1)
+
+          # Preserve the site's established dark-navy surfaces.
+          s = s.replace(
+              '.filter-card, .advanced-card { border: 1px solid var(--line); border-radius: 12px; background: rgba(255,255,255,.018); }',
+              '.filter-card, .advanced-card { border: 1px solid var(--line); border-radius: 12px; background: var(--bg-panel); }'
+          )
+          s = s.replace(
+              'border: 1px solid var(--line); border-radius: 7px; color: var(--ui-text-muted); font-size: 12px; overflow: hidden; }',
+              'border: 1px solid var(--line); border-radius: 7px; background: var(--bg-panel-2); color: var(--ui-text-muted); font-size: 12px; overflow: hidden; }'
+          )
+          s = s.replace(
+              'border: 1px solid var(--line); border-radius: 7px; background: rgba(255,255,255,.025); color: var(--text-primary);',
+              'border: 1px solid var(--line); border-radius: 7px; background: var(--bg-panel-2); color: var(--text-primary);'
+          )
+
+          # Tight price range rhythm: [from] — [to] stay visually grouped.
+          s = s.replace(
+              'grid-template-columns: auto minmax(150px,210px) auto minmax(150px,210px) minmax(130px,150px); align-items: end; gap: 10px;',
+              'grid-template-columns: auto minmax(150px,210px) auto minmax(150px,210px) minmax(130px,150px); align-items: end; column-gap: 4px; row-gap: 10px;'
+          )
+          s = s.replace(
+              '.filter-price-row { grid-template-columns: minmax(0,1fr) auto minmax(0,1fr); gap: 8px; }',
+              '.filter-price-row { grid-template-columns: minmax(0,1fr) auto minmax(0,1fr); column-gap: 4px; row-gap: 8px; }'
+          )
+          s = s.replace('.filter-price-row { gap: 6px; }', '.filter-price-row { column-gap: 3px; row-gap: 6px; }')
+
+          navy = r'''
+/* Keep Flat Finder controls on the site's original dark-navy palette. */
+.flats__controls_redesign :deep(input),
+.flats__controls_redesign :deep(button[role="combobox"]),
+.flats__controls_redesign .price-input,
+.flats__controls_redesign .filter-chip { background-color: var(--bg-panel-2) !important; }
+.filter-card, .advanced-card { background-color: var(--bg-panel) !important; }
+.currency-select__control :deep(button) { background-color: var(--bg-panel-2) !important; }
+'''
+          s = s.replace('</style>', navy + '</style>', 1)
+          page.write_text(s)
+
+      - name: Commit actual Vue redesign
+        run: |
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add app/pages/flat-finder/index.vue
+          git diff --cached --quiet && exit 0
+          git commit -m "feat: materialize flat finder filter redesign"
+          git push origin HEAD:${{ github.head_ref }}
