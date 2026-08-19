@@ -1,0 +1,49 @@
+/* Shared control primitives for the in-house component library.
+ *
+ * These are the values every UI component reads, so a control's height, radius
+ * or focus ring is defined once here rather than being re-stated (and drifting)
+ * in each component and page. The colour tokens themselves live in main.css
+ * :root; this file only adds control-level metrics.
+ */
+
+:root {
+    /* Control sizing — one scale for buttons, inputs and selects, so a button
+       and an input placed side by side always line up. */
+    --ui-control-h-sm: 32px;
+    --ui-control-h-md: 38px;
+    --ui-control-h-lg: 44px;
+    --ui-control-px: 12px;
+    --ui-control-radius: 8px;
+    --ui-control-font: 13px;
+
+    --ui-focus-ring: 0 0 0 2px rgba(224, 103, 154, 0.45);
+    --ui-transition: 120ms ease;
+
+    /* Surfaces used by controls (aliases of the palette in main.css so the
+       components never hard-code a colour). */
+    --ui-control-bg: var(--bg-panel-2, #171c3a);
+    --ui-control-border: var(--line, #252a4a);
+    --ui-control-text: var(--text-primary, #eef0f7);
+    --ui-control-placeholder: var(--text-muted, #9ea4c1);
+}
+
+/* Shared focus treatment: one visible, consistent ring for keyboard users on
+   every control, instead of each component inventing its own. */
+.ui-focusable:focus-visible,
+.ui-focusable:has(:focus-visible) {
+    outline: none;
+    box-shadow: var(--ui-focus-ring);
+    border-color: var(--accent-pink, #e0679a);
+}
+
+.ui-sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+}
