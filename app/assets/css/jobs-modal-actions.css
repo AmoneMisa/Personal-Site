@@ -1,8 +1,14 @@
 /* Vacancy modal footer actions.
- * Scope by the apply link so other Nuxt UI modal footers are untouched. */
+ * Scoped by the apply link so other modal footers are untouched.
+ *
+ * The previous version pinned a fixed height and forbade wrapping, so the long
+ * Russian labels ran past the panel edge instead of fitting. Labels may now wrap
+ * inside a button and the button grows to fit, which keeps four actions inside
+ * the footer at every width.
+ */
 :where(div, footer):has(> .job-modal__apply) {
     display: grid !important;
-    grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
     gap: 8px !important;
     width: 100%;
     align-items: stretch !important;
@@ -12,11 +18,14 @@
     box-sizing: border-box;
     width: 100%;
     min-width: 0;
-    height: 44px !important;
+    /* Grow with the label rather than clipping it. */
+    height: auto !important;
     min-height: 44px;
     justify-content: center;
     text-align: center;
-    white-space: nowrap;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    line-height: 1.25;
 }
 
 :where(div, footer):has(> .job-modal__apply) > .job-modal__apply,

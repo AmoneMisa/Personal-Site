@@ -137,7 +137,9 @@ onBeforeUnmount(() => {
 
 .u-modal__header {
   display: flex;
-  align-items: flex-start;
+  /* Centred: the 32px close button against a ~22px title line box left the
+     title sitting above the button's centre. */
+  align-items: center;
   gap: 12px;
   padding: 16px 16px 12px;
   border-bottom: 1px solid var(--line);
@@ -192,13 +194,26 @@ onBeforeUnmount(() => {
   .u-modal { padding: 0; align-items: flex-end; }
   .u-modal__panel {
     max-width: none;
-    max-height: 92dvh;
+    max-height: 95dvh;
     border-radius: var(--radius, 10px) var(--radius, 10px) 0 0;
     border-bottom: 0;
   }
-  .u-modal__header { padding: 14px 14px 10px; }
+  .u-modal__header { padding: 12px 14px 10px; }
   .u-modal__body { padding: 14px; }
-  .u-modal__footer { padding: 10px 14px calc(10px + env(safe-area-inset-bottom)); }
-  .u-modal__footer > * { flex: 1 1 auto; }
+  /* Even two-column grid instead of stretched flex items: four actions used to
+     wrap into ragged rows of different heights and ate most of the sheet,
+     leaving very little room for the content above them. */
+  .u-modal__footer {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    padding: 10px 14px calc(10px + env(safe-area-inset-bottom));
+  }
+  .u-modal__footer > * {
+    min-height: 40px;
+    min-width: 0;
+    justify-self: stretch;
+    text-align: center;
+  }
 }
 </style>
