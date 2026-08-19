@@ -1,4 +1,5 @@
 import type { Job } from './jobTypes'
+import { transliterationMappings } from './cyrillicTransliteration'
 
 const ELASTICSEARCH_URL =
     (
@@ -35,20 +36,23 @@ function indexDefinition() {
             number_of_replicas: 0,
 
             analysis: {
+                // Transliteration is a core `mapping` char filter rather than
+                // icu_transform: analysis-icu cannot be installed on this host,
+                // and an index definition referencing a missing analyzer fails
+                // to create at all — which left this index nonexistent and job
+                // search silently unranked. Shared with the candidate index so
+                // both transliterate identically.
+                char_filter: {
+                    job_cyrillic: {
+                        type: 'mapping',
+                        mappings: transliterationMappings(),
+                    },
+                },
+
                 filter: {
                     job_ascii: {
                         type: 'asciifolding',
                         preserve_original: true,
-                    },
-
-                    job_transliteration: {
-                        type: 'icu_transform',
-
-                        id:
-                            'Any-Latin; '
-                            + 'NFD; '
-                            + '[:Nonspacing Mark:] Remove; '
-                            + 'NFC',
                     },
                 },
 
@@ -67,10 +71,13 @@ function indexDefinition() {
                     job_latin: {
                         type: 'custom',
 
+                        char_filter: [
+                            'job_cyrillic',
+                        ],
+
                         tokenizer: 'standard',
 
                         filter: [
-                            'job_transliteration',
                             'lowercase',
                             'job_ascii',
                         ],
@@ -385,10 +392,32 @@ function searchDocument(
     }
 }
 
+// Analysis settings are fixed at creation time, so an index built from the old
+// (icu_transform) definition keeps its analyzers even after this file changes.
+// Warn loudly with the fix rather than silently serving a differently-analyzed
+// index — and never delete it here, since that would drop data uninvited.
+async function warnIfStaleAnalysis() {
+    try {
+        const settings = await request(`/${JOBS_INDEX}/_settings`, { method: 'GET' })
+        const analysis = settings?.[JOBS_INDEX]?.settings?.index?.analysis
+        if (analysis && !analysis.char_filter?.job_cyrillic) {
+            console.warn(
+                `[jobs:elasticsearch] ${JOBS_INDEX} was created with the old `
+                + `analysis settings, so transliterated matching is inactive. `
+                + `Recreate it (delete the index, or point `
+                + `JOBS_ELASTICSEARCH_INDEX at a new name) and re-run the refresh.`,
+            )
+        }
+    } catch {
+        // Diagnostics only — never block indexing on this probe.
+    }
+}
+
 export async function ensureJobsSearchIndex() {
     if (
         await indexExists()
     ) {
+        await warnIfStaleAnalysis()
         return
     }
 

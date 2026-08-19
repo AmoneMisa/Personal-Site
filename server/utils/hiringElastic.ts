@@ -11,6 +11,7 @@
 // falls back to in-memory filtering, so the Hiring page never depends on it.
 
 import type { CvProfile } from './hiringTypes'
+import { transliterationMappings } from './cyrillicTransliteration'
 
 const ELASTICSEARCH_URL = (
     process.env.ELASTICSEARCH_URL || 'http://flat-finder-elasticsearch:9200'
@@ -19,26 +20,6 @@ const ELASTICSEARCH_URL = (
 const CANDIDATE_INDEX = process.env.HIRING_ELASTICSEARCH_INDEX || 'candidate-profiles-v1'
 const REQUEST_TIMEOUT_MS = 10_000
 const BULK_SIZE = 400
-
-// Cyrillic -> Latin, applied before tokenizing. Covers RU and Uzbek Cyrillic, so
-// "Мария"/"Mariya" and "разработчик"/"razrabotchik" land on the same tokens.
-// Digraphs must precede single letters.
-const CYRILLIC_TO_LATIN: Record<string, string> = {
-    ё: 'yo', ж: 'zh', ц: 'ts', ч: 'ch', ш: 'sh', щ: 'sch', ю: 'yu', я: 'ya',
-    ў: 'o', қ: 'q', ғ: 'g', ҳ: 'h', є: 'ye', ї: 'yi', і: 'i', ґ: 'g',
-    а: 'a', б: 'b', в: 'v', г: 'g', д: 'd', е: 'e', з: 'z', и: 'i', й: 'y',
-    к: 'k', л: 'l', м: 'm', н: 'n', о: 'o', п: 'p', р: 'r', с: 's', т: 't',
-    у: 'u', ф: 'f', х: 'h', ъ: '', ы: 'i', ь: '', э: 'e',
-}
-
-function transliterationMappings(): string[] {
-    const out: string[] = []
-    for (const [cyr, lat] of Object.entries(CYRILLIC_TO_LATIN)) {
-        out.push(`${cyr} => ${lat}`)
-        out.push(`${cyr.toUpperCase()} => ${lat}`)
-    }
-    return out
-}
 
 function searchableText() {
     return {
