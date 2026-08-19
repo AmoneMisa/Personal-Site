@@ -960,9 +960,18 @@ onBeforeUnmount(() => { modalOpen.value = false; lightboxIndex.value = null; rel
    needs: "Год постройки от" wrapped to three lines while "Этаж от" stayed on
    one, so the Flat and House columns no longer lined up with each other. A
    fixed row height plus a balanced label column keeps the two columns in step. */
-.range-field { display: grid; grid-template-columns: minmax(70px,1fr) minmax(48px,68px) 10px minmax(48px,68px); align-items: center; gap: 4px; font-size: 11px; color: var(--ui-text-muted); min-height: 46px; }
-.range-field > span:first-child { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; line-height: 1.25; }
-.range-field > span:first-child { line-height: 1.25; overflow-wrap: anywhere; }
+/* Range rows follow the same shape as every other filter: label ABOVE the
+   control, in the shared uppercase label style. They used to put the label
+   inline to the left, which both looked unlike the rest of the panel and made
+   the Flat and House columns drift apart whenever one label wrapped to more
+   lines than its neighbour. The label spans the full width, so the two inputs
+   and their separator flow onto the next row automatically. */
+.range-field { display: grid; grid-template-columns: minmax(0,1fr) 10px minmax(0,1fr); align-items: center; column-gap: 4px; row-gap: 5px; font-size: 11px; color: var(--ui-text-muted); }
+.range-field > span:first-child {
+  grid-column: 1 / -1;
+  font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em;
+  opacity: 0.7; line-height: 1.25; overflow-wrap: anywhere;
+}
 .range-field :deep(input) { text-align: center; padding-inline: 4px; background: var(--bg-panel-2) !important; }
 .flats__controls_redesign :deep(input), .flats__controls_redesign :deep(button[role="combobox"]) { background-color: var(--bg-panel-2) !important; }
 
@@ -997,7 +1006,7 @@ onBeforeUnmount(() => { modalOpen.value = false; lightboxIndex.value = null; rel
   .filter-group, .filter-group:first-child, .filter-group:nth-child(odd), .filter-group:nth-child(even) { padding: 16px 0; border-left: 0; border-top: 1px solid var(--line); }
   .filter-group:first-child { padding-top: 0; border-top: 0; }
   .filter-group:last-child { padding-bottom: 0; }
-  .range-field { grid-template-columns: minmax(82px,1fr) minmax(52px,72px) 10px minmax(52px,72px); }
+  .range-field { grid-template-columns: minmax(0,1fr) 10px minmax(0,1fr); }
   .flat-card__photo { height: 250px; }
   .flat-modal__footer-actions { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .flat-lightbox__stage { width: 92vw; height: 76vh; }
@@ -1010,6 +1019,6 @@ onBeforeUnmount(() => { modalOpen.value = false; lightboxIndex.value = null; rel
   .filter-price-row { column-gap: 3px; row-gap: 6px; }
   .price-input :deep(.price-number-input) { font-size: 11px; }
   .filter-presets .flats__preset { max-width: 100%; }
-  .range-field { grid-template-columns: minmax(70px,1fr) 58px 8px 58px; }
+  .range-field { grid-template-columns: minmax(0,1fr) 8px minmax(0,1fr); }
 }
 </style>
