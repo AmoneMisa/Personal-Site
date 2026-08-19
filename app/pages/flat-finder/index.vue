@@ -827,17 +827,20 @@ onBeforeUnmount(() => { modalOpen.value = false; lightboxIndex.value = null; rel
 /* One control height for every filter input/select. u-input and u-select-menu
    render different internals, so their natural heights differed and the rows
    looked ragged; pin the inner control instead of the wrapper. */
+/* ONE height for every control in the panel, ranges included — a shorter range
+   input was the reason those rows looked different from the selects. */
 .flats__field :deep(input),
 .flats__field :deep(button),
 .price-input :deep(input),
 .currency-select :deep(button),
 .range-field :deep(input) { min-height: 38px; }
-.range-field :deep(input) { min-height: 32px; }
 
 /* A multi-select with several countries used to wrap onto extra lines and grow
-   the whole row. Keep it to one line and ellipsize instead. */
-.flats__field :deep(button > span),
-.flats__select :deep(button > span) {
+   the whole row, so keep the VALUE to one line and ellipsize it. Scoped to the
+   first span only: a blanket `button > span` also caught the chevron wrapper,
+   and forcing display:block + overflow:hidden on it deformed the arrow. */
+.flats__field :deep(button > span:first-child),
+.flats__select :deep(button > span:first-child) {
   display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0;
 }
 
@@ -924,16 +927,23 @@ onBeforeUnmount(() => { modalOpen.value = false; lightboxIndex.value = null; rel
 .filter-presets { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding-bottom: 14px; margin-bottom: 14px; border-bottom: 1px solid var(--line); }
 .filter-presets__label { margin-right: 4px; white-space: nowrap; }
 .filter-primary-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; }
-.filter-primary-grid :deep(button > span), .advanced-groups :deep(button > span) { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: normal; line-height: 1.25; text-align: left; }
+/* Scoped to the value span (not every span, which included the chevron) and
+   kept on one line. This rule sits after the one above and previously won with
+   `white-space: normal`, which is what still let a multi-country value wrap. */
+.filter-primary-grid :deep(button > span:first-child), .advanced-groups :deep(button > span:first-child) { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; line-height: 1.25; text-align: left; }
 /* justify-content:start is what keeps this row sane: the first track is `auto`,
    so without it every pixel of leftover width inflated the label column and
    threw the label to the far left with the inputs stranded on the right.
    column-gap does the spacing now instead of a per-element margin. */
-.filter-price-row { display: grid; grid-template-columns: auto minmax(130px,190px) 12px minmax(130px,190px) minmax(120px,145px); justify-content: start; align-items: center; column-gap: 8px; row-gap: 10px; margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--line); }
-.filter-price-row__label { margin-right: 4px; }
-.price-input { height: 38px; display: grid; grid-template-columns: auto minmax(0,1fr); align-items: center; gap: 5px; padding-left: 9px; border: 1px solid var(--line); border-radius: 7px; background: var(--bg-panel-2); color: var(--ui-text-muted); font-size: 12px; overflow: hidden; }
+.filter-price-row { display: grid; grid-template-columns: auto minmax(130px,190px) auto minmax(130px,190px) minmax(120px,145px); justify-content: start; align-items: center; column-gap: 8px; row-gap: 10px; margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--line); }
+.filter-price-row__label { margin: 0; }
+.price-input { min-height: 38px; display: grid; grid-template-columns: auto minmax(0,1fr); align-items: stretch; gap: 6px; padding-left: 10px; border: 1px solid var(--line); border-radius: 7px; background: var(--bg-panel-2); color: var(--ui-text-muted); font-size: 12px; overflow: hidden; }
 .price-input :deep(.price-number-input) { border: 0 !important; box-shadow: none !important; background: transparent !important; min-width: 0; font-size: 13px; font-variant-numeric: tabular-nums; }
-.price-input :deep(input) { min-width: 0; padding-inline: 2px; }
+.price-input :deep(input) { min-width: 0; padding-inline: 2px; height: 100%; }
+/* The wrapper stretches its children, so the "от"/"до" caption and the field
+   itself each centre their own text — previously the caption sat at the top. */
+.price-input > span { display: flex; align-items: center; line-height: 1; }
+.price-input :deep(.price-number-input) { display: flex; align-items: center; }
 .price-separator { text-align: center; color: var(--ui-text-muted); }
 .currency-select { min-width: 0; }
 .currency-select__control :deep(button) { min-height: 38px; background: var(--bg-panel-2) !important; border-color: rgba(224,103,154,.78) !important; color: var(--text-white); font-weight: 800; letter-spacing: .04em; box-shadow: inset 0 0 0 1px rgba(224,103,154,.08); }
@@ -953,7 +963,12 @@ onBeforeUnmount(() => { modalOpen.value = false; lightboxIndex.value = null; rel
 .filter-group:last-child { padding-right: 0; }
 .filter-group h3 { display: flex; align-items: center; gap: 7px; margin: 0 0 14px; color: var(--ui-text-muted); font-size: 11px; line-height: 1.3; text-transform: uppercase; letter-spacing: .04em; }
 .filter-group h3 svg { color: var(--accent-pink); flex: 0 0 auto; }
-.filter-group .flats__field + .flats__field, .range-field + .range-field { margin-top: 12px; }
+/* One vertical rhythm for every stacked filter, whatever kind it is, so the
+   Location / Flat / House / Listing columns keep the same row spacing. */
+.filter-group .flats__field + .flats__field,
+.filter-group .flats__field + .range-field,
+.filter-group .range-field + .flats__field,
+.range-field + .range-field { margin-top: 12px; }
 .quick-options { display: grid; gap: 8px; }
 .quick-options :deep(button) { width: 100%; min-height: 38px; justify-content: flex-start; height: auto; padding-block: 8px; white-space: normal; text-align: left; line-height: 1.25; }
 /* Every range row is the same height regardless of how many lines its label
@@ -966,12 +981,16 @@ onBeforeUnmount(() => { modalOpen.value = false; lightboxIndex.value = null; rel
    the Flat and House columns drift apart whenever one label wrapped to more
    lines than its neighbour. The label spans the full width, so the two inputs
    and their separator flow onto the next row automatically. */
-.range-field { display: grid; grid-template-columns: minmax(0,1fr) 10px minmax(0,1fr); align-items: center; column-gap: 4px; row-gap: 5px; font-size: 11px; color: var(--ui-text-muted); }
+/* No muted colour on the container: the label sets `opacity: .7` like every
+   other filter label, and inheriting a muted colour on top of that made these
+   labels visibly dimmer than "РАЙОН" and friends. The separator keeps it. */
+.range-field { display: grid; grid-template-columns: minmax(0,1fr) 10px minmax(0,1fr); align-items: center; column-gap: 8px; row-gap: 5px; font-size: 11px; }
 .range-field > span:first-child {
   grid-column: 1 / -1;
   font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em;
   opacity: 0.7; line-height: 1.25; overflow-wrap: anywhere;
 }
+.range-field > span:not(:first-child) { color: var(--ui-text-muted); text-align: center; }
 .range-field :deep(input) { text-align: center; padding-inline: 4px; background: var(--bg-panel-2) !important; }
 .flats__controls_redesign :deep(input), .flats__controls_redesign :deep(button[role="combobox"]) { background-color: var(--bg-panel-2) !important; }
 
