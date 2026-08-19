@@ -132,13 +132,19 @@ onBeforeUnmount(() => {
   justify-content: center;
   width: 32px;
   height: 32px;
+  padding: 0;
   border: 0;
   border-radius: 7px;
   background: transparent;
   color: inherit;
   font-size: 18px;
+  /* Without line-height:1 the button's text box is taller than the glyph, so
+     the icon sat above centre. */
+  line-height: 1;
   cursor: pointer;
 }
+/* Flex already centres it; drop the inline-baseline nudge UIcon applies. */
+.u-modal__close :deep(.u-icon) { vertical-align: 0; }
 .u-modal__close:hover { background: rgba(255, 255, 255, 0.08); }
 
 .u-modal__body {

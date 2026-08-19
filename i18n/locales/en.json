@@ -484,7 +484,8 @@
     "wmOffice": "On-site",
     "wmRemote": "Remote",
     "workMode": "Work mode",
-    "yesterday": "yesterday"
+    "yesterday": "yesterday",
+    "hideEmpty": "Hide empty fields"
   },
   "quizzes": {
     "countryFit": {

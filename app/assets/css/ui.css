@@ -31,10 +31,10 @@
     --ui-control-placeholder: var(--text-muted, #9ea4c1);
 }
 
-/* Touch devices get larger controls. Keyed on the pointer type rather than a
-   width breakpoint, so a small laptop keeps compact controls while a large
-   tablet still gets comfortable 44px targets (the accessibility guideline). */
-@media (pointer: coarse) {
+/* Larger controls on touch, but only at tablet width and below: a touchscreen
+   laptop also reports a coarse pointer, and inflating every control there made
+   the desktop filter rows look oversized. */
+@media (pointer: coarse) and (max-width: 1024px) {
     :root {
         --ui-control-h-sm: 38px;
         --ui-control-h-md: 44px;
@@ -86,3 +86,20 @@
     white-space: nowrap;
     border: 0;
 }
+
+/* Scrollbars in the site palette. Nuxt UI used to style these; without it
+   every scroll area rendered the bright OS default against the dark UI. */
+* {
+    scrollbar-width: thin;
+    scrollbar-color: var(--line, #252a4a) transparent;
+}
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+    background: var(--line, #252a4a);
+    border: 2px solid transparent;
+    background-clip: content-box;
+    border-radius: 999px;
+}
+::-webkit-scrollbar-thumb:hover { background: var(--text-muted, #9ea4c1); background-clip: content-box; }
+::-webkit-scrollbar-corner { background: transparent; }

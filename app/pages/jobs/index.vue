@@ -1359,7 +1359,7 @@ onBeforeUnmount(() => {
               {{ l.language }}<template v-if="l.level"> ({{ l.level }})</template>
             </span>
           </div>
-          <UiSpecTable :rows="vacRows" />
+          <UiSpecTable :rows="vacRows" :hide-empty-label="t('hideEmpty')" :empty-value="t('notSpecified')" />
           <p v-if="activeJob.description" class="job-modal__desc">{{ activeJob.description }}</p>
           <p v-else class="text-muted">{{ t("noDescription") }}</p>
           <div v-if="activeJob.skills && activeJob.skills.length" class="job-card__tags job-modal__tags">
