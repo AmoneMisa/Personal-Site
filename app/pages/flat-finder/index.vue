@@ -772,14 +772,14 @@ onBeforeUnmount(() => { modalOpen.value = false; lightboxIndex.value = null; rel
             <label v-if="metroOptions.length" class="flats__field"><span class="flats__field-label">{{ filterLabel("metro") }}</span><u-select-menu v-model="metroSel" :items="metroItems" value-key="value" label-key="label" class="flats__select" @update:model-value="scheduleLoad()" /></label>
           </div>
           <div class="filter-group"><h3><u-icon name="i-lucide-house" /> {{ locale.startsWith('ru') ? 'Квартира' : 'Apartment' }}</h3>
-            <div class="range-field"><span>{{ t("roomsMin") }}</span><u-input v-model.number="roomsMin" type="number" min="0" @change="scheduleLoad()" /><span>—</span><u-input v-model.number="roomsMax" type="number" min="0" @change="scheduleLoad()" /></div>
-            <div class="range-field"><span>{{ filterLabel("bedroomsMin") }}</span><u-input v-model.number="bedroomsMin" type="number" min="0" @change="scheduleLoad()" /><span>—</span><u-input v-model.number="bedroomsMax" type="number" min="0" @change="scheduleLoad()" /></div>
-            <div class="range-field"><span>{{ filterLabel("areaMin") }}</span><u-input v-model.number="areaMin" type="number" min="0" @change="scheduleLoad()" /><span>—</span><u-input v-model.number="areaMax" type="number" min="0" @change="scheduleLoad()" /></div>
+            <div class="range-field"><span>{{ rangeLabel("rooms") }}</span><u-input v-model.number="roomsMin" :label="rangeFrom" type="number" min="0" @change="scheduleLoad()" /><span>—</span><u-input v-model.number="roomsMax" :label="rangeTo" type="number" min="0" @change="scheduleLoad()" /></div>
+            <div class="range-field"><span>{{ rangeLabel("bedrooms") }}</span><u-input v-model.number="bedroomsMin" :label="rangeFrom" type="number" min="0" @change="scheduleLoad()" /><span>—</span><u-input v-model.number="bedroomsMax" :label="rangeTo" type="number" min="0" @change="scheduleLoad()" /></div>
+            <div class="range-field"><span>{{ rangeLabel("area") }}</span><u-input v-model.number="areaMin" :label="rangeFrom" type="number" min="0" @change="scheduleLoad()" /><span>—</span><u-input v-model.number="areaMax" :label="rangeTo" type="number" min="0" @change="scheduleLoad()" /></div>
           </div>
           <div class="filter-group"><h3><u-icon name="i-lucide-building-2" /> {{ locale.startsWith('ru') ? 'Дом' : 'Building' }}</h3>
-            <div class="range-field"><span>{{ filterLabel("floorMin") }}</span><u-input v-model.number="floorMin" type="number" min="0" @change="scheduleLoad()" /><span>—</span><u-input v-model.number="floorMax" type="number" min="0" @change="scheduleLoad()" /></div>
-            <div class="range-field"><span>{{ filterLabel("totalFloorsMin") }}</span><u-input v-model.number="totalFloorsMin" type="number" min="1" @change="scheduleLoad()" /><span>—</span><u-input v-model.number="totalFloorsMax" type="number" min="1" @change="scheduleLoad()" /></div>
-            <div class="range-field"><span>{{ filterLabel("yearMin") }}</span><u-input v-model.number="yearMin" type="number" min="1800" :max="new Date().getFullYear() + 2" @change="scheduleLoad()" /><span>—</span><u-input v-model.number="yearMax" type="number" min="1800" :max="new Date().getFullYear() + 2" @change="scheduleLoad()" /></div>
+            <div class="range-field"><span>{{ rangeLabel("floor") }}</span><u-input v-model.number="floorMin" :label="rangeFrom" type="number" min="0" @change="scheduleLoad()" /><span>—</span><u-input v-model.number="floorMax" :label="rangeTo" type="number" min="0" @change="scheduleLoad()" /></div>
+            <div class="range-field"><span>{{ rangeLabel("totalFloors") }}</span><u-input v-model.number="totalFloorsMin" :label="rangeFrom" type="number" min="1" @change="scheduleLoad()" /><span>—</span><u-input v-model.number="totalFloorsMax" :label="rangeTo" type="number" min="1" @change="scheduleLoad()" /></div>
+            <div class="range-field"><span>{{ rangeLabel("year") }}</span><u-input v-model.number="yearMin" :label="rangeFrom" type="number" min="1800" :max="new Date().getFullYear() + 2" @change="scheduleLoad()" /><span>—</span><u-input v-model.number="yearMax" :label="rangeTo" type="number" min="1800" :max="new Date().getFullYear() + 2" @change="scheduleLoad()" /></div>
           </div>
           <div class="filter-group"><h3><u-icon name="i-lucide-megaphone" /> {{ locale.startsWith('ru') ? 'Объявление' : 'Listing' }}</h3>
             <label class="flats__field"><span class="flats__field-label">{{ filterLabel("audience") }}</span><u-select-menu v-model="audienceSel" :items="audienceItems" value-key="value" label-key="label" :search-input="false" class="flats__select" @update:model-value="scheduleLoad()" /></label>
@@ -987,7 +987,9 @@ onBeforeUnmount(() => { modalOpen.value = false; lightboxIndex.value = null; rel
   opacity: 0.7; line-height: 1.25; overflow-wrap: anywhere;
 }
 .range-field > span:not(:first-child) { color: var(--ui-text-muted); text-align: center; }
-.range-field :deep(input) { text-align: center; padding-inline: 4px; background: var(--bg-panel-2) !important; }
+/* Left-aligned now that each field carries its own from/to floating label
+   anchored to the left edge; a centred value belonged to neither of them. */
+.range-field :deep(input) { text-align: left; }
 .flats__controls_redesign :deep(input), .flats__controls_redesign :deep(button[role="combobox"]) { background-color: var(--bg-panel-2) !important; }
 
 @media (max-width: 1100px) {

@@ -1,7 +1,9 @@
 // Shared job model + query types for the jobFinder aggregator.
 
+// Not re-exported: everything under server/utils is auto-imported, so a second
+// export of a name already exported by suspicious.ts makes the two compete and
+// one gets dropped with a warning at build time.
 import type { RiskCategory } from './suspicious'
-export type { RiskCategory }
 
 export type WorkMode = 'remote' | 'hybrid' | 'office' | 'unknown'
 export type Relocation = 'offered' | 'none' | 'unknown'

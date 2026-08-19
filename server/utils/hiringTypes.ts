@@ -1,11 +1,14 @@
 // CV/resume profiles posted by candidates (people looking for work).
 // This is intentionally separate from the /jobs vacancy aggregator.
 
-export type HiringSource = 'telegram'
+// Seniority is the Job Finder's vocabulary, so a candidate and a vacancy can be
+// compared without translating between two scales. Imported rather than restated
+// here: two identical declarations could drift apart, which is the one thing that
+// sharing the vocabulary is meant to rule out, and since everything under
+// server/utils is auto-imported, only one of the two was being kept anyway.
+import type { Seniority } from './jobTypes'
 
-// Same vocabulary as the Job Finder, so a candidate and a vacancy can be
-// compared on seniority without translating between two scales.
-export type Seniority = 'junior' | 'middle' | 'senior' | 'lead'
+export type HiringSource = 'telegram'
 
 export const HIRING_SOURCES: HiringSource[] = ['telegram']
 

@@ -10,7 +10,8 @@
 // matching a candidate against a vacancy compares incomparable strings.
 
 import { canonicalSkillName, extractSkillDetails } from '~~/shared/jobSkills'
-import type { CvProfile, Seniority } from './hiringTypes'
+import type { CvProfile } from './hiringTypes'
+import type { Seniority } from './jobTypes'
 
 // --- seniority -------------------------------------------------------------
 // Boundaries use \p{L} lookarounds rather than \b: JS word boundaries only know
