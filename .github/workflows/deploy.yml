@@ -10,10 +10,32 @@ permissions:
 
 env:
   FRONTEND_IMAGE: ghcr.io/amonemisa/personal-site
+  BACKEND_IMAGE: ghcr.io/amonemisa/personal-site-backend
+  QUEUE_IMAGE: ghcr.io/amonemisa/personal-site-jobs-queue
 
 jobs:
-  build-frontend:
+  # Every image is built here rather than on the deployment server. The server
+  # can reach ghcr.io but not Docker Hub (auth.docker.io TLS handshake timeouts),
+  # so any server-side build that needs a `python:*-slim` base fails outright.
+  # Building in CI also keeps the slow Nuxt build off the deploy command timeout.
+  build:
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: frontend
+            context: .
+            file: ./Dockerfile
+            image: ghcr.io/amonemisa/personal-site
+          - name: backend
+            context: ./backend
+            file: ./backend/Dockerfile
+            image: ghcr.io/amonemisa/personal-site-backend
+          - name: jobs-queue
+            context: ./jobs-queue-worker
+            file: ./jobs-queue-worker/Dockerfile
+            image: ghcr.io/amonemisa/personal-site-jobs-queue
     steps:
       - uses: actions/checkout@v4
 
@@ -27,20 +49,20 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build and push frontend image
+      - name: Build and push ${{ matrix.name }} image
         uses: docker/build-push-action@v6
         with:
-          context: .
-          file: ./Dockerfile
+          context: ${{ matrix.context }}
+          file: ${{ matrix.file }}
           push: true
           tags: |
-            ${{ env.FRONTEND_IMAGE }}:latest
-            ${{ env.FRONTEND_IMAGE }}:${{ github.sha }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+            ${{ matrix.image }}:latest
+            ${{ matrix.image }}:${{ github.sha }}
+          cache-from: type=gha,scope=${{ matrix.name }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.name }}
 
   deploy:
-    needs: build-frontend
+    needs: build
     environment: Production
     runs-on: ubuntu-latest
     steps:

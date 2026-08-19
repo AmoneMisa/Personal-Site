@@ -20,19 +20,20 @@ target="${1:-all}"
 
 case "$target" in
   all)
-    # Frontend is pre-built in GitHub Actions and published to GHCR; it has no
-    # build context in compose, so `--build` here only rebuilds the services that
-    # genuinely build locally (backend, queue workers) and never re-runs the slow
-    # Nuxt build on this server.
-    "${compose[@]}" pull frontend
-    "${compose[@]}" up -d --build
+    # Every image is pre-built in GitHub Actions and published to GHCR. Nothing
+    # is built here: this server cannot reach Docker Hub (auth.docker.io TLS
+    # handshake timeouts), so a local build fails as soon as it needs a base
+    # image, and the Nuxt build alone used to exceed the deploy timeout.
+    "${compose[@]}" pull
+    "${compose[@]}" up -d --no-build
     ;;
   frontend)
     "${compose[@]}" pull frontend
     "${compose[@]}" up -d --no-build frontend
     ;;
   backend)
-    "${compose[@]}" up -d --build backend
+    "${compose[@]}" pull backend
+    "${compose[@]}" up -d --no-build backend
     ;;
   *)
     echo "Usage: $0 [all|frontend|backend]" >&2

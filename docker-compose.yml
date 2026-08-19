@@ -1,7 +1,8 @@
 services:
   backend:
-    build:
-      context: ./backend
+    # Built and pushed by GitHub Actions; the deployment server can reach
+    # ghcr.io but not Docker Hub, so it must never build this locally.
+    image: ghcr.io/amonemisa/personal-site-backend:latest
     restart: unless-stopped
     environment:
       REDIS_HOST: redis
@@ -52,8 +53,9 @@ services:
       start_period: 30s
 
   jobs-queue-dispatcher:
-    build:
-      context: ./jobs-queue-worker
+    # Built and pushed by GitHub Actions; the deployment server can reach
+    # ghcr.io but not Docker Hub, so it must never build this locally.
+    image: ghcr.io/amonemisa/personal-site-jobs-queue:latest
     restart: unless-stopped
     environment:
       QUEUE_MODE: dispatcher
@@ -69,8 +71,9 @@ services:
         condition: service_healthy
 
   jobs-queue-worker-1:
-    build:
-      context: ./jobs-queue-worker
+    # Built and pushed by GitHub Actions; the deployment server can reach
+    # ghcr.io but not Docker Hub, so it must never build this locally.
+    image: ghcr.io/amonemisa/personal-site-jobs-queue:latest
     restart: unless-stopped
     environment:
       QUEUE_MODE: worker
@@ -87,8 +90,9 @@ services:
         condition: service_healthy
 
   jobs-queue-worker-2:
-    build:
-      context: ./jobs-queue-worker
+    # Built and pushed by GitHub Actions; the deployment server can reach
+    # ghcr.io but not Docker Hub, so it must never build this locally.
+    image: ghcr.io/amonemisa/personal-site-jobs-queue:latest
     restart: unless-stopped
     environment:
       QUEUE_MODE: worker
