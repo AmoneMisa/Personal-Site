@@ -822,16 +822,10 @@ onBeforeUnmount(() => { modalOpen.value = false; lightboxIndex.value = null; rel
 .flats__preset { display: inline-flex; align-items: center; gap: 8px; min-height: 32px; padding: 0 8px 0 11px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg-panel); color: var(--text-primary); cursor: pointer; }
 .flats__preset-remove { color: var(--text-muted); font-size: 18px; line-height: 1; }
 .flats__preset-remove:hover { color: var(--accent-pink); }
-/* One control height for every filter input/select. u-input and u-select-menu
-   render different internals, so their natural heights differed and the rows
-   looked ragged; pin the inner control instead of the wrapper. */
-/* ONE height for every control in the panel, ranges included — a shorter range
-   input was the reason those rows looked different from the selects. */
-.flats__field :deep(input),
-.flats__field :deep(button),
-.price-input :deep(input),
-.currency-select :deep(button),
-.range-field :deep(input) { min-height: 38px; }
+/* Control height is owned by .ui-control (assets/css/ui.css), which every input
+   and select composes. Forcing a min-height on the NATIVE element inside them
+   stacked a second height on top of the wrapper's, which is what made the range
+   fields and the price row taller than the plain selects. */
 
 /* A multi-select with several countries used to wrap onto extra lines and grow
    the whole row, so keep the VALUE to one line and ellipsize it. Scoped to the
@@ -905,7 +899,8 @@ onBeforeUnmount(() => { modalOpen.value = false; lightboxIndex.value = null; rel
 .flat-modal__translated { margin-top: 0; padding: 12px; border: 1px solid var(--line, #252a4a); border-radius: var(--radius, 10px); background: var(--bg-panel-2, #171c3a); } .flat-modal__translated-title { margin: 0 0 8px; color: var(--text-primary, #e4e5f0); font-size: 13px; font-weight: 600; }
 .flat-modal__descbox { margin-top: 0; } .flat-modal__descbox summary { cursor: pointer; font-size: 12px; font-weight: 600; opacity: 0.7; user-select: none; } .flat-modal__desc { font-size: 13.5px; line-height: 1.55; white-space: pre-wrap; color: var(--text-soft, inherit); margin-top: 8px; }
 .flat-modal__tags { display: flex; flex-wrap: wrap; gap: 6px; } .flat-modal__tag { font-size: 11px; padding: 2px 8px; border-radius: 6px; border: 1px solid var(--line); color: var(--ui-text-muted); }
-.flat-modal__footer-actions { width: 100%; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; } .flat-modal__footer-button { width: 100%; min-height: 44px; height: auto; padding: 8px 11px; justify-content: center; text-align: center; white-space: normal; line-height: 1.25; }
+/* auto-fit rather than a fixed four columns: at narrower widths four tracks squeezed the longest label onto two lines, so that one button stood taller and looked unlike the rest. They now reflow to two rows and every label stays on one line. */
+.flat-modal__footer-actions { width: 100%; display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 8px; align-items: stretch; } .flat-modal__footer-button { width: 100%; min-height: 44px; height: auto; padding: 8px 11px; justify-content: center; text-align: center; white-space: normal; line-height: 1.25; }
 .flat-modal__footer-button_primary { display: inline-flex; align-items: center; border: 1px solid var(--accent-pink, #e0679a); border-radius: 8px; background: var(--accent-pink, #e0679a); color: #1a0e14; font-weight: 600; font-size: 13.5px; }
 .flat-share__hint { margin: 0 0 12px; color: var(--text-muted); font-size: 13px; line-height: 1.5; }
 
@@ -961,7 +956,7 @@ onBeforeUnmount(() => { modalOpen.value = false; lightboxIndex.value = null; rel
 .filter-group .range-field + .flats__field,
 .range-field + .range-field { margin-top: 12px; }
 .quick-options { display: grid; gap: 8px; }
-.quick-options :deep(button) { width: 100%; min-height: 38px; justify-content: flex-start; height: auto; padding-block: 8px; white-space: normal; text-align: left; line-height: 1.25; }
+.quick-options :deep(button) { width: 100%; min-height: var(--ui-control-h-md); justify-content: flex-start; height: auto; padding-block: 8px; white-space: normal; text-align: left; line-height: 1.25; }
 /* Every range row is the same height regardless of how many lines its label
    needs: "Год постройки от" wrapped to three lines while "Этаж от" stayed on
    one, so the Flat and House columns no longer lined up with each other. A
@@ -999,7 +994,7 @@ onBeforeUnmount(() => { modalOpen.value = false; lightboxIndex.value = null; rel
   .filter-card { padding: 14px 12px; }
   .filter-presets { align-items: stretch; }
   .filter-presets__label { flex: 0 0 100%; }
-  .filter-presets :deep(button) { min-height: 38px; }
+  .filter-presets :deep(button) { min-height: var(--ui-control-h-md); }
   .filter-primary-grid { grid-template-columns: 1fr; gap: 12px; }
   .filter-price-row { grid-template-columns: minmax(0,1fr) 10px minmax(0,1fr); column-gap: 4px; row-gap: 8px; }
   .filter-price-row__label { grid-column: 1 / -1; }
