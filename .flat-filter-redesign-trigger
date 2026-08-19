@@ -1,2 +1,2 @@
-Apply approved flat finder filter redesign to app/pages/flat-finder/index.vue.
-This trigger exists only to execute the branch workflow; remove after the generated code commit lands.
+Flat Finder redesign is already materialized in app/pages/flat-finder/index.vue.
+Production redeploy trigger: 2026-08-19T12:39Z.
