@@ -72,10 +72,22 @@ export default defineNitroPlugin((nitroApp) => {
       const source = queryValue(query.flatSource).trim().toLowerCase()
       const country = queryValue(query.flatCountry).trim().toUpperCase()
       const flat = await findSharedFlat(id, source, country)
-      if (!flat) return
 
-      meta = buildFlatShareMeta(flat, id, source, country, pathname)
-      meta.image = absoluteFlatImage(flat)
+      // A shared link must always produce a card. When the lookup misses (cold
+      // snapshot, expired listing, slow upstream) we still emit a generic
+      // preview instead of returning early — otherwise the crawler receives no
+      // usable tags and the chat shows an endless "generating preview".
+      meta = flat
+        ? buildFlatShareMeta(flat, id, source, country, pathname)
+        : {
+            title: 'Property listing · Flat Finder',
+            description: 'Apartment and house search across Uzbekistan, Kazakhstan, Ukraine and Romania.',
+            image: `${SHARE_SITE_URL}/web-app-manifest-512x512.png`,
+            imageType: 'image/png' as const,
+            url: `${SHARE_SITE_URL}${pathname}?flat=${encodeURIComponent(id)}`,
+            type: 'website' as const,
+          }
+      if (flat) meta.image = absoluteFlatImage(flat)
     } else if (pathname === '/jobs' || pathname === '/en/jobs') {
       const id = queryValue(query.job).trim()
       if (!id) return
@@ -92,13 +104,24 @@ export default defineNitroPlugin((nitroApp) => {
 
     if (!meta) return
 
+    // Keep the declared type honest: absoluteFlatImage may fall back to a PNG
+    // even though listing photos are normally JPEG.
+    meta.imageType = /\.png(?:$|\?)/i.test(meta.image) ? 'image/png' : 'image/jpeg'
+
     html.head = removeExistingSocialMeta(html.head)
     html.head.push(
       `<meta property="og:type" content="${escapeXml(meta.type)}">`,
+      `<meta property="og:site_name" content="whiteslove.me">`,
       `<meta property="og:title" content="${escapeXml(meta.title)}">`,
       `<meta property="og:description" content="${escapeXml(meta.description)}">`,
       `<meta property="og:url" content="${escapeXml(meta.url)}">`,
       `<meta property="og:image" content="${escapeXml(meta.image)}">`,
+      // secure_url + type help Telegram accept the image. Dimensions are
+      // deliberately NOT declared: the real photo size is unknown here, and a
+      // wrong width/height breaks card rendering worse than omitting it.
+      `<meta property="og:image:secure_url" content="${escapeXml(meta.image)}">`,
+      `<meta property="og:image:type" content="${escapeXml(meta.imageType)}">`,
+      `<meta property="og:image:alt" content="${escapeXml(meta.title)}">`,
       '<meta name="twitter:card" content="summary_large_image">',
       `<meta name="twitter:title" content="${escapeXml(meta.title)}">`,
       `<meta name="twitter:description" content="${escapeXml(meta.description)}">`,

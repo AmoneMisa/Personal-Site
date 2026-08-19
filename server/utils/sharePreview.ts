@@ -5,6 +5,36 @@ export const SHARE_SITE_URL = (process.env.PUBLIC_SITE_URL || 'https://whiteslov
 const FLAT_API_URL = process.env.FLAT_API_URL || 'http://185.5.206.229:8082'
 const VALID_FLAT_SOURCES = new Set(['olx', 'telegram'])
 
+// Social crawlers abandon a preview after only a few seconds (Telegram is the
+// strictest), and this lookup runs inside the SSR render hook — so a slow
+// upstream used to hang the whole page render and the crawler simply gave up,
+// leaving "generating preview…" forever. Keep the budget well under that.
+const SHARE_LOOKUP_TIMEOUT_MS = Number(process.env.SHARE_LOOKUP_TIMEOUT_MS) || 2500
+
+// Crawlers fetch the same URL several times (and users re-share links), so cache
+// resolved lookups briefly. Negative results are cached too, for less time, so a
+// cold backend cannot be hammered once per crawl.
+const shareCache = new Map<string, { at: number; value: any }>()
+const SHARE_CACHE_HIT_MS = 10 * 60_000
+const SHARE_CACHE_MISS_MS = 30_000
+
+function cacheGet(key: string): { value: any } | null {
+  const hit = shareCache.get(key)
+  if (!hit) return null
+  const ttl = hit.value ? SHARE_CACHE_HIT_MS : SHARE_CACHE_MISS_MS
+  if (Date.now() - hit.at > ttl) {
+    shareCache.delete(key)
+    return null
+  }
+  return { value: hit.value }
+}
+
+function cacheSet(key: string, value: any): any {
+  if (shareCache.size > 500) shareCache.clear()
+  shareCache.set(key, { at: Date.now(), value })
+  return value
+}
+
 export type ShareMeta = {
   title: string
   description: string
@@ -60,9 +90,15 @@ export function wrapShareText(value: unknown, maxChars = 34, maxLines = 3): stri
 export async function findSharedJob(id: string): Promise<any | null> {
   const wanted = String(id || '').trim()
   if (!wanted) return null
-  const jobs = await getStoredJobs()
-  const found = jobs.find((job: any) => job.id === wanted || job.url === wanted)
-  return found ? enrichJob(found) : null
+  const cached = cacheGet(`job:${wanted}`)
+  if (cached) return cached.value
+  try {
+    const jobs = await getStoredJobs()
+    const found = jobs.find((job: any) => job.id === wanted || job.url === wanted)
+    return cacheSet(`job:${wanted}`, found ? enrichJob(found) : null)
+  } catch {
+    return null
+  }
 }
 
 export async function findSharedFlat(id: string, source = '', country = ''): Promise<any | null> {
@@ -75,16 +111,24 @@ export async function findSharedFlat(id: string, source = '', country = ''): Pro
   if (VALID_FLAT_SOURCES.has(normalizedSource)) params.set('sources', normalizedSource)
   if (/^[A-Z]{2}$/.test(normalizedCountry)) params.set('countries', normalizedCountry)
 
+  const key = `flat:${params}`
+  const cached = cacheGet(key)
+  if (cached) return cached.value
+
   try {
     const response = await fetch(`${FLAT_API_URL}/api/listings?${params}`, {
-      signal: AbortSignal.timeout(12_000),
+      signal: AbortSignal.timeout(SHARE_LOOKUP_TIMEOUT_MS),
       headers: { Accept: 'application/json' },
     })
-    if (!response.ok) return null
+    if (!response.ok) return cacheSet(key, null)
     const data = await response.json() as any
-    return Array.isArray(data?.listings)
+    const found = Array.isArray(data?.listings)
       ? data.listings.find((listing: any) => String(listing?.id) === wanted) || data.listings[0] || null
       : null
+    // Don't cache a miss caused by a cold snapshot — the listing may well appear
+    // once the country finishes warming.
+    if (!found && data?.warming) return null
+    return cacheSet(key, found)
   } catch {
     return null
   }
