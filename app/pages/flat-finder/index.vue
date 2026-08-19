@@ -928,8 +928,8 @@ onBeforeUnmount(() => { modalOpen.value = false; lightboxIndex.value = null; rel
    column-gap does the spacing now instead of a per-element margin. */
 .filter-price-row { display: grid; grid-template-columns: auto minmax(130px,190px) auto minmax(130px,190px) minmax(120px,145px); justify-content: start; align-items: center; column-gap: 8px; row-gap: 10px; margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--line); }
 .filter-price-row__label { margin: 0; }
-.price-input { min-height: 38px; display: grid; grid-template-columns: auto minmax(0,1fr); align-items: stretch; gap: 6px; padding-left: 10px; border: 1px solid var(--line); border-radius: 7px; background: var(--bg-panel-2); color: var(--ui-text-muted); font-size: 12px; overflow: hidden; }
-.price-input :deep(.price-number-input) { border: 0 !important; box-shadow: none !important; background: transparent !important; min-width: 0; font-size: 13px; font-variant-numeric: tabular-nums; }
+.price-input { min-height: var(--ui-control-h-md); height: var(--ui-control-h-md); display: grid; grid-template-columns: auto minmax(0,1fr); align-items: stretch; gap: 6px; padding-left: 10px; border: 1px solid var(--line); border-radius: 7px; background: var(--bg-panel-2); color: var(--ui-text-muted); font-size: 12px; overflow: hidden; }
+.price-input :deep(.price-number-input) { border: 0 !important; box-shadow: none !important; background: transparent !important; min-width: 0; min-height: 0 !important; height: 100%; padding: 0 !important; font-size: 13px; font-variant-numeric: tabular-nums; }
 .price-input :deep(input) { min-width: 0; padding-inline: 2px; height: 100%; }
 /* The wrapper stretches its children, so the "от"/"до" caption and the field
    itself each centre their own text — previously the caption sat at the top. */
@@ -937,7 +937,7 @@ onBeforeUnmount(() => { modalOpen.value = false; lightboxIndex.value = null; rel
 .price-input :deep(.price-number-input) { display: flex; align-items: center; }
 .price-separator { text-align: center; color: var(--ui-text-muted); }
 .currency-select { min-width: 0; }
-.currency-select__control :deep(button) { min-height: 38px; background: var(--bg-panel-2) !important; border-color: rgba(224,103,154,.78) !important; color: var(--text-white); font-weight: 800; letter-spacing: .04em; box-shadow: inset 0 0 0 1px rgba(224,103,154,.08); }
+.currency-select__control :deep(button) { min-height: var(--ui-control-h-md); height: var(--ui-control-h-md); background: var(--bg-panel-2) !important; border-color: rgba(224,103,154,.78) !important; color: var(--text-white); font-weight: 800; letter-spacing: .04em; box-shadow: inset 0 0 0 1px rgba(224,103,154,.08); }
 .filter-actions-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--line); }
 .advanced-button { flex: 0 0 auto; }
 .active-filter-chips { display: flex; flex: 1 1 300px; gap: 8px; flex-wrap: wrap; min-width: 0; }
