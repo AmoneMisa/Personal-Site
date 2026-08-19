@@ -961,6 +961,51 @@ function lightboxPhotoFailed(event: Event) {
   });
 }
 
+// --- swipe navigation (pointer events cover touch, pen and mouse drag) ---
+const SWIPE_MIN_PX = 50;
+let swipeStart: { x: number; y: number; id: number } | null = null;
+
+function onLightboxPointerDown(event: PointerEvent) {
+  if (lightboxPhotos.value.length < 2) return;
+  swipeStart = { x: event.clientX, y: event.clientY, id: event.pointerId };
+}
+
+function onLightboxPointerUp(event: PointerEvent) {
+  if (!swipeStart || event.pointerId !== swipeStart.id) return;
+  const dx = event.clientX - swipeStart.x;
+  const dy = event.clientY - swipeStart.y;
+  swipeStart = null;
+  // Horizontal-dominant gestures only, so a vertical drag or a plain click
+  // (and the desktop hover-zoom pan) never flips the photo.
+  if (Math.abs(dx) < SWIPE_MIN_PX || Math.abs(dx) <= Math.abs(dy)) return;
+  moveLightbox(dx < 0 ? 1 : -1);
+}
+
+function onLightboxPointerCancel() {
+  swipeStart = null;
+}
+
+// Safety net for the mobile scroll lock: the modal library locks body scrolling
+// while an overlay is open, and closing the teleported lightbox and the modal in
+// the wrong order could leave that lock behind, making the page unscrollable.
+// Once nothing is open, clear any leftover inline lock.
+function releaseStuckScrollLock() {
+  if (import.meta.server) return;
+  if (modalOpen.value || lightboxIndex.value !== null) return;
+  const body = document.body;
+  if (body.style.overflow === "hidden") body.style.removeProperty("overflow");
+  if (body.style.position === "fixed") {
+    const top = body.style.top;
+    body.style.removeProperty("position");
+    body.style.removeProperty("top");
+    body.style.removeProperty("width");
+    const offset = Math.abs(parseInt(top || "0", 10)) || 0;
+    if (offset) window.scrollTo(0, offset);
+  }
+  body.style.removeProperty("padding-right");
+  document.documentElement.style.removeProperty("overflow");
+}
+
 function onLightboxKeydown(event: KeyboardEvent) {
   if (lightboxIndex.value == null) return;
   if (event.key === "Escape") closeLightbox();
@@ -1473,6 +1518,13 @@ watch(modalOpen, (open) => {
   stopTranslationPoll();
   translationRequestId += 1;
   translatingDescription.value = false;
+  // Let the modal library run its own teardown first, then clear any lock it
+  // left behind (see releaseStuckScrollLock).
+  nextTick(() => setTimeout(releaseStuckScrollLock, 350));
+});
+
+watch(lightboxIndex, (index) => {
+  if (index === null) nextTick(() => setTimeout(releaseStuckScrollLock, 350));
 });
 
 // While restoring filters from the URL/localStorage on mount, these cascade
@@ -1498,6 +1550,10 @@ watch(countries, () => {
 );
 
 onBeforeUnmount(() => {
+  // Leaving the page with an overlay open must never strand a scroll lock.
+  modalOpen.value = false;
+  lightboxIndex.value = null;
+  releaseStuckScrollLock();
   window.removeEventListener("keydown", onLightboxKeydown);
   window.removeEventListener("scroll", updateBackToTop);
   if (loadTimer) clearTimeout(loadTimer);
@@ -1813,11 +1869,18 @@ onBeforeUnmount(() => {
           :aria-label="t('photoViewer')"
           @click="closeLightbox"
       >
-        <div class="flat-lightbox__stage" @click.stop>
+        <div
+            class="flat-lightbox__stage"
+            @click.stop
+            @pointerdown="onLightboxPointerDown"
+            @pointerup="onLightboxPointerUp"
+            @pointercancel="onLightboxPointerCancel"
+        >
           <img
               :src="lightboxPhoto"
               :alt="`${modalTitle(active)} (${lightboxPosition}/${lightboxPhotos.length})`"
               referrerpolicy="no-referrer"
+              draggable="false"
               @error="lightboxPhotoFailed"
               @mousemove="updateLightboxZoom"
               @mouseleave="resetLightboxZoom"
@@ -2007,7 +2070,14 @@ onBeforeUnmount(() => {
   justify-content: center;
   cursor: default;
   pointer-events: auto;
+  /* Let the browser keep vertical gestures (pinch-zoom / scroll) while
+     horizontal ones reach our swipe handler, and stop the native image-drag
+     ghost from hijacking a mouse swipe. */
+  touch-action: pan-y pinch-zoom;
+  user-select: none;
+  -webkit-user-select: none;
 }
+.flat-lightbox__stage img { -webkit-user-drag: none; user-drag: none; }
 
 .flat-lightbox__stage img {
   display: block;
