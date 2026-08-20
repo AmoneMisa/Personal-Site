@@ -4,6 +4,7 @@ import { enrichJob } from './enrich'
 import { syncJobsSearchIndex } from './jobsElastic'
 import { fetchExtraTelegramJobs } from './extraTelegramJobSources'
 import { fetchLinkedInJobs } from './linkedinSource'
+import { fetchExtraPublicJobs } from './extraPublicJobSources'
 import {
   fetchAdzuna,
   fetchArbeitnow,
@@ -42,11 +43,28 @@ async function fetchAllTelegram(q: string): Promise<Job[]> {
 }
 
 async function fetchAllCompanies(q: string): Promise<Job[]> {
-  const [primary, linkedin] = await Promise.all([
-    fetchCompanies(q),
-    fetchLinkedInJobs(q),
-  ])
-  return [...primary, ...linkedin]
+  const loaders = [
+    { label: 'companies', load: () => fetchCompanies(q) },
+    { label: 'linkedin', load: () => fetchLinkedInJobs(q) },
+    { label: 'public-boards', load: () => fetchExtraPublicJobs(q) },
+  ]
+
+  const results = await Promise.allSettled(loaders.map(({ load }) => load()))
+  const jobs: Job[] = []
+
+  results.forEach((result, index) => {
+    if (result.status === 'fulfilled') {
+      jobs.push(...result.value)
+      return
+    }
+
+    console.warn(
+      `[jobs] ${loaders[index]!.label} sub-source failed:`,
+      result.reason instanceof Error ? result.reason.message : String(result.reason),
+    )
+  })
+
+  return jobs
 }
 
 const FETCHERS: Record<JobSource, (q: string) => Promise<Job[]>> = {
