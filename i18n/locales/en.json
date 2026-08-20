@@ -1921,5 +1921,73 @@
       "copyright": "Kubai Marharyta. Front-end Developer. 2026 ©",
       "motto": "Selachii nunquam dormiunt"
     }
+  },
+  "cv": {
+    "name": "Marharyta Kubai",
+    "role": "Frontend Developer",
+    "tagline": "Vue.js · Nuxt.js · TypeScript",
+    "availability": "Looking for a Middle Frontend Developer role · remote, or relocation with visa sponsorship (incl. spouse)",
+    "relocation": "Relocation: Tashkent (Uzbekistan); USA — New York, Miami, San Francisco, Los Angeles, New Orleans",
+    "summary": "Frontend developer specializing in e-commerce and marketplace projects, with %years%+ years of hands-on experience. My preferred stack is Vue and Nuxt. I design and consume APIs with Node.js, build Electron desktop apps, and integrate Telegram and Discord bots.",
+    "location": "Bucharest, Romania · Ukrainian citizenship",
+    "languagesTitle": "Languages",
+    "languages": [
+      "Russian — native",
+      "Ukrainian — native",
+      "English — B2",
+      "Turkish — A1"
+    ],
+    "sections": {
+      "skills": "Skills",
+      "experience": "Experience",
+      "projects": "Projects",
+      "education": "Education",
+      "contact": "Get in touch"
+    },
+    "cta": {
+      "download": "Download CV (PDF)",
+      "github": "GitHub",
+      "email": "Email me",
+      "portfolio": "Portfolio"
+    },
+    "skillGroups": {
+      "core": "Core",
+      "frameworks": "Vue stack",
+      "ui": "UI / templates",
+      "platform": "Backend / integrations",
+      "tooling": "Tooling & DBs"
+    },
+    "projectDesc": {
+      "platform": "Personal platform of online tools: Nuxt SSR, multi-language, custom REST backend.",
+      "pdfEditor": "In-browser PDF editor: text editing, annotations, signature, font handling and export.",
+      "emailEditor": "HTML email editor with validation and previews for Gmail / Outlook / Yandex.",
+      "devTools": "Developer utilities: JSON compare & merge, DockerHub image-tag search."
+    },
+    "jobBullets": {
+      "bpc": [
+        "Development and support of high-load marketplace frontend features.",
+        "Implementation and maintenance of UI using Freemarker and Velocity templates.",
+        "Improving and fixing responsive layouts across different devices.",
+        "Creating and maintaining production email templates.",
+        "Docker and CI/CD day to day; deploys and releases alongside development.",
+        "Working with an existing codebase and business-driven UI changes.",
+        "Close work with the backend, testers and the designer."
+      ],
+      "itsua": [
+        "Development of a Vue-based application for Shopify.",
+        "Customization and maintenance of Shopify themes using Liquid.",
+        "Frontend integration within the Shopify ecosystem."
+      ]
+    },
+    "eduDegree": {
+      "karazin": "Master's degree, Civil law",
+      "nlu": "Bachelor's degree"
+    },
+    "duration": {
+      "year": "yr",
+      "month": "mo",
+      "lessThanMonth": "<1 mo"
+    },
+    "seoTitle": "Margarita — Frontend Developer (Vue.js · Nuxt.js · TypeScript)"
   }
 }

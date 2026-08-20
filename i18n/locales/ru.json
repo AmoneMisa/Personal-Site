@@ -2199,5 +2199,73 @@
       "copyright": "Kubai Marharyta. Front-end Developer. 2026 ©",
       "motto": "Selachii nunquam dormiunt"
     }
+  },
+  "cv": {
+    "name": "Маргарита Кубай",
+    "role": "Frontend-разработчик",
+    "tagline": "Vue.js · Nuxt.js · TypeScript",
+    "availability": "Ищу позицию Middle Frontend Developer · remote или релокация с визовой поддержкой (включая супруга)",
+    "relocation": "Релокация: Ташкент (Узбекистан); США — Нью-Йорк, Майами, Сан-Франциско, Лос-Анджелес, Новый Орлеан",
+    "summary": "Frontend-разработчик со специализацией на e-commerce и маркетплейсах, %years%+ лет опыта. Предпочитаемый стек — Vue и Nuxt. Проектирую и интегрирую API на Node.js, создаю десктоп-приложения на Electron и ботов для Telegram и Discord.",
+    "location": "Бухарест, Румыния · гражданство Украины",
+    "languagesTitle": "Языки",
+    "languages": [
+      "Русский — родной",
+      "Українська — рідна",
+      "English — B2",
+      "Türkçe — A1"
+    ],
+    "sections": {
+      "skills": "Навыки",
+      "experience": "Опыт",
+      "projects": "Проекты",
+      "education": "Образование",
+      "contact": "Связаться"
+    },
+    "cta": {
+      "download": "Скачать CV (PDF)",
+      "github": "GitHub",
+      "email": "Написать",
+      "portfolio": "Портфолио"
+    },
+    "skillGroups": {
+      "core": "База",
+      "frameworks": "Vue-стек",
+      "ui": "UI / шаблоны",
+      "platform": "Backend / интеграции",
+      "tooling": "Инструменты и БД"
+    },
+    "projectDesc": {
+      "platform": "Персональная платформа онлайн-инструментов: SSR на Nuxt, мультиязычность, собственный REST-бэкенд.",
+      "pdfEditor": "Редактор PDF в браузере: правка текста, аннотации, подпись, работа со шрифтами и экспорт.",
+      "emailEditor": "Редактор HTML-писем с валидацией и превью для Gmail / Outlook / Yandex.",
+      "devTools": "Утилиты для разработчиков: сравнение и слияние JSON, поиск тегов Docker-образов."
+    },
+    "jobBullets": {
+      "bpc": [
+        "Разработка и поддержка frontend-функций маркетплейса под high-load.",
+        "Реализация и поддержка UI на шаблонах Freemarker и Velocity.",
+        "Улучшение и исправление адаптивной вёрстки под разные устройства.",
+        "Создание и поддержка продакшн-шаблонов email.",
+        "Docker и CI/CD в повседневной работе; деплой и релизы наравне с разработкой.",
+        "Работа с существующей кодовой базой и бизнес-ориентированными изменениями UI.",
+        "Тесное взаимодействие с бэкендом, тестировщиками и дизайнером."
+      ],
+      "itsua": [
+        "Разработка Vue-приложения для Shopify.",
+        "Кастомизация и поддержка тем Shopify на Liquid.",
+        "Frontend-интеграция в экосистеме Shopify."
+      ]
+    },
+    "eduDegree": {
+      "karazin": "Магистр, гражданское право",
+      "nlu": "Бакалавр"
+    },
+    "duration": {
+      "year": "г.",
+      "month": "мес.",
+      "lessThanMonth": "<1 мес."
+    },
+    "seoTitle": "Маргарита — Frontend-разработчик (Vue.js · Nuxt.js · TypeScript)"
   }
 }

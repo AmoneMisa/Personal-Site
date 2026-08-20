@@ -36,145 +36,76 @@ const skills = {
 // Real portfolio — your own shipped work in this repo. Recruiters click these.
 const projects = [
   {
-    name: "WhitesLove — developer tools platform",
-    href: SITE_URL,
-    stack: "Nuxt 4 · SSR · i18n · WebSockets",
-    ru: "Персональная платформа онлайн-инструментов: SSR на Nuxt, мультиязычность, собственный REST-бэкенд.",
-    en: "Personal platform of online tools: Nuxt SSR, multi-language, custom REST backend.",
+    "id": "platform",
+    "name": "WhitesLove — developer tools platform",
+    "href": "https://whiteslove.me",
+    "stack": "Nuxt 4 · SSR · i18n · WebSockets"
   },
   {
-    name: "Online PDF editor",
-    href: `${SITE_URL}/services/pdf-editor`,
-    stack: "pdf.js · Fabric.js · Canvas",
-    ru: "Редактор PDF в браузере: правка текста, аннотации, подпись, работа со шрифтами и экспорт.",
-    en: "In-browser PDF editor: text editing, annotations, signature, font handling and export.",
+    "id": "pdfEditor",
+    "name": "Online PDF editor",
+    "href": "https://whiteslove.me/services/pdf-editor",
+    "stack": "pdf.js · Fabric.js · Canvas"
   },
   {
-    name: "HTML email editor",
-    href: `${SITE_URL}/services/email-editor`,
-    stack: "Monaco · HTML email · linting",
-    ru: "Редактор HTML-писем с валидацией и превью для Gmail / Outlook / Yandex.",
-    en: "HTML email editor with validation and previews for Gmail / Outlook / Yandex.",
+    "id": "emailEditor",
+    "name": "HTML email editor",
+    "href": "https://whiteslove.me/services/email-editor",
+    "stack": "Monaco · HTML email · linting"
   },
   {
-    name: "JSON merge & DockerHub search",
-    href: `${SITE_URL}/services/merge-json`,
-    stack: "Monaco · diff/merge · API",
-    ru: "Утилиты для разработчиков: сравнение и слияние JSON, поиск тегов Docker-образов.",
-    en: "Developer utilities: JSON compare & merge, DockerHub image-tag search.",
-  },
+    "id": "devTools",
+    "name": "JSON merge & DockerHub search",
+    "href": "https://whiteslove.me/services/merge-json",
+    "stack": "Monaco · diff/merge · API"
+  }
 ];
 
 // From your CV. NOTE: the Shopify vs marketplace bullets were split by best guess
 // between the two roles — reorder if the attribution isn't exact.
 const experience = [
   {
-    role: "Frontend Developer",
-    company: "BPC · Remote",
-    period: "Jun 2021 — present",
-    start: "2021-06",
-    end: null, // present
-    ru: [
-      "Разработка и поддержка frontend-функций маркетплейса под high-load.",
-      "Реализация и поддержка UI на шаблонах Freemarker и Velocity.",
-      "Улучшение и исправление адаптивной вёрстки под разные устройства.",
-      "Создание и поддержка продакшн-шаблонов email.",
-      "Docker и CI/CD в повседневной работе; деплой и релизы наравне с разработкой.",
-      "Работа с существующей кодовой базой и бизнес-ориентированными изменениями UI.",
-      "Тесное взаимодействие с бэкендом, тестировщиками и дизайнером.",
-    ],
-    en: [
-      "Development and support of high-load marketplace frontend features.",
-      "Implementation and maintenance of UI using Freemarker and Velocity templates.",
-      "Improving and fixing responsive layouts across different devices.",
-      "Creating and maintaining production email templates.",
-      "Docker and CI/CD day to day; deploys and releases alongside development.",
-      "Working with an existing codebase and business-driven UI changes.",
-      "Close work with the backend, testers and the designer.",
-    ],
+    "id": "bpc",
+    "role": "Frontend Developer",
+    "company": "BPC · Remote",
+    "period": "Jun 2021 — present",
+    "start": "2021-06",
+    "end": null
   },
   {
-    role: "Junior Frontend Developer",
-    company: "ITSUA · Kharkiv",
-    period: "May 2020 — May 2021",
-    start: "2020-05",
-    end: "2021-05",
-    ru: [
-      "Разработка Vue-приложения для Shopify.",
-      "Кастомизация и поддержка тем Shopify на Liquid.",
-      "Frontend-интеграция в экосистеме Shopify.",
-    ],
-    en: [
-      "Development of a Vue-based application for Shopify.",
-      "Customization and maintenance of Shopify themes using Liquid.",
-      "Frontend integration within the Shopify ecosystem.",
-    ],
-  },
+    "id": "itsua",
+    "role": "Junior Frontend Developer",
+    "company": "ITSUA · Kharkiv",
+    "period": "May 2020 — May 2021",
+    "start": "2020-05",
+    "end": "2021-05"
+  }
 ];
 
 // Real education from your CV (law background — included honestly).
 const education = [
   {
-    school: "V. N. Karazin Kharkiv National University",
-    period: "2015 — 2019",
-    ru: "Магистр, гражданское право",
-    en: "Master's degree, Civil law",
+    "id": "karazin",
+    "school": "V. N. Karazin Kharkiv National University",
+    "period": "2015 — 2019"
   },
   {
-    school: "National Law University — Institute of Criminal Investigation and Forensics",
-    period: "2019 — 2020",
-    ru: "Бакалавр",
-    en: "Bachelor's degree",
-  },
+    "id": "nlu",
+    "school": "National Law University — Institute of Criminal Investigation and Forensics",
+    "period": "2019 — 2020"
+  }
 ];
 
 // Bilingual prose. `L` picks the current language.
-const RU = {
-  name: "Маргарита Кубай",
-  role: "Frontend-разработчик",
-  tagline: "Vue.js · Nuxt.js · TypeScript",
-  availability: "Ищу позицию Middle Frontend Developer · remote или релокация с визовой поддержкой (включая супруга)",
-  relocation: "Релокация: Ташкент (Узбекистан); США — Нью-Йорк, Майами, Сан-Франциско, Лос-Анджелес, Новый Орлеан",
-  summary:
-    "Frontend-разработчик со специализацией на e-commerce и маркетплейсах, {years}+ лет опыта. Предпочитаемый стек — Vue и Nuxt. Проектирую и интегрирую API на Node.js, создаю десктоп-приложения на Electron и ботов для Telegram и Discord.",
-  location: "Бухарест, Румыния · гражданство Украины",
-  languagesTitle: "Языки",
-  languages: ["Русский — родной", "Українська — рідна", "English — B2", "Türkçe — A1"],
-  sections: {
-    skills: "Навыки",
-    experience: "Опыт",
-    projects: "Проекты",
-    education: "Образование",
-    contact: "Связаться",
-  },
-  cta: { download: "Скачать CV (PDF)", github: "GitHub", email: "Написать", portfolio: "Портфолио" },
-  skillGroups: { core: "База", frameworks: "Vue-стек", ui: "UI / шаблоны", platform: "Backend / интеграции", tooling: "Инструменты и БД" },
-};
-
-const EN = {
-  name: "Marharyta Kubai",
-  role: "Frontend Developer",
-  tagline: "Vue.js · Nuxt.js · TypeScript",
-  availability: "Looking for a Middle Frontend Developer role · remote, or relocation with visa sponsorship (incl. spouse)",
-  relocation: "Relocation: Tashkent (Uzbekistan); USA — New York, Miami, San Francisco, Los Angeles, New Orleans",
-  summary:
-    "Frontend developer specializing in e-commerce and marketplace projects, with {years}+ years of hands-on experience. My preferred stack is Vue and Nuxt. I design and consume APIs with Node.js, build Electron desktop apps, and integrate Telegram and Discord bots.",
-  location: "Bucharest, Romania · Ukrainian citizenship",
-  languagesTitle: "Languages",
-  languages: ["Russian — native", "Ukrainian — native", "English — B2", "Turkish — A1"],
-  sections: {
-    skills: "Skills",
-    experience: "Experience",
-    projects: "Projects",
-    education: "Education",
-    contact: "Get in touch",
-  },
-  cta: { download: "Download CV (PDF)", github: "GitHub", email: "Email me", portfolio: "Portfolio" },
-  skillGroups: { core: "Core", frameworks: "Vue stack", ui: "UI / templates", platform: "Backend / integrations", tooling: "Tooling & DBs" },
-};
-
-const { locale } = useI18n();
-const L = computed(() => (locale.value === "en" ? EN : RU));
+const { locale, t: translate, tm, rt } = useI18n();
+// Copy lives in i18n/locales/*.json under `cv`.
+const t = (key: string) => translate(`cv.${key}`);
+// Arrays (language list, job bullets) come back as message nodes, so each
+// leaf needs resolving before the template can render it.
+const list = (key: string): string[] =>
+  ((tm(`cv.${key}`) as unknown[]) ?? []).map((node) =>
+    typeof node === "string" ? node : rt(node as never),
+  );
 const skillGroupKeys = ["core", "frameworks", "ui", "platform", "tooling"] as const;
 
 // ─── Auto-calculated experience ──────────────────────────────────────────────
@@ -199,30 +130,30 @@ function roleDuration(start: string, end: string | null): string {
   const months = monthsBetween(start, end);
   const y = Math.floor(months / 12);
   const m = months % 12;
-  const en = locale.value === "en";
+  const unit = (key: string) => t(`duration.${key}`);
   const parts: string[] = [];
-  if (y) parts.push(`${y} ${en ? "yr" : "г."}`);
-  if (m) parts.push(`${m} ${en ? "mo" : "мес."}`);
-  return parts.join(" ") || (en ? "<1 mo" : "<1 мес.");
+  if (y) parts.push(`${y} ${unit("year")}`);
+  if (m) parts.push(`${m} ${unit("month")}`);
+  return parts.join(" ") || unit("lessThanMonth");
 }
 
 // Summary with the live year count spliced in (used for on-page text + SEO).
-const summary = computed(() => L.value.summary.replace("{years}", String(yearsExperience.value)));
-const summaryEn = computed(() => EN.summary.replace("{years}", String(yearsExperience.value)));
+const summary = computed(() => t("summary").replace("%years%", String(yearsExperience.value)));
+const summaryEn = computed(() =>
+  translate("cv.summary", {}, { locale: "en" }).replace("%years%", String(yearsExperience.value)),
+);
 
 // ─── SEO ─────────────────────────────────────────────────────────────────────
 // Keyword-rich, unique per language. Set directly (not via DB i18n keys) so the
 // page is correct on first paint.
 useSeoMeta({
   title: () =>
-    locale.value === "en"
-      ? "Margarita — Frontend Developer (Vue.js · Nuxt.js · TypeScript)"
-      : "Маргарита — Frontend-разработчик (Vue.js · Nuxt.js · TypeScript)",
+    t("seoTitle"),
   description: () => summary.value,
   ogType: "profile",
-  ogTitle: () => `${L.value.name} — ${L.value.role}`,
+  ogTitle: () => `${t("name")} — ${t("role")}`,
   ogDescription: () => summary.value,
-  twitterTitle: () => `${L.value.name} — ${L.value.role}`,
+  twitterTitle: () => `${t("name")} — ${t("role")}`,
   twitterDescription: () => summary.value,
 });
 
@@ -233,10 +164,10 @@ const personLd = computed(() => {
   const knowsAbout = [...skills.core, ...skills.frameworks, ...skills.platform];
   const person: Record<string, unknown> = {
     "@type": "Person",
-    name: EN.name,
+    name: translate("cv.name", {}, { locale: "en" }),
     givenName: "Marharyta",
     familyName: "Kubai",
-    jobTitle: EN.role,
+    jobTitle: translate("cv.role", {}, { locale: "en" }),
     description: summaryEn.value,
     url: `${SITE_URL}/cv`,
     sameAs,
@@ -269,38 +200,38 @@ useHead({
   <div class="cv">
     <!-- Hero -->
     <header class="cv__hero">
-      <p class="cv__badge">{{ L.availability }}</p>
+      <p class="cv__badge">{{ t('availability') }}</p>
       <h1 class="cv__name">
-        {{ L.name }} — <span class="cv__role">{{ L.role }}</span>
+        {{ t('name') }} — <span class="cv__role">{{ t('role') }}</span>
       </h1>
-      <p class="cv__tagline">{{ L.tagline }}</p>
+      <p class="cv__tagline">{{ t('tagline') }}</p>
       <p class="cv__summary">{{ summary }}</p>
 
       <div class="cv__cta">
         <a v-if="links.pdfUrl" :href="links.pdfUrl" class="cv__btn cv__btn_primary" download>
-          {{ L.cta.download }}
+          {{ t('cta.download') }}
         </a>
         <a :href="links.github" target="_blank" rel="noopener noreferrer" class="cv__btn">
-          {{ L.cta.github }}
+          {{ t('cta.github') }}
         </a>
         <a :href="links.portfolio" target="_blank" rel="noopener noreferrer" class="cv__btn">
-          {{ L.cta.portfolio }}
+          {{ t('cta.portfolio') }}
         </a>
         <a v-if="links.email" :href="`mailto:${links.email}`" class="cv__btn">
-          {{ L.cta.email }}
+          {{ t('cta.email') }}
         </a>
       </div>
 
-      <p class="cv__meta">{{ L.location }}</p>
-      <p class="cv__meta">{{ L.relocation }}</p>
+      <p class="cv__meta">{{ t('location') }}</p>
+      <p class="cv__meta">{{ t('relocation') }}</p>
     </header>
 
     <!-- Skills -->
     <section class="cv__section">
-      <h2 class="cv__h2">{{ L.sections.skills }}</h2>
+      <h2 class="cv__h2">{{ t('sections.skills') }}</h2>
       <div class="cv__skills">
         <div v-for="key in skillGroupKeys" :key="key" class="cv__skill-group">
-          <h3 class="cv__skill-title">{{ L.skillGroups[key] }}</h3>
+          <h3 class="cv__skill-title">{{ t(`skillGroups.${key}`) }}</h3>
           <ul class="cv__chips">
             <li v-for="s in skills[key]" :key="s" class="cv__chip">{{ s }}</li>
           </ul>
@@ -310,7 +241,7 @@ useHead({
 
     <!-- Experience -->
     <section class="cv__section">
-      <h2 class="cv__h2">{{ L.sections.experience }}</h2>
+      <h2 class="cv__h2">{{ t('sections.experience') }}</h2>
       <ol class="cv__timeline">
         <li v-for="(job, i) in experience" :key="i" class="cv__job">
           <div class="cv__job-head">
@@ -319,7 +250,7 @@ useHead({
             <span class="cv__job-period">{{ job.period }} · {{ roleDuration(job.start, job.end) }}</span>
           </div>
           <ul class="cv__job-points">
-            <li v-for="(p, j) in (locale === 'en' ? job.en : job.ru)" :key="j">{{ p }}</li>
+            <li v-for="(p, j) in list('jobBullets.' + job.id)" :key="j">{{ p }}</li>
           </ul>
         </li>
       </ol>
@@ -327,7 +258,7 @@ useHead({
 
     <!-- Projects -->
     <section class="cv__section">
-      <h2 class="cv__h2">{{ L.sections.projects }}</h2>
+      <h2 class="cv__h2">{{ t('sections.projects') }}</h2>
       <div class="cv__projects">
         <a
             v-for="p in projects"
@@ -339,21 +270,21 @@ useHead({
         >
           <span class="cv__project-name">{{ p.name }}</span>
           <span class="cv__project-stack">{{ p.stack }}</span>
-          <span class="cv__project-desc">{{ locale === 'en' ? p.en : p.ru }}</span>
+          <span class="cv__project-desc">{{ t('projectDesc.' + p.id) }}</span>
         </a>
       </div>
     </section>
 
     <!-- Education -->
     <section class="cv__section">
-      <h2 class="cv__h2">{{ L.sections.education }}</h2>
+      <h2 class="cv__h2">{{ t('sections.education') }}</h2>
       <ol class="cv__timeline">
         <li v-for="(ed, i) in education" :key="i" class="cv__job">
           <div class="cv__job-head">
             <span class="cv__job-role">{{ ed.school }}</span>
             <span class="cv__job-period">{{ ed.period }}</span>
           </div>
-          <p class="cv__edu-degree">{{ locale === 'en' ? ed.en : ed.ru }}</p>
+          <p class="cv__edu-degree">{{ t('eduDegree.' + ed.id) }}</p>
         </li>
       </ol>
     </section>
@@ -361,18 +292,18 @@ useHead({
     <!-- Languages + contact -->
     <section class="cv__section cv__section_split">
       <div>
-        <h2 class="cv__h2">{{ L.languagesTitle }}</h2>
+        <h2 class="cv__h2">{{ t('languagesTitle') }}</h2>
         <ul class="cv__chips">
-          <li v-for="lang in L.languages" :key="lang" class="cv__chip">{{ lang }}</li>
+          <li v-for="lang in list('languages')" :key="lang" class="cv__chip">{{ lang }}</li>
         </ul>
       </div>
       <div>
-        <h2 class="cv__h2">{{ L.sections.contact }}</h2>
+        <h2 class="cv__h2">{{ t('sections.contact') }}</h2>
         <div class="cv__cta">
           <a :href="links.github" target="_blank" rel="noopener noreferrer" class="cv__btn">GitHub</a>
           <a v-if="links.linkedin" :href="links.linkedin" target="_blank" rel="noopener noreferrer" class="cv__btn">LinkedIn</a>
           <a v-if="links.telegram" :href="links.telegram" target="_blank" rel="noopener noreferrer" class="cv__btn">Telegram</a>
-          <a v-if="links.email" :href="`mailto:${links.email}`" class="cv__btn cv__btn_primary">{{ L.cta.email }}</a>
+          <a v-if="links.email" :href="`mailto:${links.email}`" class="cv__btn cv__btn_primary">{{ t('cta.email') }}</a>
         </div>
       </div>
     </section>
