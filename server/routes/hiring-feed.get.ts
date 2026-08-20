@@ -1,7 +1,7 @@
 // GET /hiring-feed — candidate CV/resume profiles (not employer vacancies).
 // Search runs through Elasticsearch when available and falls back to memory.
 
-import { HIRING_COUNTRIES } from '../utils/hiringSources'
+import { getHiringSourceDiagnostics, HIRING_COUNTRIES } from '../utils/hiringSources'
 import { getStoredCvProfiles, isHiringStoreCold, refreshHiringStore } from '../utils/hiringStore'
 import { candidateSearchAvailable, searchCandidates } from '../utils/hiringElastic'
 import { dedupeCandidates, normalizeCandidate } from '../utils/hiringNormalize'
@@ -145,11 +145,18 @@ export default defineEventHandler(async (event) => {
     page = filtered.slice(offset, offset + limit)
   }
 
+  const sourceStatuses = getHiringSourceDiagnostics()
+  const sourceErrors = sourceStatuses
+    .filter((item) => item.status === 'error')
+    .map((item) => ({ source: 'telegram', country: item.country, handle: item.handle, error: item.error || 'source failed' }))
+
   setResponseHeader(event, 'Cache-Control', 'no-store')
   return {
     count,
     profiles: page,
     sourceCounts: sourceCounts(profiles),
+    sourceStatuses,
+    sourceErrors,
     warming,
     engine,
     filters: {
