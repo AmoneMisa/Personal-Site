@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto'
 
-export type AiKind = 'vacancy' | 'apartment' | 'translation'
+export type AiKind = 'vacancy' | 'candidate' | 'apartment' | 'translation'
 
 export type AiExtractionResult<T = Record<string, unknown>> = {
   status: 'completed'
