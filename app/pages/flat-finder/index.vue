@@ -135,6 +135,8 @@ const bedroomsMin = ref<number | undefined>(undefined);
 const bedroomsMax = ref<number | undefined>(undefined);
 const areaMin = ref<number | undefined>(undefined);
 const areaMax = ref<number | undefined>(undefined);
+const pricePerSqmMin = ref<number | undefined>(undefined);
+const pricePerSqmMax = ref<number | undefined>(undefined);
 const floorMin = ref<number | undefined>(undefined);
 const floorMax = ref<number | undefined>(undefined);
 const totalFloorsMin = ref<number | undefined>(undefined);
@@ -236,7 +238,7 @@ const locName = (v: string | null | undefined, kind: LocationKind = "any") => lo
 const cityItems = computed<Item[]>(() => [{ label: t("cityAny"), value: ANY }, ...cityOptions.value.map((c) => ({ label: locName(c, "city"), value: c }))]);
 const citySel = computed<string>({ get: () => city.value || ANY, set: (v) => (city.value = v === ANY ? "" : v) });
 const districtItems = computed<Item[]>(() => [{ label: t("districtAny"), value: ANY }, ...districtOptions.value.map((d) => ({ label: locName(d, "district"), value: d }))]);
-const metroItems = computed<Item[]>(() => [{ label: filterLabel("metroAny"), value: ANY }, ...metroOptions.value.map((m) => ({ label: locName(m, "metro"), value: m }))]);
+const metroItems = computed<Item[]>(() => [{ label: t('metroAny'), value: ANY }, ...metroOptions.value.map((m) => ({ label: locName(m, "metro"), value: m }))]);
 const CURRENCY_PRIORITY = ["USD", "EUR", "UZS", "KZT", "UAH", "RON", "GBP", "KGS", "TJS", "TMT", "PLN"];
 const currencyItems = computed<Item[]>(() => {
   const keys = Object.keys(rates.value).filter((c) => /^[A-Z]{3}$/.test(c) && rates.value[c]! > 0);
@@ -247,10 +249,10 @@ const currencyItems = computed<Item[]>(() => {
 const districtSel = computed<string>({ get: () => district.value || ANY, set: (v) => (district.value = v === ANY ? "" : v) });
 const metroSel = computed<string>({ get: () => metro.value || ANY, set: (v) => (metro.value = v === ANY ? "" : v) });
 const audienceItems = computed<Item[]>(() => [
-  { label: filterLabel("audienceAny"), value: "any" },
-  { label: filterLabel("audienceWomen"), value: "women" },
-  { label: filterLabel("audienceMen"), value: "men" },
-  { label: filterLabel("audienceFamily"), value: "family" },
+  { label: t('audienceAny'), value: "any" },
+  { label: t('audienceWomen'), value: "women" },
+  { label: t('audienceMen'), value: "men" },
+  { label: t('audienceFamily'), value: "family" },
 ]);
 const audienceSel = computed<string>({ get: () => audience.value, set: (v) => (audience.value = v) });
 const propertyTypeItems = computed<Item[]>(() => [
@@ -263,27 +265,7 @@ const dealTypeItems = computed<Item[]>(() => [
 const agencyItems = computed<Item[]>(() => [
   { label: t("agAny"), value: "any" }, { label: t("agOwner"), value: "owner" }, { label: t("agAgency"), value: "agency" },
 ]);
-const FILTER_LABELS = {
-  ru: { pets: "Pet-friendly", roomOnly: "Комната / подселение", children: "Можно с детьми", newBuilding: "Новостройка ≤ 5 лет", metro: "Метро", metroAny: "Любое метро", audience: "Для кого", audienceAny: "Для всех", audienceWomen: "Женщины", audienceMen: "Мужчины", audienceFamily: "Семья", freshDays: "Опубликовано за, дней", backToTop: "Наверх к фильтрам" },
-  en: { pets: "Pet-friendly", roomOnly: "Room / shared housing", children: "Children allowed", newBuilding: "New building ≤ 5 years", metro: "Metro", metroAny: "Any metro", audience: "Tenant type", audienceAny: "Any", audienceWomen: "Women", audienceMen: "Men", audienceFamily: "Family", freshDays: "Posted within, days", backToTop: "Back to filters" },
-} as const;
-function filterLabel(key: keyof typeof FILTER_LABELS.en): string {
-  const lang = locale.value.startsWith("ru") ? "ru" : "en";
-  return FILTER_LABELS[lang][key];
-}
 
-// A range row labels its two fields "от"/"до" directly, so the caption above the
-// pair carries only the subject — "Комнат от … до" read as a stutter once the
-// fields said "от" and "до" themselves.
-const RANGE_LABELS = {
-  ru: { rooms: "Комнат", bedrooms: "Спален", area: "Площадь, м²", floor: "Этаж", totalFloors: "Этажей в доме", year: "Год постройки" },
-  en: { rooms: "Rooms", bedrooms: "Bedrooms", area: "Area, m²", floor: "Floor", totalFloors: "Building floors", year: "Built" },
-} as const;
-function rangeLabel(key: keyof typeof RANGE_LABELS.en): string {
-  return RANGE_LABELS[locale.value.startsWith("ru") ? "ru" : "en"][key];
-}
-const rangeFrom = computed(() => (locale.value.startsWith("ru") ? "от" : "from"));
-const rangeTo = computed(() => (locale.value.startsWith("ru") ? "до" : "to"));
 
 function readSavedList(key: string, limit = MAX_SAVED_FLATS): Listing[] {
   try {
@@ -361,6 +343,8 @@ function currentFilterQuery(): Record<string, string> {
   if (bedroomsMax.value != null) q.bedroomsMax = String(bedroomsMax.value);
   if (areaMin.value != null) q.areaMin = String(areaMin.value);
   if (areaMax.value != null) q.areaMax = String(areaMax.value);
+  if (pricePerSqmMin.value != null) q.pricePerSqmMin = String(pricePerSqmMin.value);
+  if (pricePerSqmMax.value != null) q.pricePerSqmMax = String(pricePerSqmMax.value);
   if (floorMin.value != null) q.floorMin = String(floorMin.value);
   if (floorMax.value != null) q.floorMax = String(floorMax.value);
   if (totalFloorsMin.value != null) q.totalFloorsMin = String(totalFloorsMin.value);
@@ -396,6 +380,8 @@ function applyQueryParams(params: Record<string, unknown>) {
   bedroomsMax.value = Number(queryString(params.bedroomsMax)) || undefined;
   areaMin.value = Number(queryString(params.areaMin)) || undefined;
   areaMax.value = Number(queryString(params.areaMax)) || undefined;
+  pricePerSqmMin.value = Number(queryString(params.pricePerSqmMin)) || undefined;
+  pricePerSqmMax.value = Number(queryString(params.pricePerSqmMax)) || undefined;
   floorMin.value = Number(queryString(params.floorMin)) || undefined;
   floorMax.value = Number(queryString(params.floorMax)) || undefined;
   totalFloorsMin.value = Number(queryString(params.totalFloorsMin)) || undefined;
@@ -465,6 +451,8 @@ async function load(append = false, background = false) {
   if (bedroomsMax.value != null) params.bedroomsMax = String(bedroomsMax.value);
   if (areaMin.value != null) params.areaMin = String(areaMin.value);
   if (areaMax.value != null) params.areaMax = String(areaMax.value);
+  if (pricePerSqmMin.value != null) params.pricePerSqmMin = String(pricePerSqmMin.value);
+  if (pricePerSqmMax.value != null) params.pricePerSqmMax = String(pricePerSqmMax.value);
   if (floorMin.value != null) params.floorMin = String(floorMin.value);
   if (floorMax.value != null) params.floorMax = String(floorMax.value);
   if (totalFloorsMin.value != null) params.totalFloorsMin = String(totalFloorsMin.value);
@@ -510,7 +498,7 @@ function resetFilters() {
   city.value = ""; district.value = ""; metro.value = ""; propertyType.value = "any"; dealType.value = "any"; agency.value = "any"; audience.value = "any";
   petFriendly.value = false; roomOnlyFilter.value = false; childrenRequired.value = false; newBuildingOnly.value = false;
   priceMin.value = undefined; priceMax.value = undefined; displayCurrency.value = "USD";
-  roomsMin.value = undefined; roomsMax.value = undefined; bedroomsMin.value = undefined; bedroomsMax.value = undefined; areaMin.value = undefined; areaMax.value = undefined;
+  roomsMin.value = undefined; roomsMax.value = undefined; bedroomsMin.value = undefined; bedroomsMax.value = undefined; areaMin.value = undefined; areaMax.value = undefined; pricePerSqmMin.value = undefined; pricePerSqmMax.value = undefined;
   floorMin.value = undefined; floorMax.value = undefined; totalFloorsMin.value = undefined; totalFloorsMax.value = undefined; yearMin.value = undefined; yearMax.value = undefined; maxAgeDays.value = undefined;
   query.value = ""; source.value = ""; drawnArea.value = []; view.value = "active";
   scheduleLoad(80);
@@ -740,10 +728,10 @@ onBeforeUnmount(() => { modalOpen.value = false; lightboxIndex.value = null; rel
         </div>
 
         <div class="filter-price-row">
-          <span class="flats__field-label filter-price-row__label">{{ locale.startsWith('ru') ? 'Цена' : 'Price' }}</span>
-          <u-input v-model.number="priceMin" class="price-input" type="number" inputmode="numeric" min="1" max="1000000000" :label="locale.startsWith('ru') ? 'от' : 'min'" @change="scheduleLoad()" />
+          <span class="flats__field-label filter-price-row__label">{{ t('price') }}</span>
+          <u-input v-model.number="priceMin" class="price-input" type="number" inputmode="numeric" min="1" max="1000000000" :label="t('rangeFrom')" @change="scheduleLoad()" />
           <span class="price-separator">—</span>
-          <u-input v-model.number="priceMax" class="price-input" type="number" inputmode="numeric" min="1" max="1000000000" :label="locale.startsWith('ru') ? 'до' : 'max'" @change="scheduleLoad()" />
+          <u-input v-model.number="priceMax" class="price-input" type="number" inputmode="numeric" min="1" max="1000000000" :label="t('rangeTo')" @change="scheduleLoad()" />
           <label class="currency-select"><span class="sr-only">{{ t("currency") }}</span><u-select-menu v-model="displayCurrency" :items="currencyItems" value-key="value" label-key="label" class="flats__select currency-select__control" @update:model-value="(priceMin != null || priceMax != null) && scheduleLoad()" /></label>
         </div>
 
@@ -751,8 +739,8 @@ onBeforeUnmount(() => { modalOpen.value = false; lightboxIndex.value = null; rel
           <u-button type="button" variant="outline" color="neutral" icon="i-lucide-sliders-horizontal" :trailing-icon="showAdvanced ? 'i-lucide-chevron-up' : 'i-lucide-chevron-down'" :aria-expanded="showAdvanced" class="advanced-button" @click="toggleAdvanced">{{ showAdvanced ? t("hideFilters") : t("moreFilters") }}</u-button>
           <div class="active-filter-chips">
             <button v-if="district" type="button" class="filter-chip" @click="district = ''; scheduleLoad(80)">{{ t("district") }}: {{ locName(district, 'district') }} <span>×</span></button>
-            <button v-if="roomsMin != null" type="button" class="filter-chip" @click="roomsMin = undefined; scheduleLoad(80)">{{ roomsMin }}+ {{ locale.startsWith('ru') ? 'комнат' : 'rooms' }} <span>×</span></button>
-            <button v-if="petFriendly" type="button" class="filter-chip" @click="petFriendly = false; scheduleLoad(80)"><u-icon name="i-lucide-paw-print" /> {{ filterLabel("pets") }} <span>×</span></button>
+            <button v-if="roomsMin != null" type="button" class="filter-chip" @click="roomsMin = undefined; scheduleLoad(80)">{{ roomsMin }}+ {{ t('roomsChip') }} <span>×</span></button>
+            <button v-if="petFriendly" type="button" class="filter-chip" @click="petFriendly = false; scheduleLoad(80)"><u-icon name="i-lucide-paw-print" /> {{ t('pets') }} <span>×</span></button>
           </div>
           <u-button type="button" variant="ghost" color="neutral" size="sm" icon="i-lucide-rotate-ccw" class="filter-reset" @click="resetFilters">{{ t("reset") }}</u-button>
         </div>
@@ -761,30 +749,31 @@ onBeforeUnmount(() => { modalOpen.value = false; lightboxIndex.value = null; rel
       <section v-if="showAdvanced" class="advanced-card">
         <div class="advanced-card__header"><div><u-icon name="i-lucide-filter" /><strong>{{ t("moreFilters") }}</strong></div><button type="button" @click="toggleAdvanced">{{ t("hideFilters") }} <u-icon name="i-lucide-chevron-up" /></button></div>
         <div class="advanced-groups">
-          <div class="filter-group filter-group_quick"><h3><u-icon name="i-lucide-sliders-horizontal" /> {{ locale.startsWith('ru') ? 'Быстрые опции' : 'Quick options' }}</h3><div class="quick-options">
-            <u-button type="button" :variant="petFriendly ? 'solid' : 'outline'" color="neutral" icon="i-lucide-paw-print" @click="petFriendly = !petFriendly; scheduleLoad(80)">{{ filterLabel("pets") }}</u-button>
-            <u-button type="button" :variant="childrenRequired ? 'solid' : 'outline'" color="neutral" icon="i-lucide-baby" @click="childrenRequired = !childrenRequired; scheduleLoad(80)">{{ filterLabel("children") }}</u-button>
-            <u-button type="button" :variant="roomOnlyFilter ? 'solid' : 'outline'" color="neutral" icon="i-lucide-bed-single" @click="roomOnlyFilter = !roomOnlyFilter; scheduleLoad(80)">{{ filterLabel("roomOnly") }}</u-button>
-            <u-button type="button" :variant="newBuildingOnly ? 'solid' : 'outline'" color="neutral" icon="i-lucide-building-2" @click="newBuildingOnly = !newBuildingOnly; scheduleLoad(80)">{{ filterLabel("newBuilding") }}</u-button>
+          <div class="filter-group filter-group_quick"><h3><u-icon name="i-lucide-sliders-horizontal" /> {{ t('quickOptions') }}</h3><div class="quick-options">
+            <u-button type="button" :variant="petFriendly ? 'solid' : 'outline'" color="neutral" icon="i-lucide-paw-print" @click="petFriendly = !petFriendly; scheduleLoad(80)">{{ t('pets') }}</u-button>
+            <u-button type="button" :variant="childrenRequired ? 'solid' : 'outline'" color="neutral" icon="i-lucide-baby" @click="childrenRequired = !childrenRequired; scheduleLoad(80)">{{ t('children') }}</u-button>
+            <u-button type="button" :variant="roomOnlyFilter ? 'solid' : 'outline'" color="neutral" icon="i-lucide-bed-single" @click="roomOnlyFilter = !roomOnlyFilter; scheduleLoad(80)">{{ t('roomOnly') }}</u-button>
+            <u-button type="button" :variant="newBuildingOnly ? 'solid' : 'outline'" color="neutral" icon="i-lucide-building-2" @click="newBuildingOnly = !newBuildingOnly; scheduleLoad(80)">{{ t('newBuilding') }}</u-button>
           </div></div>
-          <div class="filter-group"><h3><u-icon name="i-lucide-map-pin" /> {{ locale.startsWith('ru') ? 'Локация' : 'Location' }}</h3>
+          <div class="filter-group"><h3><u-icon name="i-lucide-map-pin" /> {{ t('groupLocation') }}</h3>
             <label v-if="districtOptions.length" class="flats__field"><span class="flats__field-label">{{ t("district") }}</span><u-select-menu v-model="districtSel" :items="districtItems" value-key="value" label-key="label" class="flats__select" @update:model-value="scheduleLoad()" /></label>
-            <label v-if="metroOptions.length" class="flats__field"><span class="flats__field-label">{{ filterLabel("metro") }}</span><u-select-menu v-model="metroSel" :items="metroItems" value-key="value" label-key="label" class="flats__select" @update:model-value="scheduleLoad()" /></label>
+            <label v-if="metroOptions.length" class="flats__field"><span class="flats__field-label">{{ t('metro') }}</span><u-select-menu v-model="metroSel" :items="metroItems" value-key="value" label-key="label" class="flats__select" @update:model-value="scheduleLoad()" /></label>
           </div>
-          <div class="filter-group"><h3><u-icon name="i-lucide-house" /> {{ locale.startsWith('ru') ? 'Квартира' : 'Apartment' }}</h3>
-            <div class="range-field"><span>{{ rangeLabel("rooms") }}</span><u-input v-model.number="roomsMin" :label="rangeFrom" type="number" min="0" @change="scheduleLoad()" /><span>—</span><u-input v-model.number="roomsMax" :label="rangeTo" type="number" min="0" @change="scheduleLoad()" /></div>
-            <div class="range-field"><span>{{ rangeLabel("bedrooms") }}</span><u-input v-model.number="bedroomsMin" :label="rangeFrom" type="number" min="0" @change="scheduleLoad()" /><span>—</span><u-input v-model.number="bedroomsMax" :label="rangeTo" type="number" min="0" @change="scheduleLoad()" /></div>
-            <div class="range-field"><span>{{ rangeLabel("area") }}</span><u-input v-model.number="areaMin" :label="rangeFrom" type="number" min="0" @change="scheduleLoad()" /><span>—</span><u-input v-model.number="areaMax" :label="rangeTo" type="number" min="0" @change="scheduleLoad()" /></div>
+          <div class="filter-group"><h3><u-icon name="i-lucide-house" /> {{ t('groupApartment') }}</h3>
+            <div class="range-field"><span>{{ t('rangeRooms') }}</span><u-input v-model.number="roomsMin" :label="t('rangeFrom')" type="number" min="0" @change="scheduleLoad()" /><span>—</span><u-input v-model.number="roomsMax" :label="t('rangeTo')" type="number" min="0" @change="scheduleLoad()" /></div>
+            <div class="range-field"><span>{{ t('rangeBedrooms') }}</span><u-input v-model.number="bedroomsMin" :label="t('rangeFrom')" type="number" min="0" @change="scheduleLoad()" /><span>—</span><u-input v-model.number="bedroomsMax" :label="t('rangeTo')" type="number" min="0" @change="scheduleLoad()" /></div>
+            <div class="range-field"><span>{{ t('rangeArea') }}</span><u-input v-model.number="areaMin" :label="t('rangeFrom')" type="number" min="0" @change="scheduleLoad()" /><span>—</span><u-input v-model.number="areaMax" :label="t('rangeTo')" type="number" min="0" @change="scheduleLoad()" /></div>
+            <div class="range-field"><span>{{ t('rangePricePerSqm') }}</span><u-input v-model.number="pricePerSqmMin" :label="t('rangeFrom')" type="number" inputmode="numeric" min="0" @change="scheduleLoad()" /><span>—</span><u-input v-model.number="pricePerSqmMax" :label="t('rangeTo')" type="number" inputmode="numeric" min="0" @change="scheduleLoad()" /></div>
           </div>
-          <div class="filter-group"><h3><u-icon name="i-lucide-building-2" /> {{ locale.startsWith('ru') ? 'Дом' : 'Building' }}</h3>
-            <div class="range-field"><span>{{ rangeLabel("floor") }}</span><u-input v-model.number="floorMin" :label="rangeFrom" type="number" min="0" @change="scheduleLoad()" /><span>—</span><u-input v-model.number="floorMax" :label="rangeTo" type="number" min="0" @change="scheduleLoad()" /></div>
-            <div class="range-field"><span>{{ rangeLabel("totalFloors") }}</span><u-input v-model.number="totalFloorsMin" :label="rangeFrom" type="number" min="1" @change="scheduleLoad()" /><span>—</span><u-input v-model.number="totalFloorsMax" :label="rangeTo" type="number" min="1" @change="scheduleLoad()" /></div>
-            <div class="range-field"><span>{{ rangeLabel("year") }}</span><u-input v-model.number="yearMin" :label="rangeFrom" type="number" min="1800" :max="new Date().getFullYear() + 2" @change="scheduleLoad()" /><span>—</span><u-input v-model.number="yearMax" :label="rangeTo" type="number" min="1800" :max="new Date().getFullYear() + 2" @change="scheduleLoad()" /></div>
+          <div class="filter-group"><h3><u-icon name="i-lucide-building-2" /> {{ t('groupBuilding') }}</h3>
+            <div class="range-field"><span>{{ t('rangeFloor') }}</span><u-input v-model.number="floorMin" :label="t('rangeFrom')" type="number" min="0" @change="scheduleLoad()" /><span>—</span><u-input v-model.number="floorMax" :label="t('rangeTo')" type="number" min="0" @change="scheduleLoad()" /></div>
+            <div class="range-field"><span>{{ t('rangeTotalFloors') }}</span><u-input v-model.number="totalFloorsMin" :label="t('rangeFrom')" type="number" min="1" @change="scheduleLoad()" /><span>—</span><u-input v-model.number="totalFloorsMax" :label="t('rangeTo')" type="number" min="1" @change="scheduleLoad()" /></div>
+            <div class="range-field"><span>{{ t('rangeYear') }}</span><u-input v-model.number="yearMin" :label="t('rangeFrom')" type="number" min="1800" :max="new Date().getFullYear() + 2" @change="scheduleLoad()" /><span>—</span><u-input v-model.number="yearMax" :label="t('rangeTo')" type="number" min="1800" :max="new Date().getFullYear() + 2" @change="scheduleLoad()" /></div>
           </div>
-          <div class="filter-group"><h3><u-icon name="i-lucide-megaphone" /> {{ locale.startsWith('ru') ? 'Объявление' : 'Listing' }}</h3>
-            <label class="flats__field"><span class="flats__field-label">{{ filterLabel("audience") }}</span><u-select-menu v-model="audienceSel" :items="audienceItems" value-key="value" label-key="label" :search-input="false" class="flats__select" @update:model-value="scheduleLoad()" /></label>
+          <div class="filter-group"><h3><u-icon name="i-lucide-megaphone" /> {{ t('groupListing') }}</h3>
+            <label class="flats__field"><span class="flats__field-label">{{ t('audience') }}</span><u-select-menu v-model="audienceSel" :items="audienceItems" value-key="value" label-key="label" :search-input="false" class="flats__select" @update:model-value="scheduleLoad()" /></label>
             <label class="flats__field"><span class="flats__field-label">{{ t("propertyType") }}</span><u-select-menu v-model="propertyTypeSel" :items="propertyTypeItems" value-key="value" label-key="label" :search-input="false" class="flats__select" @update:model-value="scheduleLoad()" /></label>
-            <div class="flats__field"><u-input v-model.number="maxAgeDays" type="number" min="1" max="21" :label="filterLabel('freshDays')" @change="scheduleLoad()" /></div>
+            <div class="flats__field"><u-input v-model.number="maxAgeDays" type="number" min="1" max="21" :label="t('freshDays')" @change="scheduleLoad()" /></div>
           </div>
         </div>
       </section>
@@ -816,7 +805,7 @@ onBeforeUnmount(() => { modalOpen.value = false; lightboxIndex.value = null; rel
 
     <u-modal v-model:open="presetModalOpen" :title="t('savePreset')"><template #body><u-input v-model="presetName" autofocus :label="t('presetName')" @keyup.enter="savePreset" /></template><template #footer><u-button color="neutral" variant="ghost" @click="presetModalOpen = false">{{ t("cancel") }}</u-button><u-button @click="savePreset">{{ t("save") }}</u-button></template></u-modal>
     <u-modal v-model:open="shareModalOpen" :title="sharedLinkOpened ? t('sharedSearchApplied') : t('shareSearch')"><template #body><p class="flat-share__hint">{{ sharedLinkOpened ? t("sharedSearchHint") : t("shareSearchHint") }}</p><u-input :model-value="shareUrl" readonly /></template><template #footer><u-button icon="i-lucide-copy" @click="copyShareLink">{{ t("copyLink") }}</u-button></template></u-modal>
-    <button v-if="showBackToTop" type="button" class="flats__back-top" :aria-label="filterLabel('backToTop')" @click="scrollToFilters"><u-icon name="i-lucide-arrow-up" /><span>{{ filterLabel("backToTop") }}</span></button>
+    <button v-if="showBackToTop" type="button" class="flats__back-top" :aria-label="t('backToTop')" @click="scrollToFilters"><u-icon name="i-lucide-arrow-up" /><span>{{ t('backToTop') }}</span></button>
     <u-modal v-model:open="listingShareModalOpen" :title="t('shareListing')"><template #body><p class="flat-share__hint">{{ t("shareListingHint") }}</p><u-input :model-value="listingShareUrl" readonly /></template><template #footer><u-button :icon="listingShareCopied ? 'i-lucide-check' : 'i-lucide-copy'" @click="copyListingShareLink">{{ listingShareCopied ? t("shareCopied") : t("copyLink") }}</u-button></template></u-modal>
   </u-container>
 </template>
