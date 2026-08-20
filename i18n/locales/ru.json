@@ -1927,5 +1927,277 @@
       }
     },
     "title": "Сервисы"
+  },
+  "home": {
+    "nav": {
+      "skills": "Что я умею",
+      "experience": "Опыт",
+      "petProjects": "Pet-проекты и не только",
+      "tools": "Инструменты",
+      "cv": "Резюме",
+      "aboutMe": "Подробнее обо мне",
+      "contact": "Связаться",
+      "dropdown": {
+        "petTitle": "Pet-проекты",
+        "pet": [
+          {
+            "label": "Каталог инструментов",
+            "sub": "Vue.js / Nuxt.js сервисы",
+            "href": "/services"
+          },
+          {
+            "label": "i18n Properties Manager",
+            "sub": "Electron.js · работа с Freemarker",
+            "href": "https://github.com/AmoneMisa/i18nPropertiesManager"
+          },
+          {
+            "label": "Менеджер персонажей",
+            "sub": "Lost Ark · Electron.js",
+            "href": "#pet-projects"
+          },
+          {
+            "label": "Все проекты",
+            "sub": "полный список с описаниями",
+            "href": "/projects"
+          }
+        ],
+        "pagesTitle": "Полезные страницы",
+        "pages": [
+          {
+            "label": "Подбор страны",
+            "sub": "квиз: куда переехать",
+            "href": "/quizzes/country-fit"
+          },
+          {
+            "label": "Поиск вакансий",
+            "sub": "подборка под ваш стек",
+            "href": "/jobs"
+          },
+          {
+            "label": "Кандидаты",
+            "sub": "резюме в поиске работы",
+            "href": "/hiring"
+          },
+          {
+            "label": "Поиск жилья",
+            "sub": "аренда и продажа на карте",
+            "href": "/flat-finder"
+          },
+          {
+            "label": "Все сервисы",
+            "sub": "PDF, JSON, Docker-поиск и др.",
+            "href": "/services"
+          }
+        ]
+      }
+    },
+    "fastnav": [
+      "Обо мне",
+      "Что я умею",
+      "Мой опыт",
+      "Pet-проекты",
+      "Инструменты",
+      "Контакты"
+    ],
+    "hero": {
+      "eyebrow": "профиль",
+      "h1before": "Frontend-разработчик, который доводит фичу до ",
+      "h1accent": "релиза",
+      "lead": "Маргарита Кубай, frontend-разработчик с 6+ годами коммерческого опыта в e-commerce и маркетплейсах. Работаю в основном с Vue.js и Nuxt.js, поддерживаю production-код, беру на себя легаси-проекты, интегрирую фронтенд с бэкенд-системами и закрываю задачи по доставке фичи, когда это нужно.",
+      "ctaPrimary": "Связаться",
+      "ctaText": "Что я умею",
+      "stats": [
+        {
+          "value": "%years%+ лет",
+          "label": "коммерческой разработки"
+        },
+        {
+          "value": "E-commerce и маркетплейсы",
+          "label": "production-опыт"
+        },
+        {
+          "value": "Vue.js · Nuxt.js · TypeScript",
+          "label": "основной стек"
+        }
+      ],
+      "portraitCaption": "глажу котов между спринтами"
+    },
+    "skillsSection": {
+      "eyebrow": "с чем работаю",
+      "title": "Что я умею",
+      "subtitle": "Фронтенд — моя основа. Беру и то, что вокруг, когда этого требует задача.",
+      "ctaLead": "Нужен человек, который подхватит существующий фронтенд и продвинет задачу?",
+      "ctaText": "Расскажите о проекте",
+      "cards": [
+        {
+          "title": "Продуктовый фронтенд",
+          "items": [
+            "Разрабатываю и поддерживаю production-интерфейсы e-commerce и маркетплейсов",
+            "Работаю с Vue.js, Nuxt.js, JavaScript и TypeScript",
+            "Использую Vuex / Pinia, Vuetify, Nuxt UI и Tailwind",
+            "Работаю с шаблонизаторами: Freemarker, Liquid, Velocity и Nunjucks"
+          ]
+        },
+        {
+          "title": "Production и легаси",
+          "items": [
+            "Разбираю регрессии и баги в проде в существующих кодовых базах",
+            "Беру легаси-код, не превращая каждую задачу в переписывание с нуля",
+            "Работаю над каталогом, карточками товара и адаптивным поведением UI",
+            "Поддерживаю фронтенд, который уже работает в проде"
+          ]
+        },
+        {
+          "title": "Бэкенд и доставка",
+          "items": [
+            "Пишу REST API и cron-джобы на Node.js и FastAPI",
+            "Работаю с PostgreSQL, MongoDB и Redis",
+            "Настраиваю и поддерживаю CI/CD-пайплайны в GitLab",
+            "Работаю с Docker и участвую в релизах и деплоях"
+          ]
+        },
+        {
+          "title": "Техническая коммуникация",
+          "items": [
+            "Работаю напрямую с бэкенд-разработчиками, QA, дизайнерами и менеджерами",
+            "Подключаюсь к клиентским звонкам, когда нужен фронтенд- или технический контекст",
+            "Объясняю ограничения реализации и технические компромиссы без прятанья за жаргоном"
+          ]
+        },
+        {
+          "title": "Языки",
+          "items": [
+            "Русский — родной",
+            "Украинский — родной",
+            "Английский — B2",
+            "Турецкий — A1"
+          ]
+        }
+      ]
+    },
+    "experienceSection": {
+      "eyebrow": "опыт",
+      "title": "Коммерческий опыт",
+      "subtitle": "",
+      "items": [
+        {
+          "period": "2021 — сейчас",
+          "title": "Frontend Developer, BPC",
+          "meta": "Remote · Vue.js, Freemarker",
+          "description": "Разработка и поддержка production-фронтенда маркетплейса. Работаю с Vue.js, Freemarker и Velocity, делаю и поддерживаю адаптивные интерфейсы и production email-шаблоны, реализую бизнес-изменения, разбираю регрессии и тесно работаю с бэкенд-разработчиками, QA и дизайном. Также работаю с Docker, CI/CD и релизами наравне с фронтенд-разработкой.",
+          "tags": [
+            "Vue.js",
+            "Freemarker",
+            "Velocity",
+            "Email-шаблоны",
+            "Docker",
+            "CI/CD"
+          ]
+        },
+        {
+          "period": "2020 — 2021",
+          "title": "Junior Frontend Developer, ITSUA",
+          "meta": "Харьков · Vue.js, Shopify, Liquid",
+          "description": "Работала над e-commerce проектами на Shopify: разработка приложения на Vue.js, кастомизация тем на Liquid, интеграции и поддержка существующего функционала витрины.",
+          "tags": [
+            "Vue.js",
+            "Shopify",
+            "Liquid"
+          ]
+        }
+      ]
+    },
+    "petSection": {
+      "eyebrow": "вне работы",
+      "title": "Pet-проекты",
+      "subtitle": "Использую сайд-проекты, чтобы работать с технологиями и продуктовыми идеями, которые не всегда попадают в повседневную фронтенд-работу.",
+      "allLabel": "Все проекты",
+      "items": [
+        {
+          "kind": "Web · Vue.js / Nuxt.js",
+          "title": "Каталог инструментов",
+          "span2": true,
+          "description": "Небольшие веб-утилиты: PDF-редактор, слияние JSON, поиск в DockerHub и другие инструменты.",
+          "linkLabel": "Все сервисы",
+          "href": "/services"
+        },
+        {
+          "kind": "Desktop · Electron.js + Vite",
+          "title": "i18n Properties Manager",
+          "description": "Десктоп-инструмент для работы с файлами локализации, включая процессы с Freemarker .ftlh.",
+          "linkLabel": "GitHub",
+          "href": "https://github.com/AmoneMisa/i18nPropertiesManager"
+        },
+        {
+          "kind": "Desktop · Electron.js + Vue.js",
+          "title": "Менеджер персонажей Lost Ark",
+          "description": "Подтягивает данные персонажей из веба и отслеживает повторяющиеся игровые активности с автосбросом.",
+          "linkLabel": "Подробнее",
+          "href": null
+        },
+        {
+          "kind": "Mobile · React Native + TypeScript",
+          "title": "MediKit",
+          "description": "Общий трекер домашней аптечки: сроки годности, остатки лекарств и доступ для семьи.",
+          "linkLabel": "GitHub",
+          "href": "https://github.com/AmoneMisa/MediKit"
+        },
+        {
+          "kind": "Mobile · React Native + TypeScript",
+          "title": "Fun Things Tracker",
+          "description": "Личный трекер книг, манги, фильмов, сериалов, мест и всего, что хочется найти или запомнить.",
+          "linkLabel": "GitHub",
+          "href": "https://github.com/AmoneMisa/FunThingsTracker"
+        },
+        {
+          "kind": "Telegram-бот · Node.js",
+          "title": "Genshin Impact bot",
+          "description": "Групповой бот с мини-играми, системой опыта, лута, снаряжения и админ-инструментами.",
+          "linkLabel": "GitHub",
+          "href": "https://github.com/AmoneMisa/Genshin-Impact-tg-bot"
+        },
+        {
+          "kind": "Android · Kotlin",
+          "title": "Rustic Price Converter",
+          "description": "Нативное Android-приложение для конвертации валют и быстрого сравнения цен.",
+          "linkLabel": "GitHub",
+          "href": "https://github.com/AmoneMisa/RusticPriceConvertor"
+        }
+      ]
+    },
+    "toolsSection": {
+      "eyebrow": "повседневный стек",
+      "title": "Чем пользуюсь регулярно"
+    },
+    "closingCta": {
+      "text": "Нужно больше, чем ещё один компонент? Я работаю с существующими продуктами, легаси-кодом, интеграциями и production-релизами — в основном вокруг Vue.js и Nuxt.js. Если это похоже на вашу задачу — расскажите о ней.",
+      "contactLabel": "Связаться",
+      "cvLabel": "Смотреть CV"
+    },
+    "footer": {
+      "tag": "Frontend-разработчик. Собираю production-интерфейсы и довожу фичи до релиза.",
+      "navTitle": "Навигация",
+      "navLinks": [
+        {
+          "label": "Резюме",
+          "href": "/cv"
+        },
+        {
+          "label": "Обо мне",
+          "href": "/about"
+        },
+        {
+          "label": "Опыт",
+          "href": "#experience"
+        },
+        {
+          "label": "Проекты",
+          "href": "/projects"
+        }
+      ],
+      "contactsTitle": "Контакты",
+      "copyright": "Kubai Marharyta. Front-end Developer. 2026 ©",
+      "motto": "Selachii nunquam dormiunt"
+    }
   }
 }

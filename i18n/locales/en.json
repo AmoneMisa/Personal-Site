@@ -1649,5 +1649,277 @@
       }
     },
     "title": "Services"
+  },
+  "home": {
+    "nav": {
+      "skills": "What I do",
+      "experience": "Experience",
+      "petProjects": "Pet projects & more",
+      "tools": "Tools",
+      "cv": "CV",
+      "aboutMe": "More about me",
+      "contact": "Contact",
+      "dropdown": {
+        "petTitle": "Pet projects",
+        "pet": [
+          {
+            "label": "Tools catalog",
+            "sub": "Vue.js / Nuxt.js services",
+            "href": "/services"
+          },
+          {
+            "label": "i18n Properties Manager",
+            "sub": "Electron.js · Freemarker files",
+            "href": "https://github.com/AmoneMisa/i18nPropertiesManager"
+          },
+          {
+            "label": "Character manager",
+            "sub": "Lost Ark · Electron.js",
+            "href": "#pet-projects"
+          },
+          {
+            "label": "All projects",
+            "sub": "full list with descriptions",
+            "href": "/projects"
+          }
+        ],
+        "pagesTitle": "Useful pages",
+        "pages": [
+          {
+            "label": "Country fit",
+            "sub": "quiz: where to relocate",
+            "href": "/quizzes/country-fit"
+          },
+          {
+            "label": "Job finder",
+            "sub": "picks for your stack",
+            "href": "/jobs"
+          },
+          {
+            "label": "Hiring board",
+            "sub": "candidate CVs",
+            "href": "/hiring"
+          },
+          {
+            "label": "Flat finder",
+            "sub": "rentals & sales on a map",
+            "href": "/flat-finder"
+          },
+          {
+            "label": "All services",
+            "sub": "PDF, JSON, Docker search & more",
+            "href": "/services"
+          }
+        ]
+      }
+    },
+    "fastnav": [
+      "About me",
+      "What I do",
+      "My experience",
+      "Pet projects",
+      "Tools",
+      "Contact"
+    ],
+    "hero": {
+      "eyebrow": "profile",
+      "h1before": "Frontend developer who can take a feature all the way to ",
+      "h1accent": "release",
+      "lead": "I'm Marharyta Kubai, a frontend developer with 6+ years of commercial experience in e-commerce and marketplaces. I work mainly with Vue.js and Nuxt.js, maintain production code, take over legacy projects, integrate frontend with backend systems, and handle the delivery work around a feature when needed.",
+      "ctaPrimary": "Get in touch",
+      "ctaText": "See what I do",
+      "stats": [
+        {
+          "value": "%years%+ years",
+          "label": "commercial development"
+        },
+        {
+          "value": "E-commerce & marketplaces",
+          "label": "production experience"
+        },
+        {
+          "value": "Vue.js · Nuxt.js · TypeScript",
+          "label": "core stack"
+        }
+      ],
+      "portraitCaption": "petting cats between sprints"
+    },
+    "skillsSection": {
+      "eyebrow": "what I work with",
+      "title": "What I do",
+      "subtitle": "Frontend is my core. I handle the parts around it when the task needs it.",
+      "ctaLead": "Need someone who can pick up an existing frontend and move the task forward?",
+      "ctaText": "Tell me about the project",
+      "cards": [
+        {
+          "title": "Product frontend",
+          "items": [
+            "Build and maintain production e-commerce and marketplace interfaces",
+            "Work with Vue.js, Nuxt.js, JavaScript and TypeScript",
+            "Use Vuex / Pinia, Vuetify, Nuxt UI and Tailwind",
+            "Work with template-driven frontends: Freemarker, Liquid, Velocity and Nunjucks"
+          ]
+        },
+        {
+          "title": "Production & legacy",
+          "items": [
+            "Investigate regressions and production bugs in existing codebases",
+            "Take over legacy code without turning every task into a rewrite",
+            "Work on catalogue, product-card and responsive UI behaviour",
+            "Maintain frontend that is already used in production"
+          ]
+        },
+        {
+          "title": "Backend & delivery",
+          "items": [
+            "Build REST APIs and scheduled jobs with Node.js and FastAPI",
+            "Work with PostgreSQL, MongoDB and Redis",
+            "Set up and maintain GitLab CI/CD pipelines",
+            "Work with Docker and participate in releases and deploys"
+          ]
+        },
+        {
+          "title": "Technical communication",
+          "items": [
+            "Work directly with backend developers, QA, designers and managers",
+            "Join client calls when frontend or technical context is needed",
+            "Explain implementation constraints and technical trade-offs without hiding behind jargon"
+          ]
+        },
+        {
+          "title": "Languages",
+          "items": [
+            "Russian — native",
+            "Ukrainian — native",
+            "English — B2",
+            "Turkish — A1"
+          ]
+        }
+      ]
+    },
+    "experienceSection": {
+      "eyebrow": "experience",
+      "title": "Commercial experience",
+      "subtitle": "",
+      "items": [
+        {
+          "period": "2021 — present",
+          "title": "Frontend Developer, BPC",
+          "meta": "Remote · Vue.js, Freemarker",
+          "description": "Development and support of a production marketplace frontend. I work with Vue.js, Freemarker and Velocity, build and maintain responsive interfaces and production email templates, implement business changes, investigate regressions and work closely with backend developers, QA and design. I also work with Docker, CI/CD and releases alongside frontend development.",
+          "tags": [
+            "Vue.js",
+            "Freemarker",
+            "Velocity",
+            "Email templates",
+            "Docker",
+            "CI/CD"
+          ]
+        },
+        {
+          "period": "2020 — 2021",
+          "title": "Junior Frontend Developer, ITSUA",
+          "meta": "Kharkiv · Vue.js, Shopify, Liquid",
+          "description": "Worked on Shopify e-commerce projects: Vue.js application development, Liquid theme customisation, integrations and support of existing storefront functionality.",
+          "tags": [
+            "Vue.js",
+            "Shopify",
+            "Liquid"
+          ]
+        }
+      ]
+    },
+    "petSection": {
+      "eyebrow": "things I build outside work",
+      "title": "Pet projects",
+      "subtitle": "I use side projects to work with technologies and product ideas that don't always fit into my day-to-day frontend work.",
+      "allLabel": "All projects",
+      "items": [
+        {
+          "kind": "Web · Vue.js / Nuxt.js",
+          "title": "Tools catalog",
+          "span2": true,
+          "description": "Small web utilities including a PDF editor, JSON merge, DockerHub search and other tools.",
+          "linkLabel": "All services",
+          "href": "/services"
+        },
+        {
+          "kind": "Desktop · Electron.js + Vite",
+          "title": "i18n Properties Manager",
+          "description": "A desktop tool for working with localisation files, including Freemarker .ftlh workflows.",
+          "linkLabel": "GitHub",
+          "href": "https://github.com/AmoneMisa/i18nPropertiesManager"
+        },
+        {
+          "kind": "Desktop · Electron.js + Vue.js",
+          "title": "Lost Ark Character Manager",
+          "description": "Pulls character data from the web and keeps track of recurring in-game activities with automatic resets.",
+          "linkLabel": "Details",
+          "href": null
+        },
+        {
+          "kind": "Mobile · React Native + TypeScript",
+          "title": "MediKit",
+          "description": "A shared home medicine-cabinet tracker for expiry dates, remaining stock and family access.",
+          "linkLabel": "GitHub",
+          "href": "https://github.com/AmoneMisa/MediKit"
+        },
+        {
+          "kind": "Mobile · React Native + TypeScript",
+          "title": "Fun Things Tracker",
+          "description": "A personal tracker for books, manga, films, series, places and other things you want to discover or remember.",
+          "linkLabel": "GitHub",
+          "href": "https://github.com/AmoneMisa/FunThingsTracker"
+        },
+        {
+          "kind": "Telegram bot · Node.js",
+          "title": "Genshin Impact Bot",
+          "description": "A group bot with mini-games, XP, loot, equipment and administration tools.",
+          "linkLabel": "GitHub",
+          "href": "https://github.com/AmoneMisa/Genshin-Impact-tg-bot"
+        },
+        {
+          "kind": "Android · Kotlin",
+          "title": "Rustic Price Converter",
+          "description": "A native Android app for currency conversion and quick price comparison.",
+          "linkLabel": "GitHub",
+          "href": "https://github.com/AmoneMisa/RusticPriceConvertor"
+        }
+      ]
+    },
+    "toolsSection": {
+      "eyebrow": "day-to-day stack",
+      "title": "Tools I use regularly"
+    },
+    "closingCta": {
+      "text": "Have a frontend problem that needs more than another component? I work with existing products, legacy code, integrations and production releases — mostly around Vue.js and Nuxt.js. If that sounds close to what you're working on, tell me about the task.",
+      "contactLabel": "Contact me",
+      "cvLabel": "View CV"
+    },
+    "footer": {
+      "tag": "Frontend developer. I build production interfaces and take features through to release.",
+      "navTitle": "Navigation",
+      "navLinks": [
+        {
+          "label": "CV",
+          "href": "/cv"
+        },
+        {
+          "label": "About",
+          "href": "/about"
+        },
+        {
+          "label": "Experience",
+          "href": "#experience"
+        },
+        {
+          "label": "Projects",
+          "href": "/projects"
+        }
+      ],
+      "contactsTitle": "Contacts",
+      "copyright": "Kubai Marharyta. Front-end Developer. 2026 ©",
+      "motto": "Selachii nunquam dormiunt"
+    }
   }
 }

@@ -8,7 +8,7 @@ const hero = computed(() => content.value.hero);
 const { years } = useExperienceYears();
 const heroStats = computed(() =>
   hero.value.stats.map((s) => ({
-    value: s.value.replace("{years}", String(years.value)),
+    value: s.value.replace("%years%", String(years.value)),
     label: s.label,
   }))
 );
