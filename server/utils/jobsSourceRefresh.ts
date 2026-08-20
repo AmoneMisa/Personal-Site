@@ -3,6 +3,7 @@ import { ALL_SOURCES, type Job, type JobSource } from './jobTypes'
 import { enrichJob } from './enrich'
 import { syncJobsSearchIndex } from './jobsElastic'
 import { fetchExtraTelegramJobs } from './extraTelegramJobSources'
+import { fetchLinkedInJobs } from './linkedinSource'
 import {
   fetchAdzuna,
   fetchArbeitnow,
@@ -54,6 +55,7 @@ const FETCHERS: Record<JobSource, (q: string) => Promise<Job[]>> = {
   ishgo: fetchIshGo,
   itjobsuz: fetchItJobsUz,
   telegram: fetchAllTelegram,
+  linkedin: fetchLinkedInJobs,
   olx: fetchOlx,
 }
 
@@ -81,6 +83,8 @@ function isConfigured(source: JobSource): boolean {
       return process.env.ITJOBS_UZ_SOURCE !== 'off'
     case 'telegram':
       return process.env.TELEGRAM_SOURCE !== 'off'
+    case 'linkedin':
+      return process.env.LINKEDIN_SOURCE !== 'off'
     case 'olx':
       return process.env.OLX_SOURCE === 'on'
     default:
