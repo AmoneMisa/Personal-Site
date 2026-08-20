@@ -7,16 +7,55 @@ import {
   isHiringSourceConfigured,
   isLikelyCvPost,
 } from './hiringSources'
-import { HIRING_SOURCES, type CvProfile, type HiringSource } from './hiringTypes'
+import { normalizeCandidate } from './hiringNormalize'
+import { HIRING_SOURCES, type CandidateEmploymentType, type CvProfile, type HiringSource } from './hiringTypes'
+import {
+  aiFingerprint,
+  aiWorkerEnabled,
+  scheduleAiExtraction,
+  type AiExtractionResult,
+} from './aiWorker'
 
-const STORE_KEY = 'hiring:store:v3'
+const STORE_KEY = 'hiring:store:v4'
 const STORE_TTL_SECONDS = 100 * 86_400
 const MEMORY_TTL_MS = 5 * 60_000
 const MAX_AGE_MONTHS = 3
 const STALE_DAYS = 14
 const SOURCE_TIMEOUT_MS = 120_000
+const AI_MIN_CONFIDENCE = 0.65
 
-type StoredProfile = CvProfile & { lastSeen: string }
+type CandidateAiData = {
+  name?: string | null
+  professions?: string[]
+  previousProfessions?: string[]
+  skills?: string[]
+  features?: string[]
+  age?: number | null
+  isAdult?: boolean | null
+  salaryMin?: number | null
+  salaryMax?: number | null
+  currency?: string | null
+  country?: string | null
+  city?: string | null
+  district?: string | null
+  remote?: boolean | null
+  relocationReady?: boolean | null
+  employmentTypes?: CandidateEmploymentType[]
+  experienceYears?: number | null
+  education?: string | null
+  languages?: string[]
+  contacts?: { telegram?: string | null; email?: string | null; phone?: string | null }
+}
+
+type StoredAi = {
+  fingerprint: string
+  status: 'pending' | 'completed' | 'low_confidence' | 'failed'
+  confidence?: number
+  data?: CandidateAiData
+  updatedAt: string
+}
+
+type StoredProfile = CvProfile & { lastSeen: string; ai?: StoredAi }
 
 let memoryStore: StoredProfile[] = []
 let memoryValidUntil = 0
@@ -32,7 +71,149 @@ function isVisible(profile: StoredProfile): boolean {
 }
 
 function publicProfiles(list: StoredProfile[]): CvProfile[] {
-  return list.filter(isVisible).map(({ lastSeen: _lastSeen, ...profile }) => profile)
+  return list.filter(isVisible).map(({ lastSeen: _lastSeen, ai: _ai, ...profile }) => profile)
+}
+
+function candidateAiInput(profile: CvProfile) {
+  const normalized = normalizeCandidate(profile)
+  const rawText = normalized.originalText || normalized.description || ''
+  const knownFacts: Record<string, unknown> = {
+    name: normalized.name || null,
+    professions: normalized.professions || [],
+    previousProfessions: normalized.previousProfessions || [],
+    skills: normalized.skills || [],
+    features: normalized.features || [],
+    age: normalized.age ?? null,
+    isAdult: normalized.age == null ? null : normalized.isAdult ?? null,
+    salaryMin: normalized.salaryMin ?? null,
+    salaryMax: normalized.salaryMax ?? null,
+    currency: normalized.currency ?? null,
+    country: normalized.country || null,
+    city: normalized.city ?? null,
+    district: normalized.district ?? null,
+    remote: normalized.remote ?? null,
+    relocationReady: normalized.relocationReady ?? null,
+    employmentTypes: normalized.employmentTypes || [],
+    experienceYears: normalized.experienceYears ?? null,
+    education: normalized.education ?? null,
+    languages: normalized.languages || [],
+    contacts: normalized.contacts || {},
+  }
+  return {
+    rawText,
+    knownFacts,
+    fingerprint: aiFingerprint('candidate', rawText, knownFacts),
+  }
+}
+
+function uniqueStrings(...lists: Array<string[] | undefined>): string[] {
+  return [...new Set(lists.flatMap((items) => items || []).map((item) => item.trim()).filter(Boolean))]
+}
+
+function mergeCandidateAi(profile: CvProfile, data: CandidateAiData): CvProfile {
+  const merged: CvProfile = { ...profile }
+
+  if (!merged.name && data.name?.trim()) merged.name = data.name.trim()
+  merged.professions = uniqueStrings(merged.professions, data.professions)
+  if (!merged.role && merged.professions.length) merged.role = merged.professions[0]!
+  merged.previousProfessions = uniqueStrings(merged.previousProfessions, data.previousProfessions)
+  merged.skills = uniqueStrings(merged.skills, data.skills)
+  merged.features = uniqueStrings(merged.features, data.features)
+  merged.languages = uniqueStrings(merged.languages, data.languages)
+  merged.employmentTypes = [...new Set([...(merged.employmentTypes || []), ...(data.employmentTypes || [])])]
+
+  if (merged.age == null && data.age != null) merged.age = data.age
+  merged.isAdult = merged.age == null ? true : merged.age >= 18
+  if (merged.experienceYears == null && data.experienceYears != null) merged.experienceYears = data.experienceYears
+  if (merged.salaryMin == null && data.salaryMin != null) merged.salaryMin = data.salaryMin
+  if (merged.salaryMax == null && data.salaryMax != null) merged.salaryMax = data.salaryMax
+  if (!merged.currency && data.currency) merged.currency = data.currency.toUpperCase()
+  if (!merged.city && data.city?.trim()) merged.city = data.city.trim()
+  if (!merged.district && data.district?.trim()) merged.district = data.district.trim()
+  if (merged.remote == null && data.remote != null) merged.remote = data.remote
+  if (merged.relocationReady == null && data.relocationReady != null) merged.relocationReady = data.relocationReady
+  if (!merged.education && data.education?.trim()) merged.education = data.education.trim()
+
+  const contacts = { ...(merged.contacts || {}) }
+  if (!contacts.telegram && data.contacts?.telegram) contacts.telegram = data.contacts.telegram
+  if (!contacts.email && data.contacts?.email) contacts.email = data.contacts.email
+  if (!contacts.phone && data.contacts?.phone) contacts.phone = data.contacts.phone
+  merged.contacts = contacts
+  merged.contact = merged.contact || contacts.telegram || contacts.email || contacts.phone || null
+
+  return normalizeCandidate(merged)
+}
+
+async function persistStore(list: StoredProfile[]) {
+  memoryStore = list
+  memoryValidUntil = Date.now() + MEMORY_TTL_MS
+  try {
+    await useRedis().set(STORE_KEY, JSON.stringify(list), 'EX', STORE_TTL_SECONDS)
+  } catch (error) {
+    console.error('[hiring] failed to persist store:', (error as Error).message)
+  }
+}
+
+async function applyCandidateAiResult(
+  key: string,
+  fingerprint: string,
+  result: AiExtractionResult<CandidateAiData>,
+) {
+  const index = memoryStore.findIndex((profile) => dedupKey(profile) === key)
+  if (index < 0) return
+  const current = memoryStore[index]!
+  if (candidateAiInput(current).fingerprint !== fingerprint) return
+
+  const accepted = !result.lowConfidence && result.confidence >= AI_MIN_CONFIDENCE
+  memoryStore[index] = {
+    ...(accepted ? mergeCandidateAi(current, result.data) : current),
+    lastSeen: current.lastSeen,
+    ai: {
+      fingerprint,
+      status: accepted ? 'completed' : 'low_confidence',
+      confidence: result.confidence,
+      data: accepted ? result.data : undefined,
+      updatedAt: new Date().toISOString(),
+    },
+  }
+  await persistStore(memoryStore)
+}
+
+function scheduleCandidateAi(list: StoredProfile[]) {
+  if (!aiWorkerEnabled()) return
+  const batchSize = Math.max(1, Number(process.env.AI_WORKER_CANDIDATE_BATCH) || 12)
+  let scheduled = 0
+  const newestFirst = [...list].sort((a, b) => Date.parse(b.createdAt || '') - Date.parse(a.createdAt || ''))
+
+  for (const profile of newestFirst) {
+    if (scheduled >= batchSize) break
+    const input = candidateAiInput(profile)
+    if (!input.rawText.trim()) continue
+    if (profile.ai?.fingerprint === input.fingerprint && profile.ai.status !== 'pending') continue
+
+    const key = dedupKey(profile)
+    const queued = scheduleAiExtraction<CandidateAiData>({
+      id: key,
+      kind: 'candidate',
+      ...input,
+      meta: { source: profile.source, country: profile.country, id: profile.id, url: profile.url },
+      onResult: (result) => applyCandidateAiResult(key, input.fingerprint, result),
+      onFailed: async (status) => {
+        if (status !== 'failed') return
+        const current = memoryStore.find((item) => dedupKey(item) === key)
+        if (!current || candidateAiInput(current).fingerprint !== input.fingerprint) return
+        current.ai = { fingerprint: input.fingerprint, status: 'failed', updatedAt: new Date().toISOString() }
+        await persistStore(memoryStore)
+      },
+    })
+
+    if (queued) {
+      profile.ai = { fingerprint: input.fingerprint, status: 'pending', updatedAt: new Date().toISOString() }
+      scheduled += 1
+    }
+  }
+
+  if (scheduled) console.log(`[hiring:ai] queued ${scheduled} candidate profiles`)
 }
 
 async function fetchSource(source: HiringSource): Promise<CvProfile[]> {
@@ -89,23 +270,11 @@ function pruneStore(byKey: Map<string, StoredProfile>, now: number): StoredProfi
     if (!isVisible(profile)) continue
     const posted = profile.createdAt ? new Date(profile.createdAt).getTime() : Number.NaN
     const seen = new Date(profile.lastSeen).getTime()
-    // Posts without a trustworthy source timestamp are not allowed onto the
-    // board: recency is a hard product requirement, not an inferred value.
     if (Number.isNaN(posted) || posted < oldestPosted.getTime() || posted > now + 48 * 60 * 60 * 1000) continue
     if (Number.isNaN(seen) || seen < stalest) continue
     kept.push(profile)
   }
   return kept
-}
-
-async function persistStore(list: StoredProfile[]) {
-  memoryStore = list
-  memoryValidUntil = Date.now() + MEMORY_TTL_MS
-  try {
-    await useRedis().set(STORE_KEY, JSON.stringify(list), 'EX', STORE_TTL_SECONDS)
-  } catch (error) {
-    console.error('[hiring] failed to persist store:', (error as Error).message)
-  }
 }
 
 export async function refreshHiringStore(): Promise<{ fetched: number; stored: number }> {
@@ -130,7 +299,16 @@ async function performRefresh(): Promise<{ fetched: number; stored: number }> {
     try {
       const batch = await fetchSource(source)
       fetched += batch.length
-      for (const profile of batch) byKey.set(dedupKey(profile), { ...profile, lastSeen: nowIso })
+      for (const profile of batch) {
+        const key = dedupKey(profile)
+        const previous = byKey.get(key)
+        const input = candidateAiInput(profile)
+        const reusableAi = previous?.ai?.fingerprint === input.fingerprint ? previous.ai : undefined
+        const withAi = reusableAi?.status === 'completed' && reusableAi.data
+          ? mergeCandidateAi(profile, reusableAi.data)
+          : profile
+        byKey.set(key, { ...withAi, lastSeen: nowIso, ai: reusableAi })
+      }
     } catch (error) {
       console.error(`[hiring] source "${source}" failed:`, (error as Error).message)
     }
@@ -138,6 +316,7 @@ async function performRefresh(): Promise<{ fetched: number; stored: number }> {
 
   const kept = pruneStore(byKey, now)
   await persistStore(kept)
+  scheduleCandidateAi(kept)
   return { fetched, stored: kept.length }
 }
 
