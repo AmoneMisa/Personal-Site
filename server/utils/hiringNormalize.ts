@@ -98,6 +98,8 @@ const PROFESSION_RULES: ProfessionRule[] = [
   { name: 'Kindergarten Teacher', re: /\bkindergarten\s+teacher\b|воспитател|виховател|tarbiyachi/iu },
   { name: 'Nanny', re: /\bnanny\b|няня|нянечк|enaga/iu },
   { name: 'Teacher', re: /\bteacher\b|учитель|вчитель|преподавател|викладач|o(?:'|’)qituvchi/iu },
+  { name: 'Psychologist', re: /\bpsychologist\b|психолог|psixolog/iu },
+  { name: 'Speech Therapist', re: /\bspeech\s+therapist\b|логопед|logoped/iu },
 
   // IT / professional.
   { name: 'Software Developer', re: /\b(?:software\s+)?(?:developer|programmer|frontend|front-end|backend|back-end|full[- ]?stack|android|ios)\b|разработчик|розробник|программист|програміст|dasturchi/iu },
@@ -107,6 +109,8 @@ const PROFESSION_RULES: ProfessionRule[] = [
   { name: 'Analyst', re: /\banalyst\b|аналитик|аналітик/iu },
   { name: 'Engineer', re: /\bengineer\b|инженер|інженер|muhandis/iu },
   { name: 'Marketer', re: /\b(?:marketer|marketing\s+specialist|smm)\b|маркетолог|smm[-\s]?специалист/iu },
+  { name: 'Translator', re: /\b(?:translator|interpreter)\b|переводчик|перекладач|таржимон|tarjimon/iu },
+  { name: 'Lawyer', re: /\b(?:lawyer|attorney|legal\s+specialist)\b|юрист|адвокат|правник|yurist/iu },
 
   // Construction / production / warehouse.
   { name: 'Construction Worker', re: /\b(?:builder|construction\s+worker)\b|строител|будівельник|разнорабоч|різнороб|qurilish/iu },
@@ -125,6 +129,8 @@ const SPECIFIC_MANAGER_ROLES = new Set([
   'Sales Manager', 'Project Manager', 'Product Manager', 'Store Manager', 'Restaurant Manager',
   'General Manager', 'HR / Recruiter', 'Office Manager',
 ])
+const NON_TARGET_CONTEXT_RE = /(?:опыт\s+работы|досвід\s+роботи|work\s+experience|previous|раньше|ранее|прежде|работал|работала|працював|працювала|worked\s+(?:as|at)|oldin|avval|ishlagan|ishladim|tajriba|диплом|diplom|mutaxassisligim)/iu
+const TARGET_CONTEXT_RE = /(?:ищу\s+(?:работу|подработку)|шукаю\s+(?:роботу|підробіток)|желаемая\s+(?:должность|работа)|бажана\s+(?:посада|робота)|target\s+role|desired\s+(?:role|position)|looking\s+for\s+(?:a\s+)?(?:job|work)|open\s+to\s+work|menga\s+ish\s+kerak|ish\s+(?:kerak|qidiryapman|qidiraman|izlayapman)|ish\s+joyi\s+kerak|lavozim|kasb|soha|soxa)/iu
 
 function cleanRole(raw: string | undefined): string {
   return (raw || '').trim().replace(/^[#\-–—•*\s]+/, '').replace(/[.;,]+$/, '').replace(/\s{2,}/g, ' ').slice(0, 180)
@@ -153,18 +159,47 @@ function collectProfessions(source: string): string[] {
   return names
 }
 
-export function normalizeProfessions(rawRole: string | undefined, text: string): string[] {
-  // Desired-role text wins. Previous employment elsewhere in the CV must not
-  // silently become a current target profession.
-  const target = cleanRole(rawRole)
-  const targetMatches = target ? collectProfessions(target) : []
-  if (targetMatches.length) return targetMatches
+function normalizeProvidedProfessions(items: string[] | undefined): string[] {
+  const out: string[] = []
+  for (const item of items || []) {
+    const clean = cleanRole(item)
+    if (!clean) continue
+    const matches = collectProfessions(clean)
+    for (const value of (matches.length ? matches : [clean])) {
+      if (!out.includes(value)) out.push(value)
+    }
+  }
+  return out
+}
 
-  // If no structured desired role exists, only inspect the beginning of the post
-  // where job-seeker intent/headlines normally live; avoid deep work-history text.
-  const fallbackMatches = collectProfessions(text.slice(0, 900))
-  if (fallbackMatches.length) return fallbackMatches
-  return target ? [target] : []
+function targetContext(text: string): string {
+  const lines = text.split('\n').map((line) => line.trim()).filter(Boolean)
+  const picked: string[] = []
+  for (let i = 0; i < lines.length; i += 1) {
+    if (!TARGET_CONTEXT_RE.test(lines[i]!)) continue
+    for (let offset = 0; offset < 3 && i + offset < lines.length; offset += 1) {
+      const line = lines[i + offset]!
+      if (offset > 0 && NON_TARGET_CONTEXT_RE.test(line)) break
+      picked.push(line)
+    }
+  }
+  return picked.join('\n')
+}
+
+export function normalizeProfessions(rawRole: string | undefined, text: string): string[] {
+  // Desired-role text wins, except when a loose source parser handed us an
+  // explicit work-history/education line instead of a target role.
+  const target = cleanRole(rawRole)
+  if (target && !NON_TARGET_CONTEXT_RE.test(target)) {
+    const targetMatches = collectProfessions(target)
+    if (targetMatches.length) return targetMatches
+  }
+
+  // Fallback is restricted to job-seeker intent/target context. Do not scan the
+  // whole CV: "worked as cashier" must not become a current Cashier target.
+  const contextualMatches = collectProfessions(targetContext(text))
+  if (contextualMatches.length) return contextualMatches
+  return target && !NON_TARGET_CONTEXT_RE.test(target) ? [target] : []
 }
 
 export function normalizeRole(role: string | undefined, text: string): string {
@@ -176,7 +211,7 @@ function workHistoryBlock(text: string): string {
   if (explicit?.[1]) return explicit[1]
 
   return text.split('\n').filter((line) =>
-    /(?:работал[аи]?|працюва(?:в|ла)|worked\s+(?:as|at)|ishlagan|ishladim|ishlaganman)/iu.test(line),
+    /(?:работал[аи]?|працюва(?:в|ла)|worked\s+(?:as|at)|oldin|avval|ishlagan|ishladim|ishlaganman)/iu.test(line),
   ).join('\n')
 }
 
@@ -245,7 +280,12 @@ export function normalizeCandidate(profile: CvProfile): CvProfile {
   const originalText = profile.originalText || profile.description || ''
   const text = `${profile.name || ''}\n${profile.role || ''}\n${originalText}`
   const contacts = extractContacts(text)
-  const professions = normalizeProfessions(profile.role, originalText)
+  // AI-enriched/current structured professions must survive subsequent feed and
+  // Elasticsearch normalization. Only derive from free text when none exist.
+  const providedProfessions = normalizeProvidedProfessions(profile.professions)
+  const professions = providedProfessions.length
+    ? providedProfessions
+    : normalizeProfessions(profile.role, originalText)
   const age = profile.age ?? extractAge(originalText)
   const employmentTypes = profile.employmentTypes?.length
     ? profile.employmentTypes
@@ -258,7 +298,7 @@ export function normalizeCandidate(profile: CvProfile): CvProfile {
     role: professions[0] || normalizeRole(profile.role, originalText),
     professions,
     previousProfessions: profile.previousProfessions?.length
-      ? profile.previousProfessions
+      ? normalizeProvidedProfessions(profile.previousProfessions)
       : normalizePreviousProfessions(originalText),
     features: [...new Set([...(profile.features || []), ...extractCandidateFeatures(originalText)])],
     age,
