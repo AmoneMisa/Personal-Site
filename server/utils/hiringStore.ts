@@ -9,12 +9,12 @@ import {
 } from './hiringSources'
 import { HIRING_SOURCES, type CvProfile, type HiringSource } from './hiringTypes'
 
-const STORE_KEY = 'hiring:store:v2'
-const STORE_TTL_SECONDS = 15 * 86_400
+const STORE_KEY = 'hiring:store:v3'
+const STORE_TTL_SECONDS = 100 * 86_400
 const MEMORY_TTL_MS = 5 * 60_000
-const MAX_AGE_DAYS = 30
-const STALE_DAYS = 7
-const SOURCE_TIMEOUT_MS = 30_000
+const MAX_AGE_MONTHS = 3
+const STALE_DAYS = 14
+const SOURCE_TIMEOUT_MS = 120_000
 
 type StoredProfile = CvProfile & { lastSeen: string }
 
@@ -27,7 +27,7 @@ function dedupKey(profile: CvProfile): string {
 }
 
 function isVisible(profile: StoredProfile): boolean {
-  return isLikelyCvPost(`${profile.name}\n${profile.role}\n${profile.description || ''}`, true)
+  return isLikelyCvPost(`${profile.name || ''}\n${profile.role || ''}\n${profile.originalText || profile.description || ''}`, true)
 }
 
 function publicProfiles(list: StoredProfile[]): CvProfile[] {
@@ -52,9 +52,7 @@ async function fetchSource(source: HiringSource): Promise<CvProfile[]> {
 }
 
 export async function getStoredCvProfiles(): Promise<CvProfile[]> {
-  if (memoryStore.length && Date.now() < memoryValidUntil) {
-    return publicProfiles(memoryStore)
-  }
+  if (memoryStore.length && Date.now() < memoryValidUntil) return publicProfiles(memoryStore)
   try {
     const raw = await useRedis().get(STORE_KEY)
     if (!raw) return publicProfiles(memoryStore)
@@ -80,14 +78,19 @@ async function loadStored(): Promise<StoredProfile[]> {
 }
 
 function pruneStore(byKey: Map<string, StoredProfile>, now: number): StoredProfile[] {
-  const oldestPosted = now - MAX_AGE_DAYS * 86_400_000
+  const nowDate = new Date(now)
+  const oldestPosted = new Date(nowDate)
+  oldestPosted.setUTCMonth(oldestPosted.getUTCMonth() - MAX_AGE_MONTHS)
   const stalest = now - STALE_DAYS * 86_400_000
   const kept: StoredProfile[] = []
+
   for (const profile of byKey.values()) {
     if (!isVisible(profile)) continue
-    const posted = profile.createdAt ? new Date(profile.createdAt).getTime() : now
+    const posted = profile.createdAt ? new Date(profile.createdAt).getTime() : Number.NaN
     const seen = new Date(profile.lastSeen).getTime()
-    if (Number.isNaN(posted) || posted < oldestPosted) continue
+    // Posts without a trustworthy source timestamp are not allowed onto the
+    // board: recency is a hard product requirement, not an inferred value.
+    if (Number.isNaN(posted) || posted < oldestPosted.getTime() || posted > now + 48 * 60 * 60 * 1000) continue
     if (Number.isNaN(seen) || seen < stalest) continue
     kept.push(profile)
   }
@@ -125,9 +128,7 @@ async function performRefresh(): Promise<{ fetched: number; stored: number }> {
     try {
       const batch = await fetchSource(source)
       fetched += batch.length
-      for (const profile of batch) {
-        byKey.set(dedupKey(profile), { ...profile, lastSeen: nowIso })
-      }
+      for (const profile of batch) byKey.set(dedupKey(profile), { ...profile, lastSeen: nowIso })
     } catch (error) {
       console.error(`[hiring] source "${source}" failed:`, (error as Error).message)
     }
