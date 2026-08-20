@@ -2,6 +2,10 @@ import { useRedis } from '~~/server/utils/redis'
 import { ALL_SOURCES, type Job, type JobSource } from './jobTypes'
 import { enrichJob } from './enrich'
 import { syncJobsSearchIndex } from './jobsElastic'
+import { fetchExtraTelegramJobs } from './extraTelegramJobSources'
+import { fetchLinkedInJobs } from './linkedinSource'
+import { fetchExtraPublicJobs } from './extraPublicJobSources'
+import { fetchUsaVisaSponsorJobs } from './usaVisaSponsorSource'
 import {
   fetchAdzuna,
   fetchArbeitnow,
@@ -31,6 +35,40 @@ type StoredJob = Job & {
   ai?: unknown
 }
 
+async function fetchAllTelegram(q: string): Promise<Job[]> {
+  const [primary, extra] = await Promise.all([
+    fetchTelegram(q),
+    fetchExtraTelegramJobs(q),
+  ])
+  return [...primary, ...extra]
+}
+
+async function fetchAllCompanies(q: string): Promise<Job[]> {
+  const loaders = [
+    { label: 'companies', load: () => fetchCompanies(q) },
+    { label: 'linkedin', load: () => fetchLinkedInJobs(q) },
+    { label: 'public-boards', load: () => fetchExtraPublicJobs(q) },
+    { label: 'usa-visa-sponsors', load: () => fetchUsaVisaSponsorJobs(q) },
+  ]
+
+  const results = await Promise.allSettled(loaders.map(({ load }) => load()))
+  const jobs: Job[] = []
+
+  results.forEach((result, index) => {
+    if (result.status === 'fulfilled') {
+      jobs.push(...result.value)
+      return
+    }
+
+    console.warn(
+      `[jobs] ${loaders[index]!.label} sub-source failed:`,
+      result.reason instanceof Error ? result.reason.message : String(result.reason),
+    )
+  })
+
+  return jobs
+}
+
 const FETCHERS: Record<JobSource, (q: string) => Promise<Job[]>> = {
   remotive: fetchRemotive,
   remoteok: fetchRemoteOk,
@@ -40,11 +78,11 @@ const FETCHERS: Record<JobSource, (q: string) => Promise<Job[]>> = {
   adzuna: fetchAdzuna,
   jooble: fetchJooble,
   rss: fetchRss,
-  companies: fetchCompanies,
+  companies: fetchAllCompanies,
   devkg: fetchDevKg,
   ishgo: fetchIshGo,
   itjobsuz: fetchItJobsUz,
-  telegram: fetchTelegram,
+  telegram: fetchAllTelegram,
   olx: fetchOlx,
 }
 
