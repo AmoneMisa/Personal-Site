@@ -999,55 +999,49 @@ onBeforeUnmount(() => {
         </button>
       </div>
       <div v-if="showAdvanced" class="jobs__advanced">
-        <label class="jobs__field">
-          <span class="jobs__field-label">{{ t("country") }}</span>
-          <u-select-menu
+        <div class="jobs__field">
+          <u-select-menu :label="t('country')"
               v-model="countries" :items="countryItems" value-key="value" label-key="label"
               multiple :placeholder="t('countryPlaceholder')"
               class="jobs__select" @update:model-value="scheduleLoad()"
           />
-        </label>
+        </div>
         <div class="jobs__field jobs__field_wide">
           <u-input
               v-model="cities" icon="i-lucide-map-pin" :label="t('cities')" :placeholder="t('citiesPlaceholder')"
               @keyup.enter="load(1)" @change="scheduleLoad()"
           />
         </div>
-        <label class="jobs__field">
-          <span class="jobs__field-label">{{ t("currency") }}</span>
-          <u-select-menu
+        <div class="jobs__field">
+          <u-select-menu :label="t('currency')"
               v-model="displayCurrency" :items="currencyItems" value-key="value" label-key="label"
               class="jobs__select" @update:model-value="salaryMin && scheduleLoad()"
           />
-        </label>
-        <label class="jobs__field">
-          <span class="jobs__field-label">{{ t("period") }}</span>
-          <u-select-menu
+        </div>
+        <div class="jobs__field">
+          <u-select-menu :label="t('period')"
               v-model="displayPeriod" :items="periodItems" value-key="value" label-key="label"
               :search-input="false" class="jobs__select" @update:model-value="salaryMin && scheduleLoad()"
           />
-        </label>
-        <label class="jobs__field">
-          <span class="jobs__field-label">{{ t("workMode") }}</span>
-          <u-select-menu
+        </div>
+        <div class="jobs__field">
+          <u-select-menu :label="t('workMode')"
               v-model="workModeSelect" :items="workModeItems" value-key="value" label-key="label"
               :search-input="false" class="jobs__select" @update:model-value="scheduleLoad()"
           />
-        </label>
-        <label class="jobs__field">
-          <span class="jobs__field-label">{{ t("relocation") }}</span>
-          <u-select-menu
+        </div>
+        <div class="jobs__field">
+          <u-select-menu :label="t('relocation')"
               v-model="relocationSelect" :items="relocationItems" value-key="value" label-key="label"
               :search-input="false" class="jobs__select" @update:model-value="scheduleLoad()"
           />
-        </label>
-        <label class="jobs__field">
-          <span class="jobs__field-label">{{ t("employment") }}</span>
-          <u-select-menu
+        </div>
+        <div class="jobs__field">
+          <u-select-menu :label="t('employment')"
               v-model="employmentKindSelect" :items="employmentKindItems" value-key="value" label-key="label"
               :search-input="false" class="jobs__select" @update:model-value="scheduleLoad()"
           />
-        </label>
+        </div>
         <div class="jobs__field">
           <u-input
               v-model.number="maxExperience" type="number" min="0" max="40"
@@ -1055,28 +1049,25 @@ onBeforeUnmount(() => {
               @keyup.enter="load(1)" @change="scheduleLoad()"
           />
         </div>
-        <label class="jobs__field">
-          <span class="jobs__field-label">{{ t("language") }}</span>
-          <u-select-menu
+        <div class="jobs__field">
+          <u-select-menu :label="t('language')"
               v-model="languageSelect" :items="languageItems" value-key="value" label-key="label"
               class="jobs__select" @update:model-value="scheduleLoad()"
           />
-        </label>
-        <label class="jobs__field">
-          <span class="jobs__field-label">{{ t("languageLevel") }}</span>
-          <u-select-menu
+        </div>
+        <div class="jobs__field">
+          <u-select-menu :label="t('languageLevel')"
               v-model="languageLevelSelect" :items="levelItems" value-key="value" label-key="label"
               :search-input="false" :disabled="!language" class="jobs__select" @update:model-value="scheduleLoad()"
           />
-        </label>
-        <label class="jobs__field">
-          <span class="jobs__field-label">{{ t("excludeLanguage") }}</span>
-          <u-select-menu
+        </div>
+        <div class="jobs__field">
+          <u-select-menu :label="t('excludeLanguage')"
               v-model="excludeLanguages" :items="excludeLanguageItems" value-key="value" label-key="label"
               multiple :placeholder="t('excludeLangPlaceholder')"
               class="jobs__select" @update:model-value="scheduleLoad()"
           />
-        </label>
+        </div>
         <div class="jobs__field jobs__field_wide">
           <u-input v-model="skills" icon="i-lucide-wrench" :label="t('skills')" :placeholder="t('skillsPlaceholder')" @keyup.enter="load(1)" />
         </div>

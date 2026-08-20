@@ -569,29 +569,25 @@ onBeforeUnmount(() => {
             {{ t("shareSearch") }}
           </u-button>
         </div>
-        <label class="hiring__field">
-          <span class="hiring__field-label">{{ t("country") }}</span>
-          <u-select-menu v-model="countries" :items="countryItems" value-key="value" label-key="label"
+        <div class="hiring__field">
+          <u-select-menu :label="t('country')" v-model="countries" :items="countryItems" value-key="value" label-key="label"
               multiple :placeholder="t('countryAny')" class="hiring__select" @update:model-value="scheduleLoad()" />
-        </label>
-        <label class="hiring__field">
-          <span class="hiring__field-label">{{ t("city") }}</span>
-          <u-select-menu v-model="citySel" :items="cityItems" value-key="value" label-key="label"
+        </div>
+        <div class="hiring__field">
+          <u-select-menu :label="t('city')" v-model="citySel" :items="cityItems" value-key="value" label-key="label"
               class="hiring__select" @update:model-value="scheduleLoad()" />
-        </label>
-        <label class="hiring__field">
-          <span class="hiring__field-label">{{ t("remote") }}</span>
-          <u-select-menu v-model="remoteSel" :items="remoteItems" value-key="value" label-key="label"
+        </div>
+        <div class="hiring__field">
+          <u-select-menu :label="t('remote')" v-model="remoteSel" :items="remoteItems" value-key="value" label-key="label"
               :search-input="false" class="hiring__select" @update:model-value="scheduleLoad()" />
-        </label>
+        </div>
         <div class="hiring__field">
           <u-input v-model.number="experienceMin" type="number" min="0" icon="i-lucide-briefcase" :label="t('experienceMin')" @change="scheduleLoad()" />
         </div>
-        <label class="hiring__field">
-          <span class="hiring__field-label">{{ t("seniority") }}</span>
-          <u-select-menu v-model="senioritySel" :items="seniorityItems" value-key="value" label-key="label"
+        <div class="hiring__field">
+          <u-select-menu :label="t('seniority')" v-model="senioritySel" :items="seniorityItems" value-key="value" label-key="label"
               :search-input="false" class="hiring__select" @update:model-value="scheduleLoad()" />
-        </label>
+        </div>
         <div class="hiring__field">
           <u-input v-model="skills" icon="i-lucide-code" :label="t('skills')" :placeholder="t('skillsPlaceholder')" @change="scheduleLoad()" />
         </div>
