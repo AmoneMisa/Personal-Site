@@ -5,13 +5,15 @@ interface TelegramChannel {
   handle: string
   label: string
   location: string
+  countryCode: string
   tags: string[]
 }
 
 const EXTRA_TELEGRAM_JOB_CHANNELS: TelegramChannel[] = [
-  { handle: 'unilance', label: 'Unilance', location: 'Uzbekistan', tags: ['IT', 'Jobs'] },
-  { handle: 'jobmakon', label: 'Jobmakon', location: 'Uzbekistan', tags: ['IT', 'Jobs', 'Internships'] },
-  { handle: 'itjobstashkent', label: 'IT Jobs Tashkent', location: 'Tashkent, Uzbekistan', tags: ['IT', 'Jobs'] },
+  { handle: 'unilance', label: 'Unilance', location: 'Uzbekistan', countryCode: 'UZ', tags: ['IT', 'Jobs'] },
+  { handle: 'jobmakon', label: 'Jobmakon', location: 'Uzbekistan', countryCode: 'UZ', tags: ['IT', 'Jobs', 'Internships'] },
+  { handle: 'itjobstashkent', label: 'IT Jobs Tashkent', location: 'Tashkent, Uzbekistan', countryCode: 'UZ', tags: ['IT', 'Jobs'] },
+  { handle: 'WORKIN_CHERNIVTSI', label: 'Work in Chernivtsi', location: 'Chernivtsi, Ukraine', countryCode: 'UA', tags: ['Jobs', 'General'] },
 ]
 
 const UA = 'jobFinder/1.0 (job aggregator; contact: admin@whiteslove.me)'
@@ -22,6 +24,7 @@ interface TelegramWorkerMessage {
   text: string
   date: string | null
   preview?: string | null
+  urls?: string[]
 }
 
 function decodeTelegramEntities(text: string): string {
@@ -69,12 +72,59 @@ function titleFromText(text: string, channel: TelegramChannel): string {
   return line || `Vacancy from ${channel.label}`
 }
 
+function normalizeExternalUrl(raw: string): string | undefined {
+  try {
+    const url = new URL(decodeTelegramEntities(raw.trim()))
+    if (!/^https?:$/.test(url.protocol)) return undefined
+
+    const host = url.hostname.toLowerCase().replace(/^www\./, '')
+
+    if (host === 't.me' || host === 'telegram.me' || host === 'telegram.org') return undefined
+    if (host === 'ya.cc' || host.endsWith('.ya.cc') || host === 'clck.yandex.ru') return undefined
+
+    return url.toString()
+  } catch {
+    return undefined
+  }
+}
+
+function urlsFromText(text: string): string[] {
+  const matches = text.match(/https?:\/\/[^\s<>()"']+/gi) || []
+  return matches
+    .map(normalizeExternalUrl)
+    .filter((url): url is string => !!url)
+}
+
+function urlsFromHtml(html: string): string[] {
+  const urls: string[] = []
+  for (const match of html.matchAll(/\bhref=["']([^"']+)["']/gi)) {
+    const url = normalizeExternalUrl(match[1]!)
+    if (url) urls.push(url)
+  }
+  return urls
+}
+
+function pickApplyUrl(text: string, supplied: string[] = []): string | undefined {
+  const candidates = [
+    ...supplied,
+    ...urlsFromText(text),
+  ]
+    .map(normalizeExternalUrl)
+    .filter((url): url is string => !!url)
+
+  const unique = [...new Set(candidates)]
+
+  return unique.find((url) => /(?:linkedin\.com\/jobs|lnkd\.in|hh\.(?:uz|ru)\/vacancy|career|careers|jobs|vacanc|apply)/i.test(url))
+    || unique[0]
+}
+
 function toJob(
   text: string,
   channel: TelegramChannel,
   id: string,
   url: string,
   date: string | null | undefined,
+  externalUrls: string[] = [],
 ): Job | null {
   if (!isLikelyTelegramVacancy(text)) return null
 
@@ -82,6 +132,7 @@ function toJob(
   const company = field(text, 'company|employer|компания|работодатель|роботодавець|компанія|tashkilot|ish beruvchi') || channel.label
   const location = field(text, 'location|city|локация|город|місто|manzil|shahar') || channel.location
   const hashtags = [...text.matchAll(/(?:^|\s)#([\p{L}\p{N}_-]{2,40})/gu)].map((match) => match[1]!)
+  const applyUrl = pickApplyUrl(text, externalUrls)
 
   return {
     id,
@@ -89,9 +140,10 @@ function toJob(
     company,
     location,
     url,
+    ...(applyUrl ? { applyUrl } : {}),
     source: 'telegram',
     remote: /remote|удал[её]н|віддален|masofaviy|онлайн|online/i.test(`${title} ${text}`),
-    tags: [...channel.tags, 'UZ', `@${channel.handle}`, ...hashtags].slice(0, 8),
+    tags: [...channel.tags, channel.countryCode, `@${channel.handle}`, ...hashtags].slice(0, 8),
     postedAt: date && !Number.isNaN(Date.parse(date)) ? new Date(date).toISOString() : new Date().toISOString(),
     description: text.slice(0, DESC_MAX),
   }
@@ -115,6 +167,7 @@ async function fetchViaWorker(base: string, channel: TelegramChannel): Promise<J
         `telegram-${channel.handle}-${message.id}`,
         `https://t.me/${channel.handle}/${message.id}`,
         message.date,
+        message.urls || [],
       )
     })
     .filter((job): job is Job => job !== null)
@@ -143,6 +196,7 @@ async function fetchViaPreview(channel: TelegramChannel): Promise<Job[]> {
       `telegram-${post.replace(/[^a-z0-9_-]+/gi, '-')}`,
       `https://t.me/${post}`,
       datetime,
+      urlsFromHtml(chunk),
     )
     if (job) jobs.push(job)
   }
