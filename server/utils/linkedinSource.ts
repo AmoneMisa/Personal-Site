@@ -90,8 +90,6 @@ function extractJobId(card: string): string | undefined {
 function parseCards(html: string): Job[] {
   const jobs: Job[] = []
 
-  // The guest endpoint returns one <li> per public search result. Splitting by
-  // card keeps parsing independent from LinkedIn's utility-class churn.
   for (const part of html.split(/<li\b/i).slice(1)) {
     const card = `<li${part}`
     const jobId = extractJobId(card)
@@ -112,10 +110,8 @@ function parseCards(html: string): Job[] {
       title,
       company,
       location,
-      // A canonical URL is more stable than the tracking-heavy href rendered in
-      // the guest card and deduplicates the same job returned for two locations.
       url: `https://www.linkedin.com/jobs/view/${jobId}`,
-      source: 'linkedin',
+      source: 'companies',
       remote: /remote|anywhere|worldwide|удал[её]н|віддален/i.test(`${title} ${location}`),
       tags: ['LinkedIn'],
       postedAt: posted.toISOString(),
