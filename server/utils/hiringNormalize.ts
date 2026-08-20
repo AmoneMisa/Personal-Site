@@ -1,22 +1,14 @@
 // Candidate profile normalization + deduplication.
 //
 // Profiles arrive as free-form CV posts from several channels, so the same
-// person can appear with different wording, and skills are written however the
-// author felt like ("react.js", "REACT", "Реакт"). Everything the Hiring page
-// filters or ranks on has to be canonical, which is what this module produces.
-//
-// It reuses the Job Finder's skill catalogue (shared/jobSkills) on purpose:
-// candidates and vacancies must speak the same skill vocabulary, otherwise
-// matching a candidate against a vacancy compares incomparable strings.
+// person can appear with different wording, professions and skills. Everything
+// the Hiring page filters or ranks on has to be canonical here.
 
 import { canonicalSkillName, extractSkillDetails } from '~~/shared/jobSkills'
 import type { CvProfile } from './hiringTypes'
 import type { Seniority } from './jobTypes'
 
 // --- seniority -------------------------------------------------------------
-// Boundaries use \p{L} lookarounds rather than \b: JS word boundaries only know
-// ASCII, so \bтимлид never matches. Ordered — the first hit wins, so "senior"
-// beats a passing mention of "junior".
 const B = '(?<![\\p{L}\\p{N}])'
 const E = '(?![\\p{L}\\p{N}])'
 const rule = (body: string) => new RegExp(`${B}(?:${body})${E}`, 'iu')
@@ -28,9 +20,6 @@ const SENIORITY_RULES: [Seniority, RegExp][] = [
   ['junior', rule('junior|jr\\.?|джуниор\\p{L}*|джун|младший|trainee|intern(?:ship)?|стажер|стажёр|начинающий')],
 ]
 
-// Experience that clearly contradicts a "junior" mention wins: CVs routinely say
-// things like "mentoring junior developers" or "grew from junior to senior", and
-// those must not demote an experienced candidate.
 const JUNIOR_CONTRADICTION_YEARS = 4
 
 export function detectSeniority(text: string, experienceYears?: number | null): Seniority | null {
@@ -39,7 +28,6 @@ export function detectSeniority(text: string, experienceYears?: number | null): 
     if (level === 'junior' && (experienceYears ?? 0) >= JUNIOR_CONTRADICTION_YEARS) break
     return level
   }
-  // Nothing explicit (or a contradicted "junior") — derive it from experience.
   if (experienceYears == null) return null
   if (experienceYears >= 6) return 'senior'
   if (experienceYears >= 3) return 'middle'
@@ -48,15 +36,12 @@ export function detectSeniority(text: string, experienceYears?: number | null): 
 }
 
 // --- skills ----------------------------------------------------------------
-// Canonicalize whatever the author wrote, then top up from the free text so a
-// profile that never wrote a "Skills:" line still gets indexed skills.
 export function normalizeSkills(rawSkills: string[] | undefined, text: string): string[] {
   const out = new Set<string>()
   for (const raw of rawSkills || []) {
     const canonical = canonicalSkillName(raw)
     if (canonical) out.add(canonical)
     else {
-      // Keep an unrecognised skill, trimmed, rather than losing information.
       const trimmed = raw.trim().replace(/\s{2,}/g, ' ')
       if (trimmed.length >= 2 && trimmed.length <= 40) out.add(trimmed)
     }
@@ -65,22 +50,106 @@ export function normalizeSkills(rawSkills: string[] | undefined, text: string): 
   return [...out]
 }
 
-// --- role ------------------------------------------------------------------
-// Strip the decorations CV posts wrap around a job title so roles group.
-export function normalizeRole(role: string | undefined, text: string): string {
-  const raw = (role || '').trim()
-  const cleaned = raw
+// --- professions -----------------------------------------------------------
+// Canonical profession names are language-independent storage/search values.
+// Patterns cover Russian, Ukrainian, Uzbek and common English wording. A person
+// may match several rules: e.g. "бармен, кассир, тренер" is intentionally kept
+// as three professions instead of being collapsed into one headline.
+interface ProfessionRule {
+  name: string
+  re: RegExp
+}
+
+const PROFESSION_RULES: ProfessionRule[] = [
+  { name: 'Sales Manager', re: /\b(?:sales\s+manager|account\s+manager)\b|менеджер\s+(?:по\s+)?продаж|менеджер\s+з\s+продаж|sotuv\s+menejer/iu },
+  { name: 'Project Manager', re: /\bproject\s+manager\b|проектн(?:ый|ий)\s+менеджер|менеджер\s+проект|керівник\s+проєкт/iu },
+  { name: 'Product Manager', re: /\bproduct\s+manager\b|продакт\s*менеджер|менеджер\s+продукт/iu },
+  { name: 'HR / Recruiter', re: /\b(?:hr|human\s+resources|recruiter|talent\s+acquisition)\b|рекрутер|сорсер|кадровик|hr[-\s]?менеджер/iu },
+  { name: 'Office Manager', re: /\boffice\s+manager\b|офис[-\s]?менеджер|офіс[-\s]?менеджер/iu },
+  { name: 'Administrator', re: /\badministrator\b|администратор|адміністратор|administrator|adminstrator/iu },
+  { name: 'Manager', re: /\bmanager\b|менеджер|menejer/iu },
+  { name: 'Accountant', re: /\baccountant\b|бухгалтер|бухгалт|buxgalter/iu },
+  { name: 'Cashier', re: /\bcashier\b|кассир|касир|kassir/iu },
+  { name: 'Salesperson', re: /\b(?:salesperson|sales\s+assistant|shop\s+assistant|seller)\b|продавец|продавець|продавчин|sotuvchi/iu },
+  { name: 'Courier', re: /\bcourier\b|курьер|кур'єр|kuryer/iu },
+  { name: 'Driver', re: /\bdriver\b|водитель|водій|haydovchi|shafyor/iu },
+  { name: 'Security Guard', re: /\bsecurity(?:\s+guard)?\b|охранник|охоронець|охорона|qorovul/iu },
+  { name: 'Cleaner', re: /\b(?:cleaner|cleaning|housekeeper)\b|уборщик|уборщица|уборка|прибиральник|прибиральниц|домработниц|farrosh/iu },
+  { name: 'Bartender', re: /\b(?:bartender|barman)\b|бармен|barmen/iu },
+  { name: 'Barista', re: /\bbarista\b|бариста/iu },
+  { name: 'Waiter', re: /\bwaiter|waitress\b|официант|офіціант|afitsant/iu },
+  { name: 'Cook / Chef', re: /\b(?:cook|chef)\b|повар|кухар|ошпаз|oshpaz/iu },
+  { name: 'Fitness Trainer', re: /\b(?:fitness|gym|personal)\s+(?:trainer|coach)\b|тренер\s+(?:в\s+)?(?:спортзал|спортзале|залі|фитнес|фітнес)|фитнес[-\s]?тренер|фітнес[-\s]?тренер/iu },
+  { name: 'Trainer / Coach', re: /\b(?:trainer|coach)\b|тренер|коуч/iu },
+  { name: 'Doctor', re: /\bdoctor\b|врач|лікар|доктор|shifokor/iu },
+  { name: 'Nurse', re: /\bnurse\b|медсестр|медбрат|медична\s+сестр|hamshira/iu },
+  { name: 'Tutor', re: /\btutor\b|репетитор|repetitor/iu },
+  { name: 'Kindergarten Teacher', re: /\bkindergarten\s+teacher\b|воспитател|виховател|tarbiyachi/iu },
+  { name: 'Nanny', re: /\bnanny\b|няня|нянечк|enaga/iu },
+  { name: 'Teacher', re: /\bteacher\b|учитель|вчитель|преподавател|викладач|o(?:'|’)qituvchi/iu },
+  { name: 'Software Developer', re: /\b(?:software\s+)?(?:developer|programmer|frontend|front-end|backend|back-end|full[- ]?stack|android|ios)\b|разработчик|розробник|программист|програміст|dasturchi/iu },
+  { name: 'QA Engineer', re: /\b(?:qa|quality\s+assurance|tester|test\s+engineer)\b|тестировщик|тестувальник/iu },
+  { name: 'DevOps Engineer', re: /\bdevops\b/iu },
+  { name: 'Designer', re: /\b(?:designer|ui\/?ux)\b|дизайнер/iu },
+  { name: 'Analyst', re: /\banalyst\b|аналитик|аналітик/iu },
+  { name: 'Engineer', re: /\bengineer\b|инженер|інженер|muhandis/iu },
+  { name: 'Marketer', re: /\b(?:marketer|marketing\s+specialist|smm)\b|маркетолог|маркетинг|smm[-\s]?специалист/iu },
+  { name: 'Customer Support', re: /\b(?:customer\s+support|support\s+specialist|call\s*center)\b|поддержк|підтримк|колл[-\s]?центр|call[-\s]?центр/iu },
+  { name: 'Construction Worker', re: /\b(?:builder|construction\s+worker)\b|строител|будівельник|разнорабоч|різнороб|qurilish/iu },
+  { name: 'Welder', re: /\bwelder\b|сварщик|зварювальник|payvandchi/iu },
+  { name: 'Electrician', re: /\belectrician\b|электрик|електрик/iu },
+  { name: 'Plumber', re: /\bplumber\b|сантехник|сантехнік/iu },
+  { name: 'Mechanic', re: /\bmechanic\b|механик|механік/iu },
+  { name: 'Warehouse Worker', re: /\bwarehouse\b|кладовщик|комплектовщик|комірник|склад(?:ской|ський)?\s+работник/iu },
+  { name: 'Loader', re: /\bloader\b|грузчик|вантажник/iu },
+  { name: 'Seamstress', re: /\bseamstress\b|швея|швачка|tikuvchi/iu },
+  { name: 'Operator', re: /\boperator\b|оператор/iu },
+  { name: 'Student', re: /\bstudent\b|студент|talaba/iu },
+]
+
+const SPECIFIC_MANAGER_ROLES = new Set(['Sales Manager', 'Project Manager', 'Product Manager', 'HR / Recruiter', 'Office Manager'])
+
+function cleanRole(raw: string | undefined): string {
+  return (raw || '')
+    .trim()
     .replace(/^[#\-–—•*\s]+/, '')
     .replace(/[.;,]+$/, '')
     .replace(/\s{2,}/g, ' ')
     .slice(0, 120)
+}
+
+export function normalizeProfessions(rawRole: string | undefined, text: string): string[] {
+  const source = `${rawRole || ''}\n${text}`
+  const matches: Array<{ name: string; index: number }> = []
+
+  for (const profession of PROFESSION_RULES) {
+    const match = profession.re.exec(source)
+    if (match?.index != null) matches.push({ name: profession.name, index: match.index })
+  }
+
+  matches.sort((a, b) => a.index - b.index)
+  const names = [...new Set(matches.map((item) => item.name))]
+  if (names.some((name) => SPECIFIC_MANAGER_ROLES.has(name))) {
+    const genericIndex = names.indexOf('Manager')
+    if (genericIndex >= 0) names.splice(genericIndex, 1)
+  }
+
+  if (names.length) return names
+  const fallback = cleanRole(rawRole)
+  return fallback ? [fallback] : []
+}
+
+export function normalizeRole(role: string | undefined, text: string): string {
+  const professions = normalizeProfessions(role, text)
+  if (professions.length) return professions[0]!
+
+  const cleaned = cleanRole(role)
   if (cleaned) return cleaned
   const guess = text.match(/\b((?:senior|middle|junior|lead)?\s*(?:frontend|backend|full-?stack|mobile|qa|devops|data|ui\/?ux|product|project)\s*(?:developer|engineer|designer|manager|analyst)?)/i)
   return guess?.[1]?.trim() || ''
 }
 
 // --- contacts --------------------------------------------------------------
-// Contacts are deterministic; never let a model invent or "fix" them.
 export function extractContacts(text: string): { telegram?: string; email?: string; phone?: string } {
   const out: { telegram?: string; email?: string; phone?: string } = {}
   const tg = text.match(/@[A-Za-z0-9_]{4,32}/)
@@ -99,9 +168,11 @@ export function extractContacts(text: string): { telegram?: string; email?: stri
 export function normalizeCandidate(profile: CvProfile): CvProfile {
   const text = `${profile.name || ''}\n${profile.role || ''}\n${profile.description || ''}`
   const contacts = extractContacts(text)
+  const professions = normalizeProfessions(profile.role, text)
   return {
     ...profile,
-    role: normalizeRole(profile.role, text),
+    role: professions[0] || normalizeRole(profile.role, text),
+    professions,
     skills: normalizeSkills(profile.skills, text),
     seniority: profile.seniority ?? detectSeniority(text, profile.experienceYears),
     contact: profile.contact || contacts.telegram || contacts.email || contacts.phone || null,
@@ -110,13 +181,10 @@ export function normalizeCandidate(profile: CvProfile): CvProfile {
 }
 
 // --- deduplication ---------------------------------------------------------
-// The same CV is frequently reposted across channels and re-sent by the author.
-// Identity first (a contact handle is the strongest signal), then a content
-// fingerprint for reposts that changed only whitespace/emoji.
 function fingerprint(profile: CvProfile): string {
   const contact = profile.contacts?.telegram || profile.contacts?.email || profile.contacts?.phone
   if (contact) return `c:${contact.toLowerCase()}`
-  const text = `${profile.role || ''} ${profile.description || ''}`
+  const text = `${(profile.professions || []).join(' ')} ${profile.role || ''} ${profile.description || ''}`
     .toLowerCase()
     .replace(/https?:\/\/\S+/g, '')
     .replace(/[^a-zа-яёіїґ0-9]+/g, '')
