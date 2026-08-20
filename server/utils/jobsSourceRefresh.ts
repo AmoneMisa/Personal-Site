@@ -2,6 +2,7 @@ import { useRedis } from '~~/server/utils/redis'
 import { ALL_SOURCES, type Job, type JobSource } from './jobTypes'
 import { enrichJob } from './enrich'
 import { syncJobsSearchIndex } from './jobsElastic'
+import { fetchExtraTelegramJobs } from './extraTelegramJobSources'
 import {
   fetchAdzuna,
   fetchArbeitnow,
@@ -31,6 +32,14 @@ type StoredJob = Job & {
   ai?: unknown
 }
 
+async function fetchAllTelegram(q: string): Promise<Job[]> {
+  const [primary, extra] = await Promise.all([
+    fetchTelegram(q),
+    fetchExtraTelegramJobs(q),
+  ])
+  return [...primary, ...extra]
+}
+
 const FETCHERS: Record<JobSource, (q: string) => Promise<Job[]>> = {
   remotive: fetchRemotive,
   remoteok: fetchRemoteOk,
@@ -44,7 +53,7 @@ const FETCHERS: Record<JobSource, (q: string) => Promise<Job[]>> = {
   devkg: fetchDevKg,
   ishgo: fetchIshGo,
   itjobsuz: fetchItJobsUz,
-  telegram: fetchTelegram,
+  telegram: fetchAllTelegram,
   olx: fetchOlx,
 }
 
