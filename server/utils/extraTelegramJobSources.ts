@@ -7,6 +7,7 @@ interface TelegramChannel {
   location: string
   countryCode: string
   tags: string[]
+  remoteByDefault?: boolean
 }
 
 const EXTRA_TELEGRAM_JOB_CHANNELS: TelegramChannel[] = [
@@ -14,6 +15,17 @@ const EXTRA_TELEGRAM_JOB_CHANNELS: TelegramChannel[] = [
   { handle: 'jobmakon', label: 'Jobmakon', location: 'Uzbekistan', countryCode: 'UZ', tags: ['IT', 'Jobs', 'Internships'] },
   { handle: 'itjobstashkent', label: 'IT Jobs Tashkent', location: 'Tashkent, Uzbekistan', countryCode: 'UZ', tags: ['IT', 'Jobs'] },
   { handle: 'WORKIN_CHERNIVTSI', label: 'Work in Chernivtsi', location: 'Chernivtsi, Ukraine', countryCode: 'UA', tags: ['Jobs', 'General'] },
+
+  // Ukraine — broad career/job channels.
+  { handle: 'happymonday', label: 'Happy Monday', location: 'Ukraine', countryCode: 'UA', tags: ['Jobs', 'Career', 'Ukraine'] },
+  { handle: 'lobbyx', label: 'Lobby X', location: 'Ukraine', countryCode: 'UA', tags: ['Jobs', 'Ukraine'] },
+  { handle: 'lobbyxIT', label: 'Lobby X IT', location: 'Ukraine', countryCode: 'UA', tags: ['IT', 'Jobs', 'Ukraine'] },
+  { handle: 'univwork', label: 'UNI WORK', location: 'Ukraine', countryCode: 'UA', tags: ['Jobs', 'Internships', 'Junior', 'Ukraine'] },
+  { handle: 'aplaywork', label: 'A-Play', location: 'Ukraine', countryCode: 'UA', tags: ['Jobs', 'Internships', 'Ukraine'] },
+
+  // Ukraine — remote-first feeds.
+  { handle: 'robotaua_now_remote', label: 'robota.ua NOW Remote', location: 'Ukraine', countryCode: 'UA', tags: ['Remote', 'Jobs', 'Ukraine'], remoteByDefault: true },
+  { handle: 'top_vacansii', label: 'CATWORK', location: 'Ukraine', countryCode: 'UA', tags: ['Remote', 'Jobs', 'Internships', 'Ukraine'], remoteByDefault: true },
 ]
 
 const UA = 'jobFinder/1.0 (job aggregator; contact: admin@whiteslove.me)'
@@ -142,7 +154,8 @@ function toJob(
     url,
     ...(applyUrl ? { applyUrl } : {}),
     source: 'telegram',
-    remote: /remote|удал[её]н|віддален|masofaviy|онлайн|online/i.test(`${title} ${text}`),
+    remote: channel.remoteByDefault === true
+      || /remote|удал[её]н|віддален|дистанційн|робота\s+(?:з|із)\s+дому|masofaviy|онлайн|online/i.test(`${title} ${text}`),
     tags: [...channel.tags, channel.countryCode, `@${channel.handle}`, ...hashtags].slice(0, 8),
     postedAt: date && !Number.isNaN(Date.parse(date)) ? new Date(date).toISOString() : new Date().toISOString(),
     description: text.slice(0, DESC_MAX),
