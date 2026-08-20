@@ -1,9 +1,13 @@
-import type { Job } from './jobTypes'
+import type { Job, SponsorshipConfidence } from './jobTypes'
 
 type PublicBoard = {
   label: string
   url: string
   remoteByDefault?: boolean
+  usOnly?: boolean
+  assumeUs?: boolean
+  sponsorshipConfidence?: SponsorshipConfidence
+  sponsorshipEvidence?: string
 }
 
 // Sources collected from the community/profile links supplied for Job Finder.
@@ -25,6 +29,58 @@ const PUBLIC_JOB_BOARDS: PublicBoard[] = [
   { label: 'SimplyHired', url: 'https://www.simplyhired.com/' },
   { label: 'Escape the City', url: 'https://www.escapethecity.org/search/jobs' },
   { label: 'Diversity Jobs Group', url: 'https://diversityjobsgroup.com/job-listings/' },
+
+  // USA visa-sponsorship-focused boards. Confidence is deliberately explicit:
+  // "historical" means the employer has sponsored before, not that this exact
+  // vacancy promises sponsorship. The other values reflect the board's own
+  // curation/verification claims and are surfaced as evidence, not guarantees.
+  {
+    label: 'VisaJobSearch',
+    url: 'https://www.visajobsearch.com/jobs',
+    usOnly: true,
+    sponsorshipConfidence: 'verified',
+    sponsorshipEvidence: 'Visa-focused board labels roles with sponsorship status',
+  },
+  {
+    label: 'VisaJobFinder',
+    url: 'https://visajobfinder.com/usa',
+    usOnly: true,
+    assumeUs: true,
+    sponsorshipConfidence: 'explicit',
+    sponsorshipEvidence: 'Board states listed US roles explicitly offer visa sponsorship',
+  },
+  {
+    label: 'JobsH1B',
+    url: 'https://jobsh1b.com/jobs',
+    usOnly: true,
+    assumeUs: true,
+    sponsorshipConfidence: 'historical',
+    sponsorshipEvidence: 'Employer has H-1B sponsorship history; role eligibility is not guaranteed',
+  },
+  {
+    label: 'VisaHire',
+    url: 'https://visahire.co/',
+    usOnly: true,
+    assumeUs: true,
+    sponsorshipConfidence: 'verified',
+    sponsorshipEvidence: 'Board checks listing sponsorship intent or recent H-1B sponsor history',
+  },
+  {
+    label: 'Migrate Mate',
+    url: 'https://migratemate.co/visa-sponsorship-jobs',
+    usOnly: true,
+    assumeUs: true,
+    sponsorshipConfidence: 'verified',
+    sponsorshipEvidence: 'Visa-focused US board backed by employer sponsorship history',
+  },
+  {
+    label: 'MyVisaJobs',
+    url: 'https://www.myvisajobs.com/Search_Visa',
+    usOnly: true,
+    assumeUs: true,
+    sponsorshipConfidence: 'historical',
+    sponsorshipEvidence: 'Employer sponsorship history from US visa/LCA data',
+  },
 ]
 
 const UA =
@@ -92,6 +148,26 @@ function locationFromPosting(posting: any): string {
   return 'See listing'
 }
 
+function isUsLocation(value: string): boolean {
+  return /\bunited states\b|\busa\b|\bu\.s\.?\b|\bUS(?:\s+remote)?\b|\b(?:AL|AK|AZ|AR|CA|CO|CT|DE|FL|GA|HI|ID|IL|IN|IA|KS|KY|LA|ME|MD|MA|MI|MN|MS|MO|MT|NE|NV|NH|NJ|NM|NY|NC|ND|OH|OK|OR|PA|RI|SC|SD|TN|TX|UT|VT|VA|WA|WV|WI|WY|DC)\b/i.test(value)
+}
+
+function boardTags(board: PublicBoard): string[] {
+  const tags = [board.label]
+  if (board.sponsorshipConfidence === 'explicit') tags.push('Visa sponsorship', 'Explicit sponsorship')
+  if (board.sponsorshipConfidence === 'verified') tags.push('Visa sponsorship', 'Verified sponsor')
+  if (board.sponsorshipConfidence === 'historical') tags.push('H1B sponsor history')
+  if (board.usOnly) tags.push('USA')
+  return tags
+}
+
+function sponsorshipFields(board: PublicBoard): Pick<Job, 'sponsorshipConfidence' | 'sponsorshipEvidence'> {
+  return {
+    ...(board.sponsorshipConfidence ? { sponsorshipConfidence: board.sponsorshipConfidence } : {}),
+    ...(board.sponsorshipEvidence ? { sponsorshipEvidence: [board.sponsorshipEvidence] } : {}),
+  }
+}
+
 function jsonLdNodes(value: any): any[] {
   if (!value) return []
   if (Array.isArray(value)) return value.flatMap(jsonLdNodes)
@@ -120,6 +196,7 @@ function parseJsonLd(html: string, board: PublicBoard): Job[] {
       const url = absoluteUrl(String(node.url || node.sameAs || ''), board.url)
       if (!url) continue
       const location = locationFromPosting(node)
+      if (board.usOnly && !board.assumeUs && !isUsLocation(location)) continue
       const company = stripHtml(node?.hiringOrganization?.name) || board.label
       const description = stripHtml(node.description)
 
@@ -127,16 +204,17 @@ function parseJsonLd(html: string, board: PublicBoard): Job[] {
         id: `public-${board.label.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-${url}`,
         title: stripHtml(node.title),
         company,
-        location,
+        location: board.assumeUs && location === 'See listing' ? 'United States' : location,
         url,
         source: 'companies',
         remote: board.remoteByDefault === true
           || node.jobLocationType === 'TELECOMMUTE'
           || /remote|anywhere|worldwide/i.test(`${node.title} ${location} ${description}`),
-        tags: [board.label],
+        tags: boardTags(board),
         postedAt: validDate(node.datePosted),
         employmentType: Array.isArray(node.employmentType) ? node.employmentType[0] : node.employmentType,
         description: description.slice(0, 4000) || undefined,
+        ...sponsorshipFields(board),
       })
     }
   }
@@ -158,6 +236,10 @@ function looksLikeJobUrl(url: URL): boolean {
 }
 
 function parseAnchors(html: string, board: PublicBoard): Job[] {
+  // If a board is multinational and we cannot infer location from the anchor,
+  // avoid fabricating a US location. JSON-LD results above can still be used.
+  if (board.usOnly && !board.assumeUs) return []
+
   const byUrl = new Map<string, string>()
   const re = /<a\b[^>]*href=["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>/gi
   let match: RegExpExecArray | null
@@ -188,12 +270,13 @@ function parseAnchors(html: string, board: PublicBoard): Job[] {
     id: `public-${board.label.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-${url}`,
     title,
     company: board.label,
-    location: board.remoteByDefault ? 'Remote' : 'See listing',
+    location: board.assumeUs ? 'United States' : board.remoteByDefault ? 'Remote' : 'See listing',
     url,
     source: 'companies',
     remote: board.remoteByDefault === true || /remote|anywhere|worldwide/i.test(title),
-    tags: [board.label],
+    tags: boardTags(board),
     postedAt: now,
+    ...sponsorshipFields(board),
   }))
 }
 
