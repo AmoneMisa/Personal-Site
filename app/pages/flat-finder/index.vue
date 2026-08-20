@@ -115,6 +115,9 @@ useSeoMeta({
 });
 
 // ---- filters ----
+// What "Reset filters" selects. An empty list means every country, so a cleared
+// form needs a real choice rather than the absence of one.
+const DEFAULT_COUNTRY = "UA";
 const countries = ref<string[]>([]);
 const city = ref("");
 const district = ref("");
@@ -393,6 +396,17 @@ function applyQueryParams(params: Record<string, unknown>) {
   const sourceParam = queryString(params.sources);
   source.value = SOURCES.includes(sourceParam) ? sourceParam : "";
 }
+// The address bar follows the filters directly instead of waiting for a request
+// to come back. It used to be written only at the end of a successful load, so
+// a failed or still-running request left the URL describing filters that were no
+// longer applied: resetting did not clear it, and removing one of the chips
+// above the results did not take that filter out of the query string either.
+let querySyncTimer: ReturnType<typeof setTimeout> | undefined;
+function scheduleQuerySync(delay = 200) {
+  if (querySyncTimer) clearTimeout(querySyncTimer);
+  querySyncTimer = setTimeout(() => { querySyncTimer = undefined; void syncQueryParams(); }, delay);
+}
+
 async function syncQueryParams() {
   const preserved: Record<string, string> = {};
   for (const key of ["flat", "flatSource", "flatCountry"] as const) {
@@ -491,17 +505,25 @@ async function load(append = false, background = false) {
   if (!append) void syncQueryParams();
   scheduleWarmPoll();
 }
-function scheduleLoad(delay = 250) { if (loadTimer) clearTimeout(loadTimer); loadTimer = setTimeout(() => { loadTimer = undefined; void load(false); }, delay); }
-function selectSource(v: string) { if (source.value === v) return; source.value = v; scheduleLoad(80); }
+// One debounce for every filter interaction. Picking a country, then a city,
+// then a district used to fire a request per click at 80ms apart, and each
+// combination the server has not answered before is an uncached query that costs
+// seconds — so the earlier ones were paid for and thrown away. Long enough to
+// swallow a burst of clicks, short enough not to feel unresponsive.
+const FILTER_DEBOUNCE_MS = 350;
+function scheduleLoad(delay = FILTER_DEBOUNCE_MS) { if (loadTimer) clearTimeout(loadTimer); loadTimer = setTimeout(() => { loadTimer = undefined; void load(false); }, delay); }
+function selectSource(v: string) { if (source.value === v) return; source.value = v; scheduleLoad(); }
 function resetFilters() {
-  countries.value = [];
+  // Ukraine rather than an empty list: empty means "every country", which is not
+  // what a cleared form should ask for.
+  countries.value = [DEFAULT_COUNTRY];
   city.value = ""; district.value = ""; metro.value = ""; propertyType.value = "any"; dealType.value = "any"; agency.value = "any"; audience.value = "any";
   petFriendly.value = false; roomOnlyFilter.value = false; childrenRequired.value = false; newBuildingOnly.value = false;
   priceMin.value = undefined; priceMax.value = undefined; displayCurrency.value = "USD";
   roomsMin.value = undefined; roomsMax.value = undefined; bedroomsMin.value = undefined; bedroomsMax.value = undefined; areaMin.value = undefined; areaMax.value = undefined; pricePerSqmMin.value = undefined; pricePerSqmMax.value = undefined;
   floorMin.value = undefined; floorMax.value = undefined; totalFloorsMin.value = undefined; totalFloorsMax.value = undefined; yearMin.value = undefined; yearMax.value = undefined; maxAgeDays.value = undefined;
   query.value = ""; source.value = ""; drawnArea.value = []; view.value = "active";
-  scheduleLoad(80);
+  scheduleLoad();
 }
 function updateBackToTop() { showBackToTop.value = window.scrollY > 600; }
 function scrollToFilters() { filtersEl.value?.scrollIntoView({ behavior: "smooth", block: "start" }); }
@@ -680,6 +702,13 @@ watch(loadMoreSentinel, (current, previous) => { if (previous) infiniteObserver?
 watch(modalOpen, (open) => { if (open) return; closeLightbox(); stopTranslationPoll(); translationRequestId += 1; translatingDescription.value = false; nextTick(() => setTimeout(releaseStuckScrollLock, 350)); });
 watch(lightboxIndex, (index) => { if (index === null) nextTick(() => setTimeout(releaseStuckScrollLock, 350)); });
 const restoring = ref(true);
+
+// Keyed off the query the filters produce, so every filter is covered without
+// listing them all again here and forgetting one.
+watch(
+    () => JSON.stringify(currentFilterQuery()),
+    () => { if (!restoring.value) scheduleQuerySync(); },
+);
 watch(city, () => { if (restoring.value) return; district.value = ""; metro.value = ""; query.value = ""; });
 watch(countries, () => { if (restoring.value) return; district.value = ""; metro.value = ""; city.value = ""; query.value = ""; });
 onBeforeUnmount(() => { modalOpen.value = false; lightboxIndex.value = null; releaseStuckScrollLock(); window.removeEventListener("keydown", onLightboxKeydown); window.removeEventListener("scroll", updateBackToTop); if (loadTimer) clearTimeout(loadTimer); if (warmTimer) clearTimeout(warmTimer); if (sharedListingTimer) clearTimeout(sharedListingTimer); infiniteObserver?.disconnect(); stopTranslationPoll(); });
@@ -738,9 +767,9 @@ onBeforeUnmount(() => { modalOpen.value = false; lightboxIndex.value = null; rel
         <div class="filter-actions-row">
           <u-button type="button" variant="outline" color="neutral" icon="i-lucide-sliders-horizontal" :trailing-icon="showAdvanced ? 'i-lucide-chevron-up' : 'i-lucide-chevron-down'" :aria-expanded="showAdvanced" class="advanced-button" @click="toggleAdvanced">{{ showAdvanced ? t("hideFilters") : t("moreFilters") }}</u-button>
           <div class="active-filter-chips">
-            <button v-if="district" type="button" class="filter-chip" @click="district = ''; scheduleLoad(80)">{{ t("district") }}: {{ locName(district, 'district') }} <span>×</span></button>
-            <button v-if="roomsMin != null" type="button" class="filter-chip" @click="roomsMin = undefined; scheduleLoad(80)">{{ roomsMin }}+ {{ t('roomsChip') }} <span>×</span></button>
-            <button v-if="petFriendly" type="button" class="filter-chip" @click="petFriendly = false; scheduleLoad(80)"><u-icon name="i-lucide-paw-print" /> {{ t('pets') }} <span>×</span></button>
+            <button v-if="district" type="button" class="filter-chip" @click="district = ''; scheduleLoad()">{{ t("district") }}: {{ locName(district, 'district') }} <span>×</span></button>
+            <button v-if="roomsMin != null" type="button" class="filter-chip" @click="roomsMin = undefined; scheduleLoad()">{{ roomsMin }}+ {{ t('roomsChip') }} <span>×</span></button>
+            <button v-if="petFriendly" type="button" class="filter-chip" @click="petFriendly = false; scheduleLoad()"><u-icon name="i-lucide-paw-print" /> {{ t('pets') }} <span>×</span></button>
           </div>
           <u-button type="button" variant="ghost" color="neutral" size="sm" icon="i-lucide-rotate-ccw" class="filter-reset" @click="resetFilters">{{ t("reset") }}</u-button>
         </div>
@@ -750,10 +779,10 @@ onBeforeUnmount(() => { modalOpen.value = false; lightboxIndex.value = null; rel
         <div class="advanced-card__header"><div><u-icon name="i-lucide-filter" /><strong>{{ t("moreFilters") }}</strong></div><button type="button" @click="toggleAdvanced">{{ t("hideFilters") }} <u-icon name="i-lucide-chevron-up" /></button></div>
         <div class="advanced-groups">
           <div class="filter-group filter-group_quick"><h3><u-icon name="i-lucide-sliders-horizontal" /> {{ t('quickOptions') }}</h3><div class="quick-options">
-            <u-button type="button" :variant="petFriendly ? 'solid' : 'outline'" color="neutral" icon="i-lucide-paw-print" @click="petFriendly = !petFriendly; scheduleLoad(80)">{{ t('pets') }}</u-button>
-            <u-button type="button" :variant="childrenRequired ? 'solid' : 'outline'" color="neutral" icon="i-lucide-baby" @click="childrenRequired = !childrenRequired; scheduleLoad(80)">{{ t('children') }}</u-button>
-            <u-button type="button" :variant="roomOnlyFilter ? 'solid' : 'outline'" color="neutral" icon="i-lucide-bed-single" @click="roomOnlyFilter = !roomOnlyFilter; scheduleLoad(80)">{{ t('roomOnly') }}</u-button>
-            <u-button type="button" :variant="newBuildingOnly ? 'solid' : 'outline'" color="neutral" icon="i-lucide-building-2" @click="newBuildingOnly = !newBuildingOnly; scheduleLoad(80)">{{ t('newBuilding') }}</u-button>
+            <u-button type="button" :variant="petFriendly ? 'solid' : 'outline'" color="neutral" icon="i-lucide-paw-print" @click="petFriendly = !petFriendly; scheduleLoad()">{{ t('pets') }}</u-button>
+            <u-button type="button" :variant="childrenRequired ? 'solid' : 'outline'" color="neutral" icon="i-lucide-baby" @click="childrenRequired = !childrenRequired; scheduleLoad()">{{ t('children') }}</u-button>
+            <u-button type="button" :variant="roomOnlyFilter ? 'solid' : 'outline'" color="neutral" icon="i-lucide-bed-single" @click="roomOnlyFilter = !roomOnlyFilter; scheduleLoad()">{{ t('roomOnly') }}</u-button>
+            <u-button type="button" :variant="newBuildingOnly ? 'solid' : 'outline'" color="neutral" icon="i-lucide-building-2" @click="newBuildingOnly = !newBuildingOnly; scheduleLoad()">{{ t('newBuilding') }}</u-button>
           </div></div>
           <div class="filter-group"><h3><u-icon name="i-lucide-map-pin" /> {{ t('groupLocation') }}</h3>
             <label v-if="districtOptions.length" class="flats__field"><span class="flats__field-label">{{ t("district") }}</span><u-select-menu v-model="districtSel" :items="districtItems" value-key="value" label-key="label" class="flats__select" @update:model-value="scheduleLoad()" /></label>
