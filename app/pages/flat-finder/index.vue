@@ -750,10 +750,10 @@ onBeforeUnmount(() => { modalOpen.value = false; lightboxIndex.value = null; rel
         </div>
 
         <div class="filter-primary-grid">
-          <label class="flats__field"><span class="flats__field-label">{{ t("country") }}</span><u-select-menu v-model="countries" :items="countryItems" value-key="value" label-key="label" multiple :placeholder="t('countryAny')" class="flats__select" @update:model-value="scheduleLoad()" /></label>
-          <label class="flats__field"><span class="flats__field-label">{{ t("city") }}</span><u-select-menu v-model="citySel" :items="cityItems" value-key="value" label-key="label" class="flats__select" @update:model-value="scheduleLoad()" /></label>
-          <label class="flats__field"><span class="flats__field-label">{{ t("dealType") }}</span><u-select-menu v-model="dealTypeSel" :items="dealTypeItems" value-key="value" label-key="label" :search-input="false" class="flats__select" @update:model-value="scheduleLoad()" /></label>
-          <label class="flats__field"><span class="flats__field-label">{{ t("agency") }}</span><u-select-menu v-model="agencySel" :items="agencyItems" value-key="value" label-key="label" :search-input="false" class="flats__select" @update:model-value="scheduleLoad()" /></label>
+          <div class="flats__field"><u-select-menu :label="t('country')" v-model="countries" :items="countryItems" value-key="value" label-key="label" multiple :placeholder="t('countryAny')" class="flats__select" @update:model-value="scheduleLoad()" /></div>
+          <div class="flats__field"><u-select-menu :label="t('city')" v-model="citySel" :items="cityItems" value-key="value" label-key="label" class="flats__select" @update:model-value="scheduleLoad()" /></div>
+          <div class="flats__field"><u-select-menu :label="t('dealType')" v-model="dealTypeSel" :items="dealTypeItems" value-key="value" label-key="label" :search-input="false" class="flats__select" @update:model-value="scheduleLoad()" /></div>
+          <div class="flats__field"><u-select-menu :label="t('agency')" v-model="agencySel" :items="agencyItems" value-key="value" label-key="label" :search-input="false" class="flats__select" @update:model-value="scheduleLoad()" /></div>
         </div>
 
         <div class="filter-price-row">
@@ -785,8 +785,8 @@ onBeforeUnmount(() => { modalOpen.value = false; lightboxIndex.value = null; rel
             <u-button type="button" :variant="newBuildingOnly ? 'solid' : 'outline'" color="neutral" icon="i-lucide-building-2" @click="newBuildingOnly = !newBuildingOnly; scheduleLoad()">{{ t('newBuilding') }}</u-button>
           </div></div>
           <div class="filter-group"><h3><u-icon name="i-lucide-map-pin" /> {{ t('groupLocation') }}</h3>
-            <label v-if="districtOptions.length" class="flats__field"><span class="flats__field-label">{{ t("district") }}</span><u-select-menu v-model="districtSel" :items="districtItems" value-key="value" label-key="label" class="flats__select" @update:model-value="scheduleLoad()" /></label>
-            <label v-if="metroOptions.length" class="flats__field"><span class="flats__field-label">{{ t('metro') }}</span><u-select-menu v-model="metroSel" :items="metroItems" value-key="value" label-key="label" class="flats__select" @update:model-value="scheduleLoad()" /></label>
+            <div v-if="districtOptions.length" class="flats__field"><u-select-menu :label="t('district')" v-model="districtSel" :items="districtItems" value-key="value" label-key="label" class="flats__select" @update:model-value="scheduleLoad()" /></div>
+            <div v-if="metroOptions.length" class="flats__field"><u-select-menu :label="t('metro')" v-model="metroSel" :items="metroItems" value-key="value" label-key="label" class="flats__select" @update:model-value="scheduleLoad()" /></div>
           </div>
           <div class="filter-group"><h3><u-icon name="i-lucide-house" /> {{ t('groupApartment') }}</h3>
             <div class="range-field"><span>{{ t('rangeRooms') }}</span><u-input v-model.number="roomsMin" :label="t('rangeFrom')" type="number" min="0" @change="scheduleLoad()" /><span>—</span><u-input v-model.number="roomsMax" :label="t('rangeTo')" type="number" min="0" @change="scheduleLoad()" /></div>
@@ -800,8 +800,8 @@ onBeforeUnmount(() => { modalOpen.value = false; lightboxIndex.value = null; rel
             <div class="range-field"><span>{{ t('rangeYear') }}</span><u-input v-model.number="yearMin" :label="t('rangeFrom')" type="number" min="1800" :max="new Date().getFullYear() + 2" @change="scheduleLoad()" /><span>—</span><u-input v-model.number="yearMax" :label="t('rangeTo')" type="number" min="1800" :max="new Date().getFullYear() + 2" @change="scheduleLoad()" /></div>
           </div>
           <div class="filter-group"><h3><u-icon name="i-lucide-megaphone" /> {{ t('groupListing') }}</h3>
-            <label class="flats__field"><span class="flats__field-label">{{ t('audience') }}</span><u-select-menu v-model="audienceSel" :items="audienceItems" value-key="value" label-key="label" :search-input="false" class="flats__select" @update:model-value="scheduleLoad()" /></label>
-            <label class="flats__field"><span class="flats__field-label">{{ t("propertyType") }}</span><u-select-menu v-model="propertyTypeSel" :items="propertyTypeItems" value-key="value" label-key="label" :search-input="false" class="flats__select" @update:model-value="scheduleLoad()" /></label>
+            <div class="flats__field"><u-select-menu :label="t('audience')" v-model="audienceSel" :items="audienceItems" value-key="value" label-key="label" :search-input="false" class="flats__select" @update:model-value="scheduleLoad()" /></div>
+            <div class="flats__field"><u-select-menu :label="t('propertyType')" v-model="propertyTypeSel" :items="propertyTypeItems" value-key="value" label-key="label" :search-input="false" class="flats__select" @update:model-value="scheduleLoad()" /></div>
             <div class="flats__field"><u-input v-model.number="maxAgeDays" type="number" min="1" max="21" :label="t('freshDays')" @change="scheduleLoad()" /></div>
           </div>
         </div>

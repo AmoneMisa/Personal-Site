@@ -82,8 +82,12 @@ const options = computed(() =>
   appearance: none;
   -webkit-appearance: none;
   cursor: pointer;
+  /* The open dropdown is painted by the browser, not by this page, and it
+     follows the colour scheme rather than our CSS — without this it came up
+     white with a blue highlight against the dark field that opened it. */
+  color-scheme: dark;
 }
-/* The popup is rendered by the OS, so its options need explicit colours. */
+/* Belt and braces: engines that do honour option colours get ours. */
 .u-select__control option { background: var(--bg-panel, #131730); color: var(--text-primary, #eef0f7); }
 
 .u-select__chevron {
@@ -104,7 +108,10 @@ const options = computed(() =>
 
 .u-select__label {
   position: absolute;
-  left: var(--ui-control-px);
+  /* The extra pixel is the control's own border. UInput's label is positioned
+     inside a bordered wrapper, so it already clears it; this root has no border,
+     and without the offset the label sat 1px left of the value below it. */
+  left: calc(var(--ui-control-px) + 1px);
   top: 0;
   /* Centred on the top border, at the same size as UInput's raised label. */
   transform: translateY(-50%) scale(var(--ui-floating-scale));
@@ -125,10 +132,12 @@ const options = computed(() =>
   position: absolute;
   /* Half the legend's height above the box: a fieldset paints its top border
      through the middle of its legend rather than at the edge. */
-  top: calc(-1px - var(--ui-notch-h) / 2);
-  right: -1px;
-  bottom: -1px;
-  left: -1px;
+  /* Flush with the root on three sides: the control's border box already fills
+     it, so -1px would draw this a pixel outside the field it is outlining. */
+  top: calc(var(--ui-notch-h) / -2);
+  right: 0;
+  bottom: 0;
+  left: 0;
   margin: 0;
   padding: 0 calc(var(--ui-control-px) - 5px);
   border: 1px solid var(--ui-control-border);

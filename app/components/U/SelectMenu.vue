@@ -15,6 +15,12 @@ const props = withDefaults(defineProps<{
   valueKey?: string;
   labelKey?: string;
   placeholder?: string;
+  /**
+   * Floating label, matching UInput's and USelect's. Always in its raised
+   * position: the trigger shows a selection or a placeholder, so there is never
+   * an empty field for the label to rest in.
+   */
+  label?: string;
   searchInput?: boolean | Record<string, unknown>;
   multiple?: boolean;
   disabled?: boolean;
@@ -185,13 +191,15 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div ref="root" class="u-select-menu" :class="$attrs.class">
+  <div ref="root" class="u-select-menu" :class="[{ 'u-select-menu_floating': label }, $attrs.class]">
     <button
         type="button"
         class="u-select-menu__trigger ui-control ui-focusable"
+        :class="{ 'ui-control_floating': label }"
         :disabled="disabled"
         :aria-expanded="open"
         aria-haspopup="listbox"
+        :aria-label="label || undefined"
         @click="toggle"
         @keydown="onKeydown"
     >
@@ -200,6 +208,16 @@ onBeforeUnmount(() => {
       </span>
       <UIcon name="i-lucide-chevron-down" class="u-select-menu__chevron" :class="{ 'u-select-menu__chevron_open': open }" />
     </button>
+
+    <!-- Same floating label as UInput and USelect, so a filter row does not mix
+         captions above the control with labels on its border. Always raised:
+         a trigger shows either a selection or its placeholder, never nothing. -->
+    <template v-if="label">
+      <span class="u-select-menu__label" aria-hidden="true">{{ label }}</span>
+      <fieldset class="u-select-menu__outline" aria-hidden="true">
+        <legend class="u-select-menu__notch"><span>{{ label }}</span></legend>
+      </fieldset>
+    </template>
 
     <Teleport to="body">
     <div v-if="open" ref="popupEl" class="u-select-menu__popup" role="listbox" :style="popupStyle">
@@ -256,6 +274,66 @@ onBeforeUnmount(() => {
   transition: transform var(--ui-transition);
 }
 .u-select-menu__chevron_open { transform: rotate(180deg); }
+
+/* ---- Floating label -------------------------------------------------------
+   Mirrors USelect's: always raised, since the trigger is never empty. The
+   button carries the accessible name via aria-label, so this text is decorative
+   and hidden from the accessibility tree rather than announced twice. */
+
+.u-select-menu_floating .u-select-menu__trigger { border-color: transparent; }
+
+.u-select-menu__label {
+  position: absolute;
+  /* Plus the trigger's own border, so the label lines up with the value under
+     it exactly as UInput's does. */
+  left: calc(var(--ui-control-px) + 1px);
+  top: 0;
+  transform: translateY(-50%) scale(var(--ui-floating-scale));
+  transform-origin: left center;
+  max-width: calc(100% - var(--ui-control-px) * 2);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--ui-control-placeholder);
+  font-size: var(--ui-control-font);
+  line-height: 1.2;
+  pointer-events: none;
+  transition: color var(--ui-transition);
+}
+.u-select-menu_floating:focus-within .u-select-menu__label { color: var(--accent-pink, #e0679a); }
+
+.u-select-menu__outline {
+  position: absolute;
+  /* Half the legend above the box: a fieldset paints its top border through the
+     middle of its legend, not at the edge. */
+  top: calc(var(--ui-notch-h) / -2);
+  right: 0;
+  bottom: 0;
+  left: 0;
+  margin: 0;
+  padding: 0 calc(var(--ui-control-px) - 5px);
+  border: 1px solid var(--ui-control-border);
+  border-radius: var(--ui-control-radius);
+  min-inline-size: 0;
+  pointer-events: none;
+  transition: border-color var(--ui-transition);
+}
+/* Focus shows on the outline; the shared ring would sit outside it and read as
+   a second border. */
+.u-select-menu_floating:focus-within { box-shadow: none; }
+.u-select-menu_floating:focus-within .u-select-menu__outline {
+  border-width: 2px;
+  border-color: var(--accent-pink, #e0679a);
+}
+
+.u-select-menu__notch {
+  padding: 0 5px;
+  font-size: calc(var(--ui-control-font) * var(--ui-floating-scale));
+  height: var(--ui-notch-h);
+  line-height: var(--ui-notch-h);
+  white-space: nowrap;
+  visibility: hidden;
+}
 
 .u-select-menu__popup {
   /* Position comes from `popupStyle` — the popup is on <body>, not beside the

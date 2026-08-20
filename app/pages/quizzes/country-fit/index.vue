@@ -461,30 +461,36 @@ watch(user, (v) => lsSet(LS_KEYS.user, v), {deep: true});
     </div>
 
     <!-- Questions -->
-    <div class="quiz-questions grid grid-cols-1 md:grid-cols-2 gap-3">
+    <div class="quiz-questions grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
       <div
           v-for="q in [...countryFitQuiz.questions].sort((a, b) => a.order - b.order)"
           :key="q.id"
           class="quiz-card"
       >
-        <div class="quiz-card__title">{{ t(q.titleKey) }}</div>
+        <div :id="`${q.id}-title`" class="quiz-card__title">{{ t(q.titleKey) }}</div>
         <div class="quiz-card__desc text-muted">{{ t(q.descriptionKey) }}</div>
 
-        <div class="quiz-options grid grid-cols-1 md:grid-cols-3 gap-2">
-          <button
+        <!-- One answer per question, so these are a radio group rather than a
+             row of buttons: arrow keys move between them, a screen reader
+             announces which is chosen, and the whole group is one tab stop. -->
+        <div class="quiz-options" role="radiogroup" :aria-labelledby="`${q.id}-title`">
+          <label
               v-for="opt in q.options"
               :key="opt.id"
-              type="button"
               class="quiz-option"
-              :class="
-              answers[q.id] === opt.id
-                ? 'bg-[rgba(224, 103, 154,0.18)] border-[rgba(224, 103, 154,0.35)]'
-                : 'bg-[rgba(255,255,255,0.02)] hover:brightness-[1.05]'
-            "
-              @click="answers[q.id] = opt.id"
+              :class="{ 'quiz-option_selected': answers[q.id] === opt.id }"
           >
-            {{ t(opt.textKey) }}
-          </button>
+            <input
+                type="radio"
+                class="quiz-option__input"
+                :name="q.id"
+                :value="opt.id"
+                :checked="answers[q.id] === opt.id"
+                @change="answers[q.id] = opt.id"
+            />
+            <span class="quiz-option__dot" aria-hidden="true" />
+            <span class="quiz-option__text">{{ t(opt.textKey) }}</span>
+          </label>
         </div>
       </div>
     </div>
@@ -666,20 +672,61 @@ watch(user, (v) => lsSet(LS_KEYS.user, v), {deep: true});
    one title runs to two lines. */
 .quiz-options { margin-top: auto; }
 
+/* Stacked, not a three-across grid: with three or four cards per row there is
+   no width for side-by-side answers, and a vertical list is what a radio group
+   is meant to look like anyway. */
+.quiz-options { display: grid; gap: 6px; }
+
 .quiz-option {
   display: flex;
   align-items: center;
-  min-height: 44px;
-  padding: 8px 12px;
+  gap: 9px;
+  padding: 7px 10px;
   border: 1px solid var(--line);
-  border-radius: 10px;
+  border-radius: 9px;
   background: rgba(255, 255, 255, 0.02);
-  font-size: 13px;
+  font-size: 12.5px;
   line-height: 1.3;
   text-align: left;
+  cursor: pointer;
   transition: background-color var(--ui-transition), border-color var(--ui-transition);
 }
-.quiz-option:hover { filter: brightness(1.05); }
+.quiz-option:hover { background: rgba(255, 255, 255, 0.05); }
+.quiz-option_selected {
+  border-color: rgba(224, 103, 154, 0.35);
+  background: rgba(224, 103, 154, 0.18);
+}
+
+/* The native input stays in the accessibility tree and keeps arrow-key
+   behaviour; only its appearance is replaced by the dot beside it. */
+.quiz-option__input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+.quiz-option__dot {
+  flex: none;
+  width: 14px;
+  height: 14px;
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.03);
+  transition: border-color var(--ui-transition), box-shadow var(--ui-transition);
+}
+.quiz-option_selected .quiz-option__dot {
+  border-color: var(--accent-pink, #e0679a);
+  /* The filled centre is an inset ring, so it scales with the dot. */
+  box-shadow: inset 0 0 0 3px var(--accent-pink, #e0679a);
+}
+.quiz-option__text { min-width: 0; }
+/* Focus has to show on the label, since the input itself is not visible. */
+.quiz-option:has(.quiz-option__input:focus-visible) {
+  outline: none;
+  box-shadow: var(--ui-focus-ring);
+  border-color: var(--accent-pink, #e0679a);
+}
 
 /* One row-gap for the whole form. The hint under a field is part of that
    field's cell, so a longer hint no longer shifts the field beside it. */
