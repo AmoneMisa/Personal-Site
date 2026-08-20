@@ -73,7 +73,7 @@ const mobileOpen = ref(false);
           class="site-header__burger"
           :class="{ 'site-header__burger_open': mobileOpen }"
           :aria-expanded="mobileOpen"
-          aria-label="Меню"
+          :aria-label="$t('common.menu')"
           @click="mobileOpen = !mobileOpen"
       >
         <span class="site-header__bar" /><span class="site-header__bar" /><span class="site-header__bar" />

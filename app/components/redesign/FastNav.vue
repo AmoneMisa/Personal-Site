@@ -52,7 +52,7 @@ onBeforeUnmount(() => {
         type="button"
         class="fast-nav__toggle"
         :class="{ 'fast-nav__toggle_open': open }"
-        aria-label="Быстрая навигация по странице"
+        :aria-label="$t('common.fastNav')"
         :aria-expanded="open"
         @click="open = !open"
     >

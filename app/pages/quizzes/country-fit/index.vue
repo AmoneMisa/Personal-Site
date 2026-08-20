@@ -558,8 +558,8 @@ watch(user, (v) => lsSet(LS_KEYS.user, v), {deep: true});
                 value-key="value"
                 label-key="label"
                 class="flex-1"
-                :placeholder="t('quizzes.countryFit.addCountryPlaceholder') || 'Выбери страну'"
-                :search-input="{ placeholder: t('quizzes.countryFit.addCountryPlaceholder') || 'Выбери страну' }"
+                :placeholder="t('quizzes.countryFit.addCountryPlaceholder')"
+                :search-input="{ placeholder: t('quizzes.countryFit.addCountryPlaceholder') }"
             />
             <u-button :disabled="!addCountry" @click="addCountryToCompare">
               {{ t("common.add") }}

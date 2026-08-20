@@ -254,7 +254,7 @@ const priceColumns = computed(() => {
     </div>
 
     <div v-if="showWhy && item.why?.length" class="text-muted mt-2">
-      • {{ item.why.join(" • ") }}
+      • {{ item.why.map((key) => t(`quizzes.countryFit.notes.${key}`)).join(" • ") }}
     </div>
 
     <div v-if="item.match100 != null || item.live100 != null" class="ratings mt-3">

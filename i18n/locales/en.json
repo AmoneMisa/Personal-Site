@@ -226,7 +226,9 @@
     "noData": "No Data",
     "pin": "Pin",
     "pinned": "Pinned",
-    "remove": "Remove"
+    "remove": "Remove",
+    "menu": "Menu",
+    "fastNav": "Quick page navigation"
   },
   "errors": {
     "404": {
@@ -782,7 +784,15 @@
         "title": "City modifiers"
       },
       "tpUnavailable": "No open data available for this city yet.",
-      "usaCompareTitle": "Compare USA states"
+      "usaCompareTitle": "Compare USA states",
+      "notes": {
+        "languagesHard": "Language could be a struggle",
+        "englishNotEnough": "English alone may not be enough",
+        "russianCommon": "Russian is fairly widely spoken",
+        "remoteAwkward": "Remote work may be awkward on conditions and infrastructure",
+        "remoteFine": "Conditions for remote work are usually fine",
+        "localWorkHard": "Local work will be hard to find without the language"
+      }
     },
     "empty": {
       "text": "Try changing your search or pick another quiz.",

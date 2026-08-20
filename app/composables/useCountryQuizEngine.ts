@@ -142,14 +142,14 @@ function languagePenalty(user: UserProfile, entity: CountryEntity): { penalty: n
 
     if (en <= 1 && englishOk <= 1 && noLocal <= 1) {
         penalty += 2.5;
-        notes.push("С языками может быть тяжело");
+        notes.push("languagesHard");
     } else if (en <= 1 && englishOk <= 1) {
         penalty += 1.5;
-        notes.push("Английского может не хватить");
+        notes.push("englishNotEnough");
     }
 
     if (ru >= 2 && entity.languages.russian >= 2) {
-        notes.push("Русский встречается достаточно часто");
+        notes.push("russianCommon");
     }
 
     return {penalty, notes};
@@ -162,16 +162,16 @@ function workPenalty(user: UserProfile, entity: CountryEntity): { penalty: numbe
     if (user.job.type === "remote") {
         if (entity.work.remoteFriendly <= 1) {
             penalty += 1.0;
-            notes.push("Удалённая работа может быть неудобна по условиям/инфре");
+            notes.push("remoteAwkward");
         } else {
-            notes.push("Условия для удалёнки обычно ок");
+            notes.push("remoteFine");
         }
     }
 
     if (user.job.type === "local") {
         if (entity.work.localWithoutLocalLanguage <= 1 && levelToNum(user.languages.en) <= 1) {
             penalty += 2.0;
-            notes.push("Локальную работу без языка будет сложно найти");
+            notes.push("localWorkHard");
         }
     }
 
