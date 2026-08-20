@@ -1,0 +1,175 @@
+import type { Job } from './jobTypes'
+import { isLikelyTelegramVacancy } from './sources'
+
+interface TelegramChannel {
+  handle: string
+  label: string
+  location: string
+  tags: string[]
+}
+
+const EXTRA_TELEGRAM_JOB_CHANNELS: TelegramChannel[] = [
+  { handle: 'unilance', label: 'Unilance', location: 'Uzbekistan', tags: ['IT', 'Jobs'] },
+  { handle: 'jobmakon', label: 'Jobmakon', location: 'Uzbekistan', tags: ['IT', 'Jobs', 'Internships'] },
+  { handle: 'itjobstashkent', label: 'IT Jobs Tashkent', location: 'Tashkent, Uzbekistan', tags: ['IT', 'Jobs'] },
+]
+
+const UA = 'jobFinder/1.0 (job aggregator; contact: admin@whiteslove.me)'
+const DESC_MAX = 4000
+
+interface TelegramWorkerMessage {
+  id: number
+  text: string
+  date: string | null
+  preview?: string | null
+}
+
+function decodeTelegramEntities(text: string): string {
+  const named: Record<string, string> = {
+    amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", nbsp: ' ', ndash: '–', mdash: '—', bull: '•',
+  }
+  return text.replace(/&(#x?[0-9a-f]+|[a-z]+);/gi, (match, entity: string) => {
+    if (entity.startsWith('#')) {
+      const hex = entity[1]?.toLowerCase() === 'x'
+      const value = Number.parseInt(entity.slice(hex ? 2 : 1), hex ? 16 : 10)
+      return Number.isFinite(value) ? String.fromCodePoint(value) : match
+    }
+    return named[entity.toLowerCase()] ?? match
+  })
+}
+
+function telegramText(html: string): string {
+  return decodeTelegramEntities(
+    html
+      .replace(/<br\s*\/?>/gi, '\n')
+      .replace(/<\/(?:p|div|li|h[1-6])>/gi, '\n')
+      .replace(/<[^>]*>/g, ' '),
+  )
+    .split('\n')
+    .map((line) => line.replace(/\s+/g, ' ').trim())
+    .filter(Boolean)
+    .join('\n')
+    .trim()
+}
+
+function field(text: string, names: string): string | undefined {
+  const match = text.match(new RegExp(`(?:^|\\n)[^\\p{L}\\p{N}\\n]{0,6}(?:${names})\\s*[:—-]\\s*([^\\n]{2,120})`, 'iu'))
+  return match?.[1]?.trim()
+}
+
+function titleFromText(text: string, channel: TelegramChannel): string {
+  const explicit = field(text, 'vacancy|position|role|вакансия|позиция|посада|lavozim')
+  if (explicit) return explicit.slice(0, 180)
+
+  const line = text
+    .split('\n')
+    .map((value) => value.trim())
+    .find((value) => value.length >= 3 && value.length <= 180 && !/^#/.test(value))
+
+  return line || `Vacancy from ${channel.label}`
+}
+
+function toJob(
+  text: string,
+  channel: TelegramChannel,
+  id: string,
+  url: string,
+  date: string | null | undefined,
+): Job | null {
+  if (!isLikelyTelegramVacancy(text)) return null
+
+  const title = titleFromText(text, channel)
+  const company = field(text, 'company|employer|компания|работодатель|роботодавець|компанія|tashkilot|ish beruvchi') || channel.label
+  const location = field(text, 'location|city|локация|город|місто|manzil|shahar') || channel.location
+  const hashtags = [...text.matchAll(/(?:^|\s)#([\p{L}\p{N}_-]{2,40})/gu)].map((match) => match[1]!)
+
+  return {
+    id,
+    title,
+    company,
+    location,
+    url,
+    source: 'telegram',
+    remote: /remote|удал[её]н|віддален|masofaviy|онлайн|online/i.test(`${title} ${text}`),
+    tags: [...channel.tags, 'UZ', `@${channel.handle}`, ...hashtags].slice(0, 8),
+    postedAt: date && !Number.isNaN(Date.parse(date)) ? new Date(date).toISOString() : new Date().toISOString(),
+    description: text.slice(0, DESC_MAX),
+  }
+}
+
+async function fetchViaWorker(base: string, channel: TelegramChannel): Promise<Job[]> {
+  const url = `${base.replace(/\/+$/, '')}/history?channel=${encodeURIComponent(channel.handle)}&limit=100`
+  const res = await fetch(url, { signal: AbortSignal.timeout(15_000) })
+  if (!res.ok) throw new Error(`tg-worker @${channel.handle} -> ${res.status}`)
+
+  const data = (await res.json()) as { ok?: boolean; messages?: TelegramWorkerMessage[] }
+  if (!data.ok || !Array.isArray(data.messages)) throw new Error(`tg-worker @${channel.handle} bad payload`)
+
+  return data.messages
+    .map((message) => {
+      const text = [(message.text || '').trim(), (message.preview || '').trim()].filter(Boolean).join('\n')
+      if (!text) return null
+      return toJob(
+        text,
+        channel,
+        `telegram-${channel.handle}-${message.id}`,
+        `https://t.me/${channel.handle}/${message.id}`,
+        message.date,
+      )
+    })
+    .filter((job): job is Job => job !== null)
+}
+
+async function fetchViaPreview(channel: TelegramChannel): Promise<Job[]> {
+  const res = await fetch(`https://t.me/s/${encodeURIComponent(channel.handle)}`, {
+    headers: { 'User-Agent': UA, Accept: 'text/html,application/xhtml+xml' },
+    signal: AbortSignal.timeout(10_000),
+  })
+  if (!res.ok) throw new Error(`t.me/@${channel.handle} -> ${res.status}`)
+
+  const html = await res.text()
+  const jobs: Job[] = []
+  const chunks = html.split(/<div class="tgme_widget_message_wrap\b[^>]*>/i).slice(1)
+
+  for (const chunk of chunks) {
+    const post = chunk.match(/data-post="([^"]+)"/i)?.[1]
+    const body = chunk.match(/<div class="tgme_widget_message_text[^"]*"[^>]*>([\s\S]*?)<\/div>/i)?.[1]
+    if (!post || !body) continue
+
+    const datetime = chunk.match(/<time[^>]+datetime="([^"]+)"/i)?.[1]
+    const job = toJob(
+      telegramText(body),
+      channel,
+      `telegram-${post.replace(/[^a-z0-9_-]+/gi, '-')}`,
+      `https://t.me/${post}`,
+      datetime,
+    )
+    if (job) jobs.push(job)
+  }
+
+  return jobs
+}
+
+async function fetchChannel(channel: TelegramChannel): Promise<Job[]> {
+  const workerUrl = process.env.TELEGRAM_WORKER_URL
+  if (workerUrl) return fetchViaWorker(workerUrl, channel)
+  return fetchViaPreview(channel)
+}
+
+export async function fetchExtraTelegramJobs(q: string): Promise<Job[]> {
+  if (process.env.TELEGRAM_SOURCE === 'off') return []
+
+  const results = await Promise.all(
+    EXTRA_TELEGRAM_JOB_CHANNELS.map((channel) => fetchChannel(channel).catch((error) => {
+      console.error(`[jobs] telegram @${channel.handle} failed:`, (error as Error).message)
+      return [] as Job[]
+    })),
+  )
+
+  const jobs = results.flat()
+  if (!q) return jobs
+  const needle = q.toLocaleLowerCase('ru')
+  return jobs.filter((job) =>
+    `${job.title} ${job.company} ${job.description || ''}`.toLocaleLowerCase('ru').includes(needle),
+  )
+}
