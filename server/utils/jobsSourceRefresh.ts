@@ -41,6 +41,14 @@ async function fetchAllTelegram(q: string): Promise<Job[]> {
   return [...primary, ...extra]
 }
 
+async function fetchAllCompanies(q: string): Promise<Job[]> {
+  const [primary, linkedin] = await Promise.all([
+    fetchCompanies(q),
+    fetchLinkedInJobs(q),
+  ])
+  return [...primary, ...linkedin]
+}
+
 const FETCHERS: Record<JobSource, (q: string) => Promise<Job[]>> = {
   remotive: fetchRemotive,
   remoteok: fetchRemoteOk,
@@ -50,12 +58,11 @@ const FETCHERS: Record<JobSource, (q: string) => Promise<Job[]>> = {
   adzuna: fetchAdzuna,
   jooble: fetchJooble,
   rss: fetchRss,
-  companies: fetchCompanies,
+  companies: fetchAllCompanies,
   devkg: fetchDevKg,
   ishgo: fetchIshGo,
   itjobsuz: fetchItJobsUz,
   telegram: fetchAllTelegram,
-  linkedin: fetchLinkedInJobs,
   olx: fetchOlx,
 }
 
@@ -83,8 +90,6 @@ function isConfigured(source: JobSource): boolean {
       return process.env.ITJOBS_UZ_SOURCE !== 'off'
     case 'telegram':
       return process.env.TELEGRAM_SOURCE !== 'off'
-    case 'linkedin':
-      return process.env.LINKEDIN_SOURCE !== 'off'
     case 'olx':
       return process.env.OLX_SOURCE === 'on'
     default:
