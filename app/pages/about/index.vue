@@ -22,7 +22,7 @@ const HOBBIES = [
   { cp: "1f988", key: "sharks" },
 ];
 
-const { locale, tm, rt } = useI18n();
+const { tm, rt } = useI18n();
 // Copy lives in i18n/locales/*.json under `about`. tm() gives the message
 // tree for the active locale; a leaf may be a plain string or a compiled
 // message node depending on the build, so rt() resolves the latter.

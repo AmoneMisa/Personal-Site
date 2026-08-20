@@ -2062,5 +2062,43 @@
     "backLabel": "Back to home",
     "linkGithub": "GitHub",
     "seoTitle": "More about me — Marharyta Kubai"
+  },
+  "projects": {
+    "groups": {
+      "web-tools": "Web & tools",
+      "backend": "Backend",
+      "desktop-electron": "Desktop (Electron)",
+      "mobile": "Mobile",
+      "bots": "Bots",
+      "game-mods-patchers-c": "Game mods & patchers (C#)"
+    },
+    "descriptions": {
+      "whiteslove": "A personal platform of online tools: PDF editor, JSON merge, DockerHub tag search, email/markdown/SVG editors. The same stack as my main work — Nuxt with SSR, multi-language, a custom REST backend.",
+      "personal-site-backend": "The backend for the site's own services: a FastAPI REST API, file processing (PDF, conversion), Redis caching. It powers the tools in the catalog.",
+      "account-status-api-lost-ark": "The API behind the online module of the Account Status (Lost Ark) app.",
+      "i18n-properties-manager": "A localization-files manager, including .ftlh (Freemarker) — the same tech I use at BPC. Compare, merge and edit translation keys.",
+      "lost-ark": "Automatically pulls character data by parsing HTML, and tracks in-game activities with a scheduled auto-reset.",
+      "account-status-lost-ark": "A desktop app to save and check character status in Lost Ark (built for personal use). Its online module runs on a separate Node API.",
+      "medikit": "A home medicine-cabinet tracker: expiry dates, remaining stock, and shared family access.",
+      "fun-things-tracker": "Search, track and group what you want to (or already did) watch, read or visit: manga, books, films, series, places.",
+      "rustic-price-converter": "Currency conversion and on-the-fly price comparison.",
+      "flat-finder": "An apartment-search app.",
+      "genshin-impact-bot": "An open group bot: mini-games (cards, slots, bowling, bosses), an XP / loot / gear system, and admin tools for managing members.",
+      "amorality-discord-bot": "A Discord community bot.",
+      "lost-ark-trading-discord-bot": "A Discord bot for Lost Ark trading.",
+      "file-telegram-bot": "A Telegram bot for handling files.",
+      "increase-hard-mod-r-e-p-o": "A difficulty mod for a co-op game: scales enemies by run progress, adds random per-level modifiers and a team ping system over Photon.",
+      "autotranslatetexts": "A Skyrim patcher: auto-translates mod strings using already-existing translations (not a machine translator).",
+      "freefasttravel": "A Synthesis patcher for Skyrim: removes the fast-travel lock from exterior locations without touching quest ones.",
+      "allbookshaveperks": "A Skyrim patcher: adds a random perk to every book in the game.",
+      "moregoldformerchants": "A mod that increases the amount of gold merchants carry."
+    },
+    "eyebrow": "everything I've built",
+    "title": "Projects",
+    "subtitle": "The full list — from my work stack to desktop apps, bots and game mods. Grouped by type, most-relevant first.",
+    "open": "Open",
+    "soon": "Coming soon",
+    "seoTitle": "Projects — Marharyta Kubai",
+    "backHome": "Back to home"
   }
 }

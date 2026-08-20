@@ -1,27 +1,19 @@
 <script setup lang="ts">
 import { useProjects } from "~/composables/useProjects";
 
-const { locale } = useI18n();
+const { t } = useI18n();
 const localePath = useLocalePath();
 const groups = useProjects();
 
-const chrome = computed(() =>
-  locale.value === "en"
-    ? {
-        eyebrow: "everything I've built",
-        title: "Projects",
-        subtitle: "The full list — from my work stack to desktop apps, bots and game mods. Grouped by type, most-relevant first.",
-        open: "Open",
-        soon: "Coming soon",
-      }
-    : {
-        eyebrow: "всё, что я собрала",
-        title: "Проекты",
-        subtitle: "Полный список — от рабочего стека до десктопа, ботов и игровых модов. Сгруппировано по типу, ближе к стеку — выше.",
-        open: "Открыть",
-        soon: "Скоро",
-      }
-);
+// Copy lives in i18n/locales/*.json under `projects`, beside the group titles
+// and item descriptions that useProjects reads.
+const chrome = computed(() => ({
+  eyebrow: t("projects.eyebrow"),
+  title: t("projects.title"),
+  subtitle: t("projects.subtitle"),
+  open: t("projects.open"),
+  soon: t("projects.soon"),
+}));
 
 function resolveHref(href: string) {
   return href.startsWith("/") ? localePath(href) : href;
@@ -31,7 +23,7 @@ function isExternal(href: string | null) {
 }
 
 useSeoMeta({
-  title: () => (locale.value === "en" ? "Projects — Marharyta Kubai" : "Проекты — Маргарита Кубай"),
+  title: () => t("projects.seoTitle"),
   description: () => chrome.value.subtitle,
   ogType: "website",
   ogTitle: () => chrome.value.title,
@@ -80,7 +72,7 @@ useSeoMeta({
 
     <section class="rd-section projects-page__section">
       <div class="rd-wrap">
-        <a class="projects-page__back-link mono" :href="localePath('/')">← {{ locale === 'en' ? 'Back to home' : 'На главную' }}</a>
+        <a class="projects-page__back-link mono" :href="localePath('/')">← {{ t('projects.backHome') }}</a>
       </div>
     </section>
   </div>

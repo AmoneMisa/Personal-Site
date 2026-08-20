@@ -97,7 +97,7 @@ const education = [
 ];
 
 // Bilingual prose. `L` picks the current language.
-const { locale, t: translate, tm, rt } = useI18n();
+const { t: translate, tm, rt } = useI18n();
 // Copy lives in i18n/locales/*.json under `cv`.
 const t = (key: string) => translate(`cv.${key}`);
 // Arrays (language list, job bullets) come back as message nodes, so each

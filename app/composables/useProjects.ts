@@ -13,200 +13,176 @@ export interface ProjectGroup {
 }
 
 interface RawItem {
+  id: string;
   name: string;
   stack: string;
-  href: string | null;
-  ru: string;
-  en: string;
+  href: string;
 }
+// Group titles and item descriptions live in i18n/locales/*.json under
+// `projects`; what stays here is the structure and the things that are the
+// same in every language.
 interface RawGroup {
-  ru: string;
-  en: string;
+  id: string;
   items: RawItem[];
 }
 
 const GROUPS: RawGroup[] = [
   {
-    ru: "Веб и инструменты",
-    en: "Web & tools",
-    items: [
+    "id": "web-tools",
+    "items": [
       {
-        name: "WhitesLove — каталог инструментов",
-        stack: "Vue.js · Nuxt.js · SSR",
-        href: "/services",
-        ru: "Персональная платформа онлайн-инструментов: PDF-редактор, слияние JSON, поиск тегов DockerHub, редакторы email/markdown/SVG. Тот же стек, что и в основной работе — Nuxt с SSR, мультиязычность, собственный REST-бэкенд.",
-        en: "A personal platform of online tools: PDF editor, JSON merge, DockerHub tag search, email/markdown/SVG editors. The same stack as my main work — Nuxt with SSR, multi-language, a custom REST backend.",
-      },
-    ],
+        "id": "whiteslove",
+        "name": "WhitesLove — каталог инструментов",
+        "stack": "Vue.js · Nuxt.js · SSR",
+        "href": "/services"
+      }
+    ]
   },
   {
-    ru: "Backend",
-    en: "Backend",
-    items: [
+    "id": "backend",
+    "items": [
       {
-        name: "Personal Site Backend",
-        stack: "Python · FastAPI · PostgreSQL · Redis",
-        href: "https://github.com/AmoneMisa/Personal-Site/tree/master/backend",
-        ru: "Бэкенд для собственных сервисов сайта: REST API на FastAPI, обработка файлов (PDF, конвертация), кэширование в Redis. Питает инструменты из каталога.",
-        en: "The backend for the site's own services: a FastAPI REST API, file processing (PDF, conversion), Redis caching. It powers the tools in the catalog.",
+        "id": "personal-site-backend",
+        "name": "Personal Site Backend",
+        "stack": "Python · FastAPI · PostgreSQL · Redis",
+        "href": "https://github.com/AmoneMisa/Personal-Site/tree/master/backend"
       },
       {
-        name: "Account Status API (Lost Ark)",
-        stack: "Node.js",
-        href: "https://github.com/AmoneMisa/serverApi_AccountStatusLA",
-        ru: "API для онлайн-модуля приложения Account Status (Lost Ark).",
-        en: "The API behind the online module of the Account Status (Lost Ark) app.",
-      },
-    ],
+        "id": "account-status-api-lost-ark",
+        "name": "Account Status API (Lost Ark)",
+        "stack": "Node.js",
+        "href": "https://github.com/AmoneMisa/serverApi_AccountStatusLA"
+      }
+    ]
   },
   {
-    ru: "Десктоп (Electron)",
-    en: "Desktop (Electron)",
-    items: [
+    "id": "desktop-electron",
+    "items": [
       {
-        name: "i18n Properties Manager",
-        stack: "Electron.js · Vite",
-        href: "https://github.com/AmoneMisa/i18nPropertiesManager",
-        ru: "Менеджер файлов локализации, включая .ftlh (Freemarker) — та же технология, что я использую в работе на BPC. Сравнение, слияние и правка ключей перевода.",
-        en: "A localization-files manager, including .ftlh (Freemarker) — the same tech I use at BPC. Compare, merge and edit translation keys.",
+        "id": "i18n-properties-manager",
+        "name": "i18n Properties Manager",
+        "stack": "Electron.js · Vite",
+        "href": "https://github.com/AmoneMisa/i18nPropertiesManager"
       },
       {
-        name: "Менеджер персонажей для Lost Ark",
-        stack: "Electron.js · Vue.js",
-        href: null,
-        ru: "Автоматически подтягивает данные персонажей парсингом HTML, отслеживает игровые активности с автосбросом по расписанию.",
-        en: "Automatically pulls character data by parsing HTML, and tracks in-game activities with a scheduled auto-reset.",
+        "id": "lost-ark",
+        "name": "Менеджер персонажей для Lost Ark",
+        "stack": "Electron.js · Vue.js",
+        "href": null
       },
       {
-        name: "Account Status (Lost Ark)",
-        stack: "Electron.js · Vue.js",
-        href: "https://github.com/AmoneMisa/accountStatusLA",
-        ru: "Десктоп-приложение для сохранения и проверки статуса персонажей в Lost Ark (для личного использования). Онлайн-модуль работает через отдельный Node API.",
-        en: "A desktop app to save and check character status in Lost Ark (built for personal use). Its online module runs on a separate Node API.",
-      },
-    ],
+        "id": "account-status-lost-ark",
+        "name": "Account Status (Lost Ark)",
+        "stack": "Electron.js · Vue.js",
+        "href": "https://github.com/AmoneMisa/accountStatusLA"
+      }
+    ]
   },
   {
-    ru: "Мобильные",
-    en: "Mobile",
-    items: [
+    "id": "mobile",
+    "items": [
       {
-        name: "MediKit",
-        stack: "React Native · TypeScript",
-        href: "https://github.com/AmoneMisa/MediKit",
-        ru: "Приложение для учёта домашней аптечки: сроки годности, остатки лекарств и общий доступ для семьи.",
-        en: "A home medicine-cabinet tracker: expiry dates, remaining stock, and shared family access.",
+        "id": "medikit",
+        "name": "MediKit",
+        "stack": "React Native · TypeScript",
+        "href": "https://github.com/AmoneMisa/MediKit"
       },
       {
-        name: "Fun Things Tracker",
-        stack: "React Native (Expo) · TypeScript",
-        href: "https://github.com/AmoneMisa/FunThingsTracker",
-        ru: "Поиск, отслеживание и группировка того, что хочется или уже удалось посмотреть, прочитать или посетить: манга, книги, фильмы, сериалы, места.",
-        en: "Search, track and group what you want to (or already did) watch, read or visit: manga, books, films, series, places.",
+        "id": "fun-things-tracker",
+        "name": "Fun Things Tracker",
+        "stack": "React Native (Expo) · TypeScript",
+        "href": "https://github.com/AmoneMisa/FunThingsTracker"
       },
       {
-        name: "Rustic Price Converter",
-        stack: "Kotlin (native Android)",
-        href: "https://github.com/AmoneMisa/RusticPriceConvertor",
-        ru: "Конвертер валют и сравнение цен на лету.",
-        en: "Currency conversion and on-the-fly price comparison.",
+        "id": "rustic-price-converter",
+        "name": "Rustic Price Converter",
+        "stack": "Kotlin (native Android)",
+        "href": "https://github.com/AmoneMisa/RusticPriceConvertor"
       },
       {
-        name: "Flat Finder",
-        stack: "Dart · Flutter",
-        href: "https://github.com/AmoneMisa/flat-finder",
-        ru: "Приложение для поиска квартир.",
-        en: "An apartment-search app.",
-      },
-    ],
+        "id": "flat-finder",
+        "name": "Flat Finder",
+        "stack": "Dart · Flutter",
+        "href": "https://github.com/AmoneMisa/flat-finder"
+      }
+    ]
   },
   {
-    ru: "Боты",
-    en: "Bots",
-    items: [
+    "id": "bots",
+    "items": [
       {
-        name: "Genshin Impact bot",
-        stack: "Node.js · Telegram",
-        href: "https://github.com/AmoneMisa/Genshin-Impact-tg-bot",
-        ru: "Открытый бот для групп: мини-игры (карточки, слоты, боулинг, боссы), система опыта, лута и снаряжения, админ-инструменты для управления участниками.",
-        en: "An open group bot: mini-games (cards, slots, bowling, bosses), an XP / loot / gear system, and admin tools for managing members.",
+        "id": "genshin-impact-bot",
+        "name": "Genshin Impact bot",
+        "stack": "Node.js · Telegram",
+        "href": "https://github.com/AmoneMisa/Genshin-Impact-tg-bot"
       },
       {
-        name: "Amorality Discord bot",
-        stack: "Node.js · Discord",
-        href: "https://github.com/AmoneMisa/amorality-discord-bot",
-        ru: "Discord-бот для сообщества.",
-        en: "A Discord community bot.",
+        "id": "amorality-discord-bot",
+        "name": "Amorality Discord bot",
+        "stack": "Node.js · Discord",
+        "href": "https://github.com/AmoneMisa/amorality-discord-bot"
       },
       {
-        name: "Lost Ark trading Discord bot",
-        stack: "Node.js · Discord",
-        href: "https://github.com/AmoneMisa/discord-LA-commercial-bot",
-        ru: "Discord-бот для торговли в Lost Ark.",
-        en: "A Discord bot for Lost Ark trading.",
+        "id": "lost-ark-trading-discord-bot",
+        "name": "Lost Ark trading Discord bot",
+        "stack": "Node.js · Discord",
+        "href": "https://github.com/AmoneMisa/discord-LA-commercial-bot"
       },
       {
-        name: "File Telegram bot",
-        stack: "Node.js · Telegram",
-        href: "https://github.com/AmoneMisa/file-telegram-bot",
-        ru: "Telegram-бот для работы с файлами.",
-        en: "A Telegram bot for handling files.",
-      },
-    ],
+        "id": "file-telegram-bot",
+        "name": "File Telegram bot",
+        "stack": "Node.js · Telegram",
+        "href": "https://github.com/AmoneMisa/file-telegram-bot"
+      }
+    ]
   },
   {
-    ru: "Моды и патчеры для игр (C#)",
-    en: "Game mods & patchers (C#)",
-    items: [
+    "id": "game-mods-patchers-c",
+    "items": [
       {
-        name: "Increase Hard Mod — R.E.P.O.",
-        stack: "C# · BepInEx / HarmonyLib",
-        href: "https://github.com/AmoneMisa/Repo-Increase-Difficulty-Mod",
-        ru: "Мод сложности для кооп-игры: масштабирует врагов по прогрессу забега, добавляет случайные модификаторы за уровень и командную систему пинга поверх Photon.",
-        en: "A difficulty mod for a co-op game: scales enemies by run progress, adds random per-level modifiers and a team ping system over Photon.",
+        "id": "increase-hard-mod-r-e-p-o",
+        "name": "Increase Hard Mod — R.E.P.O.",
+        "stack": "C# · BepInEx / HarmonyLib",
+        "href": "https://github.com/AmoneMisa/Repo-Increase-Difficulty-Mod"
       },
       {
-        name: "AutoTranslateTexts",
-        stack: "C# · Skyrim SE/AE",
-        href: "https://github.com/AmoneMisa/AutoTranslateTexts",
-        ru: "Патчер для Skyrim: автоперевод строк модов через уже существующие переводы (не машинный переводчик).",
-        en: "A Skyrim patcher: auto-translates mod strings using already-existing translations (not a machine translator).",
+        "id": "autotranslatetexts",
+        "name": "AutoTranslateTexts",
+        "stack": "C# · Skyrim SE/AE",
+        "href": "https://github.com/AmoneMisa/AutoTranslateTexts"
       },
       {
-        name: "FreeFastTravel",
-        stack: "C# · Synthesis / Mutagen",
-        href: "https://github.com/AmoneMisa/FreeFastTravel",
-        ru: "Synthesis-патчер для Skyrim: снимает блокировку быстрого перемещения с внешних локаций, не трогая квестовые.",
-        en: "A Synthesis patcher for Skyrim: removes the fast-travel lock from exterior locations without touching quest ones.",
+        "id": "freefasttravel",
+        "name": "FreeFastTravel",
+        "stack": "C# · Synthesis / Mutagen",
+        "href": "https://github.com/AmoneMisa/FreeFastTravel"
       },
       {
-        name: "AllBooksHavePerks",
-        stack: "C# · Skyrim SE/AE",
-        href: "https://github.com/AmoneMisa/AllBooksHavePerks",
-        ru: "Патчер для Skyrim: добавляет случайный перк к каждой книге в игре.",
-        en: "A Skyrim patcher: adds a random perk to every book in the game.",
+        "id": "allbookshaveperks",
+        "name": "AllBooksHavePerks",
+        "stack": "C# · Skyrim SE/AE",
+        "href": "https://github.com/AmoneMisa/AllBooksHavePerks"
       },
       {
-        name: "MoreGoldForMerchants",
-        stack: "C# · Skyrim",
-        href: "https://github.com/AmoneMisa/MoreGoldForMerchants",
-        ru: "Мод для увеличения количества золота у торговцев.",
-        en: "A mod that increases the amount of gold merchants carry.",
-      },
-    ],
-  },
+        "id": "moregoldformerchants",
+        "name": "MoreGoldForMerchants",
+        "stack": "C# · Skyrim",
+        "href": "https://github.com/AmoneMisa/MoreGoldForMerchants"
+      }
+    ]
+  }
 ];
 
 export function useProjects() {
-  const { locale } = useI18n();
+  const { t } = useI18n();
   return computed<ProjectGroup[]>(() =>
     GROUPS.map((g) => ({
-      title: locale.value === "en" ? g.en : g.ru,
+      title: t(`projects.groups.${g.id}`),
       items: g.items.map((it) => ({
         name: it.name,
         stack: it.stack,
         href: it.href,
-        description: locale.value === "en" ? it.en : it.ru,
+        description: t(`projects.descriptions.${it.id}`),
       })),
     }))
   );
