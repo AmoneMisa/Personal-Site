@@ -1,19 +1,30 @@
-// Cold-start populate: if the vacancy store is empty when Nitro boots (fresh
-// deploy, or after the 15-day TTL lapsed), kick a refresh in the background so
-// the first visitor isn't served an empty list. Fire-and-forget — never blocks
-// startup, and the daily scheduled task keeps it fresh thereafter.
+// Cold-start populate: refresh every configured source shortly after Nitro boots.
+// The source-aware refresher isolates upstream failures and merges each successful
+// source into the same Redis store used by /jobs-feed.
 
-import { refreshJobStore } from '~~/server/utils/jobsStore'
+import {
+  configuredJobSources,
+  refreshJobSource,
+} from '~~/server/utils/jobsSourceRefresh'
 
 export default defineNitroPlugin(() => {
-  // Defer slightly so boot completes first. Refresh on every deployment: the
-  // configured source set may have changed even when an older store exists.
   setTimeout(async () => {
-    try {
-      const summary = await refreshJobStore()
-      console.log(`[jobs:warmup] store refreshed: stored=${summary.stored}`)
-    } catch (err) {
-      console.error('[jobs:warmup] failed:', (err as Error).message)
-    }
+    const sources = configuredJobSources()
+    const results = await Promise.allSettled(sources.map((source) => refreshJobSource(source)))
+
+    let fetched = 0
+    const failed: string[] = []
+
+    results.forEach((result, index) => {
+      const source = sources[index]!
+      if (result.status === 'rejected') {
+        failed.push(source)
+        console.error(`[jobs:warmup:${source}] failed:`, result.reason instanceof Error ? result.reason.message : String(result.reason))
+        return
+      }
+      fetched += result.value.fetched || 0
+    })
+
+    console.log(`[jobs:warmup] fetched=${fetched} failed=${failed.length}`)
   }, 2000)
 })
