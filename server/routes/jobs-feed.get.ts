@@ -44,8 +44,6 @@ function isConfigured(source: JobSource): boolean {
       return process.env.ITJOBS_UZ_SOURCE !== 'off'
     case 'telegram':
       return process.env.TELEGRAM_SOURCE !== 'off'
-    case 'linkedin':
-      return process.env.LINKEDIN_SOURCE !== 'off'
     case 'olx':
       // Explicit opt-in: OLX currently blocks the public endpoint on some IPs.
       return process.env.OLX_SOURCE === 'on'
