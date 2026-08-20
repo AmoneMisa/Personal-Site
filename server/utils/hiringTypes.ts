@@ -18,8 +18,10 @@ export interface CvProfile {
   country: string
   /** Candidate full name when known. */
   name: string
-  /** Target role / headline on the CV. */
+  /** Primary normalized profession/headline. Kept for backwards compatibility. */
   role: string
+  /** All normalized professions explicitly supported by the candidate's post. */
+  professions?: string[]
   experienceYears?: number | null
   /** Expected compensation when the CV mentions it. */
   salaryMin?: number | null
