@@ -20,6 +20,7 @@ type StoredProfile = CvProfile & { lastSeen: string }
 
 let memoryStore: StoredProfile[] = []
 let memoryValidUntil = 0
+let refreshAttempted = false
 let refreshInFlight: Promise<{ fetched: number; stored: number }> | undefined
 
 function dedupKey(profile: CvProfile): string {
@@ -110,6 +111,7 @@ async function persistStore(list: StoredProfile[]) {
 export async function refreshHiringStore(): Promise<{ fetched: number; stored: number }> {
   if (refreshInFlight) return refreshInFlight
   refreshInFlight = performRefresh().finally(() => {
+    refreshAttempted = true
     refreshInFlight = undefined
   })
   return refreshInFlight
@@ -140,5 +142,5 @@ async function performRefresh(): Promise<{ fetched: number; stored: number }> {
 }
 
 export function isHiringStoreCold(): boolean {
-  return memoryStore.length === 0
+  return memoryStore.length === 0 && !refreshAttempted
 }
