@@ -100,7 +100,6 @@ export type JobSource =
   | 'ishgo'
   | 'itjobsuz'
   | 'telegram'
-  | 'linkedin'
   | 'olx'
 
 export const FREE_SOURCES: JobSource[] = [
@@ -111,7 +110,6 @@ export const FREE_SOURCES: JobSource[] = [
   'jobicy',
   'devkg',
   'telegram',
-  'linkedin',
 ]
 
 export const OPTIONAL_SOURCES: JobSource[] = [
