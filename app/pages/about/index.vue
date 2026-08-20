@@ -22,111 +22,23 @@ const HOBBIES = [
   { cp: "1f988", key: "sharks" },
 ];
 
-const RU = {
-  heroEyebrow: "обо мне подробнее",
-  heroTitle: "Подробнее обо мне",
-  heroLead: "Главная — про работу за десять секунд. Здесь — то, что интереснее читать, когда уже зацепило: как я хочу работать, что делаю вне работы и откуда пришла в разработку.",
-  personEyebrow: "что я за человек",
-  personTitle: "Что я за человек",
-  personIntro: "Украинка, сейчас живу в Бухаресте. Немного о том, как я работаю и что мне важно — помимо строчек в резюме.",
-  person: [
-    "Беру задачу целиком — мне спокойнее довести фичу от макета до продакшена и деплоя, чем передавать её по кусочкам.",
-    "Не паникую на пожаре: баги и регрессии в проде под нагрузкой — это про «сфокусироваться и починить», а не про стресс.",
-    "Учусь через практику — осваиваю новое, собирая пет-проекты: от Electron-приложений до ботов и мобильных.",
-    "Люблю понятность: чужой легаси разбираю аккуратно и оставляю код чище, чем нашла.",
-    "Командный человек — спокойно работаю с бэкендом, тестировщиками и дизайнером, подключаюсь к клиенту, когда нужна техническая сторона.",
-  ],
-  workEyebrow: "как я хочу работать",
-  workTitle: "Формат работы и логистика",
-  work: [
-    "Полностью удалённая работа — в приоритете.",
-    "Рассматриваю релокацию в Ташкент.",
-    "Либо гибрид в Майами, Нью-Йорке, Лос-Анджелесе, Сан-Франциско или Новом Орлеане — с визовой поддержкой, включающей переезд с супругом.",
-    "Внутри команды русский, английский или украинский — со всеми ок.",
-  ],
-  projectsEyebrow: "ещё вне работы",
-  projectsTitle: "Проекты, не попавшие на главную",
-  backend: {
-    kind: "Backend · Python",
-    title: "Personal Site Backend",
-    description: "Бэкенд для собственных сервисов сайта: Python, PostgreSQL, Redis, WebSockets. Отсюда работают инструменты из каталога.",
-  },
-  modsTitle: "Моды и патчеры для игр (C#)",
-  hobbiesEyebrow: "вне экрана кода",
-  hobbiesTitle: "Старые увлечения",
-  hobbies: {
-    solo: { title: "Solo Leveling: Arise", subtitle: "текущее прохождение" },
-    l2: { title: "Lineage 2", subtitle: "с юности" },
-    gta: { title: "GTA", subtitle: "олдскул" },
-    cats: { title: "Коты", subtitle: "официальный soft skill" },
-    sharks: { title: "Акулы", subtitle: "талисман сайта" },
-  },
-  eduEyebrow: "откуда пришла",
-  eduTitle: "Образование",
-  eduNote: "Юридическое, не по специальности — но часть истории того, как я оказалась в разработке.",
-  edu: [
-    { period: "2015 — 2019", school: "Харьковский национальный университет им. В. Н. Каразина", degree: "Магистр, гражданское право" },
-    { period: "2019 — 2020", school: "Национальный юридический университет — Институт криминалистики", degree: "Бакалавр" },
-  ],
-  backLabel: "На главную",
-  linkGithub: "GitHub",
+const { locale, tm, rt } = useI18n();
+// Copy lives in i18n/locales/*.json under `about`. tm() gives the message
+// tree for the active locale; a leaf may be a plain string or a compiled
+// message node depending on the build, so rt() resolves the latter.
+const resolve = (node: unknown): unknown => {
+  if (Array.isArray(node)) return node.map(resolve);
+  if (node !== null && typeof node === "object") {
+    const record = node as Record<string, unknown>;
+    if ("type" in record || "body" in record || "loc" in record) return rt(node as never);
+    return Object.fromEntries(Object.entries(record).map(([k, v]) => [k, resolve(v)]));
+  }
+  return node;
 };
-
-const EN: typeof RU = {
-  heroEyebrow: "more about me",
-  heroTitle: "More about me",
-  heroLead: "The home page is the ten-second version. This is the part that's nicer to read once you're interested: how I want to work, what I do outside work, and how I got into development.",
-  personEyebrow: "what kind of person I am",
-  personTitle: "What kind of person I am",
-  personIntro: "Ukrainian citizen, currently living in Bucharest. A bit about how I work and what matters to me — beyond the resume bullets.",
-  person: [
-    "I take the whole task — I'd rather carry a feature from mockup to production and deploy than hand it off in pieces.",
-    "I don't panic when things are on fire: prod bugs and regressions under load are about focusing and fixing, not stress.",
-    "I learn by building — I pick up new things through pet projects, from Electron apps to bots and mobile.",
-    "I like clarity: I untangle other people's legacy carefully and leave the code cleaner than I found it.",
-    "I'm a team person — I work easily with backend, testers and the designer, and step in with clients when the technical side is needed.",
-  ],
-  workEyebrow: "how I want to work",
-  workTitle: "Work format & logistics",
-  work: [
-    "Fully remote — my priority.",
-    "Open to relocation to Tashkent.",
-    "Or hybrid in Miami, New York, Los Angeles, San Francisco or New Orleans — with visa sponsorship that covers relocating with my spouse.",
-    "Russian, English or Ukrainian inside the team — all fine with me.",
-  ],
-  projectsEyebrow: "more outside work",
-  projectsTitle: "Projects that didn't make the home page",
-  backend: {
-    kind: "Backend · Python",
-    title: "Personal Site Backend",
-    description: "The backend for this site's own services: Python, PostgreSQL, Redis, WebSockets. It powers the tools in the catalog.",
-  },
-  modsTitle: "Game mods & patchers (C#)",
-  hobbiesEyebrow: "away from the code",
-  hobbiesTitle: "Long-time hobbies",
-  hobbies: {
-    solo: { title: "Solo Leveling: Arise", subtitle: "currently playing" },
-    l2: { title: "Lineage 2", subtitle: "since my teens" },
-    gta: { title: "GTA", subtitle: "old-school" },
-    cats: { title: "Cats", subtitle: "official soft skill" },
-    sharks: { title: "Sharks", subtitle: "the site's mascot" },
-  },
-  eduEyebrow: "where I came from",
-  eduTitle: "Education",
-  eduNote: "Law, not my current field — but part of the story of how I ended up in development.",
-  edu: [
-    { period: "2015 — 2019", school: "V. N. Karazin Kharkiv National University", degree: "Master's, Civil law" },
-    { period: "2019 — 2020", school: "National Law University — Institute of Criminal Investigation and Forensics", degree: "Bachelor's" },
-  ],
-  backLabel: "Back to home",
-  linkGithub: "GitHub",
-};
-
-const { locale } = useI18n();
-const c = computed(() => (locale.value === "en" ? EN : RU));
+const c = computed(() => resolve(tm("about")) as Record<string, any>);
 
 useSeoMeta({
-  title: () => (locale.value === "en" ? "More about me — Marharyta Kubai" : "Подробнее обо мне — Маргарита Кубай"),
+  title: () => c.value.seoTitle,
   description: () => c.value.heroLead,
   ogType: "profile",
   ogTitle: () => c.value.heroTitle,
