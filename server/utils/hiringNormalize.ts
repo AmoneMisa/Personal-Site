@@ -2,7 +2,7 @@
 // Free-form posts are normalized without overwriting the original message.
 
 import { canonicalSkillName, extractSkillDetails } from '~~/shared/jobSkills'
-import type { CvProfile } from './hiringTypes'
+import type { CandidateEmploymentType, CvProfile } from './hiringTypes'
 import type { Seniority } from './jobTypes'
 
 const B = '(?<![\\p{L}\\p{N}])'
@@ -38,7 +38,7 @@ export function normalizeSkills(rawSkills: string[] | undefined, text: string): 
     if (canonical) out.add(canonical)
     else {
       const trimmed = raw.trim().replace(/\s{2,}/g, ' ')
-      if (trimmed.length >= 2 && trimmed.length <= 40) out.add(trimmed)
+      if (trimmed.length >= 2 && trimmed.length <= 60) out.add(trimmed)
     }
   }
   for (const { name } of extractSkillDetails(text)) out.add(name)
@@ -118,20 +118,36 @@ function collectProfessions(source: string): string[] {
 }
 
 export function normalizeProfessions(rawRole: string | undefined, text: string): string[] {
-  // The parsed target-role line wins. This prevents a previous job mentioned in
-  // the experience section from becoming a false current profession.
+  // Desired-role text wins. Previous employment elsewhere in the CV must not
+  // silently become a current target profession.
   const target = cleanRole(rawRole)
   const targetMatches = target ? collectProfessions(target) : []
   if (targetMatches.length) return targetMatches
 
-  // Fallback only when the source had no usable target-role line.
-  const fallbackMatches = collectProfessions(text.slice(0, 1400))
+  // If no structured desired role exists, only inspect the beginning of the post
+  // where job-seeker intent/headlines normally live; avoid deep work-history text.
+  const fallbackMatches = collectProfessions(text.slice(0, 900))
   if (fallbackMatches.length) return fallbackMatches
   return target ? [target] : []
 }
 
 export function normalizeRole(role: string | undefined, text: string): string {
   return normalizeProfessions(role, text)[0] || cleanRole(role)
+}
+
+function workHistoryBlock(text: string): string {
+  const explicit = text.match(/(?:^|\n)\s*(?:опыт\s+работы|досвід\s+роботи|work\s+experience|previous\s+(?:jobs?|positions?)|tajriba|ish\s+tajribasi)\s*[:—-]?\s*([\s\S]{1,2600}?)(?=\n\s*(?:навыки|навички|skills|образование|освіта|education|контакт|contact|ожидания|salary|языки|мови|languages)\s*[:—-]|$)/iu)
+  if (explicit?.[1]) return explicit[1]
+
+  // Unstructured posts often use "работал/работала ..." without a heading.
+  return text.split('\n').filter((line) =>
+    /(?:работал[аи]?|працюва(?:в|ла)|worked\s+(?:as|at)|ishlagan|ishladim|ishlaganman)/iu.test(line),
+  ).join('\n')
+}
+
+export function normalizePreviousProfessions(text: string): string[] {
+  const history = workHistoryBlock(text)
+  return history ? collectProfessions(history) : []
 }
 
 interface FeatureRule { name: string; re: RegExp }
@@ -141,7 +157,7 @@ const FEATURE_RULES: FeatureRule[] = [
   { name: 'No experience', re: /без\s+опыта|без\s+досвіду|no\s+experience|tajriba\s+yo(?:'|’)q/iu },
   { name: 'Part-time', re: /подработк|підробіт|part[-\s]?time|неполный\s+день|неповн(?:ий|а)\s+день|yarim\s+stavka/iu },
   { name: 'Night shift', re: /ночн(?:ая|ую|ой)\s+смен|нічн(?:а|у|ої)\s+змін|night\s+shift|tungi\s+smena/iu },
-  { name: 'Open to relocation', re: /релокац|переезд|переїзд|relocat|ko(?:'|’)chib\s+o(?:'|’)tish/iu },
+  { name: 'Open to relocation', re: /готов\p{L}*\s+к\s+переезду|готов\p{L}*\s+переехать|готов\p{L}*\s+до\s+переїзду|relocat(?:e|ion)|ko(?:'|’)chib\s+o(?:'|’)tish/iu },
 ]
 
 export function extractCandidateFeatures(text: string): string[] {
@@ -162,18 +178,58 @@ export function extractContacts(text: string): { telegram?: string; email?: stri
   return out
 }
 
+export function extractAge(text: string): number | null {
+  const patterns = [
+    /(?:возраст|вік|age|yosh)\s*[:—-]?\s*(\d{1,2})/iu,
+    /(?:мне|мені)\s+(\d{1,2})\s*(?:лет|рок(?:и|ів)?)/iu,
+    /(?:^|\n)\s*(\d{1,2})\s*(?:лет|рок(?:и|ів)?|yosh)\b/iu,
+  ]
+  for (const pattern of patterns) {
+    const match = text.match(pattern)
+    const age = match ? Number(match[1]) : Number.NaN
+    if (Number.isFinite(age) && age >= 14 && age <= 90) return age
+  }
+  return null
+}
+
+export function detectRelocationReady(text: string): boolean | null {
+  if (/не\s+готов\p{L}*\s+к\s+переезду|не\s+розгляда\p{L}*\s+переїзд|not\s+(?:open|ready)\s+to\s+relocat/iu.test(text)) return false
+  if (/готов\p{L}*\s+к\s+переезду|готов\p{L}*\s+переехать|готов\p{L}*\s+до\s+переїзду|relocat(?:e|ion)|ko(?:'|’)chib\s+o(?:'|’)tish/iu.test(text)) return true
+  return null
+}
+
+export function normalizeEmploymentTypes(text: string, raw?: string | null): CandidateEmploymentType[] {
+  const source = `${raw || ''}\n${text}`
+  const out = new Set<CandidateEmploymentType>()
+  if (/full[-\s]?time|полный\s+(?:рабочий\s+)?день|полная\s+занятость|повн(?:ий|а)\s+(?:робочий\s+)?день|повна\s+зайнятість|to(?:'|’)liq\s+(?:ish|stavka)/iu.test(source)) out.add('full_time')
+  if (/part[-\s]?time|неполный\s+(?:рабочий\s+)?день|частичная\s+занятость|подработк|неповн(?:ий|а)\s+(?:робочий\s+)?день|часткова\s+зайнятість|підробіт|yarim\s+stavka/iu.test(source)) out.add('part_time')
+  return [...out]
+}
+
 export function normalizeCandidate(profile: CvProfile): CvProfile {
   const originalText = profile.originalText || profile.description || ''
   const text = `${profile.name || ''}\n${profile.role || ''}\n${originalText}`
   const contacts = extractContacts(text)
   const professions = normalizeProfessions(profile.role, originalText)
+  const age = profile.age ?? extractAge(originalText)
+  const employmentTypes = profile.employmentTypes?.length
+    ? profile.employmentTypes
+    : normalizeEmploymentTypes(originalText, profile.employmentType)
+
   return {
     ...profile,
     originalText,
     description: profile.description || originalText,
     role: professions[0] || normalizeRole(profile.role, originalText),
     professions,
+    previousProfessions: profile.previousProfessions?.length
+      ? profile.previousProfessions
+      : normalizePreviousProfessions(originalText),
     features: [...new Set([...(profile.features || []), ...extractCandidateFeatures(originalText)])],
+    age,
+    isAdult: age == null ? true : age >= 18,
+    relocationReady: profile.relocationReady ?? detectRelocationReady(originalText),
+    employmentTypes,
     skills: normalizeSkills(profile.skills, originalText),
     seniority: profile.seniority ?? detectSeniority(text, profile.experienceYears),
     contact: profile.contact || contacts.telegram || contacts.email || contacts.phone || null,
