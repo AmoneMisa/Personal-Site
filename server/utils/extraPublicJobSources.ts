@@ -1,0 +1,246 @@
+import type { Job } from './jobTypes'
+
+type PublicBoard = {
+  label: string
+  url: string
+  remoteByDefault?: boolean
+}
+
+// Sources collected from the community/profile links supplied for Job Finder.
+// These are public candidate-facing listings, not the social profiles themselves.
+// Each board is isolated: a block/markup change produces [] for that board only.
+const PUBLIC_JOB_BOARDS: PublicBoard[] = [
+  { label: 'Remote Source', url: 'https://www.remotesource.com/jobs', remoteByDefault: true },
+  { label: 'TaskFavour', url: 'https://www.taskfavour.com/jobs' },
+  { label: 'Tech Leads Community', url: 'https://techleadscommunity.com/', remoteByDefault: true },
+  { label: '4 Day Week', url: 'https://4dayweek.io/jobs' },
+  { label: '80,000 Hours', url: 'https://jobs.80000hours.org/' },
+  { label: 'Welcome to the Jungle', url: 'https://www.welcometothejungle.com/en/jobs' },
+  { label: 'Working Nomads', url: 'https://www.workingnomads.com/', remoteByDefault: true },
+  { label: 'Remote.co', url: 'https://remote.co/remote-jobs', remoteByDefault: true },
+  { label: 'Virtual Vocations', url: 'https://www.virtualvocations.com/jobs/', remoteByDefault: true },
+  { label: 'Jobspresso', url: 'https://jobspresso.co/jobs/', remoteByDefault: true },
+  { label: 'Wellfound', url: 'https://wellfound.com/jobs' },
+  { label: 'Dice', url: 'https://www.dice.com/jobs?location=&q=' },
+  { label: 'SimplyHired', url: 'https://www.simplyhired.com/' },
+  { label: 'Escape the City', url: 'https://www.escapethecity.org/search/jobs' },
+  { label: 'Diversity Jobs Group', url: 'https://diversityjobsgroup.com/job-listings/' },
+]
+
+const UA =
+  'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ' +
+  '(KHTML, like Gecko) Chrome/126.0 Safari/537.36'
+const REQUEST_TIMEOUT_MS = 12_000
+const MAX_PER_BOARD = 100
+
+function decodeEntities(value: string): string {
+  const named: Record<string, string> = {
+    amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", nbsp: ' ', ndash: '–', mdash: '—',
+  }
+  return value.replace(/&(#x?[0-9a-f]+|[a-z]+);/gi, (match, entity: string) => {
+    if (entity.startsWith('#')) {
+      const hex = entity[1]?.toLowerCase() === 'x'
+      const code = Number.parseInt(entity.slice(hex ? 2 : 1), hex ? 16 : 10)
+      return Number.isFinite(code) ? String.fromCodePoint(code) : match
+    }
+    return named[entity.toLowerCase()] ?? match
+  })
+}
+
+function stripHtml(value: unknown): string {
+  return decodeEntities(String(value || ''))
+    .replace(/<br\s*\/?>/gi, ' ')
+    .replace(/<[^>]*>/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+function validDate(value: unknown): string {
+  const time = Date.parse(String(value || ''))
+  return Number.isNaN(time) ? new Date().toISOString() : new Date(time).toISOString()
+}
+
+function absoluteUrl(raw: string, base: string): string | undefined {
+  try {
+    const url = new URL(decodeEntities(raw), base)
+    if (!/^https?:$/.test(url.protocol)) return undefined
+    url.hash = ''
+    return url.toString()
+  } catch {
+    return undefined
+  }
+}
+
+function locationFromPosting(posting: any): string {
+  const raw = Array.isArray(posting?.jobLocation)
+    ? posting.jobLocation
+    : posting?.jobLocation
+      ? [posting.jobLocation]
+      : []
+
+  const values = raw
+    .map((item: any) => item?.address || item)
+    .map((address: any) => [
+      address?.addressLocality,
+      address?.addressRegion,
+      address?.addressCountry?.name || address?.addressCountry,
+    ].filter(Boolean).join(', '))
+    .filter(Boolean)
+
+  if (values.length) return [...new Set(values)].join('; ')
+  if (posting?.jobLocationType === 'TELECOMMUTE') return 'Remote'
+  return 'See listing'
+}
+
+function jsonLdNodes(value: any): any[] {
+  if (!value) return []
+  if (Array.isArray(value)) return value.flatMap(jsonLdNodes)
+  const graph = value?.['@graph']
+  return graph ? jsonLdNodes(graph) : [value]
+}
+
+function parseJsonLd(html: string, board: PublicBoard): Job[] {
+  const out: Job[] = []
+  const re = /<script[^>]*type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi
+  let match: RegExpExecArray | null
+
+  while ((match = re.exec(html))) {
+    let parsed: any
+    try {
+      parsed = JSON.parse(match[1]!)
+    } catch {
+      continue
+    }
+
+    for (const node of jsonLdNodes(parsed)) {
+      const type = node?.['@type']
+      const isJob = type === 'JobPosting' || (Array.isArray(type) && type.includes('JobPosting'))
+      if (!isJob || !node?.title) continue
+
+      const url = absoluteUrl(String(node.url || node.sameAs || ''), board.url)
+      if (!url) continue
+      const location = locationFromPosting(node)
+      const company = stripHtml(node?.hiringOrganization?.name) || board.label
+      const description = stripHtml(node.description)
+
+      out.push({
+        id: `public-${board.label.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-${url}`,
+        title: stripHtml(node.title),
+        company,
+        location,
+        url,
+        source: 'companies',
+        remote: board.remoteByDefault === true
+          || node.jobLocationType === 'TELECOMMUTE'
+          || /remote|anywhere|worldwide/i.test(`${node.title} ${location} ${description}`),
+        tags: [board.label],
+        postedAt: validDate(node.datePosted),
+        employmentType: Array.isArray(node.employmentType) ? node.employmentType[0] : node.employmentType,
+        description: description.slice(0, 4000) || undefined,
+      })
+    }
+  }
+
+  return out
+}
+
+function looksLikeJobUrl(url: URL): boolean {
+  const path = url.pathname.toLowerCase().replace(/\/+$/, '')
+  if (!path || path === '/') return false
+
+  if (/\/(?:login|signin|signup|register|pricing|employers?|companies|categories|search)(?:\/|$)/.test(path)) {
+    return false
+  }
+
+  // A detail route normally contains a segment after the job-like noun.
+  return /\/(?:jobs?|job|vacanc(?:y|ies)|positions?|openings?|opportunities)\/[a-z0-9][^/]{2,}/i.test(path)
+    || /\/job[-_][a-z0-9][a-z0-9_-]{4,}/i.test(path)
+}
+
+function parseAnchors(html: string, board: PublicBoard): Job[] {
+  const byUrl = new Map<string, string>()
+  const re = /<a\b[^>]*href=["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>/gi
+  let match: RegExpExecArray | null
+
+  while ((match = re.exec(html))) {
+    const href = absoluteUrl(match[1]!, board.url)
+    if (!href) continue
+
+    let parsed: URL
+    try {
+      parsed = new URL(href)
+    } catch {
+      continue
+    }
+    if (!looksLikeJobUrl(parsed)) continue
+
+    const title = stripHtml(match[2])
+    if (title.length < 3 || title.length > 180) continue
+    if (/^(apply|view|details?|read more|learn more|save|next|previous)$/i.test(title)) continue
+
+    const existing = byUrl.get(href)
+    if (!existing || title.length < existing.length) byUrl.set(href, title)
+    if (byUrl.size >= MAX_PER_BOARD) break
+  }
+
+  const now = new Date().toISOString()
+  return [...byUrl.entries()].map(([url, title]) => ({
+    id: `public-${board.label.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-${url}`,
+    title,
+    company: board.label,
+    location: board.remoteByDefault ? 'Remote' : 'See listing',
+    url,
+    source: 'companies',
+    remote: board.remoteByDefault === true || /remote|anywhere|worldwide/i.test(title),
+    tags: [board.label],
+    postedAt: now,
+  }))
+}
+
+async function fetchBoard(board: PublicBoard): Promise<Job[]> {
+  const response = await fetch(board.url, {
+    headers: {
+      'User-Agent': UA,
+      Accept: 'text/html,application/xhtml+xml',
+      'Accept-Language': 'en-US,en;q=0.9',
+    },
+    signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+  })
+
+  if (!response.ok) throw new Error(`${board.label} -> ${response.status}`)
+  const html = await response.text()
+
+  const byUrl = new Map<string, Job>()
+  for (const job of [...parseJsonLd(html, board), ...parseAnchors(html, board)]) {
+    byUrl.set(job.url, job)
+    if (byUrl.size >= MAX_PER_BOARD) break
+  }
+  return [...byUrl.values()]
+}
+
+export async function fetchExtraPublicJobs(q: string): Promise<Job[]> {
+  if (process.env.PUBLIC_JOB_BOARDS_SOURCE === 'off') return []
+
+  const results = await Promise.allSettled(PUBLIC_JOB_BOARDS.map(fetchBoard))
+  const byUrl = new Map<string, Job>()
+
+  results.forEach((result, index) => {
+    const board = PUBLIC_JOB_BOARDS[index]!
+    if (result.status === 'rejected') {
+      console.warn('[jobs] public board failed:', board.label,
+        result.reason instanceof Error ? result.reason.message : String(result.reason))
+      return
+    }
+    for (const job of result.value) byUrl.set(job.url, job)
+  })
+
+  const jobs = [...byUrl.values()]
+  if (!q) return jobs
+
+  const needle = q.toLocaleLowerCase('en')
+  return jobs.filter((job) =>
+    `${job.title} ${job.company} ${job.location} ${job.description || ''}`
+      .toLocaleLowerCase('en')
+      .includes(needle),
+  )
+}
