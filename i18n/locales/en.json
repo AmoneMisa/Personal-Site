@@ -2109,6 +2109,10 @@
     "open": "Open",
     "soon": "Coming soon",
     "seoTitle": "Projects — Marharyta Kubai",
-    "backHome": "Back to home"
+    "backHome": "Back to home",
+    "names": {
+      "whiteslove": "WhitesLove — services",
+      "lost-ark": "Lost Ark character manager"
+    }
   }
 }

@@ -32,7 +32,7 @@ const GROUPS: RawGroup[] = [
     "items": [
       {
         "id": "whiteslove",
-        "name": "WhitesLove — каталог инструментов",
+        "name": "WhitesLove — services",
         "stack": "Vue.js · Nuxt.js · SSR",
         "href": "/services"
       }
@@ -66,7 +66,7 @@ const GROUPS: RawGroup[] = [
       },
       {
         "id": "lost-ark",
-        "name": "Менеджер персонажей для Lost Ark",
+        "name": "Lost Ark character manager",
         "stack": "Electron.js · Vue.js",
         "href": null
       },
@@ -173,13 +173,21 @@ const GROUPS: RawGroup[] = [
   }
 ];
 
+// Most project names are the same in every language, so they live with the
+// rest of the structure. The few that are not get a `projects.names.<id>`
+// message in the locale that differs, rather than all of them being restated
+// per locale for the sake of two.
 export function useProjects() {
-  const { t } = useI18n();
+  const { t, te } = useI18n();
+  const nameFor = (it: RawItem) => {
+    const key = `projects.names.${it.id}`;
+    return te(key) ? t(key) : it.name;
+  };
   return computed<ProjectGroup[]>(() =>
     GROUPS.map((g) => ({
       title: t(`projects.groups.${g.id}`),
       items: g.items.map((it) => ({
-        name: it.name,
+        name: nameFor(it),
         stack: it.stack,
         href: it.href,
         description: t(`projects.descriptions.${it.id}`),
