@@ -89,6 +89,24 @@ function sourceCounts(profiles: CvProfile[]): Record<string, number> {
   return counts
 }
 
+function publicProfile(profile: CvProfile): CvProfile {
+  const details = [...(profile.tags || [])]
+  for (const feature of profile.features || []) details.push(feature)
+  if (profile.previousProfessions?.length) details.push(`Previous: ${profile.previousProfessions.join(', ')}`)
+  if (profile.district) details.push(`District: ${profile.district}`)
+  if (profile.age != null) details.push(`Age: ${profile.age}`)
+  if (profile.isAdult === false) details.push('Minor')
+  if (profile.relocationReady === true) details.push('Open to relocation')
+  if (profile.relocationReady === false) details.push('Not open to relocation')
+
+  return {
+    ...profile,
+    role: profile.professions?.length ? profile.professions.join(', ') : profile.role,
+    employmentType: profile.employmentTypes?.length ? profile.employmentTypes.join(', ') : profile.employmentType,
+    tags: [...new Set(details)].slice(0, 20),
+  }
+}
+
 export default defineEventHandler(async (event) => {
   const incoming = getRequestURL(event)
   const params = incoming.searchParams
@@ -153,7 +171,7 @@ export default defineEventHandler(async (event) => {
   setResponseHeader(event, 'Cache-Control', 'no-store')
   return {
     count,
-    profiles: page,
+    profiles: page.map(publicProfile),
     sourceCounts: sourceCounts(profiles),
     sourceStatuses,
     sourceErrors,
