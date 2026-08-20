@@ -11,21 +11,37 @@ interface TelegramChannel {
 }
 
 const EXTRA_TELEGRAM_JOB_CHANNELS: TelegramChannel[] = [
+  // Uzbekistan — IT / office feeds from the initial source set.
   { handle: 'unilance', label: 'Unilance', location: 'Uzbekistan', countryCode: 'UZ', tags: ['IT', 'Jobs'] },
   { handle: 'jobmakon', label: 'Jobmakon', location: 'Uzbekistan', countryCode: 'UZ', tags: ['IT', 'Jobs', 'Internships'] },
   { handle: 'itjobstashkent', label: 'IT Jobs Tashkent', location: 'Tashkent, Uzbekistan', countryCode: 'UZ', tags: ['IT', 'Jobs'] },
-  { handle: 'WORKIN_CHERNIVTSI', label: 'Work in Chernivtsi', location: 'Chernivtsi, Ukraine', countryCode: 'UA', tags: ['Jobs', 'General'] },
+
+  // Uzbekistan — broad/local work: retail, service, horeca, production, delivery, students.
+  { handle: 'tashjobs', label: 'Tash Jobs', location: 'Tashkent, Uzbekistan', countryCode: 'UZ', tags: ['Jobs', 'Local', 'Retail', 'Service'] },
+  { handle: 'clozjobs', label: 'CLOZ Jobs', location: 'Tashkent, Uzbekistan', countryCode: 'UZ', tags: ['Jobs', 'Local', 'Retail', 'Service'] },
+  { handle: 'ISHboor', label: 'IshBor', location: 'Tashkent, Uzbekistan', countryCode: 'UZ', tags: ['Jobs', 'Local', 'EntryLevel', 'Retail'] },
+  { handle: 'Ish_Toshkent', label: 'ISH TOSHKENT', location: 'Tashkent, Uzbekistan', countryCode: 'UZ', tags: ['Jobs', 'Local', 'EntryLevel', 'Retail'] },
+  { handle: 'tg_job', label: 'Работа в Узбекистане', location: 'Uzbekistan', countryCode: 'UZ', tags: ['Jobs', 'Local', 'Retail', 'Production'] },
+  { handle: 'work_saleuz', label: 'Worksale.uz', location: 'Uzbekistan', countryCode: 'UZ', tags: ['Jobs', 'Local', 'Retail', 'Service'] },
 
   // Ukraine — broad career/job channels.
+  { handle: 'WORKIN_CHERNIVTSI', label: 'Work in Chernivtsi', location: 'Chernivtsi, Ukraine', countryCode: 'UA', tags: ['Jobs', 'General'] },
   { handle: 'happymonday', label: 'Happy Monday', location: 'Ukraine', countryCode: 'UA', tags: ['Jobs', 'Career', 'Ukraine'] },
   { handle: 'lobbyx', label: 'Lobby X', location: 'Ukraine', countryCode: 'UA', tags: ['Jobs', 'Ukraine'] },
   { handle: 'lobbyxIT', label: 'Lobby X IT', location: 'Ukraine', countryCode: 'UA', tags: ['IT', 'Jobs', 'Ukraine'] },
   { handle: 'univwork', label: 'UNI WORK', location: 'Ukraine', countryCode: 'UA', tags: ['Jobs', 'Internships', 'Junior', 'Ukraine'] },
   { handle: 'aplaywork', label: 'A-Play', location: 'Ukraine', countryCode: 'UA', tags: ['Jobs', 'Internships', 'Ukraine'] },
+  { handle: 'ukrjob_one', label: 'UKRJOB', location: 'Ukraine', countryCode: 'UA', tags: ['Jobs', 'Remote', 'EntryLevel', 'Ecommerce'] },
+  { handle: 'beejob1_ua', label: 'BEE JOB', location: 'Ukraine', countryCode: 'UA', tags: ['Jobs', 'Remote', 'EntryLevel', 'Ecommerce'] },
 
   // Ukraine — remote-first feeds.
   { handle: 'robotaua_now_remote', label: 'robota.ua NOW Remote', location: 'Ukraine', countryCode: 'UA', tags: ['Remote', 'Jobs', 'Ukraine'], remoteByDefault: true },
+  { handle: 'workua_remote', label: 'Work.ua Remote', location: 'Ukraine', countryCode: 'UA', tags: ['Remote', 'Jobs', 'EntryLevel', 'Ukraine'], remoteByDefault: true },
   { handle: 'top_vacansii', label: 'CATWORK', location: 'Ukraine', countryCode: 'UA', tags: ['Remote', 'Jobs', 'Internships', 'Ukraine'], remoteByDefault: true },
+
+  // Romania — local jobs, including vacancies aimed at Ukrainians and newcomers.
+  { handle: 'jobs4ukrinromania', label: 'Jobs4UKR Romania', location: 'Romania', countryCode: 'RO', tags: ['Jobs', 'Local', 'EntryLevel', 'Romania'] },
+  { handle: 'RoMunca', label: 'RoMunca', location: 'Romania', countryCode: 'RO', tags: ['Jobs', 'Local', 'Romania'] },
 ]
 
 const UA = 'jobFinder/1.0 (job aggregator; contact: admin@whiteslove.me)'
@@ -73,7 +89,7 @@ function field(text: string, names: string): string | undefined {
 }
 
 function titleFromText(text: string, channel: TelegramChannel): string {
-  const explicit = field(text, 'vacancy|position|role|вакансия|позиция|посада|lavozim')
+  const explicit = field(text, 'vacancy|position|role|job|вакансия|позиция|посада|loc de muncă|loc de munca|post|angajare|lavozim')
   if (explicit) return explicit.slice(0, 180)
 
   const line = text
@@ -126,7 +142,7 @@ function pickApplyUrl(text: string, supplied: string[] = []): string | undefined
 
   const unique = [...new Set(candidates)]
 
-  return unique.find((url) => /(?:linkedin\.com\/jobs|lnkd\.in|hh\.(?:uz|ru)\/vacancy|career|careers|jobs|vacanc|apply)/i.test(url))
+  return unique.find((url) => /(?:linkedin\.com\/jobs|lnkd\.in|hh\.(?:uz|ru)\/vacancy|work\.ua|robota\.ua|jobs4ukr\.com|cloz\.uz|career|careers|jobs|vacanc|apply)/i.test(url))
     || unique[0]
 }
 
@@ -141,8 +157,8 @@ function toJob(
   if (!isLikelyTelegramVacancy(text)) return null
 
   const title = titleFromText(text, channel)
-  const company = field(text, 'company|employer|компания|работодатель|роботодавець|компанія|tashkilot|ish beruvchi') || channel.label
-  const location = field(text, 'location|city|локация|город|місто|manzil|shahar') || channel.location
+  const company = field(text, 'company|employer|компания|работодатель|роботодавець|компанія|companie|angajator|tashkilot|ish beruvchi') || channel.label
+  const location = field(text, 'location|city|локация|город|місто|locație|locatie|oraș|oras|manzil|shahar') || channel.location
   const hashtags = [...text.matchAll(/(?:^|\s)#([\p{L}\p{N}_-]{2,40})/gu)].map((match) => match[1]!)
   const applyUrl = pickApplyUrl(text, externalUrls)
 
@@ -155,7 +171,7 @@ function toJob(
     ...(applyUrl ? { applyUrl } : {}),
     source: 'telegram',
     remote: channel.remoteByDefault === true
-      || /remote|удал[её]н|віддален|дистанційн|робота\s+(?:з|із)\s+дому|masofaviy|онлайн|online/i.test(`${title} ${text}`),
+      || /remote|удал[её]н|віддален|дистанційн|робота\s+(?:з|із)\s+дому|la distanță|la distanta|de acasă|de acasa|masofaviy|онлайн|online/i.test(`${title} ${text}`),
     tags: [...channel.tags, channel.countryCode, `@${channel.handle}`, ...hashtags].slice(0, 8),
     postedAt: date && !Number.isNaN(Date.parse(date)) ? new Date(date).toISOString() : new Date().toISOString(),
     description: text.slice(0, DESC_MAX),
