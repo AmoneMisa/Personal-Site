@@ -10,6 +10,7 @@ export type Relocation = 'offered' | 'none' | 'unknown'
 export type SalaryPeriod = 'hour' | 'month' | 'year'
 export type Seniority = 'junior' | 'middle' | 'senior' | 'lead'
 export type EmployerType = 'direct' | 'agency' | 'board' | 'telegram'
+export type SponsorshipConfidence = 'explicit' | 'verified' | 'historical'
 // Normalized employment type. "project"/freelance/B2B collapse into 'contract'.
 export type EmploymentKind = 'fulltime' | 'parttime' | 'contract' | 'internship' | 'temporary'
 export const EMPLOYMENT_KINDS: EmploymentKind[] = [
@@ -54,6 +55,8 @@ export interface Job {
   workMode?: WorkMode
   relocation?: Relocation
   foreignerFriendly?: boolean // visa sponsorship / open to foreigners
+  sponsorshipConfidence?: SponsorshipConfidence // explicit listing, verified/recent sponsor, or historical sponsor only
+  sponsorshipEvidence?: string[] // short auditable reasons for the confidence level
   noExperience?: boolean // entry-level: no prior experience required (trainee/intern/junior/"без опыта")
   employmentKind?: EmploymentKind // normalized from employmentType + text
   languages?: LanguageReq[]
