@@ -16,7 +16,7 @@ MAX_ATTEMPTS = max(1, int(os.environ.get("QUEUE_MAX_ATTEMPTS", "5")))
 MAIN_QUEUE = "crawl.jobs.source"
 RETRY_QUEUE = "crawl.jobs.source.retry"
 DEAD_QUEUE = "crawl.jobs.source.dead"
-SOURCES = ["remotive", "remoteok", "arbeitnow", "themuse", "jobicy", "adzuna", "jooble", "rss", "companies", "devkg", "ishgo", "itjobsuz", "telegram", "olx"]
+SOURCES = ["remotive", "remoteok", "arbeitnow", "themuse", "jobicy", "adzuna", "jooble", "rss", "companies", "devkg", "ishgo", "itjobsuz", "telegram", "linkedin", "olx"]
 
 
 def connect():
