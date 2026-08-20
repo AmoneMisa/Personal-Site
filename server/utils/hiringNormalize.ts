@@ -47,32 +47,59 @@ export function normalizeSkills(rawSkills: string[] | undefined, text: string): 
 
 interface ProfessionRule { name: string; re: RegExp }
 const PROFESSION_RULES: ProfessionRule[] = [
+  // Management / office / sales.
   { name: 'Sales Manager', re: /\b(?:sales\s+manager|account\s+manager)\b|менеджер\s+(?:по\s+)?продаж|менеджер\s+з\s+продаж|sotuv\s+menejer/iu },
   { name: 'Project Manager', re: /\bproject\s+manager\b|проектн(?:ый|ий)\s+менеджер|менеджер\s+проект|керівник\s+проєкт/iu },
   { name: 'Product Manager', re: /\bproduct\s+manager\b|продакт\s*менеджер|менеджер\s+продукт/iu },
+  { name: 'Store Manager', re: /\bstore\s+manager\b|управляющ(?:ий|ая)\s+магазин|заведующ(?:ий|ая)\s+магазин|керуюч(?:ий|а)\s+магазин/iu },
+  { name: 'Restaurant Manager', re: /\brestaurant\s+manager\b|управляющ(?:ий|ая)\s+(?:ресторан|кафе)|керуюч(?:ий|а)\s+(?:ресторан|кафе)/iu },
+  { name: 'General Manager', re: /\bgeneral\s+manager\b|управляющ(?:ий|ая)\b|керуюч(?:ий|а)\b|директор|director/iu },
+  { name: 'Supervisor', re: /\bsupervisor\b|супервайзер|старший\s+смены|керівник\s+зміни/iu },
   { name: 'HR / Recruiter', re: /\b(?:hr|human\s+resources|recruiter|talent\s+acquisition)\b|рекрутер|сорсер|кадровик|hr[-\s]?менеджер/iu },
   { name: 'Office Manager', re: /\boffice\s+manager\b|офис[-\s]?менеджер|офіс[-\s]?менеджер/iu },
   { name: 'Administrator', re: /\badministrator\b|администратор|адміністратор/iu },
+  { name: 'Receptionist', re: /\breceptionist\b|рецепционист|рецепціоніст|ресепшн/iu },
   { name: 'Manager', re: /\bmanager\b|менеджер|menejer/iu },
   { name: 'Accountant', re: /\baccountant\b|бухгалтер|buxgalter/iu },
   { name: 'Cashier', re: /\bcashier\b|кассир|касир|kassir/iu },
   { name: 'Salesperson', re: /\b(?:salesperson|sales\s+assistant|shop\s+assistant|seller)\b|продавец|продавець|продавчин|sotuvchi/iu },
+  { name: 'Merchandiser', re: /\bmerchandiser\b|мерчендайзер|мерчандайзер/iu },
+  { name: 'Promoter', re: /\bpromoter\b|промоутер/iu },
+  { name: 'Customer Support', re: /\b(?:customer\s+support|support\s+specialist|call\s*center)\b|поддержк|підтримк|колл[-\s]?центр|call[-\s]?центр/iu },
+  { name: 'Operator', re: /\boperator\b|оператор/iu },
+
+  // Logistics / security / service.
   { name: 'Courier', re: /\bcourier\b|курьер|кур'єр|kuryer/iu },
   { name: 'Driver', re: /\bdriver\b|водитель|водій|haydovchi|shafyor/iu },
   { name: 'Security Guard', re: /\bsecurity(?:\s+guard)?\b|охранник|охоронець|охорона|qorovul/iu },
   { name: 'Cleaner', re: /\b(?:cleaner|cleaning|housekeeper)\b|уборщик|уборщица|уборка|прибиральник|прибиральниц|домработниц|farrosh/iu },
+  { name: 'Caregiver', re: /\bcaregiver\b|сиделк|доглядальниц|parvarish/iu },
+
+  // HoReCa.
   { name: 'Bartender', re: /\b(?:bartender|barman)\b|бармен|barmen/iu },
   { name: 'Barista', re: /\bbarista\b|бариста/iu },
   { name: 'Waiter', re: /\b(?:waiter|waitress)\b|официант|офіціант|afitsant/iu },
+  { name: 'Hostess', re: /\bhostess\b|хостес/iu },
   { name: 'Cook / Chef', re: /\b(?:cook|chef)\b|повар|кухар|ошпаз|oshpaz/iu },
+
+  // Sports.
   { name: 'Fitness Trainer', re: /\b(?:fitness|gym|personal)\s+(?:trainer|coach)\b|тренер\s+(?:в\s+)?(?:спортзал|спортзале|спортзалі|фитнес|фітнес)|фитнес[-\s]?тренер|фітнес[-\s]?тренер/iu },
   { name: 'Trainer / Coach', re: /\b(?:trainer|coach)\b|тренер|коуч/iu },
+
+  // Medicine.
+  { name: 'Dentist', re: /\bdentist\b|стоматолог|тиш\s+врач|tish\s+shifokor/iu },
+  { name: 'Pharmacist', re: /\bpharmacist\b|фармацевт|провизор|dorixona\s+xodim/iu },
   { name: 'Doctor', re: /\bdoctor\b|врач|лікар|доктор|shifokor/iu },
   { name: 'Nurse', re: /\bnurse\b|медсестр|медбрат|медична\s+сестр|hamshira/iu },
+  { name: 'Medical Assistant', re: /\bmedical\s+assistant\b|фельдшер|медичн(?:ий|а)\s+асистент/iu },
+
+  // Education / childcare.
   { name: 'Tutor', re: /\btutor\b|репетитор|repetitor/iu },
   { name: 'Kindergarten Teacher', re: /\bkindergarten\s+teacher\b|воспитател|виховател|tarbiyachi/iu },
   { name: 'Nanny', re: /\bnanny\b|няня|нянечк|enaga/iu },
   { name: 'Teacher', re: /\bteacher\b|учитель|вчитель|преподавател|викладач|o(?:'|’)qituvchi/iu },
+
+  // IT / professional.
   { name: 'Software Developer', re: /\b(?:software\s+)?(?:developer|programmer|frontend|front-end|backend|back-end|full[- ]?stack|android|ios)\b|разработчик|розробник|программист|програміст|dasturchi/iu },
   { name: 'QA Engineer', re: /\b(?:qa|quality\s+assurance|tester|test\s+engineer)\b|тестировщик|тестувальник/iu },
   { name: 'DevOps Engineer', re: /\bdevops\b/iu },
@@ -80,19 +107,24 @@ const PROFESSION_RULES: ProfessionRule[] = [
   { name: 'Analyst', re: /\banalyst\b|аналитик|аналітик/iu },
   { name: 'Engineer', re: /\bengineer\b|инженер|інженер|muhandis/iu },
   { name: 'Marketer', re: /\b(?:marketer|marketing\s+specialist|smm)\b|маркетолог|smm[-\s]?специалист/iu },
-  { name: 'Customer Support', re: /\b(?:customer\s+support|support\s+specialist|call\s*center)\b|поддержк|підтримк|колл[-\s]?центр|call[-\s]?центр/iu },
+
+  // Construction / production / warehouse.
   { name: 'Construction Worker', re: /\b(?:builder|construction\s+worker)\b|строител|будівельник|разнорабоч|різнороб|qurilish/iu },
   { name: 'Welder', re: /\bwelder\b|сварщик|зварювальник|payvandchi/iu },
   { name: 'Electrician', re: /\belectrician\b|электрик|електрик/iu },
   { name: 'Plumber', re: /\bplumber\b|сантехник|сантехнік/iu },
   { name: 'Mechanic', re: /\bmechanic\b|механик|механік/iu },
   { name: 'Warehouse Worker', re: /\bwarehouse\b|кладовщик|комплектовщик|комірник|склад(?:ской|ський)?\s+работник/iu },
+  { name: 'Packer', re: /\bpacker\b|упаковщик|упаковщица|пакувальник|qadoqlovchi/iu },
+  { name: 'Factory Worker', re: /\bfactory\s+worker\b|рабоч(?:ий|ая)\s+(?:на\s+)?(?:заводе|производстве)|працівник\s+виробництва|ishlab\s+chiqarish/iu },
   { name: 'Loader', re: /\bloader\b|грузчик|вантажник/iu },
   { name: 'Seamstress', re: /\bseamstress\b|швея|швачка|tikuvchi/iu },
-  { name: 'Operator', re: /\boperator\b|оператор/iu },
 ]
 
-const SPECIFIC_MANAGER_ROLES = new Set(['Sales Manager', 'Project Manager', 'Product Manager', 'HR / Recruiter', 'Office Manager'])
+const SPECIFIC_MANAGER_ROLES = new Set([
+  'Sales Manager', 'Project Manager', 'Product Manager', 'Store Manager', 'Restaurant Manager',
+  'General Manager', 'HR / Recruiter', 'Office Manager',
+])
 
 function cleanRole(raw: string | undefined): string {
   return (raw || '').trim().replace(/^[#\-–—•*\s]+/, '').replace(/[.;,]+$/, '').replace(/\s{2,}/g, ' ').slice(0, 180)
@@ -112,6 +144,10 @@ function collectProfessions(source: string): string[] {
   }
   if (names.includes('Fitness Trainer')) {
     const generic = names.indexOf('Trainer / Coach')
+    if (generic >= 0) names.splice(generic, 1)
+  }
+  if (names.includes('Dentist')) {
+    const generic = names.indexOf('Doctor')
     if (generic >= 0) names.splice(generic, 1)
   }
   return names
@@ -139,7 +175,6 @@ function workHistoryBlock(text: string): string {
   const explicit = text.match(/(?:^|\n)\s*(?:опыт\s+работы|досвід\s+роботи|work\s+experience|previous\s+(?:jobs?|positions?)|tajriba|ish\s+tajribasi)\s*[:—-]?\s*([\s\S]{1,2600}?)(?=\n\s*(?:навыки|навички|skills|образование|освіта|education|контакт|contact|ожидания|salary|языки|мови|languages)\s*[:—-]|$)/iu)
   if (explicit?.[1]) return explicit[1]
 
-  // Unstructured posts often use "работал/работала ..." without a heading.
   return text.split('\n').filter((line) =>
     /(?:работал[аи]?|працюва(?:в|ла)|worked\s+(?:as|at)|ishlagan|ishladim|ishlaganman)/iu.test(line),
   ).join('\n')
