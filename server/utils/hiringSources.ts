@@ -22,6 +22,23 @@ interface TelegramChannel {
   includeAny?: string[]
 }
 
+export interface HiringSourceDiagnostic {
+  handle: string
+  country: string
+  status: 'ok' | 'empty' | 'error'
+  fetched: number
+  candidates: number
+  checkedAt: string
+  error?: string
+}
+
+interface TelegramFetchResult {
+  profiles: CvProfile[]
+  fetched: number
+}
+
+let telegramDiagnostics: HiringSourceDiagnostic[] = []
+
 // Verified during the August 2026 audit. Mixed boards are listed only when
 // recent candidate posts were found; vacancy-only/dead/wrong-entity handles are
 // deliberately absent.
@@ -38,7 +55,7 @@ const DEFAULT_CV_CHANNELS: TelegramChannel[] = [
   { handle: 'namanganishbor', label: 'Namangan ish', country: 'UZ', location: 'Namangan', tags: ['Resume', 'Mass market'] },
   { handle: 'buxoroda_ish', label: 'Buxoroda ish', country: 'UZ', location: 'Bukhara', tags: ['Resume', 'Mass market'] },
 
-  // Kazakhstan — current candidate/resume flow; primarily IT for now.
+  // Kazakhstan — verified current resume flow; primarily IT for now.
   { handle: 'workitkz', label: 'workITkz', country: 'KZ', location: 'Kazakhstan', tags: ['Resume', 'IT'] },
 
   // Kyrgyzstan.
@@ -53,10 +70,58 @@ const DEFAULT_CV_CHANNELS: TelegramChannel[] = [
     includeAny: ['kyrgyzstan', 'кыргызстан', 'bishkek', 'бишкек', 'osh', 'ош'],
   },
 
-  // Ukraine.
+  // Ukraine — candidate-heavy professional feeds. City is parsed from each post.
   { handle: 'itcandidatesUA', label: 'IT Candidates UA', country: 'UA', location: 'Ukraine', tags: ['Resume', 'IT'], cvFeed: true },
   { handle: 'hr_recruiter_ua', label: 'HR & Recruiters UA', country: 'UA', location: 'Ukraine', tags: ['Resume', 'HR'] },
-  { handle: 'True_Help_Odessa', label: 'True Help Odesa', country: 'UA', location: 'Odesa', tags: ['Resume', 'Mass market'] },
+]
+
+const CITY_ALIASES: Record<string, Array<[string, RegExp]>> = {
+  UZ: [
+    ['Tashkent', /\b(?:tashkent|toshkent|ташкент|тошкент)\b/iu],
+    ['Samarkand', /\b(?:samarkand|samarqand|самарканд|самарқанд)\b/iu],
+    ['Bukhara', /\b(?:bukhara|buxoro|бухара|бухоро)\b/iu],
+    ['Namangan', /\b(?:namangan|наманган)\b/iu],
+    ['Andijan', /\b(?:andijan|andijon|андижан|андижон)\b/iu],
+    ['Fergana', /\b(?:fergana|farg(?:'|’)ona|фаргана|фергана)\b/iu],
+    ['Qarshi', /\b(?:qarshi|karshi|карши|қарши)\b/iu],
+    ['Nukus', /\b(?:nukus|нукус)\b/iu],
+  ],
+  UA: [
+    ['Kyiv', /\b(?:kyiv|kiev|київ|киев)\b/iu],
+    ['Kharkiv', /\b(?:kharkiv|kharkov|харків|харьков)\b/iu],
+    ['Odesa', /\b(?:odesa|odessa|одеса|одесса)\b/iu],
+    ['Dnipro', /\b(?:dnipro|дніпро|днепр)\b/iu],
+    ['Lviv', /\b(?:lviv|львів|львов)\b/iu],
+    ['Vinnytsia', /\b(?:vinnytsia|vinnitsa|вінниця|винница)\b/iu],
+    ['Zaporizhzhia', /\b(?:zaporizhzhia|zaporozhye|запоріжжя|запорожье)\b/iu],
+  ],
+  KZ: [
+    ['Almaty', /\b(?:almaty|алматы)\b/iu],
+    ['Astana', /\b(?:astana|астана)\b/iu],
+    ['Shymkent', /\b(?:shymkent|chimkent|шымкент|чимкент)\b/iu],
+    ['Karaganda', /\b(?:karaganda|караганда)\b/iu],
+    ['Atyrau', /\b(?:atyrau|атырау)\b/iu],
+    ['Aktobe', /\b(?:aktobe|актобе)\b/iu],
+  ],
+  KG: [
+    ['Bishkek', /\b(?:bishkek|бишкек)\b/iu],
+    ['Osh', /\b(?:osh|ош)\b/iu],
+    ['Karakol', /\b(?:karakol|каракол)\b/iu],
+  ],
+}
+
+const TASHKENT_DISTRICTS: Array<[string, RegExp]> = [
+  ['Chilanzar', /\b(?:chilanzar|chilonzor|чиланзар|чилонзор)\b/iu],
+  ['Yunusabad', /\b(?:yunusabad|yunusobod|юнасабад|юнусобод)\b/iu],
+  ['Mirabad', /\b(?:mirabad|mirobod|мирабад|миробод)\b/iu],
+  ['Yakkasaray', /\b(?:yakkasaray|yakkasaroy|яккасарай|яккасарой)\b/iu],
+  ['Shaykhantahur', /\b(?:shaykhantahur|shayxontohur|шейхантахур|шайхонтохур)\b/iu],
+  ['Mirzo Ulugbek', /\b(?:mirzo\s+ulugbek|mirzo\s+ulug(?:'|’)bek|мирзо\s+улугбек)\b/iu],
+  ['Uchtepa', /\b(?:uchtepa|учтепа)\b/iu],
+  ['Sergeli', /\b(?:sergeli|сергели)\b/iu],
+  ['Bektemir', /\b(?:bektemir|бектемир)\b/iu],
+  ['Almazar', /\b(?:almazar|olmazor|алмазар|олмазор)\b/iu],
+  ['Yashnabad', /\b(?:yashnabad|yashnobod|яшнабад|яшнобод)\b/iu],
 ]
 
 function telegramChannels(): TelegramChannel[] {
@@ -98,7 +163,7 @@ const CV_MARKER_RE = /(?:резюме|resume|\bcv\b|curriculum vitae|анкет�
 const FIRST_PERSON_RE = /(?:^|\n)\s*[^\p{L}\p{N}\n]{0,6}(?:я[\s—,-]|я\s+(?:ищу|шукаю)|men[\s,]|mening[\s,]|my name is|i am a|i'm a)/iu
 const EMPLOYER_RE = /(?:we(?:'re| are)\s+(?:hiring|looking\s+for)|(?:^|\n)\s*[^\p{L}\p{N}\n]{0,10}(?:ищем|требуется|требуются|вакансия|компания\s+ищет|шукаємо|потрібен|потрібна|потрібні|вакансія|запрошуємо|hiring|vacancy|ishchi\s+kerak|xodim\s+kerak|ishga\s+(?:taklif|qabul)|bo(?:'|’)sh\s+ish\s+o(?:'|’)rni))/iu
 const VACANCY_SECTION_RE = /(?:requirements?|responsibilit|qualifications?|обязанност|требован|условия\s+работ|мы\s+предлагаем|обов(?:'|’)язк|вимог|ми\s+пропонуємо|what we offer|надсилайте\s+резюме|присылайте\s+резюме)/iu
-const ROLE_RE = /\b(?:developer|engineer|designer|manager|analyst|specialist|qa|tester|devops|frontend|backend|accountant|cashier|seller|driver|builder|welder|cleaner|waiter|cook|guard|courier|teacher|tutor|nanny|nurse|doctor|bartender|barista|trainer|coach)\b|разработ|инженер|інженер|дизайнер|менеджер|аналитик|аналітик|специалист|спеціаліст|бухгалтер|кассир|касир|продав|водител|водій|строит|будівел|сварщик|зварюваль|убор|прибирал|официант|офіціант|бармен|бариста|повар|кухар|охран|охорон|управляющ|керівник|курьер|кур'єр|учител|вчител|преподав|викладач|репетитор|воспитател|виховател|нян|врач|лікар|медсестр|медбрат|тренер|dasturchi|menejer|buxgalter|kassir|sotuvchi|haydovchi|shafyor|qurilish|payvandchi|farrosh|afitsant|barmen|oshpaz|qorovul|boshqaruv|kuryer|o(?:'|’)qituvchi|repetitor|tarbiyachi|enaga|shifokor|hamshira/iu
+const ROLE_RE = /\b(?:developer|engineer|designer|manager|analyst|specialist|qa|tester|devops|frontend|backend|accountant|cashier|seller|driver|builder|welder|cleaner|waiter|cook|guard|courier|teacher|tutor|nanny|nurse|doctor|dentist|pharmacist|bartender|barista|trainer|coach|administrator|director|supervisor|receptionist|hostess|promoter|packer)\b|разработ|инженер|інженер|дизайнер|менеджер|аналитик|аналітик|специалист|спеціаліст|бухгалтер|кассир|касир|продав|водител|водій|строит|будівел|сварщик|зварюваль|убор|прибирал|официант|офіціант|бармен|бариста|повар|кухар|охран|охорон|управляющ|керівник|директор|администратор|адміністратор|супервайзер|курьер|кур'єр|учител|вчител|преподав|викладач|репетитор|воспитател|виховател|нян|врач|лікар|стоматолог|фармацевт|медсестр|медбрат|тренер|рецепционист|рецепціоніст|хостес|промоутер|упаковщик|dasturchi|menejer|buxgalter|kassir|sotuvchi|haydovchi|shafyor|qurilish|payvandchi|farrosh|afitsant|barmen|oshpaz|qorovul|boshqaruv|kuryer|o(?:'|’)qituvchi|repetitor|tarbiyachi|enaga|shifokor|hamshira/iu
 const CONTACT_RE = /(?:\+?\d[\d\s()\-]{7,}|@[a-z0-9_]{4,}|(?:telegram|телефон|phone|tel|aloqa|murojaat|bog(?:'|’)lanish)\s*[:—-])/iu
 const PROMOTION_RE = /t\.me\/addlist\b|(?:telegram[- ]?)?канал\w*\s+(?:в\s+)?(?:одн\w+\s+)?папк|добав(?:ить|ьте)\s+(?:свой\s+)?канал/iu
 
@@ -171,12 +236,16 @@ function parseExperience(text: string): number | undefined {
 }
 
 function parseName(text: string): string {
-  return (field(text, "фио|піб|full name|name|имя|ім(?:ʼ|')я|fio|ism|ismim") || '').slice(0, 100)
+  return (field(text, "фио|ф\.и\.о\.?|піб|full name|name|имя|ім(?:ʼ|')я|fio|ism|ismim") || '').slice(0, 100)
 }
 
 function parseRole(text: string): string {
-  const explicit = field(text, 'желаемая (?:работа|должность)|бажана (?:робота|посада)|ищу работу|шукаю роботу|ish kerak|menga ish kerak|position|role|должность|позиция|посада|lavozim|kasb|specialization|специализация|target role')
+  const targetNames = 'желаемая (?:работа|должность)|бажана (?:робота|посада)|ищу работу|шукаю роботу|ish kerak|menga ish kerak|position|role|должность|позиция|посада|lavozim|kasb|specialization|специализация|target role'
+  const explicit = field(text, targetNames)
   if (explicit && ROLE_RE.test(explicit)) return explicit.slice(0, 180)
+
+  const targetBlock = text.match(new RegExp(`(?:^|\\n)[^\\p{L}\\p{N}\\n]{0,8}(?:${targetNames})\\s*[:—-]?\\s*\\n([^\\n]{2,220})`, 'iu'))?.[1]?.trim()
+  if (targetBlock && ROLE_RE.test(targetBlock)) return targetBlock.slice(0, 180)
 
   const intentLine = text.split('\n').find((line) => CANDIDATE_INTENT_RE.test(line) && ROLE_RE.test(line))
   if (intentLine) return intentLine.replace(CANDIDATE_INTENT_RE, '').replace(/^\s*[:—-]\s*/, '').slice(0, 180)
@@ -195,6 +264,27 @@ function parseSkills(text: string): string[] {
 function parseLanguages(text: string): string[] {
   const raw = field(text, 'languages|языки|мови|til(?:lar)?|language skills') || blockAfter(text, 'languages|языки|мови|til(?:lar)?')
   return raw ? raw.split(/[,;/|•·]+/).map((item) => item.trim()).filter(Boolean).slice(0, 8) : []
+}
+
+function detectCity(text: string, country: string): string | null {
+  for (const [city, pattern] of CITY_ALIASES[country] || []) {
+    if (pattern.test(text)) return city
+  }
+  return null
+}
+
+function fallbackChannelCity(channel: TelegramChannel): string | null {
+  return (CITY_ALIASES[channel.country] || []).some(([city]) => city === channel.location) ? channel.location : null
+}
+
+function detectDistrict(text: string, city: string | null): string | null {
+  const explicit = field(text, 'район|р-н|district|туман|tumani')
+  if (explicit) return explicit
+  if (city !== 'Tashkent') return null
+  for (const [district, pattern] of TASHKENT_DISTRICTS) {
+    if (pattern.test(text)) return district
+  }
+  return null
 }
 
 function parseMoneyNumber(raw: string): number | null {
@@ -241,8 +331,9 @@ function messageToProfile(
   const skills = parseSkills(text)
   if (needle && !`${name} ${role} ${text} ${skills.join(' ')}`.toLocaleLowerCase('ru').includes(needle)) return null
 
-  const city = field(text, 'location|city|локация|локація|город|місто|manzil|shahar|hudud') || channel.location
-  const district = field(text, 'район|р-н|district|туман|tumani') || null
+  const explicitCity = field(text, 'location|city|локация|локація|город|місто|shahar')
+  const city = explicitCity || detectCity(text, channel.country) || fallbackChannelCity(channel)
+  const district = detectDistrict(text, city)
   const contact = field(text, 'contact|контакт|telegram|phone|телефон|tel|boglanish|aloqa|murojaat')
   const employmentType = field(text, 'employment|format|занятость|зайнятість|график|графік|ish vaqti|bandlik')
   const education = field(text, "education|образование|освіта|o['’]qish|ta['’]lim") || blockAfter(text, "education|образование|освіта|o['’]qish|ta['’]lim") || null
@@ -276,7 +367,7 @@ function messageToProfile(
 interface TelegramWorkerMessage { id: number; text: string; date: string | null; preview?: string | null }
 interface TelegramWorkerHistory { ok?: boolean; messages?: TelegramWorkerMessage[]; minId?: number | null }
 
-async function fetchChannelViaWorker(base: string, channel: TelegramChannel, q: string): Promise<CvProfile[]> {
+async function fetchChannelViaWorker(base: string, channel: TelegramChannel, q: string): Promise<TelegramFetchResult> {
   const target = telegramHistoryLimit()
   const needle = q.trim().toLocaleLowerCase('ru')
   const profiles: CvProfile[] = []
@@ -310,10 +401,10 @@ async function fetchChannelViaWorker(base: string, channel: TelegramChannel, q: 
     if (!nextBeforeId || nextBeforeId === beforeId || data.messages.length < pageLimit) break
     beforeId = nextBeforeId
   }
-  return profiles
+  return { profiles, fetched }
 }
 
-function parseChannelHtml(html: string, channel: TelegramChannel, q: string): CvProfile[] {
+function parseChannelHtml(html: string, channel: TelegramChannel, q: string): TelegramFetchResult {
   const profiles: CvProfile[] = []
   const chunks = html.split(/<div class="tgme_widget_message_wrap\b[^>]*>/i).slice(1)
   const needle = q.trim().toLocaleLowerCase('ru')
@@ -329,10 +420,10 @@ function parseChannelHtml(html: string, channel: TelegramChannel, q: string): Cv
     }, channel, needle)
     if (profile) profiles.push(profile)
   }
-  return profiles
+  return { profiles, fetched: chunks.length }
 }
 
-async function fetchTelegramChannel(channel: TelegramChannel, q: string): Promise<CvProfile[]> {
+async function fetchTelegramChannel(channel: TelegramChannel, q: string): Promise<TelegramFetchResult> {
   const workerUrl = process.env.TELEGRAM_WORKER_URL
   if (workerUrl) return fetchChannelViaWorker(workerUrl, channel, q)
   const res = await fetch(`https://t.me/s/${encodeURIComponent(channel.handle)}`, {
@@ -347,16 +438,56 @@ export async function fetchHiringTelegram(q: string): Promise<CvProfile[]> {
   if (process.env.TELEGRAM_SOURCE === 'off') return []
   const channels = telegramChannels()
   const profiles: CvProfile[] = []
+  const diagnostics: HiringSourceDiagnostic[] = []
+
   for (let start = 0; start < channels.length; start += 4) {
-    const results = await Promise.all(channels.slice(start, start + 4).map((channel) =>
-      fetchTelegramChannel(channel, q).catch((err) => {
-        console.error(`[hiring] telegram @${channel.handle} failed:`, (err as Error).message)
-        return [] as CvProfile[]
-      }),
-    ))
-    profiles.push(...results.flat())
+    const results = await Promise.all(channels.slice(start, start + 4).map(async (channel) => {
+      const checkedAt = new Date().toISOString()
+      try {
+        const result = await fetchTelegramChannel(channel, q)
+        return {
+          channel,
+          result,
+          diagnostic: {
+            handle: channel.handle,
+            country: channel.country,
+            status: result.profiles.length ? 'ok' : 'empty',
+            fetched: result.fetched,
+            candidates: result.profiles.length,
+            checkedAt,
+          } as HiringSourceDiagnostic,
+        }
+      } catch (err) {
+        const error = (err as Error).message
+        console.error(`[hiring] telegram @${channel.handle} failed:`, error)
+        return {
+          channel,
+          result: { profiles: [], fetched: 0 } as TelegramFetchResult,
+          diagnostic: {
+            handle: channel.handle,
+            country: channel.country,
+            status: 'error',
+            fetched: 0,
+            candidates: 0,
+            checkedAt,
+            error,
+          } as HiringSourceDiagnostic,
+        }
+      }
+    }))
+
+    for (const item of results) {
+      profiles.push(...item.result.profiles)
+      diagnostics.push(item.diagnostic)
+    }
   }
+
+  telegramDiagnostics = diagnostics
   return profiles
+}
+
+export function getHiringSourceDiagnostics(): HiringSourceDiagnostic[] {
+  return telegramDiagnostics.map((item) => ({ ...item }))
 }
 
 const FETCHERS: Record<HiringSource, (q: string) => Promise<CvProfile[]>> = { telegram: fetchHiringTelegram }
@@ -370,8 +501,8 @@ export async function fetchHiringSource(source: HiringSource, q = ''): Promise<C
 }
 
 export const HIRING_COUNTRIES = [
-  { code: 'UZ', name: 'Uzbekistan', currency: 'UZS', cities: ['Tashkent', 'Samarkand', 'Bukhara', 'Namangan', 'Andijan', 'Fergana'] },
-  { code: 'UA', name: 'Ukraine', currency: 'UAH', cities: ['Kyiv', 'Lviv', 'Odesa', 'Kharkiv', 'Dnipro', 'Vinnytsia'] },
-  { code: 'KZ', name: 'Kazakhstan', currency: 'KZT', cities: ['Almaty', 'Astana', 'Shymkent', 'Karaganda'] },
+  { code: 'UZ', name: 'Uzbekistan', currency: 'UZS', cities: ['Tashkent', 'Samarkand', 'Bukhara', 'Namangan', 'Andijan', 'Fergana', 'Qarshi', 'Nukus'] },
+  { code: 'UA', name: 'Ukraine', currency: 'UAH', cities: ['Kyiv', 'Lviv', 'Odesa', 'Kharkiv', 'Dnipro', 'Vinnytsia', 'Zaporizhzhia'] },
+  { code: 'KZ', name: 'Kazakhstan', currency: 'KZT', cities: ['Almaty', 'Astana', 'Shymkent', 'Karaganda', 'Atyrau', 'Aktobe'] },
   { code: 'KG', name: 'Kyrgyzstan', currency: 'KGS', cities: ['Bishkek', 'Osh', 'Karakol'] },
 ] as const
