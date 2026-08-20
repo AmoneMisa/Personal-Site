@@ -79,8 +79,11 @@ function candidateAiInput(profile: CvProfile) {
   const rawText = normalized.originalText || normalized.description || ''
   const knownFacts: Record<string, unknown> = {
     name: normalized.name || null,
-    professions: normalized.professions || [],
-    previousProfessions: normalized.previousProfessions || [],
+    // Current/previous profession extraction is intentionally left to the
+    // candidate model as well. Regex output can confuse work history with a
+    // desired role, while exact scalar/contact facts remain authoritative.
+    professions: [],
+    previousProfessions: [],
     skills: normalized.skills || [],
     features: normalized.features || [],
     age: normalized.age ?? null,
@@ -114,9 +117,17 @@ function mergeCandidateAi(profile: CvProfile, data: CandidateAiData): CvProfile 
   const merged: CvProfile = { ...profile }
 
   if (!merged.name && data.name?.trim()) merged.name = data.name.trim()
-  merged.professions = uniqueStrings(merged.professions, data.professions)
-  if (!merged.role && merged.professions.length) merged.role = merged.professions[0]!
-  merged.previousProfessions = uniqueStrings(merged.previousProfessions, data.previousProfessions)
+  // For target/history professions a confident AI result may correct the
+  // deterministic parser instead of unioning a false work-history role into
+  // the current search targets. Empty AI arrays never erase deterministic data.
+  if (data.professions?.length) {
+    merged.professions = uniqueStrings(data.professions)
+    merged.role = merged.professions[0] || merged.role
+  } else {
+    merged.professions = uniqueStrings(merged.professions)
+  }
+  if (data.previousProfessions?.length) merged.previousProfessions = uniqueStrings(data.previousProfessions)
+  else merged.previousProfessions = uniqueStrings(merged.previousProfessions)
   merged.skills = uniqueStrings(merged.skills, data.skills)
   merged.features = uniqueStrings(merged.features, data.features)
   merged.languages = uniqueStrings(merged.languages, data.languages)
