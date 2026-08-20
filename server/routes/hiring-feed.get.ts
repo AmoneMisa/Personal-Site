@@ -1,10 +1,5 @@
 // GET /hiring-feed — candidate CV/resume profiles (not employer vacancies).
-// Same-origin Nitro route; UI follows /flat-finder layout patterns.
-//
-// Search runs through Elasticsearch when it is reachable (relevance ranking,
-// fuzzy + multi-word + transliterated matching) and falls back to in-memory
-// filtering otherwise, so the page keeps working with the cluster down. The
-// store stays the source of truth for display: Elasticsearch only ranks ids.
+// Search runs through Elasticsearch when available and falls back to memory.
 
 import { HIRING_COUNTRIES } from '../utils/hiringSources'
 import { getStoredCvProfiles, isHiringStoreCold, refreshHiringStore } from '../utils/hiringStore'
@@ -25,13 +20,27 @@ function list(params: URLSearchParams, key: string): string[] {
     .filter(Boolean)
 }
 
+function profileSearchText(profile: CvProfile): string {
+  return [
+    profile.name,
+    profile.role,
+    ...(profile.professions || []),
+    ...(profile.previousProfessions || []),
+    ...(profile.features || []),
+    ...(profile.skills || []),
+    profile.city || '',
+    profile.district || '',
+    profile.description || '',
+  ].join(' ').toLocaleLowerCase('ru')
+}
+
 function matchesFilters(profile: CvProfile, params: URLSearchParams): boolean {
   const countries = list(params, 'countries').map((code) => code.toUpperCase())
   if (countries.length && !countries.includes((profile.country || '').toUpperCase())) return false
 
   const city = normalizeCity(params.get('city') || '')
   if (city) {
-    const hay = `${profile.city || ''} ${profile.name} ${profile.role} ${profile.description}`.toLocaleLowerCase('ru')
+    const hay = `${profile.city || ''} ${profile.district || ''} ${profile.description || ''}`.toLocaleLowerCase('ru')
     if (!hay.includes(city)) return false
   }
 
@@ -47,7 +56,6 @@ function matchesFilters(profile: CvProfile, params: URLSearchParams): boolean {
   const seniority = (params.get('seniority') || '').trim().toLowerCase()
   if (seniority && (profile.seniority || '') !== seniority) return false
 
-  // Every requested skill must be present, matching the Job Finder's model.
   const skills = list(params, 'skills').map((skill) => skill.toLowerCase())
   if (skills.length) {
     const owned = new Set((profile.skills || []).map((skill) => skill.toLowerCase()))
@@ -62,9 +70,7 @@ function matchesFilters(profile: CvProfile, params: URLSearchParams): boolean {
 
   const query = (params.get('query') || '').trim().toLocaleLowerCase('ru')
   if (query) {
-    const hay = `${profile.name} ${profile.role} ${profile.description} ${(profile.skills || []).join(' ')}`.toLocaleLowerCase('ru')
-    // Multi-word queries match when every word appears, so word order and
-    // punctuation between them stop mattering in the fallback too.
+    const hay = profileSearchText(profile)
     if (!query.split(/\s+/).every((word) => hay.includes(word))) return false
   }
 
@@ -79,9 +85,7 @@ function matchesFilters(profile: CvProfile, params: URLSearchParams): boolean {
 
 function sourceCounts(profiles: CvProfile[]): Record<string, number> {
   const counts: Record<string, number> = {}
-  for (const profile of profiles) {
-    counts[profile.source] = (counts[profile.source] || 0) + 1
-  }
+  for (const profile of profiles) counts[profile.source] = (counts[profile.source] || 0) + 1
   return counts
 }
 
@@ -100,7 +104,6 @@ export default defineEventHandler(async (event) => {
     })
   }
 
-  // Canonical skills/seniority/contacts, then collapse reposts of the same CV.
   const profiles = dedupeCandidates(stored.map(normalizeCandidate))
   const byId = new Map(profiles.map((profile) => [profile.id, profile]))
 
@@ -126,8 +129,6 @@ export default defineEventHandler(async (event) => {
     if (result) {
       engine = 'elasticsearch'
       count = result.total
-      // Hydrate from the store; an id missing there was removed since the last
-      // sync, so it is simply skipped rather than rendered as a broken card.
       page = result.hits
         .map(({ id, score }) => {
           const profile = byId.get(id)
