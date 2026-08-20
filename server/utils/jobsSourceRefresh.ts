@@ -5,6 +5,7 @@ import { syncJobsSearchIndex } from './jobsElastic'
 import { fetchExtraTelegramJobs } from './extraTelegramJobSources'
 import { fetchLinkedInJobs } from './linkedinSource'
 import { fetchExtraPublicJobs } from './extraPublicJobSources'
+import { fetchUsaVisaSponsorJobs } from './usaVisaSponsorSource'
 import {
   fetchAdzuna,
   fetchArbeitnow,
@@ -47,6 +48,7 @@ async function fetchAllCompanies(q: string): Promise<Job[]> {
     { label: 'companies', load: () => fetchCompanies(q) },
     { label: 'linkedin', load: () => fetchLinkedInJobs(q) },
     { label: 'public-boards', load: () => fetchExtraPublicJobs(q) },
+    { label: 'usa-visa-sponsors', load: () => fetchUsaVisaSponsorJobs(q) },
   ]
 
   const results = await Promise.allSettled(loaders.map(({ load }) => load()))
