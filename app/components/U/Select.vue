@@ -6,7 +6,7 @@
 // and the native control gives correct keyboard and mobile behaviour for free.
 // Both prop namings used in the app are supported: option-attribute /
 // value-attribute and label-key / value-key.
-import { computed } from "vue";
+import { computed, useId } from "vue";
 
 defineOptions({ inheritAttrs: false });
 
@@ -20,7 +20,16 @@ const props = withDefaults(defineProps<{
   placeholder?: string;
   disabled?: boolean;
   ui?: unknown;
+  /**
+   * Floating label, matching UInput's. A select always has a value, so unlike
+   * an input the label is simply always in its raised position — it never
+   * animates. It exists so a select sits in a form beside labelled inputs
+   * without one style of caption above the field and another on the border.
+   */
+  label?: string;
 }>(), { items: () => [] });
+
+const inputId = useId();
 
 const emit = defineEmits<{ (e: "update:modelValue", value: string | number): void }>();
 
@@ -37,12 +46,14 @@ const options = computed(() =>
 </script>
 
 <template>
-  <div class="u-select" :class="$attrs.class">
+  <div class="u-select" :class="[{ 'u-select_floating': label }, $attrs.class]">
     <select
+        :id="label ? inputId : ($attrs.id as string | undefined)"
         class="u-select__control ui-control ui-focusable"
+        :class="{ 'ui-control_floating': label }"
         :value="modelValue ?? ''"
         :disabled="disabled"
-        v-bind="{ ...$attrs, class: undefined }"
+        v-bind="{ ...$attrs, class: undefined, id: undefined }"
         @change="emit('update:modelValue', ($event.target as HTMLSelectElement).value)"
     >
       <option v-if="placeholder" value="" disabled>{{ placeholder }}</option>
@@ -50,6 +61,13 @@ const options = computed(() =>
         {{ option.label }}
       </option>
     </select>
+    <template v-if="label">
+      <label :for="inputId" class="u-select__label">{{ label }}</label>
+      <!-- Same notch trick as UInput: only a legend cuts a real gap in a border. -->
+      <fieldset class="u-select__outline" aria-hidden="true">
+        <legend class="u-select__notch"><span>{{ label }}</span></legend>
+      </fieldset>
+    </template>
     <UIcon name="i-lucide-chevron-down" class="u-select__chevron" />
   </div>
 </template>
@@ -75,5 +93,64 @@ const options = computed(() =>
   transform: translateY(-50%);
   pointer-events: none;
   color: var(--ui-control-placeholder);
+}
+
+/* ---- Floating label -------------------------------------------------------
+   Mirrors UInput's, minus the animation: a select is never empty, so the label
+   is always up on the border. */
+
+/* The fieldset paints the border; .ui-control's would be a second one. */
+.u-select_floating .u-select__control { border-color: transparent; }
+
+.u-select__label {
+  position: absolute;
+  left: var(--ui-control-px);
+  top: 0;
+  /* Centred on the top border, at the same size as UInput's raised label. */
+  transform: translateY(-50%) scale(var(--ui-floating-scale));
+  transform-origin: left center;
+  max-width: calc(100% - var(--ui-control-px) * 2);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--ui-control-placeholder);
+  font-size: var(--ui-control-font);
+  line-height: 1.2;
+  pointer-events: none;
+  transition: color var(--ui-transition);
+}
+.u-select_floating:focus-within .u-select__label { color: var(--accent-pink, #e0679a); }
+
+.u-select__outline {
+  position: absolute;
+  /* Half the legend's height above the box: a fieldset paints its top border
+     through the middle of its legend rather than at the edge. */
+  top: calc(-1px - var(--ui-notch-h) / 2);
+  right: -1px;
+  bottom: -1px;
+  left: -1px;
+  margin: 0;
+  padding: 0 calc(var(--ui-control-px) - 5px);
+  border: 1px solid var(--ui-control-border);
+  border-radius: var(--ui-control-radius);
+  min-inline-size: 0;
+  pointer-events: none;
+  transition: border-color var(--ui-transition);
+}
+/* Focus lives on the outline, so the shared ring does not sit outside it and
+   read as a second border. */
+.u-select_floating:focus-within { box-shadow: none; }
+.u-select_floating:focus-within .u-select__outline {
+  border-width: 2px;
+  border-color: var(--accent-pink, #e0679a);
+}
+
+.u-select__notch {
+  padding: 0 5px;
+  font-size: calc(var(--ui-control-font) * var(--ui-floating-scale));
+  height: var(--ui-notch-h);
+  line-height: var(--ui-notch-h);
+  white-space: nowrap;
+  visibility: hidden;
 }
 </style>

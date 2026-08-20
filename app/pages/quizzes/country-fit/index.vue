@@ -338,16 +338,16 @@ watch(user, (v) => lsSet(LS_KEYS.user, v), {deep: true});
     <page-header
         title="quizzes.countryFit.title"
         headline="quizzes.countryFit.headline"
-        class="mb-6"
+        class="mb-4"
     />
 
-    <div class="mb-6 text-muted">
+    <div class="mb-4 text-muted">
       {{ t(countryFitQuiz.descriptionKey) }}
     </div>
 
-    <div class="p-4 rounded-xl border border-[var(--line)] mb-8 bg-[rgba(255,255,255,0.03)]">
-      <div class="font-black mb-3">{{ t("quizzes.countryFit.constraintsTitle") }}</div>
-      <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+    <div class="quiz-card quiz-card_situation">
+      <div class="quiz-card__title">{{ t("quizzes.countryFit.constraintsTitle") }}</div>
+      <div class="quiz-fields grid grid-cols-1 md:grid-cols-3">
         <div class="field">
           <custom-checkbox id="cf_isShowUSA" v-model="isShowUSA" label-key="quizzes.countryFit.constraints.isShowUSA.label"/>
         </div>
@@ -364,8 +364,8 @@ watch(user, (v) => lsSet(LS_KEYS.user, v), {deep: true});
         </div>
         <!-- Job -->
         <div class="field">
-          <label class="field__label" for="cf_job">{{ t("quizzes.countryFit.constraints.job.label") }}</label>
           <u-select
+              :label='t("quizzes.countryFit.constraints.job.label")'
               id="cf_job"
               v-model="user.job.type"
               :items="[
@@ -393,8 +393,8 @@ watch(user, (v) => lsSet(LS_KEYS.user, v), {deep: true});
 
         <!-- RU level -->
         <div class="field">
-          <label class="field__label" for="cf_ru">{{ t("quizzes.countryFit.constraints.languageRu.label") }}</label>
           <u-select
+              :label='t("quizzes.countryFit.constraints.languageRu.label")'
               id="cf_ru"
               v-model="user.languages.ru"
               :items="[
@@ -412,8 +412,8 @@ watch(user, (v) => lsSet(LS_KEYS.user, v), {deep: true});
 
         <!-- EN level -->
         <div class="field">
-          <label class="field__label" for="cf_en">{{ t("quizzes.countryFit.constraints.languageEn.label") }}</label>
           <u-select
+              :label='t("quizzes.countryFit.constraints.languageEn.label")'
               id="cf_en"
               v-model="user.languages.en"
               :items="[
@@ -430,8 +430,8 @@ watch(user, (v) => lsSet(LS_KEYS.user, v), {deep: true});
 
         <!-- Family -->
         <div class="field">
-          <label class="field__label" for="cf_family">{{ t("quizzes.countryFit.constraints.family.label") }}</label>
           <u-select
+              :label='t("quizzes.countryFit.constraints.family.label")'
               id="cf_family"
               v-model="user.family.status"
               :items="[
@@ -461,21 +461,21 @@ watch(user, (v) => lsSet(LS_KEYS.user, v), {deep: true});
     </div>
 
     <!-- Questions -->
-    <div class="space-y-6 grid grid-cols-1 md:grid-cols-2 gap-2">
+    <div class="quiz-questions grid grid-cols-1 md:grid-cols-2 gap-3">
       <div
           v-for="q in [...countryFitQuiz.questions].sort((a, b) => a.order - b.order)"
           :key="q.id"
-          class="p-4 rounded-xl border border-[var(--line)] bg-[rgba(255,255,255,0.03)]"
+          class="quiz-card"
       >
-        <div class="font-black mb-2">{{ t(q.titleKey) }}</div>
-        <div class="text-muted mb-3">{{ t(q.descriptionKey) }}</div>
+        <div class="quiz-card__title">{{ t(q.titleKey) }}</div>
+        <div class="quiz-card__desc text-muted">{{ t(q.descriptionKey) }}</div>
 
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-2">
+        <div class="quiz-options grid grid-cols-1 md:grid-cols-3 gap-2">
           <button
               v-for="opt in q.options"
               :key="opt.id"
               type="button"
-              class="px-4 py-3 rounded-xl border border-[var(--line)] text-left transition"
+              class="quiz-option"
               :class="
               answers[q.id] === opt.id
                 ? 'bg-[rgba(224, 103, 154,0.18)] border-[rgba(224, 103, 154,0.35)]'
@@ -630,18 +630,69 @@ watch(user, (v) => lsSet(LS_KEYS.user, v), {deep: true});
 <style scoped>
 .field {
   display: grid;
-  gap: 6px;
+  gap: 5px;
+  align-content: start;
 }
 
-.field__label {
-  font-weight: 600;
-  font-size: 13px;
-  color: var(--text-white);
+/* ---- density and alignment ------------------------------------------------
+   The form and the question cards are one grid each, so every row lines up on
+   its own without margins fighting the grid. */
+
+.quiz-card {
+  padding: 14px 16px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.03);
 }
+.quiz-card_situation { margin-bottom: 20px; }
+
+.quiz-card__title {
+  margin-bottom: 10px;
+  font-weight: 800;
+  font-size: 14px;
+  line-height: 1.25;
+}
+.quiz-card__desc {
+  margin-bottom: 10px;
+  font-size: 13px;
+  line-height: 1.35;
+}
+
+/* Question cards stretch to the tallest in their row, so a card whose question
+   wraps does not leave its neighbour floating. */
+.quiz-questions { align-items: stretch; }
+.quiz-questions > * { display: flex; flex-direction: column; }
+/* Options sit at the bottom, so cards in a row line their answers up even when
+   one title runs to two lines. */
+.quiz-options { margin-top: auto; }
+
+.quiz-option {
+  display: flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 8px 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.02);
+  font-size: 13px;
+  line-height: 1.3;
+  text-align: left;
+  transition: background-color var(--ui-transition), border-color var(--ui-transition);
+}
+.quiz-option:hover { filter: brightness(1.05); }
+
+/* One row-gap for the whole form. The hint under a field is part of that
+   field's cell, so a longer hint no longer shifts the field beside it. */
+.quiz-fields {
+  column-gap: 16px;
+  row-gap: 14px;
+  align-items: start;
+}
+
 
 .field__hint {
-  font-size: 12px;
-  line-height: 1.25;
+  font-size: 11.5px;
+  line-height: 1.3;
 }
 
 .i-icon {
