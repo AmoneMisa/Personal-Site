@@ -1,11 +1,6 @@
 // CV/resume profiles posted by candidates (people looking for work).
 // This is intentionally separate from the /jobs vacancy aggregator.
 
-// Seniority is the Job Finder's vocabulary, so a candidate and a vacancy can be
-// compared without translating between two scales. Imported rather than restated
-// here: two identical declarations could drift apart, which is the one thing that
-// sharing the vocabulary is meant to rule out, and since everything under
-// server/utils is auto-imported, only one of the two was being kept anyway.
 import type { Seniority } from './jobTypes'
 
 export type HiringSource = 'telegram'
@@ -16,24 +11,30 @@ export interface CvProfile {
   id: string
   source: HiringSource
   country: string
-  /** Candidate full name when known. */
+  /** Candidate full name when present in the source. Empty when not provided. */
   name: string
   /** Primary normalized profession/headline. Kept for backwards compatibility. */
   role: string
-  /** All normalized professions explicitly supported by the candidate's post. */
+  /** All normalized professions the candidate is explicitly looking for. */
   professions?: string[]
+  /** Candidate circumstances useful to employers, e.g. Student or Parental leave. */
+  features?: string[]
   experienceYears?: number | null
-  /** Expected compensation when the CV mentions it. */
+  /** Expected compensation when the candidate mentions it. */
   salaryMin?: number | null
   salaryMax?: number | null
   currency?: string | null
   city?: string | null
+  district?: string | null
   remote?: boolean | null
   photo?: string | null
   photos?: string[]
+  /** Canonical link to the original Telegram message. */
   url: string
   createdAt: string | null
-  /** Full CV body (Telegram post text). */
+  /** Original message text, preserved verbatim apart from Telegram HTML decoding. */
+  originalText: string
+  /** Search/display copy; currently the same source text as originalText. */
   description: string
   skills?: string[]
   languages?: string[]
@@ -41,11 +42,8 @@ export interface CvProfile {
   tags?: string[]
   contact?: string | null
   employmentType?: string | null
-  // Normalized in hiringNormalize.ts so filtering and ranking work on canonical
-  // values rather than whatever wording the CV author used.
   seniority?: Seniority | null
   contacts?: { telegram?: string; email?: string; phone?: string }
-  // Relevance score from Elasticsearch; absent for the in-memory fallback.
   score?: number
 }
 
