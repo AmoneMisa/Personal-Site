@@ -285,7 +285,13 @@ function mergeCandidateAi(profile: CvProfile, data: CandidateAiData): CvProfile 
   if (hasAiField(data, 'remote')) merged.remote = data.remote ?? null
   if (hasAiField(data, 'relocationReady')) merged.relocationReady = data.relocationReady ?? null
 
-  if (data.education?.trim()) merged.education = data.education.trim()
+  // The model reliably confuses the schedule line that follows the education
+  // line on board cards — "любая занятость", "неполная занятость, удаленно" —
+  // and an employment type is never an education.
+  const education = data.education?.trim() || ''
+  if (education && !/занятост|зайнятіст|удал[её]нн|дистанцион|remote|full[- ]?time|part[- ]?time|график\s+работ|bandlik/iu.test(education)) {
+    merged.education = education
+  }
 
   const contacts = { ...(merged.contacts || {}) }
   if (!contacts.telegram && data.contacts?.telegram) contacts.telegram = data.contacts.telegram

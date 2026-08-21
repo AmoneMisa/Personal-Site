@@ -244,8 +244,26 @@ export function employment(text: string): CvProfile['employmentTypes'] {
   return [...out]
 }
 
+/**
+ * A run of digits is not a phone number. Cards are full of salaries
+ * ("4 000 000"), employment dates ("2007 - 2009") and ids, and the previous
+ * pattern took the first of them and published it as the way to reach the
+ * candidate. A real number here carries at least nine digits, and a pair of
+ * years is never one.
+ */
+function phoneNumber(text: string): string | null {
+  for (const match of text.matchAll(/\+?\d[\d\s()\-]{7,}\d/g)) {
+    const raw = match[0]
+    if (/(?:19|20)\d{2}\s*[-–—]\s*(?:19|20)\d{2}/.test(raw)) continue
+    const digits = raw.replace(/\D/g, '')
+    if (digits.length < 9 || digits.length > 15) continue
+    return raw.replace(/\s+/g, ' ').trim()
+  }
+  return null
+}
+
 export function contacts(text: string): CvProfile['contacts'] {
-  const phone = text.match(/(?:\+?\d[\d\s()\-]{7,}\d)/)?.[0]?.replace(/\s+/g, ' ')
+  const phone = phoneNumber(text) || undefined
   const email = text.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/iu)?.[0]
   const telegram = text.match(/@[A-Za-z0-9_]{5,}/)?.[0]
   return { ...(phone ? { phone } : {}), ...(email ? { email } : {}), ...(telegram ? { telegram } : {}) }

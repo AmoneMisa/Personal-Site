@@ -9,8 +9,24 @@ export function useRedis() {
             // try/catch fallbacks (empty list / live fetch) kick in instead of
             // buffering commands and hanging the request until reconnect.
             maxRetriesPerRequest: 2,
-            enableOfflineQueue: false,
+            // ...but not during the first moments of the process. Work that
+            // starts on boot — store warm-up, a queued refresh — would
+            // otherwise fail with "Stream isn't writeable" purely because the
+            // socket has not finished connecting, which has read as an outage
+            // in the logs and taken down a refresh with a 500. Commands are
+            // buffered until the connection settles, then fail fast as before.
+            enableOfflineQueue: true,
         });
+        const failFast = () => {
+            redis.options.enableOfflineQueue = false;
+        };
+        // The buffer lasts exactly as long as the first connection attempt:
+        // ready means the socket is usable, and a connection error means there
+        // is nothing to wait for — a missing Redis must never make requests
+        // queue up behind a connection that is not coming.
+        redis.once("ready", failFast);
+        redis.once("error", failFast);
+        setTimeout(failFast, 15_000).unref?.();
         // Without an 'error' listener, ioredis connection errors surface as
         // unhandled 'error' events (noisy, and can crash the process).
         redis.on("error", (err) => {

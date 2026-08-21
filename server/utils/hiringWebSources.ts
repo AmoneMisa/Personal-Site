@@ -96,7 +96,15 @@ function blockAnchors(html: string, source: WebCvSource): CandidateBlock[] {
     // The margin can begin inside a tag; drop the truncated attribute soup so
     // it never reaches the profile text.
     const cut = start > 0 ? sliced.indexOf('>') : -1
-    const raw = cut >= 0 && cut < 400 ? sliced.slice(cut + 1) : sliced
+    const trimmed = cut >= 0 && cut < 400 ? sliced.slice(cut + 1) : sliced
+    // The margin can also open inside a <script>, leaving its closing tag and
+    // the tail of an ad loader in the card: script contents only get stripped
+    // when both tags are present. Drop anything before an unmatched closer.
+    const orphan = trimmed.search(/<\/(?:script|style)>/i)
+    const opens = trimmed.search(/<(?:script|style)/i)
+    const raw = orphan >= 0 && (opens < 0 || orphan < opens)
+      ? trimmed.slice(trimmed.indexOf('>', orphan) + 1)
+      : trimmed
     // The longest anchor text is the card; the short ones are its controls.
     const title = item.titles.reduce((longest, candidate) => (candidate.length > longest.length ? candidate : longest), '')
     return { href: item.href, title, html: raw, text: htmlText(raw) }
@@ -154,6 +162,17 @@ const FLAGMA_EDUCATION_RE = /(?:Образование|Освіта|Ta['’]lim|
  * salary, an age or a city still yields a profile as long as it has a URL, a
  * role and a recent date.
  */
+/**
+ * Boards that hide the candidate name still print something in its place —
+ * Flagma writes "ФИО скрыто" — and storing that verbatim gives every profile
+ * on the board the same fake name. An empty name is the honest answer.
+ */
+function realName(value: string): string {
+  if (!value || value.length > 100) return ''
+  if (/скрыт|прихован|hidden|yashiring|ascuns/iu.test(value)) return ''
+  return value
+}
+
 function parseFlagma(block: CandidateBlock, source: WebCvSource): CvProfile | null {
   const activity = activityDate(block.text)
   if (!isRecent(activity)) return null
@@ -166,8 +185,8 @@ function parseFlagma(block: CandidateBlock, source: WebCvSource): CvProfile | nu
   const inlineName = demographics?.[1]?.replace(/[,|]+$/, '').trim() || ''
   const rowAbove = demographicsIndex > 0 ? lines[demographicsIndex - 1]!.replace(/[,|]+$/, '').trim() : ''
   const nameCandidate = inlineName || rowAbove
-  const name = nameCandidate && nameCandidate.length <= 100 && !/^\d|€|\$|₸|сум|lei|сохранить|save/iu.test(nameCandidate)
-    ? nameCandidate
+  const name = !/^\d|€|\$|₸|сум|lei|сохранить|save/iu.test(nameCandidate)
+    ? realName(nameCandidate)
     : ''
 
   const age = demographics ? Number(demographics[2]) : parseAge(block.text)
@@ -177,7 +196,16 @@ function parseFlagma(block: CandidateBlock, source: WebCvSource): CvProfile | nu
   const candidateCountry = demographics?.[4]?.toUpperCase() || ''
 
   const targets = block.text.match(FLAGMA_TARGET_RE)?.[1]?.trim() || ''
-  const education = block.text.match(FLAGMA_EDUCATION_RE)?.[1]?.trim() || null
+  // "ФИО скрыто , 20 лет, Ташкент | Среднее образование" — the education is
+  // the tail of the demographics row, where the word comes after the value and
+  // so is invisible to a "Образование: X" pattern. The line below it is the
+  // work schedule, which is what was being shown as education instead.
+  const demographicsTail = demographicsIndex >= 0
+    ? (lines[demographicsIndex]!.split('|')[1] || '').trim()
+    : ''
+  const education = (/образован|освіт|ta['’]?lim|studii|образование/iu.test(demographicsTail) ? demographicsTail : '')
+    || block.text.match(FLAGMA_EDUCATION_RE)?.[1]?.trim()
+    || null
   const experienceYears = /без опыта работы|no experience|fără experiență/iu.test(block.text)
     ? 0
     : parseExperience(block.text)
