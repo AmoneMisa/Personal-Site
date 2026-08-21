@@ -6,6 +6,7 @@
 import { createError, getHeader } from 'h3'
 import { hiringChannelHandles } from '~~/server/utils/hiringSources'
 import { hiringWebSourceHandles } from '~~/server/utils/hiringWebSources'
+import { hiringExtraWebSourceHandles } from '~~/server/utils/hiringExtraWebSources'
 
 export default defineEventHandler((event) => {
   const expected = String(process.env.QUEUE_INTERNAL_KEY || '')
@@ -25,6 +26,10 @@ export default defineEventHandler((event) => {
     })
   }
 
-  const handles = [...hiringChannelHandles(), ...hiringWebSourceHandles()]
+  const handles = [
+    ...hiringChannelHandles(),
+    ...hiringWebSourceHandles(),
+    ...hiringExtraWebSourceHandles(),
+  ]
   return { ok: true, count: handles.length, handles }
 })
