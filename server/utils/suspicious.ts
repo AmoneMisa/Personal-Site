@@ -17,6 +17,8 @@
 //     they only count as adult recruitment together with an explicit adult signal.
 //   * A plain office job with real duties is never blocked: the scam category
 //     needs earnings-bait markers, not merely "office" + "no experience".
+//   * Telegram/Facebook/WhatsApp and screenshot mentions are harmless by
+//     themselves; spam/microtask recruitment blocks only on a paid-action pattern.
 
 export type RiskCategory = 'gambling' | 'adult' | 'scam'
 
@@ -61,6 +63,22 @@ const SCAM = [
   ['mlm', /сетев(?:ой|ого)\s+маркетинг|\bmlm\b|млм|финансов(?:ая|ой)\s+независимост|пассивн(?:ый|ого)\s+доход/i],
   ['crypto-bait', /гарантированн\w*\s+(?:прибыл|профит)|трейдинг\s+с\s+гарант|инвестиц\w*\s+с\s+гарант/i],
 ]
+
+// Marriage/dating agencies are intentionally excluded from Job Finder. Explicit
+// agency wording is enough to block; generic dating products/apps are not.
+const DATING_AGENCY = /брачн(?:ое|ого|ом|ые|ых)\s+агентств|агентств[оа]\s+знакомств|шлюбн(?:е|ого|ому|і)\s+агентств|агенц(?:ія|ії)\s+знайомств|\bmarriage\s+agency\b|\bdating\s+agency\b/i
+
+// Romance-scam recruitment often avoids saying "agency" but describes a worker
+// chatting as another person, maintaining profiles, or monetising letters/gifts.
+const DATING_CHAT_ROLE = /чат-?оператор|оператор\s+чат|оператор\s+переписк|менеджер\s+переписк|переводчик\s+(?:в|для)\s+(?:чат|переписк)|correspondence\s+(?:operator|manager)|chat\s+operator|dating\s+operator/i
+const DATING_CHAT_SIGNAL = /переписк\w*\s+от\s+лиц[ао]\s+(?:девуш|женщин|клиент)|вести\s+(?:женск\w*\s+)?анкет|ведение\s+(?:женск\w*\s+)?анкет|анкет\w*\s+девуш|общени\w*\s+с\s+(?:мужчин|иностранц)|спілкуван\w*\s+з\s+(?:чоловік|іноземц)|листа\w*\s+від\s+імені|писать\s+письма\s+(?:мужчинам|иностранцам)|подарк\w*\s+от\s+(?:мужчин|клиент)|letters?\s+on\s+behalf\s+of|chat\s+on\s+behalf\s+of/i
+
+// Paid spam/microtask recruitment: payment per message/like/post/action combined
+// with mass posting/messaging or screenshot proof. Individual signals are too
+// common in legitimate SMM/support jobs to block on their own.
+const PAID_MICROTASK = /оплат\w*\s+(?:за\s+)?(?:кажд\w*|одно|один)\s+(?:сообщени|лайк|комментари|пост|публикаци|рассылк|действи)|(?:платим|платят|заработок)\s+за\s+(?:сообщени|лайк|комментари|пост|публикаци|рассылк|действи)|оплата\s+за\s+(?:сообщени|лайк|комментари|пост|публикаци|рассылк|действи)|paid\s+per\s+(?:message|like|comment|post|task|action)|payment\s+per\s+(?:message|like|comment|post|task|action)/i
+const MASS_SPAM_ACTION = /массов\w*\s+рассылк|рассыл\w*\s+(?:сообщени|текст|объявлен)|отправ\w*\s+сообщени\w*\s+(?:в|по)\s+(?:групп|чат)|размещ\w*\s+(?:текст|сообщени|объявлен|пост)\w*\s+(?:в|по)\s+(?:групп|чат)|публик\w*\s+(?:в|по)\s+(?:групп|чат)|(?:facebook|telegram|whatsapp)\s+(?:groups?|chats?)|post\w*\s+(?:in|to)\s+(?:facebook|telegram|whatsapp)?\s*(?:groups?|chats?)/i
+const SCREENSHOT_PROOF = /скриншот\w*\s+(?:как\s+)?(?:подтверждени|отч[её]т|доказательств)|подтвержд\w*\s+(?:выполнени\w*\s+)?скриншот|присл\w*\s+скриншот|screenshot\s+(?:as\s+)?(?:proof|confirmation|report)|send\s+(?:a\s+)?screenshot/i
 
 // ---- Soft signals: the posting never says what you'd actually do ----------
 const HAS_DUTIES = /обязанност|обов'?язк|responsibilit|what\s+you(?:'|’)?ll\s+(?:do|be\s+doing)|задачи|завдання|duties|your\s+role|чем\s+предстоит\s+заниматься|функционал|job\s+description|требования\s+к\s+задачам/i
@@ -111,9 +129,16 @@ export function classifySuspicion(input: {
   }
 
   const scam = testAll(SCAM as [string, RegExp][], text)
-  if (scam.length) {
+  const datingAgency = DATING_AGENCY.test(text)
+  const datingChat = DATING_CHAT_ROLE.test(text) && DATING_CHAT_SIGNAL.test(text)
+  const paidSpamTask = PAID_MICROTASK.test(text) && (MASS_SPAM_ACTION.test(text) || SCREENSHOT_PROOF.test(text))
+
+  if (scam.length || datingAgency || datingChat || paidSpamTask) {
     riskCategory = riskCategory || 'scam'
     riskReasons.push(...scam.map((r) => `scam:${r}`))
+    if (datingAgency) riskReasons.push('scam:dating-agency')
+    if (datingChat) riskReasons.push('scam:dating-chat')
+    if (paidSpamTask) riskReasons.push('scam:paid-spam-task')
   }
 
   // --- soft "vague posting" signals ---
