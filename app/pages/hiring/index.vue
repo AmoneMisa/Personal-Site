@@ -98,6 +98,8 @@ const profiles = ref<CvProfile[]>([]);
 const total = ref(0);
 const loading = ref(false);
 const loadingMore = ref(false);
+/** A filter changed and the confirming request has not answered yet. */
+const filtersPending = ref(false);
 const warming = ref(false);
 const failed = ref(false);
 const sourceErrors = ref<FeedResult["sourceErrors"]>([]);
@@ -208,11 +210,55 @@ const isHidden = (id: string) => hiddenIds.value.has(id);
 const isFavorite = (id: string) => favoriteIds.value.has(id);
 
 const activeProfiles = computed(() => profiles.value.filter((item) => !hiddenIds.value.has(item.id)));
+
+/**
+ * The same filters the server applies, over what is already on screen.
+ *
+ * Changing a filter used to blank the grid until the round trip came back.
+ * The loaded page can answer most of it immediately — everything except full
+ * text search, which stays the server's job — so the visible list narrows on
+ * the keystroke and is replaced by the authoritative result when it lands.
+ */
+function matchesLocally(profile: CvProfile): boolean {
+  if (countries.value.length && !countries.value.includes((profile.country || "").toUpperCase())) return false;
+  if (remote.value === "yes" && !profile.remote) return false;
+  if (remote.value === "no" && profile.remote) return false;
+  if (gender.value && (profile.gender || "unknown") !== gender.value) return false;
+  if (seniority.value && (profile.seniority || "") !== seniority.value) return false;
+
+  if (experienceMin.value != null) {
+    if (profile.experienceYears == null || profile.experienceYears < experienceMin.value) return false;
+  }
+  if (ageMin.value != null && (profile.age == null || profile.age < ageMin.value)) return false;
+  if (ageMax.value != null && (profile.age == null || profile.age > ageMax.value)) return false;
+
+  if (city.value) {
+    const needle = city.value.trim().toLocaleLowerCase("ru");
+    const hay = `${profile.city || ""} ${profile.district || ""}`.toLocaleLowerCase("ru");
+    if (!hay.includes(needle)) return false;
+  }
+
+  if (professions.value.length) {
+    const owned = new Set([...(profile.professions || []), profile.role].filter(Boolean));
+    if (!professions.value.some((profession) => owned.has(profession))) return false;
+  }
+
+  if (source.value) {
+    const origin = (profile.origin || "telegram").toLowerCase();
+    const key = (profile.sourceKey || profile.source || "").toLowerCase();
+    if (source.value !== origin && source.value !== key) return false;
+  }
+
+  return true;
+}
+
 const displayedProfiles = computed(() => {
   if (view.value === "favorites") return favorites.value;
   if (view.value === "recent") return recent.value;
   if (view.value === "hidden") return hidden.value;
-  return activeProfiles.value;
+  // While a filter change is on its way to the server, show the subset that
+  // already satisfies it rather than a dimmed copy of the previous result.
+  return filtersPending.value ? activeProfiles.value.filter(matchesLocally) : activeProfiles.value;
 });
 const hasMore = computed(() => view.value === "active" && profiles.value.length < total.value);
 
@@ -359,7 +405,9 @@ async function load(append = false, background = false) {
   const seq = ++loadSeq;
   if (!background) {
     if (append) loadingMore.value = true;
-    else loading.value = true;
+    // A filter change already has something to show; dimming the grid for it
+    // is what made filtering feel slow even when the answer was quick.
+    else loading.value = !profiles.value.length;
     failed.value = false;
   }
   const params: Record<string, string> = { limit: String(PAGE_SIZE), offset: append ? String(profiles.value.length) : "0" };
@@ -403,6 +451,7 @@ async function load(append = false, background = false) {
   if (!background) {
     loading.value = false;
     loadingMore.value = false;
+    filtersPending.value = false;
   }
   if (!append && !background) void syncQueryParams();
   scheduleWarmPoll();
@@ -410,6 +459,9 @@ async function load(append = false, background = false) {
 
 function scheduleLoad(delay = 250) {
   if (loadTimer) clearTimeout(loadTimer);
+  // Narrow what is on screen straight away; the request only confirms it and
+  // brings in whatever else matches beyond the loaded page.
+  filtersPending.value = true;
   loadTimer = setTimeout(() => { loadTimer = undefined; void load(false); }, delay);
   scheduleQuerySync(Math.min(delay, 160));
 }
