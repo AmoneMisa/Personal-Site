@@ -10,6 +10,7 @@ export type HiringSource = 'telegram'
 export type CandidateOrigin = 'telegram' | 'web'
 export type CandidateEmploymentType = 'full_time' | 'part_time'
 export type CandidateContactType = 'direct' | 'platform'
+export type CandidateGender = 'male' | 'female' | 'unknown'
 
 export const HIRING_SOURCES: HiringSource[] = ['telegram']
 
@@ -32,6 +33,8 @@ export interface CvProfile {
   /** Candidate circumstances useful to employers, e.g. Student or Parental leave. */
   features?: string[]
   age?: number | null
+  /** Explicitly stated gender only; unknown when the source does not provide it. */
+  gender?: CandidateGender
   /** Defaults to true when age is unavailable, per product requirements. */
   isAdult?: boolean
   experienceYears?: number | null

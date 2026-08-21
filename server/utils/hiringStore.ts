@@ -16,6 +16,7 @@ import {
   saveDbCandidates,
 } from './hiringDb'
 import { normalizeCandidate } from './hiringNormalize'
+import { isRecruitingOpportunity, repairCandidateProfile } from './hiringQuality'
 import { HIRING_SOURCES, type CandidateEmploymentType, type CvProfile, type HiringSource } from './hiringTypes'
 import {
   aiFingerprint,
@@ -29,7 +30,10 @@ const STORE_TTL_SECONDS = 100 * 86_400
 const MEMORY_TTL_MS = 5 * 60_000
 const MAX_AGE_MONTHS = 3
 const SOURCE_TIMEOUT_MS = 600_000
-const AI_MIN_CONFIDENCE = 0.65
+const AI_MIN_CONFIDENCE = 0.7
+const AI_CANDIDATE_PARSER_VERSION = 'candidate-semantic-v2'
+const AI_FAILED_RETRY_MS = 15 * 60_000
+const AI_PENDING_STALE_MS = 30 * 60_000
 // A refresh that fails at the transport level (worker down, Telegram
 // unreachable) stores nothing, so the board would stay empty until the next
 // scheduled run. Such an attempt is retried from the feed with backoff, while
@@ -86,6 +90,10 @@ function dedupKey(profile: CvProfile): string {
   return profile.url || profile.id
 }
 
+function repaired(profile: CvProfile): CvProfile {
+  return repairCandidateProfile(normalizeCandidate(profile))
+}
+
 /** The channel a profile came from, read back off its canonical t.me link. */
 function channelHandle(profile: CvProfile): string {
   return /^https?:\/\/t\.me\/([^/]+)/i.exec(profile.url || '')?.[1]?.toLowerCase() || ''
@@ -133,45 +141,39 @@ async function syncDb(kept: StoredProfile[]) {
 }
 
 function isVisible(profile: StoredProfile): boolean {
-  return isLikelyCvPost(`${profile.name || ''}\n${profile.role || ''}\n${profile.originalText || profile.description || ''}`, true)
+  const text = `${profile.name || ''}\n${profile.role || ''}\n${profile.originalText || profile.description || ''}`
+  if (isRecruitingOpportunity(text)) return false
+  return isLikelyCvPost(text, true)
 }
 
 function publicProfiles(list: StoredProfile[]): CvProfile[] {
-  return list.filter(isVisible).map(({ lastSeen: _lastSeen, ai: _ai, ...profile }) => profile)
+  return list
+    .filter(isVisible)
+    .map(({ lastSeen: _lastSeen, ai: _ai, ...profile }) => repaired(profile))
 }
 
 function candidateAiInput(profile: CvProfile) {
-  const normalized = normalizeCandidate(profile)
+  const normalized = repaired(profile)
   const rawText = normalized.originalText || normalized.description || ''
+
+  // Only deterministic hard facts are authoritative for the model. Parser
+  // guesses such as source-country, remote=false-by-absence, role and generic
+  // experience must stay out of knownFacts so the semantic model can correct
+  // them from the original multilingual text.
   const knownFacts: Record<string, unknown> = {
     name: normalized.name || null,
-    // Current/previous profession extraction is intentionally left to the
-    // candidate model as well. Regex output can confuse work history with a
-    // desired role, while exact scalar/contact facts remain authoritative.
-    professions: [],
-    previousProfessions: [],
-    skills: normalized.skills || [],
-    features: normalized.features || [],
     age: normalized.age ?? null,
     isAdult: normalized.age == null ? null : normalized.isAdult ?? null,
-    salaryMin: normalized.salaryMin ?? null,
-    salaryMax: normalized.salaryMax ?? null,
-    currency: normalized.currency ?? null,
-    country: normalized.country || null,
-    city: normalized.city ?? null,
-    district: normalized.district ?? null,
-    remote: normalized.remote ?? null,
-    relocationReady: normalized.relocationReady ?? null,
-    employmentTypes: normalized.employmentTypes || [],
-    experienceYears: normalized.experienceYears ?? null,
-    education: normalized.education ?? null,
-    languages: normalized.languages || [],
     contacts: normalized.contacts || {},
+  }
+  const fingerprintFacts = {
+    parserVersion: AI_CANDIDATE_PARSER_VERSION,
+    ...knownFacts,
   }
   return {
     rawText,
     knownFacts,
-    fingerprint: aiFingerprint('candidate', rawText, knownFacts),
+    fingerprint: aiFingerprint('candidate', rawText, fingerprintFacts),
   }
 }
 
@@ -179,37 +181,60 @@ function uniqueStrings(...lists: Array<string[] | undefined>): string[] {
   return [...new Set(lists.flatMap((items) => items || []).map((item) => item.trim()).filter(Boolean))]
 }
 
+function hasAiField(data: CandidateAiData, field: keyof CandidateAiData): boolean {
+  return Object.prototype.hasOwnProperty.call(data, field)
+}
+
 function mergeCandidateAi(profile: CvProfile, data: CandidateAiData): CvProfile {
   const merged: CvProfile = { ...profile }
 
+  // Name/age/contacts are hard deterministic facts when present. Semantic fields
+  // below are intentionally allowed to correct an earlier regex/source guess.
   if (!merged.name && data.name?.trim()) merged.name = data.name.trim()
-  // For target/history professions a confident AI result may correct the
-  // deterministic parser instead of unioning a false work-history role into
-  // the current search targets. Empty AI arrays never erase deterministic data.
+
   if (data.professions?.length) {
     merged.professions = uniqueStrings(data.professions)
     merged.role = merged.professions[0] || merged.role
   } else {
     merged.professions = uniqueStrings(merged.professions)
   }
-  if (data.previousProfessions?.length) merged.previousProfessions = uniqueStrings(data.previousProfessions)
-  else merged.previousProfessions = uniqueStrings(merged.previousProfessions)
+  if (Array.isArray(data.previousProfessions)) merged.previousProfessions = uniqueStrings(data.previousProfessions)
+
+  // Keep deterministic skills/features as a safety net, while letting AI add
+  // canonical spellings such as Talwindcss -> Tailwind.
   merged.skills = uniqueStrings(merged.skills, data.skills)
   merged.features = uniqueStrings(merged.features, data.features)
   merged.languages = uniqueStrings(merged.languages, data.languages)
-  merged.employmentTypes = [...new Set([...(merged.employmentTypes || []), ...(data.employmentTypes || [])])]
+
+  if (Array.isArray(data.employmentTypes)) {
+    merged.employmentTypes = [...new Set(data.employmentTypes)]
+  }
 
   if (merged.age == null && data.age != null) merged.age = data.age
   merged.isAdult = merged.age == null ? true : merged.age >= 18
-  if (merged.experienceYears == null && data.experienceYears != null) merged.experienceYears = data.experienceYears
-  if (merged.salaryMin == null && data.salaryMin != null) merged.salaryMin = data.salaryMin
-  if (merged.salaryMax == null && data.salaryMax != null) merged.salaryMax = data.salaryMax
-  if (!merged.currency && data.currency) merged.currency = data.currency.toUpperCase()
-  if (!merged.city && data.city?.trim()) merged.city = data.city.trim()
-  if (!merged.district && data.district?.trim()) merged.district = data.district.trim()
-  if (merged.remote == null && data.remote != null) merged.remote = data.remote
-  if (merged.relocationReady == null && data.relocationReady != null) merged.relocationReady = data.relocationReady
-  if (!merged.education && data.education?.trim()) merged.education = data.education.trim()
+
+  // Overall experience means experience relevant to CURRENT desired roles. AI
+  // may therefore correctly clear a regex value that came from an unrelated
+  // previous job (e.g. one year tutoring while seeking Backend Developer).
+  if (hasAiField(data, 'experienceYears')) merged.experienceYears = data.experienceYears ?? null
+
+  // AI understands open salary ranges: 300$+ => min=300, max=null.
+  if (hasAiField(data, 'salaryMin')) merged.salaryMin = data.salaryMin ?? null
+  if (hasAiField(data, 'salaryMax')) merged.salaryMax = data.salaryMax ?? null
+  if (hasAiField(data, 'currency')) merged.currency = data.currency?.trim().toUpperCase() || null
+
+  // Source/channel geography is not candidate geography. A confident semantic
+  // result may replace it (e.g. a candidate posted in UA channel but located in Canada).
+  if (data.country?.trim()) merged.country = data.country.trim()
+  if (hasAiField(data, 'city')) merged.city = data.city?.trim() || null
+  if (hasAiField(data, 'district')) merged.district = data.district?.trim() || null
+
+  // null is meaningful: it means "not stated" and must be able to replace the
+  // old parser's false-by-absence value.
+  if (hasAiField(data, 'remote')) merged.remote = data.remote ?? null
+  if (hasAiField(data, 'relocationReady')) merged.relocationReady = data.relocationReady ?? null
+
+  if (data.education?.trim()) merged.education = data.education.trim()
 
   const contacts = { ...(merged.contacts || {}) }
   if (!contacts.telegram && data.contacts?.telegram) contacts.telegram = data.contacts.telegram
@@ -218,7 +243,7 @@ function mergeCandidateAi(profile: CvProfile, data: CandidateAiData): CvProfile 
   merged.contacts = contacts
   merged.contact = merged.contact || contacts.telegram || contacts.email || contacts.phone || null
 
-  return normalizeCandidate(merged)
+  return repaired(merged)
 }
 
 async function persistStore(list: StoredProfile[]) {
@@ -243,7 +268,7 @@ async function applyCandidateAiResult(
 
   const accepted = !result.lowConfidence && result.confidence >= AI_MIN_CONFIDENCE
   memoryStore[index] = {
-    ...(accepted ? mergeCandidateAi(current, result.data) : current),
+    ...(accepted ? mergeCandidateAi(current, result.data) : repaired(current)),
     lastSeen: current.lastSeen,
     ai: {
       fingerprint,
@@ -258,22 +283,29 @@ async function applyCandidateAiResult(
 
 function scheduleCandidateAi(list: StoredProfile[]) {
   if (!aiWorkerEnabled()) return
-  const batchSize = Math.max(1, Number(process.env.AI_WORKER_CANDIDATE_BATCH) || 12)
+  const batchSize = Math.max(1, Number(process.env.AI_WORKER_CANDIDATE_BATCH) || 24)
   let scheduled = 0
   const newestFirst = [...list].sort((a, b) => Date.parse(b.createdAt || '') - Date.parse(a.createdAt || ''))
 
   for (const profile of newestFirst) {
     if (scheduled >= batchSize) break
+    if (!isVisible(profile)) continue
     const input = candidateAiInput(profile)
     if (!input.rawText.trim()) continue
-    if (profile.ai?.fingerprint === input.fingerprint && profile.ai.status !== 'pending') continue
+
+    if (profile.ai?.fingerprint === input.fingerprint) {
+      const ageMs = Date.now() - Date.parse(profile.ai.updatedAt || '')
+      if (profile.ai.status === 'completed' || profile.ai.status === 'low_confidence') continue
+      if (profile.ai.status === 'pending' && Number.isFinite(ageMs) && ageMs < AI_PENDING_STALE_MS) continue
+      if (profile.ai.status === 'failed' && Number.isFinite(ageMs) && ageMs < AI_FAILED_RETRY_MS) continue
+    }
 
     const key = dedupKey(profile)
     const queued = scheduleAiExtraction<CandidateAiData>({
       id: key,
       kind: 'candidate',
       ...input,
-      meta: { source: profile.source, country: profile.country, id: profile.id, url: profile.url },
+      meta: { source: profile.source, sourceCountry: profile.country, id: profile.id, url: profile.url },
       onResult: (result) => applyCandidateAiResult(key, input.fingerprint, result),
       onFailed: async (status) => {
         if (status !== 'failed') return
@@ -347,15 +379,16 @@ function pruneStore(byKey: Map<string, StoredProfile>, now: number): StoredProfi
   oldestPosted.setUTCMonth(oldestPosted.getUTCMonth() - MAX_AGE_MONTHS)
   const kept: StoredProfile[] = []
 
-  for (const profile of byKey.values()) {
-    if (!isVisible(profile)) continue
+  for (const rawProfile of byKey.values()) {
+    if (!isVisible(rawProfile)) continue
+    const profile = repaired(rawProfile)
     const posted = profile.createdAt ? new Date(profile.createdAt).getTime() : Number.NaN
     if (Number.isNaN(posted) || posted < oldestPosted.getTime() || posted > now + 48 * 60 * 60 * 1000) continue
     // Telegram candidate retention is based on publication time. `lastSeen` is
     // crawl bookkeeping only; dropping a two-month-old CV because a high-volume
     // channel did not resurface it during the last 14 days violated the product
     // requirement and made the board steadily shrink.
-    kept.push(profile)
+    kept.push({ ...profile, lastSeen: rawProfile.lastSeen, ai: rawProfile.ai })
   }
   return kept
 }
@@ -409,7 +442,9 @@ async function performRefresh(): Promise<{ fetched: number; stored: number }> {
     try {
       const batch = await fetchSource(source)
       fetched += batch.length
-      for (const profile of batch) {
+      for (const rawProfile of batch) {
+        const profile = repaired(rawProfile)
+        if (isRecruitingOpportunity(profile.originalText || profile.description || '')) continue
         const key = dedupKey(profile)
         const previous = byKey.get(key)
         const input = candidateAiInput(profile)
@@ -448,7 +483,9 @@ export async function refreshHiringChannel(handle: string): Promise<{ fetched: n
   const byKey = new Map<string, StoredProfile>()
   for (const profile of await loadStored()) byKey.set(dedupKey(profile), profile)
 
-  for (const profile of outcome.result.profiles) {
+  for (const rawProfile of outcome.result.profiles) {
+    const profile = repaired(rawProfile)
+    if (isRecruitingOpportunity(profile.originalText || profile.description || '')) continue
     const key = dedupKey(profile)
     const previous = byKey.get(key)
     const input = candidateAiInput(profile)

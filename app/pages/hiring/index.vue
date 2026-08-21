@@ -10,14 +10,15 @@ interface CvProfile {
   country: string;
   name: string;
   role: string;
+  professions?: string[];
+  age?: number | null;
+  gender?: "male" | "female" | "unknown";
   experienceYears?: number | null;
   salaryMin?: number | null;
   salaryMax?: number | null;
   currency?: string | null;
   city?: string | null;
   remote?: boolean | null;
-  photo?: string | null;
-  photos?: string[];
   url: string;
   createdAt: string | null;
   description: string;
@@ -34,6 +35,7 @@ interface FeedResult {
   warming?: boolean;
   sourceCounts?: Record<string, number>;
   sourceErrors?: Array<{ source?: string; country?: string; error?: string }>;
+  meta?: { professions?: string[] };
   error?: string;
 }
 interface CountryMeta { code: string; name: string; currency: string; cities?: string[] }
@@ -50,10 +52,12 @@ const STORAGE = {
   presets: "hiring:presets:v1",
 };
 
-const { t: translate } = useI18n();
+const { t: translate, locale } = useI18n();
 const t = (key: string, params: Record<string, unknown> = {}) => translate(`hiring.${key}`, params);
 const route = useRoute();
 const router = useRouter();
+const isRu = computed(() => String(locale.value).toLowerCase().startsWith("ru"));
+const label = (ru: string, en: string) => (isRu.value ? ru : en);
 
 useSeoMeta({
   title: () => t("seoTitle"),
@@ -68,6 +72,11 @@ const countries = ref<string[]>([]);
 const city = ref("");
 const remote = ref("any");
 const experienceMin = ref<number | undefined>(undefined);
+const ageMin = ref<number | undefined>(undefined);
+const ageMax = ref<number | undefined>(undefined);
+const gender = ref("");
+const professions = ref<string[]>([]);
+const professionValues = ref<string[]>([]);
 const query = ref("");
 // Canonical seniority + comma-separated canonical skills, mirroring the Job
 // Finder's filter model so both halves of the site behave the same way.
@@ -102,9 +111,6 @@ let warmTimer: ReturnType<typeof setTimeout> | undefined;
 let sharedPostTimer: ReturnType<typeof setTimeout> | undefined;
 let infiniteObserver: IntersectionObserver | undefined;
 
-// Every hiring source is Telegram today, so a source error means the board is
-// empty because the channels could not be read — not because the filters are
-// too narrow. Say so instead of showing "nothing matches your search".
 const sourcesDown = computed(() => !loading.value && !profiles.value.length && (sourceErrors.value?.length ?? 0) > 0);
 
 const meta = ref<CountryMeta[]>([]);
@@ -127,6 +133,17 @@ const remoteItems = computed<Item[]>(() => [
   { label: t("remoteNo"), value: "no" },
 ]);
 const remoteSel = computed<string>({ get: () => remote.value, set: (v) => (remote.value = v) });
+const genderItems = computed<Item[]>(() => [
+  { label: label("Любой пол", "Any gender"), value: ANY },
+  { label: label("Мужской", "Male"), value: "male" },
+  { label: label("Женский", "Female"), value: "female" },
+  { label: label("Не указан", "Not specified"), value: "unknown" },
+]);
+const genderSel = computed<string>({
+  get: () => gender.value || ANY,
+  set: (v) => (gender.value = v === ANY ? "" : v),
+});
+const professionItems = computed<Item[]>(() => professionValues.value.map((value) => ({ value, label: value })));
 const SENIORITY_ANY = "__any__";
 const seniorityItems = computed<Item[]>(() => [
   { label: t("seniorityAny"), value: SENIORITY_ANY },
@@ -186,6 +203,10 @@ function currentFilterQuery(): Record<string, string> {
   if (remote.value === "yes") queryParams.remote = "1";
   if (remote.value === "no") queryParams.remote = "0";
   if (experienceMin.value != null) queryParams.experienceMin = String(experienceMin.value);
+  if (ageMin.value != null) queryParams.ageMin = String(ageMin.value);
+  if (ageMax.value != null) queryParams.ageMax = String(ageMax.value);
+  if (gender.value) queryParams.gender = gender.value;
+  if (professions.value.length) queryParams.professions = professions.value.join(",");
   if (query.value.trim()) queryParams.query = query.value.trim();
   if (source.value) queryParams.sources = source.value;
   return queryParams;
@@ -201,6 +222,10 @@ function applyQueryParams(params: Record<string, unknown>) {
   city.value = queryString(params.city);
   remote.value = params.remote === "1" ? "yes" : params.remote === "0" ? "no" : "any";
   experienceMin.value = Number(queryString(params.experienceMin)) || undefined;
+  ageMin.value = Number(queryString(params.ageMin)) || undefined;
+  ageMax.value = Number(queryString(params.ageMax)) || undefined;
+  gender.value = ["male", "female", "unknown"].includes(queryString(params.gender)) ? queryString(params.gender) : "";
+  professions.value = queryString(params.professions).split(",").map((v) => v.trim()).filter(Boolean);
   query.value = queryString(params.query);
   const sourceParam = queryString(params.sources);
   source.value = SOURCES.includes(sourceParam) ? sourceParam : "";
@@ -287,6 +312,10 @@ async function load(append = false, background = false) {
   if (remote.value === "yes") params.remote = "1";
   if (remote.value === "no") params.remote = "0";
   if (experienceMin.value != null) params.experienceMin = String(experienceMin.value);
+  if (ageMin.value != null) params.ageMin = String(ageMin.value);
+  if (ageMax.value != null) params.ageMax = String(ageMax.value);
+  if (gender.value) params.gender = gender.value;
+  if (professions.value.length) params.professions = professions.value.join(",");
   if (query.value.trim()) params.query = query.value.trim();
   if (seniority.value) params.seniority = seniority.value;
   const skillList = skills.value.split(",").map((s) => s.trim()).filter(Boolean);
@@ -312,6 +341,7 @@ async function load(append = false, background = false) {
     total.value = data.count ?? profiles.value.length;
     sourceErrors.value = data.sourceErrors || [];
     warming.value = !!data.warming;
+    if (data.meta?.professions?.length) professionValues.value = data.meta.professions;
   }
   if (!background) {
     loading.value = false;
@@ -331,9 +361,14 @@ function selectSource(v: string) {
   scheduleLoad(80);
 }
 function resetFilters() {
+  countries.value = [];
   city.value = "";
   remote.value = "any";
   experienceMin.value = undefined;
+  ageMin.value = undefined;
+  ageMax.value = undefined;
+  gender.value = "";
+  professions.value = [];
   query.value = "";
   seniority.value = "";
   skills.value = "";
@@ -383,8 +418,15 @@ function salaryLabel(profile: CvProfile): string | null {
   return value != null ? `${value.toLocaleString()} ${cur}`.trim() : null;
 }
 
+function genderLabel(value?: CvProfile["gender"]): string {
+  if (value === "male") return label("Мужской", "Male");
+  if (value === "female") return label("Женский", "Female");
+  return t("notSpecified");
+}
+
 function specLine(profile: CvProfile): string {
   const parts: string[] = [];
+  if (profile.age != null) parts.push(`${profile.age}`);
   if (profile.experienceYears != null) parts.push(t("experienceN", { n: profile.experienceYears }));
   if (profile.city) parts.push(profile.city);
   if (profile.remote) parts.push(t("remoteBadge"));
@@ -401,6 +443,8 @@ const specRows = computed(() => {
   return [
     { label: t("specName"), value: strOr(profile.name) },
     { label: t("specRole"), value: strOr(profile.role) },
+    { label: label("Возраст", "Age"), value: profile.age != null ? String(profile.age) : t("notSpecified") },
+    { label: label("Пол", "Gender"), value: genderLabel(profile.gender) },
     { label: t("specExperience"), value: profile.experienceYears != null ? t("experienceN", { n: profile.experienceYears }) : t("notSpecified") },
     { label: t("specSalary"), value: salaryLabel(profile) || t("notSpecified") },
     { label: t("specCity"), value: strOr(profile.city) },
@@ -472,9 +516,10 @@ async function openSharedCv(id: string, sourceName = "", countryCode = "", attem
 function cardBadges(profile: CvProfile): string[] {
   const badges: string[] = [];
   if (profile.remote) badges.push(t("remoteBadge"));
+  if (profile.age != null) badges.push(`${profile.age}`);
   if (profile.experienceYears != null) badges.push(t("experienceN", { n: profile.experienceYears }));
-  for (const skill of (profile.skills || []).slice(0, 4)) badges.push(skill);
-  return badges;
+  for (const skill of (profile.skills || []).slice(0, 3)) badges.push(skill);
+  return badges.slice(0, 5);
 }
 
 function timeAgo(iso: string | null): string {
@@ -589,6 +634,19 @@ onBeforeUnmount(() => {
         <div class="hiring__field">
           <u-input v-model.number="experienceMin" type="number" min="0" icon="i-lucide-briefcase" :label="t('experienceMin')" @change="scheduleLoad()" />
         </div>
+        <div class="hiring__field hiring__age-range">
+          <u-input v-model.number="ageMin" type="number" min="14" max="99" icon="i-lucide-user-round" :label="label('Возраст от', 'Age from')" @change="scheduleLoad()" />
+          <u-input v-model.number="ageMax" type="number" min="14" max="99" icon="i-lucide-user-round" :label="label('Возраст до', 'Age to')" @change="scheduleLoad()" />
+        </div>
+        <div class="hiring__field">
+          <u-select-menu :label="label('Пол', 'Gender')" v-model="genderSel" :items="genderItems" value-key="value" label-key="label"
+              :search-input="false" class="hiring__select" @update:model-value="scheduleLoad()" />
+        </div>
+        <div class="hiring__field hiring__field_wide">
+          <u-select-menu :label="label('Желаемые должности', 'Desired positions')" v-model="professions" :items="professionItems"
+              value-key="value" label-key="label" multiple searchable :placeholder="label('Любые должности', 'Any positions')"
+              class="hiring__select" @update:model-value="scheduleLoad()" />
+        </div>
         <div class="hiring__field">
           <u-select-menu :label="t('seniority')" v-model="senioritySel" :items="seniorityItems" value-key="value" label-key="label"
               :search-input="false" class="hiring__select" @update:model-value="scheduleLoad()" />
@@ -615,10 +673,6 @@ onBeforeUnmount(() => {
           :class="{ 'hiring-card_favorite': isFavorite(profile.id), 'hiring-card_hidden': isHidden(profile.id) }"
           @click="openCv(profile)"
       >
-        <div class="hiring-card__avatar">
-          <u-icon name="i-lucide-file-user" class="hiring-card__avatar-icon" aria-hidden="true" />
-          <span v-if="profile.remote" class="hiring-card__remote">{{ t("remoteBadge") }}</span>
-        </div>
         <div class="hiring-card__body">
           <div class="hiring-card__actions">
             <button type="button" class="hiring-card__action" :class="{ 'hiring-card__action_active': isFavorite(profile.id) }" :aria-label="isFavorite(profile.id) ? t('removeFavorite') : t('addFavorite')" @click.stop="toggleFavorite(profile)">
@@ -628,11 +682,15 @@ onBeforeUnmount(() => {
               <u-icon :name="isHidden(profile.id) ? 'i-lucide-eye' : 'i-lucide-eye-off'" />
             </button>
           </div>
-          <h3 class="hiring-card__title">{{ profile.name }}</h3>
-          <div class="hiring-card__role text-muted">{{ profile.role }}</div>
-          <div v-if="salaryLabel(profile)" class="hiring-card__salary">{{ salaryLabel(profile) }}</div>
-          <div v-if="specLine(profile)" class="hiring-card__spec text-muted">{{ specLine(profile) }}</div>
-          <div v-if="cardBadges(profile).length" class="hiring-card__badges">
+          <h3 class="hiring-card__title">{{ profile.name || profile.role }}</h3>
+          <div class="hiring-card__role text-muted">{{ profile.name ? profile.role : "" }}</div>
+          <div class="hiring-card__salary" :class="{ 'hiring-card__placeholder': !salaryLabel(profile) }">
+            {{ salaryLabel(profile) || "—" }}
+          </div>
+          <div class="hiring-card__spec text-muted" :class="{ 'hiring-card__placeholder': !specLine(profile) }">
+            {{ specLine(profile) || "—" }}
+          </div>
+          <div class="hiring-card__badges">
             <span v-for="badge in cardBadges(profile)" :key="badge" class="hiring-card__badge">{{ badge }}</span>
           </div>
           <div class="hiring-card__meta text-muted">
@@ -748,11 +806,12 @@ onBeforeUnmount(() => {
 .hiring__preset-remove { color: var(--text-muted); font-size: 18px; line-height: 1; }
 .hiring__preset-remove:hover { color: var(--accent-pink); }
 @media (min-width: 700px) { .hiring__advanced { grid-template-columns: repeat(3, 1fr); } }
-@media (min-width: 1000px) { .hiring__advanced { grid-template-columns: repeat(4, 1fr); } }
-.hiring__field { display: flex; flex-direction: column; gap: 5px; }
+@media (min-width: 1000px) { .hiring__advanced { grid-template-columns: repeat(4, 1fr); } .hiring__field_wide { grid-column: span 2; } }
+.hiring__field { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
+.hiring__age-range { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
 .hiring__field-label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; opacity: 0.7; }
-.hiring__select { width: 100%; }
-.hiring__select :deep(button) { width: 100%; }
+.hiring__select { width: 100%; min-width: 0; }
+.hiring__select :deep(button) { width: 100%; min-width: 0; }
 .hiring__error { color: var(--ui-error, #f87171); }
 .hiring__source-warning { color: #f6c177; font-size: 13px; margin-bottom: 12px; }
 .hiring__warming { font-size: 13px; margin-bottom: 12px; }
@@ -762,36 +821,39 @@ onBeforeUnmount(() => {
 @media (min-width: 1024px) { .hiring__grid { grid-template-columns: repeat(3, 1fr); } }
 .hiring__grid_loading { opacity: 0.4; pointer-events: none; }
 .hiring-card {
-  border: 1px solid var(--line); border-radius: 12px; overflow: hidden; background: rgba(255,255,255,0.03);
-  cursor: pointer; transition: transform 140ms ease, border-color 180ms ease; display: flex; gap: 0;
+  height: 190px; min-width: 0; border: 1px solid var(--line); border-radius: 12px; overflow: hidden;
+  background: rgba(255,255,255,0.03); cursor: pointer; transition: transform 140ms ease, border-color 180ms ease;
+  display: flex;
 }
 .hiring-card:hover { transform: translateY(-2px); border-color: rgba(113,137,217,0.45); }
-.hiring-card__avatar {
-  width: 88px; flex: 0 0 88px; display: grid; place-items: center; position: relative;
-  background: rgba(113,137,217,0.08); border-right: 1px solid var(--line);
+.hiring-card__body {
+  position: relative; width: 100%; min-width: 0; padding: 14px 16px; display: grid;
+  grid-template-rows: auto 34px 20px 18px 42px auto; gap: 3px;
 }
-.hiring-card__avatar-icon { width: 36px; height: 36px; opacity: 0.55; color: #7189d9; }
-.hiring-card__remote {
-  position: absolute; top: 8px; left: 8px; font-size: 10px; padding: 2px 6px; border-radius: 6px;
-  background: rgba(13,17,40,0.85); color: #7189d9;
-}
-.hiring-card__body { position: relative; flex: 1; padding: 12px 14px; display: flex; flex-direction: column; gap: 4px; }
-.hiring-card__actions { position: absolute; top: 10px; right: 10px; display: flex; gap: 5px; }
+.hiring-card__actions { position: absolute; top: 10px; right: 10px; display: flex; gap: 5px; z-index: 1; }
 .hiring-card__action {
   width: 29px; height: 29px; display: inline-grid; place-items: center; padding: 0;
   border: 1px solid var(--line); border-radius: 6px; background: var(--bg-panel); color: var(--text-muted); cursor: pointer;
 }
 .hiring-card__action:hover, .hiring-card__action_active { color: #7189d9; border-color: rgba(113,137,217,0.48); }
-.hiring-card__title { font-size: 14px; font-weight: 600; line-height: 1.35; padding-right: 70px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-.hiring-card__role { font-size: 12.5px; line-height: 1.35; padding-right: 70px; }
-.hiring-card__salary { font-weight: 700; font-size: 14px; color: var(--text-white, inherit); }
-.hiring-card__spec { font-size: 12px; }
-.hiring-card__badges { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 6px; }
+.hiring-card__title {
+  min-width: 0; font-size: 14px; font-weight: 600; line-height: 1.35; padding-right: 70px;
+  white-space: nowrap; text-overflow: ellipsis; overflow: hidden;
+}
+.hiring-card__role {
+  min-width: 0; font-size: 12.5px; line-height: 1.35; padding-right: 70px;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+}
+.hiring-card__salary { font-weight: 700; font-size: 14px; color: var(--text-white, inherit); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hiring-card__spec { font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hiring-card__placeholder { visibility: hidden; }
+.hiring-card__badges { display: flex; align-content: flex-start; flex-wrap: wrap; gap: 5px; overflow: hidden; }
 .hiring-card__badge {
   font-size: 10.5px; font-weight: 600; padding: 4px 7px; border-radius: 999px;
   border: 1px solid var(--line); background: rgba(255,255,255,0.05); color: var(--text-primary); white-space: nowrap;
+  max-width: 100%; overflow: hidden; text-overflow: ellipsis;
 }
-.hiring-card__meta { display: flex; flex-wrap: wrap; gap: 6px; font-size: 11.5px; margin-top: 2px; text-transform: capitalize; }
+.hiring-card__meta { display: flex; flex-wrap: wrap; gap: 6px; font-size: 11.5px; text-transform: capitalize; align-self: end; }
 .hiring__empty { margin-top: 18px; text-align: center; padding: 18px; border-radius: 10px; border: 1px solid var(--line); background: rgba(255,255,255,0.03); }
 .hiring__sentinel { min-height: 44px; display: grid; place-items: center; }
 .hiring-card_favorite { border-color: rgba(113,137,217,0.5); }
@@ -804,14 +866,13 @@ onBeforeUnmount(() => {
 .hiring-modal__desc { font-size: 13.5px; line-height: 1.55; white-space: pre-wrap; color: var(--text-soft, inherit); margin-top: 8px; }
 .hiring-modal__tags { display: flex; flex-wrap: wrap; gap: 6px; }
 .hiring-modal__tag { font-size: 11px; padding: 2px 8px; border-radius: 6px; border: 1px solid var(--line); color: var(--ui-text-muted); }
-/* Footer action layout now lives in components/ui/ModalFooter.vue, shared with
-   the flat and vacancy popups. */
-/* Only the accent differs from the other popups; the layout is shared. */
 .hiring-modal-footer { --modal-footer-accent: #7189d9; --modal-footer-accent-text: #101428; }
 .hiring-share__hint { margin: 0 0 12px; color: var(--text-muted); font-size: 13px; line-height: 1.5; }
 @media (max-width: 700px) {
   .hiring__controls { grid-template-columns: 1fr; }
   .hiring__controls > :deep(button) { width: 100%; }
   .hiring__views { padding-left: 0; border-left: 0; }
+  .hiring__age-range { grid-template-columns: 1fr 1fr; }
+  .hiring-card { height: 184px; }
 }
 </style>
