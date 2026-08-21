@@ -244,12 +244,36 @@ function sourceCounts(profiles: CvProfile[]): Record<string, number> {
   return counts
 }
 
+// A candidate's stated role is free text, and the filter list was built from
+// it directly: whole sentences ("Всім привіт, є кандидат з рекомендаціями…"),
+// conference blurbs and work-format words ("УДАЛЕННО", "Онлайн") all became
+// selectable job titles. A curated profession is always allowed; anything
+// else has to at least look like a job title.
+const WORK_FORMAT_RE = /^(?:онлайн|online|удал[её]нн\p{L}*|удал[её]нная\s+работа|дистанцион\p{L}*|remote|любая\s+работа|подработка|ish\s+kere\p{L}*|masofaviy)/iu
+
+function looksLikeProfession(value: string): boolean {
+  const trimmed = value.trim()
+  if (trimmed.length < 2 || trimmed.length > 40) return false
+  // Sentence punctuation, emoji and long word counts mean it is a phrase.
+  if (/[,:;!?()]|\.\s|\p{Extended_Pictographic}/u.test(trimmed)) return false
+  if (trimmed.split(/\s+/).length > 4) return false
+  return !WORK_FORMAT_RE.test(trimmed)
+}
+
 function professionValues(profiles: CvProfile[]): string[] {
-  const values = new Set(Object.keys(HIRING_PROFESSION_LABELS))
-  for (const profile of profiles) {
-    for (const profession of canonicalProfessions(profile)) values.add(profession)
+  const values = new Map<string, string>()
+  for (const profession of Object.keys(HIRING_PROFESSION_LABELS)) {
+    values.set(profession.toLocaleLowerCase('ru'), profession)
   }
-  return [...values].sort((a, b) => a.localeCompare(b, 'en'))
+  for (const profile of profiles) {
+    for (const profession of canonicalProfessions(profile)) {
+      const key = profession.toLocaleLowerCase('ru')
+      // Case-only variants of the same title are one entry, not three.
+      if (values.has(key) || !looksLikeProfession(profession)) continue
+      values.set(key, profession.trim())
+    }
+  }
+  return [...values.values()].sort((a, b) => a.localeCompare(b, 'en'))
 }
 
 function targetedSearchTerm(params: URLSearchParams): string {
