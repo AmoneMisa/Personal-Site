@@ -4,6 +4,12 @@ import type { CvProfile } from './hiringTypes'
 
 const STORE_KEY = 'hiring:store:v4'
 const MAX_AGE_MONTHS = 3
+// The durable fallback below is a full candidate load. Until a web crawl has
+// actually stored something, every request would repeat it — which is what
+// made the board take seventeen seconds per request to serve nothing. A short
+// cache keeps the recovery, and caches the empty answer too.
+const FALLBACK_TTL_MS = 60_000
+const FALLBACK_TIMEOUT_MS = 2_000
 
 type StoredProfile = CvProfile & { lastSeen?: string; ai?: unknown }
 
@@ -14,6 +20,22 @@ function active(profile: CvProfile): boolean {
   const cutoff = new Date()
   cutoff.setUTCMonth(cutoff.getUTCMonth() - MAX_AGE_MONTHS)
   return activity >= cutoff.getTime() && activity <= Date.now() + 48 * 60 * 60 * 1000
+}
+
+let fallbackProfiles: CvProfile[] = []
+let fallbackAt = 0
+
+/** A slow database must never hold up the page; the store read already has. */
+async function withTimeout<T>(operation: Promise<T>, fallback: T, ms: number): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined
+  try {
+    return await Promise.race([
+      operation,
+      new Promise<T>((resolve) => { timer = setTimeout(() => resolve(fallback), ms) }),
+    ])
+  } finally {
+    if (timer) clearTimeout(timer)
+  }
 }
 
 /**
@@ -35,6 +57,14 @@ export async function getStoredWebCvProfiles(): Promise<CvProfile[]> {
   // A racing Telegram writer could previously leave a healthy Redis snapshot
   // containing only Telegram rows. Treat "no web rows" as a web-cache miss and
   // recover the durable board profiles instead of returning a false zero.
-  if (!web.length && hiringDbEnabled()) web = (await loadDbCandidates()).filter(active)
+  if (!web.length && hiringDbEnabled()) {
+    if (Date.now() - fallbackAt < FALLBACK_TTL_MS) {
+      web = fallbackProfiles
+    } else {
+      web = (await withTimeout(loadDbCandidates(), [], FALLBACK_TIMEOUT_MS)).filter(active)
+      fallbackProfiles = web
+      fallbackAt = Date.now()
+    }
+  }
   return web.map(({ lastSeen: _lastSeen, ai: _ai, ...profile }) => profile)
 }

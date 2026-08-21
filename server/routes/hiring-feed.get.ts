@@ -454,9 +454,16 @@ export default defineEventHandler(async (event) => {
     meta: {
       countries: HIRING_COUNTRIES,
       professions: professionValues(profiles),
+      // Only origins that actually have candidates: offering "Web" while no
+      // board has stored anything hands the visitor a filter whose only
+      // possible result is an empty page.
       sources: [
-        { value: 'telegram', label: 'Telegram', origin: 'telegram' },
-        { value: 'web', label: 'Web', origin: 'web' },
+        ...(profiles.some((profile) => profileOrigin(profile) === 'telegram')
+          ? [{ value: 'telegram', label: 'Telegram', origin: 'telegram' }]
+          : []),
+        ...(profiles.some((profile) => profileOrigin(profile) === 'web')
+          ? [{ value: 'web', label: 'Web', origin: 'web' }]
+          : []),
         ...listWebSources()
           .filter((source) => (sourceCounts(profiles)[source.key] || 0) > 0)
           .map((source) => ({ value: source.key, label: source.label, origin: 'web' as const })),

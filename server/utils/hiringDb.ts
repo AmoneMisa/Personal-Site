@@ -256,18 +256,26 @@ export async function recordDbSourceRun(diagnostic: SourceRun): Promise<void> {
   }
 }
 
+// Read on every candidate-feed request, and it changes only when a crawl
+// finishes. Cached so a slow or unreachable database costs one stalled
+// request a minute instead of every one of them.
+const SOURCE_RUNS_TTL_MS = 60_000
+let sourceRunsCache: Array<SourceRun & { lastSuccessAt?: string | null }> = []
+let sourceRunsAt = 0
+
 /** What each channel last did, for diagnostics that outlive a restart. */
 export async function loadDbSourceRuns(): Promise<
   Array<SourceRun & { lastSuccessAt?: string | null }>
 > {
   if (!hiringDbEnabled()) return []
+  if (Date.now() - sourceRunsAt < SOURCE_RUNS_TTL_MS) return sourceRunsCache
   try {
     await ensureSchema()
     const result = await db().query(
       `SELECT source, handle, country, status, fetched, candidates, error, checked_at, last_success_at
        FROM ${schema()}.source_runs ORDER BY checked_at DESC, handle ASC;`,
     )
-    return result.rows.map((row) => ({
+    sourceRunsCache = result.rows.map((row) => ({
       handle: row.handle,
       country: row.country,
       status: row.status,
@@ -277,9 +285,15 @@ export async function loadDbSourceRuns(): Promise<
       checkedAt: row.checked_at ? new Date(row.checked_at).toISOString() : '',
       lastSuccessAt: row.last_success_at ? new Date(row.last_success_at).toISOString() : null,
     }))
+    sourceRunsAt = Date.now()
+    return sourceRunsCache
   } catch (error) {
     console.warn('[hiring:db] source runs failed:', (error as Error).message)
-    return []
+    // Remember the failure too: retrying a dead database on every request is
+    // exactly what made the feed slow.
+    sourceRunsAt = Date.now()
+    sourceRunsCache = []
+    return sourceRunsCache
   }
 }
 
