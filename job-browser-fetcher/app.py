@@ -1,0 +1,163 @@
+import ipaddress
+import os
+import threading
+import time
+from email.utils import parsedate_to_datetime
+from urllib.parse import urlparse
+
+from curl_cffi import requests as cffi
+from flask import Flask, Response, jsonify, request
+
+app = Flask(__name__)
+
+IMPERSONATE = os.environ.get("JOB_BROWSER_IMPERSONATE", "chrome124")
+TIMEOUT = float(os.environ.get("JOB_BROWSER_TIMEOUT", "25"))
+ATTEMPTS = max(1, int(os.environ.get("JOB_BROWSER_ATTEMPTS", "2")))
+RETRY_BACKOFF = max(0.0, float(os.environ.get("JOB_BROWSER_RETRY_BACKOFF", "2")))
+RATE_LIMIT_COOLDOWN = max(30, int(os.environ.get("JOB_BROWSER_429_COOLDOWN", "900")))
+BLOCK_COOLDOWN = max(30, int(os.environ.get("JOB_BROWSER_403_COOLDOWN", "900")))
+MAX_RETRY_SLEEP = max(0.0, float(os.environ.get("JOB_BROWSER_MAX_RETRY_SLEEP", "8")))
+
+DEFAULT_ALLOWED_HOSTS = {
+    "taskfavour.com",
+    "remote.co",
+    "simplyhired.com",
+    "visajobsearch.com",
+    "visajobfinder.com",
+    "migratemate.co",
+    "gcsservices.careers.microsoft.com",
+}
+EXTRA_ALLOWED_HOSTS = {
+    value.strip().lower().removeprefix("www.")
+    for value in os.environ.get("JOB_BROWSER_ALLOWED_HOSTS", "").split(",")
+    if value.strip()
+}
+ALLOWED_HOSTS = DEFAULT_ALLOWED_HOSTS | EXTRA_ALLOWED_HOSTS
+
+_cooldowns: dict[str, float] = {}
+_cooldowns_lock = threading.Lock()
+
+
+def normalized_host(value: str) -> str:
+    return value.strip().lower().rstrip(".").removeprefix("www.")
+
+
+def allowed_url(raw: str):
+    try:
+        parsed = urlparse(raw)
+    except ValueError:
+        return None
+    if parsed.scheme != "https" or not parsed.hostname or parsed.username or parsed.password:
+        return None
+    host = normalized_host(parsed.hostname)
+    if host not in ALLOWED_HOSTS:
+        return None
+    try:
+        ipaddress.ip_address(host)
+        return None
+    except ValueError:
+        pass
+    return parsed
+
+
+def retry_after_seconds(value: str | None) -> float | None:
+    if not value:
+        return None
+    try:
+        seconds = float(value)
+        return max(0.0, seconds)
+    except ValueError:
+        pass
+    try:
+        dt = parsedate_to_datetime(value)
+        return max(0.0, dt.timestamp() - time.time())
+    except (TypeError, ValueError, OverflowError):
+        return None
+
+
+def cooldown_remaining(host: str) -> int:
+    with _cooldowns_lock:
+        until = _cooldowns.get(host, 0.0)
+        if until <= time.time():
+            _cooldowns.pop(host, None)
+            return 0
+        return max(1, int(until - time.time()))
+
+
+def set_cooldown(host: str, seconds: float):
+    with _cooldowns_lock:
+        _cooldowns[host] = max(_cooldowns.get(host, 0.0), time.time() + seconds)
+
+
+def proxy_response(upstream) -> Response:
+    content_type = upstream.headers.get("content-type") or "text/plain; charset=utf-8"
+    response = Response(upstream.content, status=upstream.status_code, content_type=content_type)
+    retry_after = upstream.headers.get("retry-after")
+    if retry_after:
+        response.headers["Retry-After"] = retry_after
+    response.headers["X-Job-Browser-Fetcher"] = IMPERSONATE
+    return response
+
+
+@app.get("/health")
+def health():
+    return jsonify(ok=True, impersonate=IMPERSONATE)
+
+
+@app.post("/fetch")
+def browser_fetch():
+    payload = request.get_json(silent=True) or {}
+    raw_url = str(payload.get("url") or "")
+    parsed = allowed_url(raw_url)
+    if not parsed:
+        return jsonify(error="URL host is not allowed"), 403
+
+    host = normalized_host(parsed.hostname or "")
+    remaining = cooldown_remaining(host)
+    if remaining:
+        response = jsonify(error=f"{host} is cooling down")
+        response.status_code = 429
+        response.headers["Retry-After"] = str(remaining)
+        return response
+
+    headers = {
+        "Accept": str(payload.get("accept") or "text/html,application/xhtml+xml,application/json;q=0.9,*/*;q=0.8")[:500],
+        "Accept-Language": str(payload.get("acceptLanguage") or "en-US,en;q=0.9")[:300],
+    }
+
+    last_error = None
+    for attempt in range(ATTEMPTS):
+        try:
+            upstream = cffi.get(
+                raw_url,
+                impersonate=IMPERSONATE,
+                timeout=TIMEOUT,
+                allow_redirects=True,
+                headers=headers,
+            )
+        except Exception as error:
+            last_error = str(error)
+            if attempt + 1 < ATTEMPTS:
+                time.sleep(min(MAX_RETRY_SLEEP, RETRY_BACKOFF * (attempt + 1)))
+            continue
+
+        status = upstream.status_code
+        if status == 429:
+            retry_after = retry_after_seconds(upstream.headers.get("retry-after"))
+            if attempt + 1 < ATTEMPTS:
+                time.sleep(min(MAX_RETRY_SLEEP, retry_after or RETRY_BACKOFF * (attempt + 1)))
+                continue
+            set_cooldown(host, max(RATE_LIMIT_COOLDOWN, retry_after or 0))
+        elif status == 403:
+            set_cooldown(host, BLOCK_COOLDOWN)
+        elif status >= 500 and attempt + 1 < ATTEMPTS:
+            time.sleep(min(MAX_RETRY_SLEEP, RETRY_BACKOFF * (attempt + 1)))
+            continue
+
+        return proxy_response(upstream)
+
+    return jsonify(error=last_error or f"failed to fetch {host}"), 502
+
+
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", "4040")))
