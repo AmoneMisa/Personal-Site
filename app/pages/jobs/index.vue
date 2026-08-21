@@ -350,6 +350,7 @@ function openJob(job: Job) {
   jobModalOpen.value = true;
   shareCopied.value = false;
   markSeen(job);
+  persistState();
 }
 
 // Fetch a single vacancy by id and open it — used by shared links and the
@@ -361,7 +362,8 @@ async function openSharedJob(id: string) {
 
 function jobShareLink(job: Job | RecentJob): string {
   const base = import.meta.client ? window.location.origin : "https://whiteslove.me";
-  return `${base}${localePath("/jobs")}?job=${encodeURIComponent(job.id)}`;
+  const qs = new URLSearchParams({ ...currentState(), job: job.id }).toString();
+  return `${base}${localePath("/jobs")}${qs ? `?${qs}` : ""}`;
 }
 
 async function shareJob(job: Job | RecentJob): Promise<boolean> {
@@ -572,6 +574,7 @@ function currentState(): Record<string, string> {
   if (hasSalary.value) s.hasSalary = "1";
   if (maxExperience.value != null) s.maxExp = String(maxExperience.value);
   if (foreignerOnly.value) s.foreigner = "1";
+  if (!hideRisky.value) s.hideRisky = "0";
   if (noExperience.value) s.noExp = "1";
   if (language.value) s.language = language.value;
   if (languageLevel.value) s.level = languageLevel.value;
@@ -598,6 +601,7 @@ function applyState(s: Record<string, string>) {
   hasSalary.value = s.hasSalary === "1";
   maxExperience.value = s.maxExp ? Number(s.maxExp) : undefined;
   foreignerOnly.value = s.foreigner === "1";
+  hideRisky.value = s.hideRisky !== "0";
   noExperience.value = s.noExp === "1";
   language.value = s.language ?? "";
   languageLevel.value = s.level ?? "";
@@ -613,7 +617,10 @@ function persistState() {
   try {
     localStorage.setItem(SEARCH_STATE_KEY, JSON.stringify(s));
   } catch { /* storage full / disabled */ }
-  const qs = new URLSearchParams(s).toString();
+  const urlState = jobModalOpen.value && activeJob.value
+    ? { ...s, job: activeJob.value.id }
+    : s;
+  const qs = new URLSearchParams(urlState).toString();
   // replaceState (not push) so the back button isn't spammed on every filter change.
   window.history.replaceState(window.history.state, "", qs ? `?${qs}` : window.location.pathname);
 }
@@ -883,6 +890,11 @@ onMounted(() => {
   restoreState(); // hydrate filters from the URL query, else last-saved localStorage
   void load(1);
   if (sharedJobId) void openSharedJob(sharedJobId); // a shared link opens the vacancy popup
+});
+watch(jobModalOpen, (isOpen) => {
+  if (isOpen) return;
+  activeJob.value = null;
+  persistState();
 });
 watch(loadMoreSentinel, (element, previous) => {
   if (previous) loadMoreObserver?.unobserve(previous);
