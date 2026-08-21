@@ -29,12 +29,18 @@ export function useRedis() {
  * hit this on every deploy, log a scary error and fall back to the slow path.
  * Waiting a moment is both cheaper and truthful.
  */
+let firstConnect: Promise<boolean> | undefined;
+
 export async function redisReady(timeoutMs = 2_000): Promise<boolean> {
     const client = useRedis();
     if (client.status === "ready") return true;
     if (client.status === "end") return false;
+    // Only the first caller ever waits. Where there is no Redis at all — local
+    // development, a dead container — every later call must fall through
+    // immediately instead of paying the timeout again on every request.
+    if (firstConnect) return firstConnect;
 
-    return new Promise<boolean>((resolve) => {
+    firstConnect = new Promise<boolean>((resolve) => {
         const done = (value: boolean) => {
             clearTimeout(timer);
             client.off("ready", onReady);
@@ -48,4 +54,5 @@ export async function redisReady(timeoutMs = 2_000): Promise<boolean> {
         client.once("ready", onReady);
         client.once("error", onError);
     });
+    return firstConnect;
 }
