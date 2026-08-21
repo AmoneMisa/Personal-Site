@@ -21,15 +21,15 @@ const SPECIAL_PROFESSIONS: Array<{ name: string; re: RegExp }> = [
   },
   {
     name: 'Penetration Tester',
-    re: /\b(?:penetration\s+tester|penetration\s+testing|pentest(?:er|ing)?|пентест(?:ер|инг)?)\b/iu,
+    re: /\b(?:penetration\s+tester|penetration\s+testing|pentest(?:er|ing)?)\b|пентест(?:ер|инг)?/iu,
   },
   {
     name: 'Network Administrator',
-    re: /\b(?:network\s+administrator|network\s+admin)\b|\b(?:tarmoq|тармоқ)\b[^\n]{0,70}\b(?:administrator|admin(?:strator)?i?|администратор)\b/iu,
+    re: /\b(?:network\s+administrator|network\s+admin)\b|(?:tarmoq|тармоқ)[^\n]{0,70}(?:administrator|admin(?:strator)?i?|администратор)/iu,
   },
   {
     name: 'System Administrator',
-    re: /\b(?:system\s+administrator|system\s+admin|sysadmin)\b|\b(?:tizim|тизим)\b[^\n]{0,50}\b(?:administrator|admin(?:strator)?i?|администратор)\b|системн(?:ый|ий)\s+администратор/iu,
+    re: /\b(?:system\s+administrator|system\s+admin|sysadmin)\b|(?:tizim|тизим)[^\n]{0,50}(?:administrator|admin(?:strator)?i?|администратор)|системн(?:ый|ий)\s+администратор/iu,
   },
   {
     name: 'Cybersecurity Specialist',
@@ -37,7 +37,7 @@ const SPECIAL_PROFESSIONS: Array<{ name: string; re: RegExp }> = [
   },
   {
     name: 'Data Scientist',
-    re: /\bdata\s+scientist\b|\b(?:data\s+science)\b|дата\s+саентист/iu,
+    re: /\bdata\s+scientist\b|\bdata\s+science\b|дата\s+саентист/iu,
   },
   {
     name: 'Data Engineer',
@@ -46,13 +46,13 @@ const SPECIAL_PROFESSIONS: Array<{ name: string; re: RegExp }> = [
 ]
 
 const COUNTRY_ALIASES: Array<{ code: string; name: string; re: RegExp }> = [
-  { code: 'CA', name: 'Canada', re: /\b(?:canada|канада)\b/iu },
-  { code: 'US', name: 'United States', re: /\b(?:usa|u\.?s\.?a\.?|united\s+states|сша)\b/iu },
-  { code: 'RO', name: 'Romania', re: /\b(?:romania|румыния|румунія|românia)\b/iu },
-  { code: 'UA', name: 'Ukraine', re: /\b(?:ukraine|украина|україна)\b/iu },
-  { code: 'UZ', name: 'Uzbekistan', re: /\b(?:uzbekistan|узбекистан|o(?:'|’)zbekiston)\b/iu },
-  { code: 'KZ', name: 'Kazakhstan', re: /\b(?:kazakhstan|казахстан|қазақстан)\b/iu },
-  { code: 'KG', name: 'Kyrgyzstan', re: /\b(?:kyrgyzstan|киргизия|кыргызстан)\b/iu },
+  { code: 'CA', name: 'Canada', re: /(?<![\p{L}\p{N}])(?:canada|канада)(?![\p{L}\p{N}])/iu },
+  { code: 'US', name: 'United States', re: /(?<![\p{L}\p{N}])(?:usa|u\.?s\.?a\.?|united\s+states|сша)(?![\p{L}\p{N}])/iu },
+  { code: 'RO', name: 'Romania', re: /(?<![\p{L}\p{N}])(?:romania|румыния|румунія|românia)(?![\p{L}\p{N}])/iu },
+  { code: 'UA', name: 'Ukraine', re: /(?<![\p{L}\p{N}])(?:ukraine|украина|україна)(?![\p{L}\p{N}])/iu },
+  { code: 'UZ', name: 'Uzbekistan', re: /(?<![\p{L}\p{N}])(?:uzbekistan|узбекистан|o(?:'|’)zbekiston)(?![\p{L}\p{N}])/iu },
+  { code: 'KZ', name: 'Kazakhstan', re: /(?<![\p{L}\p{N}])(?:kazakhstan|казахстан|қазақстан)(?![\p{L}\p{N}])/iu },
+  { code: 'KG', name: 'Kyrgyzstan', re: /(?<![\p{L}\p{N}])(?:kyrgyzstan|киргизия|кыргызстан)(?![\p{L}\p{N}])/iu },
 ]
 
 function field(text: string, names: string): string | null {
@@ -120,14 +120,14 @@ function cityFromLocation(value: string | null, country: { code: string; name: s
 }
 
 function explicitRemote(text: string): boolean | null {
-  if (/\b(?:onsite|on-site|office\s+only|тільки\s+офіс|только\s+офис|без\s+удал[её]нк|не\s+рассматрива\p{L}*\s+удал[её]н|ofisda\s+ish)\b/iu.test(text)) return false
-  if (/\b(?:remote|remotely|удал[её]н(?:но|ка|ный|ная)?|віддален(?:о|а|ий)?|дистанц(?:ионно|ійно)|masofaviy|онлайн\s+работ|online\s+work)\b/iu.test(text)) return true
+  if (/(?:onsite|on-site|office\s+only|тільки\s+офіс|только\s+офис|без\s+удал[её]нк|не\s+рассматрива\p{L}*\s+удал[её]н|ofisda\s+ish)/iu.test(text)) return false
+  if (/(?:\bremote\b|\bremotely\b|удал[её]н(?:но|ка|ный|ная)?|віддален(?:о|а|ий)?|дистанц(?:ионно|ійно)|masofaviy|онлайн\s+работ|online\s+work)/iu.test(text)) return true
   return null
 }
 
 function approximateExperience(text: string): number | null {
   const uz = text.match(/\b(\d+(?:[.,]\d+)?)\s*yil(?:ga)?\s+(?:yaqin|atrofida)\s+tajriba/iu)
-    || text.match(/\btajriba\p{L}*[^\n\d]{0,40}(\d+(?:[.,]\d+)?)\s*yil/iu)
+    || text.match(/tajriba\p{L}*[^\n\d]{0,40}(\d+(?:[.,]\d+)?)\s*yil/iu)
   if (!uz) return null
   const years = Number(uz[1]!.replace(',', '.'))
   return Number.isFinite(years) && years >= 0 && years <= 60 ? years : null
@@ -156,11 +156,11 @@ export function isRecruitingOpportunity(text: string): boolean {
   if (!value) return false
 
   const signals = [
-    /\b(?:laboratory|academy|bootcamp|training\s+program|internship\s+program)\b|\b(?:лабораторія|лаборатория|академія|академия|буткемп)\b/iu,
-    /\b(?:запрошує|приглашает|приглашаем|набір|набор)\b[^.]{0,100}\b(?:кандидат|учасник|участник)/iu,
-    /\b(?:реєстрац|регистрац|registration)\p{L}*\s+(?:до|until|by)\b/iu,
-    /\b(?:старт|початок|start)\b\s*[—:,-]?\s*\d{1,2}\s+\p{L}+/iu,
-    /\b(?:кількість\s+місць|количество\s+мест|limited\s+spots|менторськ|менторск|mentorship)\b/iu,
+    /(?:\blaboratory\b|\bacademy\b|\bbootcamp\b|\btraining\s+program\b|\binternship\s+program\b|лабораторія|лаборатория|академія|академия|буткемп)/iu,
+    /(?:запрошує|приглашает|приглашаем|набір|набор)[^.]{0,100}(?:кандидат|учасник|участник)/iu,
+    /(?:(?:реєстрац|регистрац)\p{L}*\s+до|\bregistration\b\s+(?:until|by))/iu,
+    /(?:(?:старт|початок)\s*[—:,-]?\s*\d{1,2}\s+\p{L}+|\bstart\b\s*[—:,-]?\s*\d{1,2})/iu,
+    /(?:кількість\s+місць|количество\s+мест|\blimited\s+spots\b|менторськ|менторск|\bmentorship\b)/iu,
   ].filter((pattern) => pattern.test(value)).length
 
   return signals >= 2
