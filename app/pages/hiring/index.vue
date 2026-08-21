@@ -89,8 +89,6 @@ const gender = ref("");
 const professions = ref<string[]>([]);
 const professionValues = ref<string[]>([]);
 const query = ref("");
-// Canonical seniority + comma-separated canonical skills, mirroring the Job
-// Finder's filter model so both halves of the site behave the same way.
 const seniority = ref("");
 const skills = ref("");
 const source = ref("");
@@ -118,6 +116,7 @@ const listingShareCopied = ref(false);
 const loadMoreSentinel = ref<HTMLElement | null>(null);
 let loadSeq = 0;
 let loadTimer: ReturnType<typeof setTimeout> | undefined;
+let querySyncTimer: ReturnType<typeof setTimeout> | undefined;
 let warmTimer: ReturnType<typeof setTimeout> | undefined;
 let sharedPostTimer: ReturnType<typeof setTimeout> | undefined;
 let infiniteObserver: IntersectionObserver | undefined;
@@ -217,6 +216,10 @@ const displayedProfiles = computed(() => {
 });
 const hasMore = computed(() => view.value === "active" && profiles.value.length < total.value);
 
+function canonicalSkillQuery(): string {
+  return skills.value.split(",").map((value) => value.trim()).filter(Boolean).join(",");
+}
+
 function currentFilterQuery(): Record<string, string> {
   const queryParams: Record<string, string> = {};
   if (countries.value.length) queryParams.countries = countries.value.join(",");
@@ -229,6 +232,9 @@ function currentFilterQuery(): Record<string, string> {
   if (gender.value) queryParams.gender = gender.value;
   if (professions.value.length) queryParams.professions = professions.value.join(",");
   if (query.value.trim()) queryParams.query = query.value.trim();
+  if (seniority.value) queryParams.seniority = seniority.value;
+  const skillQuery = canonicalSkillQuery();
+  if (skillQuery) queryParams.skills = skillQuery;
   if (source.value) queryParams.sources = source.value;
   return queryParams;
 }
@@ -248,8 +254,21 @@ function applyQueryParams(params: Record<string, unknown>) {
   gender.value = ["male", "female", "unknown"].includes(queryString(params.gender)) ? queryString(params.gender) : "";
   professions.value = queryString(params.professions).split(",").map((v) => v.trim()).filter(Boolean);
   query.value = queryString(params.query);
-  const sourceParam = queryString(params.sources);
-  source.value = sourceParam;
+  seniority.value = ["junior", "middle", "senior", "lead"].includes(queryString(params.seniority)) ? queryString(params.seniority) : "";
+  skills.value = queryString(params.skills);
+  source.value = queryString(params.sources);
+}
+
+function activeCvSource(profile: CvProfile): string {
+  return profile.sourceKey || profile.origin || profile.source;
+}
+
+function activeCvQuery(profile: CvProfile): Record<string, string> {
+  return {
+    cv: profile.id,
+    cvSource: activeCvSource(profile),
+    ...(profile.country ? { cvCountry: profile.country } : {}),
+  };
 }
 
 async function syncQueryParams() {
@@ -259,6 +278,22 @@ async function syncQueryParams() {
     if (value) preserved[key] = value;
   }
   await router.replace({ query: { ...currentFilterQuery(), ...preserved } });
+}
+
+function scheduleQuerySync(delay = 160) {
+  if (querySyncTimer) clearTimeout(querySyncTimer);
+  querySyncTimer = setTimeout(() => {
+    querySyncTimer = undefined;
+    void syncQueryParams();
+  }, delay);
+}
+
+async function syncActiveCvQuery(profile: CvProfile | null) {
+  await router.replace({
+    query: profile
+      ? { ...currentFilterQuery(), ...activeCvQuery(profile) }
+      : currentFilterQuery(),
+  });
 }
 
 const shareUrl = computed(() => {
@@ -339,8 +374,8 @@ async function load(append = false, background = false) {
   if (professions.value.length) params.professions = professions.value.join(",");
   if (query.value.trim()) params.query = query.value.trim();
   if (seniority.value) params.seniority = seniority.value;
-  const skillList = skills.value.split(",").map((s) => s.trim()).filter(Boolean);
-  if (skillList.length) params.skills = skillList.join(",");
+  const skillQuery = canonicalSkillQuery();
+  if (skillQuery) params.skills = skillQuery;
   if (source.value) params.sources = source.value;
 
   const { data, error } = await safeFetch<FeedResult>("/hiring-feed", { params });
@@ -376,6 +411,7 @@ async function load(append = false, background = false) {
 function scheduleLoad(delay = 250) {
   if (loadTimer) clearTimeout(loadTimer);
   loadTimer = setTimeout(() => { loadTimer = undefined; void load(false); }, delay);
+  scheduleQuerySync(Math.min(delay, 160));
 }
 function selectSource(v: string) {
   if (source.value === v) return;
@@ -394,6 +430,7 @@ function resetFilters() {
   query.value = "";
   seniority.value = "";
   skills.value = "";
+  source.value = "";
   scheduleLoad(80);
 }
 function setView(next: HiringView) { view.value = next; }
@@ -428,6 +465,7 @@ function openCv(profile: CvProfile) {
   modalOpen.value = true;
   recent.value = [profile, ...recent.value.filter((item) => item.id !== profile.id)].slice(0, MAX_RECENT);
   persistList(STORAGE.recent, recent.value, MAX_RECENT);
+  void syncActiveCvQuery(profile);
 }
 
 function salaryLabel(profile: CvProfile): string | null {
@@ -486,7 +524,7 @@ const shareCopied = ref(false);
 function makeCvShareLink(profile: CvProfile): string {
   const resolved = router.resolve({
     path: route.path,
-    query: { cv: profile.id, cvSource: profile.source, cvCountry: profile.country },
+    query: { ...currentFilterQuery(), ...activeCvQuery(profile) },
   });
   return new URL(resolved.href, window.location.origin).toString();
 }
@@ -522,7 +560,7 @@ async function openSharedCv(id: string, sourceName = "", countryCode = "", attem
   const local = profiles.value.find((profile) => profile.id === id);
   if (local) { openCv(local); return; }
   const params: Record<string, string> = { profileId: id, limit: "1", offset: "0" };
-  if (SOURCES.includes(sourceName)) params.sources = sourceName;
+  if (sourceName) params.sources = sourceName;
   if (/^[A-Za-z]{2}$/.test(countryCode)) params.countries = countryCode.toUpperCase();
   const { data } = await safeFetch<FeedResult>("/hiring-feed", { params });
   const exact = data?.profiles?.find((profile) => profile.id === id);
@@ -578,6 +616,12 @@ onMounted(async () => {
   if (loadMoreSentinel.value) infiniteObserver.observe(loadMoreSentinel.value);
 });
 
+watch(modalOpen, (isOpen) => {
+  if (isOpen) return;
+  active.value = null;
+  void syncActiveCvQuery(null);
+});
+
 watch(loadMoreSentinel, (current, previous) => {
   if (previous) infiniteObserver?.unobserve(previous);
   if (current) infiniteObserver?.observe(current);
@@ -585,6 +629,7 @@ watch(loadMoreSentinel, (current, previous) => {
 
 onBeforeUnmount(() => {
   if (loadTimer) clearTimeout(loadTimer);
+  if (querySyncTimer) clearTimeout(querySyncTimer);
   if (warmTimer) clearTimeout(warmTimer);
   if (sharedPostTimer) clearTimeout(sharedPostTimer);
   infiniteObserver?.disconnect();
