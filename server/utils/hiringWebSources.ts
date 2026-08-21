@@ -102,13 +102,25 @@ const TODAY_RE = new RegExp(`${B}(?:сегодня|сьогодні|bugun|today|
 const YESTERDAY_RE = new RegExp(`${B}(?:вчера|вчора|kecha|yesterday|ieri)${E}`, 'iu')
 const HOURS_AGO_RE = new RegExp(`(?:^|\\s)(\\d{1,3})\\s*(?:ч\\.?|час(?:а|ов)?|год(?:ину|ини)|soat|hours?|hrs?|ore|oră)${E}`, 'iu')
 const DAYS_AGO_RE = new RegExp(`(?:^|\\s)(\\d{1,3})\\s*(?:дн(?:я|ей|і|ів)?|день|days?|kun|zile|zi)${E}`, 'iu')
-const WEEKS_AGO_RE = new RegExp(`(?:^|\\s)(\\d{1,2})\\s*(?:недел(?:ю|и|ь)|тижн(?:ів|і|я)|hafta|weeks?|săptămân\\p{L}*)${E}`, 'iu')
-const MONTHS_AGO_RE = new RegExp(`(?:^|\\s)(\\d{1,2})\\s*(?:месяц\\p{L}*|місяц\\p{L}*|oy|months?|lun\\p{L}*)${E}`, 'iu')
+const AGO = '(?:\\s*(?:назад|тому|раніше|oldin|ago|în urmă))'
+const WEEKS_AGO_RE = new RegExp(`(?:^|\\s)(\\d{1,2})\\s*(?:недел(?:ю|и|ь)|тижн(?:ів|і|я)|hafta|weeks?|săptămân\\p{L}*)${AGO}`, 'iu')
+const MONTHS_AGO_RE = new RegExp(`(?:^|\\s)(\\d{1,2})\\s*(?:месяц\\p{L}*|місяц\\p{L}*|oy|months?|lun\\p{L}*)${AGO}`, 'iu')
 
 function activityDate(text: string): string | null {
   const now = new Date()
   if (TODAY_RE.test(text)) return now.toISOString()
   if (YESTERDAY_RE.test(text)) return new Date(now.getTime() - 86_400_000).toISOString()
+
+  // An explicit date beats any relative reading: cards that print one put it
+  // first, while a work history further down is full of durations.
+  const absolute = text.match(/(?<![\p{L}\p{N}])(\d{1,2})\s+([\p{L}]+),?\s+(20\d{2})(?![\p{L}\p{N}])/iu)
+  if (absolute) {
+    const month = MONTHS[absolute[2]!.toLocaleLowerCase('ru')]
+    if (month != null) return new Date(Date.UTC(Number(absolute[3]), month, Number(absolute[1]), 12)).toISOString()
+  }
+
+  const dotted = text.match(/(?<![\d])(\d{1,2})[./-](\d{1,2})[./-](20\d{2})(?![\d])/)
+  if (dotted) return new Date(Date.UTC(Number(dotted[3]), Number(dotted[2]) - 1, Number(dotted[1]), 12)).toISOString()
 
   const hours = text.match(HOURS_AGO_RE)
   if (hours) return new Date(now.getTime() - Number(hours[1]) * 3_600_000).toISOString()
@@ -121,15 +133,6 @@ function activityDate(text: string): string | null {
 
   const months = text.match(MONTHS_AGO_RE)
   if (months) return new Date(now.getTime() - Number(months[1]) * 30 * 86_400_000).toISOString()
-
-  const absolute = text.match(/\b(\d{1,2})\s+([\p{L}]+),?\s+(20\d{2})\b/iu)
-  if (absolute) {
-    const month = MONTHS[absolute[2]!.toLocaleLowerCase('ru')]
-    if (month != null) return new Date(Date.UTC(Number(absolute[3]), month, Number(absolute[1]), 12)).toISOString()
-  }
-
-  const dotted = text.match(/\b(\d{1,2})[./-](\d{1,2})[./-](20\d{2})\b/)
-  if (dotted) return new Date(Date.UTC(Number(dotted[3]), Number(dotted[2]) - 1, Number(dotted[1]), 12)).toISOString()
   return null
 }
 
@@ -149,13 +152,17 @@ function parseExperience(text: string): number | null {
 
 function parseSalary(text: string, country: string): Pick<CvProfile, 'salaryMin' | 'salaryMax' | 'currency'> {
   const currency = /(?:\$|USD|доллар)/iu.test(text) ? 'USD'
+    // careerist.ru is a Russian platform and quotes its Uzbek listings in roubles.
+    : /(?:RUB|руб|₽)/iu.test(text) ? 'RUB'
     : /(?:€|EUR|евро)/iu.test(text) ? 'EUR'
       : /(?:UZS|сум|so(?:'|’)m)/iu.test(text) ? 'UZS'
         : /(?:KZT|₸|тенге|тг\b)/iu.test(text) ? 'KZT'
           : /(?:UAH|грн|грив)/iu.test(text) ? 'UAH'
             : /(?:RON|lei\b)/iu.test(text) ? 'RON'
               : ({ UZ: 'UZS', KZ: 'KZT', UA: 'UAH', RO: 'RON' } as Record<string, string>)[country]
-  const money = text.match(/(?:от\s*)?(\d[\d\s.,]{2,})(?:\s*(?:-|–|—|до|to)\s*(\d[\d\s.,]{2,}))?\s*(?:UZS|KZT|UAH|RON|USD|EUR|сум|so(?:'|’)m|тенге|грн|lei|\$|€|₸)/iu)
+  // The amount and its currency often sit on separate rows of a card, so a
+  // single newline between them is allowed.
+  const money = text.match(/(?:от\s*)?(\d[\d\s.,]{2,})(?:\s*(?:-|–|—|до|to)\s*(\d[\d\s.,]{2,}))?\s*\n?\s*(?:UZS|KZT|UAH|RON|RUB|USD|EUR|сум|so(?:'|’)m|тенге|грн|руб\p{L}*|lei|\$|€|₸|₽)/iu)
   if (!money) return {}
   const parse = (raw: string) => Number(raw.replace(/[\s.,]/g, ''))
   const first = parse(money[1]!)
@@ -285,12 +292,68 @@ function profileBase(source: WebCvSource, block: CandidateBlock, activity: strin
   })
 }
 
+// "Michael P. , 54 года, Одесса, UA | Высшее образование" — the demographics
+// row carries age, city and the candidate's own country code, which is not
+// necessarily the country of the site the CV was posted on.
+// The row may or may not start with the name: "Michael P. , 54 года, Одесса,
+// UA" and ", 32 ani, București" are both shapes this site produces.
+const FLAGMA_DEMOGRAPHICS_RE =
+  /^\s*([^,|\n\d][^,|\n]{1,58})?\s*,?\s*(\d{2})\s*(?:года|лет|год|yil|ani|de ani)\s*,\s*([^,|\n]{2,60}?)\s*(?:,\s*([A-Z]{2})\b)?\s*(?:\||$)/mu
+const FLAGMA_TARGET_RE = /(?:ищу|шукаю|qidiraman|caut)\s+(?:в|у|in)\s+([^\n]{3,120})/iu
+const FLAGMA_EDUCATION_RE = /(?:Образование|Освіта|Ta['’]lim|Studii)\s*:?\s*([^\n]{3,240})/iu
+
+/**
+ * Shared Flagma card parser. Fields are read independently: a card missing a
+ * salary, an age or a city still yields a profile as long as it has a URL, a
+ * role and a recent date.
+ */
 function parseFlagma(block: CandidateBlock, source: WebCvSource): CvProfile | null {
   const activity = activityDate(block.text)
   if (!isRecent(activity)) return null
-  const afterTitle = block.text.split(block.title).slice(1).join(block.title)
-  const name = afterTitle.match(/\n([^\n]{2,100}?),\s*\d{2}\s*(?:лет|год|года|yil|ani)/iu)?.[1]?.trim() || ''
-  return profileBase(source, block, activity!, { name, role: block.title })
+
+  const lines = block.text.split('\n').map((line) => line.trim()).filter(Boolean)
+  const demographicsIndex = lines.findIndex((line) => FLAGMA_DEMOGRAPHICS_RE.test(line))
+  const demographics = demographicsIndex >= 0 ? lines[demographicsIndex]!.match(FLAGMA_DEMOGRAPHICS_RE) : null
+
+  // The name is either the prefix of the demographics row or the row above it.
+  const inlineName = demographics?.[1]?.replace(/[,|]+$/, '').trim() || ''
+  const rowAbove = demographicsIndex > 0 ? lines[demographicsIndex - 1]!.replace(/[,|]+$/, '').trim() : ''
+  const nameCandidate = inlineName || rowAbove
+  const name = nameCandidate && nameCandidate.length <= 100 && !/^\d|€|\$|₸|сум|lei|сохранить|save/iu.test(nameCandidate)
+    ? nameCandidate
+    : ''
+
+  const age = demographics ? Number(demographics[2]) : parseAge(block.text)
+  const city = demographics?.[3]?.trim() || cityFrom(block.text, source.country)
+  // A candidate on flagma.ro may live in Ukraine and be looking for work in
+  // Romania; the card says so, and the site's country must not overwrite it.
+  const candidateCountry = demographics?.[4]?.toUpperCase() || ''
+
+  const targets = block.text.match(FLAGMA_TARGET_RE)?.[1]?.trim() || ''
+  const education = block.text.match(FLAGMA_EDUCATION_RE)?.[1]?.trim() || null
+  const experienceYears = /без опыта работы|no experience|fără experiență/iu.test(block.text)
+    ? 0
+    : parseExperience(block.text)
+
+  return profileBase(source, block, activity!, {
+    name,
+    role: block.title,
+    city,
+    age: age != null && age >= 14 && age <= 90 ? age : null,
+    education,
+    experienceYears,
+    // Looking for work somewhere other than where they live is a relocation.
+    relocationReady: targets ? true : undefined,
+    ...(candidateCountry ? { country: candidateCountry, sourceCountry: source.country } : {}),
+  })
+}
+
+/** Value printed under a label row, e.g. "Город" then "Ташкент". */
+function labelledValue(lines: string[], label: RegExp): string | null {
+  const index = lines.findIndex((line) => label.test(line))
+  if (index < 0) return null
+  const value = lines[index + 1]?.trim()
+  return value && value.length <= 80 ? value : null
 }
 
 function parseCareerist(block: CandidateBlock, source: WebCvSource): CvProfile | null {
@@ -298,11 +361,30 @@ function parseCareerist(block: CandidateBlock, source: WebCvSource): CvProfile |
   if (!isRecent(activity)) return null
   const after = block.text.split(block.title).slice(1).join(block.title)
   const lines = after.split('\n').map((line) => line.trim()).filter(Boolean)
-  const name = lines.find((line) => !/^(?:город|возраст|опыт работы|последнее место работы|отправить приглашение|подробнее|\d[\d\s]*\s*(?:руб|₽))/iu.test(line)
-    && !cityFrom(line, 'UZ') && line.length <= 100) || ''
+
+  // "Город" carries the city the candidate states; fall back to matching the
+  // dictionary over the card only when the label is missing.
+  const labelledCity = labelledValue(lines, /^город$/iu)
+  const city = labelledCity && !/^\d/.test(labelledCity)
+    ? labelledCity
+    : cityFrom(after, 'UZ')
+
+  // The name is the row before the "Город" label — the card puts it there —
+  // but it must not be the salary or a label itself.
+  const cityLabelIndex = lines.findIndex((line) => /^город$/iu.test(line))
+  const nameCandidate = cityLabelIndex > 0 ? lines[cityLabelIndex - 1]! : ''
+  const name = nameCandidate
+    && nameCandidate.length <= 100
+    && !/^(?:возраст|опыт работы|последнее место работы|отправить приглашение|подробнее|руб|\d)/iu.test(nameCandidate)
+    ? nameCandidate
+    : ''
+
+  const labelledAge = labelledValue(lines, /^возраст$/iu)
+  const age = labelledAge ? parseAge(labelledAge) : null
+
   const exp = after.match(/Опыт работы:\s*\n?\s*(\d+)\s*(?:год|года|лет)(?:\s+и\s+(\d+)\s+месяц)?/iu)
   const experienceYears = exp ? Number(exp[1]) + Number(exp[2] || 0) / 12 : /Без опыта/iu.test(after) ? 0 : null
-  return profileBase(source, block, activity!, { name, role: block.title, experienceYears, updatedAt: activity })
+  return profileBase(source, block, activity!, { name, role: block.title, city, age, experienceYears, updatedAt: activity })
 }
 
 // Longest alternative first: "года" must not match as "год" plus a stray "а".
@@ -534,11 +616,12 @@ export async function auditWebSource(key: string, maxPages = 2): Promise<WebSour
         if (stamp >= cutoff) audit.withinWindow += 1
       }
 
-      byUrl.set(profile.url, profile)
+      const previous = byUrl.get(profile.url)
+      byUrl.set(profile.url, previous ? mergeSameCandidate(previous, profile) : profile)
       if (audit.samples.length < 3) {
         audit.samples.push(
           `${(profile.role || profile.name || '(no role)').slice(0, 44)} | ${profile.city || '-'} | ` +
-          `${profile.activityAt?.slice(0, 10) || '-'} | ${profile.url.slice(0, 60)}`,
+          `${profile.activityAt?.slice(0, 10) || '-'} | ${profile.url}`,
         )
       }
     }
@@ -577,13 +660,40 @@ async function fetchSource(source: WebCvSource): Promise<{ profiles: CvProfile[]
       const profile = source.parse(block, source)
       if (!profile) continue
       recentOnPage += 1
-      byUrl.set(profile.url, profile)
+      const previous = byUrl.get(profile.url)
+      byUrl.set(profile.url, previous ? mergeSameCandidate(previous, profile) : profile)
     }
     // Listings are sorted newest-first. Once a page has candidate links but no
     // profiles inside the three-month activity window, deeper pages are older.
     if (!recentOnPage) break
   }
   return { profiles: [...byUrl.values()], fetched }
+}
+
+/**
+ * Two cards for one profile URL are the same person listed under two desired
+ * roles. Keep one identity and collect the roles instead of overwriting.
+ */
+function mergeSameCandidate(existing: CvProfile, incoming: CvProfile): CvProfile {
+  const professions = [...new Set([
+    ...(existing.professions || []),
+    ...(incoming.professions || []),
+    ...(existing.role ? [existing.role] : []),
+    ...(incoming.role ? [incoming.role] : []),
+  ].map((value) => value.trim()).filter(Boolean))]
+
+  const newer = Date.parse(incoming.activityAt || '') > Date.parse(existing.activityAt || '') ? incoming : existing
+  return {
+    ...existing,
+    ...Object.fromEntries(Object.entries(incoming).filter(([, value]) => value != null && value !== '')),
+    // The first card's role stays the headline; the rest join the list.
+    role: existing.role || incoming.role,
+    professions,
+    skills: [...new Set([...(existing.skills || []), ...(incoming.skills || [])])],
+    activityAt: newer.activityAt,
+    updatedAt: newer.updatedAt,
+    originalText: existing.originalText,
+  }
 }
 
 function storeKey(profile: CvProfile): string {

@@ -1,6 +1,11 @@
 const FALLBACK_STATUSES = new Set([403, 429])
 const FAILURE_STATUSES = new Set([403, 429, 500, 502, 503, 504])
 const DEFAULT_BROWSER_HOSTS = new Set([
+  // Flagma answers datacenter clients with a reCAPTCHA page under HTTP 200,
+  // so it needs the impersonating fetcher for the candidate crawler.
+  'flagma.uz',
+  'flagma.ro',
+  'flagma.kg',
   'taskfavour.com',
   'remote.co',
   'simplyhired.com',
@@ -9,6 +14,24 @@ const DEFAULT_BROWSER_HOSTS = new Set([
   'migratemate.co',
   'gcsservices.careers.microsoft.com',
 ])
+
+// A challenge page is served as a successful response: same 200, same
+// content-type, with an interstitial instead of the document. Status alone
+// therefore cannot decide whether the native fetch worked.
+const SOFT_BLOCK_TITLE_RE =
+  /<title[^>]*>[^<]*(?:recaptcha|captcha|just a moment|attention required|access denied|доступ ограничен|проверка браузера|verificare)/i
+const SOFT_BLOCK_BODY_RE =
+  /(?:g-recaptcha|grecaptcha\.|cf-browser-verification|challenge-platform|__cf_chl|hcaptcha\.com\/captcha)/i
+
+/** True when a 200 response carries a challenge rather than the page. */
+export function looksSoftBlocked(html: string): boolean {
+  if (!html) return false
+  const head = html.slice(0, 4_000)
+  if (SOFT_BLOCK_TITLE_RE.test(head)) return true
+  // A real page that merely embeds a captcha widget is much larger than the
+  // interstitial that replaces it, so size keeps false positives down.
+  return html.length < 120_000 && SOFT_BLOCK_BODY_RE.test(head)
+}
 
 type FetchInput = Parameters<typeof globalThis.fetch>[0]
 type FetchInit = Parameters<typeof globalThis.fetch>[1]
@@ -95,8 +118,24 @@ export default defineNitroPlugin(() => {
 
     try {
       primaryResponse = await originalFetch(input, init)
-      if (!FALLBACK_STATUSES.has(primaryResponse.status)) return primaryResponse
-      console.warn(`[jobs:browser-fallback] ${host} -> ${primaryResponse.status}; retrying with Chrome impersonation`)
+      if (!FALLBACK_STATUSES.has(primaryResponse.status)) {
+        const contentType = primaryResponse.headers.get('content-type') || ''
+        if (!contentType.includes('html')) return primaryResponse
+
+        // Reading the body consumes it, so the response is rebuilt from the
+        // text either way.
+        const html = await primaryResponse.clone().text().catch(() => '')
+        if (!looksSoftBlocked(html)) {
+          return new Response(html, {
+            status: primaryResponse.status,
+            statusText: primaryResponse.statusText,
+            headers: primaryResponse.headers,
+          })
+        }
+        console.warn(`[browser-fallback] ${host} answered a challenge page under ${primaryResponse.status}; retrying with Chrome impersonation`)
+      } else {
+        console.warn(`[browser-fallback] ${host} -> ${primaryResponse.status}; retrying with Chrome impersonation`)
+      }
     } catch (error) {
       primaryError = error
       console.warn(`[jobs:browser-fallback] ${host} native fetch failed; retrying with Chrome impersonation`)
