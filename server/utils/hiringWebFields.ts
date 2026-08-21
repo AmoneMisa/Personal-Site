@@ -20,6 +20,8 @@ export const MONTHS: Record<string, number> = {
   november: 10, ноябрь: 10, ноября: 10, december: 11, декабрь: 11, декабря: 11,
   ianuarie: 0, februarie: 1, martie: 2, aprilie: 3, mai: 4, iunie: 5,
   iulie: 6, septembrie: 8, octombrie: 9, noiembrie: 10, decembrie: 11,
+  січня: 0, лютого: 1, березня: 2, квітня: 3, травня: 4, червня: 5,
+  липня: 6, серпня: 7, вересня: 8, жовтня: 9, листопада: 10, грудня: 11,
 }
 
 export function decodeEntities(value: string): string {
@@ -38,6 +40,9 @@ export function decodeEntities(value: string): string {
 
 export function htmlText(value: string): string {
   return decodeEntities(value)
+    // Stripping tags alone leaves the *contents* of scripts and styles behind,
+    // which is how ad-loader JavaScript ended up inside candidate profiles.
+    .replace(/<(script|style|noscript|template)\b[^>]*>[\s\S]*?<\/\1>/gi, ' ')
     .replace(/<br\s*\/?>/gi, '\n')
     .replace(/<\/(?:p|div|li|h[1-6]|tr|section|article)>/gi, '\n')
     .replace(/<[^>]*>/g, ' ')
@@ -80,7 +85,7 @@ export const HOURS_AGO_RE = new RegExp(`(?:^|\\s)(\\d{1,3})\\s*(?:ч\\.?|час(
 export const DAYS_AGO_RE = new RegExp(`(?:^|\\s)(\\d{1,3})\\s*(?:дн(?:я|ей|і|ів)?|день|days?|kun|zile|zi)${E}`, 'iu')
 export const AGO = '(?:\\s*(?:назад|тому|раніше|oldin|ago|în urmă))'
 export const WEEKS_AGO_RE = new RegExp(`(?:^|\\s)(\\d{1,2})\\s*(?:недел(?:ю|и|ь)|тижн(?:ів|і|я)|hafta|weeks?|săptămân\\p{L}*)${AGO}`, 'iu')
-export const MONTHS_AGO_RE = new RegExp(`(?:^|\\s)(\\d{1,2})\\s*(?:месяц\\p{L}*|місяц\\p{L}*|oy|months?|lun\\p{L}*)${AGO}`, 'iu')
+export const MONTHS_AGO_RE = new RegExp(`(?:^|\\s)(\\d{1,2})\\s*(?:мес(?:яц\\p{L}*)?\\.?|міс(?:яц\\p{L}*)?\\.?|oy|months?|lun\\p{L}*)${AGO}`, 'iu')
 
 export function activityDate(text: string): string | null {
   const now = new Date()
@@ -133,6 +138,8 @@ export function dayMonthDate(text: string): string | null {
 
 export function parseAge(text: string): number | null {
   const match = text.match(new RegExp(`(?<![\\d])(\\d{2})\\s*(?:лет|год(?:а)?|рок(?:и|ів)?|years?|ani|an|yil)${E}`, 'iu'))
+    // Boards with a fielded card print the number on its own, behind a label.
+    || text.match(/(?:возраст|вік|yoshi|age|vârsta)\s*[:—-]?\s*(\d{2})(?![\d])/iu)
   if (!match) return null
   const age = Number(match[1])
   return age >= 14 && age <= 90 ? age : null
@@ -182,6 +189,15 @@ export const CITIES: Record<string, Array<[string, RegExp]>> = {
     ['Bukhara', cityRe('бухара|buxoro|bukhara')], ['Namangan', cityRe('наманган|namangan')],
     ['Andijan', cityRe('андижан|andijon|andijan')], ['Fergana', cityRe("фергана|фаргана|farg(?:'|’)ona|fergana")],
     ['Nukus', cityRe('нукус|nukus')], ['Qarshi', cityRe('карши|qarshi|karshi')],
+    ['Navoi', cityRe('навои|navoi')],
+    // Uzbek boards often give a region rather than a city, and a region is
+    // still a more useful location than nothing.
+    ['Karakalpakstan', cityRe('каракалпакстан|qoraqalpog(?:\'|’)iston|karakalpakstan')],
+    ['Kashkadarya', cityRe('кашкадар\\p{L}*|qashqadaryo|kashkadarya')],
+    ['Surkhandarya', cityRe('сурхандар\\p{L}*|surxondaryo|surkhandarya')],
+    ['Jizzakh', cityRe('джизак\\p{L}*|jizzax|jizzakh')],
+    ['Syrdarya', cityRe('сырдар\\p{L}*|sirdaryo|syrdarya')],
+    ['Khorezm', cityRe('хорезм\\p{L}*|xorazm|khorezm')],
   ],
   KZ: [
     ['Almaty', cityRe('алматы|almaty')], ['Astana', cityRe('астана|astana')],

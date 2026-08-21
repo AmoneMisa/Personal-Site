@@ -10,6 +10,7 @@ import {
   activityDate,
   cityFrom,
   dayMonthDate,
+  htmlText,
   parseAge,
 } from '../server/utils/hiringWebFields.ts'
 
@@ -78,4 +79,23 @@ test('relative durations in a work history are not read as an activity date', ()
   assert.equal(activityDate('Высшее образование, опыт работы более 5 лет.'), null)
   assert.equal(activityDate('Менеджер, 5 месяцев'), null)
   assert.match(activityDate('5 месяцев назад') ?? '', /^\d{4}-\d{2}-\d{2}T/)
+})
+
+test('script and style contents never reach a candidate profile', () => {
+  const html = [
+    '<div class="card"><script>window.yaContextCb=window.yaContextCb||[];</script>',
+    '<style>.card{color:red}</style>',
+    '<h2>Бухгалтер</h2><span>Ташкент</span></div>',
+  ].join('')
+
+  const text = htmlText(html)
+  assert.doesNotMatch(text, /yaContextCb|color:red/)
+  assert.match(text, /Бухгалтер/)
+  assert.match(text, /Ташкент/)
+})
+
+test('Uzbek boards that print a region instead of a city still resolve a location', () => {
+  assert.equal(cityFrom('Резюме - Кашкадаря', 'UZ'), 'Kashkadarya')
+  assert.equal(cityFrom('Qoraqalpog’iston', 'UZ'), 'Karakalpakstan')
+  assert.equal(cityFrom('Яшнабад, Ташкент', 'UZ'), 'Tashkent')
 })

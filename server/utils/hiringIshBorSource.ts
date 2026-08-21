@@ -3,6 +3,7 @@ import { hiringDbEnabled, loadDbCandidates, saveDbCandidates } from './hiringDb'
 import { normalizeCandidate } from './hiringNormalize'
 import type { SourceRun } from './hiringDiagnostics'
 import type { CvProfile } from './hiringTypes'
+import { cityFrom, cityRe, htmlText } from './hiringWebFields'
 import { withHiringStoreLock } from './hiringStoreLock'
 import { extractCandidateAge, extractCandidateName } from './hiringCandidateFields'
 
@@ -34,13 +35,9 @@ function decodeEntities(value: string): string {
 }
 
 function htmlLines(value: string): string[] {
-  return decodeEntities(value)
-    .replace(/<br\s*\/?>/gi, '\n')
-    .replace(/<\/(?:p|div|li|h[1-6]|article|section|tr|td)>/gi, '\n')
-    .replace(/<[^>]*>/g, ' ')
-    .split('\n')
-    .map((line) => line.replace(/\s+/g, ' ').trim())
-    .filter(Boolean)
+  // One shared reader, so script and style contents stay out of the profile
+  // text here too.
+  return htmlText(value).split('\n').filter(Boolean)
 }
 
 function stripHtml(value: string): string {
@@ -106,6 +103,15 @@ function detailActivity(html: string, text: string): string | null {
   for (const match of html.matchAll(/<time\b[^>]*datetime=["']([^"']+)["']/giu)) {
     const time = Date.parse(match[1]!)
     if (Number.isFinite(time) && time <= Date.now() + 48 * 60 * 60 * 1000) candidates.push(time)
+  }
+  // The board no longer publishes JSON-LD or a <time> element. Its only date
+  // is the one in the share row, marked by a calendar icon and followed by a
+  // view counter — still explicit, just no longer labelled in words.
+  for (const match of html.matchAll(
+    /lucide:calendar[\s\S]{0,80}?(\d{1,2})[./-](\d{1,2})[./-](20\d{2})/gi,
+  )) {
+    const iso = dottedIso(match[1]!, match[2]!, match[3]!)
+    if (iso) candidates.push(Date.parse(iso))
   }
   for (const match of text.matchAll(
     /(?:опубликован[оа]?|размещен[оа]?|обновлен[оа]?|дата\s+(?:публикации|обновления)|joylashtirilgan|yangilangan)[^\d\n]{0,32}(\d{1,2})[./-](\d{1,2})[./-](20\d{2})/giu,
@@ -180,26 +186,15 @@ function parseSalary(text: string): Pick<CvProfile, 'salaryMin' | 'salaryMax' | 
   }
 }
 
-const CITY_ALIASES: Array<[string, RegExp]> = [
-  ['Tashkent', /\b(?:ташкент|tashkent|toshkent)\b/iu],
-  ['Samarkand', /\b(?:самарканд|samarqand|samarkand)\b/iu],
-  ['Bukhara', /\b(?:бухара|buxoro|bukhara)\b/iu],
-  ['Fergana', /\b(?:фергана|фаргана|farg(?:'|’)ona|fergana)\b/iu],
-  ['Andijan', /\b(?:андижан|andijon|andijan)\b/iu],
-  ['Namangan', /\b(?:наманган|namangan)\b/iu],
-  ['Nukus', /\b(?:нукус|nukus)\b/iu],
-  ['Navoi', /\b(?:навои|navoi)\b/iu],
-  ['Qarshi', /\b(?:карши|qarshi|karshi)\b/iu],
-]
 const DISTRICT_ALIASES: Array<[string, RegExp]> = [
-  ['Chilanzar', /\b(?:чиланзар|chilonzor|chilanzar)\b/iu],
-  ['Yunusabad', /\b(?:юнасабад|yunusobod|yunusabad)\b/iu],
-  ['Mirabad', /\b(?:мирабад|mirobod|mirabad)\b/iu],
-  ['Sergeli', /\b(?:сергели|sergeli)\b/iu],
-  ['Uchtepa', /\b(?:учтепа|uchtepa)\b/iu],
-  ['Almazar', /\b(?:алмазар|olmazor|almazar)\b/iu],
-  ['Yakkasaray', /\b(?:яккасарай|yakkasaroy|yakkasaray)\b/iu],
-  ['Yashnabad', /\b(?:яшнабад|yashnobod|yashnabad)\b/iu],
+  ['Chilanzar', cityRe('чиланзар|chilonzor|chilanzar')],
+  ['Yunusabad', cityRe('юнасабад|yunusobod|yunusabad')],
+  ['Mirabad', cityRe('мирабад|mirobod|mirabad')],
+  ['Sergeli', cityRe('сергели|sergeli')],
+  ['Uchtepa', cityRe('учтепа|uchtepa')],
+  ['Almazar', cityRe('алмазар|olmazor|almazar')],
+  ['Yakkasaray', cityRe('яккасарай|yakkasaroy|yakkasaray')],
+  ['Yashnabad', cityRe('яшнабад|yashnobod|yashnabad')],
 ]
 
 function detect(text: string, aliases: Array<[string, RegExp]>): string | null {
@@ -266,7 +261,8 @@ function profileFrom(summary: Summary, detailHtml: string): CvProfile | null {
     age,
     isAdult: age == null ? true : age >= 18,
     experienceYears: parseExperience(combined),
-    city: detect(combined, CITY_ALIASES),
+    // The shared list also knows the regions this board prints instead of a city.
+    city: cityFrom(combined, 'UZ'),
     district: detect(combined, DISTRICT_ALIASES),
     remote,
     relocationReady,
@@ -345,6 +341,11 @@ async function persist(profiles: CvProfile[], diagnostic: SourceRun): Promise<nu
   })
   if (hiringDbEnabled()) await saveDbCandidates(profiles, diagnostic)
   return stored
+}
+
+/** One crawl of the ish-bor board, without storing anything. For diagnostics. */
+export async function crawlIshBorSource() {
+  return fetchProfiles()
 }
 
 export function hiringIshBorSourceHandles(): string[] {

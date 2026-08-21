@@ -2,6 +2,7 @@ import { useRedis } from '~~/server/utils/redis'
 import { hiringDbEnabled, loadDbCandidates, saveDbCandidates } from './hiringDb'
 import { normalizeCandidate } from './hiringNormalize'
 import type { SourceRun } from './hiringDiagnostics'
+import { activityDate, cityFrom, parseAge } from './hiringWebFields'
 import type { CvProfile } from './hiringTypes'
 import { withHiringStoreLock } from './hiringStoreLock'
 
@@ -82,51 +83,9 @@ function recent(value: string | null | undefined): value is string {
   return Number.isFinite(time) && time >= cutoff() && time <= Date.now() + 48 * 60 * 60 * 1000
 }
 
-const MONTHS: Record<string, number> = {
-  января: 0, февраля: 1, марта: 2, апреля: 3, мая: 4, июня: 5,
-  июля: 6, августа: 7, сентября: 8, октября: 9, ноября: 10, декабря: 11,
-  січня: 0, лютого: 1, березня: 2, квітня: 3, травня: 4, червня: 5,
-  липня: 6, серпня: 7, вересня: 8, жовтня: 9, листопада: 10, грудня: 11,
-  ianuarie: 0, februarie: 1, martie: 2, aprilie: 3, mai: 4, iunie: 5,
-  iulie: 6, august: 7, septembrie: 8, octombrie: 9, noiembrie: 10, decembrie: 11,
-}
-
-function activityDate(text: string): string | null {
-  const now = Date.now()
-  if (/\b(?:сегодня|сьогодні|today|astăzi|azi)\b/iu.test(text)) return new Date(now).toISOString()
-  if (/\b(?:вчера|вчора|yesterday|ieri)\b/iu.test(text)) return new Date(now - 86_400_000).toISOString()
-
-  const hours = text.match(/\b(\d{1,3})\s*(?:ч\.?|час(?:а|ов)?|год(?:ина|ини|ин)?|hours?|hrs?)\s*(?:назад|тому|ago)?\b/iu)
-  if (hours) return new Date(now - Number(hours[1]) * 3_600_000).toISOString()
-  const days = text.match(/\b(\d{1,3})\s*(?:дн(?:я|ей)?|дн(?:і|ів)?|days?|zile)\s*(?:назад|тому|ago)?\b/iu)
-  if (days) return new Date(now - Number(days[1]) * 86_400_000).toISOString()
-  const months = text.match(/\b(\d{1,2})\s*(?:мес(?:яц(?:а|ев)?)?\.?|міс(?:яц(?:і|ів)?)?\.?|months?|luni)\s*(?:назад|тому|ago)?\b/iu)
-  if (months) {
-    const value = new Date()
-    value.setUTCMonth(value.getUTCMonth() - Number(months[1]))
-    return value.toISOString()
-  }
-
-  const dotted = text.match(/\b(\d{1,2})[./-](\d{1,2})[./-](20\d{2})\b/)
-  if (dotted) return new Date(Date.UTC(Number(dotted[3]), Number(dotted[2]) - 1, Number(dotted[1]), 12)).toISOString()
-  const words = text.match(/\b(\d{1,2})\s+([\p{L}]+),?\s+(20\d{2})\b/iu)
-  if (words) {
-    const month = MONTHS[words[2]!.toLocaleLowerCase('ru')]
-    if (month != null) return new Date(Date.UTC(Number(words[3]), month, Number(words[1]), 12)).toISOString()
-  }
-  return null
-}
-
 function maxActivity(...values: Array<string | null>): string | null {
   const times = values.map((value) => value ? Date.parse(value) : Number.NaN).filter(Number.isFinite)
   return times.length ? new Date(Math.max(...times)).toISOString() : null
-}
-
-function parseAge(text: string): number | null {
-  const match = text.match(/\b(\d{2})\s*(?:лет|год(?:а)?|рок(?:и|ів)?|years?|ani|an)\b/iu)
-    || text.match(/(?:возраст|вік|age|vârsta)\s*[:—-]?\s*(\d{2})\b/iu)
-  const age = match ? Number(match[1]) : Number.NaN
-  return Number.isFinite(age) && age >= 14 && age <= 90 ? age : null
 }
 
 function parseExperience(text: string): number | null {
@@ -158,28 +117,6 @@ function parseSalary(text: string, fallback: string): Pick<CvProfile, 'salaryMin
     salaryMax: second && Number.isFinite(second) ? Math.max(first, second) : undefined,
     currency,
   }
-}
-
-const CITIES: Record<string, Array<[string, RegExp]>> = {
-  UA: [
-    ['Kyiv', /\b(?:киев|київ|kyiv|kiev)\b/iu], ['Kharkiv', /\b(?:харьков|харків|kharkiv|kharkov)\b/iu],
-    ['Dnipro', /\b(?:днепр|дніпро|dnipro)\b/iu], ['Odesa', /\b(?:одесса|одеса|odesa|odessa)\b/iu],
-    ['Lviv', /\b(?:львов|львів|lviv)\b/iu], ['Zaporizhzhia', /\b(?:запорожье|запоріжжя|zaporizhzhia)\b/iu],
-  ],
-  KZ: [
-    ['Almaty', /\b(?:алматы|almaty)\b/iu], ['Astana', /\b(?:астана|astana)\b/iu],
-    ['Shymkent', /\b(?:шымкент|shymkent)\b/iu], ['Karaganda', /\b(?:караганда|karaganda)\b/iu],
-    ['Atyrau', /\b(?:атырау|atyrau)\b/iu], ['Aktobe', /\b(?:актобе|aktobe)\b/iu], ['Aktau', /\b(?:актау|aktau)\b/iu],
-  ],
-  RO: [
-    ['Bucharest', /\b(?:бухарест|bucharest|bucurești|bucuresti)\b/iu], ['Cluj-Napoca', /\b(?:cluj(?:-napoca)?|клуж)\b/iu],
-    ['Constanta', /\b(?:constanța|constanta|констанц)\b/iu], ['Brasov', /\b(?:brașov|brasov|брашов)\b/iu],
-    ['Iasi', /\b(?:iași|iasi|яссы)\b/iu], ['Timisoara', /\b(?:timișoara|timisoara|тимишоара)\b/iu],
-  ],
-}
-
-function cityFrom(text: string, country: keyof typeof CITIES): string | null {
-  return CITIES[country].find(([, re]) => re.test(text))?.[0] || null
 }
 
 function contacts(text: string): CvProfile['contacts'] {
@@ -392,6 +329,13 @@ function enabledKeys(): SecondaryKey[] {
   if (!raw) return all
   const allowed = new Set(raw.split(',').map((item) => item.trim().toLowerCase()).filter(Boolean))
   return all.filter((key) => allowed.has(key))
+}
+
+/** One crawl of a secondary source, without storing anything. For diagnostics. */
+export async function crawlSecondaryWebSource(key: string) {
+  const entry = LOADERS[key as SecondaryKey]
+  if (!entry) throw new Error(`unknown secondary web source: ${key}`)
+  return entry.load()
 }
 
 export function hiringSecondaryWebSourceHandles(): string[] {
