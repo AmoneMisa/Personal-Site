@@ -101,7 +101,11 @@ const PROFESSION_RULES: ProfessionRule[] = [
   { name: 'Psychologist', re: /\bpsychologist\b|психолог|psixolog/iu },
   { name: 'Speech Therapist', re: /\bspeech\s+therapist\b|логопед|logoped/iu },
 
-  // IT / professional.
+  // IT / professional. Keep specializations before the generic developer rule.
+  { name: 'Full-stack Developer', re: /\bfull[- ]?stack\s+(?:developer|engineer|dasturchi)\b|\bfullstack\s+dasturchi\b/iu },
+  { name: 'Backend Developer', re: /\bback[- ]?end\s+(?:developer|engineer|dasturchi)\b|\bbackend\s+dasturchi\b/iu },
+  { name: 'Frontend Developer', re: /\bfront[- ]?end\s+(?:developer|engineer|dasturchi)\b|\bfrontend\s+dasturchi\b/iu },
+  { name: 'Mobile Developer', re: /\b(?:mobile|android|ios)\s+(?:developer|engineer|dasturchi)\b/iu },
   { name: 'Software Developer', re: /\b(?:software\s+)?(?:developer|programmer|frontend|front-end|backend|back-end|full[- ]?stack|android|ios)\b|разработчик|розробник|программист|програміст|dasturchi/iu },
   { name: 'QA Engineer', re: /\b(?:qa|quality\s+assurance|tester|test\s+engineer)\b|тестировщик|тестувальник/iu },
   { name: 'DevOps Engineer', re: /\bdevops\b/iu },
@@ -129,8 +133,11 @@ const SPECIFIC_MANAGER_ROLES = new Set([
   'Sales Manager', 'Project Manager', 'Product Manager', 'Store Manager', 'Restaurant Manager',
   'General Manager', 'HR / Recruiter', 'Office Manager',
 ])
+const SPECIFIC_DEVELOPER_ROLES = new Set([
+  'Full-stack Developer', 'Backend Developer', 'Frontend Developer', 'Mobile Developer',
+])
 const NON_TARGET_CONTEXT_RE = /(?:опыт\s+работы|досвід\s+роботи|work\s+experience|previous|раньше|ранее|прежде|работал|работала|працював|працювала|worked\s+(?:as|at)|oldin|avval|ishlagan|ishladim|tajriba|диплом|diplom|mutaxassisligim)/iu
-const TARGET_CONTEXT_RE = /(?:ищу\s+(?:работу|подработку)|шукаю\s+(?:роботу|підробіток)|желаемая\s+(?:должность|работа)|бажана\s+(?:посада|робота)|target\s+role|desired\s+(?:role|position)|looking\s+for\s+(?:a\s+)?(?:job|work)|open\s+to\s+work|menga\s+ish\s+kerak|ish\s+(?:kerak|qidiryapman|qidiraman|izlayapman)|ish\s+joyi\s+kerak|lavozim|kasb|soha|soxa)/iu
+const TARGET_CONTEXT_RE = /(?:ищу\s+(?:работу|подработку)|шукаю\s+(?:роботу|підробіток)|желаемая\s+(?:должность|работа)|бажана\s+(?:посада|робота)|target\s+role|desired\s+(?:role|position)|looking\s+for\s+(?:a\s+)?(?:job|work)|open\s+to\s+work|menga\s+ish\s+kerak|ish\s+(?:kerak|qidiryapman|qidiraman|izlayapman)|ish\s+joyi\s+kerak|lavozim|kasb|soha|soxa|maqsad(?:im)?)/iu
 
 function cleanRole(raw: string | undefined): string {
   return (raw || '').trim().replace(/^[#\-–—•*\s]+/, '').replace(/[.;,]+$/, '').replace(/\s{2,}/g, ' ').slice(0, 180)
@@ -148,6 +155,10 @@ function collectProfessions(source: string): string[] {
     const generic = names.indexOf('Manager')
     if (generic >= 0) names.splice(generic, 1)
   }
+  if (names.some((name) => SPECIFIC_DEVELOPER_ROLES.has(name))) {
+    const generic = names.indexOf('Software Developer')
+    if (generic >= 0) names.splice(generic, 1)
+  }
   if (names.includes('Fitness Trainer')) {
     const generic = names.indexOf('Trainer / Coach')
     if (generic >= 0) names.splice(generic, 1)
@@ -157,6 +168,10 @@ function collectProfessions(source: string): string[] {
     if (generic >= 0) names.splice(generic, 1)
   }
   return names
+}
+
+export function detectMentionedProfessions(source: string): string[] {
+  return collectProfessions(source)
 }
 
 function normalizeProvidedProfessions(items: string[] | undefined): string[] {
@@ -186,6 +201,16 @@ function targetContext(text: string): string {
   return picked.join('\n')
 }
 
+function extractGoalRole(text: string): string {
+  // Uzbek CV cards often put unrelated past experience and the actual target
+  // into one "Maqsad" paragraph. Prefer the explicit "X sifatida ish topish"
+  // construction so the earlier profession cannot become the desired role.
+  const asRole = text.match(
+    /\b((?:(?:frontend|front-end|backend|back-end|full[- ]?stack|mobile|android|ios)\s+)?(?:dasturchi|developer|programmer))\s+sifatida\s+(?:ish\s+(?:topish|qidirish|izlash)|ishlash)\b/iu,
+  )
+  return cleanRole(asRole?.[1])
+}
+
 export function normalizeProfessions(rawRole: string | undefined, text: string): string[] {
   // Desired-role text wins, except when a loose source parser handed us an
   // explicit work-history/education line instead of a target role.
@@ -210,8 +235,8 @@ function workHistoryBlock(text: string): string {
   const explicit = text.match(/(?:^|\n)\s*(?:опыт\s+работы|досвід\s+роботи|work\s+experience|previous\s+(?:jobs?|positions?)|tajriba|ish\s+tajribasi)\s*[:—-]?\s*([\s\S]{1,2600}?)(?=\n\s*(?:навыки|навички|skills|образование|освіта|education|контакт|contact|ожидания|salary|языки|мови|languages)\s*[:—-]|$)/iu)
   if (explicit?.[1]) return explicit[1]
 
-  return text.split('\n').filter((line) =>
-    /(?:работал[аи]?|працюва(?:в|ла)|worked\s+(?:as|at)|oldin|avval|ishlagan|ishladim|ishlaganman)/iu.test(line),
+  return text.split(/\n|(?<=[.!?])\s+/u).filter((line) =>
+    /(?:работал[аи]?|працюва(?:в|ла)|worked\s+(?:as|at)|oldin|avval|ishlagan|ishladim|ishlaganman|tajriba(?:m)?\s+bor)/iu.test(line),
   ).join('\n')
 }
 
@@ -248,6 +273,13 @@ export function extractContacts(text: string): { telegram?: string; email?: stri
   return out
 }
 
+export function extractCandidateName(text: string): string {
+  const match = text.match(
+    /(?:^|\n)[^\p{L}\p{N}\n]{0,10}(?:xodim|hodim|nomzod|candidate|фио|ф\.и\.о\.?|имя|ism(?:i|im)?)\s*[:—-]\s*([^\n]{2,100})/iu,
+  )
+  return (match?.[1] || '').trim().replace(/\s{2,}/g, ' ').slice(0, 100)
+}
+
 export function extractAge(text: string): number | null {
   const patterns = [
     /(?:возраст|вік|age|yosh)\s*[:—-]?\s*(\d{1,2})/iu,
@@ -262,10 +294,120 @@ export function extractAge(text: string): number | null {
   return null
 }
 
+function parseMoneyNumber(raw: string): number | null {
+  let value = raw.trim().replace(/\s+/g, '')
+  if (!value) return null
+  if (/^\d{1,3}(?:[.,]\d{3})+$/.test(value)) value = value.replace(/[.,]/g, '')
+  else value = value.replace(',', '.')
+  const number = Number(value)
+  return Number.isFinite(number) ? number : null
+}
+
+function defaultCurrency(country: string): string | null {
+  return ({ UZ: 'UZS', UA: 'UAH', KZ: 'KZT', KG: 'KGS' } as Record<string, string>)[country.toUpperCase()] || null
+}
+
+export function extractCandidateSalary(
+  text: string,
+  country: string,
+): Pick<CvProfile, 'salaryMin' | 'salaryMax' | 'currency'> {
+  const field = text.match(
+    /(?:^|\n)[^\p{L}\p{N}\n]{0,10}(?:narxi?|salary|expected\s+salary|зарплата|зп|бажана\s+зарплата|oylik|maosh|ish\s+haqi)\s*[:—-]\s*([^\n]{1,120})/iu,
+  )?.[1]
+  if (!field) return {}
+
+  const values = (field.match(/\d[\d\s.,]*\d|\d/g) || [])
+    .map(parseMoneyNumber)
+    .filter((value): value is number => value != null && value > 0)
+    .slice(0, 2)
+  if (!values.length) return {}
+
+  const multiplier = /(?:млн|million|mln)/iu.test(field) ? 1_000_000
+    : /(?:тыс|тис|thousand|ming)/iu.test(field) ? 1_000
+      : 1
+  const amounts = values.map((value) => Math.round(value * multiplier))
+  const currency = /(?:\$|usd|доллар)/iu.test(field) ? 'USD'
+    : /(?:uzs|сум|so(?:'|’)m)/iu.test(field) ? 'UZS'
+      : /(?:uah|грн|грив)/iu.test(field) ? 'UAH'
+        : /(?:kzt|₸|тенге|тг)/iu.test(field) ? 'KZT'
+          : /(?:kgs|сом)/iu.test(field) ? 'KGS'
+            : defaultCurrency(country)
+
+  if (amounts.length > 1) {
+    return { salaryMin: Math.min(...amounts), salaryMax: Math.max(...amounts), currency }
+  }
+  if (/\+|(?:^|\s)(?:от|від|from)\s/iu.test(field)) {
+    return { salaryMin: amounts[0], currency }
+  }
+  return { salaryMin: amounts[0], salaryMax: amounts[0], currency }
+}
+
 export function detectRelocationReady(text: string): boolean | null {
   if (/не\s+готов\p{L}*\s+к\s+переезду|не\s+розгляда\p{L}*\s+переїзд|not\s+(?:open|ready)\s+to\s+relocat/iu.test(text)) return false
   if (/готов\p{L}*\s+к\s+переезду|готов\p{L}*\s+переехать|готов\p{L}*\s+до\s+переїзду|relocat(?:e|ion)|ko(?:'|’)chib\s+o(?:'|’)tish/iu.test(text)) return true
   return null
+}
+
+const REMOTE_POSITIVE_RE = /\bremote\b|удал[её]н(?:но|ная|ную|ка)|віддален|дистанцион|masofaviy|online\s+(?:work|job)|онлайн\s+работ/iu
+const REMOTE_NEGATIVE_RE = /только\s+офис|офисн(?:ый|ая)\s+формат|офлайн|удал[её]нк\p{L}*\s+не\s+рассматрива|remote\s+(?:not|no)|faqat\s+ofis|ofisda\s+ishlash/iu
+
+export function normalizeRemotePreference(
+  raw: boolean | null | undefined,
+  text: string,
+  origin: CvProfile['origin'],
+): boolean | null {
+  if (REMOTE_NEGATIVE_RE.test(text)) return false
+  if (REMOTE_POSITIVE_RE.test(text)) return true
+  // Legacy Telegram parsing used RegExp.test(), so every post without a remote
+  // marker was persisted as false. Treat that false as unknown; web adapters
+  // can still preserve an explicit structured false from their source.
+  if ((origin ?? 'telegram') === 'telegram' && raw === false) return null
+  return raw ?? null
+}
+
+function numericExperience(segment: string): number | null {
+  const direct = segment.match(
+    /(?:опыт(?:\s+работы)?|досвід(?:\s+роботи)?|experience|staj|tajriba(?:m)?)\s*[:—-]?\s*(\d+(?:[.,]\d+)?)\+?\s*(?:лет|год(?:а)?|рок(?:и|ів)?|years?|yil|йил)?/iu,
+  )
+  const reverse = segment.match(
+    /(\d+(?:[.,]\d+)?)\+?\s*(?:лет|год(?:а)?|рок(?:и|ів)?|years?|yil(?:lik)?|йил(?:лик)?)[^\n.!?]{0,100}(?:опыт|досвід|experience|staj|tajriba(?:m)?)/iu,
+  )
+  const value = direct?.[1] || reverse?.[1]
+  if (!value) return null
+  const years = Number(value.replace(',', '.'))
+  return Number.isFinite(years) && years >= 0 && years <= 60 ? years : null
+}
+
+function sameProfessionFamily(a: string, b: string): boolean {
+  if (a === b) return true
+  return /Developer$/u.test(a) && /Developer$/u.test(b)
+}
+
+export function normalizeRelevantExperience(
+  raw: number | null | undefined,
+  targetProfessions: string[],
+  text: string,
+): number | null | undefined {
+  if (raw == null) return raw
+  const years = Number(raw)
+  if (!Number.isFinite(years)) return null
+
+  const mentions = text
+    .split(/\n|(?<=[.!?])\s+/u)
+    .map((segment) => ({ segment, years: numericExperience(segment) }))
+    .filter((item) => item.years != null && Math.abs(item.years - years) < 0.001)
+  if (!mentions.length || !targetProfessions.length) return raw
+
+  const hasRelevantEvidence = mentions.some(({ segment }) => {
+    const mentioned = collectProfessions(segment)
+    // A generic "3 years experience" remains valid. We reject only when the
+    // source explicitly ties those years to a different profession.
+    if (!mentioned.length) return true
+    return mentioned.some((profession) =>
+      targetProfessions.some((target) => sameProfessionFamily(profession, target)),
+    )
+  })
+  return hasRelevantEvidence ? raw : null
 }
 
 export function normalizeEmploymentTypes(text: string, raw?: string | null): CandidateEmploymentType[] {
@@ -278,24 +420,42 @@ export function normalizeEmploymentTypes(text: string, raw?: string | null): Can
 
 export function normalizeCandidate(profile: CvProfile): CvProfile {
   const originalText = profile.originalText || profile.description || ''
-  const text = `${profile.name || ''}\n${profile.role || ''}\n${originalText}`
-  const contacts = extractContacts(text)
+  const goalRole = extractGoalRole(originalText)
+  const effectiveRole = goalRole || profile.role
+  const name = profile.name?.trim() || extractCandidateName(originalText)
+  const text = `${name}\n${effectiveRole || ''}\n${originalText}`
+  const extractedContacts = extractContacts(text)
+  const contacts = {
+    ...(extractedContacts.telegram ? { telegram: extractedContacts.telegram } : {}),
+    ...(extractedContacts.email ? { email: extractedContacts.email } : {}),
+    ...(extractedContacts.phone ? { phone: extractedContacts.phone } : {}),
+    ...(profile.contacts || {}),
+  }
   // AI-enriched/current structured professions must survive subsequent feed and
   // Elasticsearch normalization. Only derive from free text when none exist.
   const providedProfessions = normalizeProvidedProfessions(profile.professions)
   const professions = providedProfessions.length
     ? providedProfessions
-    : normalizeProfessions(profile.role, originalText)
+    : normalizeProfessions(effectiveRole, originalText)
   const age = profile.age ?? extractAge(originalText)
   const employmentTypes = profile.employmentTypes?.length
     ? profile.employmentTypes
     : normalizeEmploymentTypes(originalText, profile.employmentType)
+  const experienceYears = normalizeRelevantExperience(profile.experienceYears, professions, originalText)
+  const remote = normalizeRemotePreference(profile.remote, originalText, profile.origin)
+  const extractedSalary = profile.salaryMin == null && profile.salaryMax == null
+    ? extractCandidateSalary(originalText, profile.country)
+    : {}
+  const salaryMin = profile.salaryMin ?? extractedSalary.salaryMin
+  const salaryMax = profile.salaryMax ?? extractedSalary.salaryMax
+  const currency = profile.currency ?? extractedSalary.currency
 
   return {
     ...profile,
+    name,
     originalText,
     description: profile.description || originalText,
-    role: professions[0] || normalizeRole(profile.role, originalText),
+    role: professions[0] || normalizeRole(effectiveRole, originalText),
     professions,
     previousProfessions: profile.previousProfessions?.length
       ? normalizeProvidedProfessions(profile.previousProfessions)
@@ -303,12 +463,17 @@ export function normalizeCandidate(profile: CvProfile): CvProfile {
     features: [...new Set([...(profile.features || []), ...extractCandidateFeatures(originalText)])],
     age,
     isAdult: age == null ? true : age >= 18,
+    experienceYears,
+    salaryMin,
+    salaryMax,
+    currency,
+    remote,
     relocationReady: profile.relocationReady ?? detectRelocationReady(originalText),
     employmentTypes,
     skills: normalizeSkills(profile.skills, originalText),
-    seniority: profile.seniority ?? detectSeniority(text, profile.experienceYears),
+    seniority: profile.seniority ?? detectSeniority(text, experienceYears),
     contact: profile.contact || contacts.telegram || contacts.email || contacts.phone || null,
-    contacts: profile.contacts ?? contacts,
+    contacts,
   }
 }
 
