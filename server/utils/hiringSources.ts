@@ -5,8 +5,12 @@ import type { CvProfile, HiringSource } from './hiringTypes'
 import { isLikelyTelegramVacancy } from './sources'
 
 const UA = 'hiringFinder/1.0 (CV board; contact: admin@whiteslove.me)'
-const DEFAULT_HISTORY_LIMIT = 200
-const MAX_HISTORY_LIMIT = 500
+// Mixed UZ boards can publish hundreds of vacancies between two candidate
+// posts. A 200-message window therefore covers too little of the required
+// three-month retention period. Per-channel minimums below drive the initial
+// backfill; the date cutoff stops paging as soon as the eligible window ends.
+const DEFAULT_HISTORY_LIMIT = 600
+const MAX_HISTORY_LIMIT = 5_000
 const MIN_HISTORY_LIMIT = 50
 const TELEGRAM_WORKER_PAGE_LIMIT = 200
 const TELEGRAM_WORKER_TIMEOUT_MS = 60_000
@@ -26,6 +30,10 @@ interface TelegramChannel {
   tags: string[]
   cvFeed?: boolean
   includeAny?: string[]
+  /** Mixed boards must contain an explicit job-seeker marker before parsing. */
+  requireCandidateMarker?: boolean
+  /** Minimum number of recent messages to inspect before the date cutoff wins. */
+  historyLimit?: number
 }
 
 export interface HiringSourceDiagnostic {
@@ -45,25 +53,50 @@ interface TelegramFetchResult {
 
 let telegramDiagnostics: HiringSourceDiagnostic[] = []
 
+// Strong job-seeker forms observed in the verified UZ sources. In particular,
+// `#ish #qidiryapman` is two separate hashtags and was not matched by the old
+// generic intent regex.
+const UZ_CANDIDATE_MARKER_RE =
+  /(?:#(?:ish[_-]?kerak|menga[_-]?ish[_-]?kerak|ish[_-]?izlayapman)|#ish\s+#qidir(?:yapman|aman)|\b(?:menga\s+)?ish\s+(?:joyi\s+)?kerak\b|\bish\s+(?:qidiryapman|qidiraman|izlayapman)\b|\b(?:ish|ishga)\s+joylash(?:moqchiman|ish)\b|\b(?:я\s+)?ищу\s+(?:себе\s+)?(?:работу|подработку)\b|\bработу\s+ищу\b|\bнужна\s+(?:мне\s+)?работа\b|\bмогу\s+работать\b|#ищу\s+#работу|\b(?:у\s+пошуку|шукаю)\s+(?:роботу|підробіток)\b)/iu
+
+// Employer language must always win over a positive hashtag. This matters for
+// UZ boards where a vacancy can be tagged `#ish_izlayapman #vakansiya`.
+const UZ_EMPLOYER_RE =
+  /(?:#(?:ishchi[_-]?kerak|xodim[_-]?kerak|ishga[_-]?taklif[_-]?qilamiz|vakansiya)|\bvakansi(?:ya|я)\b|\bbo(?:'|’)sh\s+ish\s+o(?:'|’)rin(?:i|lari)\b|\bishga\s+(?:taklif\s+qilamiz|qabul\s+qilamiz|qabul\s+qilinadi|olamiz)\b|\b(?:xodim|hodim|ishchi)\s+kerak\b|\b(?:sotuvchi|kassir|operator|farrosh|afitsiant|ofitsiant|barmen|barista|oshpaz|haydovchi|qorovul|hamshira|o(?:'|’)qituvchi|administrator)\s+kerak\b|\btalab\s+(?:qilinadi|etiladi)\b|\bnomzod(?:ga|lar)?\s+.*?talab\b|\brezyume(?:ni)?\s+yubor(?:ing|ishingiz)\b)/iu
+
+// Structured fields commonly used by actual self-posted CV cards. These are
+// evidence of a candidate, but never override employer/vacancy signals.
+const CANDIDATE_FORM_RE =
+  /(?:^|\n)\s*[^\p{L}\p{N}\n]{0,8}(?:ismi|ismim|f\.?i\.?o\.?|фио|имя|yoshi|yoshim|возраст|qidirayotgan\s+kasb|so(?:'|’)ralgan\s+ish\s+turi|ожидаемая\s+работа|желаемая\s+(?:должность|работа)|tajriba|опыт\s+работы)\s*[:—-]/imu
+
 // Verified during the August 2026 audit. Mixed boards are listed only when
 // recent candidate posts were found; vacancy-only/dead/wrong-entity handles are
 // deliberately absent.
 const DEFAULT_CV_CHANNELS: TelegramChannel[] = [
-  // Uzbekistan — Tashkent + regions, broad mass-market coverage.
-  { handle: 'ISH_QIDIR', label: 'Ish Qidir', country: 'UZ', location: 'Uzbekistan', tags: ['Resume', 'Mass market'] },
-  { handle: 'myrabota_uz', label: 'Работа в Ташкенте', country: 'UZ', location: 'Tashkent', tags: ['Resume', 'Mass market'] },
-  { handle: 'TALIMDAN_ISH_TOPISH', label: 'Taʼlimdan ish topish', country: 'UZ', location: 'Tashkent', tags: ['Resume', 'Education'] },
-  { handle: 'SAMARQAND_ISH', label: 'Samarqand ish', country: 'UZ', location: 'Samarkand', tags: ['Resume', 'Mass market'] },
-  { handle: 'Fargona_ishlar', label: 'Fargona ishlar', country: 'UZ', location: 'Fergana', tags: ['Resume', 'Mass market'] },
-  { handle: 'Ishga_marhamat_andijon_elonlar', label: 'Andijon ish', country: 'UZ', location: 'Andijan', tags: ['Resume', 'Mass market'] },
-  { handle: 'namanganishbor', label: 'Namangan ish', country: 'UZ', location: 'Namangan', tags: ['Resume', 'Mass market'] },
-  { handle: 'buxoroda_ish', label: 'Buxoroda ish', country: 'UZ', location: 'Bukhara', tags: ['Resume', 'Mass market'] },
+  // Uzbekistan — Tashkent + regions, broad mass-market coverage. Every mixed
+  // source requires an explicit candidate marker so its vacancy stream cannot
+  // leak into /hiring.
+  { handle: 'ISH_QIDIR', label: 'Ish Qidir', country: 'UZ', location: 'Uzbekistan', tags: ['Resume', 'Mass market'], requireCandidateMarker: true, historyLimit: 3_000 },
+  { handle: 'myrabota_uz', label: 'Работа в Ташкенте', country: 'UZ', location: 'Tashkent', tags: ['Resume', 'Mass market'], requireCandidateMarker: true, historyLimit: 2_000 },
+  { handle: 'UzJobs', label: 'UzJobs', country: 'UZ', location: 'Uzbekistan', tags: ['Resume', 'Mass market'], requireCandidateMarker: true, historyLimit: 5_000 },
+  { handle: 'uzb_vakansiya', label: 'UZB Vakansiya', country: 'UZ', location: 'Uzbekistan', tags: ['Resume', 'Mass market'], requireCandidateMarker: true, historyLimit: 3_000 },
+  { handle: 'ishchi', label: 'ISHCHI', country: 'UZ', location: 'Uzbekistan', tags: ['Resume', 'Mass market'], requireCandidateMarker: true, historyLimit: 3_000 },
+  { handle: 'ishbor_olx_uz', label: 'OLX.UZ Ish', country: 'UZ', location: 'Uzbekistan', tags: ['Resume', 'Mass market'], requireCandidateMarker: true, historyLimit: 5_000 },
+  { handle: 'ISH_QAYERDA', label: 'Ish Qayerda', country: 'UZ', location: 'Uzbekistan', tags: ['Resume', 'Education'], requireCandidateMarker: true, historyLimit: 3_000 },
+  { handle: 'UstozShogird', label: 'Ustoz Shogird', country: 'UZ', location: 'Uzbekistan', tags: ['Resume', 'IT', 'Student'], requireCandidateMarker: true, historyLimit: 3_000 },
+  { handle: 'TALIMDAN_ISH_TOPISH', label: 'Taʼlimdan ish topish', country: 'UZ', location: 'Tashkent', tags: ['Resume', 'Education'], requireCandidateMarker: true, historyLimit: 3_000 },
+  { handle: 'SAMARQAND_ISH', label: 'Samarqand ish', country: 'UZ', location: 'Samarkand', tags: ['Resume', 'Mass market'], requireCandidateMarker: true, historyLimit: 2_000 },
+  { handle: 'Fargona_ishlar', label: 'Fargona ishlar', country: 'UZ', location: 'Fergana', tags: ['Resume', 'Mass market'], requireCandidateMarker: true, historyLimit: 2_000 },
+  { handle: 'Ishga_marhamat_andijon_elonlar', label: 'Andijon ish', country: 'UZ', location: 'Andijan', tags: ['Resume', 'Mass market'], requireCandidateMarker: true, historyLimit: 2_000 },
+  { handle: 'namanganishbor', label: 'Namangan ish', country: 'UZ', location: 'Namangan', tags: ['Resume', 'Mass market'], requireCandidateMarker: true, historyLimit: 2_000 },
+  { handle: 'buxoroda_ish', label: 'Buxoroda ish', country: 'UZ', location: 'Bukhara', tags: ['Resume', 'Mass market'], requireCandidateMarker: true, historyLimit: 2_000 },
+  { handle: 'Xorazm_ish', label: 'Xorazm ish', country: 'UZ', location: 'Uzbekistan', tags: ['Resume', 'Mass market'], requireCandidateMarker: true, historyLimit: 2_000 },
 
   // Kazakhstan — verified current resume flow; primarily IT for now.
-  { handle: 'workitkz', label: 'workITkz', country: 'KZ', location: 'Kazakhstan', tags: ['Resume', 'IT'] },
+  { handle: 'workitkz', label: 'workITkz', country: 'KZ', location: 'Kazakhstan', tags: ['Resume', 'IT'], historyLimit: 1_500 },
 
   // Kyrgyzstan.
-  { handle: 'jobslbish', label: 'Jobs.bish', country: 'KG', location: 'Bishkek', tags: ['Resume', 'Mass market'] },
+  { handle: 'jobslbish', label: 'Jobs.bish', country: 'KG', location: 'Bishkek', tags: ['Resume', 'Mass market'], historyLimit: 1_500 },
   {
     handle: 'Cvflow',
     label: 'CV Flow',
@@ -72,11 +105,12 @@ const DEFAULT_CV_CHANNELS: TelegramChannel[] = [
     tags: ['Resume', 'IT'],
     cvFeed: true,
     includeAny: ['kyrgyzstan', 'кыргызстан', 'bishkek', 'бишкек', 'osh', 'ош'],
+    historyLimit: 1_500,
   },
 
   // Ukraine — candidate-heavy professional feeds. City is parsed from each post.
-  { handle: 'itcandidatesUA', label: 'IT Candidates UA', country: 'UA', location: 'Ukraine', tags: ['Resume', 'IT'], cvFeed: true },
-  { handle: 'hr_recruiter_ua', label: 'HR & Recruiters UA', country: 'UA', location: 'Ukraine', tags: ['Resume', 'HR'] },
+  { handle: 'itcandidatesUA', label: 'IT Candidates UA', country: 'UA', location: 'Ukraine', tags: ['Resume', 'IT'], cvFeed: true, historyLimit: 1_500 },
+  { handle: 'hr_recruiter_ua', label: 'HR & Recruiters UA', country: 'UA', location: 'Ukraine', tags: ['Resume', 'HR'], historyLimit: 1_500 },
 ]
 
 const CITY_ALIASES: Record<string, Array<[string, RegExp]>> = {
@@ -89,6 +123,8 @@ const CITY_ALIASES: Record<string, Array<[string, RegExp]>> = {
     ['Fergana', /\b(?:fergana|farg(?:'|’)ona|фаргана|фергана)\b/iu],
     ['Qarshi', /\b(?:qarshi|karshi|карши|қарши)\b/iu],
     ['Nukus', /\b(?:nukus|нукус)\b/iu],
+    ['Urgench', /\b(?:urgench|urganch|ургенч|урганч)\b/iu],
+    ['Khiva', /\b(?:khiva|xiva|хива)\b/iu],
   ],
   UA: [
     ['Kyiv', /\b(?:kyiv|kiev|київ|киев)\b/iu],
@@ -140,14 +176,26 @@ function telegramChannels(): TelegramChannel[] {
       location: label || country,
       tags: ['Resume'],
       cvFeed: true,
+      requireCandidateMarker: country.toUpperCase() === 'UZ',
+      historyLimit: country.toUpperCase() === 'UZ' ? 2_000 : 1_500,
     }
   }).filter((channel) => channel.handle)
 }
 
-function telegramHistoryLimit(): number {
+function telegramHistoryLimit(channel: TelegramChannel): number {
   const requested = Number(process.env.HIRING_TELEGRAM_HISTORY_LIMIT || DEFAULT_HISTORY_LIMIT)
-  if (!Number.isFinite(requested)) return DEFAULT_HISTORY_LIMIT
-  return Math.min(MAX_HISTORY_LIMIT, Math.max(MIN_HISTORY_LIMIT, Math.round(requested)))
+  const envLimit = Number.isFinite(requested) ? requested : DEFAULT_HISTORY_LIMIT
+  // A stale production env value such as 200 must not silently undo the deep
+  // backfill required by a verified mixed board. Env can raise, not lower, a
+  // source-specific minimum.
+  const wanted = Math.max(envLimit, channel.historyLimit || DEFAULT_HISTORY_LIMIT)
+  return Math.min(MAX_HISTORY_LIMIT, Math.max(MIN_HISTORY_LIMIT, Math.round(wanted)))
+}
+
+function candidateCutoff(): number {
+  const cutoff = new Date()
+  cutoff.setUTCMonth(cutoff.getUTCMonth() - MAX_CANDIDATE_AGE_MONTHS)
+  return cutoff.getTime()
 }
 
 function recentCandidateDate(dateIso: string | null | undefined): string | null {
@@ -155,18 +203,16 @@ function recentCandidateDate(dateIso: string | null | undefined): string | null 
   const date = new Date(dateIso)
   if (!Number.isFinite(date.getTime())) return null
   const now = new Date()
-  const cutoff = new Date(now)
-  cutoff.setUTCMonth(cutoff.getUTCMonth() - MAX_CANDIDATE_AGE_MONTHS)
-  if (date < cutoff || date.getTime() > now.getTime() + FUTURE_DATE_TOLERANCE_MS) return null
+  if (date.getTime() < candidateCutoff() || date.getTime() > now.getTime() + FUTURE_DATE_TOLERANCE_MS) return null
   return date.toISOString()
 }
 
 const CANDIDATE_INTENT_RE =
-  /(?:#(?:ищу[_-]?(?:работу|подработку)|ищуработу|шукаю[_-]?(?:роботу|підробіток)|шукаюроботу|кандидат(?:ка)?|резюме|resume|cv|ish[_-]?kerak|ish[_-]?izlayapman|menga[_-]?ish[_-]?kerak)|\b(?:ищу|шукаю)\s+(?:работу|подработку|роботу|підробіток)|\b(?:у\s+пошуках?\s+роботи|у\s+пошуку\s+роботи|розглядаю\s+пропозиції|нахожусь\s+в\s+поиске\s+работы|в\s+поиске\s+работы)|\b(?:menga\s+ish\s+kerak|ish\s+(?:kerak|izlayapman|qidiryapman|qidiraman)|ish\s+joyi\s+kerak)|\b(?:looking\s+for\s+(?:a\s+)?(?:job|work|opportunit(?:y|ies))|open\s+to\s+work))/iu
+  /(?:#(?:ищу[_-]?(?:работу|подработку)|ищуработу|шукаю[_-]?(?:роботу|підробіток)|шукаюроботу|кандидат(?:ка)?|резюме|resume|cv|ish[_-]?kerak|ish[_-]?izlayapman|menga[_-]?ish[_-]?kerak)|#ищу\s+#работу|#ish\s+#qidir(?:yapman|aman)|\b(?:ищу|шукаю)\s+(?:себе\s+)?(?:работу|подработку|роботу|підробіток)|\b(?:работу\s+ищу|нужна\s+(?:мне\s+)?работа|могу\s+работать)|\b(?:у\s+пошуках?\s+роботи|у\s+пошуку\s+роботи|розглядаю\s+пропозиції|нахожусь\s+в\s+поиске\s+работы|в\s+поиске\s+работы)|\b(?:menga\s+ish\s+kerak|ish\s+(?:joyi\s+)?kerak|ish\s+(?:izlayapman|qidiryapman|qidiraman))|\b(?:looking\s+for\s+(?:a\s+)?(?:job|work|opportunit(?:y|ies))|open\s+to\s+work))/iu
 const CV_MARKER_RE = /(?:резюме|resume|\bcv\b|curriculum vitae|анкета|профиль кандидата|профіль кандидата|кандидат(?:ка)?|candidate profile|mening\s+(?:cv|rezume)|my\s+cv)/iu
-const FIRST_PERSON_RE = /(?:^|\n)\s*[^\p{L}\p{N}\n]{0,6}(?:я[\s—,-]|я\s+(?:ищу|шукаю)|men[\s,]|mening[\s,]|my name is|i am a|i'm a)/iu
+const FIRST_PERSON_RE = /(?:^|\n)\s*[^\p{L}\p{N}\n]{0,6}(?:я[\s—,-]|я\s+(?:ищу|шукаю)|men[\s,]|mening[\s,]|my name is|i am a|i'm a|ismim\b)/iu
 const EMPLOYER_RE = /(?:we(?:'re| are)\s+(?:hiring|looking\s+for)|(?:^|\n)\s*[^\p{L}\p{N}\n]{0,10}(?:ищем|требуется|требуются|вакансия|компания\s+ищет|шукаємо|потрібен|потрібна|потрібні|вакансія|запрошуємо|hiring|vacancy|ishchi\s+kerak|xodim\s+kerak|ishga\s+(?:taklif|qabul)|bo(?:'|’)sh\s+ish\s+o(?:'|’)rni))/iu
-const VACANCY_SECTION_RE = /(?:requirements?|responsibilit|qualifications?|обязанност|требован|условия\s+работ|мы\s+предлагаем|обов(?:'|’)язк|вимог|ми\s+пропонуємо|what we offer|надсилайте\s+резюме|присылайте\s+резюме)/iu
+const VACANCY_SECTION_RE = /(?:requirements?|responsibilit|qualifications?|обязанност|требован|условия\s+работ|мы\s+предлагаем|обов(?:'|’)язк|вимог|ми\s+пропонуємо|what we offer|надсилайте\s+резюме|присылайте\s+резюме|(?:^|\n)\s*(?:talablar|vazifalar)\s*[:—-]|biz\s+taklif\s+qilamiz)/imu
 const ROLE_RE = /\b(?:developer|engineer|designer|manager|analyst|specialist|qa|tester|devops|frontend|backend|accountant|cashier|seller|driver|builder|welder|cleaner|waiter|cook|guard|courier|teacher|tutor|nanny|nurse|doctor|dentist|pharmacist|bartender|barista|trainer|coach|administrator|director|supervisor|receptionist|hostess|promoter|packer)\b|разработ|инженер|інженер|дизайнер|менеджер|аналитик|аналітик|специалист|спеціаліст|бухгалтер|кассир|касир|продав|водител|водій|строит|будівел|сварщик|зварюваль|убор|прибирал|официант|офіціант|бармен|бариста|повар|кухар|охран|охорон|управляющ|керівник|директор|администратор|адміністратор|супервайзер|курьер|кур'єр|учител|вчител|преподав|викладач|репетитор|воспитател|виховател|нян|врач|лікар|стоматолог|фармацевт|медсестр|медбрат|тренер|рецепционист|рецепціоніст|хостес|промоутер|упаковщик|dasturchi|menejer|buxgalter|kassir|sotuvchi|haydovchi|shafyor|qurilish|payvandchi|farrosh|afitsant|barmen|oshpaz|qorovul|boshqaruv|kuryer|o(?:'|’)qituvchi|repetitor|tarbiyachi|enaga|shifokor|hamshira/iu
 const CONTACT_RE = /(?:\+?\d[\d\s()\-]{7,}|@[a-z0-9_]{4,}|(?:telegram|телефон|phone|tel|aloqa|murojaat|bog(?:'|’)lanish)\s*[:—-])/iu
 const PROMOTION_RE = /t\.me\/addlist\b|(?:telegram[- ]?)?канал\w*\s+(?:в\s+)?(?:одн\w+\s+)?папк|добав(?:ить|ьте)\s+(?:свой\s+)?канал/iu
@@ -187,9 +233,13 @@ export function isLikelyCvPost(text: string, cvFeed = false): boolean {
   const value = text.split('\n').map((line) => line.replace(/\s+/g, ' ').trim()).filter(Boolean).join('\n').trim()
   const compact = value.replace(/\s+/g, ' ')
   if (compact.length < 30 || PROMOTION_RE.test(value)) return false
+
   const explicitIntent = CANDIDATE_INTENT_RE.test(value)
-  if (EMPLOYER_RE.test(value) || VACANCY_SECTION_RE.test(value)) return false
-  if (!explicitIntent && isLikelyTelegramVacancy(compact)) return false
+  const candidateForm = CANDIDATE_FORM_RE.test(value)
+  // Strong employer structure has precedence even if the board used a sloppy
+  // candidate-looking hashtag in the same post.
+  if (EMPLOYER_RE.test(value) || UZ_EMPLOYER_RE.test(value) || VACANCY_SECTION_RE.test(value)) return false
+  if (!explicitIntent && !candidateForm && isLikelyTelegramVacancy(compact)) return false
 
   const hasCvMarker = CV_MARKER_RE.test(value)
   const firstPerson = FIRST_PERSON_RE.test(value)
@@ -198,10 +248,12 @@ export function isLikelyCvPost(text: string, cvFeed = false): boolean {
   const sections = cvSectionCount(value)
   const hasExperience = /(?:\d+\+?\s*(?:лет|рок(?:и|ів)?|years|yil|йил)|(?:опыт|досвід|experience|staj|tajriba)\s*[:—-]?\s*\d)/iu.test(value)
 
-  if (explicitIntent && (firstPerson || hasRole || hasContact || sections >= 1 || compact.length >= 60)) return true
-  if (hasCvMarker && (hasRole || sections >= 1 || hasContact)) return true
-  if (cvFeed && (firstPerson || hasCvMarker) && (hasRole || sections >= 2 || hasExperience || hasContact)) return true
-  if (firstPerson && hasRole && (sections >= 2 || hasExperience || hasContact)) return true
+  // The old `compact.length >= 60` branch admitted long but otherwise
+  // unstructured ads. A job-seeker intent now needs actual candidate evidence.
+  if (explicitIntent && (firstPerson || candidateForm || hasRole || hasContact || sections >= 1)) return true
+  if (hasCvMarker && (candidateForm || hasRole || sections >= 1 || hasContact)) return true
+  if (cvFeed && (firstPerson || hasCvMarker || candidateForm) && (hasRole || sections >= 1 || hasExperience || hasContact)) return true
+  if (firstPerson && hasRole && (candidateForm || sections >= 1 || hasExperience || hasContact)) return true
   return false
 }
 
@@ -244,7 +296,7 @@ function parseName(text: string): string {
 }
 
 function parseRole(text: string): string {
-  const targetNames = 'желаемая (?:работа|должность)|бажана (?:робота|посада)|ищу работу|шукаю роботу|ish kerak|menga ish kerak|position|role|должность|позиция|посада|lavozim|kasb|specialization|специализация|target role'
+  const targetNames = 'желаемая (?:работа|должность)|бажана (?:робота|посада)|ожидаемая работа|ищу работу|шукаю роботу|ish kerak|menga ish kerak|ish joyi kerak|qidirayotgan kasb|so(?:\'|’)ralgan ish turi|position|role|должность|позиция|посада|lavozim|kasb|specialization|специализация|target role'
   const explicit = field(text, targetNames)
   if (explicit && ROLE_RE.test(explicit)) return explicit.slice(0, 180)
 
@@ -301,7 +353,7 @@ function parseMoneyNumber(raw: string): number | null {
 }
 
 function parseSalary(text: string, country: string): Pick<CvProfile, 'salaryMin' | 'salaryMax' | 'currency'> {
-  const raw = field(text, 'ожидания по (?:зп|зарплате)|зарплата|зп|бажана зарплата|salary|expected salary|oylik|maosh|ish haqi')
+  const raw = field(text, 'ожидания по (?:зп|зарплате)|зарплата|зп|бажана зарплата|salary|expected salary|oylik|maosh|ish haqi|shaxsiy talab')
   if (!raw) return {}
   const numbers = (raw.match(/\d[\d\s.,]*\d|\d/g) || []).map(parseMoneyNumber).filter((value): value is number => value != null)
   if (!numbers.length) return {}
@@ -328,6 +380,9 @@ function messageToProfile(
   if (!createdAt) return null
   const lowerText = text.toLocaleLowerCase('ru')
   if (channel.includeAny?.length && !channel.includeAny.some((marker) => lowerText.includes(marker.toLocaleLowerCase('ru')))) return null
+  // UZ mixed feeds must explicitly say that the person is looking for work.
+  // This source-level gate is intentionally stricter than the generic parser.
+  if (channel.requireCandidateMarker && !UZ_CANDIDATE_MARKER_RE.test(text)) return null
   if (!isLikelyCvPost(text, channel.cvFeed)) return null
 
   const name = parseName(text)
@@ -335,12 +390,12 @@ function messageToProfile(
   const skills = parseSkills(text)
   if (needle && !`${name} ${role} ${text} ${skills.join(' ')}`.toLocaleLowerCase('ru').includes(needle)) return null
 
-  const explicitCity = field(text, 'location|city|локация|локація|город|місто|shahar')
+  const explicitCity = field(text, 'location|city|локация|локація|город|місто|shahar|manzil|hozirgi manzil')
   const city = explicitCity || detectCity(text, channel.country) || fallbackChannelCity(channel)
   const district = detectDistrict(text, city)
-  const contact = field(text, 'contact|контакт|telegram|phone|телефон|tel|boglanish|aloqa|murojaat')
+  const contact = field(text, 'contact|контакт|telegram|phone|телефон|tel|telefon|boglanish|aloqa|murojaat')
   const employmentType = field(text, 'employment|format|занятость|зайнятість|график|графік|ish vaqti|bandlik')
-  const education = field(text, "education|образование|освіта|o['’]qish|ta['’]lim") || blockAfter(text, "education|образование|освіта|o['’]qish|ta['’]lim") || null
+  const education = field(text, "education|образование|освіта|o['’]qish|ta['’]lim|ma['’]lumoti|diplom") || blockAfter(text, "education|образование|освіта|o['’]qish|ta['’]lim|ma['’]lumoti|diplom") || null
   const hashtags = [...text.matchAll(/(?:^|\s)#([\p{L}\p{N}_-]{2,40})/gu)].map((match) => match[1]!)
   const salary = parseSalary(text, channel.country)
 
@@ -372,7 +427,8 @@ interface TelegramWorkerMessage { id: number; text: string; date: string | null;
 interface TelegramWorkerHistory { ok?: boolean; messages?: TelegramWorkerMessage[]; minId?: number | null }
 
 async function fetchChannelViaWorker(base: string, channel: TelegramChannel, q: string): Promise<TelegramFetchResult> {
-  const target = telegramHistoryLimit()
+  const target = telegramHistoryLimit(channel)
+  const cutoff = candidateCutoff()
   const needle = q.trim().toLocaleLowerCase('ru')
   const profiles: CvProfile[] = []
   let fetched = 0
@@ -400,6 +456,15 @@ async function fetchChannelViaWorker(base: string, channel: TelegramChannel, q: 
     }
 
     fetched += data.messages.length
+
+    // Telegram history is newest -> oldest. Once a page reaches beyond the
+    // three-month retention boundary, every later page is ineligible and the
+    // backfill is complete even when the numeric cap is much higher.
+    const dates = data.messages
+      .map((message) => message.date ? Date.parse(message.date) : Number.NaN)
+      .filter(Number.isFinite)
+    if (dates.length && Math.min(...dates) < cutoff) break
+
     const ids = data.messages.map((message) => message.id).filter(Number.isFinite)
     const nextBeforeId = Number(data.minId) || (ids.length ? Math.min(...ids) : 0)
     if (!nextBeforeId || nextBeforeId === beforeId || data.messages.length < pageLimit) break
@@ -535,7 +600,7 @@ export async function fetchHiringSource(source: HiringSource, q = ''): Promise<C
 }
 
 export const HIRING_COUNTRIES = [
-  { code: 'UZ', name: 'Uzbekistan', currency: 'UZS', cities: ['Tashkent', 'Samarkand', 'Bukhara', 'Namangan', 'Andijan', 'Fergana', 'Qarshi', 'Nukus'] },
+  { code: 'UZ', name: 'Uzbekistan', currency: 'UZS', cities: ['Tashkent', 'Samarkand', 'Bukhara', 'Namangan', 'Andijan', 'Fergana', 'Qarshi', 'Nukus', 'Urgench', 'Khiva'] },
   { code: 'UA', name: 'Ukraine', currency: 'UAH', cities: ['Kyiv', 'Lviv', 'Odesa', 'Kharkiv', 'Dnipro', 'Vinnytsia', 'Zaporizhzhia'] },
   { code: 'KZ', name: 'Kazakhstan', currency: 'KZT', cities: ['Almaty', 'Astana', 'Shymkent', 'Karaganda', 'Atyrau', 'Aktobe'] },
   { code: 'KG', name: 'Kyrgyzstan', currency: 'KGS', cities: ['Bishkek', 'Osh', 'Karakol'] },

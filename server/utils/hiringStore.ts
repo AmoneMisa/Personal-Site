@@ -28,7 +28,6 @@ const STORE_KEY = 'hiring:store:v4'
 const STORE_TTL_SECONDS = 100 * 86_400
 const MEMORY_TTL_MS = 5 * 60_000
 const MAX_AGE_MONTHS = 3
-const STALE_DAYS = 14
 const SOURCE_TIMEOUT_MS = 600_000
 const AI_MIN_CONFIDENCE = 0.65
 // A refresh that fails at the transport level (worker down, Telegram
@@ -346,15 +345,16 @@ function pruneStore(byKey: Map<string, StoredProfile>, now: number): StoredProfi
   const nowDate = new Date(now)
   const oldestPosted = new Date(nowDate)
   oldestPosted.setUTCMonth(oldestPosted.getUTCMonth() - MAX_AGE_MONTHS)
-  const stalest = now - STALE_DAYS * 86_400_000
   const kept: StoredProfile[] = []
 
   for (const profile of byKey.values()) {
     if (!isVisible(profile)) continue
     const posted = profile.createdAt ? new Date(profile.createdAt).getTime() : Number.NaN
-    const seen = new Date(profile.lastSeen).getTime()
     if (Number.isNaN(posted) || posted < oldestPosted.getTime() || posted > now + 48 * 60 * 60 * 1000) continue
-    if (Number.isNaN(seen) || seen < stalest) continue
+    // Telegram candidate retention is based on publication time. `lastSeen` is
+    // crawl bookkeeping only; dropping a two-month-old CV because a high-volume
+    // channel did not resurface it during the last 14 days violated the product
+    // requirement and made the board steadily shrink.
     kept.push(profile)
   }
   return kept
