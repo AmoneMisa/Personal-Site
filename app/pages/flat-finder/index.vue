@@ -582,10 +582,41 @@ let translationRequestId = 0;
 const TRANSLATION_MAX_POLL_ATTEMPTS = 159;
 function translationCacheKey(listing: Listing, targetLanguage = locale.value.startsWith("en") ? "en" : "ru"): string { return `${listing.id}:${targetLanguage}`; }
 function stopTranslationPoll() { if (translationPollTimer) clearTimeout(translationPollTimer); translationPollTimer = undefined; }
+/**
+ * Mirrors the open listing in the address bar, using the same parameters the
+ * share button produces, so copying the URL shares exactly what is on screen.
+ * Replaces rather than pushes: opening listing after listing should not fill
+ * the history with entries the back button has to walk through.
+ */
+function syncListingInUrl(listing: Listing | null) {
+  if (import.meta.server) return;
+  const query: Record<string, string> = {};
+  for (const [key, value] of Object.entries(route.query)) {
+    const text = queryString(value);
+    if (text) query[key] = text;
+  }
+
+  if (listing) {
+    query.flat = listing.id;
+    query.flatSource = listing.source;
+    query.flatCountry = listing.country;
+  } else {
+    delete query.flat;
+    delete query.flatSource;
+    delete query.flatCountry;
+    // "shared" only marks how the visitor arrived; it means nothing once the
+    // listing it referred to is closed.
+    delete query.shared;
+  }
+
+  void router.replace({ query });
+}
+
 function openListing(l: Listing) {
   stopTranslationPoll(); translationRequestId += 1; lightboxIndex.value = null; active.value = l;
   translatedDescription.value = translationCache.get(translationCacheKey(l)) || ""; translatingDescription.value = false; translationFailed.value = false; modalOpen.value = true;
   recent.value = [l, ...recent.value.filter((item) => item.id !== l.id)].slice(0, MAX_RECENT_FLATS); persistList(STORAGE.recent, recent.value, MAX_RECENT_FLATS);
+  syncListingInUrl(l);
 }
 function modalTitle(listing: Listing | null): string {
   if (!listing) return "";
@@ -725,8 +756,16 @@ onMounted(async () => {
   await load(false); if (sharedFlatId) await openSharedListing(sharedFlatId, sharedFlatSource, sharedFlatCountry); await nextTick(); lastPaginationScrollY = window.scrollY; setupInfinitePagination();
 });
 watch(loadMoreSentinel, (current, previous) => { if (previous) infiniteObserver?.unobserve(previous); if (current) infiniteObserver?.observe(current); });
-watch(modalOpen, (open) => { if (open) return; closeLightbox(); stopTranslationPoll(); translationRequestId += 1; translatingDescription.value = false; nextTick(() => setTimeout(releaseStuckScrollLock, 350)); });
+watch(modalOpen, (open) => { if (open) return; syncListingInUrl(null); closeLightbox(); stopTranslationPoll(); translationRequestId += 1; translatingDescription.value = false; nextTick(() => setTimeout(releaseStuckScrollLock, 350)); });
 watch(lightboxIndex, (index) => { if (index === null) nextTick(() => setTimeout(releaseStuckScrollLock, 350)); });
+// A link that names a listing should open it, whether the page is mounting for
+// the first time or the query changed underneath one that is already up. The
+// mount-time read covers only the first case; this covers both, and cannot
+// loop, because opening a listing sets modalOpen before it writes the query.
+watch(() => queryString(route.query.flat), (id, previous) => {
+  if (!import.meta.client || !id || id === previous || modalOpen.value) return;
+  void openSharedListing(id, queryString(route.query.flatSource), queryString(route.query.flatCountry));
+});
 const restoring = ref(true);
 
 // Keyed off the query the filters produce, so every filter is covered without
