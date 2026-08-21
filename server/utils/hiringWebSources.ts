@@ -9,12 +9,28 @@ import {
   type WebSourceDiagnostic,
 } from './hiringDiagnostics'
 import { withHiringStoreLock } from './hiringStoreLock'
+import {
+  CITIES,
+  MAX_AGE_MONTHS,
+  absoluteUrl,
+  activityDate,
+  cityFrom,
+  contacts,
+  cutoffDate,
+  dayMonthDate,
+  decodeEntities,
+  employment,
+  htmlText,
+  isRecent,
+  parseAge,
+  parseExperience,
+  parseSalary,
+} from './hiringWebFields'
 
 const UA =
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ' +
   '(KHTML, like Gecko) Chrome/126.0 Safari/537.36'
 const REQUEST_TIMEOUT_MS = 25_000
-const MAX_AGE_MONTHS = 3
 const STORE_KEY = 'hiring:store:v4'
 const STORE_TTL_SECONDS = 100 * 86_400
 const MAX_PAGES = 5
@@ -40,185 +56,6 @@ interface CandidateBlock {
 }
 
 type StoredProfile = CvProfile & { lastSeen?: string; ai?: unknown }
-
-const MONTHS: Record<string, number> = {
-  январь: 0, января: 0, february: 1, февраль: 1, февраля: 1,
-  март: 2, марта: 2, april: 3, апрель: 3, апреля: 3,
-  may: 4, май: 4, мая: 4, june: 5, июнь: 5, июня: 5,
-  july: 6, июль: 6, июля: 6, august: 7, август: 7, августа: 7,
-  september: 8, сентябрь: 8, сентября: 8, october: 9, октябрь: 9, октября: 9,
-  november: 10, ноябрь: 10, ноября: 10, december: 11, декабрь: 11, декабря: 11,
-  ianuarie: 0, februarie: 1, martie: 2, aprilie: 3, mai: 4, iunie: 5,
-  iulie: 6, august: 7, septembrie: 8, octombrie: 9, noiembrie: 10, decembrie: 11,
-}
-
-function decodeEntities(value: string): string {
-  const named: Record<string, string> = {
-    amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", nbsp: ' ', ndash: '–', mdash: '—',
-  }
-  return value.replace(/&(#x?[0-9a-f]+|[a-z]+);/gi, (match, entity: string) => {
-    if (entity.startsWith('#')) {
-      const hex = entity[1]?.toLowerCase() === 'x'
-      const code = Number.parseInt(entity.slice(hex ? 2 : 1), hex ? 16 : 10)
-      return Number.isFinite(code) ? String.fromCodePoint(code) : match
-    }
-    return named[entity.toLowerCase()] ?? match
-  })
-}
-
-function htmlText(value: string): string {
-  return decodeEntities(value)
-    .replace(/<br\s*\/?>/gi, '\n')
-    .replace(/<\/(?:p|div|li|h[1-6]|tr|section|article)>/gi, '\n')
-    .replace(/<[^>]*>/g, ' ')
-    .split('\n')
-    .map((line) => line.replace(/\s+/g, ' ').trim())
-    .filter(Boolean)
-    .join('\n')
-    .trim()
-}
-
-function absoluteUrl(raw: string, base: string): string {
-  try {
-    const url = new URL(decodeEntities(raw), base)
-    url.hash = ''
-    return url.toString()
-  } catch {
-    return raw
-  }
-}
-
-function cutoffDate(): Date {
-  const value = new Date()
-  value.setUTCMonth(value.getUTCMonth() - MAX_AGE_MONTHS)
-  return value
-}
-
-function isRecent(iso: string | null): boolean {
-  if (!iso) return false
-  const time = Date.parse(iso)
-  return Number.isFinite(time) && time >= cutoffDate().getTime() && time <= Date.now() + 48 * 60 * 60 * 1000
-}
-
-// Unicode-aware boundaries. JavaScript's \b only knows ASCII word characters,
-// so it never fires next to Cyrillic or Romanian letters.
-const B = '(?<![\\p{L}\\p{N}])'
-const E = '(?![\\p{L}\\p{N}])'
-const TODAY_RE = new RegExp(`${B}(?:сегодня|сьогодні|bugun|today|astăzi|azi)${E}`, 'iu')
-const YESTERDAY_RE = new RegExp(`${B}(?:вчера|вчора|kecha|yesterday|ieri)${E}`, 'iu')
-const HOURS_AGO_RE = new RegExp(`(?:^|\\s)(\\d{1,3})\\s*(?:ч\\.?|час(?:а|ов)?|год(?:ину|ини)|soat|hours?|hrs?|ore|oră)${E}`, 'iu')
-const DAYS_AGO_RE = new RegExp(`(?:^|\\s)(\\d{1,3})\\s*(?:дн(?:я|ей|і|ів)?|день|days?|kun|zile|zi)${E}`, 'iu')
-const AGO = '(?:\\s*(?:назад|тому|раніше|oldin|ago|în urmă))'
-const WEEKS_AGO_RE = new RegExp(`(?:^|\\s)(\\d{1,2})\\s*(?:недел(?:ю|и|ь)|тижн(?:ів|і|я)|hafta|weeks?|săptămân\\p{L}*)${AGO}`, 'iu')
-const MONTHS_AGO_RE = new RegExp(`(?:^|\\s)(\\d{1,2})\\s*(?:месяц\\p{L}*|місяц\\p{L}*|oy|months?|lun\\p{L}*)${AGO}`, 'iu')
-
-function activityDate(text: string): string | null {
-  const now = new Date()
-  if (TODAY_RE.test(text)) return now.toISOString()
-  if (YESTERDAY_RE.test(text)) return new Date(now.getTime() - 86_400_000).toISOString()
-
-  // An explicit date beats any relative reading: cards that print one put it
-  // first, while a work history further down is full of durations.
-  const absolute = text.match(/(?<![\p{L}\p{N}])(\d{1,2})\s+([\p{L}]+),?\s+(20\d{2})(?![\p{L}\p{N}])/iu)
-  if (absolute) {
-    const month = MONTHS[absolute[2]!.toLocaleLowerCase('ru')]
-    if (month != null) return new Date(Date.UTC(Number(absolute[3]), month, Number(absolute[1]), 12)).toISOString()
-  }
-
-  const dotted = text.match(/(?<![\d])(\d{1,2})[./-](\d{1,2})[./-](20\d{2})(?![\d])/)
-  if (dotted) return new Date(Date.UTC(Number(dotted[3]), Number(dotted[2]) - 1, Number(dotted[1]), 12)).toISOString()
-
-  const hours = text.match(HOURS_AGO_RE)
-  if (hours) return new Date(now.getTime() - Number(hours[1]) * 3_600_000).toISOString()
-
-  const days = text.match(DAYS_AGO_RE)
-  if (days) return new Date(now.getTime() - Number(days[1]) * 86_400_000).toISOString()
-
-  const weeks = text.match(WEEKS_AGO_RE)
-  if (weeks) return new Date(now.getTime() - Number(weeks[1]) * 7 * 86_400_000).toISOString()
-
-  const months = text.match(MONTHS_AGO_RE)
-  if (months) return new Date(now.getTime() - Number(months[1]) * 30 * 86_400_000).toISOString()
-  return null
-}
-
-function parseAge(text: string): number | null {
-  const match = text.match(/\b(\d{2})\s*(?:лет|год(?:а)?|рок(?:и|ів)?|years?|ani|an|yil)\b/iu)
-  if (!match) return null
-  const age = Number(match[1])
-  return age >= 14 && age <= 90 ? age : null
-}
-
-function parseExperience(text: string): number | null {
-  if (/без опыта|no experience|fără experiență|ish tajribasi talab qilinmaydi/iu.test(text)) return 0
-  const match = text.match(/(?:опыт(?: работы)?|experience|experiență|ish tajribasi)[^\d]{0,30}(\d+(?:[.,]\d+)?)\s*(?:лет|год(?:а)?|years?|ani|an|yil)/iu)
-    || text.match(/\b(\d+(?:[.,]\d+)?)\s*(?:лет|год(?:а)?|years?|ani|an|yil)\b[^\n]{0,30}(?:опыт|experience|experiență)/iu)
-  return match ? Number(match[1]!.replace(',', '.')) : null
-}
-
-function parseSalary(text: string, country: string): Pick<CvProfile, 'salaryMin' | 'salaryMax' | 'currency'> {
-  const currency = /(?:\$|USD|доллар)/iu.test(text) ? 'USD'
-    // careerist.ru is a Russian platform and quotes its Uzbek listings in roubles.
-    : /(?:RUB|руб|₽)/iu.test(text) ? 'RUB'
-    : /(?:€|EUR|евро)/iu.test(text) ? 'EUR'
-      : /(?:UZS|сум|so(?:'|’)m)/iu.test(text) ? 'UZS'
-        : /(?:KZT|₸|тенге|тг\b)/iu.test(text) ? 'KZT'
-          : /(?:UAH|грн|грив)/iu.test(text) ? 'UAH'
-            : /(?:RON|lei\b)/iu.test(text) ? 'RON'
-              : ({ UZ: 'UZS', KZ: 'KZT', UA: 'UAH', RO: 'RON' } as Record<string, string>)[country]
-  // The amount and its currency often sit on separate rows of a card, so a
-  // single newline between them is allowed.
-  const money = text.match(/(?:от\s*)?(\d[\d\s.,]{2,})(?:\s*(?:-|–|—|до|to)\s*(\d[\d\s.,]{2,}))?\s*\n?\s*(?:UZS|KZT|UAH|RON|RUB|USD|EUR|сум|so(?:'|’)m|тенге|грн|руб\p{L}*|lei|\$|€|₸|₽)/iu)
-  if (!money) return {}
-  const parse = (raw: string) => Number(raw.replace(/[\s.,]/g, ''))
-  const first = parse(money[1]!)
-  const second = money[2] ? parse(money[2]) : first
-  if (!Number.isFinite(first) || first <= 0) return {}
-  return { salaryMin: Math.min(first, second), salaryMax: Math.max(first, second), currency }
-}
-
-const CITIES: Record<string, Array<[string, RegExp]>> = {
-  UZ: [
-    ['Tashkent', /\b(?:ташкент|tashkent|toshkent)\b/iu], ['Samarkand', /\b(?:самарканд|samarqand|samarkand)\b/iu],
-    ['Bukhara', /\b(?:бухара|buxoro|bukhara)\b/iu], ['Namangan', /\b(?:наманган|namangan)\b/iu],
-    ['Andijan', /\b(?:андижан|andijon|andijan)\b/iu], ['Fergana', /\b(?:фергана|фаргана|farg(?:'|’)ona|fergana)\b/iu],
-    ['Nukus', /\b(?:нукус|nukus)\b/iu], ['Qarshi', /\b(?:карши|qarshi|karshi)\b/iu],
-  ],
-  KZ: [
-    ['Almaty', /\b(?:алматы|almaty)\b/iu], ['Astana', /\b(?:астана|astana)\b/iu],
-    ['Shymkent', /\b(?:шымкент|shymkent)\b/iu], ['Karaganda', /\b(?:караганда|karaganda)\b/iu],
-    ['Atyrau', /\b(?:атырау|atyrau)\b/iu], ['Aktobe', /\b(?:актобе|aktobe)\b/iu], ['Aktau', /\b(?:актау|aktau)\b/iu],
-  ],
-  UA: [
-    ['Kyiv', /\b(?:киев|київ|kyiv|kiev)\b/iu], ['Kharkiv', /\b(?:харьков|харків|kharkiv|kharkov)\b/iu],
-    ['Dnipro', /\b(?:днепр|дніпро|dnipro)\b/iu], ['Odesa', /\b(?:одесса|одеса|odesa|odessa)\b/iu],
-    ['Lviv', /\b(?:львов|львів|lviv)\b/iu], ['Vinnytsia', /\b(?:винница|вінниця|vinnytsia)\b/iu],
-  ],
-  RO: [
-    ['Bucharest', /\b(?:bucharest|bucurești|bucuresti|бухарест)\b/iu], ['Cluj-Napoca', /\b(?:cluj(?:-napoca)?|клуж)\b/iu],
-    ['Iași', /\b(?:iași|iasi|яссы)\b/iu], ['Timișoara', /\b(?:timișoara|timisoara|тимишоара)\b/iu],
-    ['Brașov', /\b(?:brașov|brasov|брашов)\b/iu], ['Constanța', /\b(?:constanța|constanta|констанца)\b/iu],
-  ],
-}
-
-function cityFrom(text: string, country: string): string | null {
-  for (const [city, re] of CITIES[country] || []) if (re.test(text)) return city
-  return null
-}
-
-function employment(text: string): CvProfile['employmentTypes'] {
-  const out = new Set<'full_time' | 'part_time'>()
-  if (/полная занятость|полный день|full[- ]?time|to['’]?liq bandlik|normă întreagă/iu.test(text)) out.add('full_time')
-  if (/неполная занятость|неполный день|частичная занятость|part[- ]?time|qisman bandlik|part[- ]time/iu.test(text)) out.add('part_time')
-  return [...out]
-}
-
-function contacts(text: string): CvProfile['contacts'] {
-  const phone = text.match(/(?:\+?\d[\d\s()\-]{7,}\d)/)?.[0]?.replace(/\s+/g, ' ')
-  const email = text.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/iu)?.[0]
-  const telegram = text.match(/@[A-Za-z0-9_]{5,}/)?.[0]
-  return { ...(phone ? { phone } : {}), ...(email ? { email } : {}), ...(telegram ? { telegram } : {}) }
-}
 
 function blockAnchors(html: string, source: WebCvSource): CandidateBlock[] {
   const matches: Array<{ index: number; end: number; href: string; title: string }> = []
@@ -255,7 +92,11 @@ function blockAnchors(html: string, source: WebCvSource): CandidateBlock[] {
     const start = Math.max(0, item.first - 350)
     const nextStart = byProfile[index + 1]?.first
     const end = nextStart ?? Math.min(html.length, item.end + 5_000)
-    const raw = html.slice(start, end)
+    const sliced = html.slice(start, end)
+    // The margin can begin inside a tag; drop the truncated attribute soup so
+    // it never reaches the profile text.
+    const cut = start > 0 ? sliced.indexOf('>') : -1
+    const raw = cut >= 0 && cut < 400 ? sliced.slice(cut + 1) : sliced
     // The longest anchor text is the card; the short ones are its controls.
     const title = item.titles.reduce((longest, candidate) => (candidate.length > longest.length ? candidate : longest), '')
     return { href: item.href, title, html: raw, text: htmlText(raw) }
@@ -440,25 +281,57 @@ function parseRabotaKz(block: CandidateBlock, source: WebCvSource): CvProfile | 
   })
 }
 
-function parseTalent(block: CandidateBlock, source: WebCvSource): CvProfile | null {
-  const activity = activityDate(block.text)
+/**
+ * Talent.UA renders whole cards server-side, each field in its own element:
+ * the date, the candidate's name and city, an education/experience line, the
+ * work-schedule line and the skill tags. Reading those directly is both more
+ * accurate and steadier than guessing from the card's flattened text, which
+ * is what the previous parser did — it recovered a name or a city for none of
+ * the profiles it accepted.
+ */
+/**
+ * The block a card belongs to keeps a margin of its neighbours on both sides,
+ * and this listing prints the salary in the card header — near enough to the
+ * boundary to be read off the wrong card. Cut to the card's own container.
+ */
+function talentCard(block: CandidateBlock): CandidateBlock {
+  const anchor = Math.max(0, block.html.indexOf(block.href))
+  const open = block.html.lastIndexOf('<div class="card">', anchor)
+  const from = open >= 0 ? open : 0
+  const close = block.html.indexOf('<div class="card">', from + 1)
+  const html = close > from ? block.html.slice(from, close) : block.html.slice(from)
+  return { ...block, html, text: htmlText(html) }
+}
+
+function parseTalent(source_block: CandidateBlock, source: WebCvSource): CvProfile | null {
+  const block = talentCard(source_block)
+  // "8 ч.", "Вчера", "19 августа" — the listing's own freshness stamp.
+  const stamp = htmlText(block.html.match(/class="date"[^>]*>\s*<div>([\s\S]*?)<\/div>/i)?.[1] || '')
+  const activity = (stamp && (activityDate(stamp) || dayMonthDate(stamp))) || activityDate(block.text)
   if (!isRecent(activity)) return null
-  const after = block.text.split(block.title).slice(1).join(block.title)
-  const city = cityFrom(after, 'UA')
-  let name = ''
-  if (city) {
-    const cityNames = CITIES.UA.find(([value]) => value === city)?.[1]
-    if (cityNames) {
-      const nameMatch = after.match(new RegExp(`(?:^|\\n)([^\\n]{2,100}?)\\s+(?:${cityNames.source.replace(/^\\b|\\b$/g, '')})\\b`, 'iu'))
-      name = nameMatch?.[1]?.trim() || ''
-    }
-  }
+
+  const info = block.html.match(/class="card__info[^"]*"[^>]*>([\s\S]*?)<\/div>/i)?.[1] || ''
+  const fields = [...info.matchAll(/<span[^>]*>([\s\S]*?)<\/span>/gi)]
+    .map((match) => htmlText(match[1]!))
+    .filter(Boolean)
+  // Both fields are optional and the city is always last: a card with one
+  // value is showing a city, not a name.
+  const cityText = fields[fields.length - 1] || ''
+  const name = fields.length > 1 ? fields[0]! : ''
+
+  const skills = [...block.html.matchAll(/<a[^>]*href="[^"]*resumes\/search\?tag=\d+"[^>]*>([\s\S]*?)<\/a>/gi)]
+    .map((match) => htmlText(match[1]!))
+    .filter(Boolean)
+    .slice(0, 20)
+
   return profileBase(source, block, activity!, {
     name,
     role: block.title,
-    city,
+    // Cities outside the known list keep the spelling the board printed.
+    city: cityFrom(cityText, 'UA') || cityText || null,
+    ...(skills.length ? { skills } : {}),
     updatedAt: activity,
-    relocationReady: /возможен переезд|можливий переїзд/iu.test(after),
+    relocationReady: /возможен переезд|можливий переїзд/iu.test(block.text),
   })
 }
 
@@ -482,7 +355,7 @@ const SOURCES: WebCvSource[] = [
   {
     key: 'talent-ua', label: 'Talent.UA', country: 'UA', root: 'https://talent.ua/ru/resumes/search',
     pageUrl: (page) => page === 1 ? 'https://talent.ua/ru/resumes/search' : `https://talent.ua/ru/resumes/search/page${page}`,
-    linkRe: /talent\.ua\/ru\/resumes\/\d+/i, parse: parseTalent,
+    linkRe: /(?:talent\.ua|rabota\.[a-z0-9.-]+\.ua)\/ru\/resumes\/\d+/i, parse: parseTalent,
   },
   {
     key: 'flagma-ro', label: 'Flagma RO', country: 'RO', root: 'https://flagma.ro/ru/resume/',
