@@ -16,6 +16,7 @@ import {
   saveDbCandidates,
 } from './hiringDb'
 import { normalizeCandidate } from './hiringNormalize'
+import { isRecruitingOpportunity, repairCandidateProfile } from './hiringQuality'
 import { HIRING_SOURCES, type CandidateEmploymentType, type CvProfile, type HiringSource } from './hiringTypes'
 import {
   aiFingerprint,
@@ -86,6 +87,10 @@ function dedupKey(profile: CvProfile): string {
   return profile.url || profile.id
 }
 
+function repaired(profile: CvProfile): CvProfile {
+  return repairCandidateProfile(normalizeCandidate(profile))
+}
+
 /** The channel a profile came from, read back off its canonical t.me link. */
 function channelHandle(profile: CvProfile): string {
   return /^https?:\/\/t\.me\/([^/]+)/i.exec(profile.url || '')?.[1]?.toLowerCase() || ''
@@ -133,15 +138,19 @@ async function syncDb(kept: StoredProfile[]) {
 }
 
 function isVisible(profile: StoredProfile): boolean {
-  return isLikelyCvPost(`${profile.name || ''}\n${profile.role || ''}\n${profile.originalText || profile.description || ''}`, true)
+  const text = `${profile.name || ''}\n${profile.role || ''}\n${profile.originalText || profile.description || ''}`
+  if (isRecruitingOpportunity(text)) return false
+  return isLikelyCvPost(text, true)
 }
 
 function publicProfiles(list: StoredProfile[]): CvProfile[] {
-  return list.filter(isVisible).map(({ lastSeen: _lastSeen, ai: _ai, ...profile }) => profile)
+  return list
+    .filter(isVisible)
+    .map(({ lastSeen: _lastSeen, ai: _ai, ...profile }) => repaired(profile))
 }
 
 function candidateAiInput(profile: CvProfile) {
-  const normalized = normalizeCandidate(profile)
+  const normalized = repaired(profile)
   const rawText = normalized.originalText || normalized.description || ''
   const knownFacts: Record<string, unknown> = {
     name: normalized.name || null,
@@ -218,7 +227,7 @@ function mergeCandidateAi(profile: CvProfile, data: CandidateAiData): CvProfile 
   merged.contacts = contacts
   merged.contact = merged.contact || contacts.telegram || contacts.email || contacts.phone || null
 
-  return normalizeCandidate(merged)
+  return repaired(merged)
 }
 
 async function persistStore(list: StoredProfile[]) {
@@ -243,7 +252,7 @@ async function applyCandidateAiResult(
 
   const accepted = !result.lowConfidence && result.confidence >= AI_MIN_CONFIDENCE
   memoryStore[index] = {
-    ...(accepted ? mergeCandidateAi(current, result.data) : current),
+    ...(accepted ? mergeCandidateAi(current, result.data) : repaired(current)),
     lastSeen: current.lastSeen,
     ai: {
       fingerprint,
@@ -264,6 +273,7 @@ function scheduleCandidateAi(list: StoredProfile[]) {
 
   for (const profile of newestFirst) {
     if (scheduled >= batchSize) break
+    if (!isVisible(profile)) continue
     const input = candidateAiInput(profile)
     if (!input.rawText.trim()) continue
     if (profile.ai?.fingerprint === input.fingerprint && profile.ai.status !== 'pending') continue
@@ -273,7 +283,7 @@ function scheduleCandidateAi(list: StoredProfile[]) {
       id: key,
       kind: 'candidate',
       ...input,
-      meta: { source: profile.source, country: profile.country, id: profile.id, url: profile.url },
+      meta: { source: profile.source, country: repaired(profile).country, id: profile.id, url: profile.url },
       onResult: (result) => applyCandidateAiResult(key, input.fingerprint, result),
       onFailed: async (status) => {
         if (status !== 'failed') return
@@ -347,15 +357,16 @@ function pruneStore(byKey: Map<string, StoredProfile>, now: number): StoredProfi
   oldestPosted.setUTCMonth(oldestPosted.getUTCMonth() - MAX_AGE_MONTHS)
   const kept: StoredProfile[] = []
 
-  for (const profile of byKey.values()) {
-    if (!isVisible(profile)) continue
+  for (const rawProfile of byKey.values()) {
+    if (!isVisible(rawProfile)) continue
+    const profile = repaired(rawProfile)
     const posted = profile.createdAt ? new Date(profile.createdAt).getTime() : Number.NaN
     if (Number.isNaN(posted) || posted < oldestPosted.getTime() || posted > now + 48 * 60 * 60 * 1000) continue
     // Telegram candidate retention is based on publication time. `lastSeen` is
     // crawl bookkeeping only; dropping a two-month-old CV because a high-volume
     // channel did not resurface it during the last 14 days violated the product
     // requirement and made the board steadily shrink.
-    kept.push(profile)
+    kept.push({ ...profile, lastSeen: rawProfile.lastSeen, ai: rawProfile.ai })
   }
   return kept
 }
@@ -409,7 +420,9 @@ async function performRefresh(): Promise<{ fetched: number; stored: number }> {
     try {
       const batch = await fetchSource(source)
       fetched += batch.length
-      for (const profile of batch) {
+      for (const rawProfile of batch) {
+        const profile = repaired(rawProfile)
+        if (isRecruitingOpportunity(profile.originalText || profile.description || '')) continue
         const key = dedupKey(profile)
         const previous = byKey.get(key)
         const input = candidateAiInput(profile)
@@ -448,7 +461,9 @@ export async function refreshHiringChannel(handle: string): Promise<{ fetched: n
   const byKey = new Map<string, StoredProfile>()
   for (const profile of await loadStored()) byKey.set(dedupKey(profile), profile)
 
-  for (const profile of outcome.result.profiles) {
+  for (const rawProfile of outcome.result.profiles) {
+    const profile = repaired(rawProfile)
+    if (isRecruitingOpportunity(profile.originalText || profile.description || '')) continue
     const key = dedupKey(profile)
     const previous = byKey.get(key)
     const input = candidateAiInput(profile)
