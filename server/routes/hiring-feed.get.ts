@@ -203,6 +203,33 @@ function matchesFilters(profile: CvProfile, params: URLSearchParams): boolean {
   return true
 }
 
+// Normalizing one real CV costs about 7ms — profession detection, skills,
+// languages, contacts, the lot — so a store of a few hundred is seconds of
+// work, and it was being redone from scratch on every request. The result
+// depends only on the stored snapshot, so it is cached against a cheap
+// signature of it and recomputed when the snapshot moves.
+const SNAPSHOT_TTL_MS = 60_000
+let snapshotCache: CvProfile[] = []
+let snapshotKey = ''
+let snapshotAt = 0
+
+function snapshotSignature(stored: CvProfile[]): string {
+  const newest = stored.reduce((latest, profile) => {
+    const activity = profile.activityAt || profile.updatedAt || profile.createdAt || ''
+    return activity > latest ? activity : latest
+  }, '')
+  return `${stored.length}:${newest}:${stored[0]?.id || ''}:${stored[stored.length - 1]?.id || ''}`
+}
+
+function normalizedSnapshot(stored: CvProfile[]): CvProfile[] {
+  const key = snapshotSignature(stored)
+  if (key === snapshotKey && Date.now() - snapshotAt < SNAPSHOT_TTL_MS) return snapshotCache
+  snapshotCache = dedupeCandidates(stored.map((profile) => withProfessionExperience(normalizeCandidate(profile))))
+  snapshotKey = key
+  snapshotAt = Date.now()
+  return snapshotCache
+}
+
 function sourceCounts(profiles: CvProfile[]): Record<string, number> {
   const counts: Record<string, number> = {}
   for (const profile of profiles) {
@@ -347,7 +374,7 @@ export default defineEventHandler(async (event) => {
     })
   }
 
-  const profiles = dedupeCandidates(stored.map((profile) => withProfessionExperience(normalizeCandidate(profile))))
+  const profiles = normalizedSnapshot(stored)
   const byId = new Map(profiles.map((profile) => [profile.id, profile]))
 
   const query = (params.get('query') || '').trim()

@@ -165,10 +165,24 @@ function isVisible(profile: StoredProfile): boolean {
   return isLikelyCvPost(text, true)
 }
 
+let publicCache: CvProfile[] = []
+let publicCacheSource: StoredProfile[] | null = null
+
+/**
+ * Visible, repaired profiles for the current snapshot.
+ *
+ * Both steps are expensive — the visibility classifier runs the Telegram
+ * intent regexes, and repairing re-normalizes the whole profile — so the
+ * result is memoized against the array it was derived from. A new snapshot is
+ * a new array, which is what invalidates it.
+ */
 function publicProfiles(list: StoredProfile[]): CvProfile[] {
-  return list
+  if (publicCacheSource === list) return publicCache
+  publicCache = list
     .filter(isVisible)
     .map(({ lastSeen: _lastSeen, ai: _ai, ...profile }) => repaired(profile))
+  publicCacheSource = list
+  return publicCache
 }
 
 function candidateAiInput(profile: CvProfile) {
