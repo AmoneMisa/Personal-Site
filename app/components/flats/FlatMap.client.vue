@@ -60,9 +60,11 @@ async function setExpanded(value: boolean) {
   expanded.value = value;
   if (import.meta.client) document.body.style.overflow = value ? "hidden" : "";
   await nextTick();
-  // After the CSS transition, not during it — mid-flight sizes make Leaflet
-  // fetch a row of tiles it immediately throws away.
-  setTimeout(() => map?.invalidateSize(), 220);
+  // Once for the new box, once after the browser has settled: a single late
+  // call left a band of unloaded tiles across the map.
+  requestAnimationFrame(() => map?.invalidateSize());
+  setTimeout(() => map?.invalidateSize(), 260);
+  setTimeout(() => map?.invalidateSize(), 600);
 }
 
 function toggleExpanded() {
@@ -296,6 +298,7 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
+  <Teleport to="body" :disabled="!expanded">
   <div v-show="!failed" class="flat-map-shell" :class="{ 'flat-map-shell_full': expanded }">
     <div ref="el" class="flat-map" />
 
@@ -337,6 +340,7 @@ onBeforeUnmount(() => {
     </div>
     <div v-if="drawing" class="flat-map__hint">{{ props.drawHint || "Click points on the map to outline an area." }}</div>
   </div>
+  </Teleport>
 </template>
 
 <style scoped>
