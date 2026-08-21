@@ -3,14 +3,17 @@
 
 import type { Seniority } from './jobTypes'
 
-export type HiringSource = 'telegram'
+export type HiringSource = 'telegram' | 'web'
 export type CandidateEmploymentType = 'full_time' | 'part_time'
+export type CandidateContactType = 'direct' | 'platform'
 
-export const HIRING_SOURCES: HiringSource[] = ['telegram']
+export const HIRING_SOURCES: HiringSource[] = ['telegram', 'web']
 
 export interface CvProfile {
   id: string
   source: HiringSource
+  /** Stable source adapter key, e.g. flagma-uz or rabotakz. */
+  sourceKey?: string
   country: string
   /** Candidate full name when present in the source. Empty when not provided. */
   name: string
@@ -37,10 +40,17 @@ export interface CvProfile {
   employmentTypes?: CandidateEmploymentType[]
   photo?: string | null
   photos?: string[]
-  /** Canonical link to the original Telegram message. */
+  /** Canonical link to the original candidate post/profile. */
   url: string
+  /** Original publication date when the source exposes it. */
+  publishedAt?: string | null
+  /** Last candidate-controlled CV update when the source exposes it. */
+  updatedAt?: string | null
+  /** Freshness signal used by web boards: updatedAt ?? publishedAt. */
+  activityAt?: string | null
+  /** Backwards-compatible activity timestamp used by current store/search code. */
   createdAt: string | null
-  /** Original message text, preserved verbatim apart from Telegram HTML decoding. */
+  /** Original public source text. Never synthesized by AI. */
   originalText: string
   /** Search/display copy; currently the same source text as originalText. */
   description: string
@@ -49,6 +59,8 @@ export interface CvProfile {
   education?: string | null
   tags?: string[]
   contact?: string | null
+  /** Whether a direct public contact exists or the employer must use the source platform. */
+  contactType?: CandidateContactType
   /** Raw employment wording from the source, retained for traceability. */
   employmentType?: string | null
   seniority?: Seniority | null
