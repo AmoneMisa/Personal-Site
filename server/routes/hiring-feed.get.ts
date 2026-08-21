@@ -6,7 +6,7 @@ import { getStoredCvProfiles, isHiringStoreCold, refreshHiringStore } from '../u
 import { getStoredWebCvProfiles } from '../utils/hiringWebStore'
 import { candidateSearchAvailable, searchCandidates } from '../utils/hiringElastic'
 import { dedupeCandidates, normalizeCandidate } from '../utils/hiringNormalize'
-import type { CvProfile } from '../utils/hiringTypes'
+import type { CandidateGender, CvProfile } from '../utils/hiringTypes'
 
 const PAGE_MAX = 60
 
@@ -23,6 +23,30 @@ function list(params: URLSearchParams, key: string): string[] {
 
 function profileSource(profile: CvProfile): string {
   return (profile.sourceKey || profile.source || 'unknown').toLowerCase()
+}
+
+function explicitGender(profile: CvProfile): CandidateGender {
+  if (profile.gender === 'male' || profile.gender === 'female') return profile.gender
+
+  const text = `${profile.originalText || ''}\n${profile.description || ''}`
+  const labelled = text.match(/(?:пол|gender|sex|jins(?:i)?|жинс)\s*[:：—-]?\s*(муж(?:ской)?|жен(?:ский)?|male|female|erkak|ayol)\b/iu)?.[1]?.toLowerCase()
+  if (labelled) {
+    if (/^(?:муж|male|erkak)/iu.test(labelled)) return 'male'
+    if (/^(?:жен|female|ayol)/iu.test(labelled)) return 'female'
+  }
+
+  if (/(?:ищу\s+работу|шукаю\s+роботу|ish\s+(?:kerak|qidir)|looking\s+for\s+(?:a\s+)?job)[^\n]{0,80}\b(?:мужчина|парень|erkak|yigit)\b/iu.test(text)
+    || /\b(?:мужчина|парень|erkak|yigit)\b[^\n]{0,80}(?:ищет\s+работу|ищу\s+работу|ish\s+(?:kerak|qidir))/iu.test(text)) return 'male'
+
+  if (/(?:ищу\s+работу|шукаю\s+роботу|ish\s+(?:kerak|qidir)|looking\s+for\s+(?:a\s+)?job)[^\n]{0,80}\b(?:женщина|девушка|ayol|qiz)\b/iu.test(text)
+    || /\b(?:женщина|девушка|ayol|qiz)\b[^\n]{0,80}(?:ищет\s+работу|ищу\s+работу|ish\s+(?:kerak|qidir))/iu.test(text)) return 'female'
+
+  return 'unknown'
+}
+
+function desiredProfessions(profile: CvProfile): string[] {
+  const values = profile.professions?.length ? profile.professions : [profile.role]
+  return [...new Set(values.map((value) => value.trim()).filter(Boolean))]
 }
 
 function profileSearchText(profile: CvProfile): string {
@@ -56,6 +80,25 @@ function matchesFilters(profile: CvProfile, params: URLSearchParams): boolean {
   const expMin = Number(params.get('experienceMin'))
   if (Number.isFinite(expMin) && expMin > 0) {
     if (profile.experienceYears == null || profile.experienceYears < expMin) return false
+  }
+
+  const ageMin = Number(params.get('ageMin'))
+  if (Number.isFinite(ageMin) && ageMin > 0) {
+    if (profile.age == null || profile.age < ageMin) return false
+  }
+
+  const ageMax = Number(params.get('ageMax'))
+  if (Number.isFinite(ageMax) && ageMax > 0) {
+    if (profile.age == null || profile.age > ageMax) return false
+  }
+
+  const gender = (params.get('gender') || '').trim().toLowerCase()
+  if (gender && ['male', 'female', 'unknown'].includes(gender) && explicitGender(profile) !== gender) return false
+
+  const professions = list(params, 'professions').map((value) => value.toLocaleLowerCase('ru'))
+  if (professions.length) {
+    const desired = desiredProfessions(profile).map((value) => value.toLocaleLowerCase('ru'))
+    if (!professions.some((profession) => desired.some((value) => value === profession))) return false
   }
 
   const seniority = (params.get('seniority') || '').trim().toLowerCase()
@@ -97,6 +140,14 @@ function sourceCounts(profiles: CvProfile[]): Record<string, number> {
   return counts
 }
 
+function professionOptions(profiles: CvProfile[]): string[] {
+  const values = new Set<string>()
+  for (const profile of profiles) {
+    for (const profession of desiredProfessions(profile)) values.add(profession)
+  }
+  return [...values].sort((a, b) => a.localeCompare(b, 'ru'))
+}
+
 function publicProfile(profile: CvProfile): CvProfile {
   const details = [...(profile.tags || [])]
   for (const feature of profile.features || []) details.push(feature)
@@ -108,8 +159,10 @@ function publicProfile(profile: CvProfile): CvProfile {
   if (profile.relocationReady === false) details.push('Not open to relocation')
   if (profile.origin === 'web' && profile.contactType === 'platform') details.push('Contact via source platform')
 
+  const { photo: _photo, photos: _photos, ...withoutPhotos } = profile
   return {
-    ...profile,
+    ...withoutPhotos,
+    gender: explicitGender(profile),
     role: profile.professions?.length ? profile.professions.join(', ') : profile.role,
     employmentType: profile.employmentTypes?.length ? profile.employmentTypes.join(', ') : profile.employmentType,
     tags: [...new Set(details)].slice(0, 20),
@@ -142,15 +195,19 @@ export default defineEventHandler(async (event) => {
   const byId = new Map(profiles.map((profile) => [profile.id, profile]))
 
   const query = (params.get('query') || '').trim()
+  const hasMemoryOnlyFilters = Boolean(
+    params.get('ageMin')
+    || params.get('ageMax')
+    || params.get('gender')
+    || params.get('professions'),
+  )
   let page: CvProfile[] = []
   let count = 0
   let engine: 'elasticsearch' | 'memory' = 'memory'
 
-  // Until the Elasticsearch candidate mapping includes sourceKey/origin, use
-  // the complete in-memory set whenever web CVs are present. This prevents a
-  // valid Careerist/Flagma/Rabota.kz card from disappearing only when a text
-  // query is entered.
-  if (query && !webStored.length && (await candidateSearchAvailable())) {
+  // Age/gender/profession filters are evaluated against the normalized stored
+  // profile so they also work for legacy records without an ES remap.
+  if (query && !webStored.length && !hasMemoryOnlyFilters && (await candidateSearchAvailable())) {
     const result = await searchCandidates({
       query,
       countries: list(params, 'countries').map((code) => code.toUpperCase()),
@@ -203,6 +260,10 @@ export default defineEventHandler(async (event) => {
       query: params.get('query') || '',
       remote: params.get('remote') || '',
       experienceMin: params.get('experienceMin') || '',
+      ageMin: params.get('ageMin') || '',
+      ageMax: params.get('ageMax') || '',
+      gender: params.get('gender') || '',
+      professions: params.get('professions') || '',
       seniority: params.get('seniority') || '',
       skills: params.get('skills') || '',
       languages: params.get('languages') || '',
@@ -210,6 +271,9 @@ export default defineEventHandler(async (event) => {
       offset,
       limit,
     },
-    meta: { countries: HIRING_COUNTRIES },
+    meta: {
+      countries: HIRING_COUNTRIES,
+      professions: professionOptions(profiles),
+    },
   }
 })
