@@ -31,16 +31,31 @@ export function detectSeniority(text: string, experienceYears?: number | null): 
   return null
 }
 
+function addSkill(out: Set<string>, raw: string) {
+  const canonical = canonicalSkillName(raw)
+  if (canonical) out.add(canonical)
+  else {
+    const trimmed = raw.trim().replace(/\s{2,}/g, ' ')
+    if (trimmed.length >= 2 && trimmed.length <= 60) out.add(trimmed)
+  }
+}
+
 export function normalizeSkills(rawSkills: string[] | undefined, text: string): string[] {
   const out = new Set<string>()
-  for (const raw of rawSkills || []) {
-    const canonical = canonicalSkillName(raw)
-    if (canonical) out.add(canonical)
-    else {
-      const trimmed = raw.trim().replace(/\s{2,}/g, ' ')
-      if (trimmed.length >= 2 && trimmed.length <= 60) out.add(trimmed)
+  for (const raw of rawSkills || []) addSkill(out, raw)
+
+  // Structured UZ CV cards commonly call this field `Texnologiya`, singular.
+  // Keep unknown but meaningful entries (e.g. DRF, Telegram Bot) instead of
+  // relying only on the canonical skill catalogue.
+  const structured = text.match(
+    /(?:^|\n)[^\p{L}\p{N}\n]{0,10}(?:skills|навыки|навички|стек|stack|technologies|texnologiya(?:lar)?|ko(?:'|’)nikmalar)\s*[:—-]\s*([^\n]{2,500})/iu,
+  )?.[1]
+  if (structured) {
+    for (const raw of structured.split(/[,;/|•·]+/)) {
+      if (raw.trim()) addSkill(out, raw)
     }
   }
+
   for (const { name } of extractSkillDetails(text)) out.add(name)
   return [...out]
 }
