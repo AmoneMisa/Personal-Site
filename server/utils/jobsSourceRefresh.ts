@@ -8,6 +8,7 @@ import { fetchExtraPublicJobs } from './extraPublicJobSources'
 import { fetchUsaVisaSponsorJobs } from './usaVisaSponsorSource'
 import { fetchSourceExpansionJobs } from './sourceExpansionJobs'
 import { fetchAviationExpansionJobs } from './aviationExpansionJobs'
+import { fetchIntelliasJobs } from './intelliasJobs'
 import {
   fetchAdzuna,
   fetchArbeitnow,
@@ -58,6 +59,7 @@ async function fetchAllCompanies(q: string): Promise<Job[]> {
     { label: 'usa-visa-sponsors', load: () => fetchUsaVisaSponsorJobs(q) },
     { label: 'source-expansion', load: () => fetchSourceExpansionJobs(q) },
     { label: 'aviation-expansion', load: () => fetchAviationExpansionJobs(q) },
+    { label: 'intellias', load: () => fetchIntelliasJobs(q) },
   ]
 
   const results = await Promise.allSettled(loaders.map(({ load }) => load()))
