@@ -458,6 +458,13 @@ export default defineEventHandler(async (event) => {
     sourceStatuses,
     webSourceStatuses,
     sourceErrors,
+    // When crawling stops — a dead queue worker, a broker that refuses the
+    // login — the board keeps serving what it already had and looks healthy.
+    // This is the one field that gives that away.
+    lastCrawlAt: [...persistedSourceRuns.map((run) => run.lastSuccessAt || ''), ...sourceStatuses.map((item) => item.checkedAt)]
+      .filter(Boolean)
+      .sort()
+      .pop() || null,
     funnel: getStoreFunnel(),
     warming,
     engine,
