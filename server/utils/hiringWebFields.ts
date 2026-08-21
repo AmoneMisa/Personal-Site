@@ -1,8 +1,8 @@
 // Field parsing for public CV boards: dates, ages, salaries, cities, contacts.
 //
 // Split out from the crawler so it can be exercised without a Redis or a
-// network: three separate bugs here came from JavaScript's , which only
-// knows ASCII word characters and therefore never fires next to Cyrillic —
+// network: three separate bugs here came from JavaScript's word boundary,
+// which knows ASCII word characters only and never fires next to Cyrillic —
 // city names, ages and freshness stamps all matched nothing for months
 // without failing loudly. Anything matching non-Latin text belongs here,
 // behind a test.
@@ -186,13 +186,18 @@ export function parseSalary(text: string, country: string): Pick<CvProfile, 'sal
  * Cyrillic. Only the Latin spellings ever worked.
  */
 export function cityRe(alternatives: string): RegExp {
-  return new RegExp(`${B}(?:${alternatives})${E}`, 'iu')
+  // A Cyrillic place name is almost never written in the nominative in running
+  // text — "живу в Ташкенте", "работа в Киеве", "из Алматы" — so a short
+  // case ending is allowed after the alias. The ending is restricted to
+  // Cyrillic, which keeps Latin aliases matching whole words only: otherwise
+  // "osh" would swallow the Uzbek "oshpaz".
+  return new RegExp(`${B}(?:${alternatives})(?:\\p{Script=Cyrillic}{1,3})?${E}`, 'iu')
 }
 
 export const CITIES: Record<string, Array<[string, RegExp]>> = {
   UZ: [
     ['Tashkent', cityRe('ташкент|tashkent|toshkent')], ['Samarkand', cityRe('самарканд|samarqand|samarkand')],
-    ['Bukhara', cityRe('бухара|buxoro|bukhara')], ['Namangan', cityRe('наманган|namangan')],
+    ['Bukhara', cityRe('бухара|buxoro|bukhara')], ['Namangan', cityRe('наманган\\p{L}*|namangan')],
     ['Andijan', cityRe('андижан|andijon|andijan')], ['Fergana', cityRe("фергана|фаргана|farg(?:'|’)ona|fergana")],
     ['Nukus', cityRe('нукус|nukus')], ['Qarshi', cityRe('карши|qarshi|karshi')],
     ['Navoi', cityRe('навои|navoi')],
@@ -212,9 +217,13 @@ export const CITIES: Record<string, Array<[string, RegExp]>> = {
   ],
   UA: [
     ['Kyiv', cityRe('киев|київ|kyiv|kiev')], ['Kharkiv', cityRe('харьков|харків|kharkiv|kharkov')],
-    ['Dnipro', cityRe('днепр|дніпро|dnipro')], ['Odesa', cityRe('одесса|одеса|odesa|odessa')],
-    ['Lviv', cityRe('львов|львів|lviv')], ['Vinnytsia', cityRe('винница|вінниця|vinnytsia')],
+    ['Dnipro', cityRe('днепр|дніпро|dnipro')], ['Odesa', cityRe('одесс|одес|odesa|odessa')],
+    ['Lviv', cityRe('львов|львів|lviv')], ['Vinnytsia', cityRe('винниц|вінниц|vinnytsia')],
     ['Zaporizhzhia', cityRe('запорожье|запоріжжя|zaporizhzhia')], ['Poltava', cityRe('полтава|poltava')],
+  ],
+  KG: [
+    ['Bishkek', cityRe('бишкек|bishkek')], ['Osh', cityRe('ош|osh')],
+    ['Karakol', cityRe('каракол|karakol')], ['Jalal-Abad', cityRe('джалал[- ]?абад|jalal[- ]?abad')],
   ],
   RO: [
     ['Bucharest', cityRe('bucharest|bucurești|bucuresti|бухарест')], ['Cluj-Napoca', cityRe('cluj(?:-napoca)?|клуж')],

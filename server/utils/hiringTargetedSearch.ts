@@ -1,5 +1,6 @@
 import { normalizeCandidate } from './hiringNormalize'
 import type { CvProfile } from './hiringTypes'
+import { cityRe } from './hiringWebFields'
 
 const UA =
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ' +
@@ -219,7 +220,7 @@ function parseBlock(block: CandidateBlock): CvProfile | null {
 }
 
 function flagmaRegion(city: string): string {
-  return /(?:^|\b)(?:tashkent|toshkent|ташкент|тошкент)(?:\b|$)/iu.test(city.trim()) ? 'tashkent/' : ''
+  return cityRe('tashkent|toshkent|ташкент|тошкент').test(city.trim()) ? 'tashkent/' : ''
 }
 
 function pageUrl(term: string, page: number, city: string): string {

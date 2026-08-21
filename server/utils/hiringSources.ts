@@ -4,6 +4,7 @@
 import type { CvProfile, HiringSource } from './hiringTypes'
 import { emptyCursor, loadCursors, saveCursor, type ChannelCursor } from './hiringCursors'
 import { isLikelyTelegramVacancy } from './sources'
+import { cityRe } from './hiringWebFields'
 import { extractCandidateName } from './hiringCandidateFields'
 
 const UA = 'hiringFinder/1.0 (CV board; contact: admin@whiteslove.me)'
@@ -158,53 +159,53 @@ const DEFAULT_CV_CHANNELS: TelegramChannel[] = [
 
 const CITY_ALIASES: Record<string, Array<[string, RegExp]>> = {
   UZ: [
-    ['Tashkent', /\b(?:tashkent|toshkent|ташкент|тошкент)\b/iu],
-    ['Samarkand', /\b(?:samarkand|samarqand|самарканд|самарқанд)\b/iu],
-    ['Bukhara', /\b(?:bukhara|buxoro|бухара|бухоро)\b/iu],
-    ['Namangan', /\b(?:namangan|наманган)\b/iu],
-    ['Andijan', /\b(?:andijan|andijon|андижан|андижон)\b/iu],
-    ['Fergana', /\b(?:fergana|farg(?:'|’)ona|фаргана|фергана)\b/iu],
-    ['Qarshi', /\b(?:qarshi|karshi|карши|қарши)\b/iu],
-    ['Nukus', /\b(?:nukus|нукус)\b/iu],
-    ['Urgench', /\b(?:urgench|urganch|ургенч|урганч)\b/iu],
-    ['Khiva', /\b(?:khiva|xiva|хива)\b/iu],
+    ['Tashkent', cityRe('tashkent|toshkent|ташкент|тошкент')],
+    ['Samarkand', cityRe('samarkand|samarqand|самарканд|самарқанд')],
+    ['Bukhara', cityRe('bukhara|buxoro|бухара|бухоро')],
+    ['Namangan', cityRe('namangan|наманган')],
+    ['Andijan', cityRe('andijan|andijon|андижан|андижон')],
+    ['Fergana', cityRe("fergana|farg(?:'|’)ona|фаргана|фергана")],
+    ['Qarshi', cityRe('qarshi|karshi|карши|қарши')],
+    ['Nukus', cityRe('nukus|нукус')],
+    ['Urgench', cityRe('urgench|urganch|ургенч|урганч')],
+    ['Khiva', cityRe('khiva|xiva|хива')],
   ],
   UA: [
-    ['Kyiv', /\b(?:kyiv|kiev|київ|киев)\b/iu],
-    ['Kharkiv', /\b(?:kharkiv|kharkov|харків|харьков)\b/iu],
-    ['Odesa', /\b(?:odesa|odessa|одеса|одесса)\b/iu],
-    ['Dnipro', /\b(?:dnipro|дніпро|днепр)\b/iu],
-    ['Lviv', /\b(?:lviv|львів|львов)\b/iu],
-    ['Vinnytsia', /\b(?:vinnytsia|vinnitsa|вінниця|винница)\b/iu],
-    ['Zaporizhzhia', /\b(?:zaporizhzhia|zaporozhye|запоріжжя|запорожье)\b/iu],
+    ['Kyiv', cityRe('kyiv|kiev|київ|киев')],
+    ['Kharkiv', cityRe('kharkiv|kharkov|харків|харьков')],
+    ['Odesa', cityRe('odesa|odessa|одеса|одесса')],
+    ['Dnipro', cityRe('dnipro|дніпро|днепр')],
+    ['Lviv', cityRe('lviv|львів|львов')],
+    ['Vinnytsia', cityRe('vinnytsia|vinnitsa|вінниця|винница')],
+    ['Zaporizhzhia', cityRe('zaporizhzhia|zaporozhye|запоріжжя|запорожье')],
   ],
   KZ: [
-    ['Almaty', /\b(?:almaty|алматы)\b/iu],
-    ['Astana', /\b(?:astana|астана)\b/iu],
-    ['Shymkent', /\b(?:shymkent|chimkent|шымкент|чимкент)\b/iu],
-    ['Karaganda', /\b(?:karaganda|караганда)\b/iu],
-    ['Atyrau', /\b(?:atyrau|атырау)\b/iu],
-    ['Aktobe', /\b(?:aktobe|актобе)\b/iu],
+    ['Almaty', cityRe('almaty|алматы')],
+    ['Astana', cityRe('astana|астана')],
+    ['Shymkent', cityRe('shymkent|chimkent|шымкент|чимкент')],
+    ['Karaganda', cityRe('karaganda|караганда')],
+    ['Atyrau', cityRe('atyrau|атырау')],
+    ['Aktobe', cityRe('aktobe|актобе')],
   ],
   KG: [
-    ['Bishkek', /\b(?:bishkek|бишкек)\b/iu],
-    ['Osh', /\b(?:osh|ош)\b/iu],
-    ['Karakol', /\b(?:karakol|каракол)\b/iu],
+    ['Bishkek', cityRe('bishkek|бишкек')],
+    ['Osh', cityRe('osh|ош')],
+    ['Karakol', cityRe('karakol|каракол')],
   ],
 }
 
 const TASHKENT_DISTRICTS: Array<[string, RegExp]> = [
-  ['Chilanzar', /\b(?:chilanzar|chilonzor|чиланзар|чилонзор)\b/iu],
-  ['Yunusabad', /\b(?:yunusabad|yunusobod|юнасабад|юнусобод)\b/iu],
-  ['Mirabad', /\b(?:mirabad|mirobod|мирабад|миробод)\b/iu],
-  ['Yakkasaray', /\b(?:yakkasaray|yakkasaroy|яккасарай|яккасарой)\b/iu],
-  ['Shaykhantahur', /\b(?:shaykhantahur|shayxontohur|шейхантахур|шайхонтохур)\b/iu],
-  ['Mirzo Ulugbek', /\b(?:mirzo\s+ulugbek|mirzo\s+ulug(?:'|’)bek|мирзо\s+улугбек)\b/iu],
-  ['Uchtepa', /\b(?:uchtepa|учтепа)\b/iu],
-  ['Sergeli', /\b(?:sergeli|сергели)\b/iu],
-  ['Bektemir', /\b(?:bektemir|бектемир)\b/iu],
-  ['Almazar', /\b(?:almazar|olmazor|алмазар|олмазор)\b/iu],
-  ['Yashnabad', /\b(?:yashnabad|yashnobod|яшнабад|яшнобод)\b/iu],
+  ['Chilanzar', cityRe('chilanzar|chilonzor|чиланзар|чилонзор')],
+  ['Yunusabad', cityRe('yunusabad|yunusobod|юнасабад|юнусобод')],
+  ['Mirabad', cityRe('mirabad|mirobod|мирабад|миробод')],
+  ['Yakkasaray', cityRe('yakkasaray|yakkasaroy|яккасарай|яккасарой')],
+  ['Shaykhantahur', cityRe('shaykhantahur|shayxontohur|шейхантахур|шайхонтохур')],
+  ['Mirzo Ulugbek', cityRe("mirzo\\s+ulugbek|mirzo\\s+ulug(?:'|’)bek|мирзо\\s+улугбек")],
+  ['Uchtepa', cityRe('uchtepa|учтепа')],
+  ['Sergeli', cityRe('sergeli|сергели')],
+  ['Bektemir', cityRe('bektemir|бектемир')],
+  ['Almazar', cityRe('almazar|olmazor|алмазар|олмазор')],
+  ['Yashnabad', cityRe('yashnabad|yashnobod|яшнабад|яшнобод')],
 ]
 
 function telegramChannels(): TelegramChannel[] {
@@ -371,7 +372,7 @@ function parseLanguages(text: string): string[] {
   return raw ? raw.split(/[,;/|•·]+/).map((item) => item.trim()).filter(Boolean).slice(0, 8) : []
 }
 
-function detectCity(text: string, country: string): string | null {
+export function detectCity(text: string, country: string): string | null {
   for (const [city, pattern] of CITY_ALIASES[country] || []) {
     if (pattern.test(text)) return city
   }
@@ -382,7 +383,7 @@ function fallbackChannelCity(channel: TelegramChannel): string | null {
   return (CITY_ALIASES[channel.country] || []).some(([city]) => city === channel.location) ? channel.location : null
 }
 
-function detectDistrict(text: string, city: string | null): string | null {
+export function detectDistrict(text: string, city: string | null): string | null {
   const explicit = field(text, 'район|р-н|district|туман|tumani')
   if (explicit) return explicit
   if (city !== 'Tashkent') return null
