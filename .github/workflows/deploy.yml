@@ -12,6 +12,7 @@ env:
   FRONTEND_IMAGE: ghcr.io/amonemisa/personal-site
   BACKEND_IMAGE: ghcr.io/amonemisa/personal-site-backend
   QUEUE_IMAGE: ghcr.io/amonemisa/personal-site-jobs-queue
+  JOB_BROWSER_FETCHER_IMAGE: ghcr.io/amonemisa/personal-site-job-browser-fetcher
 
 jobs:
   # Every image is built here rather than on the deployment server. The server
@@ -36,6 +37,10 @@ jobs:
             context: ./jobs-queue-worker
             file: ./jobs-queue-worker/Dockerfile
             image: ghcr.io/amonemisa/personal-site-jobs-queue
+          - name: job-browser-fetcher
+            context: ./job-browser-fetcher
+            file: ./job-browser-fetcher/Dockerfile
+            image: ghcr.io/amonemisa/personal-site-job-browser-fetcher
     steps:
       - uses: actions/checkout@v4
 
