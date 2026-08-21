@@ -1,4 +1,5 @@
 const FALLBACK_STATUSES = new Set([403, 429])
+const FAILURE_STATUSES = new Set([403, 429, 500, 502, 503, 504])
 const DEFAULT_BROWSER_HOSTS = new Set([
   'taskfavour.com',
   'remote.co',
@@ -56,6 +57,8 @@ export default defineNitroPlugin(() => {
   const hosts = targetHosts()
   const originalFetch = globalThis.fetch.bind(globalThis)
   const proxyTimeoutMs = Math.max(5_000, Number(process.env.JOB_BROWSER_PROXY_TIMEOUT_MS) || 65_000)
+  const failureCooldownMs = Math.max(30_000, Number(process.env.JOB_BROWSER_FAILURE_COOLDOWN_MS) || 300_000)
+  const failedUntil = new Map<string, number>()
 
   const browserFallback = async (url: URL, input: FetchInput, init?: FetchInit): Promise<Response> => {
     return originalFetch(`${endpoint}/fetch`, {
@@ -66,6 +69,8 @@ export default defineNitroPlugin(() => {
     })
   }
 
+  const coolDown = (host: string) => failedUntil.set(host, Date.now() + failureCooldownMs)
+
   const wrappedFetch = async (input: FetchInput, init?: FetchInit): Promise<Response> => {
     const url = inputUrl(input)
     if (!url || url.protocol !== 'https:' || inputMethod(input, init) !== 'GET') {
@@ -74,6 +79,16 @@ export default defineNitroPlugin(() => {
 
     const host = normalizedHost(url.hostname)
     if (!hosts.has(host)) return originalFetch(input, init)
+
+    const blockedUntil = failedUntil.get(host) || 0
+    if (blockedUntil > Date.now()) {
+      const retryAfter = Math.max(1, Math.ceil((blockedUntil - Date.now()) / 1000))
+      return new Response('upstream temporarily cooling down', {
+        status: 503,
+        headers: { 'Retry-After': String(retryAfter) },
+      })
+    }
+    failedUntil.delete(host)
 
     let primaryResponse: Response | undefined
     let primaryError: unknown
@@ -90,12 +105,15 @@ export default defineNitroPlugin(() => {
     try {
       const fallback = await browserFallback(url, input, init)
       if (fallback.ok) {
+        failedUntil.delete(host)
         console.info(`[jobs:browser-fallback] ${host} recovered via Chrome impersonation`)
       } else {
+        if (FAILURE_STATUSES.has(fallback.status)) coolDown(host)
         console.warn(`[jobs:browser-fallback] ${host} browser fetch -> ${fallback.status}`)
       }
       return fallback
     } catch (fallbackError) {
+      coolDown(host)
       console.warn(
         `[jobs:browser-fallback] ${host} sidecar failed:`,
         fallbackError instanceof Error ? fallbackError.message : String(fallbackError),
