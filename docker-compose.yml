@@ -17,6 +17,26 @@ services:
       retries: 3
       start_period: 20s
 
+  job-browser-fetcher:
+    # Lightweight Chrome TLS/JA3 impersonation for public job pages whose WAF
+    # blocks Node fetch. Internal-only: no host port is published.
+    image: ghcr.io/amonemisa/personal-site-job-browser-fetcher:latest
+    restart: unless-stopped
+    environment:
+      JOB_BROWSER_IMPERSONATE: ${JOB_BROWSER_IMPERSONATE:-chrome124}
+      JOB_BROWSER_TIMEOUT: ${JOB_BROWSER_TIMEOUT:-25}
+      JOB_BROWSER_ATTEMPTS: ${JOB_BROWSER_ATTEMPTS:-2}
+      JOB_BROWSER_RETRY_BACKOFF: ${JOB_BROWSER_RETRY_BACKOFF:-2}
+      JOB_BROWSER_429_COOLDOWN: ${JOB_BROWSER_429_COOLDOWN:-900}
+      JOB_BROWSER_403_COOLDOWN: ${JOB_BROWSER_403_COOLDOWN:-900}
+      JOB_BROWSER_ALLOWED_HOSTS: ${JOB_BROWSER_ALLOWED_HOSTS:-}
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:4040/health',timeout=3).status==200 else 1)"]
+      interval: 20s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
   frontend:
     # Deliberately NO build context: the Nuxt image is built and pushed by GitHub
     # Actions (see .github/workflows/deploy.yml, which builds ./Dockerfile
@@ -34,6 +54,9 @@ services:
       AI_WORKER_URL: http://ai-worker:4030
       ELASTICSEARCH_URL: http://flat-finder-elasticsearch:9200
       JOBS_ELASTICSEARCH_INDEX: job-listings-v1
+      JOB_BROWSER_FETCHER_URL: http://job-browser-fetcher:4040
+      JOB_BROWSER_PROXY_TIMEOUT_MS: ${JOB_BROWSER_PROXY_TIMEOUT_MS:-65000}
+      JOB_BROWSER_ALLOWED_HOSTS: ${JOB_BROWSER_ALLOWED_HOSTS:-}
       QUEUE_INTERNAL_KEY: ${QUEUE_INTERNAL_KEY:-}
       # Durable CV storage: the shared Postgres, in its own "hiring" schema.
       # Requires flat-finder-postgres to be on ai-net. Unset it and the board
@@ -42,6 +65,8 @@ services:
       HIRING_DB_SCHEMA: ${HIRING_DB_SCHEMA:-hiring}
     depends_on:
       backend:
+        condition: service_healthy
+      job-browser-fetcher:
         condition: service_healthy
       redis:
         condition: service_healthy
