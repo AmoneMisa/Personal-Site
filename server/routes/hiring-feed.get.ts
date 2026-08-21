@@ -7,6 +7,7 @@ import { getStoredWebCvProfiles } from '../utils/hiringWebStore'
 import { candidateSearchAvailable, searchCandidates } from '../utils/hiringElastic'
 import { dedupeCandidates, normalizeCandidate } from '../utils/hiringNormalize'
 import { withProfessionExperience } from '../utils/hiringExperience'
+import { listWebSources } from '../utils/hiringWebSources'
 import type { CvProfile } from '../utils/hiringTypes'
 import {
   hiringProfessionLabel,
@@ -29,6 +30,25 @@ function list(params: URLSearchParams, key: string): string[] {
 
 function profileSource(profile: CvProfile): string {
   return (profile.sourceKey || profile.source || 'unknown').toLowerCase()
+}
+
+/**
+ * Where the profile actually came from. Legacy records carry source
+ * 'telegram' regardless of origin — a compatibility shim, not a claim — so a
+ * web candidate must be identified by origin and never by that field.
+ */
+function profileOrigin(profile: CvProfile): string {
+  return (profile.origin || 'telegram').toLowerCase()
+}
+
+const WEB_SOURCE_LABELS = new Map(listWebSources().map((source) => [source.key, source.label]))
+
+/** Human name of the provider, for cards and the filter list. */
+function profileProvider(profile: CvProfile): string {
+  const key = profile.sourceKey?.toLowerCase()
+  if (key && WEB_SOURCE_LABELS.has(key)) return WEB_SOURCE_LABELS.get(key)!
+  if (profileOrigin(profile) === 'web') return key || 'Web'
+  return 'Telegram'
 }
 
 function profileSearchText(profile: CvProfile): string {
@@ -87,7 +107,7 @@ function matchesFilters(profile: CvProfile, params: URLSearchParams): boolean {
   }
 
   const sources = list(params, 'sources').map((source) => source.toLowerCase())
-  if (sources.length && !sources.includes(profileSource(profile)) && !sources.includes(profile.source)) return false
+  if (sources.length && !sources.includes(profileSource(profile)) && !sources.includes(profileOrigin(profile))) return false
 
   const profileId = params.get('profileId') || params.get('listingId')
   if (profileId && profile.id !== profileId) return false
@@ -164,6 +184,12 @@ function publicProfile(profile: CvProfile, locale: HiringProfessionLocale): CvPr
     })),
     employmentType: profile.employmentTypes?.length ? profile.employmentTypes.join(', ') : profile.employmentType,
     tags: [...new Set(details)].slice(0, 20),
+    // Semantic identity for the UI. `source` stays as stored for backwards
+    // compatibility, but nothing user-facing should read it: a Careerist
+    // candidate is not a Telegram candidate.
+    origin: profileOrigin(profile) as CvProfile['origin'],
+    sourceKey: profileSource(profile),
+    sourceLabel: profileProvider(profile),
   }
 }
 
@@ -263,6 +289,17 @@ export default defineEventHandler(async (event) => {
       offset,
       limit,
     },
-    meta: { countries: HIRING_COUNTRIES },
+    meta: {
+      countries: HIRING_COUNTRIES,
+      // What the source filter may offer: the two origins, then whichever
+      // concrete providers actually have candidates in the store.
+      sources: [
+        { value: 'telegram', label: 'Telegram', origin: 'telegram' },
+        { value: 'web', label: 'Web', origin: 'web' },
+        ...listWebSources()
+          .filter((source) => (sourceCounts(profiles)[source.key] || 0) > 0)
+          .map((source) => ({ value: source.key, label: source.label, origin: 'web' as const })),
+      ],
+    },
   }
 })

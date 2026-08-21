@@ -7,6 +7,9 @@ import { safeFetch } from "~/utils/safeFetch";
 interface CvProfile {
   id: string;
   source: string;
+  origin?: string;
+  sourceKey?: string;
+  sourceLabel?: string;
   country: string;
   name: string;
   role: string;
@@ -119,8 +122,12 @@ const cityOptions = computed(() => {
   return [...new Set(picked.flatMap((c) => c.cities ?? []))].sort();
 });
 
-const SOURCES = ["telegram"];
-const sourceOptions = computed(() => [{ value: "", label: t("all") }, { value: "telegram", label: "Telegram" }]);
+interface SourceOption { value: string; label: string; origin?: string }
+const availableSources = ref<SourceOption[]>([]);
+const sourceOptions = computed<SourceOption[]>(() => [
+  { value: "", label: t("all") },
+  ...availableSources.value,
+]);
 
 const ANY = "__any__";
 type Item = { label: string; value: string };
@@ -228,7 +235,7 @@ function applyQueryParams(params: Record<string, unknown>) {
   professions.value = queryString(params.professions).split(",").map((v) => v.trim()).filter(Boolean);
   query.value = queryString(params.query);
   const sourceParam = queryString(params.sources);
-  source.value = SOURCES.includes(sourceParam) ? sourceParam : "";
+  source.value = sourceParam;
 }
 
 async function syncQueryParams() {
@@ -320,7 +327,7 @@ async function load(append = false, background = false) {
   if (seniority.value) params.seniority = seniority.value;
   const skillList = skills.value.split(",").map((s) => s.trim()).filter(Boolean);
   if (skillList.length) params.skills = skillList.join(",");
-  params.sources = source.value || SOURCES.join(",");
+  if (source.value) params.sources = source.value;
 
   const { data, error } = await safeFetch<FeedResult>("/hiring-feed", { params });
   if (seq !== loadSeq) {
@@ -342,6 +349,7 @@ async function load(append = false, background = false) {
     sourceErrors.value = data.sourceErrors || [];
     warming.value = !!data.warming;
     if (data.meta?.professions?.length) professionValues.value = data.meta.professions;
+    if (data.meta?.sources?.length) availableSources.value = data.meta.sources;
   }
   if (!background) {
     loading.value = false;
@@ -456,7 +464,7 @@ const specRows = computed(() => {
     { label: t("specLanguages"), value: listOr(profile.languages) },
     { label: t("specSkills"), value: listOr(profile.skills) },
     { label: t("specContact"), value: strOr(profile.contact) },
-    { label: t("specSource"), value: profile.source === "telegram" ? "Telegram" : profile.source },
+    { label: t("specSource"), value: profile.sourceLabel || (profile.source === "telegram" ? "Telegram" : profile.source) },
   ];
 });
 
@@ -691,7 +699,7 @@ onBeforeUnmount(() => {
             <span v-for="badge in cardBadges(profile)" :key="badge" class="hiring-card__badge">{{ badge }}</span>
           </div>
           <div class="hiring-card__meta text-muted">
-            <span>{{ profile.source }}</span>
+            <span>{{ profile.sourceLabel || profile.source }}</span>
             <span v-if="timeAgo(profile.createdAt)">· {{ timeAgo(profile.createdAt) }}</span>
           </div>
         </div>
