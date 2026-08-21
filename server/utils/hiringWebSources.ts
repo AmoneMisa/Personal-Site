@@ -1,8 +1,13 @@
 import { useRedis } from '~~/server/utils/redis'
 import { hiringDbEnabled, loadDbCandidates, saveDbCandidates } from './hiringDb'
+import { emptyWebCursor, loadWebCursors, saveWebCursor, type WebCursor } from './hiringCursors'
 import { normalizeCandidate } from './hiringNormalize'
 import type { CvProfile } from './hiringTypes'
-import type { HiringSourceDiagnostic } from './hiringSources'
+import {
+  recordWebDiagnostic,
+  type SourceRun,
+  type WebSourceDiagnostic,
+} from './hiringDiagnostics'
 
 const UA =
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ' +
@@ -633,6 +638,13 @@ export async function auditWebSource(key: string, maxPages = 2): Promise<WebSour
   return audit
 }
 
+/** One crawl round for a source, without storing anything. For diagnostics. */
+export async function crawlWebSource(key: string, cursor?: WebCursor): Promise<WebSourceRun> {
+  const source = SOURCES.find((item) => item.key === key)
+  if (!source) throw new Error(`unknown web source: ${key}`)
+  return fetchSource(source, cursor || emptyWebCursor(source.key))
+}
+
 export function hiringWebSourceHandles(): string[] {
   if (process.env.HIRING_WEB_CV_SOURCE === 'off') return []
   return configuredSources().map((source) => `web:${source.key}`)
@@ -647,27 +659,119 @@ async function fetchPage(url: string): Promise<string> {
   return response.text()
 }
 
-async function fetchSource(source: WebCvSource): Promise<{ profiles: CvProfile[]; fetched: number }> {
+/**
+ * Stable identity for a profile: the source's own id where its URLs carry one
+ * — "-rr486.html", "/cv/list/<hex>", "-6863660.html" — and the canonical URL
+ * otherwise. Used to recognise a profile we have already crawled.
+ */
+export function webProfileId(url: string): string {
+  const patterns = [/-rr(\d+)\.html/i, /\/cv\/list\/([a-z0-9]{8,})/i, /-(\d{5,})\.html/i, /\/resumes\/(\d+)/i]
+  for (const pattern of patterns) {
+    const match = url.match(pattern)
+    if (match) return match[1]!
+  }
+  return url
+}
+
+export interface WebSourceRun {
+  profiles: CvProfile[]
+  fetched: number
+  pages: number
+  parsed: number
+  rejected: number
+  duplicate: number
+  cursor: WebCursor
+  newestActivityAt: string | null
+  oldestActivityAt: string | null
+  /** The run stopped early because it reached the previous cursor. */
+  reachedCursor: boolean
+}
+
+/**
+ * Reads a listing newest-first and stops at the first profile already seen and
+ * unchanged. Without the cursor every refresh re-walked a fixed page count
+ * whether or not anything had been posted since.
+ */
+async function fetchSource(source: WebCvSource, cursor: WebCursor): Promise<WebSourceRun> {
   const byUrl = new Map<string, CvProfile>()
-  let fetched = 0
-  for (let page = 1; page <= Math.max(1, Number(process.env.HIRING_WEB_CV_MAX_PAGES) || MAX_PAGES); page++) {
+  const run: WebSourceRun = {
+    profiles: [],
+    fetched: 0,
+    pages: 0,
+    parsed: 0,
+    rejected: 0,
+    duplicate: 0,
+    cursor: { ...cursor },
+    newestActivityAt: null,
+    oldestActivityAt: null,
+    reachedCursor: false,
+  }
+
+  const maxPages = Math.max(1, Number(process.env.HIRING_WEB_CV_MAX_PAGES) || MAX_PAGES)
+  let newestSeen: CvProfile | null = null
+  let reachedKnown = false
+
+  for (let page = 1; page <= maxPages && !reachedKnown; page++) {
     const html = await fetchPage(source.pageUrl(page))
+    run.pages += 1
     const blocks = blockAnchors(html, source)
     if (!blocks.length) break
-    fetched += blocks.length
+    run.fetched += blocks.length
+
     let recentOnPage = 0
     for (const block of blocks) {
       const profile = source.parse(block, source)
-      if (!profile) continue
+      if (!profile) {
+        run.rejected += 1
+        continue
+      }
+      run.parsed += 1
       recentOnPage += 1
+
+      const activity = profile.activityAt || profile.updatedAt || null
+      if (activity) {
+        if (!run.newestActivityAt || activity > run.newestActivityAt) run.newestActivityAt = activity
+        if (!run.oldestActivityAt || activity < run.oldestActivityAt) run.oldestActivityAt = activity
+      }
+      if (!newestSeen) newestSeen = profile
+
+      // Reaching the profile that was newest last round means everything below
+      // it has already been read. Identity alone decides that: most boards
+      // print relative dates ("2 hours ago"), which resolve to a different
+      // instant on every parse, so an activity comparison would never match
+      // and the crawl would walk the full page budget every time.
+      //
+      // If that profile has since disappeared from the listing, no stop fires
+      // and the round falls back to the bounded page walk.
+      const identity = webProfileId(profile.url)
+      if (cursor.lastSeenProfileId && identity === cursor.lastSeenProfileId) {
+        reachedKnown = true
+        run.reachedCursor = true
+        break
+      }
+
       const previous = byUrl.get(profile.url)
+      if (previous) run.duplicate += 1
       byUrl.set(profile.url, previous ? mergeSameCandidate(previous, profile) : profile)
     }
+
     // Listings are sorted newest-first. Once a page has candidate links but no
     // profiles inside the three-month activity window, deeper pages are older.
     if (!recentOnPage) break
   }
-  return { profiles: [...byUrl.values()], fetched }
+
+  if (newestSeen) {
+    run.cursor = {
+      sourceKey: source.key,
+      lastSeenProfileId: webProfileId(newestSeen.url),
+      lastSeenUrl: newestSeen.url,
+      lastSeenUpdatedAt: newestSeen.activityAt || newestSeen.updatedAt || null,
+      lastSuccessAt: new Date().toISOString(),
+    }
+  }
+
+  run.profiles = [...byUrl.values()]
+  return run
 }
 
 /**
@@ -700,7 +804,20 @@ function storeKey(profile: CvProfile): string {
   return profile.url || profile.id
 }
 
-async function persistWebProfiles(profiles: CvProfile[], diagnostic: HiringSourceDiagnostic): Promise<number> {
+interface PersistResult {
+  /** Everything in the store after the write, all sources included. */
+  stored: number
+  /** Profiles from this source still inside the retention window. */
+  shown: number
+  /** Profiles from this source the retention window dropped. */
+  expired: number
+}
+
+async function persistWebProfiles(
+  profiles: CvProfile[],
+  diagnostic: SourceRun,
+  sourceKey: string,
+): Promise<PersistResult> {
   const now = new Date().toISOString()
   let existing: StoredProfile[] = []
   try {
@@ -718,6 +835,8 @@ async function persistWebProfiles(profiles: CvProfile[], diagnostic: HiringSourc
   for (const profile of profiles) byKey.set(storeKey(profile), { ...profile, lastSeen: now })
 
   const cutoff = cutoffDate().getTime()
+  const fromSource = (profile: StoredProfile) => profile.sourceKey === sourceKey
+  const beforeRetention = [...byKey.values()].filter(fromSource).length
   const kept = [...byKey.values()].filter((profile) => {
     // Web boards have already passed source-specific candidate parsing. Do not
     // run Telegram vacancy heuristics over them here.
@@ -727,7 +846,8 @@ async function persistWebProfiles(profiles: CvProfile[], diagnostic: HiringSourc
 
   await useRedis().set(STORE_KEY, JSON.stringify(kept), 'EX', STORE_TTL_SECONDS)
   if (hiringDbEnabled()) await saveDbCandidates(profiles, diagnostic)
-  return kept.length
+  const shown = kept.filter(fromSource).length
+  return { stored: kept.length, shown, expired: Math.max(0, beforeRetention - shown) }
 }
 
 export async function refreshHiringWebSource(handle: string): Promise<{ fetched: number; stored: number; candidates: number } | null> {
@@ -736,30 +856,77 @@ export async function refreshHiringWebSource(handle: string): Promise<{ fetched:
   const source = configuredSources().find((item) => item.key === key)
   if (!source) return null
   const checkedAt = new Date().toISOString()
+  const startedAt = Date.now()
+  const cursor = (await loadWebCursors()).get(source.key) || emptyWebCursor(source.key)
 
   try {
-    const result = await fetchSource(source)
-    const diagnostic: HiringSourceDiagnostic = {
+    const run = await fetchSource(source, cursor)
+    const diagnostic: WebSourceDiagnostic = {
       handle: `web:${source.key}`,
+      key: source.key,
+      label: source.label,
       country: source.country,
-      status: result.profiles.length ? 'ok' : 'empty',
-      fetched: result.fetched,
-      candidates: result.profiles.length,
+      status: run.profiles.length ? 'ok' : 'empty',
+      fetched: run.fetched,
+      candidates: run.profiles.length,
+      pages: run.pages,
+      blocks: run.fetched,
+      parsed: run.parsed,
+      rejected: run.rejected,
+      duplicate: run.duplicate,
+      expired: 0,
+      shown: 0,
+      fetchDurationMs: Date.now() - startedAt,
+      newestActivityAt: run.newestActivityAt,
+      oldestActivityAt: run.oldestActivityAt,
+      lastSeenProfileId: run.cursor.lastSeenProfileId,
+      lastSuccessAt: run.cursor.lastSuccessAt,
+      reachedCursor: run.reachedCursor,
       checkedAt,
     }
-    const stored = await persistWebProfiles(result.profiles, diagnostic)
-    console.log(`[hiring:web] ${source.key} fetched=${result.fetched} candidates=${result.profiles.length} store=${stored}`)
-    return { fetched: result.fetched, candidates: result.profiles.length, stored }
+
+    const persisted = await persistWebProfiles(run.profiles, diagnostic, source.key)
+    diagnostic.shown = persisted.shown
+    diagnostic.expired = persisted.expired
+    recordWebDiagnostic(diagnostic)
+    // Only after a successful write: a cursor advanced past profiles that were
+    // never stored would skip them on every later run.
+    await saveWebCursor(run.cursor)
+
+    console.log(
+      `[hiring:web] ${source.key} pages=${run.pages} blocks=${run.fetched} parsed=${run.parsed}`
+      + ` rejected=${run.rejected} dup=${run.duplicate} shown=${persisted.shown} expired=${persisted.expired}`
+      + ` cursor=${run.cursor.lastSeenProfileId || '-'}${run.reachedCursor ? ' (stopped at cursor)' : ''}`
+      + ` store=${persisted.stored} in ${diagnostic.fetchDurationMs}ms`,
+    )
+    return { fetched: run.fetched, candidates: run.profiles.length, stored: persisted.stored }
   } catch (error) {
-    const diagnostic: HiringSourceDiagnostic = {
+    const diagnostic: WebSourceDiagnostic = {
       handle: `web:${source.key}`,
+      key: source.key,
+      label: source.label,
       country: source.country,
       status: 'error',
       fetched: 0,
       candidates: 0,
+      pages: 0,
+      blocks: 0,
+      parsed: 0,
+      rejected: 0,
+      duplicate: 0,
+      expired: 0,
+      shown: 0,
+      fetchDurationMs: Date.now() - startedAt,
+      newestActivityAt: null,
+      oldestActivityAt: null,
+      // The cursor is untouched on failure, so the next run retries from here.
+      lastSeenProfileId: cursor.lastSeenProfileId,
+      lastSuccessAt: cursor.lastSuccessAt,
+      reachedCursor: false,
       checkedAt,
       error: (error as Error).message,
     }
+    recordWebDiagnostic(diagnostic)
     if (hiringDbEnabled()) await saveDbCandidates([], diagnostic)
     throw error
   }

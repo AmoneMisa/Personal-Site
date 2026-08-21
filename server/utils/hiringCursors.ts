@@ -42,9 +42,30 @@ export function emptyCursor(handle: string): ChannelCursor {
   }
 }
 
+/**
+ * Where a web CV crawl left off. Listings are ordered newest-first, so the
+ * newest profile of the previous run is the natural stopping point: reaching
+ * it again, unchanged, means everything below has already been seen.
+ *
+ * Identity is the source's own profile id when its URLs carry one, and the
+ * canonical URL otherwise.
+ */
+export interface WebCursor {
+  sourceKey: string
+  lastSeenProfileId: string
+  lastSeenUrl: string
+  lastSeenUpdatedAt: string | null
+  lastSuccessAt: string | null
+}
+
+export function emptyWebCursor(sourceKey: string): WebCursor {
+  return { sourceKey, lastSeenProfileId: '', lastSeenUrl: '', lastSeenUpdatedAt: null, lastSuccessAt: null }
+}
+
 // Local development runs without a database; cursors then live for the process
 // only, which is enough to exercise the crawl logic.
 const memory = new Map<string, ChannelCursor>()
+const webMemory = new Map<string, WebCursor>()
 
 let pool: Pool | undefined
 let ready: Promise<void> | undefined
@@ -83,6 +104,16 @@ function ensureSchema(): Promise<void> {
         oldest_message_id BIGINT NOT NULL DEFAULT 0,
         bootstrap_complete BOOLEAN NOT NULL DEFAULT FALSE,
         last_message_date TIMESTAMPTZ,
+        last_success_at TIMESTAMPTZ,
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      );
+    `)
+    await db().query(`
+      CREATE TABLE IF NOT EXISTS ${name}.web_cursors (
+        source_key TEXT PRIMARY KEY,
+        last_seen_profile_id TEXT NOT NULL DEFAULT '',
+        last_seen_url TEXT NOT NULL DEFAULT '',
+        last_seen_updated_at TIMESTAMPTZ,
         last_success_at TIMESTAMPTZ,
         updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
       );
@@ -169,5 +200,56 @@ export async function saveCursor(next: ChannelCursor): Promise<void> {
     )
   } catch (error) {
     console.warn(`[hiring:cursors] save @${next.handle} failed:`, (error as Error).message)
+  }
+}
+
+/** Where each web source left off, keyed by source key. */
+export async function loadWebCursors(): Promise<Map<string, WebCursor>> {
+  if (!enabled()) return new Map(webMemory)
+  try {
+    await ensureSchema()
+    const result = await db().query(`SELECT * FROM ${schema()}.web_cursors;`)
+    const cursors = new Map<string, WebCursor>()
+    for (const row of result.rows) {
+      cursors.set(String(row.source_key), {
+        sourceKey: String(row.source_key),
+        lastSeenProfileId: String(row.last_seen_profile_id || ''),
+        lastSeenUrl: String(row.last_seen_url || ''),
+        lastSeenUpdatedAt: row.last_seen_updated_at ? new Date(row.last_seen_updated_at).toISOString() : null,
+        lastSuccessAt: row.last_success_at ? new Date(row.last_success_at).toISOString() : null,
+      })
+    }
+    return cursors
+  } catch (error) {
+    console.warn('[hiring:cursors] web load failed:', (error as Error).message)
+    return new Map(webMemory)
+  }
+}
+
+export async function saveWebCursor(next: WebCursor): Promise<void> {
+  webMemory.set(next.sourceKey, { ...next, lastSuccessAt: next.lastSuccessAt || new Date().toISOString() })
+  if (!enabled()) return
+  try {
+    await ensureSchema()
+    await db().query(
+      `INSERT INTO ${schema()}.web_cursors (
+         source_key, last_seen_profile_id, last_seen_url, last_seen_updated_at, last_success_at, updated_at
+       ) VALUES ($1, $2, $3, $4::timestamptz, $5::timestamptz, NOW())
+       ON CONFLICT (source_key) DO UPDATE SET
+         last_seen_profile_id = EXCLUDED.last_seen_profile_id,
+         last_seen_url = EXCLUDED.last_seen_url,
+         last_seen_updated_at = EXCLUDED.last_seen_updated_at,
+         last_success_at = COALESCE(EXCLUDED.last_success_at, ${schema()}.web_cursors.last_success_at),
+         updated_at = NOW();`,
+      [
+        next.sourceKey,
+        next.lastSeenProfileId,
+        next.lastSeenUrl,
+        next.lastSeenUpdatedAt,
+        next.lastSuccessAt || new Date().toISOString(),
+      ],
+    )
+  } catch (error) {
+    console.warn(`[hiring:cursors] web save ${next.sourceKey} failed:`, (error as Error).message)
   }
 }

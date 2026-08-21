@@ -1,7 +1,7 @@
 import { useRedis } from '~~/server/utils/redis'
 import { hiringDbEnabled, loadDbCandidates, saveDbCandidates } from './hiringDb'
 import { normalizeCandidate } from './hiringNormalize'
-import type { HiringSourceDiagnostic } from './hiringSources'
+import type { SourceRun } from './hiringDiagnostics'
 import type { CvProfile } from './hiringTypes'
 
 const UA =
@@ -311,7 +311,7 @@ async function fetchProfiles(): Promise<{ profiles: CvProfile[]; fetched: number
   return { profiles, fetched: summaries.length }
 }
 
-async function persist(profiles: CvProfile[], diagnostic: HiringSourceDiagnostic): Promise<number> {
+async function persist(profiles: CvProfile[], diagnostic: SourceRun): Promise<number> {
   const now = new Date().toISOString()
   let existing: StoredProfile[] = []
   try {
@@ -350,7 +350,7 @@ export async function refreshHiringIshBorSource(
   const checkedAt = new Date().toISOString()
   try {
     const result = await fetchProfiles()
-    const diagnostic: HiringSourceDiagnostic = {
+    const diagnostic: SourceRun = {
       handle: 'web:ishbor-uz',
       country: 'UZ',
       status: result.profiles.length ? 'ok' : 'empty',
@@ -362,7 +362,7 @@ export async function refreshHiringIshBorSource(
     console.log(`[hiring:web] ishbor-uz fetched=${result.fetched} candidates=${result.profiles.length} store=${stored}`)
     return { fetched: result.fetched, candidates: result.profiles.length, stored }
   } catch (error) {
-    const diagnostic: HiringSourceDiagnostic = {
+    const diagnostic: SourceRun = {
       handle: 'web:ishbor-uz',
       country: 'UZ',
       status: 'error',

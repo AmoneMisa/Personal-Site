@@ -1,7 +1,7 @@
 import { useRedis } from '~~/server/utils/redis'
 import { hiringDbEnabled, loadDbCandidates, saveDbCandidates } from './hiringDb'
 import { normalizeCandidate } from './hiringNormalize'
-import type { HiringSourceDiagnostic } from './hiringSources'
+import type { SourceRun } from './hiringDiagnostics'
 import type { CvProfile } from './hiringTypes'
 
 const UA =
@@ -397,7 +397,7 @@ export function hiringSecondaryWebSourceHandles(): string[] {
   return enabledKeys().map((key) => `web:${key}`)
 }
 
-async function persist(profiles: CvProfile[], diagnostic: HiringSourceDiagnostic): Promise<number> {
+async function persist(profiles: CvProfile[], diagnostic: SourceRun): Promise<number> {
   const now = new Date().toISOString()
   let existing: StoredProfile[] = []
   try {
@@ -434,7 +434,7 @@ export async function refreshHiringSecondaryWebSource(
 
   try {
     const result = await entry.load()
-    const diagnostic: HiringSourceDiagnostic = {
+    const diagnostic: SourceRun = {
       handle: `web:${key}`,
       country: entry.country,
       status: result.profiles.length ? 'ok' : 'empty',
@@ -446,7 +446,7 @@ export async function refreshHiringSecondaryWebSource(
     console.log(`[hiring:web] ${key} fetched=${result.fetched} candidates=${result.profiles.length} store=${stored}`)
     return { fetched: result.fetched, candidates: result.profiles.length, stored }
   } catch (error) {
-    const diagnostic: HiringSourceDiagnostic = {
+    const diagnostic: SourceRun = {
       handle: `web:${key}`,
       country: entry.country,
       status: 'error',

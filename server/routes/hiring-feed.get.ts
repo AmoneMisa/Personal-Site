@@ -8,6 +8,7 @@ import { candidateSearchAvailable, searchCandidates } from '../utils/hiringElast
 import { dedupeCandidates, normalizeCandidate } from '../utils/hiringNormalize'
 import { withProfessionExperience } from '../utils/hiringExperience'
 import { listWebSources } from '../utils/hiringWebSources'
+import { getHiringWebDiagnostics } from '../utils/hiringDiagnostics'
 import type { CvProfile } from '../utils/hiringTypes'
 import {
   hiringProfessionLabel,
@@ -262,9 +263,17 @@ export default defineEventHandler(async (event) => {
   }
 
   const sourceStatuses = getHiringSourceDiagnostics()
-  const sourceErrors = sourceStatuses
-    .filter((item) => item.status === 'error')
-    .map((item) => ({ source: 'telegram', country: item.country, handle: item.handle, error: item.error || 'source failed' }))
+  // Web boards fail differently from channels and carry their own funnel, so
+  // they are reported alongside rather than folded into the channel list.
+  const webSourceStatuses = getHiringWebDiagnostics()
+  const sourceErrors = [
+    ...sourceStatuses
+      .filter((item) => item.status === 'error')
+      .map((item) => ({ source: 'telegram', country: item.country, handle: item.handle, error: item.error || 'source failed' })),
+    ...webSourceStatuses
+      .filter((item) => item.status === 'error')
+      .map((item) => ({ source: item.key, country: item.country, handle: item.handle, error: item.error || 'source failed' })),
+  ]
 
   setResponseHeader(event, 'Cache-Control', 'no-store')
   return {
@@ -272,6 +281,7 @@ export default defineEventHandler(async (event) => {
     profiles: page.map((profile) => publicProfile(profile, locale)),
     sourceCounts: sourceCounts(profiles),
     sourceStatuses,
+    webSourceStatuses,
     sourceErrors,
     funnel: getStoreFunnel(),
     warming,

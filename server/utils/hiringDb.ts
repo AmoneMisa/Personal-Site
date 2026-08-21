@@ -12,7 +12,7 @@ import { Pool } from 'pg'
 import { normalizeCandidate } from './hiringNormalize'
 import { withProfessionExperience } from './hiringExperience'
 import type { CvProfile } from './hiringTypes'
-import type { HiringSourceDiagnostic } from './hiringSources'
+import { runOrigin, type SourceRun } from './hiringDiagnostics'
 
 const HYDRATE_LIMIT = 5_000
 const UPSERT_BATCH = 500
@@ -192,7 +192,7 @@ export async function loadDbCandidates(): Promise<CvProfile[]> {
  */
 export async function saveDbCandidates(
   profiles: CvProfile[],
-  diagnostic: HiringSourceDiagnostic,
+  diagnostic: SourceRun,
 ): Promise<number> {
   if (!hiringDbEnabled()) return 0
   try {
@@ -218,7 +218,7 @@ export async function saveDbCandidates(
 }
 
 /** Per-channel run history, including the last time each one actually worked. */
-export async function recordDbSourceRun(diagnostic: HiringSourceDiagnostic): Promise<void> {
+export async function recordDbSourceRun(diagnostic: SourceRun): Promise<void> {
   if (!hiringDbEnabled()) return
   try {
     await ensureSchema()
@@ -241,7 +241,7 @@ export async function recordDbSourceRun(diagnostic: HiringSourceDiagnostic): Pro
          END,
          updated_at = NOW();`,
       [
-        'telegram',
+        runOrigin(diagnostic.handle),
         diagnostic.handle.replace(/^@/, ''),
         (diagnostic.country || '').toUpperCase(),
         ['ok', 'empty', 'error'].includes(diagnostic.status) ? diagnostic.status : 'error',
@@ -258,7 +258,7 @@ export async function recordDbSourceRun(diagnostic: HiringSourceDiagnostic): Pro
 
 /** What each channel last did, for diagnostics that outlive a restart. */
 export async function loadDbSourceRuns(): Promise<
-  Array<HiringSourceDiagnostic & { lastSuccessAt?: string | null }>
+  Array<SourceRun & { lastSuccessAt?: string | null }>
 > {
   if (!hiringDbEnabled()) return []
   try {
