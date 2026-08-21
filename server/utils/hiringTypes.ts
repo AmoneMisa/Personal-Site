@@ -28,6 +28,12 @@ export interface CvProfile {
   sourceKey?: string
   /** Human provider name for display: "Telegram", "Careerist UZ", "Flagma RO". */
   sourceLabel?: string
+  /**
+   * Set when the store has already run this profile through normalization,
+   * repair and profession experience. Readers use it to skip work that would
+   * otherwise be repeated on every request. See DERIVED_VERSION.
+   */
+  derived?: string
   /** Where the candidate is, when known. Empty when the post does not say. */
   country: string
   /** The channel country this profile came from — never a claim about the candidate. */

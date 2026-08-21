@@ -16,6 +16,7 @@ import {
   saveDbCandidates,
 } from './hiringDb'
 import { dedupeCandidates, normalizeCandidate } from './hiringNormalize'
+import { withProfessionExperience } from './hiringExperience'
 import { isCharityAppeal, isRecruitingOpportunity, repairCandidateProfile } from './hiringQuality'
 import { HIRING_SOURCES, type CandidateEmploymentType, type CvProfile, type HiringSource } from './hiringTypes'
 import {
@@ -77,7 +78,20 @@ type StoredAi = {
   updatedAt: string
 }
 
-type StoredProfile = CvProfile & { lastSeen: string; ai?: StoredAi }
+type StoredProfile = CvProfile & {
+  lastSeen: string
+  ai?: StoredAi
+  /**
+   * Marks a profile whose expensive derivations are already done and stored:
+   * normalization, repair, profession experience, and the visibility verdict.
+   * Reading such a profile costs nothing. Bump the version to force every
+   * stored row through the current parsers again.
+   */
+  derived?: string
+  visible?: boolean
+}
+
+export const DERIVED_VERSION = 'd1'
 
 let memoryStore: StoredProfile[] = []
 let memoryValidUntil = 0
@@ -179,8 +193,12 @@ let publicCacheSource: StoredProfile[] | null = null
 function publicProfiles(list: StoredProfile[]): CvProfile[] {
   if (publicCacheSource === list) return publicCache
   publicCache = list
-    .filter(isVisible)
-    .map(({ lastSeen: _lastSeen, ai: _ai, ...profile }) => repaired(profile))
+    // Rows written before this version, and rows written by the web adapters
+    // straight into the shared snapshot, are derived on the spot; the next
+    // store write stamps them.
+    .map(derive)
+    .filter((profile) => profile.visible !== false)
+    .map(({ lastSeen: _lastSeen, ai: _ai, visible: _visible, ...profile }) => profile)
   publicCacheSource = list
   return publicCache
 }
@@ -279,7 +297,26 @@ function mergeCandidateAi(profile: CvProfile, data: CandidateAiData): CvProfile 
   return repaired(merged)
 }
 
-async function persistStore(list: StoredProfile[]) {
+/**
+ * Normalizing and repairing one real CV costs single-digit milliseconds, and
+ * the board serves a few hundred of them uncached — several seconds per
+ * request, repeated for every request, for a result that only changes when a
+ * crawl does. The work now happens once, here, on the way into the store.
+ */
+function derive(profile: StoredProfile): StoredProfile {
+  if (profile.derived === DERIVED_VERSION) return profile
+  const full = withProfessionExperience(repaired(profile)) as StoredProfile
+  return {
+    ...full,
+    lastSeen: profile.lastSeen,
+    ai: profile.ai,
+    derived: DERIVED_VERSION,
+    visible: isVisible(profile),
+  }
+}
+
+async function persistStore(input: StoredProfile[]) {
+  const list = input.map(derive)
   memoryStore = list
   memoryValidUntil = Date.now() + MEMORY_TTL_MS
   try {

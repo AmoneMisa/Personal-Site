@@ -2,7 +2,7 @@
 // Search runs through Elasticsearch when available and falls back to memory.
 
 import { getHiringSourceDiagnostics, HIRING_COUNTRIES } from '../utils/hiringSources'
-import { getStoreFunnel, getStoredCvProfiles, isHiringStoreCold, refreshHiringStore } from '../utils/hiringStore'
+import { DERIVED_VERSION, getStoreFunnel, getStoredCvProfiles, isHiringStoreCold, refreshHiringStore } from '../utils/hiringStore'
 import { getStoredWebCvProfiles } from '../utils/hiringWebStore'
 import { candidateSearchAvailable, searchCandidates } from '../utils/hiringElastic'
 import { dedupeCandidates, detectMentionedProfessions, normalizeCandidate } from '../utils/hiringNormalize'
@@ -224,7 +224,12 @@ function snapshotSignature(stored: CvProfile[]): string {
 function normalizedSnapshot(stored: CvProfile[]): CvProfile[] {
   const key = snapshotSignature(stored)
   if (key === snapshotKey && Date.now() - snapshotAt < SNAPSHOT_TTL_MS) return snapshotCache
-  snapshotCache = dedupeCandidates(stored.map((profile) => withProfessionExperience(normalizeCandidate(profile))))
+  // Profiles the store has already derived are used as they are; only rows
+  // written by another adapter, or from before the current parser version,
+  // pay for normalization here.
+  snapshotCache = dedupeCandidates(stored.map((profile) => (
+    profile.derived === DERIVED_VERSION ? profile : withProfessionExperience(normalizeCandidate(profile))
+  )))
   snapshotKey = key
   snapshotAt = Date.now()
   return snapshotCache
