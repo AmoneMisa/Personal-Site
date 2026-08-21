@@ -33,3 +33,16 @@ test('employer posts stay out of the candidate feed', () => {
   ]
   for (const post of posts) assert.equal(isLikelyCvPost(post), false, post)
 })
+
+import { extractProfessionExperience } from '../server/utils/hiringExperience.ts'
+
+test('a duration in months is not read as that many years', () => {
+  // "Опыт работы: 2 мес, Administrator" was being published as two years.
+  const months = extractProfessionExperience('Опыт работы: 2 мес, Администратор, Language Centre')
+  assert.ok(months.length, 'expected the administrator mention to be found')
+  assert.ok(months[0].years < 1, `expected under a year, got ${months[0].years}`)
+
+  const years = extractProfessionExperience('Опыт работы: 5 лет, Офис менеджер, Colgate')
+  assert.ok(years.length)
+  assert.equal(years[0].years, 5)
+})

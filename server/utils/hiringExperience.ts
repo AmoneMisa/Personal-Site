@@ -25,6 +25,26 @@ function experienceMentions(text: string): ExperienceMention[] {
       continue
     }
 
+    // "Опыт работы: 2 мес" — the unit below is optional, so without this a
+    // duration in months was read as that many years, and a two-month stint
+    // was published as two years of experience.
+    const months = segment.match(
+      /(?:опыт(?:\s+работы)?|досвід(?:\s+роботи)?|experience|staj|tajriba(?:m)?)[^\n.!?]{0,100}?(\d{1,2})\s*(?:мес(?:яц\p{L}*)?\.?|міс(?:яц\p{L}*)?\.?|months?|mo\b|oy(?:lik)?)/iu,
+    )
+    if (months?.[1]) {
+      const value = Number(months[1])
+      if (Number.isFinite(value) && value > 0 && value < 24) {
+        // As below: the profession usually follows the duration, so the rest
+        // of the line has to travel with it.
+        const from = (months.index || 0) + months[0].length
+        mentions.push({
+          years: Math.round((value / 12) * 10) / 10,
+          context: `${months[0]} ${segment.slice(from, from + 100)}`.trim(),
+        })
+      }
+      continue
+    }
+
     const direct = segment.match(
       /(?:опыт(?:\s+работы)?|досвід(?:\s+роботи)?|experience|staj|tajriba(?:m)?)[^\n.!?]{0,100}?(\d+(?:[.,]\d+)?)\+?\s*(?:лет|год(?:а)?|рок(?:и|ів)?|years?|yil|йил)?/iu,
     )
