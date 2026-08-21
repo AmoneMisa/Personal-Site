@@ -25,11 +25,11 @@ const SPECIAL_PROFESSIONS: Array<{ name: string; re: RegExp }> = [
   },
   {
     name: 'Network Administrator',
-    re: /\b(?:network\s+administrator|network\s+admin)\b|\b(?:tarmoq|тармоқ)\b[^\n,;]{0,40}\b(?:administrator|admin(?:strator)?i?|администратор)\b/iu,
+    re: /\b(?:network\s+administrator|network\s+admin)\b|\b(?:tarmoq|тармоқ)\b[^\n]{0,70}\b(?:administrator|admin(?:strator)?i?|администратор)\b/iu,
   },
   {
     name: 'System Administrator',
-    re: /\b(?:system\s+administrator|system\s+admin|sysadmin)\b|\b(?:tizim|тизим)\b[^\n,;]{0,40}\b(?:administrator|admin(?:strator)?i?|администратор)\b|системн(?:ый|ий)\s+администратор/iu,
+    re: /\b(?:system\s+administrator|system\s+admin|sysadmin)\b|\b(?:tizim|тизим)\b[^\n]{0,50}\b(?:administrator|admin(?:strator)?i?|администратор)\b|системн(?:ый|ий)\s+администратор/iu,
   },
   {
     name: 'Cybersecurity Specialist',
@@ -120,7 +120,7 @@ function cityFromLocation(value: string | null, country: { code: string; name: s
 }
 
 function explicitRemote(text: string): boolean | null {
-  if (/\b(?:onsite|on-site|office\s+only|офис(?:\s+онли)?|тільки\s+офіс|только\s+офис|без\s+удал[её]нк|не\s+рассматрива\p{L}*\s+удал[её]н|ofisda)\b/iu.test(text)) return false
+  if (/\b(?:onsite|on-site|office\s+only|тільки\s+офіс|только\s+офис|без\s+удал[её]нк|не\s+рассматрива\p{L}*\s+удал[её]н|ofisda\s+ish)\b/iu.test(text)) return false
   if (/\b(?:remote|remotely|удал[её]н(?:но|ка|ный|ная)?|віддален(?:о|а|ий)?|дистанц(?:ионно|ійно)|masofaviy|онлайн\s+работ|online\s+work)\b/iu.test(text)) return true
   return null
 }
