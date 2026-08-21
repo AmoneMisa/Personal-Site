@@ -3,7 +3,8 @@
 // Source adapters intentionally stay conservative. This layer fixes structured
 // facts that can be proven from the original CV text, including legacy records
 // already persisted before a parser rule was added. It never guesses gender,
-// remote status, location, or a profession from a person's name.
+// remote status, location, or a profession from a person's name. Semantic AI
+// enrichment remains authoritative for ambiguous free-form text.
 
 import type { CvProfile } from './hiringTypes'
 
@@ -14,7 +15,21 @@ const GENERIC_PROFESSIONS = new Set([
   'Specialist',
 ])
 
+const STATUS_ONLY_RE = /^(?:talaba|student|студент(?:ка)?|студент(?:ка)?ка|o(?:'|’)quvchi|учащ(?:ийся|аяся))$/iu
+
 const SPECIAL_PROFESSIONS: Array<{ name: string; re: RegExp }> = [
+  {
+    name: 'Sales Manager',
+    re: /(?:sotuv|savdo)\s+(?:menejer|menejr|menedjer|manager)|\bsales\s+manager\b|менеджер\s+(?:по\s+)?продаж|менеджер\s+з\s+продаж/iu,
+  },
+  {
+    name: 'Backend Developer',
+    re: /\bbackend\s+(?:developer|engineer)\b|\bback[- ]?end\s+(?:developer|engineer)\b|backend\s+dasturchi|серверн(?:ый|ий)\s+разработчик/iu,
+  },
+  {
+    name: 'Frontend Developer',
+    re: /\bfrontend\s+(?:developer|engineer)\b|\bfront[- ]?end\s+(?:developer|engineer)\b|frontend\s+dasturchi/iu,
+  },
   {
     name: 'AI / ML Engineer',
     re: /\b(?:ai|artificial\s+intelligence|machine\s+learning|ml)\s*(?:\/\s*(?:ai|ml))?\s*(?:engineer|developer)\b|\b(?:engineer|developer)\s+(?:ai|ml|machine\s+learning)\b/iu,
@@ -68,14 +83,28 @@ function unique(values: string[]): string[] {
   return [...new Set(values.map((value) => value.trim()).filter(Boolean))]
 }
 
+function intentLines(text: string): string {
+  return text
+    .split('\n')
+    .map((line) => line.trim())
+    .filter((line) => /(?:maqsad|мақсад|goal|цель|мета|ish\s+topish|ищу\s+работ|шукаю\s+робот|looking\s+for\s+(?:a\s+)?job)/iu.test(line))
+    .slice(0, 4)
+    .join('\n')
+}
+
 function candidateTargetContext(profile: CvProfile, text: string): string {
-  const roleField = field(
+  const roleFieldRaw = field(
     text,
-    "желаемая (?:работа|должность)|бажана (?:робота|посада)|target role|desired (?:role|position)|position|role|должность|посада|lavozim|kasb|qidirayotgan kasb|so(?:'|’)ralgan ish turi|texnologiya|technology",
+    "желаемая (?:работа|должность)|бажана (?:робота|посада)|target role|desired (?:role|position)|position|role|должность|посада|lavozim|kasbi|kasb|qidirayotgan kasb|so(?:'|’)ralgan ish turi",
   )
-  const technology = field(text, "texnologiya|technology|технология|технології")
-  const headline = text.split('\n').map((line) => line.trim()).filter(Boolean).slice(0, 6).join('\n')
-  return [profile.role || '', ...(profile.professions || []), roleField || '', technology || '', headline].join('\n')
+  const roleField = roleFieldRaw && !STATUS_ONLY_RE.test(cleanToken(roleFieldRaw)) ? roleFieldRaw : ''
+  const goal = field(text, 'maqsad|мақсад|goal|цель|мета') || ''
+  const headline = text.split('\n').map((line) => line.trim()).filter(Boolean).slice(0, 4).join('\n')
+
+  // Technology/stack is deliberately NOT part of target context. JavaScript or
+  // PostgreSQL are skills, not desired professions. A profession must come from
+  // an explicit role/goal/headline or from AI semantic extraction.
+  return [profile.role || '', ...(profile.professions || []), roleField, goal, intentLines(text), headline].join('\n')
 }
 
 function repairProfessions(profile: CvProfile, text: string): string[] {
@@ -86,7 +115,7 @@ function repairProfessions(profile: CvProfile, text: string): string[] {
 
   return unique([
     ...specific,
-    ...current.filter((profession) => !GENERIC_PROFESSIONS.has(profession) && !/^Engineer$/iu.test(profession)),
+    ...current.filter((profession) => !GENERIC_PROFESSIONS.has(profession) && !STATUS_ONLY_RE.test(cleanToken(profession)) && !/^Engineer$/iu.test(profession)),
   ])
 }
 
@@ -149,7 +178,11 @@ function uzSalary(text: string): Pick<CvProfile, 'salaryMin' | 'salaryMax' | 'cu
   if (/\b(?:mln|million)\b/iu.test(raw)) value *= 1_000_000
   else if (/\b(?:ming|thousand)\b/iu.test(raw)) value *= 1_000
   const currency = /(?:\$|usd|dollar)/iu.test(raw) ? 'USD' : 'UZS'
-  return { salaryMin: Math.round(value), salaryMax: Math.round(value), currency }
+  return {
+    salaryMin: Math.round(value),
+    salaryMax: /\+/.test(raw) ? null : Math.round(value),
+    currency,
+  }
 }
 
 /**
