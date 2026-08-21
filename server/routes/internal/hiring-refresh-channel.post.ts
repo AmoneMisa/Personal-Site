@@ -6,6 +6,7 @@ import { createError, getHeader, readBody } from 'h3'
 import { hiringChannelHandles } from '~~/server/utils/hiringSources'
 import { refreshHiringChannel } from '~~/server/utils/hiringStore'
 import { hiringWebSourceHandles, refreshHiringWebSource } from '~~/server/utils/hiringWebSources'
+import { hiringExtraWebSourceHandles, refreshHiringExtraWebSource } from '~~/server/utils/hiringExtraWebSources'
 
 export default defineEventHandler(async (event) => {
   const expected = String(process.env.QUEUE_INTERNAL_KEY || '')
@@ -20,21 +21,22 @@ export default defineEventHandler(async (event) => {
 
   const body = await readBody<{ handle?: string }>(event)
   const handle = String(body?.handle || '').replace(/^@/, '')
-  const telegramHandles = hiringChannelHandles()
-  const webHandles = hiringWebSourceHandles()
-  const knownTelegram = telegramHandles.some((item) => item.toLowerCase() === handle.toLowerCase())
-  const knownWeb = webHandles.some((item) => item.toLowerCase() === handle.toLowerCase())
+  const knownTelegram = hiringChannelHandles().some((item) => item.toLowerCase() === handle.toLowerCase())
+  const knownWeb = hiringWebSourceHandles().some((item) => item.toLowerCase() === handle.toLowerCase())
+  const knownExtraWeb = hiringExtraWebSourceHandles().some((item) => item.toLowerCase() === handle.toLowerCase())
 
-  if (!handle || (!knownTelegram && !knownWeb)) {
+  if (!handle || (!knownTelegram && !knownWeb && !knownExtraWeb)) {
     throw createError({ statusCode: 400, statusMessage: `Unknown hiring source: ${handle || '<empty>'}` })
   }
 
-  const result = knownWeb
-    ? await refreshHiringWebSource(handle)
-    : await refreshHiringChannel(handle)
+  const result = knownExtraWeb
+    ? await refreshHiringExtraWebSource(handle)
+    : knownWeb
+      ? await refreshHiringWebSource(handle)
+      : await refreshHiringChannel(handle)
 
   if (!result) {
-    throw createError({ statusCode: 503, statusMessage: knownWeb ? 'Web CV source is disabled' : 'Telegram source is disabled' })
+    throw createError({ statusCode: 503, statusMessage: knownTelegram ? 'Telegram source is disabled' : 'Web CV source is disabled' })
   }
 
   return { ok: true, handle, ...result }
