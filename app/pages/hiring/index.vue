@@ -433,8 +433,10 @@ async function load(append = false, background = false) {
   }
   if (error || !data || data.error) {
     if (!background) {
-      failed.value = true;
-      if (!append) { profiles.value = []; total.value = 0; }
+      // A failed request is usually a redeploy restarting the server. Throwing
+      // away the board for it turns a blip into an empty page; keep what is on
+      // screen and only admit failure when there is nothing to keep.
+      failed.value = !profiles.value.length;
       sourceErrors.value = [];
     }
   } else {
@@ -649,7 +651,9 @@ const denseGrid = computed(() => {
     if (salaryLabel(profile)) filled += 1;
     if (specLine(profile)) filled += 1;
     if (cardBadges(profile).length >= 3) filled += 1;
-    return filled >= 3;
+    // All four, not most of them: a card without a salary line already leaves
+    // a third of its height empty at three columns.
+    return filled === 4;
   }).length;
   return rich / cards.length < 0.5;
 });
