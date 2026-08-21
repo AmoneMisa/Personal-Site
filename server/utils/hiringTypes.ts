@@ -3,15 +3,21 @@
 
 import type { Seniority } from './jobTypes'
 
-export type HiringSource = 'telegram' | 'web'
+// `source` stays backwards-compatible with the existing hiring pipeline. Public
+// web boards are distinguished by `origin` + `sourceKey` so the current store,
+// search index and source filters do not need a flag-day migration.
+export type HiringSource = 'telegram'
+export type CandidateOrigin = 'telegram' | 'web'
 export type CandidateEmploymentType = 'full_time' | 'part_time'
 export type CandidateContactType = 'direct' | 'platform'
 
-export const HIRING_SOURCES: HiringSource[] = ['telegram', 'web']
+export const HIRING_SOURCES: HiringSource[] = ['telegram']
 
 export interface CvProfile {
   id: string
   source: HiringSource
+  /** Actual origin of the profile; defaults to telegram for legacy records. */
+  origin?: CandidateOrigin
   /** Stable source adapter key, e.g. flagma-uz or rabotakz. */
   sourceKey?: string
   country: string
