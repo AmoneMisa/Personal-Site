@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { safeFetch } from "~/utils/safeFetch";
-import { locationLabel, type LocationKind } from "~/utils/locationLabels";
+import { metroLabelWithAlias, locationLabel, type LocationKind } from "~/utils/locationLabels";
 import FlatMap from "~/components/flats/FlatMap.client.vue";
 
 // Flat Finder. Auto-routed at /flat-finder. Reuses the flat-finder backend
@@ -140,6 +140,10 @@ const areaMin = ref<number | undefined>(undefined);
 const areaMax = ref<number | undefined>(undefined);
 const pricePerSqmMin = ref<number | undefined>(undefined);
 const pricePerSqmMax = ref<number | undefined>(undefined);
+// Walking distance, in metres, from the coordinate-derived places data.
+const metroMaxM = ref<number | undefined>(undefined);
+const nearbyKind = ref("");
+const nearbyMaxM = ref<number | undefined>(undefined);
 const floorMin = ref<number | undefined>(undefined);
 const floorMax = ref<number | undefined>(undefined);
 const totalFloorsMin = ref<number | undefined>(undefined);
@@ -230,6 +234,10 @@ const metroOptions = computed(() => {
 });
 
 const SOURCES = ["olx", "telegram"];
+const NEARBY_KINDS = [
+  "supermarket", "mall", "market", "pharmacy", "clinic",
+  "school", "kindergarten", "park", "transport", "historic", "cinema", "landmark",
+] as const;
 const sourceOptions = computed(() => [{ value: "", label: t("all") }, ...SOURCES.map((s) => ({ value: s, label: s }))]);
 const ANY = "__any__";
 type Item = { label: string; value: string };
@@ -241,6 +249,14 @@ const locName = (v: string | null | undefined, kind: LocationKind = "any") => lo
 const cityItems = computed<Item[]>(() => [{ label: t("cityAny"), value: ANY }, ...cityOptions.value.map((c) => ({ label: locName(c, "city"), value: c }))]);
 const citySel = computed<string>({ get: () => city.value || ANY, set: (v) => (city.value = v === ANY ? "" : v) });
 const districtItems = computed<Item[]>(() => [{ label: t("districtAny"), value: ANY }, ...districtOptions.value.map((d) => ({ label: locName(d, "district"), value: d }))]);
+const nearbyKindItems = computed<Item[]>(() => [
+  { label: t("nearbyKindAny"), value: ANY },
+  ...NEARBY_KINDS.map((kind) => ({ value: kind, label: t(`nearbyKind_${kind}`) })),
+]);
+const nearbyKindSel = computed<string>({
+  get: () => nearbyKind.value || ANY,
+  set: (v) => (nearbyKind.value = v === ANY ? "" : v),
+});
 const metroItems = computed<Item[]>(() => [{ label: t('metroAny'), value: ANY }, ...metroOptions.value.map((m) => ({ label: locName(m, "metro"), value: m }))]);
 const CURRENCY_PRIORITY = ["USD", "EUR", "UZS", "KZT", "UAH", "RON", "GBP", "KGS", "TJS", "TMT", "PLN"];
 const currencyItems = computed<Item[]>(() => {
@@ -348,6 +364,9 @@ function currentFilterQuery(): Record<string, string> {
   if (areaMax.value != null) q.areaMax = String(areaMax.value);
   if (pricePerSqmMin.value != null) q.pricePerSqmMin = String(pricePerSqmMin.value);
   if (pricePerSqmMax.value != null) q.pricePerSqmMax = String(pricePerSqmMax.value);
+  if (metroMaxM.value != null) q.metroMaxM = String(metroMaxM.value);
+  if (nearbyKind.value) q.nearbyKind = nearbyKind.value;
+  if (nearbyMaxM.value != null) q.nearbyMaxM = String(nearbyMaxM.value);
   if (floorMin.value != null) q.floorMin = String(floorMin.value);
   if (floorMax.value != null) q.floorMax = String(floorMax.value);
   if (totalFloorsMin.value != null) q.totalFloorsMin = String(totalFloorsMin.value);
@@ -385,6 +404,9 @@ function applyQueryParams(params: Record<string, unknown>) {
   areaMax.value = Number(queryString(params.areaMax)) || undefined;
   pricePerSqmMin.value = Number(queryString(params.pricePerSqmMin)) || undefined;
   pricePerSqmMax.value = Number(queryString(params.pricePerSqmMax)) || undefined;
+  metroMaxM.value = Number(queryString(params.metroMaxM)) || undefined;
+  nearbyKind.value = queryString(params.nearbyKind);
+  nearbyMaxM.value = Number(queryString(params.nearbyMaxM)) || undefined;
   floorMin.value = Number(queryString(params.floorMin)) || undefined;
   floorMax.value = Number(queryString(params.floorMax)) || undefined;
   totalFloorsMin.value = Number(queryString(params.totalFloorsMin)) || undefined;
@@ -467,6 +489,9 @@ async function load(append = false, background = false) {
   if (areaMax.value != null) params.areaMax = String(areaMax.value);
   if (pricePerSqmMin.value != null) params.pricePerSqmMin = String(pricePerSqmMin.value);
   if (pricePerSqmMax.value != null) params.pricePerSqmMax = String(pricePerSqmMax.value);
+  if (metroMaxM.value != null) params.metroMaxM = String(metroMaxM.value);
+  if (nearbyKind.value) params.nearbyKind = nearbyKind.value;
+  if (nearbyMaxM.value != null) params.nearbyMaxM = String(nearbyMaxM.value);
   if (floorMin.value != null) params.floorMin = String(floorMin.value);
   if (floorMax.value != null) params.floorMax = String(floorMax.value);
   if (totalFloorsMin.value != null) params.totalFloorsMin = String(totalFloorsMin.value);
@@ -521,6 +546,7 @@ function resetFilters() {
   petFriendly.value = false; roomOnlyFilter.value = false; childrenRequired.value = false; newBuildingOnly.value = false;
   priceMin.value = undefined; priceMax.value = undefined; displayCurrency.value = "USD";
   roomsMin.value = undefined; roomsMax.value = undefined; bedroomsMin.value = undefined; bedroomsMax.value = undefined; areaMin.value = undefined; areaMax.value = undefined; pricePerSqmMin.value = undefined; pricePerSqmMax.value = undefined;
+  metroMaxM.value = undefined; nearbyKind.value = ""; nearbyMaxM.value = undefined;
   floorMin.value = undefined; floorMax.value = undefined; totalFloorsMin.value = undefined; totalFloorsMax.value = undefined; yearMin.value = undefined; yearMax.value = undefined; maxAgeDays.value = undefined;
   query.value = ""; source.value = ""; drawnArea.value = []; view.value = "active";
   scheduleLoad();
@@ -665,7 +691,7 @@ const specRows = computed<Array<{ label: string; value: string }>>(() => {
   const l = active.value; if (!l) return [];
   return [
     { label: t("specDeal"), value: dealLabel(l.dealType) || t("notSpecified") }, { label: t("specType"), value: ptLabel(l.propertyType) }, { label: t("specListedBy"), value: l.byAgency ? t("agAgency") : t("agOwner") }, { label: t("specSource"), value: sourceLabel(l.source) },
-    { label: t("specRooms"), value: numOr(l.rooms) }, { label: t("specBedrooms"), value: numOr(l.bedrooms) }, { label: t("specBathrooms"), value: numOr(l.bathrooms) }, { label: t("specArea"), value: l.areaSqm != null ? `${l.areaSqm} ${t("sqm")}` : t("notSpecified") }, { label: t("specFloor"), value: floorLabel(l) }, { label: t("specYear"), value: numOr(l.buildingYear) }, { label: t("specNewBuilding"), value: fmtBool(l.newBuilding) }, { label: t("specCondition"), value: conditionLabel(l.condition) }, { label: t("specComplex"), value: strOr(l.residenceComplex) }, { label: t("specCity"), value: strOr(locName(l.city, "city")) }, { label: t("specDistrict"), value: strOr(locName(l.district, "district")) }, { label: t("specKvartal"), value: strOr(l.area || l.kvartal) }, { label: t("specMetro"), value: strOr(locName(l.metro, "metro")) }, { label: t("specAddress"), value: strOr(l.address) },
+    { label: t("specRooms"), value: numOr(l.rooms) }, { label: t("specBedrooms"), value: numOr(l.bedrooms) }, { label: t("specBathrooms"), value: numOr(l.bathrooms) }, { label: t("specArea"), value: l.areaSqm != null ? `${l.areaSqm} ${t("sqm")}` : t("notSpecified") }, { label: t("specFloor"), value: floorLabel(l) }, { label: t("specYear"), value: numOr(l.buildingYear) }, { label: t("specNewBuilding"), value: fmtBool(l.newBuilding) }, { label: t("specCondition"), value: conditionLabel(l.condition) }, { label: t("specComplex"), value: strOr(l.residenceComplex) }, { label: t("specCity"), value: strOr(locName(l.city, "city")) }, { label: t("specDistrict"), value: strOr(locName(l.district, "district")) }, { label: t("specKvartal"), value: strOr(l.area || l.kvartal) }, { label: t("specMetro"), value: strOr(metroLabelWithAlias(l.metro, locale.value)) }, { label: t("specAddress"), value: strOr(l.address) },
     { label: t("specParking"), value: fmtBool(l.parking) }, { label: t("specElevator"), value: fmtBool(l.elevator) }, { label: t("specFurnished"), value: fmtBool(l.furnished) }, { label: t("specBalcony"), value: fmtBool(l.balcony) }, { label: t("specAC"), value: fmtBool(l.airConditioner) }, { label: t("specGas"), value: fmtBool(l.gas) }, { label: t("specHeating"), value: fmtBool(l.heating) }, { label: t("specHotWater"), value: fmtBool(l.hotWater) }, { label: t("specInternet"), value: fmtBool(l.internet) }, { label: t("specPets"), value: fmtBool(l.petsAllowed) }, { label: t("specChildren"), value: fmtBool(l.childrenAllowed) }, { label: t("specSmoking"), value: fmtBool(l.smokingAllowed) }, { label: t("specAudience"), value: audienceLabel(l.audience) }, { label: t("specRoomShare"), value: fmtBool(l.roomOnly) }, { label: t("specNegotiable"), value: fmtBool(l.negotiable) }, { label: t("specDeposit"), value: depositLabel(l) }, { label: t("specCommission"), value: commissionLabel(l) }, { label: t("specCommunal"), value: communalLabel(l) }, { label: t("specUtilAmount"), value: l.utilitiesAmount != null ? `${l.utilitiesAmount.toLocaleString()} ${l.currency}` : t("notSpecified") }, { label: t("specMinLease"), value: strOr(l.minLeaseTerm) }, { label: t("specAvailable"), value: strOr(l.availableFrom) }, { label: t("specShops"), value: listOr(l.nearbyShops) }, { label: t("specNearby"), value: nearbyListOr(l.nearby) }, { label: t("specAmenities"), value: amenitiesListOr(l.amenities) },
   ];
 });
@@ -787,6 +813,9 @@ onBeforeUnmount(() => { modalOpen.value = false; lightboxIndex.value = null; rel
           <div class="filter-group"><h3><u-icon name="i-lucide-map-pin" /> {{ t('groupLocation') }}</h3>
             <div v-if="districtOptions.length" class="flats__field"><u-select-menu :label="t('district')" v-model="districtSel" :items="districtItems" value-key="value" label-key="label" class="flats__select" @update:model-value="scheduleLoad()" /></div>
             <div v-if="metroOptions.length" class="flats__field"><u-select-menu :label="t('metro')" v-model="metroSel" :items="metroItems" value-key="value" label-key="label" class="flats__select" @update:model-value="scheduleLoad()" /></div>
+            <div class="range-field"><span>{{ t('metroWithin') }}</span><u-input v-model.number="metroMaxM" :label="t('metres')" type="number" inputmode="numeric" min="0" step="100" @change="scheduleLoad()" /></div>
+            <div class="flats__field"><u-select-menu :label="t('nearbyKind')" v-model="nearbyKindSel" :items="nearbyKindItems" value-key="value" label-key="label" class="flats__select" @update:model-value="scheduleLoad()" /></div>
+            <div class="range-field"><span>{{ t('nearbyWithin') }}</span><u-input v-model.number="nearbyMaxM" :label="t('metres')" type="number" inputmode="numeric" min="0" step="100" @change="scheduleLoad()" /></div>
           </div>
           <div class="filter-group"><h3><u-icon name="i-lucide-house" /> {{ t('groupApartment') }}</h3>
             <div class="range-field"><span>{{ t('rangeRooms') }}</span><u-input v-model.number="roomsMin" :label="t('rangeFrom')" type="number" min="0" @change="scheduleLoad()" /><span>—</span><u-input v-model.number="roomsMax" :label="t('rangeTo')" type="number" min="0" @change="scheduleLoad()" /></div>
@@ -812,7 +841,7 @@ onBeforeUnmount(() => { modalOpen.value = false; lightboxIndex.value = null; rel
     <p v-else-if="source === 'telegram' && !loading && !listings.length && sourceErrors?.some((item) => item.source === 'telegram')" class="flats__source-warning">{{ t("telegramUnavailable") }}</p>
     <p v-else class="flats__count text-muted">{{ t("found", { n: view === 'active' ? total : displayedListings.length }) }}</p>
 
-    <section v-if="listings.length" class="flats__map-wrap"><flat-map :points="mapPoints" :draw-label="t('drawArea')" :done-label="t('done')" :clear-label="t('clearArea')" :draw-hint="t('drawHint')" @select="openById" @area-change="drawnArea = $event" /></section>
+    <section v-if="listings.length" class="flats__map-wrap"><flat-map :points="mapPoints" :draw-label="t('drawArea')" :done-label="t('done')" :clear-label="t('clearArea')" :draw-hint="t('drawHint')" :expand-label="t('mapExpand')" :collapse-label="t('mapCollapse')" @select="openById" @area-change="drawnArea = $event" /></section>
 
     <div class="flats__grid" :class="{ 'flats__grid_loading': loading }">
       <article v-for="l in displayedListings" :key="`${l.source}:${l.country}:${l.id}`" class="flat-card" :class="{ 'flat-card_favorite': isFavorite(l.id), 'flat-card_hidden': isHidden(l.id) }" @click="openListing(l)">

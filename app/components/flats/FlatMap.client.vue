@@ -7,7 +7,7 @@
 // don't stack into one unreadable blob. Clicking a cluster fans its listings out
 // as small "tablet" cards in a radial menu (Sims-style) instead of hiding them
 // behind each other; clicking a lone point selects it directly.
-import { onBeforeUnmount, onMounted, ref, watch } from "vue";
+import { nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
 
 interface FlatPoint {
   id: string;
@@ -24,6 +24,8 @@ const props = defineProps<{
   doneLabel?: string;
   clearLabel?: string;
   drawHint?: string;
+  expandLabel?: string;
+  collapseLabel?: string;
 }>();
 const emit = defineEmits<{
   (e: "select", id: string): void;
@@ -50,6 +52,26 @@ const drawing = ref(false);
 const area = ref<Array<{ lat: number; lng: number }>>([]);
 const radial = ref<{ x: number; y: number; items: FlatPoint[] } | null>(null);
 let map: any = null;
+const expanded = ref(false);
+
+// Leaflet caches the container size, so a map that grew to fill the screen
+// keeps rendering tiles for the old box until it is told to look again.
+async function setExpanded(value: boolean) {
+  expanded.value = value;
+  if (import.meta.client) document.body.style.overflow = value ? "hidden" : "";
+  await nextTick();
+  // After the CSS transition, not during it — mid-flight sizes make Leaflet
+  // fetch a row of tiles it immediately throws away.
+  setTimeout(() => map?.invalidateSize(), 220);
+}
+
+function toggleExpanded() {
+  void setExpanded(!expanded.value);
+}
+
+function onKeydown(event: KeyboardEvent) {
+  if (event.key === "Escape" && expanded.value) void setExpanded(false);
+}
 let layer: any = null;
 let areaLayer: any = null;
 let lastFitSig = "";
@@ -227,6 +249,7 @@ function clearArea() {
 }
 
 onMounted(async () => {
+  window.addEventListener("keydown", onKeydown);
   if (!el.value) return;
   let L: any;
   try {
@@ -262,6 +285,9 @@ onMounted(async () => {
 });
 watch(() => props.points, () => { renderMarkers(); fitToPoints(); }, { deep: true });
 onBeforeUnmount(() => {
+  window.removeEventListener("keydown", onKeydown);
+  // Leaving the page while expanded would otherwise leave the body unscrollable.
+  document.body.style.overflow = "";
   map?.remove?.();
   map = null;
   layer = null;
@@ -270,7 +296,7 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div v-show="!failed" class="flat-map-shell">
+  <div v-show="!failed" class="flat-map-shell" :class="{ 'flat-map-shell_full': expanded }">
     <div ref="el" class="flat-map" />
 
     <!-- Radial "Sims menu": tablets fanned around a clicked cluster -->
@@ -295,6 +321,15 @@ onBeforeUnmount(() => {
     </div>
 
     <div class="flat-map__tools">
+      <button
+          type="button"
+          class="flat-map__tool"
+          :class="{ 'flat-map__tool_active': expanded }"
+          :aria-label="expanded ? (props.collapseLabel || 'Close map') : (props.expandLabel || 'Full screen')"
+          @click="toggleExpanded"
+      >
+        {{ expanded ? "×" : "⤢" }} <span>{{ expanded ? (props.collapseLabel || "Close") : (props.expandLabel || "Full screen") }}</span>
+      </button>
       <button type="button" class="flat-map__tool" :class="{ 'flat-map__tool_active': drawing }" @click="toggleDrawing">
         {{ drawing ? "✓" : "⌁" }} <span>{{ drawing ? (props.doneLabel || "Done") : (props.drawLabel || "Draw area") }}</span>
       </button>
@@ -306,6 +341,17 @@ onBeforeUnmount(() => {
 
 <style scoped>
 .flat-map-shell { position: relative; z-index: 0; isolation: isolate; }
+/* Full screen is a fixed overlay rather than the Fullscreen API: the drawing
+   tools and the radial picker are ordinary DOM, and the API's stacking context
+   would leave them behind the map. */
+.flat-map-shell_full {
+  position: fixed;
+  inset: 0;
+  z-index: 3000;
+  padding: 12px;
+  background: var(--bg-primary, #0b0f2a);
+}
+.flat-map-shell_full .flat-map { height: 100%; border-radius: 8px; }
 .flat-map {
   width: 100%;
   height: 420px;

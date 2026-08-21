@@ -66,6 +66,32 @@ const METRO_RU: Record<string, string> = {
   Turon: 'Туран', Qipchoq: 'Кипчак',
 };
 
+// A second name people still use for a station: the Soviet-era name it was
+// renamed from, or — where the Uzbek name is a phrase rather than a proper
+// noun — what it means. Historic names are taken from OSM's old_name tag
+// rather than memory; stations OSM does not record are simply absent.
+const METRO_ALIAS_RU: Record<string, string> = {
+  'Buyuk Ipak Yoli': 'Максим Горький',
+  Novza: 'Хамза',
+  'Amir Temur Xiyoboni': 'Сквер Октябрьской Революции',
+  'Mustaqillik Maydoni': 'Площадь Ленина',
+  'Milliy Bog': 'Национальный парк',
+  Yunusobod: 'Фахрийлар чойхонаси',
+  'Xalqlar Dostligi': 'Дружба народов',
+  Ozbekiston: 'Узбекистан',
+  Mashinasozlar: 'Машиностроителей',
+  Dostlik: 'Дружба',
+  Tinchlik: 'Мир',
+};
+
+/** Alias in parentheses when the station carries one: "Новза (Хамза)". */
+export function metroLabelWithAlias(value: string | null | undefined, locale: string): string {
+  const label = locationLabel(value, locale, 'metro');
+  if (!value || !locale.toLowerCase().startsWith('ru')) return label;
+  const alias = METRO_ALIAS_RU[value];
+  return alias && alias !== label ? `${label} (${alias})` : label;
+}
+
 export type LocationKind = 'city' | 'district' | 'metro' | 'any';
 
 const MAPS: Record<Exclude<LocationKind, 'any'>, Record<string, string>> = {
