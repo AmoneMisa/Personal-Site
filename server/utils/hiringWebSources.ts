@@ -337,6 +337,111 @@ function configuredSources(): WebCvSource[] {
   return SOURCES.filter((source) => enabled.has(source.key))
 }
 
+export interface WebSourceAudit {
+  key: string
+  label: string
+  country: string
+  pagesFetched: number
+  blocksFound: number
+  parsed: number
+  rejected: number
+  rejectReasons: string[]
+  withinWindow: number
+  deduplicated: number
+  fetchDurationMs: number
+  newestActivityAt: string | null
+  oldestActivityAt: string | null
+  httpErrors: string[]
+  samples: string[]
+}
+
+/** The registry, for audits and for the source filter the UI exposes. */
+export function listWebSources(): Array<{ key: string; label: string; country: string }> {
+  return SOURCES.map((source) => ({ key: source.key, label: source.label, country: source.country }))
+}
+
+/**
+ * Walks a source the way the crawler does, but reports every stage instead of
+ * only the profiles. This is how a dead source is told apart from a blocked
+ * one, a parser failure or a genuinely low-yield board.
+ */
+export async function auditWebSource(key: string, maxPages = 2): Promise<WebSourceAudit> {
+  const source = SOURCES.find((item) => item.key === key)
+  if (!source) throw new Error(`unknown web source: ${key}`)
+
+  const startedAt = Date.now()
+  const audit: WebSourceAudit = {
+    key: source.key,
+    label: source.label,
+    country: source.country,
+    pagesFetched: 0,
+    blocksFound: 0,
+    parsed: 0,
+    rejected: 0,
+    rejectReasons: [],
+    withinWindow: 0,
+    deduplicated: 0,
+    fetchDurationMs: 0,
+    newestActivityAt: null,
+    oldestActivityAt: null,
+    httpErrors: [],
+    samples: [],
+  }
+
+  const cutoff = cutoffDate().getTime()
+  const byUrl = new Map<string, CvProfile>()
+
+  for (let page = 1; page <= maxPages; page += 1) {
+    let html = ''
+    try {
+      html = await fetchPage(source.pageUrl(page))
+      audit.pagesFetched += 1
+    } catch (error) {
+      audit.httpErrors.push(`page ${page}: ${(error as Error).message}`)
+      break
+    }
+
+    const blocks = blockAnchors(html, source)
+    audit.blocksFound += blocks.length
+    if (!blocks.length) {
+      // Blocks are what the link pattern finds; none means the listing markup
+      // changed, the page is empty, or an anti-bot wall replaced it.
+      audit.rejectReasons.push(`page ${page}: no candidate blocks in ${html.length} bytes`)
+      break
+    }
+
+    for (const block of blocks) {
+      const profile = source.parse(block, source)
+      if (!profile) {
+        audit.rejected += 1
+        continue
+      }
+      audit.parsed += 1
+
+      const stamp = Date.parse(profile.activityAt || profile.updatedAt || profile.createdAt || '')
+      if (Number.isFinite(stamp)) {
+        const iso = new Date(stamp).toISOString()
+        if (!audit.newestActivityAt || iso > audit.newestActivityAt) audit.newestActivityAt = iso
+        if (!audit.oldestActivityAt || iso < audit.oldestActivityAt) audit.oldestActivityAt = iso
+        if (stamp >= cutoff) audit.withinWindow += 1
+      }
+
+      byUrl.set(profile.url, profile)
+      if (audit.samples.length < 3) {
+        audit.samples.push(
+          `${(profile.role || profile.name || '(no role)').slice(0, 44)} | ${profile.city || '-'} | ` +
+          `${profile.activityAt?.slice(0, 10) || '-'} | ${profile.url.slice(0, 60)}`,
+        )
+      }
+    }
+  }
+
+  audit.deduplicated = byUrl.size
+  if (audit.rejected) audit.rejectReasons.push(`${audit.rejected} blocks the parser could not turn into a profile`)
+  audit.fetchDurationMs = Date.now() - startedAt
+  return audit
+}
+
 export function hiringWebSourceHandles(): string[] {
   if (process.env.HIRING_WEB_CV_SOURCE === 'off') return []
   return configuredSources().map((source) => `web:${source.key}`)
