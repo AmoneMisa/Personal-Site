@@ -21,7 +21,7 @@
 //     themselves; spam/microtask recruitment blocks only on a paid-action pattern.
 //   * Crypto/blockchain jobs are not blocked merely for mentioning crypto. The
 //     vague-crypto rule requires vague operational duties plus beginner/training
-//     bait and a Telegram-only recruitment path.
+//     bait and either Telegram recruitment or implausibly high beginner pay.
 
 export type RiskCategory = 'gambling' | 'adult' | 'scam'
 
@@ -63,7 +63,7 @@ const SCAM = [
   ['daily-payout', /выплаты\s+(?:ежедневно|каждый\s+день)|ежедневн(?:ые|ая)\s+выплат|оплата\s+каждый\s+день|щоденн[іа]\s+виплат/i],
   ['guaranteed-income', /гарантированн(?:ый|ого)\s+доход|гарантований\s+дохід|guaranteed\s+income|доход\s+от\s+\d[\d\s]{2,}\s*(?:\$|usd|у\.?е\.?)\s*в\s*(?:день|неделю)/i],
   ['no-investment', /без\s+вложений|без\s+вкладень|no\s+investment\s+required/i],
-  ['mlm', /сетев(?:ой|ого)\s+маркетинг|\bmlm\b|млм|финансов(?:ая|ой)\s+независимост|пассивн(?:ый|ого)\s+доход/i],
+  ['mlm', /сетев(?:ой|ого)\s+(?:маркетинг|бизнес)|\bmlm\b|млм|финансов(?:ая|ой)\s+независимост|пассивн(?:ый|ого)\s+доход/i],
   ['crypto-bait', /гарантированн[а-яёіїєґ]*\s+(?:прибыл|профит)|трейдинг\s+с\s+гарант|инвестиц[а-яёіїєґ]*\s+с\s+гарант/i],
 ]
 
@@ -73,6 +73,9 @@ const SCAM_CONTACTS = [
   ['telegram:valery_hr_36', /(?:^|[^a-z0-9_])@?valery_hr_36(?:$|[^a-z0-9_])/i],
   ['telegram:kris_mogelevich7', /(?:^|[^a-z0-9_])@?kris_mogelevich7(?:$|[^a-z0-9_])/i],
   ['telegram:gasgazz_07', /(?:^|[^a-z0-9_])@?gasgazz_07(?:$|[^a-z0-9_])/i],
+  ['phone:+998992993435', /(?:\+?998[\s()\-]*)99[\s()\-]*299[\s()\-]*34[\s()\-]*35/],
+  ['phone:+998992600344', /(?:\+?998[\s()\-]*)99[\s()\-]*260[\s()\-]*03[\s()\-]*44/],
+  ['phone:+998931244802', /(?:\+?998[\s()\-]*)93[\s()\-]*124[\s()\-]*48[\s()\-]*02/],
 ] as const
 
 // Marriage/dating agencies are intentionally excluded from Job Finder. Explicit
@@ -94,13 +97,26 @@ const SCREENSHOT_PROOF = /скриншот[а-яёіїєґ]*\s+(?:как\s+)?(?:
 // Course/project reselling schemes masquerading as ordinary remote employment.
 // General course sales roles are not blocked; this targets resale/network wording
 // and known Rich Team / RT-school recruitment templates.
-const INFOPRODUCT_RESELL = /перепродават[а-яёіїєґ]*\s+(?:наш[а-яёіїєґ]*\s+)?(?:курс|проект)|\brich\s*team\b|онлайн[-\s]?школ[а-яёіїєґ]*\s+RT\b/i
+const INFOPRODUCT_RESELL = /перепродават[а-яёіїєґ]*\s+(?:наш[а-яёіїєґ]*\s+)?(?:курс|проект)|\brich\s*team\b|онлайн[-\s]?школ[а-яёіїєґ]*\s+RT\b|\bFRLNS\s*TEAM\b/i
+
+// MLM/direct-selling texts often avoid the words "network marketing" and instead
+// describe building a team and taking a percentage of its turnover.
+const MLM_TEAM_COMMISSION = /созда(?:ть|вайте|ни[ея])[а-яёіїєґ\s]*команд[а-яёіїєґ]*[^.\n]{0,120}(?:процент|%)[^.\n]{0,80}(?:товарооборот|оборот)|(?:процент|%)[^.\n]{0,80}(?:товарооборот|оборот)[^.\n]{0,120}команд|партн[её]рск[а-яёіїєґ]*\s+(?:структур|команд)[а-яёіїєґ]*[^.\n]{0,100}(?:доход|заработ)/i
+
+// "Work from home" bait with no profession/duties: the recruiter promises to
+// teach the candidate how to earn and moves the conversation to Telegram.
+const VAGUE_REMOTE_EARNINGS = /научу\s+как\s+зарабат[а-яёіїєґ]*|научим\s+зарабат[а-яёіїєґ]*|зарабат[а-яёіїєґ]*\s+не\s+выходя\s+из\s+дома|желани[а-яёіїєґ]*\s+зарабат[а-яёіїєґ]*[^.\n]{0,100}(?:особых\s+навыков\s+не\s+требуется|опыт\s+не\s+нужен)/i
+const VAGUE_REMOTE_PROFILE = /особых\s+навыков\s+(?:в\s+работе\s+)?не\s+требуется|без\s+опыта|опыт\s+не\s+нужен|(?:девушк|женщин)[а-яёіїєґ\s,]*(?:от\s+)?\d{2}[\s–—-]*(?:до\s+)?\d{2}|(?:ПК|компьютер)[^.\n]{0,80}(?:интернет|доступ\s+в\s+интернет)/i
+
+// Wellness/"women's community" MLM recruitment. The combination is deliberately
+// specific; ordinary health jobs or community-manager roles do not match it.
+const WELLNESS_NETWORK_PROJECT = /(?:женщин[а-яёіїєґ]*\s*30\+|женщин[а-яёіїєґ]*\s+в\s+декрет|мам[а-яёіїєґ]*\s+в\s+декрет)[\s\S]{0,500}(?:онлайн[-\s]?проект|сообществ[а-яёіїєґ]*\s+поддержк)[\s\S]{0,500}(?:здоровь|продукц[а-яёіїєґ]*\s+для\s+здоровь)[\s\S]{0,500}(?:доход|зарабат|бесплатн[а-яёіїєґ]*\s+обучени)/i
 
 // Vague crypto recruiter pattern seen in fake "digital assets manager" postings.
 // The combination is intentionally strict so normal blockchain/crypto engineering,
 // compliance, support, product, and exchange roles are not blocked.
-const CRYPTO_JOB_SIGNAL = /цифров(?:ые|ых|ыми)\s+актив|криптовалют(?:а|ы|е|ой|ные|ных|ними)|крипто-?актив|\bDEX\b|\bDeFi\b|digital\s+assets?|crypto(?:currency)?\s+(?:services?|assets?|operations?)/i
-const VAGUE_CRYPTO_DUTIES = /работа\s+с\s+(?:предоставленн[а-яёіїєґ]*\s+)?информаци[а-яёіїєґ]*|работа\s+с\s+DEX-?инструмент[а-яёіїєґ]*|выполнени[а-яёіїєґ]*\s+(?:поставленных\s+)?задач\s+по\s+готов[а-яёіїєґ]*\s+алгоритм[а-яёіїєґ]*|использовани[а-яёіїєґ]*\s+(?:необходимых\s+)?криптовалютн[а-яёіїєґ]*\s+сервис[а-яёіїєґ]*(?:\s+(?:согласно|по)\s+(?:рабочим\s+)?инструкц[а-яёіїєґ]*)?|проверка\s+данных\s+и\s+статус[а-яёіїєґ]*\s+задач|сопровождени[а-яёіїєґ]*\s+(?:текущих\s+)?процесс[а-яёіїєґ]*|контроль\s+выполнени[а-яёіїєґ]*\s+(?:поставленных\s+)?задан[а-яёіїєґ]*|ведение\s+(?:внутренн[а-яёіїєґ]*\s+отч[её]тност|рабоч[а-яёіїєґ]*\s+данн[а-яёіїєґ]*)|соблюдени[а-яёіїєґ]*\s+инструкц[а-яёіїєґ]*|working\s+with\s+(?:information|data)\s+(?:in|about)\s+(?:crypto|digital\s+assets)|follow(?:ing)?\s+(?:internal\s+)?instructions\s+for\s+crypto/i
+const CRYPTO_JOB_SIGNAL = /цифров(?:ые|ых|ыми)\s+актив|криптовалют(?:а|ы|е|ой|ные|ных|ными)|крипто-?актив|\bDEX\b|\bDeFi\b|digital\s+assets?|crypto(?:currency)?\s+(?:services?|assets?|operations?)/i
+const VAGUE_CRYPTO_DUTIES = /работа\s+с\s+(?:предоставленн[а-яёіїєґ]*\s+)?информаци[а-яёіїєґ]*|работа\s+с\s+DEX-?инструмент[а-яёіїєґ]*|выполнени[а-яёіїєґ]*\s+(?:поставленных\s+)?задач\s+по\s+готов[а-яёіїєґ]*\s+алгоритм[а-яёіїєґ]*|использовани[а-яёіїєґ]*\s+(?:необходимых\s+)?криптовалютн[а-яёіїєґ]*\s+сервис[а-яёіїєґ]*(?:\s+(?:согласно|по)\s+(?:рабочим\s+)?инструкц[а-яёіїєґ]*)?|проверка\s+данных\s+и\s+статус[а-яёіїєґ]*\s+задач|сопровождени[а-яёіїєґ]*\s+(?:текущих\s+)?процесс[а-яёіїєґ]*|контроль\s+выполнени[а-яёіїєґ]*\s+(?:поставленных\s+)?задан[а-яёіїєґ]*|ведение\s+(?:внутренн[а-яёіїєґ]*\s+отч[её]тност|рабоч[а-яёіїєґ]*\s+данн[а-яёіїєґ]*)|соблюдени[а-яёіїєґ]*\s+инструкц[а-яёіїєґ]*|сопровожда(?:ть|ете|ете\s+их)[^.\n]{0,100}(?:операц|сделк)|следи(?:ть|те)[^.\n]{0,80}(?:параметр|операц|сделк)|готов[а-яёіїєґ]*\s+торгов[а-яёіїєґ]*\s+сигнал|working\s+with\s+(?:information|data)\s+(?:in|about)\s+(?:crypto|digital\s+assets)|follow(?:ing)?\s+(?:internal\s+)?instructions\s+for\s+crypto/i
 const BEGINNER_TRAINING_BAIT = /без\s+опыта|опыт[а-яёіїєґ\s]*не\s+(?:является\s+)?обязател|бесплатн[а-яёіїєґ]*\s+обучени|обучени[а-яёіїєґ]*\s+с\s+нуля|помощ[а-яёіїєґ]*\s+наставник|поддержк[а-яёіїєґ]*\s+(?:наставник|после\s+обучения)|no\s+experience|free\s+training|training\s+from\s+scratch|mentor(?:ship)?\s+(?:provided|available)/i
 const TELEGRAM_RECRUITMENT = /(?:обращаться|писать|контакт|подробност[а-яёіїєґ]*|связ[а-яёіїєґ]*)[^\n]{0,80}(?:telegram|телеграм)|(?:telegram|телеграм)[^\n]{0,80}(?:@?[a-z][a-z0-9_]{4,}|t\.me\/)/i
 
@@ -158,12 +174,33 @@ export function classifySuspicion(input: {
   const datingChat = DATING_CHAT_ROLE.test(text) && DATING_CHAT_SIGNAL.test(text)
   const paidSpamTask = PAID_MICROTASK.test(text) && (MASS_SPAM_ACTION.test(text) || SCREENSHOT_PROOF.test(text))
   const infoproductResell = INFOPRODUCT_RESELL.test(text)
+  const mlmTeamCommission = MLM_TEAM_COMMISSION.test(text)
+  const vagueRemoteEarnings = VAGUE_REMOTE_EARNINGS.test(text)
+    && VAGUE_REMOTE_PROFILE.test(text)
+    && TELEGRAM_RECRUITMENT.test(text)
+  const wellnessNetworkProject = WELLNESS_NETWORK_PROJECT.test(text)
+  const cryptoTop = input.salaryMax ?? input.salaryMin
+  const cryptoCurrency = String(input.salaryCurrency || '').toUpperCase()
+  const highBeginnerCryptoPay = cryptoTop !== undefined
+    && ((cryptoCurrency === 'EUR' || cryptoCurrency === 'USD') && cryptoTop >= 3000
+      || cryptoCurrency === 'GBP' && cryptoTop >= 2500)
   const vagueCryptoRecruitment = CRYPTO_JOB_SIGNAL.test(text)
     && VAGUE_CRYPTO_DUTIES.test(text)
     && BEGINNER_TRAINING_BAIT.test(text)
-    && TELEGRAM_RECRUITMENT.test(text)
+    && (TELEGRAM_RECRUITMENT.test(text) || highBeginnerCryptoPay)
 
-  if (scam.length || scamContacts.length || datingAgency || datingChat || paidSpamTask || infoproductResell || vagueCryptoRecruitment) {
+  if (
+    scam.length
+    || scamContacts.length
+    || datingAgency
+    || datingChat
+    || paidSpamTask
+    || infoproductResell
+    || mlmTeamCommission
+    || vagueRemoteEarnings
+    || wellnessNetworkProject
+    || vagueCryptoRecruitment
+  ) {
     riskCategory = riskCategory || 'scam'
     riskReasons.push(...scam.map((r) => `scam:${r}`))
     riskReasons.push(...scamContacts.map((r) => `scam:known-contact:${r}`))
@@ -171,6 +208,9 @@ export function classifySuspicion(input: {
     if (datingChat) riskReasons.push('scam:dating-chat')
     if (paidSpamTask) riskReasons.push('scam:paid-spam-task')
     if (infoproductResell) riskReasons.push('scam:course-resell')
+    if (mlmTeamCommission) riskReasons.push('scam:mlm-team-commission')
+    if (vagueRemoteEarnings) riskReasons.push('scam:vague-remote-earnings')
+    if (wellnessNetworkProject) riskReasons.push('scam:wellness-network-project')
     if (vagueCryptoRecruitment) riskReasons.push('scam:vague-crypto-recruitment')
   }
 
