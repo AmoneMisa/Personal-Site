@@ -16,7 +16,7 @@ import {
   saveDbCandidates,
 } from './hiringDb'
 import { normalizeCandidate } from './hiringNormalize'
-import { isRecruitingOpportunity, repairCandidateProfile } from './hiringQuality'
+import { isCharityAppeal, isRecruitingOpportunity, repairCandidateProfile } from './hiringQuality'
 import { HIRING_SOURCES, type CandidateEmploymentType, type CvProfile, type HiringSource } from './hiringTypes'
 import {
   aiFingerprint,
@@ -142,7 +142,7 @@ async function syncDb(kept: StoredProfile[]) {
 
 function isVisible(profile: StoredProfile): boolean {
   const text = `${profile.name || ''}\n${profile.role || ''}\n${profile.originalText || profile.description || ''}`
-  if (isRecruitingOpportunity(text)) return false
+  if (isRecruitingOpportunity(text) || isCharityAppeal(text)) return false
   return isLikelyCvPost(text, true)
 }
 

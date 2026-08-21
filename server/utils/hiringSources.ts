@@ -284,11 +284,17 @@ function blockAfter(text: string, names: string): string | undefined {
   return match?.[1]?.replace(/\s+/g, ' ').trim()
 }
 
+const MAX_PLAUSIBLE_EXPERIENCE_YEARS = 55
+
 function parseExperience(text: string): number | undefined {
   const match = text.match(/(?:опыт|досвід|experience|staj|tajriba)\s*[:—-]?\s*(\d+)\+?\s*(?:лет|рок(?:и|ів)?|years|yil|йил)?/iu)
-    || text.match(/(\d+)\+?\s*(?:лет|рок(?:и|ів)?|years|yil|йил)\s*(?:опыт|досвід|experience|tajriba)?/iu)
+    // The keyword is required on this side: a bare "80 років" is somebody's
+    // age, not their career.
+    || text.match(/(\d+)\+?\s*(?:лет|рок(?:и|ів)?|years|yil|йил)\s+(?:опыт\p{L}*|досвід\p{L}*|experience|tajriba\p{L}*|staj\p{L}*)/iu)
+    || text.match(/(?:опыт|досвід|experience|staj|tajriba)\p{L}*\s+(?:работы|роботи|of\s+work)?\s*[:—-]?\s*(\d+)/iu)
   const years = match ? Number(match[1]) : undefined
-  return Number.isFinite(years) ? years : undefined
+  if (!Number.isFinite(years)) return undefined
+  return years > 0 && years <= MAX_PLAUSIBLE_EXPERIENCE_YEARS ? years : undefined
 }
 
 function parseName(text: string): string {
@@ -296,7 +302,7 @@ function parseName(text: string): string {
 }
 
 function parseRole(text: string): string {
-  const targetNames = 'желаемая (?:работа|должность)|бажана (?:робота|посада)|ожидаемая работа|ищу работу|шукаю роботу|ish kerak|menga ish kerak|ish joyi kerak|qidirayotgan kasb|so(?:\'|’)ralgan ish turi|position|role|должность|позиция|посада|lavozim|kasb|specialization|специализация|target role'
+  const targetNames = 'желаемая (?:работа|должность)|бажана (?:робота|посада)|ожидаемая работа|ищу работу|шукаю роботу|ish kerak|menga ish kerak|ish joyi kerak|qidirayotgan kasb|so(?:\'|’)ralgan ish turi|position|role|должность|позиция|посада|lavozim|kasb(?:i|im)?|mutaxassislik|specialization|специализация|target role'
   const explicit = field(text, targetNames)
   if (explicit && ROLE_RE.test(explicit)) return explicit.slice(0, 180)
 

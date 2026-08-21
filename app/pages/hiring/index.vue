@@ -450,6 +450,7 @@ const specRows = computed(() => {
     { label: t("specCity"), value: strOr(profile.city) },
     { label: t("specCountry"), value: strOr(meta.value.find((c) => c.code === profile.country)?.name || profile.country) },
     { label: t("specRemote"), value: fmtBool(profile.remote) },
+    { label: t("specContactHours"), value: strOr(profile.contactHours) },
     { label: t("specEmployment"), value: strOr(profile.employmentType) },
     { label: t("specEducation"), value: strOr(profile.education) },
     { label: t("specLanguages"), value: listOr(profile.languages) },
@@ -683,13 +684,9 @@ onBeforeUnmount(() => {
             </button>
           </div>
           <h3 class="hiring-card__title">{{ profile.name || profile.role }}</h3>
-          <div class="hiring-card__role text-muted">{{ profile.name ? profile.role : "" }}</div>
-          <div class="hiring-card__salary" :class="{ 'hiring-card__placeholder': !salaryLabel(profile) }">
-            {{ salaryLabel(profile) || "—" }}
-          </div>
-          <div class="hiring-card__spec text-muted" :class="{ 'hiring-card__placeholder': !specLine(profile) }">
-            {{ specLine(profile) || "—" }}
-          </div>
+          <div v-if="profile.name && profile.role" class="hiring-card__role text-muted">{{ profile.role }}</div>
+          <div v-if="salaryLabel(profile)" class="hiring-card__salary">{{ salaryLabel(profile) }}</div>
+          <div v-if="specLine(profile)" class="hiring-card__spec text-muted">{{ specLine(profile) }}</div>
           <div class="hiring-card__badges">
             <span v-for="badge in cardBadges(profile)" :key="badge" class="hiring-card__badge">{{ badge }}</span>
           </div>
@@ -828,7 +825,9 @@ onBeforeUnmount(() => {
 .hiring-card:hover { transform: translateY(-2px); border-color: rgba(113,137,217,0.45); }
 .hiring-card__body {
   position: relative; width: 100%; min-width: 0; padding: 14px 16px; display: grid;
-  grid-template-rows: auto 34px 20px 18px 42px auto; gap: 3px;
+  /* Rows size to their content and the badges absorb whatever is left, so a
+     sparse profile is a short card rather than a title above empty space. */
+  grid-template-rows: auto auto auto auto 1fr auto; gap: 3px;
 }
 .hiring-card__actions { position: absolute; top: 10px; right: 10px; display: flex; gap: 5px; z-index: 1; }
 .hiring-card__action {
@@ -847,7 +846,7 @@ onBeforeUnmount(() => {
 .hiring-card__salary { font-weight: 700; font-size: 14px; color: var(--text-white, inherit); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .hiring-card__spec { font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .hiring-card__placeholder { visibility: hidden; }
-.hiring-card__badges { display: flex; align-content: flex-start; flex-wrap: wrap; gap: 5px; overflow: hidden; }
+.hiring-card__badges { display: flex; align-content: flex-start; flex-wrap: wrap; gap: 5px; overflow: hidden; min-height: 0; padding-top: 3px; }
 .hiring-card__badge {
   font-size: 10.5px; font-weight: 600; padding: 4px 7px; border-radius: 999px;
   border: 1px solid var(--line); background: rgba(255,255,255,0.05); color: var(--text-primary); white-space: nowrap;

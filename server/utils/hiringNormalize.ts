@@ -121,7 +121,8 @@ const PROFESSION_RULES: ProfessionRule[] = [
   { name: 'Backend Developer', re: /\bback[- ]?end\s+(?:developer|engineer|dasturchi)\b|\bbackend\s+dasturchi\b/iu },
   { name: 'Frontend Developer', re: /\bfront[- ]?end\s+(?:developer|engineer|dasturchi)\b|\bfrontend\s+dasturchi\b/iu },
   { name: 'Mobile Developer', re: /\b(?:mobile|android|ios)\s+(?:developer|engineer|dasturchi)\b/iu },
-  { name: 'Software Developer', re: /\b(?:software\s+)?(?:developer|programmer|frontend|front-end|backend|back-end|full[- ]?stack|android|ios)\b|разработчик|розробник|программист|програміст|dasturchi/iu },
+  { name: 'System Administrator', re: /\b(?:system|network|windows\s+server)\s+administrator\b|систем(?:ный|ним)\s+администратор|сисадмин|сетевой\s+администратор|tarmoq\s+administrator|tizim\s+administrator/iu },
+  { name: 'Software Developer', re: /\b(?:software\s+)?(?:developer|programmer|frontend|front-end|backend|back-end|full[- ]?stack|android|ios)\b|разработчик|розробник|программист|програміст|dasturchi|dasturlash/iu },
   { name: 'QA Engineer', re: /\b(?:qa|quality\s+assurance|tester|test\s+engineer)\b|тестировщик|тестувальник/iu },
   { name: 'DevOps Engineer', re: /\bdevops\b/iu },
   { name: 'Designer', re: /\b(?:designer|ui\/?ux)\b|дизайнер/iu },
@@ -172,6 +173,10 @@ function collectProfessions(source: string): string[] {
   }
   if (names.some((name) => SPECIFIC_DEVELOPER_ROLES.has(name))) {
     const generic = names.indexOf('Software Developer')
+    if (generic >= 0) names.splice(generic, 1)
+  }
+  if (names.includes('System Administrator')) {
+    const generic = names.indexOf('Administrator')
     if (generic >= 0) names.splice(generic, 1)
   }
   if (names.includes('Fitness Trainer')) {
@@ -272,6 +277,21 @@ const FEATURE_RULES: FeatureRule[] = [
 
 export function extractCandidateFeatures(text: string): string[] {
   return FEATURE_RULES.filter((feature) => feature.re.test(text)).map((feature) => feature.name)
+}
+
+// "Murojaat qilish vaqti: 8:00 - 22:00" is on nearly every structured UZ card
+// and answers a real question — when may I call this person. Deliberately not
+// matched on a bare "ish vaqti", which is the working schedule the candidate
+// wants, not the hours they answer the phone.
+const CONTACT_HOURS_RE =
+  /(?:^|\n)[^\p{L}\p{N}\n]{0,10}(?:murojaat\s+qilish\s+vaqti|aloqa\s+vaqti|qo(?:'|’)ng(?:'|’)iroq\s+vaqti|bog(?:'|’)lanish\s+vaqti|время\s+(?:связи|звонков|для\s+связи)|звонить\s+(?:с|в)|contact\s+(?:hours|time)|call\s+time)\s*[:—-]?\s*([^\n]{3,60})/iu;
+
+export function extractContactHours(text: string): string | null {
+  const raw = text.match(CONTACT_HOURS_RE)?.[1];
+  if (!raw) return null;
+  const cleaned = raw.replace(/\s{2,}/g, ' ').replace(/[.;,]+$/, '').trim();
+  // A time range is what makes this field worth showing at all.
+  return /\d{1,2}[:.]\d{2}|\d{1,2}\s*[-–—]\s*\d{1,2}/.test(cleaned) ? cleaned.slice(0, 60) : null;
 }
 
 export function extractContacts(text: string): { telegram?: string; email?: string; phone?: string } {
@@ -488,6 +508,7 @@ export function normalizeCandidate(profile: CvProfile): CvProfile {
     skills: normalizeSkills(profile.skills, originalText),
     seniority: profile.seniority ?? detectSeniority(text, experienceYears),
     contact: profile.contact || contacts.telegram || contacts.email || contacts.phone || null,
+    contactHours: profile.contactHours ?? extractContactHours(originalText),
     contacts,
   }
 }

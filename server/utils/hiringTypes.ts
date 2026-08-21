@@ -76,6 +76,8 @@ export interface CvProfile {
   education?: string | null
   tags?: string[]
   contact?: string | null
+  /** When the candidate asks to be contacted, e.g. "8:00 - 22:00". */
+  contactHours?: string | null
   /** Whether a direct public contact exists or the employer must use the source platform. */
   contactType?: CandidateContactType
   /** Raw employment wording from the source, retained for traceability. */

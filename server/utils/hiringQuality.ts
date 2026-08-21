@@ -190,6 +190,19 @@ function uzSalary(text: string): Pick<CvProfile, 'salaryMin' | 'salaryMax' | 'cu
  * not the candidate board. Requiring multiple program signals avoids rejecting a
  * real candidate merely because their CV says they previously completed a course.
  */
+// Charity and fundraising appeals: someone is being helped, not hired.
+const APPEAL_RE =
+  /(?:шелтер|притулок|прихисток|благодійн\p{L}*|благотворительн\p{L}*|донат\p{L}*|пожертв\p{L}*|збір\s+(?:кошт|грош)\p{L}*|сбор\s+средств|допоможіть|допомогти\s+(?:родин|дідус|бабус)\p{L}*|потребує\s+допомоги|нуждается\s+в\s+помощи|опікунств\p{L}*|інвалідніст\p{L}*|карта\s+для\s+допомоги|реквізити\s+для|monobank|банка\s+збор)/iu
+
+/** True when the post asks for help rather than offering work. */
+export function isCharityAppeal(text: string): boolean {
+  if (!text) return false
+  const matches = text.match(new RegExp(APPEAL_RE.source, 'giu')) || []
+  // One mention can be incidental ("маю досвід роботи у благодійному фонді");
+  // two or more make it the subject of the post.
+  return matches.length >= 2
+}
+
 export function isRecruitingOpportunity(text: string): boolean {
   const value = text.replace(/\s+/g, ' ').trim()
   if (!value) return false

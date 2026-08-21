@@ -359,7 +359,8 @@
     "senioritySenior": "Senior",
     "seniorityLead": "Lead",
     "skills": "Навыки",
-    "skillsPlaceholder": "React, TypeScript"
+    "skillsPlaceholder": "React, TypeScript",
+    "specContactHours": "Время для связи"
   },
   "jobs": {
     "advanced": "Расширенные фильтры",
