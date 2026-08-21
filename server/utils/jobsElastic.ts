@@ -287,6 +287,25 @@ export function jobSearchKey(
     ].join(':')
 }
 
+function textList(value: unknown): string[] {
+    const out: string[] = []
+    const visit = (item: unknown) => {
+        if (item == null) return
+        if (Array.isArray(item)) {
+            item.forEach(visit)
+            return
+        }
+        if (typeof item === 'string' || typeof item === 'number' || typeof item === 'boolean') {
+            const text = String(item).trim()
+            if (text) out.push(text)
+            return
+        }
+        if (typeof item === 'object') Object.values(item as Record<string, unknown>).forEach(visit)
+    }
+    visit(value)
+    return [...new Set(out)]
+}
+
 function searchDocument(
     job: Job,
     syncToken: string,
@@ -320,16 +339,16 @@ function searchDocument(
             job.description ?? '',
 
         tags:
-            job.tags ?? [],
+            textList(job.tags),
 
         skills:
-            job.skills ?? [],
+            textList(job.skills),
 
         niceToHave:
-            job.niceToHave ?? [],
+            textList(job.niceToHave),
 
         tools:
-            job.tools ?? [],
+            textList(job.tools),
 
         languages:
             (job.languages ?? [])
@@ -518,59 +537,27 @@ async function bulkIndex(
 export async function syncJobsSearchIndex(
     jobs: Job[],
 ) {
-    /*
-     * Пустой store не используем
-     * как сигнал удалить весь индекс:
-     * это может быть временная проблема Redis.
-     */
-    if (!jobs.length) {
-        console.warn(
-            '[jobs:elasticsearch] '
-            + 'empty store, sync skipped',
-        )
-
-        return 0
-    }
-
     await ensureJobsSearchIndex()
 
     const syncToken =
-        new Date()
-            .toISOString()
-
-    let indexed = 0
+        `${Date.now()}-${Math.random().toString(36).slice(2)}`
 
     for (
         let offset = 0;
         offset < jobs.length;
         offset += BULK_SIZE
     ) {
-        const batch =
+        await bulkIndex(
             jobs.slice(
                 offset,
                 offset + BULK_SIZE,
-            )
-
-        await bulkIndex(
-            batch,
+            ),
             syncToken,
         )
-
-        indexed +=
-            batch.length
     }
 
-    /*
-     * Удаляем вакансии, которых уже
-     * нет в текущем Redis store.
-     *
-     * Это заменяет необходимость
-     * отдельного PostgreSQL для jobs.
-     */
     await request(
-        `/${JOBS_INDEX}/_delete_by_query`
-        + '?conflicts=proceed'
-        + '&refresh=true',
+        `/${JOBS_INDEX}/_delete_by_query?conflicts=proceed`,
         {
             method: 'POST',
 
@@ -595,347 +582,4 @@ export async function syncJobsSearchIndex(
                 }),
         },
     )
-
-    console.log(
-        `[jobs:elasticsearch] `
-        + `synced ${indexed} jobs`,
-    )
-
-    return indexed
-}
-
-const SEARCH_FIELDS = [
-    'title^12',
-    'title.latin^12',
-
-    'skills^10',
-    'skills.latin^10',
-
-    'niceToHave^7',
-    'niceToHave.latin^7',
-
-    'company^6',
-    'company.latin^6',
-
-    'tools^6',
-    'tools.latin^6',
-
-    'tags^5',
-    'tags.latin^5',
-
-    'location^5',
-    'location.latin^5',
-
-    'city^5',
-    'city.latin^5',
-
-    'description^2',
-    'description.latin^2',
-
-    'education',
-    'education.latin',
-
-    'schedule',
-    'schedule.latin',
-
-    'contractType',
-    'contractType.latin',
-]
-
-function searchTokens(
-    query: string,
-) {
-    return [
-        ...new Set(
-            (
-                query.match(
-                    /[\p{L}\p{N}+#.-]+/gu,
-                )
-                ?? []
-            )
-                .map(
-                    (token) =>
-                        token
-                            .trim()
-                            .toLowerCase(),
-                )
-                .filter(Boolean),
-        ),
-    ].slice(
-        0,
-        16,
-    )
-}
-
-function buildSearchQuery(
-    query: string,
-) {
-    const tokens =
-        searchTokens(query)
-
-    if (!tokens.length) {
-        return {
-            match_none: {},
-        }
-    }
-
-    return {
-        bool: {
-            must:
-                tokens.map(
-                    (token) => ({
-                        multi_match: {
-                            query:
-                            token,
-
-                            fields:
-                            SEARCH_FIELDS,
-
-                            type:
-                                'best_fields',
-
-                            fuzziness:
-                                token.length >= 4
-                                    ? 'AUTO'
-                                    : 0,
-
-                            prefix_length:
-                                token.length >= 4
-                                    ? 1
-                                    : 0,
-                        },
-                    }),
-                ),
-
-            should: [
-                {
-                    multi_match: {
-                        query,
-
-                        fields: [
-                            'title^12',
-                            'title.latin^12',
-                            'skills^10',
-                            'skills.latin^10',
-                            'company^6',
-                            'company.latin^6',
-                        ],
-
-                        type:
-                            'phrase',
-
-                        slop:
-                            1,
-
-                        boost:
-                            8,
-                    },
-                },
-
-                {
-                    multi_match: {
-                        query,
-
-                        fields:
-                        SEARCH_FIELDS,
-
-                        type:
-                            'best_fields',
-
-                        operator:
-                            'and',
-
-                        boost:
-                            3,
-                    },
-                },
-            ],
-        },
-    }
-}
-
-export interface JobSearchMatches {
-    rank: Map<string, number>
-    total: number
-}
-
-export async function searchJobMatches(
-    query: string,
-): Promise<JobSearchMatches | null> {
-    const text =
-        String(query ?? '')
-            .trim()
-
-    if (!text) {
-        return null
-    }
-
-    /*
-     * Индекс ещё не построен после
-     * первого deploy → используем
-     * старый includes fallback.
-     */
-    if (
-        !(await indexExists())
-    ) {
-        return null
-    }
-
-    const rank =
-        new Map<string, number>()
-
-    const PAGE_SIZE = 1000
-    const MAX_MATCHES = 50_000
-
-    let searchAfter:
-        unknown[] | undefined
-
-    let total = 0
-
-    while (
-        rank.size <
-        MAX_MATCHES
-        ) {
-        const body: any = {
-            size:
-                Math.min(
-                    PAGE_SIZE,
-                    MAX_MATCHES -
-                    rank.size,
-                ),
-
-            _source:
-                false,
-
-            track_total_hits:
-                true,
-
-            track_scores:
-                true,
-
-            query:
-                buildSearchQuery(
-                    text,
-                ),
-
-            sort: [
-                {
-                    _score:
-                        'desc',
-                },
-
-                {
-                    key:
-                        'asc',
-                },
-            ],
-        }
-
-        if (searchAfter) {
-            body.search_after =
-                searchAfter
-        }
-
-        const result: any =
-            await request(
-                `/${JOBS_INDEX}/_search`,
-                {
-                    method: 'POST',
-
-                    headers: {
-                        'Content-Type':
-                            'application/json',
-                    },
-
-                    body:
-                        JSON.stringify(
-                            body,
-                        ),
-                },
-            )
-
-        const hits =
-            result?.hits?.hits
-            ?? []
-
-        total =
-            typeof result?.hits?.total
-            === 'number'
-                ? result.hits.total
-                : (
-                    result?.hits
-                        ?.total
-                        ?.value
-                    ?? total
-                )
-
-        if (!hits.length) {
-            break
-        }
-
-        for (const hit of hits) {
-            const key =
-                hit.sort?.[1]
-
-            if (
-                typeof key !== 'string'
-                || rank.has(key)
-            ) {
-                continue
-            }
-
-            rank.set(
-                key,
-                rank.size,
-            )
-        }
-
-        if (
-            hits.length <
-            PAGE_SIZE
-        ) {
-            break
-        }
-
-        const last =
-            hits[
-            hits.length - 1
-                ]
-
-        if (
-            !Array.isArray(
-                last?.sort,
-            )
-        ) {
-            break
-        }
-
-        searchAfter =
-            last.sort
-    }
-
-    /*
-     * Пустой ES после первого создания,
-     * когда Redis уже содержит вакансии,
-     * лучше считать fallback-состоянием.
-     */
-    if (!rank.size && total === 0) {
-        const count: any =
-            await request(
-                `/${JOBS_INDEX}/_count`,
-            )
-
-        if (
-            Number(
-                count?.count ?? 0,
-            ) === 0
-        ) {
-            return null
-        }
-    }
-
-    return {
-        rank,
-        total,
-    }
 }
