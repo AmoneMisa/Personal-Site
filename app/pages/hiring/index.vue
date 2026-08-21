@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import { safeFetch } from "~/utils/safeFetch";
+import { locationLabel } from "~/utils/locationLabels";
+import { hiringProfessionLabel, hiringProfessionLocale } from "~~/shared/hiringProfessionLabels";
 
 // Hiring board — CV/resume profiles from candidates looking for work.
 // Auto-routed at /hiring. UI follows /flat-finder; data from /hiring-feed.
@@ -30,6 +32,7 @@ interface CvProfile {
   education?: string | null;
   tags?: string[];
   contact?: string | null;
+  contactHours?: string | null;
   employmentType?: string | null;
 }
 interface FeedResult {
@@ -38,7 +41,10 @@ interface FeedResult {
   warming?: boolean;
   sourceCounts?: Record<string, number>;
   sourceErrors?: Array<{ source?: string; country?: string; error?: string }>;
-  meta?: { professions?: string[] };
+  meta?: {
+    professions?: string[];
+    sources?: Array<{ value: string; label: string; origin?: string }>;
+  };
   error?: string;
 }
 interface CountryMeta { code: string; name: string; currency: string; cities?: string[] }
@@ -61,6 +67,8 @@ const route = useRoute();
 const router = useRouter();
 const isRu = computed(() => String(locale.value).toLowerCase().startsWith("ru"));
 const label = (ru: string, en: string) => (isRu.value ? ru : en);
+const professionLocale = computed(() => hiringProfessionLocale(locale.value));
+const cityLabel = (value?: string | null) => locationLabel(value, String(locale.value), "city");
 
 useSeoMeta({
   title: () => t("seoTitle"),
@@ -119,7 +127,8 @@ const sourcesDown = computed(() => !loading.value && !profiles.value.length && (
 const meta = ref<CountryMeta[]>([]);
 const cityOptions = computed(() => {
   const picked = countries.value.length ? meta.value.filter((c) => countries.value.includes(c.code)) : meta.value;
-  return [...new Set(picked.flatMap((c) => c.cities ?? []))].sort();
+  return [...new Set(picked.flatMap((c) => c.cities ?? []))]
+    .sort((a, b) => cityLabel(a).localeCompare(cityLabel(b), String(locale.value)));
 });
 
 interface SourceOption { value: string; label: string; origin?: string }
@@ -132,7 +141,10 @@ const sourceOptions = computed<SourceOption[]>(() => [
 const ANY = "__any__";
 type Item = { label: string; value: string };
 const countryItems = computed<Item[]>(() => meta.value.map((c) => ({ value: c.code, label: c.name })));
-const cityItems = computed<Item[]>(() => [{ label: t("cityAny"), value: ANY }, ...cityOptions.value.map((c) => ({ label: c, value: c }))]);
+const cityItems = computed<Item[]>(() => [
+  { label: t("cityAny"), value: ANY },
+  ...cityOptions.value.map((c) => ({ label: cityLabel(c), value: c })),
+]);
 const citySel = computed<string>({ get: () => city.value || ANY, set: (v) => (city.value = v === ANY ? "" : v) });
 const remoteItems = computed<Item[]>(() => [
   { label: t("remoteAny"), value: "any" },
@@ -150,7 +162,9 @@ const genderSel = computed<string>({
   get: () => gender.value || ANY,
   set: (v) => (gender.value = v === ANY ? "" : v),
 });
-const professionItems = computed<Item[]>(() => professionValues.value.map((value) => ({ value, label: value })));
+const professionItems = computed<Item[]>(() => professionValues.value
+  .map((value) => ({ value, label: hiringProfessionLabel(value, professionLocale.value) }))
+  .sort((a, b) => a.label.localeCompare(b.label, professionLocale.value)));
 const SENIORITY_ANY = "__any__";
 const seniorityItems = computed<Item[]>(() => [
   { label: t("seniorityAny"), value: SENIORITY_ANY },
@@ -436,7 +450,7 @@ function specLine(profile: CvProfile): string {
   const parts: string[] = [];
   if (profile.age != null) parts.push(`${profile.age}`);
   if (profile.experienceYears != null) parts.push(t("experienceN", { n: profile.experienceYears }));
-  if (profile.city) parts.push(profile.city);
+  if (profile.city) parts.push(cityLabel(profile.city));
   if (profile.remote) parts.push(t("remoteBadge"));
   return parts.join(" · ");
 }
@@ -455,7 +469,7 @@ const specRows = computed(() => {
     { label: label("Пол", "Gender"), value: genderLabel(profile.gender) },
     { label: t("specExperience"), value: profile.experienceYears != null ? t("experienceN", { n: profile.experienceYears }) : t("notSpecified") },
     { label: t("specSalary"), value: salaryLabel(profile) || t("notSpecified") },
-    { label: t("specCity"), value: strOr(profile.city) },
+    { label: t("specCity"), value: profile.city ? cityLabel(profile.city) : t("notSpecified") },
     { label: t("specCountry"), value: strOr(meta.value.find((c) => c.code === profile.country)?.name || profile.country) },
     { label: t("specRemote"), value: fmtBool(profile.remote) },
     { label: t("specContactHours"), value: strOr(profile.contactHours) },
