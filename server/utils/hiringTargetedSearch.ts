@@ -5,7 +5,7 @@ const UA =
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ' +
   '(KHTML, like Gecko) Chrome/126.0 Safari/537.36'
 const REQUEST_TIMEOUT_MS = 25_000
-const MAX_PAGES = 5
+const MAX_PAGES = 3
 const MAX_AGE_MONTHS = 3
 
 interface CandidateBlock {
@@ -85,8 +85,14 @@ function activityDate(text: string): string | null {
   if (/(?:^|\s)сегодня(?:\s|$)/iu.test(text)) return now.toISOString()
   if (/(?:^|\s)вчера(?:\s|$)/iu.test(text)) return new Date(now.getTime() - 86_400_000).toISOString()
 
+  const hours = text.match(/(?:^|\s)(\d{1,3})\s*(?:ч\.?|час(?:а|ов)?)\s+назад(?:\s|$)/iu)
+  if (hours) return new Date(now.getTime() - Number(hours[1]) * 3_600_000).toISOString()
+
   const days = text.match(/(?:^|\s)(\d{1,3})\s*(?:дн(?:я|ей)?|день)\s+назад(?:\s|$)/iu)
   if (days) return new Date(now.getTime() - Number(days[1]) * 86_400_000).toISOString()
+
+  const weeks = text.match(/(?:^|\s)(\d{1,2})\s*недел(?:ю|и|ь)\s+назад(?:\s|$)/iu)
+  if (weeks) return new Date(now.getTime() - Number(weeks[1]) * 7 * 86_400_000).toISOString()
 
   const absolute = text.match(/(?<![\p{L}\p{N}])(\d{1,2})\s+([\p{L}]+),?\s+(20\d{2})(?![\p{L}\p{N}])/iu)
   if (absolute) {
@@ -152,6 +158,15 @@ function blockAnchors(html: string): CandidateBlock[] {
 const DEMOGRAPHICS_RE =
   /^\s*([^,|\n\d][^,|\n]{1,80})?\s*,?\s*(\d{2})\s*(?:года|лет|год|yil)\s*,\s*([^,|\n]{2,80}?)\s*(?:,\s*([A-Z]{2})\b)?\s*(?:\||$)/mu
 
+function profileId(url: string): string {
+  const token = url
+    .replace(/^https?:\/\//, '')
+    .replace(/[^a-z0-9]+/gi, '-')
+    .replace(/^-|-$/g, '')
+    .slice(-180)
+  return `web-flagma-uz-${token}`
+}
+
 function parseBlock(block: CandidateBlock): CvProfile | null {
   const activity = activityDate(block.text)
   if (!recent(activity)) return null
@@ -170,10 +185,9 @@ function parseBlock(block: CandidateBlock): CvProfile | null {
   const candidateCountry = demographics?.[4]?.toUpperCase() || 'UZ'
   const publicContacts = contacts(block.text)
   const hasDirect = Boolean(publicContacts.phone || publicContacts.email || publicContacts.telegram)
-  const sourceId = block.href.match(/-rr(\d+)\.html/i)?.[1] || block.href
 
   return normalizeCandidate({
-    id: `web-flagma-uz-${sourceId}`,
+    id: profileId(block.href),
     source: 'telegram',
     origin: 'web',
     sourceKey: 'flagma-uz',
@@ -204,24 +218,29 @@ function parseBlock(block: CandidateBlock): CvProfile | null {
   })
 }
 
-function pageUrl(term: string, page: number): string {
+function flagmaRegion(city: string): string {
+  return /(?:^|\b)(?:tashkent|toshkent|ташкент|тошкент)(?:\b|$)/iu.test(city.trim()) ? 'tashkent/' : ''
+}
+
+function pageUrl(term: string, page: number, city: string): string {
   const querySegment = encodeURIComponent(`q=${term.trim().replace(/\s+/g, ' ')}`)
   const suffix = page <= 1 ? '' : `page-${page}/`
-  return `https://flagma.uz/ru/resume/${querySegment}/${suffix}?sort=added`
+  return `https://flagma.uz/ru/resume/${flagmaRegion(city)}${querySegment}/${suffix}`
 }
 
 /**
  * Query-specific Flagma search complements the bounded background crawl.
- * Flagma UZ has enough CV volume that five pages of the global feed cannot
- * represent a three-month role search; its own public search endpoint can.
+ * Flagma UZ has enough CV volume that a small global feed window cannot
+ * represent a role search. Tashkent queries use Flagma's own city scope; other
+ * cities safely fall back to the country-wide search and are filtered later.
  */
-export async function searchTargetedHiringProfiles(term: string): Promise<CvProfile[]> {
+export async function searchTargetedHiringProfiles(term: string, city = ''): Promise<CvProfile[]> {
   const normalized = term.trim().replace(/\s+/g, ' ')
   if (normalized.length < 2 || normalized.length > 120) return []
 
   const byUrl = new Map<string, CvProfile>()
   for (let page = 1; page <= MAX_PAGES; page += 1) {
-    const response = await fetch(pageUrl(normalized, page), {
+    const response = await fetch(pageUrl(normalized, page, city), {
       headers: {
         'User-Agent': UA,
         Accept: 'text/html,application/xhtml+xml',
