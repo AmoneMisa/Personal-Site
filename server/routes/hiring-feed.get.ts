@@ -3,6 +3,7 @@
 
 import { getHiringSourceDiagnostics, HIRING_COUNTRIES } from '../utils/hiringSources'
 import { getStoredCvProfiles, isHiringStoreCold, refreshHiringStore } from '../utils/hiringStore'
+import { getStoredWebCvProfiles } from '../utils/hiringWebStore'
 import { candidateSearchAvailable, searchCandidates } from '../utils/hiringElastic'
 import { dedupeCandidates, normalizeCandidate } from '../utils/hiringNormalize'
 import type { CvProfile } from '../utils/hiringTypes'
@@ -18,6 +19,10 @@ function list(params: URLSearchParams, key: string): string[] {
     .split(',')
     .map((item) => item.trim())
     .filter(Boolean)
+}
+
+function profileSource(profile: CvProfile): string {
+  return (profile.sourceKey || profile.source || 'unknown').toLowerCase()
 }
 
 function profileSearchText(profile: CvProfile): string {
@@ -75,7 +80,7 @@ function matchesFilters(profile: CvProfile, params: URLSearchParams): boolean {
   }
 
   const sources = list(params, 'sources').map((source) => source.toLowerCase())
-  if (sources.length && !sources.includes(profile.source)) return false
+  if (sources.length && !sources.includes(profileSource(profile)) && !sources.includes(profile.source)) return false
 
   const profileId = params.get('profileId') || params.get('listingId')
   if (profileId && profile.id !== profileId) return false
@@ -85,7 +90,10 @@ function matchesFilters(profile: CvProfile, params: URLSearchParams): boolean {
 
 function sourceCounts(profiles: CvProfile[]): Record<string, number> {
   const counts: Record<string, number> = {}
-  for (const profile of profiles) counts[profile.source] = (counts[profile.source] || 0) + 1
+  for (const profile of profiles) {
+    const key = profileSource(profile)
+    counts[key] = (counts[key] || 0) + 1
+  }
   return counts
 }
 
@@ -98,6 +106,7 @@ function publicProfile(profile: CvProfile): CvProfile {
   if (profile.isAdult === false) details.push('Minor')
   if (profile.relocationReady === true) details.push('Open to relocation')
   if (profile.relocationReady === false) details.push('Not open to relocation')
+  if (profile.origin === 'web' && profile.contactType === 'platform') details.push('Contact via source platform')
 
   return {
     ...profile,
@@ -114,7 +123,14 @@ export default defineEventHandler(async (event) => {
   const limit = Math.min(PAGE_MAX, Math.max(1, Number(params.get('limit')) || 20))
 
   let warming = false
-  const stored = await getStoredCvProfiles()
+  const [telegramStored, webStored] = await Promise.all([
+    getStoredCvProfiles(),
+    getStoredWebCvProfiles(),
+  ])
+  const storedByUrl = new Map<string, CvProfile>()
+  for (const profile of [...telegramStored, ...webStored]) storedByUrl.set(profile.url || profile.id, profile)
+  const stored = [...storedByUrl.values()]
+
   if (!stored.length && isHiringStoreCold()) {
     warming = true
     refreshHiringStore().catch((error) => {
@@ -130,7 +146,11 @@ export default defineEventHandler(async (event) => {
   let count = 0
   let engine: 'elasticsearch' | 'memory' = 'memory'
 
-  if (query && (await candidateSearchAvailable())) {
+  // Until the Elasticsearch candidate mapping includes sourceKey/origin, use
+  // the complete in-memory set whenever web CVs are present. This prevents a
+  // valid Careerist/Flagma/Rabota.kz card from disappearing only when a text
+  // query is entered.
+  if (query && !webStored.length && (await candidateSearchAvailable())) {
     const result = await searchCandidates({
       query,
       countries: list(params, 'countries').map((code) => code.toUpperCase()),
@@ -158,7 +178,7 @@ export default defineEventHandler(async (event) => {
 
   if (engine === 'memory') {
     const filtered = profiles.filter((profile) => matchesFilters(profile, params))
-    filtered.sort((a, b) => Date.parse(b.createdAt || '') - Date.parse(a.createdAt || ''))
+    filtered.sort((a, b) => Date.parse(b.activityAt || b.updatedAt || b.createdAt || '') - Date.parse(a.activityAt || a.updatedAt || a.createdAt || ''))
     count = filtered.length
     page = filtered.slice(offset, offset + limit)
   }
