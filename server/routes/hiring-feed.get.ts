@@ -6,9 +6,16 @@ import { getStoredCvProfiles, isHiringStoreCold, refreshHiringStore } from '../u
 import { getStoredWebCvProfiles } from '../utils/hiringWebStore'
 import { candidateSearchAvailable, searchCandidates } from '../utils/hiringElastic'
 import { dedupeCandidates, normalizeCandidate } from '../utils/hiringNormalize'
+import { isRecruitingOpportunity, repairCandidateProfile } from '../utils/hiringQuality'
 import type { CandidateGender, CvProfile } from '../utils/hiringTypes'
 
 const PAGE_MAX = 60
+const EXTRA_COUNTRIES = [
+  { code: 'RO', name: 'Romania', currency: 'RON', cities: ['Bucharest', 'Cluj-Napoca', 'Iasi', 'Timisoara', 'Brasov'] },
+  { code: 'CA', name: 'Canada', currency: 'CAD', cities: [] },
+  { code: 'US', name: 'United States', currency: 'USD', cities: [] },
+] as const
+const COUNTRY_META = [...HIRING_COUNTRIES, ...EXTRA_COUNTRIES]
 
 function normalizeCity(value: string): string {
   return value.trim().toLocaleLowerCase('ru')
@@ -74,8 +81,8 @@ function matchesFilters(profile: CvProfile, params: URLSearchParams): boolean {
   }
 
   const remote = params.get('remote')
-  if (remote === '1' && !profile.remote) return false
-  if (remote === '0' && profile.remote) return false
+  if (remote === '1' && profile.remote !== true) return false
+  if (remote === '0' && profile.remote !== false) return false
 
   const expMin = Number(params.get('experienceMin'))
   if (Number.isFinite(expMin) && expMin > 0) {
@@ -169,6 +176,22 @@ function publicProfile(profile: CvProfile): CvProfile {
   }
 }
 
+function qualityChanged(before: CvProfile[], after: CvProfile[]): boolean {
+  if (before.length !== after.length) return true
+  const byId = new Map(before.map((profile) => [profile.id, profile]))
+  return after.some((profile) => {
+    const original = byId.get(profile.id)
+    if (!original) return true
+    return original.country !== profile.country
+      || original.city !== profile.city
+      || original.remote !== profile.remote
+      || original.role !== profile.role
+      || original.name !== profile.name
+      || original.experienceYears !== profile.experienceYears
+      || JSON.stringify(original.professions || []) !== JSON.stringify(profile.professions || [])
+  })
+}
+
 export default defineEventHandler(async (event) => {
   const incoming = getRequestURL(event)
   const params = incoming.searchParams
@@ -191,7 +214,12 @@ export default defineEventHandler(async (event) => {
     })
   }
 
-  const profiles = dedupeCandidates(stored.map(normalizeCandidate))
+  const normalized = stored.map(normalizeCandidate)
+  const repaired = normalized
+    .filter((profile) => !isRecruitingOpportunity(profile.originalText || profile.description || ''))
+    .map(repairCandidateProfile)
+  const hasQualityRepairs = qualityChanged(normalized, repaired)
+  const profiles = dedupeCandidates(repaired)
   const byId = new Map(profiles.map((profile) => [profile.id, profile]))
 
   const query = (params.get('query') || '').trim()
@@ -205,9 +233,11 @@ export default defineEventHandler(async (event) => {
   let count = 0
   let engine: 'elasticsearch' | 'memory' = 'memory'
 
-  // Age/gender/profession filters are evaluated against the normalized stored
-  // profile so they also work for legacy records without an ES remap.
-  if (query && !webStored.length && !hasMemoryOnlyFilters && (await candidateSearchAvailable())) {
+  // Candidate quality repairs use original source text and can fix persisted
+  // country/role/remote values from an older parser. Until the repaired value
+  // is reindexed, use memory for that request so Elasticsearch cannot reapply a
+  // stale `Ukraine / Engineer / remote=false` document.
+  if (query && !webStored.length && !hasMemoryOnlyFilters && !hasQualityRepairs && (await candidateSearchAvailable())) {
     const result = await searchCandidates({
       query,
       countries: list(params, 'countries').map((code) => code.toUpperCase()),
@@ -272,7 +302,7 @@ export default defineEventHandler(async (event) => {
       limit,
     },
     meta: {
-      countries: HIRING_COUNTRIES,
+      countries: COUNTRY_META,
       professions: professionOptions(profiles),
     },
   }
