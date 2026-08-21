@@ -7,6 +7,7 @@ import { fetchLinkedInJobs } from './linkedinSource'
 import { fetchExtraPublicJobs } from './extraPublicJobSources'
 import { fetchUsaVisaSponsorJobs } from './usaVisaSponsorSource'
 import { fetchSourceExpansionJobs } from './sourceExpansionJobs'
+import { fetchAviationExpansionJobs } from './aviationExpansionJobs'
 import {
   fetchAdzuna,
   fetchArbeitnow,
@@ -30,6 +31,11 @@ const STORE_TTL_SECONDS = 15 * 86_400
 const MAX_AGE_DAYS = 14
 const STALE_DAYS = 4
 const SOURCE_TIMEOUT_MS = 30_000
+// `companies` is intentionally an umbrella source: official ATS feeds, career
+// pages, regional boards and aviation sources all run as isolated sub-loaders.
+// Give that fan-out room to finish, but stay below the Rabbit worker's 180s
+// frontend request timeout so retries remain controlled by RabbitMQ.
+const COMPANIES_SOURCE_TIMEOUT_MS = 150_000
 
 type StoredJob = Job & {
   lastSeen: string
@@ -51,6 +57,7 @@ async function fetchAllCompanies(q: string): Promise<Job[]> {
     { label: 'public-boards', load: () => fetchExtraPublicJobs(q) },
     { label: 'usa-visa-sponsors', load: () => fetchUsaVisaSponsorJobs(q) },
     { label: 'source-expansion', load: () => fetchSourceExpansionJobs(q) },
+    { label: 'aviation-expansion', load: () => fetchAviationExpansionJobs(q) },
   ]
 
   const results = await Promise.allSettled(loaders.map(({ load }) => load()))
@@ -147,14 +154,15 @@ function prune(list: StoredJob[], now: number): StoredJob[] {
 
 async function fetchSource(source: JobSource): Promise<Job[]> {
   let timer: ReturnType<typeof setTimeout> | undefined
+  const timeoutMs = source === 'companies' ? COMPANIES_SOURCE_TIMEOUT_MS : SOURCE_TIMEOUT_MS
 
   try {
     return await Promise.race([
       FETCHERS[source](''),
       new Promise<Job[]>((_, reject) => {
         timer = setTimeout(
-          () => reject(new Error(`timed out after ${SOURCE_TIMEOUT_MS / 1000}s`)),
-          SOURCE_TIMEOUT_MS,
+          () => reject(new Error(`timed out after ${timeoutMs / 1000}s`)),
+          timeoutMs,
         )
       }),
     ])
