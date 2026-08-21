@@ -1,9 +1,11 @@
-// The channel list the queue dispatcher fans out over. Served from the app so
-// the Python dispatcher never carries a second copy of the handles that would
-// drift out of step with DEFAULT_CV_CHANNELS.
+// The source list the queue dispatcher fans out over. Telegram usernames and
+// public web-CV adapters share the same durable RabbitMQ queue; web adapters use
+// a `web:<key>` handle so the Python dispatcher does not need source-specific
+// knowledge.
 
 import { createError, getHeader } from 'h3'
 import { hiringChannelHandles } from '~~/server/utils/hiringSources'
+import { hiringWebSourceHandles } from '~~/server/utils/hiringWebSources'
 
 export default defineEventHandler((event) => {
   const expected = String(process.env.QUEUE_INTERNAL_KEY || '')
@@ -23,6 +25,6 @@ export default defineEventHandler((event) => {
     })
   }
 
-  const handles = hiringChannelHandles()
+  const handles = [...hiringChannelHandles(), ...hiringWebSourceHandles()]
   return { ok: true, count: handles.length, handles }
 })
