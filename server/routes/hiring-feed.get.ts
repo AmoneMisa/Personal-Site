@@ -9,6 +9,7 @@ import { dedupeCandidates, detectMentionedProfessions, normalizeCandidate } from
 import { withProfessionExperience } from '../utils/hiringExperience'
 import { listWebSources } from '../utils/hiringWebSources'
 import { getHiringWebDiagnostics } from '../utils/hiringDiagnostics'
+import { searchTargetedHiringProfiles } from '../utils/hiringTargetedSearch'
 import type { CvProfile } from '../utils/hiringTypes'
 import {
   HIRING_PROFESSION_LABELS,
@@ -19,8 +20,58 @@ import {
 
 const PAGE_MAX = 60
 
+const CITY_ALIASES: Record<string, string[]> = {
+  tashkent: ['tashkent', 'toshkent', 'ташкент', 'тошкент'],
+  samarkand: ['samarkand', 'samarqand', 'самарканд', 'самарқанд'],
+  bukhara: ['bukhara', 'buxoro', 'бухара', 'бухоро'],
+  namangan: ['namangan', 'наманган'],
+  andijan: ['andijan', 'andijon', 'андижан', 'андижон'],
+  fergana: ['fergana', "farg'ona", 'fargona', 'фаргана', 'фергана'],
+  qarshi: ['qarshi', 'karshi', 'карши', 'қарши'],
+  nukus: ['nukus', 'нукус'],
+  urgench: ['urgench', 'urganch', 'ургенч', 'урганч'],
+  khiva: ['khiva', 'xiva', 'хива'],
+  kyiv: ['kyiv', 'kiev', 'киев', 'київ'],
+  lviv: ['lviv', 'львов', 'львів'],
+  odesa: ['odesa', 'odessa', 'одесса', 'одеса'],
+  kharkiv: ['kharkiv', 'kharkov', 'харьков', 'харків'],
+  dnipro: ['dnipro', 'днепр', 'дніпро'],
+  vinnytsia: ['vinnytsia', 'vinnitsa', 'винница', 'вінниця'],
+  zaporizhzhia: ['zaporizhzhia', 'zaporozhye', 'запорожье', 'запоріжжя'],
+  almaty: ['almaty', 'алматы'],
+  astana: ['astana', 'астана'],
+  shymkent: ['shymkent', 'chimkent', 'шымкент', 'чимкент'],
+  karaganda: ['karaganda', 'караганда'],
+  atyrau: ['atyrau', 'атырау'],
+  aktobe: ['aktobe', 'актобе'],
+  bishkek: ['bishkek', 'бишкек'],
+  osh: ['osh', 'ош'],
+  karakol: ['karakol', 'каракол'],
+  bucharest: ['bucharest', 'bucuresti', 'bucurești', 'бухарест'],
+  'cluj-napoca': ['cluj-napoca', 'cluj napoca', 'cluj', 'клуж-напока', 'клуж'],
+  iasi: ['iasi', 'iași', 'яссы'],
+  timisoara: ['timisoara', 'timișoara', 'тимишоара'],
+  brasov: ['brasov', 'brașov', 'брашов'],
+}
+
 function normalizeCity(value: string): string {
-  return value.trim().toLocaleLowerCase('ru')
+  return value.trim().toLocaleLowerCase('ru').replace(/ё/g, 'е')
+}
+
+function canonicalCity(value: string): string {
+  const normalized = normalizeCity(value)
+  for (const [canonical, aliases] of Object.entries(CITY_ALIASES)) {
+    if (aliases.some((alias) => normalizeCity(alias) === normalized)) return canonical
+  }
+  return normalized
+}
+
+function cityMatches(profile: CvProfile, requested: string): boolean {
+  const canonical = canonicalCity(requested)
+  if (profile.city && canonicalCity(profile.city) === canonical) return true
+  const hay = `${profile.city || ''} ${profile.district || ''} ${profile.description || ''}`.toLocaleLowerCase('ru')
+  const aliases = CITY_ALIASES[canonical] || [requested]
+  return aliases.some((alias) => hay.includes(normalizeCity(alias)))
 }
 
 function list(params: URLSearchParams, key: string): string[] {
@@ -90,11 +141,8 @@ function matchesFilters(profile: CvProfile, params: URLSearchParams): boolean {
   const countries = list(params, 'countries').map((code) => code.toUpperCase())
   if (countries.length && !countries.includes((profile.country || '').toUpperCase())) return false
 
-  const city = normalizeCity(params.get('city') || '')
-  if (city) {
-    const hay = `${profile.city || ''} ${profile.district || ''} ${profile.description || ''}`.toLocaleLowerCase('ru')
-    if (!hay.includes(city)) return false
-  }
+  const city = (params.get('city') || '').trim()
+  if (city && !cityMatches(profile, city)) return false
 
   const remote = params.get('remote')
   if (remote === '1' && !profile.remote) return false
@@ -171,6 +219,28 @@ function professionValues(profiles: CvProfile[]): string[] {
   return [...values].sort((a, b) => a.localeCompare(b, 'en'))
 }
 
+function targetedSearchTerm(params: URLSearchParams): string {
+  const query = (params.get('query') || '').trim()
+  if (query) {
+    const mentioned = detectMentionedProfessions(query)
+    if (mentioned.length) return mentioned.map((profession) => hiringProfessionLabel(profession, 'ru')).join(' ')
+    return query
+  }
+  return list(params, 'professions')
+    .map((profession) => hiringProfessionLabel(profession, 'ru'))
+    .join(' ')
+    .trim()
+}
+
+function shouldSearchFlagma(params: URLSearchParams, term: string): boolean {
+  if (!term) return false
+  const countries = list(params, 'countries').map((value) => value.toUpperCase())
+  if (countries.length && !countries.includes('UZ')) return false
+  const sources = list(params, 'sources').map((value) => value.toLowerCase())
+  if (sources.length && !sources.includes('web') && !sources.includes('flagma-uz')) return false
+  return true
+}
+
 function requestLocale(event: Parameters<typeof getCookie>[0]): HiringProfessionLocale {
   const cookieLocale = getCookie(event, 'i18n_lang')
   if (cookieLocale) return hiringProfessionLocale(cookieLocale)
@@ -231,9 +301,6 @@ function publicProfile(profile: CvProfile, locale: HiringProfessionLocale): CvPr
     })),
     employmentType: profile.employmentTypes?.length ? profile.employmentTypes.join(', ') : profile.employmentType,
     tags: [...new Set(details)].slice(0, 20),
-    // Semantic identity for the UI. `source` stays as stored for backwards
-    // compatibility, but nothing user-facing should read it: a Careerist
-    // candidate is not a Telegram candidate.
     origin: profileOrigin(profile) as CvProfile['origin'],
     sourceKey: profileSource(profile),
     sourceLabel: profileProvider(profile),
@@ -252,8 +319,23 @@ export default defineEventHandler(async (event) => {
     getStoredCvProfiles(),
     getStoredWebCvProfiles(),
   ])
+
+  const term = targetedSearchTerm(params)
+  let targetedProfiles: CvProfile[] = []
+  let targetedError = ''
+  if (shouldSearchFlagma(params, term)) {
+    try {
+      targetedProfiles = await searchTargetedHiringProfiles(term)
+    } catch (error) {
+      targetedError = (error as Error).message
+      console.warn('[hiring-feed] targeted Flagma search failed:', targetedError)
+    }
+  }
+
   const storedByUrl = new Map<string, CvProfile>()
-  for (const profile of [...telegramStored, ...webStored]) storedByUrl.set(profile.url || profile.id, profile)
+  for (const profile of [...telegramStored, ...webStored, ...targetedProfiles]) {
+    storedByUrl.set(profile.url || profile.id, profile)
+  }
   const stored = [...storedByUrl.values()]
 
   if (!stored.length && isHiringStoreCold()) {
@@ -274,15 +356,12 @@ export default defineEventHandler(async (event) => {
     || params.get('gender'),
   )
   const professionQuery = query ? detectMentionedProfessions(query).length > 0 : false
+  const hasWebProfiles = webStored.length > 0 || targetedProfiles.length > 0
   let page: CvProfile[] = []
   let count = 0
   let engine: 'elasticsearch' | 'memory' = 'memory'
 
-  // Until the Elasticsearch candidate mapping includes sourceKey/origin and
-  // all hiring-only filters, use the complete in-memory set when correctness
-  // would otherwise differ. Profession queries also stay in memory so aliases
-  // such as "кассир" can match the canonical role "Cashier".
-  if (query && !webStored.length && !needsMemoryFilters && !professionQuery && (await candidateSearchAvailable())) {
+  if (query && !hasWebProfiles && !needsMemoryFilters && !professionQuery && (await candidateSearchAvailable())) {
     const result = await searchCandidates({
       query,
       countries: list(params, 'countries').map((code) => code.toUpperCase()),
@@ -316,8 +395,6 @@ export default defineEventHandler(async (event) => {
   }
 
   const sourceStatuses = getHiringSourceDiagnostics()
-  // Web boards fail differently from channels and carry their own funnel, so
-  // they are reported alongside rather than folded into the channel list.
   const webSourceStatuses = getHiringWebDiagnostics()
   const sourceErrors = [
     ...sourceStatuses
@@ -326,6 +403,7 @@ export default defineEventHandler(async (event) => {
     ...webSourceStatuses
       .filter((item) => item.status === 'error')
       .map((item) => ({ source: item.key, country: item.country, handle: item.handle, error: item.error || 'source failed' })),
+    ...(targetedError ? [{ source: 'flagma-uz', country: 'UZ', handle: 'web:flagma-uz:search', error: targetedError }] : []),
   ]
 
   setResponseHeader(event, 'Cache-Control', 'no-store')
@@ -359,8 +437,6 @@ export default defineEventHandler(async (event) => {
     meta: {
       countries: HIRING_COUNTRIES,
       professions: professionValues(profiles),
-      // What the source filter may offer: the two origins, then whichever
-      // concrete providers actually have candidates in the store.
       sources: [
         { value: 'telegram', label: 'Telegram', origin: 'telegram' },
         { value: 'web', label: 'Web', origin: 'web' },
