@@ -583,6 +583,25 @@ function cardBadges(profile: CvProfile): string[] {
   return badges.slice(0, 5);
 }
 
+/**
+ * Cards from the CV boards are often only a role, a city and an age: at three
+ * columns that leaves most of each card empty. When the page is mostly such
+ * cards, a fourth column fits without crowding anything.
+ */
+const denseGrid = computed(() => {
+  const cards = displayedProfiles.value;
+  if (cards.length < 4) return false;
+  const rich = cards.filter((profile) => {
+    let filled = 0;
+    if (profile.name && profile.role) filled += 1;
+    if (salaryLabel(profile)) filled += 1;
+    if (specLine(profile)) filled += 1;
+    if (cardBadges(profile).length >= 3) filled += 1;
+    return filled >= 3;
+  }).length;
+  return rich / cards.length < 0.5;
+});
+
 function timeAgo(iso: string | null): string {
   if (!iso) return "";
   const days = Math.floor((Date.now() - new Date(iso).getTime()) / 86_400_000);
@@ -735,7 +754,7 @@ onBeforeUnmount(() => {
     <p v-else-if="warming && !loading" class="hiring__warming text-muted">{{ t("warming") }}</p>
     <p v-else class="hiring__count text-muted">{{ t("found", { n: view === 'active' ? total : displayedProfiles.length }) }}</p>
 
-    <div class="hiring__grid" :class="{ 'hiring__grid_loading': loading }">
+    <div class="hiring__grid" :class="{ 'hiring__grid_loading': loading, 'hiring__grid_dense': denseGrid }">
       <article
           v-for="profile in displayedProfiles" :key="profile.id" class="hiring-card"
           :class="{ 'hiring-card_favorite': isFavorite(profile.id), 'hiring-card_hidden': isHidden(profile.id) }"
@@ -883,6 +902,8 @@ onBeforeUnmount(() => {
 .hiring__grid { display: grid; gap: 14px; grid-template-columns: 1fr; align-items: stretch; }
 @media (min-width: 640px) { .hiring__grid { grid-template-columns: repeat(2, 1fr); } }
 @media (min-width: 1024px) { .hiring__grid { grid-template-columns: repeat(3, 1fr); } }
+@media (min-width: 1180px) { .hiring__grid.hiring__grid_dense { grid-template-columns: repeat(4, 1fr); } }
+@media (min-width: 1600px) { .hiring__grid { grid-template-columns: repeat(4, 1fr); } }
 .hiring__grid_loading { opacity: 0.4; pointer-events: none; }
 .hiring-card {
   height: 190px; min-width: 0; border: 1px solid var(--line); border-radius: 12px; overflow: hidden;
