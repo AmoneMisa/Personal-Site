@@ -9,7 +9,7 @@ const ELASTICSEARCH_URL =
 
 const JOBS_INDEX =
     process.env.JOBS_ELASTICSEARCH_INDEX
-    || 'job-listings-v1'
+    || 'job-listings-v2'
 
 const REQUEST_TIMEOUT_MS = 15_000
 const BULK_SIZE = 500
