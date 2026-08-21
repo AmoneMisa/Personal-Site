@@ -9,6 +9,8 @@
 // with it, so failures are logged and answered with an empty/zero result.
 
 import { Pool } from 'pg'
+import { normalizeCandidate } from './hiringNormalize'
+import { withProfessionExperience } from './hiringExperience'
 import type { CvProfile } from './hiringTypes'
 import type { HiringSourceDiagnostic } from './hiringSources'
 
@@ -111,20 +113,21 @@ function isoDate(value: unknown): string | null {
 }
 
 function candidateRow(profile: CvProfile, handle: string) {
+  const normalized = withProfessionExperience(normalizeCandidate(profile))
   return {
-    source: String(profile.source || 'telegram').toLowerCase(),
-    country: String(profile.country || '').toUpperCase(),
-    source_id: String(profile.id || ''),
+    source: String(normalized.source || 'telegram').toLowerCase(),
+    country: String(normalized.country || '').toUpperCase(),
+    source_id: String(normalized.id || ''),
     source_handle: handle.replace(/^@/, ''),
-    name: String(profile.name || ''),
-    role: String(profile.role || ''),
-    city: profile.city ?? null,
-    district: profile.district ?? null,
-    remote: profile.remote ?? null,
-    experience_years: Number.isFinite(Number(profile.experienceYears)) ? Number(profile.experienceYears) : null,
-    created_at: isoDate(profile.createdAt),
-    url: String(profile.url || ''),
-    data: profile,
+    name: String(normalized.name || ''),
+    role: String(normalized.role || ''),
+    city: normalized.city ?? null,
+    district: normalized.district ?? null,
+    remote: normalized.remote ?? null,
+    experience_years: Number.isFinite(Number(normalized.experienceYears)) ? Number(normalized.experienceYears) : null,
+    created_at: isoDate(normalized.createdAt),
+    url: String(normalized.url || ''),
+    data: normalized,
   }
 }
 

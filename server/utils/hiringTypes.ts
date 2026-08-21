@@ -12,6 +12,11 @@ export type CandidateEmploymentType = 'full_time' | 'part_time'
 export type CandidateContactType = 'direct' | 'platform'
 export type CandidateGender = 'male' | 'female' | 'unknown'
 
+export interface ProfessionExperience {
+  profession: string
+  years: number
+}
+
 export const HIRING_SOURCES: HiringSource[] = ['telegram']
 
 export interface CvProfile {
@@ -30,6 +35,8 @@ export interface CvProfile {
   professions?: string[]
   /** Normalized professions explicitly mentioned as previous work. */
   previousProfessions?: string[]
+  /** Explicitly role-bound experience, independent from the currently desired role. */
+  professionExperience?: ProfessionExperience[]
   /** Candidate circumstances useful to employers, e.g. Student or Parental leave. */
   features?: string[]
   age?: number | null
@@ -37,6 +44,7 @@ export interface CvProfile {
   gender?: CandidateGender
   /** Defaults to true when age is unavailable, per product requirements. */
   isAdult?: boolean
+  /** Experience relevant to the currently desired profession only. */
   experienceYears?: number | null
   /** Expected compensation when the candidate mentions it. */
   salaryMin?: number | null
