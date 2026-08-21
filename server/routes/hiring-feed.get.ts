@@ -6,6 +6,7 @@ import { getStoredCvProfiles, isHiringStoreCold, refreshHiringStore } from '../u
 import { getStoredWebCvProfiles } from '../utils/hiringWebStore'
 import { candidateSearchAvailable, searchCandidates } from '../utils/hiringElastic'
 import { dedupeCandidates, normalizeCandidate } from '../utils/hiringNormalize'
+import { withProfessionExperience } from '../utils/hiringExperience'
 import type { CvProfile } from '../utils/hiringTypes'
 
 const PAGE_MAX = 60
@@ -31,6 +32,7 @@ function profileSearchText(profile: CvProfile): string {
     profile.role,
     ...(profile.professions || []),
     ...(profile.previousProfessions || []),
+    ...(profile.professionExperience || []).map((item) => `${item.profession} ${item.years}`),
     ...(profile.features || []),
     ...(profile.skills || []),
     profile.city || '',
@@ -97,10 +99,21 @@ function sourceCounts(profiles: CvProfile[]): Record<string, number> {
   return counts
 }
 
+function previousExperienceSummary(profile: CvProfile): string[] {
+  const byProfession = new Map(
+    (profile.professionExperience || []).map((item) => [item.profession, item.years]),
+  )
+  return (profile.previousProfessions || []).map((profession) => {
+    const years = byProfession.get(profession)
+    return years == null ? profession : `${profession} — ${years}y`
+  })
+}
+
 function publicProfile(profile: CvProfile): CvProfile {
   const details = [...(profile.tags || [])]
   for (const feature of profile.features || []) details.push(feature)
-  if (profile.previousProfessions?.length) details.push(`Previous: ${profile.previousProfessions.join(', ')}`)
+  const previous = previousExperienceSummary(profile)
+  if (previous.length) details.push(`Previous: ${previous.join(', ')}`)
   if (profile.district) details.push(`District: ${profile.district}`)
   if (profile.age != null) details.push(`Age: ${profile.age}`)
   if (profile.isAdult === false) details.push('Minor')
@@ -138,7 +151,7 @@ export default defineEventHandler(async (event) => {
     })
   }
 
-  const profiles = dedupeCandidates(stored.map(normalizeCandidate))
+  const profiles = dedupeCandidates(stored.map((profile) => withProfessionExperience(normalizeCandidate(profile))))
   const byId = new Map(profiles.map((profile) => [profile.id, profile]))
 
   const query = (params.get('query') || '').trim()
