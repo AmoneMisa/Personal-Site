@@ -28,8 +28,10 @@ case "$target" in
     "${compose[@]}" up -d --no-build
     ;;
   frontend)
-    "${compose[@]}" pull frontend
-    "${compose[@]}" up -d --no-build frontend
+    # Frontend depends on the browser-fetcher sidecar used as a WAF fallback for
+    # selected public job sites, so a targeted frontend deploy must refresh both.
+    "${compose[@]}" pull job-browser-fetcher frontend
+    "${compose[@]}" up -d --no-build job-browser-fetcher frontend
     ;;
   backend)
     "${compose[@]}" pull backend
