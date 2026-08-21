@@ -24,6 +24,7 @@ import {
   scheduleAiExtraction,
   type AiExtractionResult,
 } from './aiWorker'
+import { withHiringStoreLock } from './hiringStoreLock'
 
 const STORE_KEY = 'hiring:store:v4'
 const STORE_TTL_SECONDS = 100 * 86_400
@@ -155,6 +156,10 @@ async function syncDb(kept: StoredProfile[]) {
 }
 
 function isVisible(profile: StoredProfile): boolean {
+  // Public CV boards are candidate-only sources and have already passed their
+  // adapter's shape/freshness checks. Telegram intent heuristics reject their
+  // card text and used to delete them during every ordinary channel refresh.
+  if (profile.origin === 'web') return true
   const text = `${profile.name || ''}\n${profile.role || ''}\n${profile.originalText || profile.description || ''}`
   if (isRecruitingOpportunity(text) || isCharityAppeal(text)) return false
   return isLikelyCvPost(text, true)
@@ -275,24 +280,27 @@ async function applyCandidateAiResult(
   fingerprint: string,
   result: AiExtractionResult<CandidateAiData>,
 ) {
-  const index = memoryStore.findIndex((profile) => dedupKey(profile) === key)
-  if (index < 0) return
-  const current = memoryStore[index]!
-  if (candidateAiInput(current).fingerprint !== fingerprint) return
+  await withHiringStoreLock(async () => {
+    const stored = await loadStored()
+    const index = stored.findIndex((profile) => dedupKey(profile) === key)
+    if (index < 0) return
+    const current = stored[index]!
+    if (candidateAiInput(current).fingerprint !== fingerprint) return
 
-  const accepted = !result.lowConfidence && result.confidence >= AI_MIN_CONFIDENCE
-  memoryStore[index] = {
-    ...(accepted ? mergeCandidateAi(current, result.data) : repaired(current)),
-    lastSeen: current.lastSeen,
-    ai: {
-      fingerprint,
-      status: accepted ? 'completed' : 'low_confidence',
-      confidence: result.confidence,
-      data: accepted ? result.data : undefined,
-      updatedAt: new Date().toISOString(),
-    },
-  }
-  await persistStore(memoryStore)
+    const accepted = !result.lowConfidence && result.confidence >= AI_MIN_CONFIDENCE
+    stored[index] = {
+      ...(accepted ? mergeCandidateAi(current, result.data) : repaired(current)),
+      lastSeen: current.lastSeen,
+      ai: {
+        fingerprint,
+        status: accepted ? 'completed' : 'low_confidence',
+        confidence: result.confidence,
+        data: accepted ? result.data : undefined,
+        updatedAt: new Date().toISOString(),
+      },
+    }
+    await persistStore(stored)
+  })
 }
 
 function scheduleCandidateAi(list: StoredProfile[]) {
@@ -323,10 +331,13 @@ function scheduleCandidateAi(list: StoredProfile[]) {
       onResult: (result) => applyCandidateAiResult(key, input.fingerprint, result),
       onFailed: async (status) => {
         if (status !== 'failed') return
-        const current = memoryStore.find((item) => dedupKey(item) === key)
-        if (!current || candidateAiInput(current).fingerprint !== input.fingerprint) return
-        current.ai = { fingerprint: input.fingerprint, status: 'failed', updatedAt: new Date().toISOString() }
-        await persistStore(memoryStore)
+        await withHiringStoreLock(async () => {
+          const stored = await loadStored()
+          const current = stored.find((item) => dedupKey(item) === key)
+          if (!current || candidateAiInput(current).fingerprint !== input.fingerprint) return
+          current.ai = { fingerprint: input.fingerprint, status: 'failed', updatedAt: new Date().toISOString() }
+          await persistStore(stored)
+        })
       },
     })
 
@@ -445,10 +456,6 @@ export async function refreshHiringStore(): Promise<{ fetched: number; stored: n
 async function performRefresh(): Promise<{ fetched: number; stored: number }> {
   const now = Date.now()
   const nowIso = new Date(now).toISOString()
-  const existing = await loadStored()
-  const byKey = new Map<string, StoredProfile>()
-  for (const profile of existing) byKey.set(dedupKey(profile), profile)
-
   const activeSources = HIRING_SOURCES.filter(isHiringSourceConfigured)
   const crawled: CvProfile[] = []
   let fetched = 0
@@ -458,18 +465,6 @@ async function performRefresh(): Promise<{ fetched: number; stored: number }> {
       const batch = await fetchSource(source)
       crawled.push(...batch)
       fetched += batch.length
-      for (const rawProfile of batch) {
-        const profile = repaired(rawProfile)
-        if (isRecruitingOpportunity(profile.originalText || profile.description || '')) continue
-        const key = dedupKey(profile)
-        const previous = byKey.get(key)
-        const input = candidateAiInput(profile)
-        const reusableAi = previous?.ai?.fingerprint === input.fingerprint ? previous.ai : undefined
-        const withAi = reusableAi?.status === 'completed' && reusableAi.data
-          ? mergeCandidateAi(profile, reusableAi.data)
-          : profile
-        byKey.set(key, { ...withAi, lastSeen: nowIso, ai: reusableAi })
-      }
     } catch (error) {
       sourceFailures += 1
       console.error(`[hiring] source "${source}" failed:`, (error as Error).message)
@@ -485,8 +480,28 @@ async function performRefresh(): Promise<{ fetched: number; stored: number }> {
     else seen.add(key)
   }
 
-  const kept = pruneStore(byKey, now)
-  await persistStore(kept)
+  const kept = await withHiringStoreLock(async () => {
+    // Load after the long crawl, under the write lock. Loading before it meant
+    // a scheduled full refresh could overwrite every per-source queue update
+    // that completed while the crawl was running.
+    const byKey = new Map<string, StoredProfile>()
+    for (const profile of await loadStored()) byKey.set(dedupKey(profile), profile)
+    for (const rawProfile of crawled) {
+      const profile = repaired(rawProfile)
+      if (isRecruitingOpportunity(profile.originalText || profile.description || '')) continue
+      const key = dedupKey(profile)
+      const previous = byKey.get(key)
+      const input = candidateAiInput(profile)
+      const reusableAi = previous?.ai?.fingerprint === input.fingerprint ? previous.ai : undefined
+      const withAi = reusableAi?.status === 'completed' && reusableAi.data
+        ? mergeCandidateAi(profile, reusableAi.data)
+        : profile
+      byKey.set(key, { ...withAi, lastSeen: nowIso, ai: reusableAi })
+    }
+    const next = pruneStore(byKey, now)
+    await persistStore(next)
+    return next
+  })
   scheduleCandidateAi(kept)
   await syncDb(kept)
   // Everything the crawl produced, minus what each stage removed.
@@ -526,24 +541,27 @@ export async function refreshHiringChannel(handle: string): Promise<{ fetched: n
 
   const now = Date.now()
   const nowIso = new Date(now).toISOString()
-  const byKey = new Map<string, StoredProfile>()
-  for (const profile of await loadStored()) byKey.set(dedupKey(profile), profile)
+  const kept = await withHiringStoreLock(async () => {
+    const byKey = new Map<string, StoredProfile>()
+    for (const profile of await loadStored()) byKey.set(dedupKey(profile), profile)
 
-  for (const rawProfile of outcome.result.profiles) {
-    const profile = repaired(rawProfile)
-    if (isRecruitingOpportunity(profile.originalText || profile.description || '')) continue
-    const key = dedupKey(profile)
-    const previous = byKey.get(key)
-    const input = candidateAiInput(profile)
-    const reusableAi = previous?.ai?.fingerprint === input.fingerprint ? previous.ai : undefined
-    const withAi = reusableAi?.status === 'completed' && reusableAi.data
-      ? mergeCandidateAi(profile, reusableAi.data)
-      : profile
-    byKey.set(key, { ...withAi, lastSeen: nowIso, ai: reusableAi })
-  }
+    for (const rawProfile of outcome.result.profiles) {
+      const profile = repaired(rawProfile)
+      if (isRecruitingOpportunity(profile.originalText || profile.description || '')) continue
+      const key = dedupKey(profile)
+      const previous = byKey.get(key)
+      const input = candidateAiInput(profile)
+      const reusableAi = previous?.ai?.fingerprint === input.fingerprint ? previous.ai : undefined
+      const withAi = reusableAi?.status === 'completed' && reusableAi.data
+        ? mergeCandidateAi(profile, reusableAi.data)
+        : profile
+      byKey.set(key, { ...withAi, lastSeen: nowIso, ai: reusableAi })
+    }
 
-  const kept = pruneStore(byKey, now)
-  await persistStore(kept)
+    const next = pruneStore(byKey, now)
+    await persistStore(next)
+    return next
+  })
   scheduleCandidateAi(kept)
 
   if (hiringDbEnabled()) {

@@ -7,6 +7,7 @@ import {
   findSharedJob,
   flatPhotoUrl,
 } from '../utils/sharePreview'
+import { removeExistingSocialMeta } from '../utils/shareHead'
 
 function queryValue(value: unknown): string {
   return Array.isArray(value) ? String(value[0] ?? '') : String(value ?? '')
@@ -30,31 +31,6 @@ function absoluteFlatImage(flat: any): string {
   }
 
   return `${SHARE_SITE_URL}/web-app-manifest-512x512.png`
-}
-
-const SOCIAL_META_MARKERS = [
-  'property="og:title"',
-  "property='og:title'",
-  'property="og:description"',
-  "property='og:description'",
-  'property="og:image"',
-  "property='og:image'",
-  'property="og:url"',
-  "property='og:url'",
-  'property="og:type"',
-  "property='og:type'",
-  'name="twitter:card"',
-  "name='twitter:card'",
-  'name="twitter:title"',
-  "name='twitter:title'",
-  'name="twitter:description"',
-  "name='twitter:description'",
-  'name="twitter:image"',
-  "name='twitter:image'",
-]
-
-function removeExistingSocialMeta(head: string[]): string[] {
-  return head.filter((entry) => !SOCIAL_META_MARKERS.some((marker) => entry.includes(marker)))
 }
 
 export default defineNitroPlugin((nitroApp) => {

@@ -8,6 +8,7 @@ import {
   type SourceRun,
   type WebSourceDiagnostic,
 } from './hiringDiagnostics'
+import { withHiringStoreLock } from './hiringStoreLock'
 
 const UA =
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ' +
@@ -818,36 +819,39 @@ async function persistWebProfiles(
   diagnostic: SourceRun,
   sourceKey: string,
 ): Promise<PersistResult> {
-  const now = new Date().toISOString()
-  let existing: StoredProfile[] = []
-  try {
-    const raw = await useRedis().get(STORE_KEY)
-    if (raw) existing = JSON.parse(raw) as StoredProfile[]
-  } catch {
-    // If Redis is cold, hydrate from Postgres below before writing a new store.
-  }
-  if (!existing.length && hiringDbEnabled()) {
-    existing = (await loadDbCandidates()).map((profile) => ({ ...profile, lastSeen: now }))
-  }
+  const persisted = await withHiringStoreLock(async () => {
+    const now = new Date().toISOString()
+    let existing: StoredProfile[] = []
+    try {
+      const raw = await useRedis().get(STORE_KEY)
+      if (raw) existing = JSON.parse(raw) as StoredProfile[]
+    } catch {
+      // If Redis is cold, hydrate from Postgres below before writing a new store.
+    }
+    if (!existing.length && hiringDbEnabled()) {
+      existing = (await loadDbCandidates()).map((profile) => ({ ...profile, lastSeen: now }))
+    }
 
-  const byKey = new Map<string, StoredProfile>()
-  for (const profile of existing) byKey.set(storeKey(profile), profile)
-  for (const profile of profiles) byKey.set(storeKey(profile), { ...profile, lastSeen: now })
+    const byKey = new Map<string, StoredProfile>()
+    for (const profile of existing) byKey.set(storeKey(profile), profile)
+    for (const profile of profiles) byKey.set(storeKey(profile), { ...profile, lastSeen: now })
 
-  const cutoff = cutoffDate().getTime()
-  const fromSource = (profile: StoredProfile) => profile.sourceKey === sourceKey
-  const beforeRetention = [...byKey.values()].filter(fromSource).length
-  const kept = [...byKey.values()].filter((profile) => {
-    // Web boards have already passed source-specific candidate parsing. Do not
-    // run Telegram vacancy heuristics over them here.
-    const time = Date.parse(profile.activityAt || profile.updatedAt || profile.createdAt || '')
-    return Number.isFinite(time) && time >= cutoff && time <= Date.now() + 48 * 60 * 60 * 1000
+    const cutoff = cutoffDate().getTime()
+    const fromSource = (profile: StoredProfile) => profile.sourceKey === sourceKey
+    const beforeRetention = [...byKey.values()].filter(fromSource).length
+    const kept = [...byKey.values()].filter((profile) => {
+      // Web boards have already passed source-specific candidate parsing. Do not
+      // run Telegram vacancy heuristics over them here.
+      const time = Date.parse(profile.activityAt || profile.updatedAt || profile.createdAt || '')
+      return Number.isFinite(time) && time >= cutoff && time <= Date.now() + 48 * 60 * 60 * 1000
+    })
+
+    await useRedis().set(STORE_KEY, JSON.stringify(kept), 'EX', STORE_TTL_SECONDS)
+    const shown = kept.filter(fromSource).length
+    return { stored: kept.length, shown, expired: Math.max(0, beforeRetention - shown) }
   })
-
-  await useRedis().set(STORE_KEY, JSON.stringify(kept), 'EX', STORE_TTL_SECONDS)
   if (hiringDbEnabled()) await saveDbCandidates(profiles, diagnostic)
-  const shown = kept.filter(fromSource).length
-  return { stored: kept.length, shown, expired: Math.max(0, beforeRetention - shown) }
+  return persisted
 }
 
 export async function refreshHiringWebSource(handle: string): Promise<{ fetched: number; stored: number; candidates: number } | null> {

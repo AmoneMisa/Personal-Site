@@ -4,6 +4,7 @@
 import type { CvProfile, HiringSource } from './hiringTypes'
 import { emptyCursor, loadCursors, saveCursor, type ChannelCursor } from './hiringCursors'
 import { isLikelyTelegramVacancy } from './sources'
+import { extractCandidateName } from './hiringCandidateFields'
 
 const UA = 'hiringFinder/1.0 (CV board; contact: admin@whiteslove.me)'
 // Mixed UZ boards can publish hundreds of vacancies between two candidate
@@ -99,7 +100,7 @@ let telegramDiagnostics: HiringSourceDiagnostic[] = []
 // `#ish #qidiryapman` is two separate hashtags and was not matched by the old
 // generic intent regex.
 const UZ_CANDIDATE_MARKER_RE =
-  /(?:#(?:ish[_-]?kerak|menga[_-]?ish[_-]?kerak|ish[_-]?izlayapman)|#ish\s+#qidir(?:yapman|aman)|\b(?:menga\s+)?ish\s+(?:joyi\s+)?kerak\b|\bish\s+(?:qidiryapman|qidiraman|izlayapman)\b|\b(?:ish|ishga)\s+joylash(?:moqchiman|ish)\b|\b(?:я\s+)?ищу\s+(?:себе\s+)?(?:работу|подработку)\b|\bработу\s+ищу\b|\bнужна\s+(?:мне\s+)?работа\b|\bмогу\s+работать\b|#ищу\s+#работу|\b(?:у\s+пошуку|шукаю)\s+(?:роботу|підробіток)\b)/iu
+  /(?:#(?:ish[_-]?kerak|menga[_-]?ish[_-]?kerak|ish[_-]?izlayapman)|#ish\s+#qidir(?:yapman|aman)|\b(?:menga\s+)?ish\s+(?:joyi\s+)?kerak\b|\bish\s+(?:qidiryapman|qidiraman|izlayapman)\b|\b(?:ish|ishga)\s+joylash(?:moqchiman|ish)\b|(?:^|\n)\s*so(?:['’‘])ralgan\s+ish\s+(?:joyi|turi)\s*[:—-]|\b(?:я\s+)?ищу\s+(?:себе\s+)?(?:работу|подработку)\b|\bработу\s+ищу\b|\bнужна\s+(?:мне\s+)?работа\b|\bмогу\s+работать\b|#ищу\s+#работу|\b(?:у\s+пошуку|шукаю)\s+(?:роботу|підробіток)\b)/iu
 
 // Employer language must always win over a positive hashtag. This matters for
 // UZ boards where a vacancy can be tagged `#ish_izlayapman #vakansiya`.
@@ -109,7 +110,7 @@ const UZ_EMPLOYER_RE =
 // Structured fields commonly used by actual self-posted CV cards. These are
 // evidence of a candidate, but never override employer/vacancy signals.
 const CANDIDATE_FORM_RE =
-  /(?:^|\n)\s*[^\p{L}\p{N}\n]{0,8}(?:ismi|ismim|f\.?i\.?o\.?|фио|имя|yoshi|yoshim|возраст|qidirayotgan\s+kasb|so(?:'|’)ralgan\s+ish\s+turi|ожидаемая\s+работа|желаемая\s+(?:должность|работа)|tajriba|опыт\s+работы)\s*[:—-]/imu
+  /(?:^|\n)\s*[^\p{L}\p{N}\n]{0,8}(?:ism(?:i|im)?(?:\s*[-–—]\s*(?:familya|familiya))?|familya|familiya|f\.?i\.?o\.?|фио|имя|yoshi|yoshim|tug(?:['’‘])ilgan\s+yili|возраст|qidirayotgan\s+kasb|so(?:['’‘])ralgan\s+ish\s+(?:joyi|turi)|yashash\s+manzili|ma(?:['’‘])lumoti|ожидаемая\s+работа|желаемая\s+(?:должность|работа)|tajribasi?|опыт\s+работы)\s*[:—-]/imu
 
 // Verified during the August 2026 audit. Mixed boards are listed only when
 // recent candidate posts were found; vacancy-only/dead/wrong-entity handles are
@@ -329,7 +330,7 @@ function blockAfter(text: string, names: string): string | undefined {
 const MAX_PLAUSIBLE_EXPERIENCE_YEARS = 55
 
 function parseExperience(text: string): number | undefined {
-  const match = text.match(/(?:опыт|досвід|experience|staj|tajriba)\s*[:—-]?\s*(\d+)\+?\s*(?:лет|рок(?:и|ів)?|years|yil|йил)?/iu)
+  const match = text.match(/(?:опыт|досвід|experience|staj|tajriba\p{L}*)\s*[:—-]?\s*(\d+)\+?\s*(?:лет|рок(?:и|ів)?|years|yil|йил)?/iu)
     // The keyword is required on this side: a bare "80 років" is somebody's
     // age, not their career.
     || text.match(/(\d+)\+?\s*(?:лет|рок(?:и|ів)?|years|yil|йил)\s+(?:опыт\p{L}*|досвід\p{L}*|experience|tajriba\p{L}*|staj\p{L}*)/iu)
@@ -340,11 +341,11 @@ function parseExperience(text: string): number | undefined {
 }
 
 function parseName(text: string): string {
-  return (field(text, "фио|ф\.и\.о\.?|піб|full name|name|имя|ім(?:ʼ|')я|fio|ism|ismim") || '').slice(0, 100)
+  return extractCandidateName(text)
 }
 
 function parseRole(text: string): string {
-  const targetNames = 'желаемая (?:работа|должность)|бажана (?:робота|посада)|ожидаемая работа|ищу работу|шукаю роботу|ish kerak|menga ish kerak|ish joyi kerak|qidirayotgan kasb|so(?:\'|’)ralgan ish turi|position|role|должность|позиция|посада|lavozim|kasb(?:i|im)?|mutaxassislik|specialization|специализация|target role'
+  const targetNames = 'желаемая (?:работа|должность)|бажана (?:робота|посада)|ожидаемая работа|ищу работу|шукаю роботу|ish kerak|menga ish kerak|ish joyi kerak|qidirayotgan kasb|so(?:\'|’|‘)ralgan ish (?:joyi|turi)|position|role|должность|позиция|посада|lavozim|kasb(?:i|im)?|mutaxassislik|specialization|специализация|target role'
   const explicit = field(text, targetNames)
   if (explicit && ROLE_RE.test(explicit)) return explicit.slice(0, 180)
 
@@ -442,7 +443,8 @@ function messageToProfile(
   const skills = parseSkills(text)
   if (needle && !`${name} ${role} ${text} ${skills.join(' ')}`.toLocaleLowerCase('ru').includes(needle)) return null
 
-  const explicitCity = field(text, 'location|city|локация|локація|город|місто|shahar|manzil|hozirgi manzil')
+  const explicitLocation = field(text, 'location|city|локация|локація|город|місто|shahar|yashash manzili|hozirgi manzil|manzil')
+  const explicitCity = explicitLocation ? detectCity(explicitLocation, channel.country) || explicitLocation : null
   const city = localToChannel
     ? explicitCity || detectCity(text, channel.country) || fallbackChannelCity(channel)
     : explicitCity || null

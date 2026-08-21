@@ -4,6 +4,7 @@
 import { canonicalSkillName, extractSkillDetails } from '~~/shared/jobSkills'
 import type { CandidateEmploymentType, CvProfile } from './hiringTypes'
 import type { Seniority } from './jobTypes'
+import { extractCandidateAge, extractCandidateName } from './hiringCandidateFields'
 
 const B = '(?<![\\p{L}\\p{N}])'
 const E = '(?![\\p{L}\\p{N}])'
@@ -308,25 +309,8 @@ export function extractContacts(text: string): { telegram?: string; email?: stri
   return out
 }
 
-export function extractCandidateName(text: string): string {
-  const match = text.match(
-    /(?:^|\n)[^\p{L}\p{N}\n]{0,10}(?:xodim|hodim|nomzod|candidate|фио|ф\.и\.о\.?|имя|ism(?:i|im)?)\s*[:—-]\s*([^\n]{2,100})/iu,
-  )
-  return (match?.[1] || '').trim().replace(/\s{2,}/g, ' ').slice(0, 100)
-}
-
 export function extractAge(text: string): number | null {
-  const patterns = [
-    /(?:возраст|вік|age|yosh)\s*[:—-]?\s*(\d{1,2})/iu,
-    /(?:мне|мені)\s+(\d{1,2})\s*(?:лет|рок(?:и|ів)?)/iu,
-    /(?:^|\n)\s*(\d{1,2})\s*(?:лет|рок(?:и|ів)?|yosh)\b/iu,
-  ]
-  for (const pattern of patterns) {
-    const match = text.match(pattern)
-    const age = match ? Number(match[1]) : Number.NaN
-    if (Number.isFinite(age) && age >= 14 && age <= 90) return age
-  }
-  return null
+  return extractCandidateAge(text)
 }
 
 function parseMoneyNumber(raw: string): number | null {
@@ -457,7 +441,13 @@ export function normalizeCandidate(profile: CvProfile): CvProfile {
   const originalText = profile.originalText || profile.description || ''
   const goalRole = extractGoalRole(originalText)
   const effectiveRole = goalRole || profile.role
-  const name = profile.name?.trim() || extractCandidateName(originalText)
+  // Repair already-stored rows where a loose adapter saved the whole labelled
+  // line ("familya: ...") as the name. New parses and old data then converge.
+  const rawName = profile.name?.trim() || ''
+  const name = (rawName ? extractCandidateName(rawName) || rawName : extractCandidateName(originalText))
+    .replace(/\s{2,}/g, ' ')
+    .trim()
+    .slice(0, 100)
   const text = `${name}\n${effectiveRole || ''}\n${originalText}`
   const extractedContacts = extractContacts(text)
   const contacts = {

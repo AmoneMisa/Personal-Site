@@ -3,6 +3,7 @@ import { hiringDbEnabled, loadDbCandidates, saveDbCandidates } from './hiringDb'
 import { normalizeCandidate } from './hiringNormalize'
 import type { SourceRun } from './hiringDiagnostics'
 import type { CvProfile } from './hiringTypes'
+import { withHiringStoreLock } from './hiringStoreLock'
 
 const UA =
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ' +
@@ -398,30 +399,33 @@ export function hiringSecondaryWebSourceHandles(): string[] {
 }
 
 async function persist(profiles: CvProfile[], diagnostic: SourceRun): Promise<number> {
-  const now = new Date().toISOString()
-  let existing: StoredProfile[] = []
-  try {
-    const raw = await useRedis().get(STORE_KEY)
-    if (raw) existing = JSON.parse(raw) as StoredProfile[]
-  } catch {
-    // Postgres fallback below.
-  }
-  if (!existing.length && hiringDbEnabled()) {
-    existing = (await loadDbCandidates()).map((item) => ({ ...item, lastSeen: now }))
-  }
+  const stored = await withHiringStoreLock(async () => {
+    const now = new Date().toISOString()
+    let existing: StoredProfile[] = []
+    try {
+      const raw = await useRedis().get(STORE_KEY)
+      if (raw) existing = JSON.parse(raw) as StoredProfile[]
+    } catch {
+      // Postgres fallback below.
+    }
+    if (!existing.length && hiringDbEnabled()) {
+      existing = (await loadDbCandidates()).map((item) => ({ ...item, lastSeen: now }))
+    }
 
-  const byKey = new Map<string, StoredProfile>()
-  for (const item of existing) byKey.set(item.url || item.id, item)
-  for (const item of profiles) byKey.set(item.url || item.id, { ...item, lastSeen: now })
+    const byKey = new Map<string, StoredProfile>()
+    for (const item of existing) byKey.set(item.url || item.id, item)
+    for (const item of profiles) byKey.set(item.url || item.id, { ...item, lastSeen: now })
 
-  const oldest = cutoff()
-  const kept = [...byKey.values()].filter((item) => {
-    const time = Date.parse(item.activityAt || item.updatedAt || item.createdAt || '')
-    return Number.isFinite(time) && time >= oldest && time <= Date.now() + 48 * 60 * 60 * 1000
+    const oldest = cutoff()
+    const kept = [...byKey.values()].filter((item) => {
+      const time = Date.parse(item.activityAt || item.updatedAt || item.createdAt || '')
+      return Number.isFinite(time) && time >= oldest && time <= Date.now() + 48 * 60 * 60 * 1000
+    })
+    await useRedis().set(STORE_KEY, JSON.stringify(kept), 'EX', STORE_TTL_SECONDS)
+    return kept.length
   })
-  await useRedis().set(STORE_KEY, JSON.stringify(kept), 'EX', STORE_TTL_SECONDS)
   if (hiringDbEnabled()) await saveDbCandidates(profiles, diagnostic)
-  return kept.length
+  return stored
 }
 
 export async function refreshHiringSecondaryWebSource(

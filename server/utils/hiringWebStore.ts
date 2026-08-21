@@ -1,4 +1,5 @@
 import { useRedis } from '~~/server/utils/redis'
+import { hiringDbEnabled, loadDbCandidates } from './hiringDb'
 import type { CvProfile } from './hiringTypes'
 
 const STORE_KEY = 'hiring:store:v4'
@@ -22,15 +23,18 @@ function active(profile: CvProfile): boolean {
  * requirement here.
  */
 export async function getStoredWebCvProfiles(): Promise<CvProfile[]> {
+  let stored: StoredProfile[] = []
   try {
     const raw = await useRedis().get(STORE_KEY)
-    if (!raw) return []
-    const stored = JSON.parse(raw) as StoredProfile[]
-    return stored
-      .filter(active)
-      .map(({ lastSeen: _lastSeen, ai: _ai, ...profile }) => profile)
+    if (raw) stored = JSON.parse(raw) as StoredProfile[]
   } catch (error) {
     console.warn('[hiring:web] store read failed:', (error as Error).message)
-    return []
   }
+
+  let web = stored.filter(active)
+  // A racing Telegram writer could previously leave a healthy Redis snapshot
+  // containing only Telegram rows. Treat "no web rows" as a web-cache miss and
+  // recover the durable board profiles instead of returning a false zero.
+  if (!web.length && hiringDbEnabled()) web = (await loadDbCandidates()).filter(active)
+  return web.map(({ lastSeen: _lastSeen, ai: _ai, ...profile }) => profile)
 }

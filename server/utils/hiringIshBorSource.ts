@@ -3,6 +3,8 @@ import { hiringDbEnabled, loadDbCandidates, saveDbCandidates } from './hiringDb'
 import { normalizeCandidate } from './hiringNormalize'
 import type { SourceRun } from './hiringDiagnostics'
 import type { CvProfile } from './hiringTypes'
+import { withHiringStoreLock } from './hiringStoreLock'
+import { extractCandidateAge, extractCandidateName } from './hiringCandidateFields'
 
 const UA =
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ' +
@@ -138,21 +140,22 @@ function field(text: string, names: string): string | null {
 }
 
 function parseName(text: string): string {
-  return (field(text, 'ФИО|Ф\.И\.О\.?|Имя|Ism(?:i|im)?|FIO') || '').slice(0, 100)
+  return extractCandidateName(text)
 }
 
 function parseAge(text: string): number | null {
-  const match = text.match(/(?:возраст|yoshi)\s*[:—-]?\s*(\d{2})\b/iu)
-    || text.match(/\b(\d{2})\s*(?:лет|год(?:а)?|yosh)\b/iu)
-  const age = match ? Number(match[1]) : Number.NaN
-  return Number.isFinite(age) && age >= 14 && age <= 90 ? age : null
+  return extractCandidateAge(text)
 }
 
 function parseExperience(text: string): number | null {
   if (/без опыта|tajribasiz/iu.test(text)) return 0
-  const match = text.match(/(?:опыт(?: работы)?|стаж|tajriba)[^\d]{0,30}(\d+(?:[.,]\d+)?)\s*(?:лет|год(?:а)?|yil)/iu)
+  const match = text.match(/(?:опыт(?: работы)?|стаж|tajriba\p{L}*)[^\d]{0,30}(\d+(?:[.,]\d+)?)\s*(?:лет|год(?:а)?|yil)/iu)
     || text.match(/\b(\d+(?:[.,]\d+)?)\s*(?:лет|год(?:а)?|yil)\b[^\n]{0,30}(?:опыт|стаж|tajriba)/iu)
   return match ? Number(match[1]!.replace(',', '.')) : null
+}
+
+function parseRole(text: string, fallback: string): string {
+  return (field(text, "so(?:['’‘])ralgan ish (?:joyi|turi)|qidirayotgan kasb|lavozim|kasb") || fallback).slice(0, 180)
 }
 
 function parseSalary(text: string): Pick<CvProfile, 'salaryMin' | 'salaryMax' | 'currency'> {
@@ -232,6 +235,7 @@ function profileFrom(summary: Summary, detailHtml: string): CvProfile | null {
   const publicContacts = contacts(detailText)
   const hasDirect = Boolean(publicContacts.phone || publicContacts.email || publicContacts.telegram)
   const age = parseAge(combined)
+  const role = parseRole(detailText, summary.role)
   const sourceId = summary.url.match(/\/id\/(\d+)/)?.[1] || summary.url
   const features: string[] = []
   if (/\b(?:student|talaba)\b|\bстудент\p{L}*\b/iu.test(combined)) features.push('Student')
@@ -255,8 +259,8 @@ function profileFrom(summary: Summary, detailHtml: string): CvProfile | null {
     sourceKey: 'ishbor-uz',
     country: 'UZ',
     name: parseName(detailText),
-    role: summary.role,
-    professions: [summary.role],
+    role,
+    professions: [role],
     previousProfessions: [],
     features,
     age,
@@ -270,6 +274,7 @@ function profileFrom(summary: Summary, detailHtml: string): CvProfile | null {
       ...(/полный день|полная занятость|to['’]?liq/iu.test(combined) ? ['full_time' as const] : []),
       ...(/неполный день|частичная занятость|подработка|qisman/iu.test(combined) ? ['part_time' as const] : []),
     ],
+    education: field(detailText, "ma(?:['’‘])lumoti|ta(?:['’‘])lim|образование") || null,
     url: summary.url,
     publishedAt: null,
     updatedAt: activity,
@@ -312,31 +317,34 @@ async function fetchProfiles(): Promise<{ profiles: CvProfile[]; fetched: number
 }
 
 async function persist(profiles: CvProfile[], diagnostic: SourceRun): Promise<number> {
-  const now = new Date().toISOString()
-  let existing: StoredProfile[] = []
-  try {
-    const raw = await useRedis().get(STORE_KEY)
-    if (raw) existing = JSON.parse(raw) as StoredProfile[]
-  } catch {
-    // Postgres hydration below is the fallback.
-  }
-  if (!existing.length && hiringDbEnabled()) {
-    existing = (await loadDbCandidates()).map((profile) => ({ ...profile, lastSeen: now }))
-  }
+  const stored = await withHiringStoreLock(async () => {
+    const now = new Date().toISOString()
+    let existing: StoredProfile[] = []
+    try {
+      const raw = await useRedis().get(STORE_KEY)
+      if (raw) existing = JSON.parse(raw) as StoredProfile[]
+    } catch {
+      // Postgres hydration below is the fallback.
+    }
+    if (!existing.length && hiringDbEnabled()) {
+      existing = (await loadDbCandidates()).map((profile) => ({ ...profile, lastSeen: now }))
+    }
 
-  const byKey = new Map<string, StoredProfile>()
-  for (const profile of existing) byKey.set(profile.url || profile.id, profile)
-  for (const profile of profiles) byKey.set(profile.url || profile.id, { ...profile, lastSeen: now })
+    const byKey = new Map<string, StoredProfile>()
+    for (const profile of existing) byKey.set(profile.url || profile.id, profile)
+    for (const profile of profiles) byKey.set(profile.url || profile.id, { ...profile, lastSeen: now })
 
-  const oldest = cutoff()
-  const kept = [...byKey.values()].filter((profile) => {
-    const time = Date.parse(profile.activityAt || profile.updatedAt || profile.createdAt || '')
-    return Number.isFinite(time) && time >= oldest && time <= Date.now() + 48 * 60 * 60 * 1000
+    const oldest = cutoff()
+    const kept = [...byKey.values()].filter((profile) => {
+      const time = Date.parse(profile.activityAt || profile.updatedAt || profile.createdAt || '')
+      return Number.isFinite(time) && time >= oldest && time <= Date.now() + 48 * 60 * 60 * 1000
+    })
+
+    await useRedis().set(STORE_KEY, JSON.stringify(kept), 'EX', STORE_TTL_SECONDS)
+    return kept.length
   })
-
-  await useRedis().set(STORE_KEY, JSON.stringify(kept), 'EX', STORE_TTL_SECONDS)
   if (hiringDbEnabled()) await saveDbCandidates(profiles, diagnostic)
-  return kept.length
+  return stored
 }
 
 export function hiringIshBorSourceHandles(): string[] {

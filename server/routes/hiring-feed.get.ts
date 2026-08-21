@@ -9,6 +9,7 @@ import { dedupeCandidates, detectMentionedProfessions, normalizeCandidate } from
 import { withProfessionExperience } from '../utils/hiringExperience'
 import { listWebSources } from '../utils/hiringWebSources'
 import { getHiringWebDiagnostics } from '../utils/hiringDiagnostics'
+import { loadDbSourceRuns } from '../utils/hiringDb'
 import { searchTargetedHiringProfiles } from '../utils/hiringTargetedSearch'
 import type { CvProfile } from '../utils/hiringTypes'
 import {
@@ -315,9 +316,10 @@ export default defineEventHandler(async (event) => {
   const limit = Math.min(PAGE_MAX, Math.max(1, Number(params.get('limit')) || 20))
 
   let warming = false
-  const [telegramStored, webStored] = await Promise.all([
+  const [telegramStored, webStored, persistedSourceRuns] = await Promise.all([
     getStoredCvProfiles(),
     getStoredWebCvProfiles(),
+    loadDbSourceRuns(),
   ])
 
   const term = targetedSearchTerm(params)
@@ -395,14 +397,29 @@ export default defineEventHandler(async (event) => {
   }
 
   const sourceStatuses = getHiringSourceDiagnostics()
-  const webSourceStatuses = getHiringWebDiagnostics()
+  // In-memory diagnostics disappear on every deploy. Merge the durable run
+  // history so a broken/empty web source remains visible instead of making a
+  // zero-result filter look like a legitimate empty market.
+  const webStatusesByHandle = new Map(
+    persistedSourceRuns
+      .filter((item) => /^web:/i.test(item.handle))
+      .map((item) => [item.handle.toLowerCase(), item]),
+  )
+  for (const item of getHiringWebDiagnostics()) webStatusesByHandle.set(item.handle.toLowerCase(), item)
+  const webSourceStatuses = [...webStatusesByHandle.values()]
+    .sort((a, b) => a.handle.localeCompare(b.handle))
   const sourceErrors = [
     ...sourceStatuses
       .filter((item) => item.status === 'error')
       .map((item) => ({ source: 'telegram', country: item.country, handle: item.handle, error: item.error || 'source failed' })),
     ...webSourceStatuses
       .filter((item) => item.status === 'error')
-      .map((item) => ({ source: item.key, country: item.country, handle: item.handle, error: item.error || 'source failed' })),
+      .map((item) => ({
+        source: 'key' in item ? item.key : item.handle.replace(/^web:/i, ''),
+        country: item.country,
+        handle: item.handle,
+        error: item.error || 'source failed',
+      })),
     ...(targetedError ? [{ source: 'flagma-uz', country: 'UZ', handle: 'web:flagma-uz:search', error: targetedError }] : []),
   ]
 
