@@ -16,7 +16,10 @@ const MAX_PAGES = 5
 interface WebCvSource {
   key: string
   label: string
-  country: 'UZ' | 'UA' | 'KZ' | 'RO'
+  country: 'UZ' | 'UA' | 'KZ' | 'RO' | 'KG'
+  /** Anchor text longer than this is not a candidate title. Cards that wrap the
+   *  whole profile in one link need a larger budget than a plain headline. */
+  maxTitleChars?: number
   root: string
   pageUrl: (page: number) => string
   linkRe: RegExp
@@ -91,16 +94,33 @@ function isRecent(iso: string | null): boolean {
   return Number.isFinite(time) && time >= cutoffDate().getTime() && time <= Date.now() + 48 * 60 * 60 * 1000
 }
 
+// Unicode-aware boundaries. JavaScript's \b only knows ASCII word characters,
+// so it never fires next to Cyrillic or Romanian letters.
+const B = '(?<![\\p{L}\\p{N}])'
+const E = '(?![\\p{L}\\p{N}])'
+const TODAY_RE = new RegExp(`${B}(?:сегодня|сьогодні|bugun|today|astăzi|azi)${E}`, 'iu')
+const YESTERDAY_RE = new RegExp(`${B}(?:вчера|вчора|kecha|yesterday|ieri)${E}`, 'iu')
+const HOURS_AGO_RE = new RegExp(`(?:^|\\s)(\\d{1,3})\\s*(?:ч\\.?|час(?:а|ов)?|год(?:ину|ини)|soat|hours?|hrs?|ore|oră)${E}`, 'iu')
+const DAYS_AGO_RE = new RegExp(`(?:^|\\s)(\\d{1,3})\\s*(?:дн(?:я|ей|і|ів)?|день|days?|kun|zile|zi)${E}`, 'iu')
+const WEEKS_AGO_RE = new RegExp(`(?:^|\\s)(\\d{1,2})\\s*(?:недел(?:ю|и|ь)|тижн(?:ів|і|я)|hafta|weeks?|săptămân\\p{L}*)${E}`, 'iu')
+const MONTHS_AGO_RE = new RegExp(`(?:^|\\s)(\\d{1,2})\\s*(?:месяц\\p{L}*|місяц\\p{L}*|oy|months?|lun\\p{L}*)${E}`, 'iu')
+
 function activityDate(text: string): string | null {
   const now = new Date()
-  if (/\b(?:сегодня|today|astăzi|azi)\b/iu.test(text)) return now.toISOString()
-  if (/\b(?:вчера|yesterday|ieri)\b/iu.test(text)) return new Date(now.getTime() - 86_400_000).toISOString()
+  if (TODAY_RE.test(text)) return now.toISOString()
+  if (YESTERDAY_RE.test(text)) return new Date(now.getTime() - 86_400_000).toISOString()
 
-  const hours = text.match(/(?:^|\s)(\d{1,3})\s*(?:ч\.?|час(?:а|ов)?|hours?|hrs?|soat)\b/iu)
+  const hours = text.match(HOURS_AGO_RE)
   if (hours) return new Date(now.getTime() - Number(hours[1]) * 3_600_000).toISOString()
 
-  const days = text.match(/(?:^|\s)(\d{1,3})\s*(?:дн(?:я|ей)?|days?|kun|zile)\b/iu)
+  const days = text.match(DAYS_AGO_RE)
   if (days) return new Date(now.getTime() - Number(days[1]) * 86_400_000).toISOString()
+
+  const weeks = text.match(WEEKS_AGO_RE)
+  if (weeks) return new Date(now.getTime() - Number(weeks[1]) * 7 * 86_400_000).toISOString()
+
+  const months = text.match(MONTHS_AGO_RE)
+  if (months) return new Date(now.getTime() - Number(months[1]) * 30 * 86_400_000).toISOString()
 
   const absolute = text.match(/\b(\d{1,2})\s+([\p{L}]+),?\s+(20\d{2})\b/iu)
   if (absolute) {
@@ -196,18 +216,36 @@ function blockAnchors(html: string, source: WebCvSource): CandidateBlock[] {
     source.linkRe.lastIndex = 0
     if (!source.linkRe.test(href)) continue
     const title = htmlText(match[2]!)
-    if (!title || title.length > 240) continue
+    if (!title || title.length > (source.maxTitleChars ?? 240)) continue
     matches.push({ index: match.index, end: re.lastIndex, href, title })
   }
 
-  return matches.map((item, index) => {
-    // Relative/absolute activity markers are often rendered immediately before
-    // the candidate title; details are rendered after it. Keep both sides but
-    // never spill through the next resume title.
-    const start = Math.max(0, item.index - 350)
-    const end = matches[index + 1]?.index ?? Math.min(html.length, item.end + 5_000)
+  // A card usually contains several links to the same profile — the card
+  // itself, "expand", "report". Cutting at the next matching anchor therefore
+  // cut cards in half and produced one empty block per secondary link. Group by
+  // profile instead: a card runs from its first anchor to the first anchor of
+  // the next distinct profile, which is what "the containing card" means here.
+  const byProfile: Array<{ href: string; first: number; end: number; titles: string[] }> = []
+  for (const item of matches) {
+    const current = byProfile[byProfile.length - 1]
+    if (current && current.href === item.href) {
+      current.end = Math.max(current.end, item.end)
+      current.titles.push(item.title)
+      continue
+    }
+    byProfile.push({ href: item.href, first: item.index, end: item.end, titles: [item.title] })
+  }
+
+  return byProfile.map((item, index) => {
+    // Activity markers are rendered just before or just after the card, so keep
+    // a margin on both sides without spilling into the next profile.
+    const start = Math.max(0, item.first - 350)
+    const nextStart = byProfile[index + 1]?.first
+    const end = nextStart ?? Math.min(html.length, item.end + 5_000)
     const raw = html.slice(start, end)
-    return { href: item.href, title: item.title, html: raw, text: htmlText(raw) }
+    // The longest anchor text is the card; the short ones are its controls.
+    const title = item.titles.reduce((longest, candidate) => (candidate.length > longest.length ? candidate : longest), '')
+    return { href: item.href, title, html: raw, text: htmlText(raw) }
   })
 }
 
@@ -267,16 +305,51 @@ function parseCareerist(block: CandidateBlock, source: WebCvSource): CvProfile |
   return profileBase(source, block, activity!, { name, role: block.title, experienceYears, updatedAt: activity })
 }
 
+// Longest alternative first: "года" must not match as "год" plus a stray "а".
+const KZ_AGE_LINE_RE = /^(\d{2})\s*(?:года|лет|год)\s*,?\s*(.*)$/iu
+const KZ_SALARY_LINE_RE = /(\d[\d\s]{2,})\s*(?:KZT|₸|тенге)/iu
+
+/**
+ * The card is a sequence of lines: name, age, city, desired role, salary, then
+ * skill chips and a summary. Positions are read relative to the age line,
+ * which is the one reliably recognisable row, so a reordered or renamed
+ * wrapper does not break the parse.
+ */
 function parseRabotaKz(block: CandidateBlock, source: WebCvSource): CvProfile | null {
   const activity = activityDate(block.text)
   if (!isRecent(activity)) return null
-  const text = block.title
-  const lead = text.match(/^(.{2,80}?)\s+(\d{2})\s+(?:год|года|лет),\s*([^\n]{2,60}?)\s+(.+)$/iu)
-  const name = lead?.[1]?.trim() || ''
-  const city = lead?.[3]?.trim() || cityFrom(text, 'KZ')
-  let role = lead?.[4]?.trim() || text
-  role = role.replace(/\s+\d[\d\s]*\s*(?:KZT|₸|тенге)\b[\s\S]*$/iu, '').trim()
-  return profileBase(source, block, activity!, { name, role, city, age: lead ? Number(lead[2]) : parseAge(text), updatedAt: activity })
+
+  const lines = block.title.split('\n').map((line) => line.trim()).filter(Boolean)
+  const ageIndex = lines.findIndex((line) => KZ_AGE_LINE_RE.test(line))
+  // Secondary anchors ("Развернуть", "Пожаловаться") point at the same profile
+  // and carry no card; without them the URL-keyed map would overwrite a real
+  // profile with an empty one.
+  if (ageIndex < 0 && lines.length < 3) return null
+
+  const ageMatch = ageIndex >= 0 ? lines[ageIndex]!.match(KZ_AGE_LINE_RE) : null
+  const age = ageMatch ? Number(ageMatch[1]) : parseAge(block.text)
+  const name = ageIndex > 0 ? lines[ageIndex - 1]! : ''
+  const city = ageMatch?.[2]?.trim() || cityFrom(block.text, 'KZ')
+
+  const salaryIndex = lines.findIndex((line) => KZ_SALARY_LINE_RE.test(line))
+  // The desired role sits directly under the age/city row.
+  const roleIndex = ageIndex >= 0 ? ageIndex + 1 : 0
+  const role = (salaryIndex === roleIndex ? '' : lines[roleIndex] || '').trim()
+
+  // Chips between the salary and the free-text summary are the candidate's
+  // own skill list; the long line after them is the summary.
+  const skills = salaryIndex >= 0
+    ? lines.slice(salaryIndex + 1).filter((line) => line.length >= 3 && line.length <= 70).slice(0, 12)
+    : []
+
+  return profileBase(source, block, activity!, {
+    name,
+    role: role || block.title.split('\n')[0] || '',
+    city,
+    age: Number.isFinite(age) ? age : null,
+    skills,
+    updatedAt: activity,
+  })
 }
 
 function parseTalent(block: CandidateBlock, source: WebCvSource): CvProfile | null {
@@ -314,7 +387,7 @@ const SOURCES: WebCvSource[] = [
     parse: parseCareerist,
   },
   {
-    key: 'rabotakz', label: 'Rabota.kz', country: 'KZ', root: 'https://rabota.kz/cv/list',
+    key: 'rabotakz', label: 'Rabota.kz', country: 'KZ', root: 'https://rabota.kz/cv/list', maxTitleChars: 900,
     pageUrl: (page) => page === 1 ? 'https://rabota.kz/cv/list' : `https://rabota.kz/cv/list?page=${page}`,
     linkRe: /rabota\.kz\/cv\/list\/[a-z0-9-]{8,}/i, parse: parseRabotaKz,
   },
@@ -346,6 +419,20 @@ export interface WebSourceAudit {
   parsed: number
   rejected: number
   rejectReasons: string[]
+  /** Why blocks were rejected: no activity date, outside the window, or an
+   *  unrecognised card shape. Separates a stale board from a broken parser. */
+  rejectedNoDate: number
+  rejectedStale: number
+  rejectedShape: number
+  rejectSamples: string[]
+  fieldCounts: {
+    name: number
+    age: number
+    city: number
+    role: number
+    salary: number
+    activity: number
+  }
   withinWindow: number
   deduplicated: number
   fetchDurationMs: number
@@ -379,6 +466,11 @@ export async function auditWebSource(key: string, maxPages = 2): Promise<WebSour
     parsed: 0,
     rejected: 0,
     rejectReasons: [],
+    rejectedNoDate: 0,
+    rejectedStale: 0,
+    rejectedShape: 0,
+    rejectSamples: [],
+    fieldCounts: { name: 0, age: 0, city: 0, role: 0, salary: 0, activity: 0 },
     withinWindow: 0,
     deduplicated: 0,
     fetchDurationMs: 0,
@@ -414,9 +506,25 @@ export async function auditWebSource(key: string, maxPages = 2): Promise<WebSour
       const profile = source.parse(block, source)
       if (!profile) {
         audit.rejected += 1
+        const activity = activityDate(block.text)
+        if (!activity) audit.rejectedNoDate += 1
+        else if (!isRecent(activity)) audit.rejectedStale += 1
+        else audit.rejectedShape += 1
+        if (audit.rejectSamples.length < 3) {
+          audit.rejectSamples.push(
+            `${activity ? (isRecent(activity) ? 'shape' : 'stale ' + activity.slice(0, 10)) : 'no-date'}: ` +
+            `${block.title.replace(/\n/g, ' | ').slice(0, 90)}`,
+          )
+        }
         continue
       }
       audit.parsed += 1
+      if (profile.name) audit.fieldCounts.name += 1
+      if (profile.age != null) audit.fieldCounts.age += 1
+      if (profile.city) audit.fieldCounts.city += 1
+      if (profile.role) audit.fieldCounts.role += 1
+      if (profile.salaryMin != null || profile.salaryMax != null) audit.fieldCounts.salary += 1
+      if (profile.activityAt) audit.fieldCounts.activity += 1
 
       const stamp = Date.parse(profile.activityAt || profile.updatedAt || profile.createdAt || '')
       if (Number.isFinite(stamp)) {
