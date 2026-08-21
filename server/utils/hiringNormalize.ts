@@ -109,7 +109,7 @@ const PROFESSION_RULES: ProfessionRule[] = [
   { name: 'Medical Assistant', re: /\bmedical\s+assistant\b|фельдшер|медичн(?:ий|а)\s+асистент/iu },
 
   // Education / childcare.
-  { name: 'Tutor', re: /\btutor\b|репетитор|repetitor/iu },
+  { name: 'Tutor', re: /\btutor\b|репетитор|rep(?:e|i)titor(?:lik)?/iu },
   { name: 'Kindergarten Teacher', re: /\bkindergarten\s+teacher\b|воспитател|виховател|tarbiyachi/iu },
   { name: 'Nanny', re: /\bnanny\b|няня|нянечк|enaga/iu },
   { name: 'Teacher', re: /\bteacher\b|учитель|вчитель|преподавател|викладач|o(?:'|’)qituvchi/iu },
