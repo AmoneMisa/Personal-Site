@@ -215,6 +215,60 @@ function contacts(text: string): CvProfile['contacts'] {
   }
 }
 
+/**
+ * The detail page labels its fields with icons instead of words: `map-pin`
+ * marks the location, `user` the name and gender, `graduation-cap` the
+ * education, `clock` the experience. Reading the span that follows the icon
+ * beats searching the page text, where the same words also appear in the
+ * navigation, the filter panel and the footer.
+ */
+function iconField(html: string, icon: string): string | null {
+  // The value is the span that immediately follows the icon. Anything looser
+  // matches the navigation, which uses the same icon set — and the icon name
+  // must be terminated, or "user" also matches the nav's "users".
+  const match = html.match(new RegExp(
+    `lucide:${icon}"[^>]*></iconify-icon>\\s*(?:</div>\\s*)?<span[^>]*>([^<]{1,200})</span>`,
+    'i',
+  ))
+  return match ? htmlText(match[1]!).trim() || null : null
+}
+
+/**
+ * The board's own page summary carries the asked salary after a 💵 marker, in
+ * whatever shape the candidate typed it: "4000000", "2-4 mln", "5 mlndan 15
+ * mlngacha", "7 milliyondanyuqori". A number under a thousand alongside a
+ * "million" word is millions; anything else is a plain sum.
+ */
+function metaSalary(html: string): Pick<CvProfile, 'salaryMin' | 'salaryMax' | 'currency'> {
+  const raw = html.match(/name="description"\s+content="[^"]*?💵:\s*([^."]{1,40})/i)?.[1]
+  if (!raw) return {}
+  const usd = /\$|usd|доллар/iu.test(raw)
+  const millions = /(?:mln|mil|million|milliyon|млн|миллион)/iu.test(raw)
+  const values = [...raw.matchAll(/\d[\d\s]*/g)]
+    .map((match) => Number(match[0].replace(/\s+/g, '')))
+    .filter((value) => Number.isFinite(value) && value > 0)
+    .map((value) => (millions && value < 1_000 ? value * 1_000_000 : value))
+    .filter((value) => (usd ? value >= 50 && value <= 100_000 : value >= 100_000 && value <= 500_000_000))
+  if (!values.length) return {}
+  return { salaryMin: Math.min(...values), salaryMax: Math.max(...values), currency: usd ? 'USD' : 'UZS' }
+}
+
+/** "1 год", "У меня нет опыта работы" — the clock field, not free text. */
+function iconExperience(html: string): number | null {
+  const value = iconField(html, 'clock')
+  if (!value) return null
+  if (/нет опыта|tajriba(?:m)? yo(?:'|’)q|tajribasiz/iu.test(value)) return 0
+  const match = value.match(/(\d+(?:[.,]\d+)?)\s*(?:год|года|лет|yil)/iu)
+  return match ? Number(match[1]!.replace(',', '.')) : null
+}
+
+/** "Hilola (Женщина)" — the board prints the gender next to the name. */
+function iconName(html: string): string {
+  const value = iconField(html, 'user') || ''
+  const name = value.replace(/\s*\((?:женщина|мужчина|ayol|erkak|female|male)\)\s*$/iu, '').trim()
+  return name.length >= 2 && name.length <= 80 && !/^\d/.test(name) ? name : ''
+}
+
 function triState(text: string, positive: RegExp, negative: RegExp): boolean | null {
   if (negative.test(text)) return false
   if (positive.test(text)) return true
@@ -253,16 +307,16 @@ function profileFrom(summary: Summary, detailHtml: string): CvProfile | null {
     origin: 'web',
     sourceKey: 'ishbor-uz',
     country: 'UZ',
-    name: parseName(detailText),
+    name: iconName(detailHtml) || parseName(detailText),
     role,
     professions: [role],
     previousProfessions: [],
     features,
     age,
     isAdult: age == null ? true : age >= 18,
-    experienceYears: parseExperience(combined),
+    experienceYears: iconExperience(detailHtml) ?? parseExperience(combined),
     // The shared list also knows the regions this board prints instead of a city.
-    city: cityFrom(combined, 'UZ'),
+    city: cityFrom(iconField(detailHtml, 'map-pin') || '', 'UZ') || cityFrom(combined, 'UZ'),
     district: detect(combined, DISTRICT_ALIASES),
     remote,
     relocationReady,
@@ -270,7 +324,9 @@ function profileFrom(summary: Summary, detailHtml: string): CvProfile | null {
       ...(/полный день|полная занятость|to['’]?liq/iu.test(combined) ? ['full_time' as const] : []),
       ...(/неполный день|частичная занятость|подработка|qisman/iu.test(combined) ? ['part_time' as const] : []),
     ],
-    education: field(detailText, "ma(?:['’‘])lumoti|ta(?:['’‘])lim|образование") || null,
+    education: iconField(detailHtml, 'graduation-cap')
+      || field(detailText, "ma(?:['’‘])lumoti|ta(?:['’‘])lim|образование")
+      || null,
     url: summary.url,
     publishedAt: null,
     updatedAt: activity,
@@ -282,7 +338,9 @@ function profileFrom(summary: Summary, detailHtml: string): CvProfile | null {
     contacts: publicContacts,
     contact: publicContacts.telegram || publicContacts.email || publicContacts.phone || summary.url,
     contactType: hasDirect ? 'direct' : 'platform',
+    // The summary line is the board's own field; the page text is a guess.
     ...parseSalary(combined),
+    ...metaSalary(detailHtml),
   })
 }
 
