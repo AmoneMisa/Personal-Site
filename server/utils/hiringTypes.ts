@@ -26,7 +26,10 @@ export interface CvProfile {
   origin?: CandidateOrigin
   /** Stable source adapter key, e.g. flagma-uz or rabotakz. */
   sourceKey?: string
+  /** Where the candidate is, when known. Empty when the post does not say. */
   country: string
+  /** The channel country this profile came from — never a claim about the candidate. */
+  sourceCountry?: string
   /** Candidate full name when present in the source. Empty when not provided. */
   name: string
   /** Primary normalized desired profession/headline. Kept for backwards compatibility. */

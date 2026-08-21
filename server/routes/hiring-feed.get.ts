@@ -2,7 +2,7 @@
 // Search runs through Elasticsearch when available and falls back to memory.
 
 import { getHiringSourceDiagnostics, HIRING_COUNTRIES } from '../utils/hiringSources'
-import { getStoredCvProfiles, isHiringStoreCold, refreshHiringStore } from '../utils/hiringStore'
+import { getStoreFunnel, getStoredCvProfiles, isHiringStoreCold, refreshHiringStore } from '../utils/hiringStore'
 import { getStoredWebCvProfiles } from '../utils/hiringWebStore'
 import { candidateSearchAvailable, searchCandidates } from '../utils/hiringElastic'
 import { dedupeCandidates, normalizeCandidate } from '../utils/hiringNormalize'
@@ -247,6 +247,7 @@ export default defineEventHandler(async (event) => {
     sourceCounts: sourceCounts(profiles),
     sourceStatuses,
     sourceErrors,
+    funnel: getStoreFunnel(),
     warming,
     engine,
     filters: {

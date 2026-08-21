@@ -15,7 +15,7 @@ import {
   pruneDbCandidates,
   saveDbCandidates,
 } from './hiringDb'
-import { normalizeCandidate } from './hiringNormalize'
+import { dedupeCandidates, normalizeCandidate } from './hiringNormalize'
 import { isCharityAppeal, isRecruitingOpportunity, repairCandidateProfile } from './hiringQuality'
 import { HIRING_SOURCES, type CandidateEmploymentType, type CvProfile, type HiringSource } from './hiringTypes'
 import {
@@ -84,6 +84,20 @@ let refreshAttempted = false
 let refreshEndedAt = 0
 let failedRefreshStreak = 0
 let dbHydratedAt = 0
+
+export interface StoreFunnel {
+  parsed: number
+  duplicate: number
+  expired: number
+  visibilityRejected: number
+  shown: number
+}
+
+let storeFunnel: StoreFunnel = { parsed: 0, duplicate: 0, expired: 0, visibilityRejected: 0, shown: 0 }
+
+export function getStoreFunnel(): StoreFunnel {
+  return { ...storeFunnel }
+}
 let refreshInFlight: Promise<{ fetched: number; stored: number }> | undefined
 
 function dedupKey(profile: CvProfile): string {
@@ -436,11 +450,13 @@ async function performRefresh(): Promise<{ fetched: number; stored: number }> {
   for (const profile of existing) byKey.set(dedupKey(profile), profile)
 
   const activeSources = HIRING_SOURCES.filter(isHiringSourceConfigured)
+  const crawled: CvProfile[] = []
   let fetched = 0
   let sourceFailures = 0
   for (const source of activeSources) {
     try {
       const batch = await fetchSource(source)
+      crawled.push(...batch)
       fetched += batch.length
       for (const rawProfile of batch) {
         const profile = repaired(rawProfile)
@@ -460,10 +476,40 @@ async function performRefresh(): Promise<{ fetched: number; stored: number }> {
     }
   }
 
+  // Attribute every profile the crawl produced, before pruning collapses them.
+  const seen = new Set<string>()
+  let duplicate = 0
+  for (const profile of crawled) {
+    const key = dedupKey(profile)
+    if (seen.has(key)) duplicate += 1
+    else seen.add(key)
+  }
+
   const kept = pruneStore(byKey, now)
   await persistStore(kept)
   scheduleCandidateAi(kept)
   await syncDb(kept)
+  // Everything the crawl produced, minus what each stage removed.
+  const withinRetention = crawled.filter((profile) => {
+    const posted = profile.createdAt ? new Date(profile.createdAt).getTime() : Number.NaN
+    return Number.isFinite(posted) && posted >= now - MAX_AGE_MONTHS * 30 * 86_400_000
+  })
+  const visible = withinRetention.filter((profile) => isVisible({ ...profile, lastSeen: nowIso }))
+  storeFunnel = {
+    parsed: crawled.length,
+    duplicate,
+    expired: crawled.length - withinRetention.length,
+    visibilityRejected: withinRetention.length - visible.length,
+    // What the feed will actually serve: the store applies visibility and
+    // dedup again on read, so counting stored rows here would overstate it.
+    shown: dedupeCandidates(publicProfiles(kept)).length,
+  }
+  console.log(
+    `[hiring] funnel: ${storeFunnel.parsed} parsed -> ${storeFunnel.duplicate} duplicate -> ` +
+    `${storeFunnel.expired} expired -> ${storeFunnel.visibilityRejected} visibility-rejected -> ` +
+    `${storeFunnel.shown} stored`,
+  )
+
   noteRefreshOutcome(kept.length === 0 && (sourceFailures > 0 || !sourcesAnswered(activeSources)))
   return { fetched, stored: kept.length }
 }
