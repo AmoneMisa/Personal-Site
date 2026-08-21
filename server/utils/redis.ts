@@ -19,3 +19,33 @@ export function useRedis() {
     }
     return redis;
 }
+
+/**
+ * Waits for the connection to be usable, briefly.
+ *
+ * With the offline queue disabled, a command issued in the first moments after
+ * boot fails outright with "Stream isn't writeable" — not because Redis is
+ * down, but because the socket has not finished connecting. Startup readers
+ * hit this on every deploy, log a scary error and fall back to the slow path.
+ * Waiting a moment is both cheaper and truthful.
+ */
+export async function redisReady(timeoutMs = 2_000): Promise<boolean> {
+    const client = useRedis();
+    if (client.status === "ready") return true;
+    if (client.status === "end") return false;
+
+    return new Promise<boolean>((resolve) => {
+        const done = (value: boolean) => {
+            clearTimeout(timer);
+            client.off("ready", onReady);
+            client.off("error", onError);
+            resolve(value);
+        };
+        const onReady = () => done(true);
+        const onError = () => done(false);
+        const timer = setTimeout(() => done(client.status === "ready"), timeoutMs);
+
+        client.once("ready", onReady);
+        client.once("error", onError);
+    });
+}
