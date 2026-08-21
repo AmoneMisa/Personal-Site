@@ -5,12 +5,13 @@ import { getHiringSourceDiagnostics, HIRING_COUNTRIES } from '../utils/hiringSou
 import { getStoreFunnel, getStoredCvProfiles, isHiringStoreCold, refreshHiringStore } from '../utils/hiringStore'
 import { getStoredWebCvProfiles } from '../utils/hiringWebStore'
 import { candidateSearchAvailable, searchCandidates } from '../utils/hiringElastic'
-import { dedupeCandidates, normalizeCandidate } from '../utils/hiringNormalize'
+import { dedupeCandidates, detectMentionedProfessions, normalizeCandidate } from '../utils/hiringNormalize'
 import { withProfessionExperience } from '../utils/hiringExperience'
 import { listWebSources } from '../utils/hiringWebSources'
 import { getHiringWebDiagnostics } from '../utils/hiringDiagnostics'
 import type { CvProfile } from '../utils/hiringTypes'
 import {
+  HIRING_PROFESSION_LABELS,
   hiringProfessionLabel,
   hiringProfessionLocale,
   type HiringProfessionLocale,
@@ -52,13 +53,31 @@ function profileProvider(profile: CvProfile): string {
   return 'Telegram'
 }
 
+function canonicalProfessions(profile: CvProfile): string[] {
+  return [...new Set([
+    ...(profile.professions || []),
+    profile.role,
+  ].map((value) => String(value || '').trim()).filter(Boolean))]
+}
+
 function profileSearchText(profile: CvProfile): string {
+  const professionTerms = [
+    ...canonicalProfessions(profile),
+    ...(profile.previousProfessions || []),
+  ].flatMap((profession) => [
+    profession,
+    hiringProfessionLabel(profession, 'ru'),
+    hiringProfessionLabel(profession, 'en'),
+  ])
+
   return [
     profile.name,
-    profile.role,
-    ...(profile.professions || []),
-    ...(profile.previousProfessions || []),
-    ...(profile.professionExperience || []).map((item) => `${item.profession} ${item.years}`),
+    ...professionTerms,
+    ...(profile.professionExperience || []).flatMap((item) => [
+      `${item.profession} ${item.years}`,
+      `${hiringProfessionLabel(item.profession, 'ru')} ${item.years}`,
+      `${hiringProfessionLabel(item.profession, 'en')} ${item.years}`,
+    ]),
     ...(profile.features || []),
     ...(profile.skills || []),
     profile.city || '',
@@ -84,6 +103,25 @@ function matchesFilters(profile: CvProfile, params: URLSearchParams): boolean {
   const expMin = Number(params.get('experienceMin'))
   if (Number.isFinite(expMin) && expMin > 0) {
     if (profile.experienceYears == null || profile.experienceYears < expMin) return false
+  }
+
+  const ageMin = Number(params.get('ageMin'))
+  if (Number.isFinite(ageMin) && ageMin > 0) {
+    if (profile.age == null || profile.age < ageMin) return false
+  }
+
+  const ageMax = Number(params.get('ageMax'))
+  if (Number.isFinite(ageMax) && ageMax > 0) {
+    if (profile.age == null || profile.age > ageMax) return false
+  }
+
+  const gender = (params.get('gender') || '').trim().toLowerCase()
+  if (gender && (profile.gender || 'unknown') !== gender) return false
+
+  const professions = list(params, 'professions')
+  if (professions.length) {
+    const owned = new Set(canonicalProfessions(profile))
+    if (!professions.some((profession) => owned.has(profession))) return false
   }
 
   const seniority = (params.get('seniority') || '').trim().toLowerCase()
@@ -123,6 +161,14 @@ function sourceCounts(profiles: CvProfile[]): Record<string, number> {
     counts[key] = (counts[key] || 0) + 1
   }
   return counts
+}
+
+function professionValues(profiles: CvProfile[]): string[] {
+  const values = new Set(Object.keys(HIRING_PROFESSION_LABELS))
+  for (const profile of profiles) {
+    for (const profession of canonicalProfessions(profile)) values.add(profession)
+  }
+  return [...values].sort((a, b) => a.localeCompare(b, 'en'))
 }
 
 function requestLocale(event: Parameters<typeof getCookie>[0]): HiringProfessionLocale {
@@ -174,10 +220,10 @@ function publicProfile(profile: CvProfile, locale: HiringProfessionLocale): CvPr
   if (profile.relocationReady === false) details.push('Not open to relocation')
   if (profile.origin === 'web' && profile.contactType === 'platform') details.push('Contact via source platform')
 
-  const canonicalProfessions = profile.professions?.length ? profile.professions : [profile.role].filter(Boolean)
+  const canonical = profile.professions?.length ? profile.professions : [profile.role].filter(Boolean)
   return {
     ...profile,
-    role: canonicalProfessions.map((profession) => hiringProfessionLabel(profession, locale)).join(', '),
+    role: canonical.map((profession) => hiringProfessionLabel(profession, locale)).join(', '),
     previousProfessions: (profile.previousProfessions || []).map((profession) => hiringProfessionLabel(profession, locale)),
     professionExperience: (profile.professionExperience || []).map((item) => ({
       ...item,
@@ -221,15 +267,22 @@ export default defineEventHandler(async (event) => {
   const byId = new Map(profiles.map((profile) => [profile.id, profile]))
 
   const query = (params.get('query') || '').trim()
+  const needsMemoryFilters = Boolean(
+    list(params, 'professions').length
+    || params.get('ageMin')
+    || params.get('ageMax')
+    || params.get('gender'),
+  )
+  const professionQuery = query ? detectMentionedProfessions(query).length > 0 : false
   let page: CvProfile[] = []
   let count = 0
   let engine: 'elasticsearch' | 'memory' = 'memory'
 
-  // Until the Elasticsearch candidate mapping includes sourceKey/origin, use
-  // the complete in-memory set whenever web CVs are present. This prevents a
-  // valid Careerist/Flagma/Rabota.kz card from disappearing only when a text
-  // query is entered.
-  if (query && !webStored.length && (await candidateSearchAvailable())) {
+  // Until the Elasticsearch candidate mapping includes sourceKey/origin and
+  // all hiring-only filters, use the complete in-memory set when correctness
+  // would otherwise differ. Profession queries also stay in memory so aliases
+  // such as "кассир" can match the canonical role "Cashier".
+  if (query && !webStored.length && !needsMemoryFilters && !professionQuery && (await candidateSearchAvailable())) {
     const result = await searchCandidates({
       query,
       countries: list(params, 'countries').map((code) => code.toUpperCase()),
@@ -292,6 +345,10 @@ export default defineEventHandler(async (event) => {
       query: params.get('query') || '',
       remote: params.get('remote') || '',
       experienceMin: params.get('experienceMin') || '',
+      ageMin: params.get('ageMin') || '',
+      ageMax: params.get('ageMax') || '',
+      gender: params.get('gender') || '',
+      professions: params.get('professions') || '',
       seniority: params.get('seniority') || '',
       skills: params.get('skills') || '',
       languages: params.get('languages') || '',
@@ -301,6 +358,7 @@ export default defineEventHandler(async (event) => {
     },
     meta: {
       countries: HIRING_COUNTRIES,
+      professions: professionValues(profiles),
       // What the source filter may offer: the two origins, then whichever
       // concrete providers actually have candidates in the store.
       sources: [
