@@ -8,6 +8,11 @@ import { candidateSearchAvailable, searchCandidates } from '../utils/hiringElast
 import { dedupeCandidates, normalizeCandidate } from '../utils/hiringNormalize'
 import { withProfessionExperience } from '../utils/hiringExperience'
 import type { CvProfile } from '../utils/hiringTypes'
+import {
+  hiringProfessionLabel,
+  hiringProfessionLocale,
+  type HiringProfessionLocale,
+} from '../../shared/hiringProfessionLabels'
 
 const PAGE_MAX = 60
 
@@ -99,21 +104,48 @@ function sourceCounts(profiles: CvProfile[]): Record<string, number> {
   return counts
 }
 
-function previousExperienceSummary(profile: CvProfile): string[] {
+function requestLocale(event: Parameters<typeof getCookie>[0]): HiringProfessionLocale {
+  const cookieLocale = getCookie(event, 'i18n_lang')
+  if (cookieLocale) return hiringProfessionLocale(cookieLocale)
+
+  const referer = getRequestHeader(event, 'referer') || ''
+  if (referer) {
+    try {
+      if (/^\/en(?:\/|$)/.test(new URL(referer).pathname)) return 'en'
+    } catch {
+      // Ignore malformed/relative referer and use the site default below.
+    }
+  }
+  return 'ru'
+}
+
+function formatYears(years: number, locale: HiringProfessionLocale): string {
+  if (locale === 'en') return `${years} ${years === 1 ? 'year' : 'years'}`
+  const integer = Math.abs(Math.trunc(years))
+  const mod10 = integer % 10
+  const mod100 = integer % 100
+  const unit = mod10 === 1 && mod100 !== 11 ? 'год'
+    : mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14) ? 'года'
+      : 'лет'
+  return `${years} ${unit}`
+}
+
+function previousExperienceSummary(profile: CvProfile, locale: HiringProfessionLocale): string[] {
   const byProfession = new Map(
     (profile.professionExperience || []).map((item) => [item.profession, item.years]),
   )
   return (profile.previousProfessions || []).map((profession) => {
+    const label = hiringProfessionLabel(profession, locale)
     const years = byProfession.get(profession)
-    return years == null ? profession : `${profession} — ${years}y`
+    return years == null ? label : `${label} — ${formatYears(years, locale)}`
   })
 }
 
-function publicProfile(profile: CvProfile): CvProfile {
+function publicProfile(profile: CvProfile, locale: HiringProfessionLocale): CvProfile {
   const details = [...(profile.tags || [])]
   for (const feature of profile.features || []) details.push(feature)
-  const previous = previousExperienceSummary(profile)
-  if (previous.length) details.push(`Previous: ${previous.join(', ')}`)
+  const previous = previousExperienceSummary(profile, locale)
+  if (previous.length) details.push(`${locale === 'en' ? 'Previous experience' : 'Предыдущий опыт'}: ${previous.join(', ')}`)
   if (profile.district) details.push(`District: ${profile.district}`)
   if (profile.age != null) details.push(`Age: ${profile.age}`)
   if (profile.isAdult === false) details.push('Minor')
@@ -121,9 +153,15 @@ function publicProfile(profile: CvProfile): CvProfile {
   if (profile.relocationReady === false) details.push('Not open to relocation')
   if (profile.origin === 'web' && profile.contactType === 'platform') details.push('Contact via source platform')
 
+  const canonicalProfessions = profile.professions?.length ? profile.professions : [profile.role].filter(Boolean)
   return {
     ...profile,
-    role: profile.professions?.length ? profile.professions.join(', ') : profile.role,
+    role: canonicalProfessions.map((profession) => hiringProfessionLabel(profession, locale)).join(', '),
+    previousProfessions: (profile.previousProfessions || []).map((profession) => hiringProfessionLabel(profession, locale)),
+    professionExperience: (profile.professionExperience || []).map((item) => ({
+      ...item,
+      profession: hiringProfessionLabel(item.profession, locale),
+    })),
     employmentType: profile.employmentTypes?.length ? profile.employmentTypes.join(', ') : profile.employmentType,
     tags: [...new Set(details)].slice(0, 20),
   }
@@ -132,6 +170,7 @@ function publicProfile(profile: CvProfile): CvProfile {
 export default defineEventHandler(async (event) => {
   const incoming = getRequestURL(event)
   const params = incoming.searchParams
+  const locale = requestLocale(event)
   const offset = Math.max(0, Number(params.get('offset')) || 0)
   const limit = Math.min(PAGE_MAX, Math.max(1, Number(params.get('limit')) || 20))
 
@@ -204,7 +243,7 @@ export default defineEventHandler(async (event) => {
   setResponseHeader(event, 'Cache-Control', 'no-store')
   return {
     count,
-    profiles: page.map(publicProfile),
+    profiles: page.map((profile) => publicProfile(profile, locale)),
     sourceCounts: sourceCounts(profiles),
     sourceStatuses,
     sourceErrors,
