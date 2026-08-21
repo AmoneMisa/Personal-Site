@@ -50,14 +50,10 @@ const ADULT_STRONG = [
   ['adult-content', /\badult\s+(?:content|industry|video|site)|порно|эротич|еротич|интим(?:н|ные услуги)|інтим/i],
   ['escort', /\bescort\b|эскорт|ескорт/i],
 ]
-// WEAK terms are legitimate roles in most contexts; they only block when an
-// explicit adult signal appears alongside them.
 const ADULT_WEAK = /\bweb\s?model\b|веб-?модел|стример(?:ша|ов)?|стрімер|чат-?оператор|chat\s+operator|оператор\s+чат/i
 const ADULT_SIGNAL = /18\+|только\s+девушк|лише\s+дівчат|откровенн|відверт|приватн(?:ые|ый)\s+(?:шоу|чат)|интимн|adult|пикантн|без\s+интима|для\s+девушек\s+от\s+18/i
 
 // ---- Hard-blocked: earnings-bait / scam recruitment -----------------------
-// These target the "no duties, just money" pattern used by scam call centres and
-// MLM. A normal office vacancy that states duties will not match.
 const SCAM = [
   ['easy-money', /лёгк(?:ий|ие)\s+(?:заработок|деньги)|легк(?:ий|ие)\s+(?:заработок|деньги)|быстр(?:ый|ые)\s+(?:заработок|деньги)|easy\s+money|швидк(?:ий|і)\s+заробіт/i],
   ['daily-payout', /выплаты\s+(?:ежедневно|каждый\s+день)|ежедневн(?:ые|ая)\s+выплат|оплата\s+каждый\s+день|щоденн[іа]\s+виплат/i],
@@ -67,8 +63,7 @@ const SCAM = [
   ['crypto-bait', /гарантированн[а-яёіїєґ]*\s+(?:прибыл|профит)|трейдинг\s+с\s+гарант|инвестиц[а-яёіїєґ]*\s+с\s+гарант/i],
 ]
 
-// Known scam recruiter/contact identifiers. Keep exact enough that a common first
-// name or Telegram mention can never hard-block a legitimate vacancy on its own.
+// Known scam recruiter/contact identifiers gathered from reviewed vacancy samples.
 const SCAM_CONTACTS = [
   ['telegram:valery_hr_36', /(?:^|[^a-z0-9_])@?valery_hr_36(?:$|[^a-z0-9_])/i],
   ['telegram:kris_mogelevich7', /(?:^|[^a-z0-9_])@?kris_mogelevich7(?:$|[^a-z0-9_])/i],
@@ -78,43 +73,45 @@ const SCAM_CONTACTS = [
   ['phone:+998931244802', /(?:\+?998[\s()\-]*)93[\s()\-]*124[\s()\-]*48[\s()\-]*02/],
 ] as const
 
-// Marriage/dating agencies are intentionally excluded from Job Finder. Explicit
-// agency wording is enough to block; generic dating products/apps are not.
-const DATING_AGENCY = /брачн(?:ое|ого|ом|ые|ых)\s+агентств|агентств[оа]\s+знакомств|шлюбн(?:е|ого|ому|і)\s+агентств|агенц(?:ія|ії)\s+знайомств|\bmarriage\s+agency\b|\bdating\s+agency\b/i
+// User-reported Telegram blacklist from Moshelovka/ONF. These matches are kept
+// strict: only an @handle or t.me link triggers, never a bare ordinary word.
+// Source: https://moshelovka.onf.ru/blacklist_site/tg-kanaly-moshennikov/
+const REPORTED_SCAM_TELEGRAM = [
+  ['moshelovka:pitupishka', /(?:@pitupishka\b|t\.me\/pitupishka\b)/i],
+  ['moshelovka:obnalmanua1', /(?:@obnalmanua1\b|t\.me\/obnalmanua1\b)/i],
+  ['moshelovka:p2p_lab_processing', /(?:@p2p_lab_processing\b|t\.me\/p2p_lab_processing\b)/i],
+  ['moshelovka:hoodmoneyp2p', /(?:@hoodmoneyp2p\b|t\.me\/hoodmoneyp2p\b)/i],
+  ['moshelovka:p2prvt', /(?:@p2prvt\b|t\.me\/p2prvt\b)/i],
+  ['moshelovka:invite-hqnj', /t\.me\/\+-HQNjKgsgHA2ZWM0/i],
+  ['moshelovka:protsessing', /(?:@protsessing\b|t\.me\/protsessing\b)/i],
+  ['moshelovka:protsessing0', /(?:@protsessing0\b|t\.me\/protsessing0\b)/i],
+  ['moshelovka:dropovod01k_chat', /(?:@dropovod01k_chat\b|t\.me\/dropovod01k_chat\b)/i],
+  ['moshelovka:invite-adhp', /t\.me\/\+adhPBvVJDdk2NjFi/i],
+  ['moshelovka:processing_skupka', /(?:@processing_skupka\b|t\.me\/processing_skupka\b)/i],
+  ['moshelovka:mamonts', /(?:@mamonts\b|t\.me\/mamonts\b)/i],
+  ['moshelovka:brown_bear0', /(?:@brown_bear0\b|t\.me\/brown_bear0\b)/i],
+  ['moshelovka:mediap2p', /(?:@mediap2p\b|t\.me\/mediap2p\b)/i],
+  ['moshelovka:proseccina', /(?:@proseccina\b|t\.me\/proseccina\b)/i],
+  ['moshelovka:amanatniy', /(?:@amanatniy\b|t\.me\/amanatniy\b)/i],
+  ['moshelovka:pitupitradersrf', /(?:@pitupitradersrf\b|t\.me\/pitupitradersrf\b)/i],
+  ['moshelovka:russiantradersclubs', /(?:@russiantradersclubs\b|t\.me\/russiantradersclubs\b)/i],
+  ['moshelovka:vvaybit', /(?:@vvaybit\b|t\.me\/vvaybit\b)/i],
+] as const
 
-// Romance-scam recruitment often avoids saying "agency" but describes a worker
-// chatting as another person, maintaining profiles, or monetising letters/gifts.
+const DATING_AGENCY = /брачн(?:ое|ого|ом|ые|ых)\s+агентств|агентств[оа]\s+знакомств|шлюбн(?:е|ого|ому|і)\s+агентств|агенц(?:ія|ії)\s+знайомств|\bmarriage\s+agency\b|\bdating\s+agency\b/i
 const DATING_CHAT_ROLE = /чат-?оператор|оператор\s+чат|оператор\s+переписк|менеджер\s+переписк|переводчик\s+(?:в|для)\s+(?:чат|переписк)|correspondence\s+(?:operator|manager)|chat\s+operator|dating\s+operator/i
 const DATING_CHAT_SIGNAL = /переписк[а-яёіїєґ]*\s+от\s+лиц[ао]\s+(?:девуш|женщин|клиент)|вести\s+(?:женск[а-яёіїєґ]*\s+)?анкет|ведение\s+(?:женск[а-яёіїєґ]*\s+)?анкет|анкет[а-яёіїєґ]*\s+девуш|общени[а-яёіїєґ]*\s+с\s+(?:мужчин|иностранц)|спілкуван[а-яёіїєґ]*\s+з\s+(?:чоловік|іноземц)|листа[а-яёіїєґ]*\s+від\s+імені|писать\s+письма\s+(?:мужчинам|иностранцам)|подарк[а-яёіїєґ]*\s+от\s+(?:мужчин|клиент)|letters?\s+on\s+behalf\s+of|chat\s+on\s+behalf\s+of/i
 
-// Paid spam/microtask recruitment: payment per message/like/post/action combined
-// with mass posting/messaging or screenshot proof. Individual signals are too
-// common in legitimate SMM/support jobs to block on their own.
 const PAID_MICROTASK = /оплат[а-яёіїєґ]*\s+(?:за\s+)?(?:кажд[а-яёіїєґ]*|одно|один)\s+(?:сообщени|лайк|комментари|пост|публикаци|рассылк|действи)|(?:платим|платят|заработок)\s+за\s+(?:сообщени|лайк|комментари|пост|публикаци|рассылк|действи)|оплата\s+за\s+(?:сообщени|лайк|комментари|пост|публикаци|рассылк|действи)|paid\s+per\s+(?:message|like|comment|post|task|action)|payment\s+per\s+(?:message|like|comment|post|task|action)/i
 const MASS_SPAM_ACTION = /массов[а-яёіїєґ]*\s+рассылк|рассыл[а-яёіїєґ]*\s+(?:сообщени|текст|объявлен)|отправ[а-яёіїєґ]*\s+сообщени[а-яёіїєґ]*\s+(?:в|по)\s+(?:групп|чат)|размещ[а-яёіїєґ]*\s+(?:текст|сообщени|объявлен|пост)[а-яёіїєґ]*\s+(?:в|по)\s+(?:групп|чат)|публик[а-яёіїєґ]*\s+(?:в|по)\s+(?:групп|чат)|(?:facebook|telegram|whatsapp)\s+(?:groups?|chats?)|post\w*\s+(?:in|to)\s+(?:facebook|telegram|whatsapp)?\s*(?:groups?|chats?)/i
 const SCREENSHOT_PROOF = /скриншот[а-яёіїєґ]*\s+(?:как\s+)?(?:подтверждени|отч[её]т|доказательств)|подтвержд[а-яёіїєґ]*\s+(?:выполнени[а-яёіїєґ]*\s+)?скриншот|присл[а-яёіїєґ]*\s+скриншот|screenshot\s+(?:as\s+)?(?:proof|confirmation|report)|send\s+(?:a\s+)?screenshot/i
 
-// Course/project reselling schemes masquerading as ordinary remote employment.
-// General course sales roles are not blocked; this targets resale/network wording
-// and known Rich Team / RT-school recruitment templates.
 const INFOPRODUCT_RESELL = /перепродават[а-яёіїєґ]*\s+(?:наш[а-яёіїєґ]*\s+)?(?:курс|проект)|\brich\s*team\b|онлайн[-\s]?школ[а-яёіїєґ]*\s+RT\b|\bFRLNS\s*TEAM\b/i
-
-// MLM/direct-selling texts often avoid the words "network marketing" and instead
-// describe building a team and taking a percentage of its turnover.
 const MLM_TEAM_COMMISSION = /созда(?:ть|вайте|ни[ея])[а-яёіїєґ\s]*команд[а-яёіїєґ]*[^.\n]{0,120}(?:процент|%)[^.\n]{0,80}(?:товарооборот|оборот)|(?:процент|%)[^.\n]{0,80}(?:товарооборот|оборот)[^.\n]{0,120}команд|партн[её]рск[а-яёіїєґ]*\s+(?:структур|команд)[а-яёіїєґ]*[^.\n]{0,100}(?:доход|заработ)/i
-
-// "Work from home" bait with no profession/duties: the recruiter promises to
-// teach the candidate how to earn and moves the conversation to Telegram.
 const VAGUE_REMOTE_EARNINGS = /научу\s+как\s+зарабат[а-яёіїєґ]*|научим\s+зарабат[а-яёіїєґ]*|зарабат[а-яёіїєґ]*\s+не\s+выходя\s+из\s+дома|желани[а-яёіїєґ]*\s+зарабат[а-яёіїєґ]*[^.\n]{0,100}(?:особых\s+навыков\s+не\s+требуется|опыт\s+не\s+нужен)/i
 const VAGUE_REMOTE_PROFILE = /особых\s+навыков\s+(?:в\s+работе\s+)?не\s+требуется|без\s+опыта|опыт\s+не\s+нужен|(?:девушк|женщин)[а-яёіїєґ\s,]*(?:от\s+)?\d{2}[\s–—-]*(?:до\s+)?\d{2}|(?:ПК|компьютер)[^.\n]{0,80}(?:интернет|доступ\s+в\s+интернет)/i
-
-// Wellness/"women's community" MLM recruitment. The combination is deliberately
-// specific; ordinary health jobs or community-manager roles do not match it.
 const WELLNESS_NETWORK_PROJECT = /(?:женщин[а-яёіїєґ]*\s*30\+|женщин[а-яёіїєґ]*\s+в\s+декрет|мам[а-яёіїєґ]*\s+в\s+декрет)[\s\S]{0,500}(?:онлайн[-\s]?проект|сообществ[а-яёіїєґ]*\s+поддержк)[\s\S]{0,500}(?:здоровь|продукц[а-яёіїєґ]*\s+для\s+здоровь)[\s\S]{0,500}(?:доход|зарабат|бесплатн[а-яёіїєґ]*\s+обучени)/i
 
-// Vague crypto recruiter pattern seen in fake "digital assets manager" postings.
-// The combination is intentionally strict so normal blockchain/crypto engineering,
-// compliance, support, product, and exchange roles are not blocked.
 const CRYPTO_JOB_SIGNAL = /цифров(?:ые|ых|ыми)\s+актив|криптовалют(?:а|ы|е|ой|ные|ных|ными)|крипто-?актив|\bDEX\b|\bDeFi\b|digital\s+assets?|crypto(?:currency)?\s+(?:services?|assets?|operations?)/i
 const VAGUE_CRYPTO_DUTIES = /работа\s+с\s+(?:предоставленн[а-яёіїєґ]*\s+)?информаци[а-яёіїєґ]*|работа\s+с\s+DEX-?инструмент[а-яёіїєґ]*|выполнени[а-яёіїєґ]*\s+(?:поставленных\s+)?задач\s+по\s+готов[а-яёіїєґ]*\s+алгоритм[а-яёіїєґ]*|использовани[а-яёіїєґ]*\s+(?:необходимых\s+)?криптовалютн[а-яёіїєґ]*\s+сервис[а-яёіїєґ]*(?:\s+(?:согласно|по)\s+(?:рабочим\s+)?инструкц[а-яёіїєґ]*)?|проверка\s+данных\s+и\s+статус[а-яёіїєґ]*\s+задач|сопровождени[а-яёіїєґ]*\s+(?:текущих\s+)?процесс[а-яёіїєґ]*|контроль\s+выполнени[а-яёіїєґ]*\s+(?:поставленных\s+)?задан[а-яёіїєґ]*|ведение\s+(?:внутренн[а-яёіїєґ]*\s+отч[её]тност|рабоч[а-яёіїєґ]*\s+данн[а-яёіїєґ]*)|соблюдени[а-яёіїєґ]*\s+инструкц[а-яёіїєґ]*|сопровожда(?:ть|ете|ете\s+их)[^.\n]{0,100}(?:операц|сделк)|следи(?:ть|те)[^.\n]{0,80}(?:параметр|операц|сделк)|готов[а-яёіїєґ]*\s+торгов[а-яёіїєґ]*\s+сигнал|working\s+with\s+(?:information|data)\s+(?:in|about)\s+(?:crypto|digital\s+assets)|follow(?:ing)?\s+(?:internal\s+)?instructions\s+for\s+crypto/i
 const BEGINNER_TRAINING_BAIT = /без\s+опыта|опыт[а-яёіїєґ\s]*не\s+(?:является\s+)?обязател|бесплатн[а-яёіїєґ]*\s+обучени|обучени[а-яёіїєґ]*\s+с\s+нуля|помощ[а-яёіїєґ]*\s+наставник|поддержк[а-яёіїєґ]*\s+(?:наставник|после\s+обучения)|no\s+experience|free\s+training|training\s+from\s+scratch|mentor(?:ship)?\s+(?:provided|available)/i
@@ -134,10 +131,6 @@ function testAll(rules: readonly (readonly [string, RegExp])[] | [string, RegExp
   return hits
 }
 
-/**
- * Classify a vacancy. `title`/`company`/`description` are raw text; everything is
- * matched case-insensitively across the combined text.
- */
 export function classifySuspicion(input: {
   title?: string
   company?: string
@@ -150,7 +143,6 @@ export function classifySuspicion(input: {
   const description = (input.description || '').trim()
   const text = `${title}\n${input.company || ''}\n${description}`
 
-  // --- hard-blocked categories ---
   const riskReasons: string[] = []
   let riskCategory: RiskCategory | null = null
 
@@ -170,6 +162,7 @@ export function classifySuspicion(input: {
 
   const scam = testAll(SCAM as [string, RegExp][], text)
   const scamContacts = testAll(SCAM_CONTACTS, text)
+  const reportedScamTelegram = testAll(REPORTED_SCAM_TELEGRAM, text)
   const datingAgency = DATING_AGENCY.test(text)
   const datingChat = DATING_CHAT_ROLE.test(text) && DATING_CHAT_SIGNAL.test(text)
   const paidSpamTask = PAID_MICROTASK.test(text) && (MASS_SPAM_ACTION.test(text) || SCREENSHOT_PROOF.test(text))
@@ -192,6 +185,7 @@ export function classifySuspicion(input: {
   if (
     scam.length
     || scamContacts.length
+    || reportedScamTelegram.length
     || datingAgency
     || datingChat
     || paidSpamTask
@@ -204,6 +198,7 @@ export function classifySuspicion(input: {
     riskCategory = riskCategory || 'scam'
     riskReasons.push(...scam.map((r) => `scam:${r}`))
     riskReasons.push(...scamContacts.map((r) => `scam:known-contact:${r}`))
+    riskReasons.push(...reportedScamTelegram.map((r) => `scam:reported-contact:${r}`))
     if (datingAgency) riskReasons.push('scam:dating-agency')
     if (datingChat) riskReasons.push('scam:dating-chat')
     if (paidSpamTask) riskReasons.push('scam:paid-spam-task')
@@ -214,7 +209,6 @@ export function classifySuspicion(input: {
     if (vagueCryptoRecruitment) riskReasons.push('scam:vague-crypto-recruitment')
   }
 
-  // --- soft "vague posting" signals ---
   const suspicionReasons: string[] = []
   const hasDuties = HAS_DUTIES.test(text)
   const longEnough = description.length >= 200
@@ -227,13 +221,10 @@ export function classifySuspicion(input: {
   }
   if (longEnough && !HAS_PRODUCT.test(text)) suspicionReasons.push('no-product-description')
 
-  // Earnings mentioned far more than the work itself.
   const earnings = (text.match(EARNINGS_FOCUS) || []).length
   const work = (text.match(WORK_WORDS) || []).length
   if (earnings >= 3 && earnings > work) suspicionReasons.push('earnings-focused')
 
-  // A high salary with no stated duties is the classic bait shape. Currency-aware
-  // so a large nominal amount in a soft currency is not treated as "high".
   const HIGH: Record<string, number> = { USD: 5000, EUR: 5000, GBP: 4000, PLN: 20000, UAH: 120000, KZT: 1500000, UZS: 40000000, RUB: 400000 }
   const cap = HIGH[String(input.salaryCurrency || '').toUpperCase()]
   const top = input.salaryMax ?? input.salaryMin
@@ -242,7 +233,6 @@ export function classifySuspicion(input: {
   return {
     riskCategory,
     riskReasons,
-    // Two independent weak signals, or any hard-block, make it worth warning about.
     suspicious: suspicionReasons.length >= 2 || riskCategory !== null,
     suspicionReasons,
   }
