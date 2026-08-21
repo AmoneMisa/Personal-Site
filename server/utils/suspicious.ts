@@ -72,6 +72,7 @@ const SCAM = [
 const SCAM_CONTACTS = [
   ['telegram:valery_hr_36', /(?:^|[^a-z0-9_])@?valery_hr_36(?:$|[^a-z0-9_])/i],
   ['telegram:kris_mogelevich7', /(?:^|[^a-z0-9_])@?kris_mogelevich7(?:$|[^a-z0-9_])/i],
+  ['telegram:gasgazz_07', /(?:^|[^a-z0-9_])@?gasgazz_07(?:$|[^a-z0-9_])/i],
 ] as const
 
 // Marriage/dating agencies are intentionally excluded from Job Finder. Explicit
@@ -90,10 +91,15 @@ const PAID_MICROTASK = /оплат[а-яёіїєґ]*\s+(?:за\s+)?(?:кажд[�
 const MASS_SPAM_ACTION = /массов[а-яёіїєґ]*\s+рассылк|рассыл[а-яёіїєґ]*\s+(?:сообщени|текст|объявлен)|отправ[а-яёіїєґ]*\s+сообщени[а-яёіїєґ]*\s+(?:в|по)\s+(?:групп|чат)|размещ[а-яёіїєґ]*\s+(?:текст|сообщени|объявлен|пост)[а-яёіїєґ]*\s+(?:в|по)\s+(?:групп|чат)|публик[а-яёіїєґ]*\s+(?:в|по)\s+(?:групп|чат)|(?:facebook|telegram|whatsapp)\s+(?:groups?|chats?)|post\w*\s+(?:in|to)\s+(?:facebook|telegram|whatsapp)?\s*(?:groups?|chats?)/i
 const SCREENSHOT_PROOF = /скриншот[а-яёіїєґ]*\s+(?:как\s+)?(?:подтверждени|отч[её]т|доказательств)|подтвержд[а-яёіїєґ]*\s+(?:выполнени[а-яёіїєґ]*\s+)?скриншот|присл[а-яёіїєґ]*\s+скриншот|screenshot\s+(?:as\s+)?(?:proof|confirmation|report)|send\s+(?:a\s+)?screenshot/i
 
+// Course/project reselling schemes masquerading as ordinary remote employment.
+// General course sales roles are not blocked; this targets resale/network wording
+// and known Rich Team / RT-school recruitment templates.
+const INFOPRODUCT_RESELL = /перепродават[а-яёіїєґ]*\s+(?:наш[а-яёіїєґ]*\s+)?(?:курс|проект)|\brich\s*team\b|онлайн[-\s]?школ[а-яёіїєґ]*\s+RT\b/i
+
 // Vague crypto recruiter pattern seen in fake "digital assets manager" postings.
 // The combination is intentionally strict so normal blockchain/crypto engineering,
 // compliance, support, product, and exchange roles are not blocked.
-const CRYPTO_JOB_SIGNAL = /цифров(?:ые|ых|ыми)\s+актив|криптовалют(?:а|ы|е|ой|ные|ных|ными)|крипто-?актив|\bDEX\b|\bDeFi\b|digital\s+assets?|crypto(?:currency)?\s+(?:services?|assets?|operations?)/i
+const CRYPTO_JOB_SIGNAL = /цифров(?:ые|ых|ыми)\s+актив|криптовалют(?:а|ы|е|ой|ные|ных|ними)|крипто-?актив|\bDEX\b|\bDeFi\b|digital\s+assets?|crypto(?:currency)?\s+(?:services?|assets?|operations?)/i
 const VAGUE_CRYPTO_DUTIES = /работа\s+с\s+(?:предоставленн[а-яёіїєґ]*\s+)?информаци[а-яёіїєґ]*|работа\s+с\s+DEX-?инструмент[а-яёіїєґ]*|выполнени[а-яёіїєґ]*\s+(?:поставленных\s+)?задач\s+по\s+готов[а-яёіїєґ]*\s+алгоритм[а-яёіїєґ]*|использовани[а-яёіїєґ]*\s+(?:необходимых\s+)?криптовалютн[а-яёіїєґ]*\s+сервис[а-яёіїєґ]*(?:\s+(?:согласно|по)\s+(?:рабочим\s+)?инструкц[а-яёіїєґ]*)?|проверка\s+данных\s+и\s+статус[а-яёіїєґ]*\s+задач|сопровождени[а-яёіїєґ]*\s+(?:текущих\s+)?процесс[а-яёіїєґ]*|контроль\s+выполнени[а-яёіїєґ]*\s+(?:поставленных\s+)?задан[а-яёіїєґ]*|ведение\s+(?:внутренн[а-яёіїєґ]*\s+отч[её]тност|рабоч[а-яёіїєґ]*\s+данн[а-яёіїєґ]*)|соблюдени[а-яёіїєґ]*\s+инструкц[а-яёіїєґ]*|working\s+with\s+(?:information|data)\s+(?:in|about)\s+(?:crypto|digital\s+assets)|follow(?:ing)?\s+(?:internal\s+)?instructions\s+for\s+crypto/i
 const BEGINNER_TRAINING_BAIT = /без\s+опыта|опыт[а-яёіїєґ\s]*не\s+(?:является\s+)?обязател|бесплатн[а-яёіїєґ]*\s+обучени|обучени[а-яёіїєґ]*\s+с\s+нуля|помощ[а-яёіїєґ]*\s+наставник|поддержк[а-яёіїєґ]*\s+(?:наставник|после\s+обучения)|no\s+experience|free\s+training|training\s+from\s+scratch|mentor(?:ship)?\s+(?:provided|available)/i
 const TELEGRAM_RECRUITMENT = /(?:обращаться|писать|контакт|подробност[а-яёіїєґ]*|связ[а-яёіїєґ]*)[^\n]{0,80}(?:telegram|телеграм)|(?:telegram|телеграм)[^\n]{0,80}(?:@?[a-z][a-z0-9_]{4,}|t\.me\/)/i
@@ -151,18 +157,20 @@ export function classifySuspicion(input: {
   const datingAgency = DATING_AGENCY.test(text)
   const datingChat = DATING_CHAT_ROLE.test(text) && DATING_CHAT_SIGNAL.test(text)
   const paidSpamTask = PAID_MICROTASK.test(text) && (MASS_SPAM_ACTION.test(text) || SCREENSHOT_PROOF.test(text))
+  const infoproductResell = INFOPRODUCT_RESELL.test(text)
   const vagueCryptoRecruitment = CRYPTO_JOB_SIGNAL.test(text)
     && VAGUE_CRYPTO_DUTIES.test(text)
     && BEGINNER_TRAINING_BAIT.test(text)
     && TELEGRAM_RECRUITMENT.test(text)
 
-  if (scam.length || scamContacts.length || datingAgency || datingChat || paidSpamTask || vagueCryptoRecruitment) {
+  if (scam.length || scamContacts.length || datingAgency || datingChat || paidSpamTask || infoproductResell || vagueCryptoRecruitment) {
     riskCategory = riskCategory || 'scam'
     riskReasons.push(...scam.map((r) => `scam:${r}`))
     riskReasons.push(...scamContacts.map((r) => `scam:known-contact:${r}`))
     if (datingAgency) riskReasons.push('scam:dating-agency')
     if (datingChat) riskReasons.push('scam:dating-chat')
     if (paidSpamTask) riskReasons.push('scam:paid-spam-task')
+    if (infoproductResell) riskReasons.push('scam:course-resell')
     if (vagueCryptoRecruitment) riskReasons.push('scam:vague-crypto-recruitment')
   }
 
