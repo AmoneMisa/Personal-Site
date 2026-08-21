@@ -3,7 +3,7 @@ import os
 import threading
 import time
 from email.utils import parsedate_to_datetime
-from urllib.parse import urlparse
+from urllib.parse import urljoin, urlparse
 
 from curl_cffi import requests as cffi
 from flask import Flask, Response, jsonify, request
@@ -17,6 +17,7 @@ RETRY_BACKOFF = max(0.0, float(os.environ.get("JOB_BROWSER_RETRY_BACKOFF", "2"))
 RATE_LIMIT_COOLDOWN = max(30, int(os.environ.get("JOB_BROWSER_429_COOLDOWN", "900")))
 BLOCK_COOLDOWN = max(30, int(os.environ.get("JOB_BROWSER_403_COOLDOWN", "900")))
 MAX_RETRY_SLEEP = max(0.0, float(os.environ.get("JOB_BROWSER_MAX_RETRY_SLEEP", "8")))
+MAX_REDIRECTS = max(0, min(10, int(os.environ.get("JOB_BROWSER_MAX_REDIRECTS", "5"))))
 
 DEFAULT_ALLOWED_HOSTS = {
     "taskfavour.com",
@@ -99,6 +100,29 @@ def proxy_response(upstream) -> Response:
     return response
 
 
+def chrome_get(raw_url: str, headers: dict[str, str]):
+    current_url = raw_url
+    for redirect in range(MAX_REDIRECTS + 1):
+        if not allowed_url(current_url):
+            raise ValueError("redirect target host is not allowed")
+        upstream = cffi.get(
+            current_url,
+            impersonate=IMPERSONATE,
+            timeout=TIMEOUT,
+            allow_redirects=False,
+            headers=headers,
+        )
+        if upstream.status_code not in {301, 302, 303, 307, 308}:
+            return upstream
+        location = upstream.headers.get("location")
+        if not location:
+            return upstream
+        if redirect >= MAX_REDIRECTS:
+            raise RuntimeError("too many redirects")
+        current_url = urljoin(current_url, location)
+    raise RuntimeError("too many redirects")
+
+
 @app.get("/health")
 def health():
     return jsonify(ok=True, impersonate=IMPERSONATE)
@@ -128,13 +152,7 @@ def browser_fetch():
     last_error = None
     for attempt in range(ATTEMPTS):
         try:
-            upstream = cffi.get(
-                raw_url,
-                impersonate=IMPERSONATE,
-                timeout=TIMEOUT,
-                allow_redirects=True,
-                headers=headers,
-            )
+            upstream = chrome_get(raw_url, headers)
         except Exception as error:
             last_error = str(error)
             if attempt + 1 < ATTEMPTS:
