@@ -217,7 +217,14 @@ export async function saveDbCandidates(
   }
 }
 
-/** Per-channel run history, including the last time each one actually worked. */
+/**
+ * Per-channel run history, including the last time each one actually worked.
+ *
+ * The status parameter is read twice — once as the varchar column, once in a
+ * text comparison — and Postgres deduces a different type from each context
+ * and rejects the whole statement ("inconsistent types deduced for parameter
+ * $4"). Hence the explicit casts on both readings.
+ */
 export async function recordDbSourceRun(diagnostic: SourceRun): Promise<void> {
   if (!hiringDbEnabled()) return
   try {
@@ -226,8 +233,8 @@ export async function recordDbSourceRun(diagnostic: SourceRun): Promise<void> {
       `INSERT INTO ${schema()}.source_runs (
          source, handle, country, status, fetched, candidates, error,
          checked_at, last_success_at, updated_at
-       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8::timestamptz,
-         CASE WHEN $4 <> 'error' THEN $8::timestamptz ELSE NULL END, NOW())
+       ) VALUES ($1, $2, $3, $4::text, $5, $6, $7, $8::timestamptz,
+         CASE WHEN $4::text <> 'error' THEN $8::timestamptz ELSE NULL END, NOW())
        ON CONFLICT (source, handle) DO UPDATE SET
          country = EXCLUDED.country,
          status = EXCLUDED.status,
