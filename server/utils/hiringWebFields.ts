@@ -86,6 +86,9 @@ export const DAYS_AGO_RE = new RegExp(`(?:^|\\s)(\\d{1,3})\\s*(?:дн(?:я|ей|
 export const AGO = '(?:\\s*(?:назад|тому|раніше|oldin|ago|în urmă))'
 export const WEEKS_AGO_RE = new RegExp(`(?:^|\\s)(\\d{1,2})\\s*(?:недел(?:ю|и|ь)|тижн(?:ів|і|я)|hafta|weeks?|săptămân\\p{L}*)${AGO}`, 'iu')
 export const MONTHS_AGO_RE = new RegExp(`(?:^|\\s)(\\d{1,2})\\s*(?:мес(?:яц\\p{L}*)?\\.?|міс(?:яц\\p{L}*)?\\.?|oy|months?|lun\\p{L}*)${AGO}`, 'iu')
+// Well outside the retention window, but a dated profile can be reported as
+// stale, where an undated one is indistinguishable from a parser failure.
+export const YEARS_AGO_RE = new RegExp(`(?:^|\\s)(\\d{1,2})\\s*(?:год(?:а|ов)?|лет|рік|рок(?:и|ів)|yil|years?|ani|an)${AGO}`, 'iu')
 
 export function activityDate(text: string): string | null {
   const now = new Date()
@@ -114,6 +117,9 @@ export function activityDate(text: string): string | null {
 
   const months = text.match(MONTHS_AGO_RE)
   if (months) return new Date(now.getTime() - Number(months[1]) * 30 * 86_400_000).toISOString()
+
+  const years = text.match(YEARS_AGO_RE)
+  if (years) return new Date(now.getTime() - Number(years[1]) * 365 * 86_400_000).toISOString()
   return null
 }
 

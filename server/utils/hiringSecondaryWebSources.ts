@@ -2,7 +2,7 @@ import { useRedis } from '~~/server/utils/redis'
 import { hiringDbEnabled, loadDbCandidates, saveDbCandidates } from './hiringDb'
 import { normalizeCandidate } from './hiringNormalize'
 import type { SourceRun } from './hiringDiagnostics'
-import { activityDate, cityFrom, parseAge } from './hiringWebFields'
+import { activityDate, cityFrom, htmlText, parseAge } from './hiringWebFields'
 import type { CvProfile } from './hiringTypes'
 import { withHiringStoreLock } from './hiringStoreLock'
 
@@ -143,6 +143,8 @@ function profile(input: {
   url: string
   text: string
   salaryCurrency: string
+  /** Read from the card's own salary field, where the board has one. */
+  salary?: Pick<CvProfile, 'salaryMin' | 'salaryMax' | 'currency'>
   contactType?: 'direct' | 'platform'
 }): CvProfile {
   const publicContacts = contacts(input.text)
@@ -179,6 +181,7 @@ function profile(input: {
     contact: publicContacts.telegram || publicContacts.email || publicContacts.phone || input.url,
     contactType: input.contactType || (hasDirect ? 'direct' : 'platform'),
     ...parseSalary(input.text, input.salaryCurrency),
+    ...(input.salary || {}),
   })
 }
 
@@ -199,6 +202,23 @@ function linkBlocks(html: string, re: RegExp, base: string): Array<{ url: string
   return [...byUrl.values()]
 }
 
+/**
+ * NovaRobota renders its listing as a table of cards, each field in its own
+ * element: `.resume_title`, `.person_name`, `.price`, `.age`, `.city`,
+ * `.publish_date`. The generic block reader gave the text that happened to sit
+ * around the link, which is how a candidate ended up named `ass="row">`.
+ */
+function novaField(card: string, cls: string): string {
+  const match = card.match(new RegExp(`class="${cls}"[^>]*>([\\s\\S]{0,300}?)</`, 'i'))
+  return match ? htmlText(match[1]!).trim() : ''
+}
+
+function novaCards(html: string): string[] {
+  const marker = /<div class="resume_one[^"]*">/g
+  const starts = [...html.matchAll(marker)].map((match) => match.index!)
+  return starts.map((from, index) => html.slice(from, starts[index + 1] ?? html.length))
+}
+
 async function fetchNovaRobota(): Promise<FetchResult> {
   const maxPages = Math.max(1, Math.min(10, Number(process.env.HIRING_NOVAROBOTA_MAX_PAGES) || 5))
   const byUrl = new Map<string, CvProfile>()
@@ -207,26 +227,36 @@ async function fetchNovaRobota(): Promise<FetchResult> {
   for (let page = 1; page <= maxPages; page++) {
     const pageUrl = page === 1 ? 'https://novarobota.ua/resume' : `https://novarobota.ua/resume?page=${page}`
     const html = await fetchHtml(pageUrl)
-    const blocks = linkBlocks(html, /novarobota\.ua\/resume\/[a-z0-9%_-]+-\d+\/?$/iu, pageUrl)
-    if (!blocks.length) break
-    fetched += blocks.length
+    const cards = novaCards(html)
+    if (!cards.length) break
     let fresh = 0
 
-    for (const block of blocks) {
-      const activity = activityDate(block.text)
+    for (const card of cards) {
+      const link = card.match(/<a[^>]*href="([^"]*\/resume\/[^"]*-\d+)"[^>]*class="[^"]*resume_title[^"]*"[^>]*>([\s\S]*?)<\/a>/i)
+      if (!link) continue
+      fetched += 1
+
+      const url = absoluteUrl(link[1]!, pageUrl)
+      if (!url) continue
+      // The card's own "posted" field, not a date from anywhere in its text.
+      const activity = activityDate(novaField(card, 'publish_date'))
       if (!recent(activity)) continue
-      const lines = block.text.split('\n').filter(Boolean)
-      const role = block.title
-      const name = lines.find((line) =>
-        line !== role
-        && line.length >= 2 && line.length <= 100
-        && !/грн|UAH|лет|рок|год|Киев|Київ|Харьков|Харків|Днепр|Дніпро|Одес|Льв|час|дн|назад|тому|предпросмотр|попередній|место работы|місце роботи/iu.test(line),
-      ) || ''
-      const id = block.url.match(/-(\d+)\/?$/)?.[1] || block.url
+
+      const cityText = novaField(card, 'city')
       const cv = profile({
-        key: 'novarobota-ua', country: 'UA', label: 'NovaRobota', id,
-        role, name, activity: activity!, url: block.url, text: block.text,
-        salaryCurrency: 'UAH', contactType: 'platform',
+        key: 'novarobota-ua', country: 'UA', label: 'NovaRobota',
+        id: url.match(/-(\d+)\/?$/)?.[1] || url,
+        role: htmlText(link[2]!),
+        name: novaField(card, 'person_name'),
+        age: parseAge(novaField(card, 'age')),
+        // "Работа за границей" is a preference, not a place.
+        city: cityFrom(cityText, 'UA') || (/за границей|за кордоном/iu.test(cityText) ? null : cityText || null),
+        activity: activity!,
+        url,
+        text: htmlText(card),
+        salaryCurrency: 'UAH',
+        salary: chipSalary(novaField(card, 'price')),
+        contactType: 'platform',
       })
       byUrl.set(cv.url, cv)
       fresh += 1
@@ -248,6 +278,44 @@ function layboardActivity(text: string): string | null {
   return maxActivity(onlineIso, activityDate(text))
 }
 
+/**
+ * Layboard renders each CV as a complete card: the title link, the candidate's
+ * name, chips for salary, age and location, and a "last online" stamp. Reading
+ * the text that happens to sit before the link — which is what the generic
+ * block reader gives — recovered a role and nothing else.
+ */
+function layboardCards(html: string): string[] {
+  const marker = '<div class="resume__card">'
+  return html.split(marker).slice(1).map((part) => {
+    const stop = part.indexOf('<div class="pagination')
+    return stop > 0 ? part.slice(0, stop) : part
+  })
+}
+
+function spanText(card: string, cls: string): string {
+  // Matched as a substring of the class attribute: these cards carry several
+  // classes per element ("vacancies-list-user vacancies-list-owner").
+  const match = card.match(new RegExp(`class="[^"]*${cls}[^"]*"[^>]*>([\\s\\S]{0,300}?)</span>`, 'i'))
+  return match ? htmlText(match[1]!).replace(/^[\\s,]+/, '').trim() : ''
+}
+
+function chipSalary(chip: string): Pick<CvProfile, 'salaryMin' | 'salaryMax' | 'currency'> {
+  const amounts = [...chip.matchAll(/\d[\d\s]*/g)]
+    .map((match) => Number(match[0].replace(/\s+/g, '')))
+    .filter((value) => Number.isFinite(value) && value > 0)
+  if (!amounts.length) return {}
+  const currency = /\$|usd/iu.test(chip) ? 'USD'
+    : /руб|rub|₽/iu.test(chip) ? 'RUB'
+      : /€|eur/iu.test(chip) ? 'EUR'
+        : /₸|тенге|kzt/iu.test(chip) ? 'KZT'
+          : /грн|uah|₴/iu.test(chip) ? 'UAH'
+            : /lei|ron/iu.test(chip) ? 'RON'
+              // "Другая валюта" is the board's own "some other currency": the
+              // number is real but unitless, so it is not a salary we can show.
+              : ''
+  return currency ? { salaryMin: Math.min(...amounts), salaryMax: Math.max(...amounts), currency } : {}
+}
+
 async function fetchLayboard(): Promise<FetchResult> {
   const maxPages = Math.max(1, Math.min(8, Number(process.env.HIRING_LAYBOARD_MAX_PAGES) || 3))
   const byUrl = new Map<string, CvProfile>()
@@ -258,29 +326,43 @@ async function fetchLayboard(): Promise<FetchResult> {
       ? 'https://layboard.com/rezume/kazahstan'
       : `https://layboard.com/rezume/kazahstan?page=${page}`
     const html = await fetchHtml(pageUrl)
-    const blocks = linkBlocks(html, /layboard\.com\/rezume\/\d+\/[a-z0-9%_-]+\/?$/iu, pageUrl)
-    if (!blocks.length) break
-    fetched += blocks.length
+    const cards = layboardCards(html)
+    if (!cards.length) break
     let fresh = 0
 
-    for (const block of blocks) {
-      const activity = layboardActivity(block.text)
+    for (const card of cards) {
+      const link = card.match(/<a[^>]*href="([^"]+)"[^>]*class="[^"]*card__title[^"]*"[^>]*>([\s\S]*?)<\/a>/i)
+      if (!link) continue
+      fetched += 1
+
+      const url = absoluteUrl(link[1]!, pageUrl)
+      if (!url) continue
+      const text = htmlText(card)
+      const activity = layboardActivity(text)
       if (!recent(activity)) continue
-      const role = block.title
-      const lines = block.text.split('\n').filter(Boolean)
-      const nameLine = lines.find((line) =>
-        line !== role
-        && /(?:был\(а\) в сети|last online)/iu.test(line)
-        && line.length <= 160,
-      )
-      const name = nameLine
-        ? nameLine.replace(/\s*(?:был\(а\) в сети|last online)[\s\S]*$/iu, '').trim()
-        : ''
-      const id = block.url.match(/\/rezume\/(\d+)\//)?.[1] || block.url
+
+      // The chips carry salary, age and location in whatever order the card
+      // has them, so each is recognised by its content rather than position.
+      const chips = [...card.matchAll(/class="org__info[^"]*"[^>]*>([\s\S]*?)<\/span>/gi)]
+        .map((match) => htmlText(match[1]!).trim())
+        .filter(Boolean)
+      const age = chips.map((chip) => parseAge(chip)).find((value) => value != null) ?? null
+      const place = chips.find((chip) => !/\d/.test(chip)) || ''
+      const salary = chips.map(chipSalary).find((value) => value.salaryMin != null) || {}
+
       const cv = profile({
-        key: 'layboard-kz', country: 'KZ', label: 'Layboard', id,
-        role, name, activity: activity!, url: block.url, text: block.text,
-        salaryCurrency: 'KZT', contactType: 'platform',
+        key: 'layboard-kz', country: 'KZ', label: 'Layboard',
+        id: url.match(/\/rezume\/(\d+)\//)?.[1] || url,
+        role: htmlText(link[2]!),
+        name: htmlText(card.match(/class="name"[^>]*>([\s\S]*?)<\/a>/i)?.[1] || ''),
+        age,
+        city: cityFrom(place, 'KZ') || cityFrom(text, 'KZ'),
+        activity: activity!,
+        url,
+        text,
+        salaryCurrency: 'KZT',
+        salary,
+        contactType: 'platform',
       })
       byUrl.set(cv.url, cv)
       fresh += 1
@@ -290,30 +372,49 @@ async function fetchLayboard(): Promise<FetchResult> {
   return { profiles: [...byUrl.values()], fetched }
 }
 
+/**
+ * Amountwork lists each CV as a `.vacancies-list-item`: the title link, the
+ * candidate's name, the asked salary, the countries they are looking in with
+ * the city, and the posting date. Read as loose text, the first line that was
+ * not a salary or a date turned out to be the search form.
+ */
+function amountworkCards(html: string): string[] {
+  const starts = [...html.matchAll(/<div class="vacancies-list-item[^"]*">/g)].map((match) => match.index!)
+  return starts.map((from, index) => html.slice(from, starts[index + 1] ?? html.length))
+}
+
 async function fetchAmountwork(): Promise<FetchResult> {
   const pageUrl = 'https://amountwork.com/resume/in/rumyniya'
   const html = await fetchHtml(pageUrl)
-  const blocks = linkBlocks(html, /amountwork\.com\/(?:[a-z]{2}\/)?r\/\d+\/[a-z0-9%_-]+\/?$/iu, pageUrl)
+  const cards = amountworkCards(html)
   const profiles: CvProfile[] = []
+  let fetched = 0
 
-  for (const block of blocks) {
-    const activity = activityDate(block.text)
+  for (const card of cards) {
+    const link = card.match(/<a[^>]*href="([^"]*\/r\/\d+\/[^"]*)"[^>]*>([\s\S]*?)<\/a>/i)
+    if (!link) continue
+    fetched += 1
+
+    const url = absoluteUrl(link[1]!, pageUrl)
+    if (!url) continue
+    const activity = activityDate(spanText(card, 'vacancies-list-date bottom'))
     if (!recent(activity)) continue
-    const lines = block.text.split('\n').filter(Boolean)
-    const role = block.title
-    const name = lines.find((line) =>
-      line !== role
-      && line.length >= 2 && line.length <= 100
-      && !/€|\$|USD|EUR|RON|lei|Румыни|Румун|Romania|дн|мес|month|zile|назад|тому/iu.test(line),
-    ) || ''
-    const id = block.url.match(/\/r\/(\d+)\//)?.[1] || block.url
+
     profiles.push(profile({
-      key: 'amountwork-ro', country: 'RO', label: 'Amountwork', id,
-      role, name, activity: activity!, url: block.url, text: block.text,
-      salaryCurrency: 'EUR', contactType: 'platform',
+      key: 'amountwork-ro', country: 'RO', label: 'Amountwork',
+      id: url.match(/\/r\/(\d+)\//)?.[1] || url,
+      role: htmlText(link[2]!),
+      name: spanText(card, 'vacancies-list-user'),
+      city: cityFrom(spanText(card, 'city') || htmlText(card), 'RO'),
+      activity: activity!,
+      url,
+      text: htmlText(card),
+      salaryCurrency: 'EUR',
+      salary: chipSalary(spanText(card, 'vacancies-list-salary')),
+      contactType: 'platform',
     }))
   }
-  return { profiles, fetched: blocks.length }
+  return { profiles, fetched }
 }
 
 const LOADERS: Record<SecondaryKey, { country: 'UA' | 'KZ' | 'RO'; load: () => Promise<FetchResult> }> = {
