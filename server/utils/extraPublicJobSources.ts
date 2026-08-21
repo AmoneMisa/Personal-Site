@@ -3,6 +3,14 @@ import type { Job, SponsorshipConfidence } from './jobTypes'
 type PublicBoard = {
   label: string
   url: string
+  /**
+   * Deterministic parser for a board whose markup we know. The generic
+   * anchor/JSON-LD path stays the default for everything else — it guesses,
+   * which is fine for boards nobody has looked at, and wrong for ones we have.
+   */
+  parse?: (html: string, board: PublicBoard) => Job[]
+  /** Country the listing belongs to when the board is national. */
+  country?: string
   remoteByDefault?: boolean
   usOnly?: boolean
   assumeUs?: boolean
@@ -13,7 +21,102 @@ type PublicBoard = {
 // Sources collected from the community/profile links supplied for Job Finder.
 // These are public candidate-facing listings, not the social profiles themselves.
 // Each board is isolated: a block/markup change produces [] for that board only.
+// Flagma publishes vacancies alongside the resumes the hiring board already
+// reads: same card layout, "-rv<id>.html" instead of "-rr<id>.html". Low
+// volume (RO lists a few dozen), so this adds breadth rather than bulk. The UZ
+// domain answers datacenter clients with a reCAPTCHA page, and reaches this
+// parser only once the Chrome-impersonating fetcher unblocks it.
+// The whole anchor, not just its href: the vacancy title is the link text.
+const FLAGMA_VACANCY_LINK_RE =
+  /<a\b[^>]*href="([^"]*flagma\.[a-z]{2}\/(?:ru\/)?vakansiya-[^"?#]*-rv\d+\.html)"[^>]*>([\s\S]*?)<\/a>/gi
+
+/** Card markup as rows, because each row of a Flagma card means something. */
+function cardLines(fragment: string): string[] {
+  return decodeEntities(fragment)
+    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/<\/(?:p|div|li|h[1-6]|tr|section|article|span|td)>/gi, '\n')
+    .replace(/<[^>]*>/g, ' ')
+    .split('\n')
+    .map((line) => line.replace(/\s+/g, ' ').trim())
+    .filter(Boolean)
+}
+
+function parseFlagmaVacancies(html: string, board: PublicBoard): Job[] {
+  const jobs: Job[] = []
+  const seen = new Set<string>()
+  const matches = [...html.matchAll(FLAGMA_VACANCY_LINK_RE)]
+
+  for (const [index, match] of matches.entries()) {
+    const url = match[1]!
+    if (seen.has(url)) continue
+    seen.add(url)
+
+    // The card runs to the next link for a *different* vacancy: a card holds
+    // several anchors to the same posting, and stopping at the first of them
+    // would cut off the employer and location rows that follow the title.
+    const start = Math.max(0, (match.index ?? 0) - 200)
+    const nextDistinct = matches.slice(index + 1).find((candidate) => candidate[1] !== url)
+    const end = nextDistinct?.index ?? Math.min(html.length, (match.index ?? 0) + 2_000)
+    // The shared stripHtml flattens a document to one line, which is right for
+    // the generic boards and useless here: this card's meaning is in its rows.
+    const lines = cardLines(html.slice(start, end))
+
+    const title = stripHtml(match[2] || '') || lines[0] || ''
+    // "Коваленко О.А., ФЛП" then "| Полтава, UA" — the employer and where it
+    // is, which the card may put on one row or two.
+    const employerRowIndex = lines.findIndex((line) => /\|\s*[^|]+,\s*[A-Z]{2}\s*$/.test(line))
+    const employerRow = employerRowIndex >= 0 ? lines[employerRowIndex]! : ''
+    const inlineEmployer = employerRow.includes('|') ? employerRow.split('|')[0]!.trim() : ''
+    const employerPart = inlineEmployer
+      || (employerRowIndex > 0 ? lines[employerRowIndex - 1]!.replace(/[|,]+$/, '').trim() : '')
+    const locationPart = employerRow.replace(/^[^|]*\|/, '').trim()
+    // "в Бухаресте, полная занятость" — where the work is.
+    const placementLine = lines.find((line) => /^(?:в|у|in)\s+\p{Lu}/u.test(line)) || ''
+
+    const text = lines.join(' ')
+    const cleanTitle = title.replace(/\s+/g, ' ').trim()
+    if (cleanTitle.length < 3 || cleanTitle.length > 180) continue
+
+    jobs.push({
+      id: `flagma-${url.match(/-rv(\d+)\.html/)?.[1] || url.slice(-24)}`,
+      title: cleanTitle,
+      company: employerPart || board.label,
+      // "в Бухаресте, полная занятость" -> "Бухаресте". The city keeps the
+      // grammatical case the site prints; declining it back is not worth a
+      // dictionary, and the string is only ever displayed.
+      location: placementLine
+        .replace(/^(?:в|у|in)\s+/iu, '')
+        .replace(/,\s*(?:полная|частичная|неполная)\s+занятость.*$/iu, '')
+        .replace(/,\s*удал[ёе]нно.*$/iu, '')
+        .trim()
+        || locationPart
+        || board.country
+        || '',
+      url,
+      source: 'companies',
+      remote: /удал[её]н|remote|masofaviy|la distanță/iu.test(text),
+      postedAt: new Date().toISOString(),
+      description: lines.slice(0, 8).join(' · ').slice(0, 600),
+      tags: [board.label, ...(board.country ? [board.country] : [])],
+    } as Job)
+  }
+
+  return jobs
+}
+
 const PUBLIC_JOB_BOARDS: PublicBoard[] = [
+  {
+    label: 'Flagma RO',
+    url: 'https://flagma.ro/ru/vacancies/',
+    country: 'RO',
+    parse: parseFlagmaVacancies,
+  },
+  {
+    label: 'Flagma UZ',
+    url: 'https://flagma.uz/ru/vacancies/',
+    country: 'UZ',
+    parse: parseFlagmaVacancies,
+  },
   { label: 'Remote Source', url: 'https://www.remotesource.com/jobs', remoteByDefault: true },
   { label: 'TaskFavour', url: 'https://www.taskfavour.com/jobs' },
   { label: 'Tech Leads Community', url: 'https://techleadscommunity.com/', remoteByDefault: true },
@@ -294,7 +397,8 @@ async function fetchBoard(board: PublicBoard): Promise<Job[]> {
   const html = await response.text()
 
   const byUrl = new Map<string, Job>()
-  for (const job of [...parseJsonLd(html, board), ...parseAnchors(html, board)]) {
+  const parsed = board.parse ? board.parse(html, board) : [...parseJsonLd(html, board), ...parseAnchors(html, board)]
+  for (const job of parsed) {
     byUrl.set(job.url, job)
     if (byUrl.size >= MAX_PER_BOARD) break
   }
