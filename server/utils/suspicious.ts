@@ -19,6 +19,9 @@
 //     needs earnings-bait markers, not merely "office" + "no experience".
 //   * Telegram/Facebook/WhatsApp and screenshot mentions are harmless by
 //     themselves; spam/microtask recruitment blocks only on a paid-action pattern.
+//   * Crypto/blockchain jobs are not blocked merely for mentioning crypto. The
+//     vague-crypto rule requires vague operational duties plus beginner/training
+//     bait and a Telegram-only recruitment path.
 
 export type RiskCategory = 'gambling' | 'adult' | 'scam'
 
@@ -61,8 +64,14 @@ const SCAM = [
   ['guaranteed-income', /гарантированн(?:ый|ого)\s+доход|гарантований\s+дохід|guaranteed\s+income|доход\s+от\s+\d[\d\s]{2,}\s*(?:\$|usd|у\.?е\.?)\s*в\s*(?:день|неделю)/i],
   ['no-investment', /без\s+вложений|без\s+вкладень|no\s+investment\s+required/i],
   ['mlm', /сетев(?:ой|ого)\s+маркетинг|\bmlm\b|млм|финансов(?:ая|ой)\s+независимост|пассивн(?:ый|ого)\s+доход/i],
-  ['crypto-bait', /гарантированн\w*\s+(?:прибыл|профит)|трейдинг\s+с\s+гарант|инвестиц\w*\s+с\s+гарант/i],
+  ['crypto-bait', /гарантированн[а-яёіїєґ]*\s+(?:прибыл|профит)|трейдинг\s+с\s+гарант|инвестиц[а-яёіїєґ]*\s+с\s+гарант/i],
 ]
+
+// Known scam recruiter/contact identifiers. Keep exact enough that a common first
+// name or Telegram mention can never hard-block a legitimate vacancy on its own.
+const SCAM_CONTACTS = [
+  ['telegram:valery_hr_36', /(?:^|[^a-z0-9_])@?valery_hr_36(?:$|[^a-z0-9_])/i],
+] as const
 
 // Marriage/dating agencies are intentionally excluded from Job Finder. Explicit
 // agency wording is enough to block; generic dating products/apps are not.
@@ -79,6 +88,14 @@ const DATING_CHAT_SIGNAL = /переписк[а-яёіїєґ]*\s+от\s+лиц[�
 const PAID_MICROTASK = /оплат[а-яёіїєґ]*\s+(?:за\s+)?(?:кажд[а-яёіїєґ]*|одно|один)\s+(?:сообщени|лайк|комментари|пост|публикаци|рассылк|действи)|(?:платим|платят|заработок)\s+за\s+(?:сообщени|лайк|комментари|пост|публикаци|рассылк|действи)|оплата\s+за\s+(?:сообщени|лайк|комментари|пост|публикаци|рассылк|действи)|paid\s+per\s+(?:message|like|comment|post|task|action)|payment\s+per\s+(?:message|like|comment|post|task|action)/i
 const MASS_SPAM_ACTION = /массов[а-яёіїєґ]*\s+рассылк|рассыл[а-яёіїєґ]*\s+(?:сообщени|текст|объявлен)|отправ[а-яёіїєґ]*\s+сообщени[а-яёіїєґ]*\s+(?:в|по)\s+(?:групп|чат)|размещ[а-яёіїєґ]*\s+(?:текст|сообщени|объявлен|пост)[а-яёіїєґ]*\s+(?:в|по)\s+(?:групп|чат)|публик[а-яёіїєґ]*\s+(?:в|по)\s+(?:групп|чат)|(?:facebook|telegram|whatsapp)\s+(?:groups?|chats?)|post\w*\s+(?:in|to)\s+(?:facebook|telegram|whatsapp)?\s*(?:groups?|chats?)/i
 const SCREENSHOT_PROOF = /скриншот[а-яёіїєґ]*\s+(?:как\s+)?(?:подтверждени|отч[её]т|доказательств)|подтвержд[а-яёіїєґ]*\s+(?:выполнени[а-яёіїєґ]*\s+)?скриншот|присл[а-яёіїєґ]*\s+скриншот|screenshot\s+(?:as\s+)?(?:proof|confirmation|report)|send\s+(?:a\s+)?screenshot/i
+
+// Vague crypto recruiter pattern seen in fake "digital assets manager" postings.
+// The combination is intentionally strict so normal blockchain/crypto engineering,
+// compliance, support, product, and exchange roles are not blocked.
+const CRYPTO_JOB_SIGNAL = /цифров(?:ые|ых|ыми)\s+актив|криптовалют(?:а|ы|е|ой|ные|ных|ными)|крипто-?актив|digital\s+assets?|crypto(?:currency)?\s+(?:services?|assets?|operations?)/i
+const VAGUE_CRYPTO_DUTIES = /работа\s+с\s+информаци[а-яёіїєґ]*|использовани[а-яёіїєґ]*\s+криптовалютн[а-яёіїєґ]*\s+сервис[а-яёіїєґ]*\s+(?:согласно|по)\s+(?:рабочим\s+)?инструкц|проверка\s+данных\s+и\s+статус[а-яёіїєґ]*\s+задач|сопровождени[а-яёіїєґ]*\s+(?:текущих\s+)?процесс[а-яёіїєґ]*|контроль\s+выполнени[а-яёіїєґ]*\s+(?:поставленных\s+)?задан[а-яёіїєґ]*|ведение\s+внутренн[а-яёіїєґ]*\s+отч[её]тност|working\s+with\s+(?:information|data)\s+(?:in|about)\s+(?:crypto|digital\s+assets)|follow(?:ing)?\s+(?:internal\s+)?instructions\s+for\s+crypto/i
+const BEGINNER_TRAINING_BAIT = /без\s+опыта|опыт[а-яёіїєґ\s]*не\s+(?:является\s+)?обязател|бесплатн[а-яёіїєґ]*\s+обучени|помощ[а-яёіїєґ]*\s+наставник|поддержк[а-яёіїєґ]*\s+(?:наставник|после\s+обучения)|no\s+experience|free\s+training|mentor(?:ship)?\s+(?:provided|available)/i
+const TELEGRAM_RECRUITMENT = /(?:обращаться|писать|контакт|подробност[а-яёіїєґ]*|связ[а-яёіїєґ]*)[^\n]{0,80}(?:telegram|телеграм)|(?:telegram|телеграм)[^\n]{0,80}(?:@?[a-z][a-z0-9_]{4,}|t\.me\/)/i
 
 // ---- Soft signals: the posting never says what you'd actually do ----------
 const HAS_DUTIES = /обязанност|обов'?язк|responsibilit|what\s+you(?:'|’)?ll\s+(?:do|be\s+doing)|задачи|завдання|duties|your\s+role|чем\s+предстоит\s+заниматься|функционал|job\s+description|требования\s+к\s+задачам/i
@@ -129,16 +146,23 @@ export function classifySuspicion(input: {
   }
 
   const scam = testAll(SCAM as [string, RegExp][], text)
+  const scamContacts = testAll(SCAM_CONTACTS, text)
   const datingAgency = DATING_AGENCY.test(text)
   const datingChat = DATING_CHAT_ROLE.test(text) && DATING_CHAT_SIGNAL.test(text)
   const paidSpamTask = PAID_MICROTASK.test(text) && (MASS_SPAM_ACTION.test(text) || SCREENSHOT_PROOF.test(text))
+  const vagueCryptoRecruitment = CRYPTO_JOB_SIGNAL.test(text)
+    && VAGUE_CRYPTO_DUTIES.test(text)
+    && BEGINNER_TRAINING_BAIT.test(text)
+    && TELEGRAM_RECRUITMENT.test(text)
 
-  if (scam.length || datingAgency || datingChat || paidSpamTask) {
+  if (scam.length || scamContacts.length || datingAgency || datingChat || paidSpamTask || vagueCryptoRecruitment) {
     riskCategory = riskCategory || 'scam'
     riskReasons.push(...scam.map((r) => `scam:${r}`))
+    riskReasons.push(...scamContacts.map((r) => `scam:known-contact:${r}`))
     if (datingAgency) riskReasons.push('scam:dating-agency')
     if (datingChat) riskReasons.push('scam:dating-chat')
     if (paidSpamTask) riskReasons.push('scam:paid-spam-task')
+    if (vagueCryptoRecruitment) riskReasons.push('scam:vague-crypto-recruitment')
   }
 
   // --- soft "vague posting" signals ---
