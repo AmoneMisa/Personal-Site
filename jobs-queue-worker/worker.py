@@ -13,9 +13,20 @@ REFRESH_SECONDS = max(60, int(os.environ.get("QUEUE_REFRESH_SECONDS", "1800")))
 PREFETCH = max(1, int(os.environ.get("QUEUE_PREFETCH", "1")))
 MAX_ATTEMPTS = max(1, int(os.environ.get("QUEUE_MAX_ATTEMPTS", "5")))
 
+HIRING_REFRESH_SECONDS = max(60, int(os.environ.get("HIRING_QUEUE_REFRESH_SECONDS", "1800")))
+# Kill switch for the CV channel dispatch, so a misbehaving hiring queue can be
+# stopped with an env change and a restart instead of a rebuild. Consumers stay
+# registered either way; this only stops new work being queued.
+HIRING_QUEUE_ENABLED = os.environ.get("HIRING_QUEUE_ENABLED", "on").strip().lower() != "off"
+
 MAIN_QUEUE = "crawl.jobs.source"
 RETRY_QUEUE = "crawl.jobs.source.retry"
 DEAD_QUEUE = "crawl.jobs.source.dead"
+# CV channels ride their own queue set: a Telegram backlog (one MTProto worker,
+# one channel at a time) must not stall the vacancy sources behind it.
+HIRING_QUEUE = "crawl.hiring.channel"
+HIRING_RETRY_QUEUE = "crawl.hiring.channel.retry"
+HIRING_DEAD_QUEUE = "crawl.hiring.channel.dead"
 SOURCES = ["remotive", "remoteok", "arbeitnow", "themuse", "jobicy", "adzuna", "jooble", "rss", "companies", "devkg", "ishgo", "itjobsuz", "telegram", "olx"]
 
 
@@ -32,6 +43,29 @@ def declare(channel):
     channel.queue_declare(MAIN_QUEUE, durable=True)
     channel.queue_declare(RETRY_QUEUE, durable=True, arguments={"x-message-ttl": 30000, "x-dead-letter-exchange": "", "x-dead-letter-routing-key": MAIN_QUEUE})
     channel.queue_declare(DEAD_QUEUE, durable=True)
+    channel.queue_declare(HIRING_QUEUE, durable=True)
+    channel.queue_declare(HIRING_RETRY_QUEUE, durable=True, arguments={"x-message-ttl": 60000, "x-dead-letter-exchange": "", "x-dead-letter-routing-key": HIRING_QUEUE})
+    channel.queue_declare(HIRING_DEAD_QUEUE, durable=True)
+
+
+def frontend_request(path, payload=None, method="POST"):
+    if len(QUEUE_INTERNAL_KEY) < 16:
+        raise RuntimeError("QUEUE_INTERNAL_KEY must be at least 16 characters")
+    body = json.dumps(payload, separators=(",", ":")).encode("utf-8") if payload is not None else None
+    request = urllib.request.Request(
+        f"{FRONTEND_URL}{path}",
+        method=method,
+        data=body,
+        headers={"Content-Type": "application/json", "User-Agent": "jobs-rabbit-worker/2.0", "X-Queue-Key": QUEUE_INTERNAL_KEY},
+    )
+    with urllib.request.urlopen(request, timeout=180) as response:
+        return json.loads(response.read().decode("utf-8"))
+
+
+def hiring_handles():
+    """Channel list straight from the app, so the two never drift apart."""
+    data = frontend_request("/internal/hiring-channels", method="GET")
+    return [str(handle) for handle in (data.get("handles") or []) if handle]
 
 
 def publish(channel, queue, payload, attempt=0):
@@ -45,6 +79,7 @@ def publish(channel, queue, payload, attempt=0):
 
 
 def dispatch_forever():
+    hiring_due_at = 0.0
     while True:
         try:
             connection = connect()
@@ -54,6 +89,19 @@ def dispatch_forever():
             for source in SOURCES:
                 publish(channel, MAIN_QUEUE, {"type": "jobs.refresh.source", "source": source, "queuedAt": int(time.time())})
             print(f"[jobs:queue:dispatcher] queued {len(SOURCES)} source tasks", flush=True)
+
+            # CV channels run on their own cadence, and a failure to read the
+            # handle list must not cost us the vacancy dispatch above.
+            if HIRING_QUEUE_ENABLED and time.monotonic() >= hiring_due_at:
+                try:
+                    handles = hiring_handles()
+                    for handle in handles:
+                        publish(channel, HIRING_QUEUE, {"type": "hiring.refresh.channel", "handle": handle, "queuedAt": int(time.time())})
+                    print(f"[hiring:queue:dispatcher] queued {len(handles)} channel tasks", flush=True)
+                    hiring_due_at = time.monotonic() + HIRING_REFRESH_SECONDS
+                except Exception as exc:
+                    print(f"[hiring:queue:dispatcher] error: {exc}", flush=True)
+
             connection.close()
         except Exception as exc:
             print(f"[jobs:queue:dispatcher] error: {exc}", flush=True)
@@ -64,17 +112,37 @@ def execute_task(payload):
     source = str(payload.get("source") or "")
     if payload.get("type") != "jobs.refresh.source" or source not in SOURCES:
         raise ValueError("unsupported job source task")
-    if len(QUEUE_INTERNAL_KEY) < 16:
-        raise RuntimeError("QUEUE_INTERNAL_KEY must be at least 16 characters")
+    return frontend_request("/internal/jobs-refresh-source", {"source": source})
 
-    request = urllib.request.Request(
-        f"{FRONTEND_URL}/internal/jobs-refresh-source",
-        method="POST",
-        data=json.dumps({"source": source}).encode("utf-8"),
-        headers={"Content-Type": "application/json", "User-Agent": "jobs-rabbit-worker/2.0", "X-Queue-Key": QUEUE_INTERNAL_KEY},
-    )
-    with urllib.request.urlopen(request, timeout=120) as response:
-        return json.loads(response.read().decode("utf-8"))
+
+def execute_hiring_task(payload):
+    handle = str(payload.get("handle") or "")
+    if payload.get("type") != "hiring.refresh.channel" or not handle:
+        raise ValueError("unsupported hiring channel task")
+    return frontend_request("/internal/hiring-refresh-channel", {"handle": handle})
+
+
+def consumer(label, runner, retry_queue, dead_queue, describe):
+    """One ack/retry policy for both queues; only the task body differs."""
+
+    def on_message(ch, method, properties, body):
+        try:
+            payload = json.loads(body.decode("utf-8"))
+            result = runner(payload)
+            ch.basic_ack(method.delivery_tag)
+            print(f"[{label}] completed {describe(payload)} stored={result.get('stored', result.get('fetched', 0))}", flush=True)
+        except Exception as exc:
+            attempt = int((properties.headers or {}).get("attempt", 0)) + 1
+            try:
+                payload = json.loads(body.decode("utf-8"))
+            except Exception:
+                payload = {"raw": body.decode("utf-8", errors="replace")}
+            target = retry_queue if attempt < MAX_ATTEMPTS else dead_queue
+            publish(ch, target, payload, attempt=attempt)
+            ch.basic_ack(method.delivery_tag)
+            print(f"[{label}] failed attempt={attempt} target={target}: {exc}", flush=True)
+
+    return on_message
 
 
 def worker_forever():
@@ -85,25 +153,21 @@ def worker_forever():
             declare(channel)
             channel.basic_qos(prefetch_count=PREFETCH)
 
-            def on_message(ch, method, properties, body):
-                try:
-                    payload = json.loads(body.decode("utf-8"))
-                    result = execute_task(payload)
-                    ch.basic_ack(method.delivery_tag)
-                    print(f"[jobs:queue:worker] completed source={payload.get('source')} fetched={result.get('fetched', 0)}", flush=True)
-                except Exception as exc:
-                    attempt = int((properties.headers or {}).get("attempt", 0)) + 1
-                    try:
-                        payload = json.loads(body.decode("utf-8"))
-                    except Exception:
-                        payload = {"raw": body.decode("utf-8", errors="replace")}
-                    target = RETRY_QUEUE if attempt < MAX_ATTEMPTS else DEAD_QUEUE
-                    publish(ch, target, payload, attempt=attempt)
-                    ch.basic_ack(method.delivery_tag)
-                    print(f"[jobs:queue:worker] failed attempt={attempt} target={target}: {exc}", flush=True)
-
-            channel.basic_consume(MAIN_QUEUE, on_message_callback=on_message)
-            print("[jobs:queue:worker] consuming source tasks", flush=True)
+            channel.basic_consume(
+                MAIN_QUEUE,
+                on_message_callback=consumer(
+                    "jobs:queue:worker", execute_task, RETRY_QUEUE, DEAD_QUEUE,
+                    lambda payload: f"source={payload.get('source')}",
+                ),
+            )
+            channel.basic_consume(
+                HIRING_QUEUE,
+                on_message_callback=consumer(
+                    "hiring:queue:worker", execute_hiring_task, HIRING_RETRY_QUEUE, HIRING_DEAD_QUEUE,
+                    lambda payload: f"channel=@{payload.get('handle')}",
+                ),
+            )
+            print("[jobs:queue:worker] consuming source + hiring channel tasks", flush=True)
             channel.start_consuming()
         except Exception as exc:
             print(f"[jobs:queue:worker] connection error: {exc}", flush=True)

@@ -35,6 +35,11 @@ services:
       ELASTICSEARCH_URL: http://flat-finder-elasticsearch:9200
       JOBS_ELASTICSEARCH_INDEX: job-listings-v1
       QUEUE_INTERNAL_KEY: ${QUEUE_INTERNAL_KEY:-}
+      # Durable CV storage: the shared Postgres, in its own "hiring" schema.
+      # Requires flat-finder-postgres to be on ai-net. Unset it and the board
+      # falls back to Redis-only.
+      HIRING_DATABASE_URL: ${HIRING_DATABASE_URL:-}
+      HIRING_DB_SCHEMA: ${HIRING_DB_SCHEMA:-hiring}
     depends_on:
       backend:
         condition: service_healthy
@@ -63,6 +68,8 @@ services:
       JOBS_FRONTEND_URL: http://frontend:3000
       QUEUE_INTERNAL_KEY: ${QUEUE_INTERNAL_KEY:-}
       QUEUE_REFRESH_SECONDS: ${JOBS_QUEUE_REFRESH_SECONDS:-1800}
+      HIRING_QUEUE_REFRESH_SECONDS: ${HIRING_QUEUE_REFRESH_SECONDS:-1800}
+      HIRING_QUEUE_ENABLED: ${HIRING_QUEUE_ENABLED:-on}
     networks:
       - default
       - ai-net

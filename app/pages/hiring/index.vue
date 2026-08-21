@@ -102,6 +102,11 @@ let warmTimer: ReturnType<typeof setTimeout> | undefined;
 let sharedPostTimer: ReturnType<typeof setTimeout> | undefined;
 let infiniteObserver: IntersectionObserver | undefined;
 
+// Every hiring source is Telegram today, so a source error means the board is
+// empty because the channels could not be read — not because the filters are
+// too narrow. Say so instead of showing "nothing matches your search".
+const sourcesDown = computed(() => !loading.value && !profiles.value.length && (sourceErrors.value?.length ?? 0) > 0);
+
 const meta = ref<CountryMeta[]>([]);
 const cityOptions = computed(() => {
   const picked = countries.value.length ? meta.value.filter((c) => countries.value.includes(c.code)) : meta.value;
@@ -598,10 +603,9 @@ onBeforeUnmount(() => {
     </form>
 
     <p v-if="failed" class="hiring__error">{{ t("error") }}</p>
-    <p
-        v-else-if="source === 'telegram' && !loading && !profiles.length && sourceErrors?.some((item) => item.source === 'telegram')"
-        class="hiring__source-warning"
-    >{{ t("telegramUnavailable") }}</p>
+    <p v-else-if="sourcesDown" class="hiring__source-warning">
+      {{ t("telegramUnavailable", { n: sourceErrors?.length ?? 0 }) }}
+    </p>
     <p v-else-if="warming && !loading" class="hiring__warming text-muted">{{ t("warming") }}</p>
     <p v-else class="hiring__count text-muted">{{ t("found", { n: view === 'active' ? total : displayedProfiles.length }) }}</p>
 
@@ -644,7 +648,7 @@ onBeforeUnmount(() => {
     </div>
 
     <div v-if="!loading && !displayedProfiles.length && !failed" class="hiring__empty">
-      <div class="text-muted">{{ t("empty") }}</div>
+      <div class="text-muted">{{ sourcesDown ? t("emptySourcesDown") : t("empty") }}</div>
     </div>
 
     <u-modal v-model:open="modalOpen" :title="active?.name || ''" :ui="{ content: 'max-w-3xl' }">

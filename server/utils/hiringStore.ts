@@ -3,10 +3,18 @@
 
 import { useRedis } from '~~/server/utils/redis'
 import {
+  fetchHiringChannel,
   fetchHiringSource,
+  getHiringSourceDiagnostics,
   isHiringSourceConfigured,
   isLikelyCvPost,
 } from './hiringSources'
+import {
+  hiringDbEnabled,
+  loadDbCandidates,
+  pruneDbCandidates,
+  saveDbCandidates,
+} from './hiringDb'
 import { normalizeCandidate } from './hiringNormalize'
 import { HIRING_SOURCES, type CandidateEmploymentType, type CvProfile, type HiringSource } from './hiringTypes'
 import {
@@ -21,8 +29,18 @@ const STORE_TTL_SECONDS = 100 * 86_400
 const MEMORY_TTL_MS = 5 * 60_000
 const MAX_AGE_MONTHS = 3
 const STALE_DAYS = 14
-const SOURCE_TIMEOUT_MS = 120_000
+const SOURCE_TIMEOUT_MS = 600_000
 const AI_MIN_CONFIDENCE = 0.65
+// A refresh that fails at the transport level (worker down, Telegram
+// unreachable) stores nothing, so the board would stay empty until the next
+// scheduled run. Such an attempt is retried from the feed with backoff, while
+// sources that answered with no candidates are never retried: that is a
+// legitimately empty result, not an outage.
+const COLD_RETRY_MIN_MS = 60_000
+const COLD_RETRY_MAX_MS = 15 * 60_000
+// Postgres is only consulted when Redis has nothing; this stops a permanently
+// empty database from being re-queried on every single request.
+const DB_HYDRATE_COOLDOWN_MS = 60_000
 
 type CandidateAiData = {
   name?: string | null
@@ -60,10 +78,59 @@ type StoredProfile = CvProfile & { lastSeen: string; ai?: StoredAi }
 let memoryStore: StoredProfile[] = []
 let memoryValidUntil = 0
 let refreshAttempted = false
+let refreshEndedAt = 0
+let failedRefreshStreak = 0
+let dbHydratedAt = 0
 let refreshInFlight: Promise<{ fetched: number; stored: number }> | undefined
 
 function dedupKey(profile: CvProfile): string {
   return profile.url || profile.id
+}
+
+/** The channel a profile came from, read back off its canonical t.me link. */
+function channelHandle(profile: CvProfile): string {
+  return /^https?:\/\/t\.me\/([^/]+)/i.exec(profile.url || '')?.[1]?.toLowerCase() || ''
+}
+
+/**
+ * Refills the store from Postgres when Redis is cold. Candidates keep their
+ * original createdAt (that is what the age prune judges); lastSeen is stamped
+ * now because Postgres already dropped anything outside the retention window.
+ */
+async function hydrateFromDb(): Promise<StoredProfile[]> {
+  if (!hiringDbEnabled() || Date.now() - dbHydratedAt < DB_HYDRATE_COOLDOWN_MS) return []
+  dbHydratedAt = Date.now()
+  const profiles = await loadDbCandidates()
+  if (!profiles.length) return []
+  const nowIso = new Date().toISOString()
+  const restored = profiles.map((profile) => ({ ...profile, lastSeen: nowIso }))
+  console.log(`[hiring:db] hydrated ${restored.length} candidates from postgres`)
+  await persistStore(restored)
+  return restored
+}
+
+/**
+ * Mirrors the refreshed store into Postgres, one call per channel so each
+ * channel's run — including "checked, found nothing" and "errored" — lands in
+ * hiring_source_runs next to its candidates.
+ */
+async function syncDb(kept: StoredProfile[]) {
+  if (!hiringDbEnabled()) return
+  const byHandle = new Map<string, CvProfile[]>()
+  for (const profile of kept) {
+    const handle = channelHandle(profile)
+    if (!handle) continue
+    const bucket = byHandle.get(handle)
+    if (bucket) bucket.push(profile)
+    else byHandle.set(handle, [profile])
+  }
+
+  let saved = 0
+  for (const diagnostic of getHiringSourceDiagnostics()) {
+    saved += await saveDbCandidates(byHandle.get(diagnostic.handle.toLowerCase()) || [], diagnostic)
+  }
+  const pruned = await pruneDbCandidates()
+  console.log(`[hiring:db] upserted ${saved} candidates, pruned ${pruned}`)
 }
 
 function isVisible(profile: StoredProfile): boolean {
@@ -248,14 +315,17 @@ export async function getStoredCvProfiles(): Promise<CvProfile[]> {
   if (memoryStore.length && Date.now() < memoryValidUntil) return publicProfiles(memoryStore)
   try {
     const raw = await useRedis().get(STORE_KEY)
-    if (!raw) return publicProfiles(memoryStore)
-    const list = JSON.parse(raw) as StoredProfile[]
-    memoryStore = list
-    memoryValidUntil = Date.now() + MEMORY_TTL_MS
-    return publicProfiles(list)
+    if (raw) {
+      const list = JSON.parse(raw) as StoredProfile[]
+      memoryStore = list
+      memoryValidUntil = Date.now() + MEMORY_TTL_MS
+      return publicProfiles(list)
+    }
   } catch {
-    return publicProfiles(memoryStore)
+    // Redis unavailable — Postgres below is the next best source.
   }
+  if (memoryStore.length) return publicProfiles(memoryStore)
+  return publicProfiles(await hydrateFromDb())
 }
 
 /** @deprecated use getStoredCvProfiles */
@@ -264,10 +334,12 @@ export const getStoredHiringPosts = getStoredCvProfiles
 async function loadStored(): Promise<StoredProfile[]> {
   try {
     const raw = await useRedis().get(STORE_KEY)
-    return raw ? (JSON.parse(raw) as StoredProfile[]) : memoryStore
+    if (raw) return JSON.parse(raw) as StoredProfile[]
   } catch {
-    return memoryStore
+    // Fall through to memory/Postgres.
   }
+  if (memoryStore.length) return memoryStore
+  return hydrateFromDb()
 }
 
 function pruneStore(byKey: Map<string, StoredProfile>, now: number): StoredProfile[] {
@@ -288,12 +360,38 @@ function pruneStore(byKey: Map<string, StoredProfile>, now: number): StoredProfi
   return kept
 }
 
+function coldRetryDelay(): number {
+  return Math.min(COLD_RETRY_MAX_MS, COLD_RETRY_MIN_MS * 2 ** Math.max(0, failedRefreshStreak - 1))
+}
+
+/** Records whether the store stayed empty because no source could be reached. */
+function noteRefreshOutcome(transportFailed: boolean) {
+  failedRefreshStreak = transportFailed ? failedRefreshStreak + 1 : 0
+  if (!transportFailed) return
+  console.warn(
+    `[hiring] refresh #${failedRefreshStreak} reached no source and stored nothing; ` +
+    `retrying in ${Math.round(coldRetryDelay() / 1000)}s`,
+  )
+}
+
+/** True when at least one source/channel answered, however few candidates it had. */
+function sourcesAnswered(activeSources: HiringSource[]): boolean {
+  if (!activeSources.length) return true
+  return getHiringSourceDiagnostics().some((item) => item.status !== 'error')
+}
+
 export async function refreshHiringStore(): Promise<{ fetched: number; stored: number }> {
   if (refreshInFlight) return refreshInFlight
-  refreshInFlight = performRefresh().finally(() => {
-    refreshAttempted = true
-    refreshInFlight = undefined
-  })
+  refreshInFlight = performRefresh()
+    .catch((error) => {
+      noteRefreshOutcome(true)
+      throw error
+    })
+    .finally(() => {
+      refreshAttempted = true
+      refreshEndedAt = Date.now()
+      refreshInFlight = undefined
+    })
   return refreshInFlight
 }
 
@@ -306,6 +404,7 @@ async function performRefresh(): Promise<{ fetched: number; stored: number }> {
 
   const activeSources = HIRING_SOURCES.filter(isHiringSourceConfigured)
   let fetched = 0
+  let sourceFailures = 0
   for (const source of activeSources) {
     try {
       const batch = await fetchSource(source)
@@ -321,6 +420,7 @@ async function performRefresh(): Promise<{ fetched: number; stored: number }> {
         byKey.set(key, { ...withAi, lastSeen: nowIso, ai: reusableAi })
       }
     } catch (error) {
+      sourceFailures += 1
       console.error(`[hiring] source "${source}" failed:`, (error as Error).message)
     }
   }
@@ -328,9 +428,63 @@ async function performRefresh(): Promise<{ fetched: number; stored: number }> {
   const kept = pruneStore(byKey, now)
   await persistStore(kept)
   scheduleCandidateAi(kept)
+  await syncDb(kept)
+  noteRefreshOutcome(kept.length === 0 && (sourceFailures > 0 || !sourcesAnswered(activeSources)))
   return { fetched, stored: kept.length }
 }
 
+/**
+ * Refreshes one channel and folds it into the store. This is the unit of work
+ * the RabbitMQ tasks carry: a channel that times out is retried on its own,
+ * instead of a whole-source refresh failing and taking the good channels with
+ * it. Returns null when the handle is not configured.
+ */
+export async function refreshHiringChannel(handle: string): Promise<{ fetched: number; stored: number } | null> {
+  const outcome = await fetchHiringChannel(handle)
+  if (!outcome) return null
+
+  const now = Date.now()
+  const nowIso = new Date(now).toISOString()
+  const byKey = new Map<string, StoredProfile>()
+  for (const profile of await loadStored()) byKey.set(dedupKey(profile), profile)
+
+  for (const profile of outcome.result.profiles) {
+    const key = dedupKey(profile)
+    const previous = byKey.get(key)
+    const input = candidateAiInput(profile)
+    const reusableAi = previous?.ai?.fingerprint === input.fingerprint ? previous.ai : undefined
+    const withAi = reusableAi?.status === 'completed' && reusableAi.data
+      ? mergeCandidateAi(profile, reusableAi.data)
+      : profile
+    byKey.set(key, { ...withAi, lastSeen: nowIso, ai: reusableAi })
+  }
+
+  const kept = pruneStore(byKey, now)
+  await persistStore(kept)
+  scheduleCandidateAi(kept)
+
+  if (hiringDbEnabled()) {
+    await saveDbCandidates(
+      kept.filter((profile) => channelHandle(profile) === outcome.diagnostic.handle.toLowerCase()),
+      outcome.diagnostic,
+    )
+  }
+
+  // A channel that answered proves the transport works, so the whole-store
+  // backoff must not keep treating the board as mid-outage.
+  if (outcome.diagnostic.status !== 'error') {
+    refreshAttempted = true
+    refreshEndedAt = Date.now()
+    failedRefreshStreak = 0
+  }
+
+  return { fetched: outcome.diagnostic.fetched, stored: kept.length }
+}
+
 export function isHiringStoreCold(): boolean {
-  return memoryStore.length === 0 && !refreshAttempted
+  if (memoryStore.length) return false
+  if (!refreshAttempted) return true
+  // Only outages are retried, and never more often than the backoff allows.
+  if (!failedRefreshStreak) return false
+  return Date.now() - refreshEndedAt >= coldRetryDelay()
 }

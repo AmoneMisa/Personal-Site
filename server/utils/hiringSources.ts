@@ -5,10 +5,16 @@ import type { CvProfile, HiringSource } from './hiringTypes'
 import { isLikelyTelegramVacancy } from './sources'
 
 const UA = 'hiringFinder/1.0 (CV board; contact: admin@whiteslove.me)'
-const DEFAULT_HISTORY_LIMIT = 300
+const DEFAULT_HISTORY_LIMIT = 200
 const MAX_HISTORY_LIMIT = 500
 const MIN_HISTORY_LIMIT = 50
 const TELEGRAM_WORKER_PAGE_LIMIT = 200
+const TELEGRAM_WORKER_TIMEOUT_MS = 60_000
+// Channels are fetched four at a time over the public t.me preview, but one at
+// a time through the worker: its queue is single-lane by design (parallel calls
+// from one account trip FLOOD_WAIT), so fanning out only inflates the wait each
+// request has to survive.
+const TELEGRAM_PARALLEL_CHANNELS = 4
 const MAX_CANDIDATE_AGE_MONTHS = 3
 const FUTURE_DATE_TOLERANCE_MS = 48 * 60 * 60 * 1000
 
@@ -46,9 +52,7 @@ const DEFAULT_CV_CHANNELS: TelegramChannel[] = [
   // Uzbekistan — Tashkent + regions, broad mass-market coverage.
   { handle: 'ISH_QIDIR', label: 'Ish Qidir', country: 'UZ', location: 'Uzbekistan', tags: ['Resume', 'Mass market'] },
   { handle: 'myrabota_uz', label: 'Работа в Ташкенте', country: 'UZ', location: 'Tashkent', tags: ['Resume', 'Mass market'] },
-  { handle: 'ishchi', label: 'ISHCHI', country: 'UZ', location: 'Uzbekistan', tags: ['Resume', 'Mass market'] },
   { handle: 'TALIMDAN_ISH_TOPISH', label: 'Taʼlimdan ish topish', country: 'UZ', location: 'Tashkent', tags: ['Resume', 'Education'] },
-  { handle: 'uzb_vakansiya', label: 'UZB Vakansiya', country: 'UZ', location: 'Uzbekistan', tags: ['Resume', 'Mass market'] },
   { handle: 'SAMARQAND_ISH', label: 'Samarqand ish', country: 'UZ', location: 'Samarkand', tags: ['Resume', 'Mass market'] },
   { handle: 'Fargona_ishlar', label: 'Fargona ishlar', country: 'UZ', location: 'Fergana', tags: ['Resume', 'Mass market'] },
   { handle: 'Ishga_marhamat_andijon_elonlar', label: 'Andijon ish', country: 'UZ', location: 'Andijan', tags: ['Resume', 'Mass market'] },
@@ -378,7 +382,7 @@ async function fetchChannelViaWorker(base: string, channel: TelegramChannel, q: 
     const pageLimit = Math.min(TELEGRAM_WORKER_PAGE_LIMIT, target - fetched)
     const params = new URLSearchParams({ channel: channel.handle, limit: String(pageLimit) })
     if (beforeId > 0) params.set('beforeId', String(beforeId))
-    const res = await fetch(`${base.replace(/\/+$/, '')}/history?${params}`, { signal: AbortSignal.timeout(15_000) })
+    const res = await fetch(`${base.replace(/\/+$/, '')}/history?${params}`, { signal: AbortSignal.timeout(TELEGRAM_WORKER_TIMEOUT_MS) })
     if (!res.ok) throw new Error(`tg-worker @${channel.handle} -> ${res.status}`)
     const data = (await res.json()) as TelegramWorkerHistory
     if (!data.ok || !Array.isArray(data.messages)) throw new Error(`tg-worker @${channel.handle} bad payload`)
@@ -434,48 +438,78 @@ async function fetchTelegramChannel(channel: TelegramChannel, q: string): Promis
   return parseChannelHtml(await res.text(), channel, q)
 }
 
+interface ChannelOutcome {
+  result: TelegramFetchResult
+  diagnostic: HiringSourceDiagnostic
+}
+
+// One channel, never throwing: a dead handle is a diagnostic, not a reason to
+// abandon the other channels in the batch.
+async function readChannel(channel: TelegramChannel, q: string): Promise<ChannelOutcome> {
+  const checkedAt = new Date().toISOString()
+  try {
+    const result = await fetchTelegramChannel(channel, q)
+    return {
+      result,
+      diagnostic: {
+        handle: channel.handle,
+        country: channel.country,
+        status: result.profiles.length ? 'ok' : 'empty',
+        fetched: result.fetched,
+        candidates: result.profiles.length,
+        checkedAt,
+      },
+    }
+  } catch (err) {
+    const error = (err as Error).message
+    console.error(`[hiring] telegram @${channel.handle} failed:`, error)
+    return {
+      result: { profiles: [], fetched: 0 },
+      diagnostic: {
+        handle: channel.handle,
+        country: channel.country,
+        status: 'error',
+        fetched: 0,
+        candidates: 0,
+        checkedAt,
+        error,
+      },
+    }
+  }
+}
+
+/** Configured handles, in fetch order — the queue dispatcher fans these out. */
+export function hiringChannelHandles(): string[] {
+  return telegramChannels().map((channel) => channel.handle)
+}
+
+/**
+ * Refreshes a single channel, for the per-channel queue tasks. The shared
+ * diagnostics list is patched in place so /hiring-feed keeps reporting one row
+ * per channel no matter which path last refreshed it.
+ */
+export async function fetchHiringChannel(handle: string, q = ''): Promise<ChannelOutcome | null> {
+  if (process.env.TELEGRAM_SOURCE === 'off') return null
+  const wanted = handle.replace(/^@/, '').toLowerCase()
+  const channel = telegramChannels().find((item) => item.handle.toLowerCase() === wanted)
+  if (!channel) return null
+
+  const outcome = await readChannel(channel, q)
+  const index = telegramDiagnostics.findIndex((item) => item.handle.toLowerCase() === wanted)
+  if (index >= 0) telegramDiagnostics[index] = outcome.diagnostic
+  else telegramDiagnostics = [...telegramDiagnostics, outcome.diagnostic]
+  return outcome
+}
+
 export async function fetchHiringTelegram(q: string): Promise<CvProfile[]> {
   if (process.env.TELEGRAM_SOURCE === 'off') return []
   const channels = telegramChannels()
   const profiles: CvProfile[] = []
   const diagnostics: HiringSourceDiagnostic[] = []
 
-  for (let start = 0; start < channels.length; start += 4) {
-    const results = await Promise.all(channels.slice(start, start + 4).map(async (channel) => {
-      const checkedAt = new Date().toISOString()
-      try {
-        const result = await fetchTelegramChannel(channel, q)
-        return {
-          channel,
-          result,
-          diagnostic: {
-            handle: channel.handle,
-            country: channel.country,
-            status: result.profiles.length ? 'ok' : 'empty',
-            fetched: result.fetched,
-            candidates: result.profiles.length,
-            checkedAt,
-          } as HiringSourceDiagnostic,
-        }
-      } catch (err) {
-        const error = (err as Error).message
-        console.error(`[hiring] telegram @${channel.handle} failed:`, error)
-        return {
-          channel,
-          result: { profiles: [], fetched: 0 } as TelegramFetchResult,
-          diagnostic: {
-            handle: channel.handle,
-            country: channel.country,
-            status: 'error',
-            fetched: 0,
-            candidates: 0,
-            checkedAt,
-            error,
-          } as HiringSourceDiagnostic,
-        }
-      }
-    }))
-
+  const stride = process.env.TELEGRAM_WORKER_URL ? 1 : TELEGRAM_PARALLEL_CHANNELS
+  for (let start = 0; start < channels.length; start += stride) {
+    const results = await Promise.all(channels.slice(start, start + stride).map((channel) => readChannel(channel, q)))
     for (const item of results) {
       profiles.push(...item.result.profiles)
       diagnostics.push(item.diagnostic)
