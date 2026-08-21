@@ -98,7 +98,13 @@ function structuredName(text: string): string | null {
 }
 
 function explicitLocation(text: string): string | null {
-  return field(text, 'location|локация|локація|country|страна|країна')
+  const labelled = field(text, 'location|локация|локація|country|страна|країна')
+  if (labelled) return labelled
+
+  // Candidate feeds frequently use compact headlines such as
+  // `Локація #Canada` without punctuation between label and value.
+  const compact = text.match(/(?:^|\n)[^\p{L}\p{N}\n]{0,8}(?:location|локация|локація|country|страна|країна)\s+(#?[\p{L}][^\n]{0,120})/iu)
+  return compact?.[1]?.trim() || null
 }
 
 function countryFromLocation(value: string | null): { code: string; name: string } | null {
