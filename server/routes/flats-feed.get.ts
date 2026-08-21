@@ -8,6 +8,14 @@ import { canonicalMetroValue } from '../utils/tashkentMetroLabels'
 const FLAT_API_URL = process.env.FLAT_API_URL || 'http://185.5.206.229:8082'
 const FEED_FRESH_MS = 30_000
 const FEED_STALE_MS = 60 * 60_000
+// An answer with no listings is almost always the upstream being unhappy — a
+// warming store, a degraded source, a timeout that resolved to nothing. Serving
+// one for the full hour turns a blip into "нет объявлений" for every visitor
+// asking that question, so empty answers get a short leash and are refetched.
+const EMPTY_STALE_MS = 60_000
+// The flat API answers an uncached query in ~6s and slower under load; 15s left
+// legitimate searches failing as if nothing matched.
+const UPSTREAM_TIMEOUT_MS = 25_000
 const feedCache = new Map<string, { at: number; data: any }>()
 const feedRefreshes = new Map<string, Promise<any>>()
 
@@ -36,10 +44,18 @@ function shapeResponse(raw: any, requestedSources: string[]): any {
   return data
 }
 
+/** How long a cached answer may still be served: empty ones expire quickly. */
+function staleWindow(entry: { data: any } | undefined): number {
+  const listings = entry?.data?.listings
+  return Array.isArray(listings) && listings.length && !entry?.data?.warming
+    ? FEED_STALE_MS
+    : EMPTY_STALE_MS
+}
+
 function refreshFeed(key: string, url: string): Promise<any> {
   const current = feedRefreshes.get(key)
   if (current) return current
-  const request = $fetch<any>(url, { timeout: 15_000 })
+  const request = $fetch<any>(url, { timeout: UPSTREAM_TIMEOUT_MS })
     .then((data) => {
       const at = data?.warming ? Date.now() - FEED_FRESH_MS : Date.now()
       feedCache.set(key, { at, data })
@@ -82,7 +98,7 @@ export default defineEventHandler(async (event) => {
     const combinedKey = `combined:${combinedParams}`
     const combinedUrl = `${FLAT_API_URL}/api/listings?${combinedParams}`
     const combinedCached = feedCache.get(combinedKey)
-    const combinedRaw = combinedCached && Date.now() - combinedCached.at < FEED_STALE_MS
+    const combinedRaw = combinedCached && Date.now() - combinedCached.at < staleWindow(combinedCached)
       ? combinedCached.data
       : await refreshFeed(combinedKey, combinedUrl)
     const combined = shapeResponse(combinedRaw, requestedSources)
@@ -93,7 +109,7 @@ export default defineEventHandler(async (event) => {
     setResponseHeader(event, 'Cache-Control', 'no-store')
     return await shapeWithCombinedFallback(cached.data)
   }
-  if (cached && Date.now() - cached.at < FEED_STALE_MS) {
+  if (cached && Date.now() - cached.at < staleWindow(cached)) {
     refreshFeed(key, url).catch(() => {})
     setResponseHeader(event, 'Cache-Control', 'no-store')
     return { ...await shapeWithCombinedFallback(cached.data), stale: true }
@@ -103,7 +119,13 @@ export default defineEventHandler(async (event) => {
     setResponseHeader(event, 'Cache-Control', 'no-store')
     return await shapeWithCombinedFallback(data)
   } catch (err) {
+    // A stale answer, however old, beats reporting a failure — but only if it
+    // actually has something in it.
+    if (cached && Array.isArray(cached.data?.listings) && cached.data.listings.length) {
+      setResponseHeader(event, 'Cache-Control', 'no-store')
+      return { ...await shapeWithCombinedFallback(cached.data), stale: true }
+    }
     setResponseStatus(event, 502)
-    return { error: (err as Error).message, listings: [], count: 0 }
+    return { error: (err as Error).message, listings: [], count: 0, upstreamFailed: true }
   }
 })
