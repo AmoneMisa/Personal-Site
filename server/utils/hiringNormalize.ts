@@ -5,6 +5,9 @@ import { canonicalSkillName, extractSkillDetails } from '~~/shared/jobSkills'
 import type { CandidateEmploymentType, CvProfile } from './hiringTypes'
 import type { Seniority } from './jobTypes'
 import { extractCandidateAge, extractCandidateName } from './hiringCandidateFields'
+import { ishBorLocationFromText, trimIshBorProfileText } from './hiringIshBorFields'
+import { careeristRoleFromText, trimCareeristProfileText } from './hiringCareeristFields'
+import { parseSalary as parseWebSalary } from './hiringWebFields'
 
 const B = '(?<![\\p{L}\\p{N}])'
 const E = '(?![\\p{L}\\p{N}])'
@@ -64,29 +67,30 @@ export function normalizeSkills(rawSkills: string[] | undefined, text: string): 
 interface ProfessionRule { name: string; re: RegExp }
 const PROFESSION_RULES: ProfessionRule[] = [
   // Management / office / sales.
-  { name: 'Sales Manager', re: /\b(?:sales\s+manager|account\s+manager)\b|менеджер\s+(?:по\s+)?продаж|менеджер\s+з\s+продаж|sotuv\s+menejer/iu },
+  { name: 'Sales Manager', re: /\b(?:sales\s+manager|account\s+manager)\b|менеджер\s+(?:по\s+)?(?:экспортн\p{L}*\s+)?продаж|менеджер\s+з\s+продаж|sotuv\s+menejer/iu },
   { name: 'Project Manager', re: /\bproject\s+manager\b|проектн(?:ый|ий)\s+менеджер|менеджер\s+проект|керівник\s+проєкт/iu },
   { name: 'Product Manager', re: /\bproduct\s+manager\b|продакт\s*менеджер|менеджер\s+продукт/iu },
   { name: 'Store Manager', re: /\bstore\s+manager\b|управляющ(?:ий|ая)\s+магазин|заведующ(?:ий|ая)\s+магазин|керуюч(?:ий|а)\s+магазин/iu },
   { name: 'Restaurant Manager', re: /\brestaurant\s+manager\b|управляющ(?:ий|ая)\s+(?:ресторан|кафе)|керуюч(?:ий|а)\s+(?:ресторан|кафе)/iu },
   { name: 'General Manager', re: /\bgeneral\s+manager\b|управляющ(?:ий|ая)\b|керуюч(?:ий|а)\b|директор|director/iu },
   { name: 'Supervisor', re: /\bsupervisor\b|супервайзер|старший\s+смены|керівник\s+зміни/iu },
-  { name: 'HR / Recruiter', re: /\b(?:hr|human\s+resources|recruiter|talent\s+acquisition)\b|рекрутер|сорсер|кадровик|hr[-\s]?менеджер/iu },
+  { name: 'HR / Recruiter', re: /\b(?:hr|human\s+resources|recruiter|talent\s+acquisition|people\s+partner|hrbp|hrd)\b|рекрутер|сорсер|кадровик|кадров\p{L}*\s+аудит|hr[-\s]?менеджер/iu },
   { name: 'Office Manager', re: /\boffice\s+manager\b|офис[-\s]?менеджер|офіс[-\s]?менеджер/iu },
   { name: 'Administrator', re: /\badministrator\b|администратор|адміністратор/iu },
   { name: 'Receptionist', re: /\breceptionist\b|рецепционист|рецепціоніст|ресепшн/iu },
   { name: 'Manager', re: /\bmanager\b|менеджер|menejer/iu },
-  { name: 'Accountant', re: /\baccountant\b|бухгалтер|buxgalter/iu },
-  { name: 'Cashier', re: /\bcashier\b|кассир|касир|kassir/iu },
+  { name: 'Accountant', re: /\baccountant\b|б[уy]галтер(?:ия)?|b(?:u(?:x|h)?|o)?galter(?:iya)?/iu },
+  { name: 'Cashier', re: /\bcashier\b|кассир|касир|kassir|kassa\s+(?:xodimi|mudiri)/iu },
   { name: 'Salesperson', re: /\b(?:salesperson|sales\s+assistant|shop\s+assistant|seller)\b|продавец|продавець|продавчин|sotuvchi/iu },
   { name: 'Merchandiser', re: /\bmerchandiser\b|мерчендайзер|мерчандайзер/iu },
   { name: 'Promoter', re: /\bpromoter\b|промоутер/iu },
   { name: 'Customer Support', re: /\b(?:customer\s+support|support\s+specialist|call\s*center)\b|поддержк|підтримк|колл[-\s]?центр|call[-\s]?центр/iu },
-  { name: 'Operator', re: /\boperator\b|оператор/iu },
+  { name: 'Operator', re: /\boperator(?:lik)?\b|оператор/iu },
+  { name: 'Copywriter', re: /\bcopywriter\b|копирайтер|копірайтер|составлени\p{L}*\s+текст|наборщик\s+текста/iu },
 
   // Logistics / security / service.
   { name: 'Courier', re: /\bcourier\b|курьер|кур'єр|kuryer/iu },
-  { name: 'Driver', re: /\bdriver\b|водитель|водій|haydovchi|shafyor/iu },
+  { name: 'Driver', re: /\bdriver\b|(?<!\p{L})водитель(?!\p{L})|(?<!\p{L})водій(?!\p{L})|\bhaydovchi\b|\bshafyor\b|(?<!\p{L})[СC][ЕE]\s+категори/iu },
   { name: 'Security Guard', re: /\bsecurity(?:\s+guard)?\b|охранник|охоронець|охорона|qorovul/iu },
   { name: 'Cleaner', re: /\b(?:cleaner|cleaning|housekeeper)\b|уборщик|уборщица|уборка|прибиральник|прибиральниц|домработниц|farrosh/iu },
   { name: 'Caregiver', re: /\bcaregiver\b|сиделк|доглядальниц|parvarish/iu },
@@ -111,27 +115,33 @@ const PROFESSION_RULES: ProfessionRule[] = [
 
   // Education / childcare.
   { name: 'Tutor', re: /\btutor\b|репетитор|rep(?:e|i)titor(?:lik)?/iu },
-  { name: 'Kindergarten Teacher', re: /\bkindergarten\s+teacher\b|воспитател|виховател|tarbiyachi/iu },
-  { name: 'Nanny', re: /\bnanny\b|няня|нянечк|enaga/iu },
-  { name: 'Teacher', re: /\bteacher\b|учитель|вчитель|преподавател|викладач|o(?:'|’)qituvchi/iu },
+  { name: 'Kindergarten Teacher', re: /\bkindergarten\s+teacher\b|воспитател|виховател|tarbiyachi|(?:xususiy\s+)?bog['’ʻʼ‘`]?cha/iu },
+  { name: 'Nanny', re: /\bnanny\b|няня|нянечк|enaga|bola\s+qarash/iu },
+  { name: 'Teacher', re: /\bteacher\b|учитель|вчитель|преподавател|викладач|o['’ʻʼ‘`]?qituvchi(?:lik)?/iu },
   { name: 'Psychologist', re: /\bpsychologist\b|психолог|psixolog/iu },
   { name: 'Speech Therapist', re: /\bspeech\s+therapist\b|логопед|logoped/iu },
 
   // IT / professional. Keep specializations before the generic developer rule.
   { name: 'Full-stack Developer', re: /\bfull[- ]?stack\s+(?:developer|engineer|dasturchi)\b|\bfullstack\s+dasturchi\b/iu },
   { name: 'Backend Developer', re: /\bback[- ]?end\s+(?:developer|engineer|dasturchi)\b|\bbackend\s+dasturchi\b/iu },
-  { name: 'Frontend Developer', re: /\bfront[- ]?end\s+(?:developer|engineer|dasturchi)\b|\bfrontend\s+dasturchi\b/iu },
+  { name: 'Frontend Developer', re: /\bfront[- ]?end\s+(?:developer|engineer|dasturchi)\b|\bfrontend\s+dasturchi\b|фронтенд/iu },
   { name: 'Mobile Developer', re: /\b(?:mobile|android|ios)\s+(?:developer|engineer|dasturchi)\b/iu },
   { name: 'System Administrator', re: /\b(?:system|network|windows\s+server)\s+administrator\b|систем(?:ный|ним)\s+администратор|сисадмин|сетевой\s+администратор|tarmoq\s+administrator|tizim\s+administrator/iu },
   { name: 'Software Developer', re: /\b(?:software\s+)?(?:developer|programmer|frontend|front-end|backend|back-end|full[- ]?stack|android|ios)\b|разработчик|розробник|программист|програміст|dasturchi|dasturlash/iu },
   { name: 'QA Engineer', re: /\b(?:qa|quality\s+assurance|tester|test\s+engineer)\b|тестировщик|тестувальник/iu },
   { name: 'DevOps Engineer', re: /\bdevops\b/iu },
+  { name: 'Cybersecurity Specialist', re: /\b(?:cybersecurity|cyber\s+security|ciso)\b|информационн\p{L}*\s+безопасност|axborot\s+xavfsizligi/iu },
+  { name: 'Engineering Manager', re: /\b(?:cto|vp\s+of\s+engineering|head\s+of\s+engineering|engineering\s+manager)\b|техническ\p{L}*\s+директор/iu },
+  { name: 'Hardware Engineer', re: /\b(?:hardware|embedded|pcb)\s*(?:engineer|developer)?\b|друкован\p{L}*\s+плат|печатн\p{L}*\s+плат|мікроконтролер|микроконтроллер/iu },
   { name: 'Designer', re: /\b(?:designer|ui\/?ux)\b|дизайнер/iu },
   { name: 'Analyst', re: /\banalyst\b|аналитик|аналітик/iu },
   { name: 'Engineer', re: /\bengineer\b|инженер|інженер|muhandis/iu },
-  { name: 'Marketer', re: /\b(?:marketer|marketing\s+specialist|smm)\b|маркетолог|smm[-\s]?специалист/iu },
+  { name: 'Marketer', re: /\b(?:marketer|marketing(?:\s+specialist)?|smm)\b|маркетинг|маркетолог|smm[-\s]?специалист/iu },
+  { name: 'Production Manager', re: /\bproduction\s+(?:manager|director)\b|директор\s+по\s+производств|техническ\p{L}*\s+директор/iu },
   { name: 'Translator', re: /\b(?:translator|interpreter)\b|переводчик|перекладач|таржимон|tarjimon/iu },
   { name: 'Lawyer', re: /\b(?:lawyer|attorney|legal\s+specialist)\b|юрист|адвокат|правник|yurist/iu },
+  { name: 'Notary', re: /\bnotar(?:y|ius)\b|нотариус/iu },
+  { name: 'Metrology Specialist', re: /\bmetrolog(?:y|iya)\b|метролог|standartlashtirish/iu },
 
   // Construction / production / warehouse.
   { name: 'Construction Worker', re: /\b(?:builder|construction\s+worker)\b|строител|будівельник|разнорабоч|різнороб|qurilish/iu },
@@ -170,6 +180,10 @@ function collectProfessions(source: string): string[] {
   const names = [...new Set(matches.map((item) => item.name))]
   if (names.some((name) => SPECIFIC_MANAGER_ROLES.has(name))) {
     const generic = names.indexOf('Manager')
+    if (generic >= 0) names.splice(generic, 1)
+  }
+  if (names.includes('Production Manager') || names.includes('Engineering Manager')) {
+    const generic = names.indexOf('General Manager')
     if (generic >= 0) names.splice(generic, 1)
   }
   if (names.some((name) => SPECIFIC_DEVELOPER_ROLES.has(name))) {
@@ -292,7 +306,7 @@ export function extractContactHours(text: string): string | null {
   if (!raw) return null;
   const cleaned = raw.replace(/\s{2,}/g, ' ').replace(/[.;,]+$/, '').trim();
   // A time range is what makes this field worth showing at all.
-  return /\d{1,2}[:.]\d{2}|\d{1,2}\s*[-–—]\s*\d{1,2}/.test(cleaned) ? cleaned.slice(0, 60) : null;
+  return /\b24\s*\/\s*7\b|\d{1,2}[:.]\d{2}|\d{1,2}\s*[-–—]\s*\d{1,2}/.test(cleaned) ? cleaned.slice(0, 60) : null;
 }
 
 export function extractContacts(text: string): { telegram?: string; email?: string; phone?: string } {
@@ -432,19 +446,85 @@ export function normalizeRelevantExperience(
 export function normalizeEmploymentTypes(text: string, raw?: string | null): CandidateEmploymentType[] {
   const source = `${raw || ''}\n${text}`
   const out = new Set<CandidateEmploymentType>()
-  if (/full[-\s]?time|полный\s+(?:рабочий\s+)?день|полная\s+занятость|повн(?:ий|а)\s+(?:робочий\s+)?день|повна\s+зайнятість|to(?:'|’)liq\s+(?:ish|stavka)/iu.test(source)) out.add('full_time')
-  if (/part[-\s]?time|неполный\s+(?:рабочий\s+)?день|частичная\s+занятость|подработк|неповн(?:ий|а)\s+(?:робочий\s+)?день|часткова\s+зайнятість|підробіт|yarim\s+stavka/iu.test(source)) out.add('part_time')
+  if (/full[-\s]?time|(?<!\p{L})полный\s+(?:рабочий\s+)?день|(?<!\p{L})полная\s+занятость|(?<!\p{L})повн(?:ий|а)\s+(?:робочий\s+)?день|(?<!\p{L})повна\s+зайнятість|to(?:'|’)liq\s+(?:ish|stavka)/iu.test(source)) out.add('full_time')
+  if (/part[-\s]?time|неполный\s+(?:рабочий\s+)?день|неполная\s+занятость|частичная\s+занятость|подработк|неповн(?:ий|а)\s+(?:робочий\s+)?день|часткова\s+зайнятість|підробіт|yarim\s+stavka/iu.test(source)) out.add('part_time')
   return [...out]
 }
 
+/** Removes text ligatures emitted by icon fonts from older stored web cards. */
+function stripUiArtifacts(value: string): string {
+  return value
+    .replace(/\b(?:local_shipping|location_on|work_outline|account_circle)\b/giu, ' ')
+    .split('\n')
+    .map((line) => line.replace(/[ \t]{2,}/g, ' ').trim())
+    .join('\n')
+    .trim()
+}
+
+const HIDDEN_NAME_RE = /^(?:фио|піб|name)?\s*(?:скрыт\p{L}*|прихован\p{L}*|hidden|yashiril\p{L}*|ascuns)$/iu
+const EMPLOYMENT_AS_EDUCATION_RE = /занятост|зайнятіст|удал[её]нн|дистанцион|remote|full[- ]?time|part[- ]?time|график\s+работ|bandlik/iu
+const NON_ROLE_RE = /^(?:удал[её]нно|remote|farqi\s+yo['’ʻʼ‘`]?q|bilmaym\p{L}*|ish\s+ker(?:e|a)\s+onlayn|любая\s+(?:работа|занятость)|немає|нет|не\s+указано|not\s+specified)$/iu
+
+function normalizeCandidateEducation(profile: CvProfile, text: string): string | null | undefined {
+  const raw = profile.education?.trim() || ''
+  const withoutPreviewBoilerplate = raw.replace(/\s*[·|]\s*Location:\s*[\s\S]*$/iu, '').trim()
+  if (withoutPreviewBoilerplate && !EMPLOYMENT_AS_EDUCATION_RE.test(withoutPreviewBoilerplate)) return withoutPreviewBoilerplate
+  if (profile.sourceKey?.startsWith('flagma')) {
+    const demographics = text.match(
+      /\|\s*([^\n|]{0,120}(?:образован\p{L}*|освіт\p{L}*|studii|ta(?:['’])?lim)[^\n|]{0,120})/iu,
+    )?.[1]?.trim()
+    if (demographics && !EMPLOYMENT_AS_EDUCATION_RE.test(demographics)) return demographics
+    const shortDemographics = text.match(/\|\s*([^\n|]{2,80})/u)?.[1]?.trim()
+    if (shortDemographics && /(?:высш|средн|бакалавр|магистр|колледж|лицей|образован)/iu.test(shortDemographics)) {
+      return shortDemographics
+    }
+  }
+  return raw ? null : profile.education
+}
+
+function validStoredContact(value: string | null | undefined): string | null {
+  const raw = value?.trim() || ''
+  if (!raw) return null
+  if (/^https?:\/\//iu.test(raw) || /^@[A-Za-z0-9_]{4,32}$/u.test(raw) || /^[^\s@]+@[^\s@]+\.[^\s@]+$/u.test(raw)) return raw
+  const digits = raw.replace(/\D/g, '')
+  return digits.length >= 9 && digits.length <= 15 ? raw : null
+}
+
+function normalizeMixedScriptName(value: string): string {
+  if ((value.match(/\p{Script=Cyrillic}/gu) || []).length < 2) return value
+  const confusables: Record<string, string> = {
+    A: 'А', B: 'В', C: 'С', E: 'Е', H: 'Н', K: 'К', M: 'М', O: 'О', P: 'Р', T: 'Т', X: 'Х', Y: 'У',
+  }
+  return value.replace(/[ABCEHKMOPTXY]/g, (letter) => confusables[letter] || letter)
+}
+
+function normalizeCandidateNameCase(value: string): string {
+  if (!value || value !== value.toLocaleLowerCase('ru') || !/\p{L}/u.test(value)) return value
+  return value.replace(/(^|[\s-])(\p{L})/gu, (_match, boundary: string, letter: string) => (
+    `${boundary}${letter.toLocaleUpperCase('ru')}`
+  ))
+}
+
 export function normalizeCandidate(profile: CvProfile): CvProfile {
-  const originalText = profile.originalText || profile.description || ''
+  // Repair rows parsed before Material Icon ligatures were removed from the
+  // source HTML. Underscored glyph names are presentation markup, not CV text.
+  const rawSourceText = stripUiArtifacts(profile.originalText || profile.description || '')
+  const originalText = profile.sourceKey === 'ishbor-uz'
+    ? trimIshBorProfileText(rawSourceText)
+    : profile.sourceKey === 'careerist-uz' ? trimCareeristProfileText(rawSourceText) : rawSourceText
   const goalRole = extractGoalRole(originalText)
-  const effectiveRole = goalRole || profile.role
+  const sourceRole = profile.sourceKey === 'careerist-uz' ? careeristRoleFromText(originalText) : null
+  const rawEffectiveRole = goalRole || sourceRole || profile.role
+  const effectiveRole = NON_ROLE_RE.test(rawEffectiveRole || '') ? '' : rawEffectiveRole
   // Repair already-stored rows where a loose adapter saved the whole labelled
   // line ("familya: ...") as the name. New parses and old data then converge.
   const rawName = profile.name?.trim() || ''
-  const name = (rawName ? extractCandidateName(rawName) || rawName : extractCandidateName(originalText))
+  const roleAsName = profile.origin === 'web' && rawName.split(/\s+/u).length <= 3
+    && collectProfessions(rawName).length > 0
+  const nameCandidate = rawName && !HIDDEN_NAME_RE.test(rawName) && !roleAsName
+    ? extractCandidateName(rawName) || rawName
+    : extractCandidateName(originalText)
+  const name = normalizeCandidateNameCase(normalizeMixedScriptName(HIDDEN_NAME_RE.test(nameCandidate) ? '' : nameCandidate))
     .replace(/\s{2,}/g, ' ')
     .trim()
     .slice(0, 100)
@@ -458,28 +538,45 @@ export function normalizeCandidate(profile: CvProfile): CvProfile {
   }
   // AI-enriched/current structured professions must survive subsequent feed and
   // Elasticsearch normalization. Only derive from free text when none exist.
-  const providedProfessions = normalizeProvidedProfessions(profile.professions)
+  const providedProfessions = profile.sourceKey === 'careerist-uz' || !effectiveRole ? [] : normalizeProvidedProfessions(profile.professions)
   const professions = providedProfessions.length
     ? providedProfessions
     : normalizeProfessions(effectiveRole, originalText)
-  const age = profile.age ?? extractAge(originalText)
-  const employmentTypes = profile.employmentTypes?.length
-    ? profile.employmentTypes
-    : normalizeEmploymentTypes(originalText, profile.employmentType)
-  const experienceYears = normalizeRelevantExperience(profile.experienceYears, professions, originalText)
+  const storedAge = profile.age != null && profile.age >= 14 && profile.age <= 90 ? profile.age : null
+  const age = storedAge ?? extractAge(originalText)
+  const parsedEmploymentTypes = normalizeEmploymentTypes(originalText, profile.employmentType)
+  const employmentTypes = profile.sourceKey?.startsWith('flagma')
+    ? parsedEmploymentTypes
+    : profile.employmentTypes?.length ? profile.employmentTypes : parsedEmploymentTypes
+  const relevantExperience = normalizeRelevantExperience(profile.experienceYears, professions, originalText)
+  // Month-based durations (20 years 4 months) are repeating IEEE fractions.
+  // One decimal is enough for the source precision and keeps JSON/UI readable.
+  const experienceYears = relevantExperience == null ? null : Number(relevantExperience.toFixed(1))
+  const storedCity = profile.city == null ? profile.city : stripUiArtifacts(profile.city) || null
+  const city = profile.sourceKey === 'ishbor-uz'
+    ? ishBorLocationFromText(rawSourceText) || storedCity
+    : storedCity
   const remote = normalizeRemotePreference(profile.remote, originalText, profile.origin)
-  const extractedSalary = profile.salaryMin == null && profile.salaryMax == null
-    ? extractCandidateSalary(originalText, profile.country)
-    : {}
-  const salaryMin = profile.salaryMin ?? extractedSalary.salaryMin
-  const salaryMax = profile.salaryMax ?? extractedSalary.salaryMax
-  const currency = profile.currency ?? extractedSalary.currency
+  const extractedSalary = profile.sourceKey === 'careerist-uz'
+    ? parseWebSalary(originalText, profile.country)
+    : profile.salaryMin == null && profile.salaryMax == null
+      ? extractCandidateSalary(originalText, profile.country)
+      : {}
+  const replaceStoredSalary = profile.sourceKey === 'careerist-uz' && extractedSalary.salaryMin != null
+  const salaryMin = replaceStoredSalary ? extractedSalary.salaryMin : profile.salaryMin ?? extractedSalary.salaryMin
+  const salaryMax = replaceStoredSalary ? extractedSalary.salaryMax : profile.salaryMax ?? extractedSalary.salaryMax
+  const currency = replaceStoredSalary ? extractedSalary.currency : profile.currency ?? extractedSalary.currency
+  const education = normalizeCandidateEducation(profile, originalText)
 
   return {
     ...profile,
     name,
     originalText,
-    description: profile.description || originalText,
+    description: profile.sourceKey === 'ishbor-uz'
+      ? trimIshBorProfileText(stripUiArtifacts(profile.description || originalText))
+      : profile.sourceKey === 'careerist-uz'
+        ? trimCareeristProfileText(stripUiArtifacts(profile.description || originalText))
+        : stripUiArtifacts(profile.description || originalText),
     role: professions[0] || normalizeRole(effectiveRole, originalText),
     professions,
     previousProfessions: profile.previousProfessions?.length
@@ -489,15 +586,18 @@ export function normalizeCandidate(profile: CvProfile): CvProfile {
     age,
     isAdult: age == null ? true : age >= 18,
     experienceYears,
+    city,
+    education,
     salaryMin,
     salaryMax,
     currency,
     remote,
     relocationReady: profile.relocationReady ?? detectRelocationReady(originalText),
     employmentTypes,
-    skills: normalizeSkills(profile.skills, originalText),
+    skills: normalizeSkills(profile.sourceKey === 'careerist-uz' ? [] : profile.skills, originalText),
     seniority: profile.seniority ?? detectSeniority(text, experienceYears),
-    contact: profile.contact || contacts.telegram || contacts.email || contacts.phone || null,
+    contact: validStoredContact(profile.contact) || contacts.telegram || contacts.email || contacts.phone
+      || (profile.contactType === 'platform' ? profile.url : null),
     contactHours: profile.contactHours ?? extractContactHours(originalText),
     contacts,
   }
@@ -506,6 +606,14 @@ export function normalizeCandidate(profile: CvProfile): CvProfile {
 function fingerprint(profile: CvProfile): string {
   const contact = profile.contacts?.telegram || profile.contacts?.email || profile.contacts?.phone
   if (contact) return `c:${contact.toLowerCase()}`
+  const name = (profile.name || '').toLocaleLowerCase('ru').replace(/[^\p{L}\p{N}]+/gu, '')
+  if (profile.origin === 'web' && name.length >= 4 && !HIDDEN_NAME_RE.test(profile.name || '')) {
+    const source = (profile.sourceKey || profile.source || '').toLocaleLowerCase('ru')
+    const city = (profile.city || '').toLocaleLowerCase('ru').replace(/[^\p{L}\p{N}]+/gu, '')
+    const professions = [...(profile.professions || [])].sort().join(',').toLocaleLowerCase('en')
+    const salary = `${profile.salaryMin ?? ''}:${profile.salaryMax ?? ''}:${profile.currency || ''}`
+    return `p:${source}:${name}:${city}:${profile.age ?? ''}:${professions}:${salary}`
+  }
   const text = `${(profile.professions || []).join(' ')} ${profile.role || ''} ${profile.originalText || profile.description || ''}`
     .toLowerCase()
     .replace(/https?:\/\/\S+/g, '')

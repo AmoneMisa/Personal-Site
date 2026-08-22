@@ -26,6 +26,7 @@ import {
   parseExperience,
   parseSalary,
 } from './hiringWebFields'
+import { trimCareeristProfileText } from './hiringCareeristFields'
 
 const UA =
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ' +
@@ -232,9 +233,10 @@ function labelledValue(lines: string[], label: RegExp): string | null {
 }
 
 function parseCareerist(block: CandidateBlock, source: WebCvSource): CvProfile | null {
-  const activity = activityDate(block.text)
+  const cleanBlock = { ...block, text: trimCareeristProfileText(block.text) }
+  const activity = activityDate(cleanBlock.text)
   if (!isRecent(activity)) return null
-  const after = block.text.split(block.title).slice(1).join(block.title)
+  const after = cleanBlock.text.split(block.title).slice(1).join(block.title)
   const lines = after.split('\n').map((line) => line.trim()).filter(Boolean)
 
   // "Город" carries the city the candidate states; fall back to matching the
@@ -259,7 +261,7 @@ function parseCareerist(block: CandidateBlock, source: WebCvSource): CvProfile |
 
   const exp = after.match(/Опыт работы:\s*\n?\s*(\d+)\s*(?:год|года|лет)(?:\s+и\s+(\d+)\s+месяц)?/iu)
   const experienceYears = exp ? Number(exp[1]) + Number(exp[2] || 0) / 12 : /Без опыта/iu.test(after) ? 0 : null
-  return profileBase(source, block, activity!, { name, role: block.title, city, age, experienceYears, updatedAt: activity })
+  return profileBase(source, cleanBlock, activity!, { name, role: block.title, city, age, experienceYears, updatedAt: activity })
 }
 
 // Longest alternative first: "года" must not match as "год" plus a stray "а".

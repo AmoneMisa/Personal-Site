@@ -163,7 +163,7 @@ const CITY_ALIASES: Record<string, Array<[string, RegExp]>> = {
     ['Samarkand', cityRe('samarkand|samarqand|самарканд|самарқанд')],
     ['Bukhara', cityRe('bukhara|buxoro|бухара|бухоро')],
     ['Namangan', cityRe('namangan|наманган')],
-    ['Andijan', cityRe('andijan|andijon|андижан|андижон')],
+    ['Andijan', cityRe('andijan|andijon|anjan|anjon|андижан|андижон')],
     ['Fergana', cityRe("fergana|farg(?:'|’)ona|фаргана|фергана")],
     ['Qarshi', cityRe('qarshi|karshi|карши|қарши')],
     ['Nukus', cityRe('nukus|нукус')],
@@ -257,9 +257,9 @@ const CV_MARKER_RE = /(?:резюме|resume|\bcv\b|curriculum vitae|анкет�
 const FIRST_PERSON_RE = /(?:^|\n)\s*[^\p{L}\p{N}\n]{0,6}(?:я[\s—,-]|я\s+(?:ищу|шукаю)|men[\s,]|mening[\s,]|my name is|i am a|i'm a|ismim\b)/iu
 const EMPLOYER_RE = /(?:we(?:'re| are)\s+(?:hiring|looking\s+for)|(?:^|\n)\s*[^\p{L}\p{N}\n]{0,10}(?:ищем|требуется|требуются|вакансия|компания\s+ищет|шукаємо|потрібен|потрібна|потрібні|вакансія|запрошуємо|hiring|vacancy|ishchi\s+kerak|xodim\s+kerak|ishga\s+(?:taklif|qabul)|bo(?:'|’)sh\s+ish\s+o(?:'|’)rni))/iu
 const VACANCY_SECTION_RE = /(?:requirements?|responsibilit|qualifications?|обязанност|требован|условия\s+работ|мы\s+предлагаем|обов(?:'|’)язк|вимог|ми\s+пропонуємо|what we offer|надсилайте\s+резюме|присылайте\s+резюме|(?:^|\n)\s*(?:talablar|vazifalar)\s*[:—-]|biz\s+taklif\s+qilamiz)/imu
-const ROLE_RE = /\b(?:developer|engineer|designer|manager|analyst|specialist|qa|tester|devops|frontend|backend|accountant|cashier|seller|driver|builder|welder|cleaner|waiter|cook|guard|courier|teacher|tutor|nanny|nurse|doctor|dentist|pharmacist|bartender|barista|trainer|coach|administrator|director|supervisor|receptionist|hostess|promoter|packer|marketer|marketing|lawyer|economist|logistician|recruiter|programmer|operator|storekeeper|loader|electrician|plumber|painter|hairdresser|seamstress|baker|florist|realtor|copywriter|translator|secretary|mechanic|agronomist|sysadmin|smm)\b|разработ|инженер|інженер|дизайнер|менеджер|аналитик|аналітик|специалист|спеціаліст|бухгалтер|кассир|касир|продав|водител|водій|строит|будівел|сварщик|зварюваль|убор|прибирал|официант|офіціант|бармен|бариста|повар|кухар|охран|охорон|управляющ|керівник|директор|администратор|адміністратор|супервайзер|курьер|кур'єр|учител|вчител|преподав|викладач|репетитор|воспитател|виховател|нян|врач|лікар|стоматолог|фармацевт|медсестр|медбрат|тренер|рецепционист|рецепціоніст|хостес|промоутер|упаковщик|dasturchi|menejer|buxgalter|kassir|sotuvchi|haydovchi|shafyor|qurilish|payvandchi|farrosh|afitsant|barmen|oshpaz|qorovul|boshqaruv|kuryer|o(?:'|’)qituvchi|repetitor|tarbiyachi|enaga|shifokor|hamshira|маркетолог|таргетолог|програміст|программист|юрист|економіст|экономист|логіст|логист|рекрут|кадров|оператор|комірник|кладовщик|вантажник|грузчик|слесар|слюсар|электрик|електрик|сантехник|сантехнік|маляр|штукатур|плиточник|перукар|парикмахер|масажист|массажист|косметолог|манікюр|маникюр|швея|кравец|портн|кондитер|пекар|пекарь|флорист|ріелтор|риелтор|риэлтор|копірайтер|копирайтер|перекладач|переводчик|секретар|токар|фрезеров|механик|механік|агроном|швачк|sartarosh|tikuvchi|elektrik|santexnik|yuk\s+ortuvchi|marketolog/iu
+const ROLE_RE = /\b(?:developer|engineer|designer|manager|analyst|specialist|qa|tester|devops|frontend|backend|accountant|cashier|seller|driver|builder|welder|cleaner|waiter|cook|guard|courier|teacher|tutor|nanny|nurse|doctor|dentist|pharmacist|bartender|barista|trainer|coach|administrator|director|supervisor|receptionist|hostess|promoter|packer|marketer|marketing|lawyer|economist|logistician|recruiter|programmer|operator|storekeeper|loader|electrician|plumber|painter|hairdresser|seamstress|baker|florist|realtor|copywriter|translator|secretary|mechanic|agronomist|sysadmin|smm)\b|разработ|инженер|інженер|дизайнер|менеджер|аналитик|аналітик|специалист|спеціаліст|бухгалтер|кассир|касир|продав|водител|водій|строит|будівел|сварщик|зварюваль|убор|прибирал|официант|офіціант|бармен|бариста|повар|кухар|охран|охорон|управляющ|керівник|директор|администратор|адміністратор|супервайзер|курьер|кур'єр|учител|вчител|преподав|викладач|репетитор|воспитател|виховател|нян|врач|лікар|стоматолог|фармацевт|медсестр|медбрат|тренер|рецепционист|рецепціоніст|хостес|промоутер|упаковщик|dasturchi|menejer|buxgalter|kassir|sotuvchi|haydovchi|shafyor|qurilish|payvandchi|farrosh|afitsant|barmen|oshpaz|qorovul|boshqaruv|kuryer|o['’ʻʼ‘`]?qituvchi(?:lik)?|repetitor|tarbiyachi|enaga|shifokor|hamshira|маркетолог|таргетолог|програміст|программист|юрист|економіст|экономист|логіст|логист|рекрут|кадров|оператор|комірник|кладовщик|вантажник|грузчик|слесар|слюсар|электрик|електрик|сантехник|сантехнік|маляр|штукатур|плиточник|перукар|парикмахер|масажист|массажист|косметолог|манікюр|маникюр|швея|кравец|портн|кондитер|пекар|пекарь|флорист|ріелтор|риелтор|риэлтор|копірайтер|копирайтер|перекладач|переводчик|секретар|токар|фрезеров|механик|механік|агроном|швачк|sartarosh|tikuvchi|elektrik|santexnik|yuk\s+ortuvchi|marketolog|kassa\s+(?:xodimi|mudiri)|b(?:u(?:x|h)?|o)?galter(?:iya)?|notarius|metrologiya|operatorlik/iu
 const CONTACT_RE = /(?:\+?\d[\d\s()\-]{7,}|@[a-z0-9_]{4,}|(?:telegram|телефон|phone|tel|aloqa|murojaat|bog(?:'|’)lanish)\s*[:—-])/iu
-const PROMOTION_RE = /t\.me\/addlist\b|(?:telegram[- ]?)?канал\w*\s+(?:в\s+)?(?:одн\w+\s+)?папк|добав(?:ить|ьте)\s+(?:свой\s+)?канал/iu
+const PROMOTION_RE = /t\.me\/addlist\b|(?:telegram[- ]?)?канал\w*\s+(?:в\s+)?(?:одн\w+\s+)?папк|добав(?:ить|ьте)\s+(?:свой\s+)?канал|happy\s+monday\s+оновил\p{L}*\s+функционал|залиште\s+відгук\s+на\s+happy\s+monday|відгук\p{L}*\s+про\s+роботодавц|(?:women\s+)?career\s+day|кар['’]єрн\p{L}*\s+поді\p{L}*|придбати\s+квитки|добірк\p{L}*\s+новин|отримувати\s+такі\s+новини\s+щотижня/iu
 
 const SECTION_PATTERNS = {
   experience: /(?:опыт|досвід|experience|staj|tajriba|ish\s+tajribasi)/iu,
@@ -277,6 +277,7 @@ export function isLikelyCvPost(text: string, cvFeed = false): boolean {
   const value = text.split('\n').map((line) => line.replace(/\s+/g, ' ').trim()).filter(Boolean).join('\n').trim()
   const compact = value.replace(/\s+/g, ' ')
   if (compact.length < 30 || PROMOTION_RE.test(value)) return false
+  if (/^(?:колеги[,!\s]*)?(?:вітаю[,!\s]*)?рекомендую\s+(?:класного\s+)?кандидат\p{L}*[.!\s]+(?:контакт\p{L}*\s+та\s+)?резюме\s+додаю\.?$/iu.test(compact)) return false
 
   const explicitIntent = CANDIDATE_INTENT_RE.test(value)
   const candidateForm = CANDIDATE_FORM_RE.test(value)
@@ -331,6 +332,8 @@ function blockAfter(text: string, names: string): string | undefined {
 const MAX_PLAUSIBLE_EXPERIENCE_YEARS = 55
 
 function parseExperience(text: string): number | undefined {
+  const halfYears = text.match(/(?:ish\s+staji|staj|tajriba\p{L}*)\s*[:—-]?\s*(\d+)\s+yarim\s+yil/iu)
+  if (halfYears?.[1]) return Number(halfYears[1]) + 0.5
   const match = text.match(/(?:опыт|досвід|experience|staj|tajriba\p{L}*)\s*[:—-]?\s*(\d+)\+?\s*(?:лет|рок(?:и|ів)?|years|yil|йил)?/iu)
     // The keyword is required on this side: a bare "80 років" is somebody's
     // age, not their career.
@@ -346,7 +349,7 @@ function parseName(text: string): string {
 }
 
 function parseRole(text: string): string {
-  const targetNames = 'желаемая (?:работа|должность)|бажана (?:робота|посада)|ожидаемая работа|ищу работу|шукаю роботу|ish kerak|menga ish kerak|ish joyi kerak|qidirayotgan kasb|so(?:\'|’|‘)ralgan ish (?:joyi|turi)|position|role|должность|позиция|посада|lavozim|kasb(?:i|im)?|mutaxassislik|specialization|специализация|target role'
+  const targetNames = 'желаемая (?:работа|должность)|бажана (?:робота|посада)|ожидаемая работа|ищу работу|шукаю роботу|ish kerak|menga ish kerak|ish joyi kerak|qidirayotgan kasb|so(?:\'|’|ʻ|ʼ|‘)ralgan ish (?:joyi|turi)|soha|position|role|должность|позиция|посада|lavozim|kasb(?:i|im)?|mutaxassislik|specialization|специализация|target role'
   const explicit = field(text, targetNames)
   if (explicit && ROLE_RE.test(explicit)) return explicit.slice(0, 180)
 
@@ -444,7 +447,7 @@ function messageToProfile(
   const skills = parseSkills(text)
   if (needle && !`${name} ${role} ${text} ${skills.join(' ')}`.toLocaleLowerCase('ru').includes(needle)) return null
 
-  const explicitLocation = field(text, 'location|city|локация|локація|город|місто|shahar|yashash manzili|hozirgi manzil|manzil')
+  const explicitLocation = field(text, 'location|city|локация|локація|город|місто|shahar|yashash (?:manzili|joyi)|hozirgi manzil|manzil|hudud')
   const explicitCity = explicitLocation ? detectCity(explicitLocation, channel.country) || explicitLocation : null
   const city = localToChannel
     ? explicitCity || detectCity(text, channel.country) || fallbackChannelCity(channel)

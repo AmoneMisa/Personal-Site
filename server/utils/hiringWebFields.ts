@@ -43,6 +43,10 @@ export function htmlText(value: string): string {
     // Stripping tags alone leaves the *contents* of scripts and styles behind,
     // which is how ad-loader JavaScript ended up inside candidate profiles.
     .replace(/<(script|style|noscript|template)\b[^>]*>[\s\S]*?<\/\1>/gi, ' ')
+    .replace(/<!--[\s\S]*?-->/g, ' ')
+    // Material Icons use their text content as a glyph name. Keeping that
+    // content turns a Careerist city into e.g. "Tashkent local_shipping".
+    .replace(/<([a-z][\w:-]*)\b[^>]*class=["'][^"']*(?:material-icons|material-symbols)[^"']*["'][^>]*>[\s\S]*?<\/\1>/gi, ' ')
     .replace(/<br\s*\/?>/gi, '\n')
     .replace(/<\/(?:p|div|li|h[1-6]|tr|section|article)>/gi, '\n')
     .replace(/<[^>]*>/g, ' ')
@@ -159,19 +163,20 @@ export function parseExperience(text: string): number | null {
 }
 
 export function parseSalary(text: string, country: string): Pick<CvProfile, 'salaryMin' | 'salaryMax' | 'currency'> {
-  const currency = /(?:\$|USD|доллар)/iu.test(text) ? 'USD'
-    // careerist.ru is a Russian platform and quotes its Uzbek listings in roubles.
-    : /(?:RUB|руб|₽)/iu.test(text) ? 'RUB'
-    : /(?:€|EUR|евро)/iu.test(text) ? 'EUR'
-      : /(?:UZS|сум|so(?:'|’)m)/iu.test(text) ? 'UZS'
-        : /(?:KZT|₸|тенге|тг(?![\p{L}\p{N}]))/iu.test(text) ? 'KZT'
-          : /(?:UAH|грн|грив)/iu.test(text) ? 'UAH'
-            : /(?:RON|lei\b)/iu.test(text) ? 'RON'
-              : ({ UZ: 'UZS', KZ: 'KZT', UA: 'UAH', RO: 'RON' } as Record<string, string>)[country]
   // The amount and its currency often sit on separate rows of a card, so a
   // single newline between them is allowed.
-  const money = text.match(/(?:от\s*)?(\d[\d\s.,]{2,})(?:\s*(?:-|–|—|до|to)\s*(\d[\d\s.,]{2,}))?\s*\n?\s*(?:UZS|KZT|UAH|RON|RUB|USD|EUR|сум|so(?:'|’)m|тенге|грн|руб\p{L}*|lei|\$|€|₸|₽)/iu)
+  const money = text.match(/(?:от\s*)?(\d[\d\s.,]{2,})(?:\s*(?:-|–|—|до|to)\s*(\d[\d\s.,]{2,}))?\s*\n?\s*(UZS|KZT|UAH|RON|RUB|USD|EUR|сум|so(?:'|’)m|тенге|грн|руб\p{L}*|lei|\$|€|₸|₽)/iu)
   if (!money) return {}
+  const unit = money[3] || ''
+  const currency = /(?:\$|USD|доллар)/iu.test(unit) ? 'USD'
+    // careerist.ru is a Russian platform and quotes its Uzbek listings in roubles.
+    : /(?:RUB|руб|₽)/iu.test(unit) ? 'RUB'
+      : /(?:€|EUR|евро)/iu.test(unit) ? 'EUR'
+        : /(?:UZS|сум|so(?:'|’)m)/iu.test(unit) ? 'UZS'
+          : /(?:KZT|₸|тенге|тг(?![\p{L}\p{N}]))/iu.test(unit) ? 'KZT'
+            : /(?:UAH|грн|грив)/iu.test(unit) ? 'UAH'
+              : /(?:RON|lei\b)/iu.test(unit) ? 'RON'
+                : ({ UZ: 'UZS', KZ: 'KZT', UA: 'UAH', RO: 'RON' } as Record<string, string>)[country]
   const parse = (raw: string) => Number(raw.replace(/[\s.,]/g, ''))
   const first = parse(money[1]!)
   const second = money[2] ? parse(money[2]) : first
@@ -196,6 +201,7 @@ export function cityRe(alternatives: string): RegExp {
 
 export const CITIES: Record<string, Array<[string, RegExp]>> = {
   UZ: [
+    ['Tashkent Region', cityRe('ташкент(?:ская)?\\s+(?:обл(?:асть)?\\.?|region)|toshkent\\s+viloyati|tashkent\\s+region')],
     ['Tashkent', cityRe('ташкент|tashkent|toshkent')], ['Samarkand', cityRe('самарканд|samarqand|samarkand')],
     ['Bukhara', cityRe('бухара|buxoro|bukhara')], ['Namangan', cityRe('наманган\\p{L}*|namangan')],
     ['Andijan', cityRe('андижан|andijon|andijan')], ['Fergana', cityRe("фергана|фаргана|farg(?:'|’)ona|fergana")],
@@ -239,7 +245,7 @@ export function cityFrom(text: string, country: string): string | null {
 
 export function employment(text: string): CvProfile['employmentTypes'] {
   const out = new Set<'full_time' | 'part_time'>()
-  if (/полная занятость|полный день|full[- ]?time|to['’]?liq bandlik|normă întreagă/iu.test(text)) out.add('full_time')
+  if (/(?<!\p{L})(?:полная занятость|полный день)|full[- ]?time|to['’]?liq bandlik|normă întreagă/iu.test(text)) out.add('full_time')
   if (/неполная занятость|неполный день|частичная занятость|part[- ]?time|qisman bandlik|part[- ]time/iu.test(text)) out.add('part_time')
   return [...out]
 }

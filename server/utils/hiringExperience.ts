@@ -103,9 +103,15 @@ function targetProfessions(profile: CvProfile): string[] {
 
 export function withProfessionExperience(profile: CvProfile): CvProfile {
   const byProfession = new Map<string, ProfessionExperience>()
-  for (const item of [...normalizeExisting(profile.professionExperience), ...extractProfessionExperience(profile.originalText || profile.description || '')]) {
+  for (const item of normalizeExisting(profile.professionExperience)) {
     const previous = byProfession.get(item.profession)
     if (!previous || item.years > previous.years) byProfession.set(item.profession, item)
+  }
+  // Fresh source extraction replaces an older derived value for the same
+  // profession. This repairs rows where "2 мес" was previously stored as
+  // two years; taking the maximum would preserve the stale error forever.
+  for (const item of extractProfessionExperience(profile.originalText || profile.description || '')) {
+    byProfession.set(item.profession, item)
   }
 
   const professionExperience = [...byProfession.values()]

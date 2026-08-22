@@ -34,6 +34,16 @@ test('employer posts stay out of the candidate feed', () => {
   for (const post of posts) assert.equal(isLikelyCvPost(post), false, post)
 })
 
+test('HR news, career events and empty recommendations are not CVs', () => {
+  const posts = [
+    'Happy Monday оновила функціонал відгуків про роботодавців. Залиште відгук на Happy Monday.',
+    'Women Career Day — кар’єрна подія. Придбати квитки за посиланням. Head of Recruitment та HR директори серед спікерів.',
+    'Корисна добірка новин від HURMA Community. Хочете отримувати такі новини щотижня? Приєднуйтесь.',
+    'Колеги, вітаю! Рекомендую класного кандидата. Контакти та резюме додаю.',
+  ]
+  for (const post of posts) assert.equal(isLikelyCvPost(post, true), false, post)
+})
+
 import { extractProfessionExperience } from '../server/utils/hiringExperience.ts'
 
 test('a duration in months is not read as that many years', () => {

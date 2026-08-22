@@ -545,6 +545,9 @@ function salaryLabel(profile: CvProfile): string | null {
   if (profile.salaryMin == null && profile.salaryMax == null) return null;
   const cur = profile.currency || "";
   if (profile.salaryMin != null && profile.salaryMax != null) {
+    if (profile.salaryMin === profile.salaryMax) {
+      return `${profile.salaryMin.toLocaleString()} ${cur}`.trim();
+    }
     return `${profile.salaryMin.toLocaleString()}–${profile.salaryMax.toLocaleString()} ${cur}`.trim();
   }
   const value = profile.salaryMin ?? profile.salaryMax;
@@ -557,10 +560,16 @@ function genderLabel(value?: CvProfile["gender"]): string {
   return t("notSpecified");
 }
 
+function experienceLabel(years: number): string {
+  if (years === 0) return t("experienceNone");
+  const value = new Intl.NumberFormat(String(locale.value), { maximumFractionDigits: 1 }).format(years);
+  return t("experienceN", { n: value });
+}
+
 function specLine(profile: CvProfile): string {
   const parts: string[] = [];
   if (profile.age != null) parts.push(`${profile.age}`);
-  if (profile.experienceYears != null) parts.push(t("experienceN", { n: profile.experienceYears }));
+  if (profile.experienceYears != null) parts.push(experienceLabel(profile.experienceYears));
   if (profile.city) parts.push(cityLabel(profile.city));
   if (profile.remote) parts.push(t("remoteBadge"));
   return parts.join(" · ");
@@ -569,6 +578,14 @@ function specLine(profile: CvProfile): string {
 const fmtBool = (v?: boolean | null) => (v === true ? t("yes") : v === false ? t("no") : t("notSpecified"));
 const strOr = (v?: string | null) => (v ? v : t("notSpecified"));
 const listOr = (v?: string[] | null) => (v?.length ? v.join(", ") : t("notSpecified"));
+const employmentLabel = (value?: string | null) => value
+  ? value.split(",").map((item) => {
+      const key = item.trim();
+      if (key === "full_time") return t("employmentFull");
+      if (key === "part_time") return t("employmentPart");
+      return key;
+    }).join(", ")
+  : t("notSpecified");
 
 const specRows = computed(() => {
   const profile = active.value;
@@ -578,13 +595,13 @@ const specRows = computed(() => {
     { label: t("specRole"), value: strOr(profile.role) },
     { label: label("Возраст", "Age"), value: profile.age != null ? String(profile.age) : t("notSpecified") },
     { label: label("Пол", "Gender"), value: genderLabel(profile.gender) },
-    { label: t("specExperience"), value: profile.experienceYears != null ? t("experienceN", { n: profile.experienceYears }) : t("notSpecified") },
+    { label: t("specExperience"), value: profile.experienceYears != null ? experienceLabel(profile.experienceYears) : t("notSpecified") },
     { label: t("specSalary"), value: salaryLabel(profile) || t("notSpecified") },
     { label: t("specCity"), value: profile.city ? cityLabel(profile.city) : t("notSpecified") },
     { label: t("specCountry"), value: strOr(meta.value.find((c) => c.code === profile.country)?.name || profile.country) },
     { label: t("specRemote"), value: fmtBool(profile.remote) },
     { label: t("specContactHours"), value: strOr(profile.contactHours) },
-    { label: t("specEmployment"), value: strOr(profile.employmentType) },
+    { label: t("specEmployment"), value: employmentLabel(profile.employmentType) },
     { label: t("specEducation"), value: strOr(profile.education) },
     { label: t("specLanguages"), value: listOr(profile.languages) },
     { label: t("specSkills"), value: listOr(profile.skills) },
@@ -651,7 +668,7 @@ function cardBadges(profile: CvProfile): string[] {
   const badges: string[] = [];
   if (profile.remote) badges.push(t("remoteBadge"));
   if (profile.age != null) badges.push(`${profile.age}`);
-  if (profile.experienceYears != null) badges.push(t("experienceN", { n: profile.experienceYears }));
+  if (profile.experienceYears != null) badges.push(experienceLabel(profile.experienceYears));
   for (const skill of (profile.skills || []).slice(0, 3)) badges.push(skill);
   return badges.slice(0, 5);
 }
@@ -867,10 +884,10 @@ onBeforeUnmount(() => {
       <div class="text-muted">{{ t("empty") }}</div>
     </div>
 
-    <u-modal v-model:open="modalOpen" :title="active?.name || ''" :ui="{ content: 'max-w-3xl' }">
+    <u-modal v-model:open="modalOpen" :title="active?.name || active?.role || t('notSpecified')" :ui="{ content: 'max-w-3xl' }">
       <template #title>
-        <h2 class="hiring-modal__title">{{ active?.name || "" }}</h2>
-        <p v-if="active" class="hiring-modal__role">{{ active.role }}</p>
+        <h2 class="hiring-modal__title">{{ active?.name || active?.role || t("notSpecified") }}</h2>
+        <p v-if="active?.name && active?.role" class="hiring-modal__role">{{ active.role }}</p>
       </template>
       <template #body>
         <div v-if="active" class="hiring-modal">

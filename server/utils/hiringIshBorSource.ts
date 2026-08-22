@@ -6,6 +6,7 @@ import type { CvProfile } from './hiringTypes'
 import { cityFrom, cityRe, htmlText } from './hiringWebFields'
 import { withHiringStoreLock } from './hiringStoreLock'
 import { extractCandidateAge, extractCandidateName } from './hiringCandidateFields'
+import { ishBorProfileHtml } from './hiringIshBorFields'
 
 const UA =
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ' +
@@ -276,7 +277,8 @@ function triState(text: string, positive: RegExp, negative: RegExp): boolean | n
 }
 
 function profileFrom(summary: Summary, detailHtml: string): CvProfile | null {
-  const detailText = htmlLines(detailHtml).join('\n')
+  const profileHtml = ishBorProfileHtml(detailHtml)
+  const detailText = htmlLines(profileHtml).join('\n')
   const activity = detailActivity(detailHtml, detailText)
   if (!validRecent(activity)) return null
 
@@ -307,16 +309,16 @@ function profileFrom(summary: Summary, detailHtml: string): CvProfile | null {
     origin: 'web',
     sourceKey: 'ishbor-uz',
     country: 'UZ',
-    name: iconName(detailHtml) || parseName(detailText),
+    name: iconName(profileHtml) || parseName(detailText),
     role,
     professions: [role],
     previousProfessions: [],
     features,
     age,
     isAdult: age == null ? true : age >= 18,
-    experienceYears: iconExperience(detailHtml) ?? parseExperience(combined),
+    experienceYears: iconExperience(profileHtml) ?? parseExperience(combined),
     // The shared list also knows the regions this board prints instead of a city.
-    city: cityFrom(iconField(detailHtml, 'map-pin') || '', 'UZ') || cityFrom(combined, 'UZ'),
+    city: cityFrom(iconField(profileHtml, 'map-pin') || '', 'UZ') || cityFrom(combined, 'UZ'),
     district: detect(combined, DISTRICT_ALIASES),
     remote,
     relocationReady,
@@ -324,7 +326,7 @@ function profileFrom(summary: Summary, detailHtml: string): CvProfile | null {
       ...(/полный день|полная занятость|to['’]?liq/iu.test(combined) ? ['full_time' as const] : []),
       ...(/неполный день|частичная занятость|подработка|qisman/iu.test(combined) ? ['part_time' as const] : []),
     ],
-    education: iconField(detailHtml, 'graduation-cap')
+    education: iconField(profileHtml, 'graduation-cap')
       || field(detailText, "ma(?:['’‘])lumoti|ta(?:['’‘])lim|образование")
       || null,
     url: summary.url,

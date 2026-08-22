@@ -244,36 +244,11 @@ function sourceCounts(profiles: CvProfile[]): Record<string, number> {
   return counts
 }
 
-// A candidate's stated role is free text, and the filter list was built from
-// it directly: whole sentences ("Всім привіт, є кандидат з рекомендаціями…"),
-// conference blurbs and work-format words ("УДАЛЕННО", "Онлайн") all became
-// selectable job titles. A curated profession is always allowed; anything
-// else has to at least look like a job title.
-const WORK_FORMAT_RE = /^(?:онлайн|online|удал[её]нн\p{L}*|удал[её]нная\s+работа|дистанцион\p{L}*|remote|любая\s+работа|подработка|ish\s+kere\p{L}*|masofaviy)/iu
-
-function looksLikeProfession(value: string): boolean {
-  const trimmed = value.trim()
-  if (trimmed.length < 2 || trimmed.length > 40) return false
-  // Sentence punctuation, emoji and long word counts mean it is a phrase.
-  if (/[,:;!?()]|\.\s|\p{Extended_Pictographic}/u.test(trimmed)) return false
-  if (trimmed.split(/\s+/).length > 4) return false
-  return !WORK_FORMAT_RE.test(trimmed)
-}
-
-function professionValues(profiles: CvProfile[]): string[] {
-  const values = new Map<string, string>()
-  for (const profession of Object.keys(HIRING_PROFESSION_LABELS)) {
-    values.set(profession.toLocaleLowerCase('ru'), profession)
-  }
-  for (const profile of profiles) {
-    for (const profession of canonicalProfessions(profile)) {
-      const key = profession.toLocaleLowerCase('ru')
-      // Case-only variants of the same title are one entry, not three.
-      if (values.has(key) || !looksLikeProfession(profession)) continue
-      values.set(key, profession.trim())
-    }
-  }
-  return [...values.values()].sort((a, b) => a.localeCompare(b, 'en'))
+// The selector is a taxonomy, not an index of arbitrary CV headlines. Raw
+// roles remain searchable in the full text, but only canonical values may be
+// submitted as a structured profession filter.
+function professionValues(): string[] {
+  return Object.keys(HIRING_PROFESSION_LABELS).sort((a, b) => a.localeCompare(b, 'en'))
 }
 
 function targetedSearchTerm(params: URLSearchParams): string {
@@ -314,6 +289,16 @@ function requestLocale(event: Parameters<typeof getCookie>[0]): HiringProfession
 }
 
 function formatYears(years: number, locale: HiringProfessionLocale): string {
+  if (years > 0 && years < 1) {
+    const months = Math.max(1, Math.round(years * 12))
+    if (locale === 'en') return `${months} ${months === 1 ? 'month' : 'months'}`
+    const mod10 = months % 10
+    const mod100 = months % 100
+    const unit = mod10 === 1 && mod100 !== 11 ? 'месяц'
+      : mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14) ? 'месяца'
+        : 'месяцев'
+    return `${months} ${unit}`
+  }
   if (locale === 'en') return `${years} ${years === 1 ? 'year' : 'years'}`
   const integer = Math.abs(Math.trunc(years))
   const mod10 = integer % 10
@@ -336,16 +321,30 @@ function previousExperienceSummary(profile: CvProfile, locale: HiringProfessionL
 }
 
 function publicProfile(profile: CvProfile, locale: HiringProfessionLocale): CvProfile {
-  const details = [...(profile.tags || [])]
-  for (const feature of profile.features || []) details.push(feature)
+  const localizeEmploymentType = (value: string): string => value === 'full_time'
+    ? locale === 'en' ? 'Full-time' : 'Полная занятость'
+    : value === 'part_time' ? locale === 'en' ? 'Part-time' : 'Частичная занятость' : value
+  const localizeDetail = (value: string): string => {
+    if (locale === 'en') return value
+    if (value === 'No experience') return 'Без опыта'
+    if (value === 'Student') return 'Студент'
+    if (value === 'Minor') return 'Несовершеннолетний'
+    if (value === 'Open to relocation') return 'Готов к переезду'
+    if (value === 'Not open to relocation') return 'Не готов к переезду'
+    if (value === 'Contact via source platform') return 'Контакт через платформу-источник'
+    if (value === 'Web CV') return 'Веб-резюме'
+    return value.replace(/^Age:\s*/u, 'Возраст: ').replace(/^District:\s*/u, 'Район: ')
+  }
+  const details = [...(profile.tags || [])].map(localizeDetail)
+  for (const feature of profile.features || []) details.push(localizeDetail(feature))
   const previous = previousExperienceSummary(profile, locale)
   if (previous.length) details.push(`${locale === 'en' ? 'Previous experience' : 'Предыдущий опыт'}: ${previous.join(', ')}`)
-  if (profile.district) details.push(`District: ${profile.district}`)
-  if (profile.age != null) details.push(`Age: ${profile.age}`)
-  if (profile.isAdult === false) details.push('Minor')
-  if (profile.relocationReady === true) details.push('Open to relocation')
-  if (profile.relocationReady === false) details.push('Not open to relocation')
-  if (profile.origin === 'web' && profile.contactType === 'platform') details.push('Contact via source platform')
+  if (profile.district) details.push(localizeDetail(`District: ${profile.district}`))
+  if (profile.age != null) details.push(localizeDetail(`Age: ${profile.age}`))
+  if (profile.isAdult === false) details.push(localizeDetail('Minor'))
+  if (profile.relocationReady === true) details.push(localizeDetail('Open to relocation'))
+  if (profile.relocationReady === false) details.push(localizeDetail('Not open to relocation'))
+  if (profile.origin === 'web' && profile.contactType === 'platform') details.push(localizeDetail('Contact via source platform'))
 
   const canonical = profile.professions?.length ? profile.professions : [profile.role].filter(Boolean)
   return {
@@ -356,7 +355,9 @@ function publicProfile(profile: CvProfile, locale: HiringProfessionLocale): CvPr
       ...item,
       profession: hiringProfessionLabel(item.profession, locale),
     })),
-    employmentType: profile.employmentTypes?.length ? profile.employmentTypes.join(', ') : profile.employmentType,
+    employmentType: profile.employmentTypes?.length
+      ? profile.employmentTypes.map(localizeEmploymentType).join(', ')
+      : profile.employmentType ? localizeEmploymentType(profile.employmentType) : profile.employmentType,
     tags: [...new Set(details)].slice(0, 20),
     origin: profileOrigin(profile) as CvProfile['origin'],
     sourceKey: profileSource(profile),
@@ -516,7 +517,7 @@ export default defineEventHandler(async (event) => {
     },
     meta: {
       countries: HIRING_COUNTRIES,
-      professions: professionValues(profiles),
+      professions: professionValues(),
       // Only origins that actually have candidates: offering "Web" while no
       // board has stored anything hands the visitor a filter whose only
       // possible result is an empty page.

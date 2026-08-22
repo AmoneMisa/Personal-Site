@@ -8,8 +8,11 @@
 const CITY_RU: Record<string, string> = {
   // UZ
   Tashkent: 'Ташкент', Samarkand: 'Самарканд', Bukhara: 'Бухара', Namangan: 'Наманган',
-  Andijan: 'Андижан', Fergana: 'Фергана', Nukus: 'Нукус', Navoiy: 'Навои', Jizzakh: 'Джизак',
+  Andijan: 'Андижан', Fergana: 'Фергана', Nukus: 'Нукус', Navoi: 'Навои', Navoiy: 'Навои', Jizzakh: 'Джизак',
   Termez: 'Термез', Qarshi: 'Карши', Urgench: 'Ургенч', Gulistan: 'Гулистан', Chirchiq: 'Чирчик',
+  'Tashkent Region': 'Ташкентская область',
+  Karakalpakstan: 'Каракалпакстан', Kashkadarya: 'Кашкадарья', Surkhandarya: 'Сурхандарья',
+  Syrdarya: 'Сырдарья', Khorezm: 'Хорезм',
   // KZ
   Almaty: 'Алматы', Astana: 'Астана', Shymkent: 'Шымкент', Karaganda: 'Караганда',
   Aktobe: 'Актобе', Atyrau: 'Атырау', Oral: 'Уральск', Taraz: 'Тараз', Pavlodar: 'Павлодар',

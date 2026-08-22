@@ -1,13 +1,16 @@
 export function extractCandidateName(text: string): string {
   const match = text.match(
-    /(?:^|\n)[^\p{L}\p{N}\n]{0,10}(?:xodim|hodim|nomzod|candidate|фио|ф\.и\.о\.?|піб|full name|name|имя|ім(?:ʼ|')я|fio|ism(?:i|im)?(?:\s*[-–—]\s*(?:familya|familiya))?|familya|familiya)\s*[:—-]\s*([^\n]{2,100})/iu,
+    /(?:^|\n)[^\p{L}\p{N}\n]{0,10}(?:xodim|hodim|nomzod|candidate|фио|ф\.и\.о\.?|f\.?\s*i\.?\s*sh\.?|піб|full name|name|имя|ім(?:ʼ|')я|fio|ism(?:i|im)?(?:\s*[-–—]\s*(?:familya|familiya))?|familya|familiya)\s*[:—-]\s*([^\n]{2,100})/iu,
   )
-  return (match?.[1] || '').trim().replace(/\s{2,}/g, ' ').slice(0, 100)
+  return (match?.[1] || '')
+    .split(/\s*[▪▫◾◽📚🕑🌐💰📞🇺🇿]\s*|\s+(?=(?:tug['’ʻʼ‘`]?ilgan|yashash|ma['’ʻʼ‘`]?lumoti|avvalgi|ish\s+staji|so['’ʻʼ‘`]?ralgan)\b)/iu)[0]!
+    .trim().replace(/\s{2,}/g, ' ').slice(0, 100)
 }
 
 export function extractCandidateAge(text: string, now = new Date()): number | null {
   const patterns = [
     /(?:возраст|вік|age|yosh)\s*[:—-]?\s*(\d{1,2})/iu,
+    /(?:yoshim|yoshm)\s*(\d{1,2})\s*da\b/iu,
     /(?:мне|мені)\s+(\d{1,2})\s*(?:лет|рок(?:и|ів)?)/iu,
     /(?:^|\n)\s*(\d{1,2})\s*(?:лет|рок(?:и|ів)?|yosh)\b/iu,
   ]

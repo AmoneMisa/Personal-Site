@@ -7,17 +7,15 @@
 // enrichment remains authoritative for ambiguous free-form text.
 
 import type { CvProfile } from './hiringTypes'
-
-const GENERIC_PROFESSIONS = new Set([
-  'Engineer',
-  'Administrator',
-  'Manager',
-  'Specialist',
-])
+import { detectMentionedProfessions } from './hiringNormalize'
 
 const STATUS_ONLY_RE = /^(?:talaba|student|студент(?:ка)?|студент(?:ка)?ка|o(?:'|’)quvchi|учащ(?:ийся|аяся))$/iu
 
 const SPECIAL_PROFESSIONS: Array<{ name: string; re: RegExp }> = [
+  {
+    name: 'HR / Recruiter',
+    re: /#(?:hr|hrd|hrbp|hrgeneralist|peopleops)\b|\b(?:hr\s+lead|head\s+of\s+hr|people\s+partner|talent\s+operations|кадров\p{L}*\s+аудит)\b/iu,
+  },
   {
     name: 'Sales Manager',
     re: /(?:sotuv|savdo)\s+(?:menejer|menejr|menedjer|manager)|\bsales\s+manager\b|менеджер\s+(?:по\s+)?продаж|менеджер\s+з\s+продаж/iu,
@@ -111,19 +109,34 @@ function repairProfessions(profile: CvProfile, text: string): string[] {
   const current = unique(profile.professions?.length ? profile.professions : [profile.role || ''])
   const target = candidateTargetContext(profile, text)
   const specific = SPECIAL_PROFESSIONS.filter((rule) => rule.re.test(target)).map((rule) => rule.name)
+  if (!specific.length && !current.length) {
+    const technologies = field(text, 'texnologiya|technologies|technology|stack') || ''
+    if (/\bflutter\b|\bdart\b/iu.test(technologies)) return ['Mobile Developer']
+    const softwareSignals = (technologies.match(/\b(?:python|java(?:script)?|typescript|php|react|next\.?\s*js|fastapi|flask|sql|html|css)\b/giu) || []).length
+    if (softwareSignals >= 2) return ['Software Developer']
+    const headline = text.split('\n').map((line) => line.trim()).filter(Boolean).slice(0, 8).join('\n')
+    const headlineProfessions = detectMentionedProfessions(headline)
+    if (headlineProfessions.length) return headlineProfessions
+  }
   if (!specific.length) return current
 
-  return unique([
-    ...specific,
-    ...current.filter((profession) => !GENERIC_PROFESSIONS.has(profession) && !STATUS_ONLY_RE.test(cleanToken(profession)) && !/^Engineer$/iu.test(profession)),
-  ])
+  return unique(specific)
 }
 
 function structuredName(text: string): string | null {
   const value = field(text, "xodim|hodim|ism(?:i|im)?|f\\.?i\\.?o\\.?|фио|піб|full name|name|имя|ім(?:ʼ|')я")
-  if (!value) return null
-  const cleaned = value.replace(/[📚🕑🌐💰📞🇺🇿].*$/u, '').trim()
-  return cleaned.length >= 2 && cleaned.length <= 100 ? cleaned : null
+  if (value) {
+    const cleaned = value.replace(/[📚🕑🌐💰📞🇺🇿].*$/u, '').trim()
+    if (cleaned.length >= 2 && cleaned.length <= 100) return cleaned
+  }
+  const linkedIn = text.match(/(?:резюме|resume)\s*\|\s*(\p{Lu}\p{Ll}+(?:\s+\p{Lu}(?:\p{Ll}+|\.))?)/u)?.[1]
+    || text.match(/(?:^|\n)(\p{Lu}\p{Ll}+(?:\s+\p{Lu}\p{Ll}+)+)\s+-\s+(?:HR|Developer|Engineer|Manager|Designer)\b/u)?.[1]
+  if (linkedIn) return linkedIn
+  const introduced = text.match(/(?:^|\n)(?:вітаю,?\s+)?мене\s+звати\s+(\p{Lu}\p{Ll}+)/iu)?.[1]
+  if (introduced) return introduced
+  const handleName = text.match(/@(\p{Lu}\p{Ll}{2,})(?:_|\p{Lu}|\d)/u)?.[1]
+  if (handleName) return handleName
+  return text.match(/(?:^|\n)(\p{Lu}\p{Ll}+)\s+\d+\+?\s+(?:рок\p{L}*|лет|years?)\s+(?:у|в|in)\s+(?:HR|IT)\b/iu)?.[1] || null
 }
 
 function explicitLocation(text: string): string | null {
