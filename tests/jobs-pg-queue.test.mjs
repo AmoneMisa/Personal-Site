@@ -10,6 +10,8 @@ const envExample = readFileSync(new URL('../.env.example', import.meta.url), 'ut
 const packageJson = readFileSync(new URL('../package.json', import.meta.url), 'utf8')
 const packageLock = readFileSync(new URL('../package-lock.json', import.meta.url), 'utf8')
 const backendRequirements = readFileSync(new URL('../backend/requirements.txt', import.meta.url), 'utf8')
+const backendPdf = readFileSync(new URL('../backend/src/routers/pdf.py', import.meta.url), 'utf8')
+const backendStateStore = readFileSync(new URL('../backend/src/utils/state_store.py', import.meta.url), 'utf8')
 
 test('jobs and hiring tasks use a durable PostgreSQL queue', () => {
   assert.match(queue, /CREATE TABLE IF NOT EXISTS \$\{name\}\.tasks/)
@@ -53,6 +55,10 @@ test('application state no longer requires Redis', () => {
   assert.doesNotMatch(packageJson, /"ioredis"\s*:/)
   assert.doesNotMatch(packageLock, /"node_modules\/ioredis"\s*:/)
   assert.doesNotMatch(backendRequirements, /^redis(?:\[hiredis\])?(?:[=<>!~].*)?$/m)
+  assert.doesNotMatch(backendPdf, /(?:from|import)\s+redis(?:\.|\s)/)
+  assert.doesNotMatch(backendPdf, /utils\.redis_client/)
+  assert.match(backendPdf, /utils\.state_store\s+import\s+get_state_store/)
+  assert.match(backendStateStore, /class PersistentFileKV/)
   assert.match(compose, /^\s{2}site_state:\s*$/m)
   assert.match(compose, /SITE_STATE_DIR:\s*\/var\/app\/state\/site/)
   assert.match(compose, /BACKEND_STATE_DIR:\s*\/var\/app\/state\/backend/)
