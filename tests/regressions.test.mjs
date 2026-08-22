@@ -2,9 +2,11 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import test from 'node:test'
 import { hiringEducationLabel } from '../shared/hiringEducationLabels.ts'
+import { hiringProfessionLabel } from '../shared/hiringProfessionLabels.ts'
 
 import {
   extractCandidateAge,
+  extractCandidateGender,
   extractCandidateName,
 } from '../server/utils/hiringCandidateFields.ts'
 import { removeExistingSocialMeta } from '../server/utils/shareHead.ts'
@@ -55,6 +57,30 @@ test('Uzbek academic tutor roles join the broad teacher profession', () => {
   assert.deepEqual(normalizeProfessions('Tyutorlik', ''), ['Teacher'])
   assert.deepEqual(normalizeProfessions('Тьютор', ''), ['Teacher'])
   assert.deepEqual(normalizeProfessions('Репетитор', ''), ['Tutor'])
+})
+
+test('IshBor oil and gas profiles recover their profession and explicit gender', () => {
+  assert.deepEqual(normalizeProfessions('Neft vagaz sohasida', ''), ['Oil & Gas Worker'])
+  assert.equal(hiringProfessionLabel('Oil & Gas Worker', 'ru'), 'Работник нефтегазовой отрасли')
+  assert.equal(extractCandidateGender('Sanjar Rahmatov (Мужчина)'), 'male')
+  assert.equal(extractCandidateGender('Dilafruz (Ayol)'), 'female')
+
+  const profile = normalizeCandidate({
+    id: 'ishbor-gender',
+    source: 'telegram',
+    origin: 'web',
+    sourceKey: 'ishbor-uz',
+    country: 'UZ',
+    name: 'Sanjar Rahmatov',
+    role: 'Neft vagaz sohasida',
+    professions: ['Neft vagaz sohasida'],
+    url: 'https://ish-bor.uz/ru/ishchilar/id/118057',
+    createdAt: '2026-08-21T12:00:00.000Z',
+    originalText: 'Neft vagaz sohasida\nSanjar Rahmatov (Мужчина)\nВысший',
+    description: 'Neft vagaz sohasida\nSanjar Rahmatov (Мужчина)\nВысший',
+  })
+  assert.equal(profile.role, 'Oil & Gas Worker')
+  assert.equal(profile.gender, 'male')
 })
 
 test('Uzbek structured CV fields keep labels out of the candidate name', () => {

@@ -91,7 +91,7 @@ type StoredProfile = CvProfile & {
   visible?: boolean
 }
 
-export const DERIVED_VERSION = 'd9'
+export const DERIVED_VERSION = 'd10'
 
 let memoryStore: StoredProfile[] = []
 let memoryValidUntil = 0

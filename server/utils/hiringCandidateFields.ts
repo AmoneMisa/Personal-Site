@@ -1,3 +1,12 @@
+import type { CandidateGender } from './hiringTypes'
+
+/** Reads only an explicitly stated gender; never guesses from the name. */
+export function extractCandidateGender(text: string): CandidateGender | undefined {
+  if (/(?:^|[^\p{L}])(?:женщина|female|ayol)(?=$|[^\p{L}])/iu.test(text)) return 'female'
+  if (/(?:^|[^\p{L}])(?:мужчина|male|erkak)(?=$|[^\p{L}])/iu.test(text)) return 'male'
+  return undefined
+}
+
 export function extractCandidateName(text: string): string {
   const match = text.match(
     /(?:^|\n)[^\p{L}\p{N}\n]{0,10}(?:xodim|hodim|nomzod|candidate|фио|ф\.и\.о\.?|f\.?\s*i\.?\s*sh\.?|піб|full name|name|имя|ім(?:ʼ|')я|fio|ism(?:i|im)?(?:\s*[-–—]\s*(?:familya|familiya))?|familya|familiya)\s*[:—-]\s*([^\n]{2,100})/iu,

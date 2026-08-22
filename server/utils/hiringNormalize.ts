@@ -4,7 +4,7 @@
 import { canonicalSkillName, extractSkillDetails } from '~~/shared/jobSkills'
 import type { CandidateEmploymentType, CvProfile } from './hiringTypes'
 import type { Seniority } from './jobTypes'
-import { extractCandidateAge, extractCandidateName } from './hiringCandidateFields'
+import { extractCandidateAge, extractCandidateGender, extractCandidateName } from './hiringCandidateFields'
 import { ishBorLocationFromText, trimIshBorProfileText } from './hiringIshBorFields'
 import { careeristRoleFromText, trimCareeristProfileText } from './hiringCareeristFields'
 import { parseSalary as parseWebSalary } from './hiringWebFields'
@@ -142,6 +142,7 @@ const PROFESSION_RULES: ProfessionRule[] = [
   { name: 'Lawyer', re: /\b(?:lawyer|attorney|legal\s+specialist)\b|юрист|адвокат|правник|yurist/iu },
   { name: 'Notary', re: /\bnotar(?:y|ius)\b|нотариус/iu },
   { name: 'Metrology Specialist', re: /\bmetrolog(?:y|iya)\b|метролог|standartlashtirish/iu },
+  { name: 'Oil & Gas Worker', re: /\boil\s*(?:&|and)?\s*gas\b|нефт\p{L}*\s*(?:и|&)?\s*газ\p{L}*|neft\s*(?:va\s*)?gaz(?:\s+soha\p{L}*)?/iu },
 
   // Construction / production / warehouse.
   { name: 'General Laborer', re: /\b(?:general\s+laborer|handyman)\b|разнорабоч|різнороб/iu },
@@ -572,6 +573,9 @@ export function normalizeCandidate(profile: CvProfile): CvProfile {
   const salaryMax = replaceStoredSalary ? extractedSalary.salaryMax : profile.salaryMax ?? extractedSalary.salaryMax
   const currency = replaceStoredSalary ? extractedSalary.currency : profile.currency ?? extractedSalary.currency
   const education = normalizeCandidateEducation(profile, originalText)
+  const gender = profile.gender === 'male' || profile.gender === 'female'
+    ? profile.gender
+    : extractCandidateGender(originalText)
 
   return {
     ...profile,
@@ -589,6 +593,7 @@ export function normalizeCandidate(profile: CvProfile): CvProfile {
       : normalizePreviousProfessions(originalText),
     features: [...new Set([...(profile.features || []), ...extractCandidateFeatures(originalText)])],
     age,
+    gender,
     isAdult: age == null ? true : age >= 18,
     experienceYears,
     city,

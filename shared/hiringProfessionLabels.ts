@@ -78,6 +78,7 @@ export const HIRING_PROFESSION_LABELS: Record<string, ProfessionLabels> = {
   Lawyer: { en: 'Lawyer', ru: 'Юрист' },
   Notary: { en: 'Notary', ru: 'Нотариус' },
   'Metrology Specialist': { en: 'Metrology Specialist', ru: 'Специалист по метрологии и стандартизации' },
+  'Oil & Gas Worker': { en: 'Oil & Gas Worker', ru: 'Работник нефтегазовой отрасли' },
 
   'General Laborer': { en: 'General Laborer', ru: 'Разнорабочий' },
   'Construction Worker': { en: 'Construction Worker', ru: 'Строитель' },
