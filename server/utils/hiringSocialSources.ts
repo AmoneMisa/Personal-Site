@@ -113,7 +113,7 @@ function contacts(text: string): DirectContacts {
 
 const INTENT_PREFIX_RE = /(?:^|\n)\s*[^\p{L}\p{N}\n]{0,8}(?:я\s+)?(?:ищу|шукаю)\s+(?:себе\s+)?(?:работу|подработку|роботу|підробіток)\s*[:—-]?\s*/iu
 const UZ_INTENT_PREFIX_RE = /(?:^|\n)\s*[^\p{L}\p{N}\n]{0,8}(?:menga\s+)?(?:ish(?:\s+joyi)?\s+kerak|ish\s+(?:qidiryapman|qidiraman|izlayapman))\s*[:—-]?\s*/iu
-const LOCAL_CANDIDATE_INTENT_RE = /\b(?:жұмыс\s+іздеймін|жумуш\s+(?:издейм|издеп\s+жатам)|иш\s+издейм|caut\s+(?:un\s+)?loc\s+de\s+munc[ăa]|(?:îmi|imi)\s+caut\s+(?:un\s+)?(?:job|loc\s+de\s+munc[ăa]))\b/iu
+const LOCAL_CANDIDATE_INTENT_RE = /(?<![\p{L}\p{N}])(?:жұмыс\s+іздеймін|жумуш\s+(?:издейм|издеп\s+жатам)|иш\s+издейм|caut\s+(?:un\s+)?loc\s+de\s+munc[ăa]|(?:îmi|imi)\s+caut\s+(?:un\s+)?(?:job|loc\s+de\s+munc[ăa]))(?![\p{L}\p{N}])/iu
 
 function roleFrom(text: string): string {
   const intent = text.split('\n')
