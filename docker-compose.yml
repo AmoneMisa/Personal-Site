@@ -5,11 +5,9 @@ services:
     image: ghcr.io/amonemisa/personal-site-backend:latest
     restart: unless-stopped
     environment:
-      REDIS_HOST: redis
-      REDIS_PORT: "6379"
-    depends_on:
-      redis:
-        condition: service_healthy
+      BACKEND_STATE_DIR: /var/app/state/backend
+    volumes:
+      - site_state:/var/app/state
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:8000/openapi.json',timeout=3).status==200 else 1)"]
       interval: 30s
@@ -50,7 +48,7 @@ services:
     env_file:
       - ${SITE_ENV_FILE:-./db.env}
     environment:
-      REDIS_URL: redis://redis:6379
+      SITE_STATE_DIR: /var/app/state/site
       AI_WORKER_URL: http://ai-worker:4030
       ELASTICSEARCH_URL: http://flat-finder-elasticsearch:9200
       JOBS_ELASTICSEARCH_INDEX: job-listings-v1
@@ -78,12 +76,12 @@ services:
       JOBS_QUEUE_LEASE_SECONDS: ${JOBS_QUEUE_LEASE_SECONDS:-240}
       JOBS_QUEUE_RETRY_BASE_MS: ${JOBS_QUEUE_RETRY_BASE_MS:-30000}
       JOBS_QUEUE_RETRY_MAX_MS: ${JOBS_QUEUE_RETRY_MAX_MS:-300000}
+    volumes:
+      - site_state:/var/app/state
     depends_on:
       backend:
         condition: service_healthy
       job-browser-fetcher:
-        condition: service_healthy
-      redis:
         condition: service_healthy
     ports:
       - "127.0.0.1:8080:3000"
@@ -128,21 +126,8 @@ services:
       frontend:
         condition: service_healthy
 
-  redis:
-    image: redis:8.4.0
-    restart: unless-stopped
-    command: ["redis-server", "--appendonly", "yes"]
-    volumes:
-      - redis_data:/data
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 10s
-      timeout: 3s
-      retries: 5
-      start_period: 5s
-
 volumes:
-  redis_data:
+  site_state:
 
 networks:
   ai-net:
