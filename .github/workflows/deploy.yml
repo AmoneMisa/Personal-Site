@@ -71,6 +71,21 @@ jobs:
     environment: Production
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v4
+
+      # Runtime queue wiring lives in compose. Sync it with the exact image
+      # revision being deployed so the server cannot keep a stale RabbitMQ URL
+      # after the workers themselves have moved to PostgreSQL.
+      - name: Sync compose runtime config
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ vars.SERVER_HOST }}
+          username: ${{ vars.SERVER_USER }}
+          key: ${{ secrets.SERVER_SSH_KEY }}
+          source: "docker-compose.yml"
+          target: "~/opt/myproject"
+          overwrite: true
+
       - name: Deploy via SSH
         uses: appleboy/ssh-action@v1.0.0
         with:
