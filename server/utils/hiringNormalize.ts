@@ -6,6 +6,8 @@ import type { CandidateEmploymentType, CvProfile } from './hiringTypes'
 import type { Seniority } from './jobTypes'
 import { extractCandidateAge, extractCandidateName } from './hiringCandidateFields'
 import { ishBorLocationFromText, trimIshBorProfileText } from './hiringIshBorFields'
+import { trimCareeristProfileText } from './hiringCareeristFields'
+import { parseSalary as parseWebSalary } from './hiringWebFields'
 
 const B = '(?<![\\p{L}\\p{N}])'
 const E = '(?![\\p{L}\\p{N}])'
@@ -65,7 +67,7 @@ export function normalizeSkills(rawSkills: string[] | undefined, text: string): 
 interface ProfessionRule { name: string; re: RegExp }
 const PROFESSION_RULES: ProfessionRule[] = [
   // Management / office / sales.
-  { name: 'Sales Manager', re: /\b(?:sales\s+manager|account\s+manager)\b|менеджер\s+(?:по\s+)?продаж|менеджер\s+з\s+продаж|sotuv\s+menejer/iu },
+  { name: 'Sales Manager', re: /\b(?:sales\s+manager|account\s+manager)\b|менеджер\s+(?:по\s+)?(?:экспортн\p{L}*\s+)?продаж|менеджер\s+з\s+продаж|sotuv\s+menejer/iu },
   { name: 'Project Manager', re: /\bproject\s+manager\b|проектн(?:ый|ий)\s+менеджер|менеджер\s+проект|керівник\s+проєкт/iu },
   { name: 'Product Manager', re: /\bproduct\s+manager\b|продакт\s*менеджер|менеджер\s+продукт/iu },
   { name: 'Store Manager', re: /\bstore\s+manager\b|управляющ(?:ий|ая)\s+магазин|заведующ(?:ий|ая)\s+магазин|керуюч(?:ий|а)\s+магазин/iu },
@@ -87,7 +89,7 @@ const PROFESSION_RULES: ProfessionRule[] = [
 
   // Logistics / security / service.
   { name: 'Courier', re: /\bcourier\b|курьер|кур'єр|kuryer/iu },
-  { name: 'Driver', re: /\bdriver\b|водитель|водій|haydovchi|shafyor/iu },
+  { name: 'Driver', re: /\bdriver\b|водитель|водій|haydovchi|shafyor|[СC][ЕE]\s+категори/iu },
   { name: 'Security Guard', re: /\bsecurity(?:\s+guard)?\b|охранник|охоронець|охорона|qorovul/iu },
   { name: 'Cleaner', re: /\b(?:cleaner|cleaning|housekeeper)\b|уборщик|уборщица|уборка|прибиральник|прибиральниц|домработниц|farrosh/iu },
   { name: 'Caregiver', re: /\bcaregiver\b|сиделк|доглядальниц|parvarish/iu },
@@ -463,13 +465,21 @@ function normalizeCandidateEducation(profile: CvProfile, text: string): string |
   return raw ? null : profile.education
 }
 
+function normalizeMixedScriptName(value: string): string {
+  if ((value.match(/\p{Script=Cyrillic}/gu) || []).length < 2) return value
+  const confusables: Record<string, string> = {
+    A: 'А', B: 'В', C: 'С', E: 'Е', H: 'Н', K: 'К', M: 'М', O: 'О', P: 'Р', T: 'Т', X: 'Х', Y: 'У',
+  }
+  return value.replace(/[ABCEHKMOPTXY]/g, (letter) => confusables[letter] || letter)
+}
+
 export function normalizeCandidate(profile: CvProfile): CvProfile {
   // Repair rows parsed before Material Icon ligatures were removed from the
   // source HTML. Underscored glyph names are presentation markup, not CV text.
   const rawSourceText = stripUiArtifacts(profile.originalText || profile.description || '')
   const originalText = profile.sourceKey === 'ishbor-uz'
     ? trimIshBorProfileText(rawSourceText)
-    : rawSourceText
+    : profile.sourceKey === 'careerist-uz' ? trimCareeristProfileText(rawSourceText) : rawSourceText
   const goalRole = extractGoalRole(originalText)
   const effectiveRole = goalRole || profile.role
   // Repair already-stored rows where a loose adapter saved the whole labelled
@@ -478,7 +488,7 @@ export function normalizeCandidate(profile: CvProfile): CvProfile {
   const nameCandidate = rawName && !HIDDEN_NAME_RE.test(rawName)
     ? extractCandidateName(rawName) || rawName
     : extractCandidateName(originalText)
-  const name = (HIDDEN_NAME_RE.test(nameCandidate) ? '' : nameCandidate)
+  const name = normalizeMixedScriptName(HIDDEN_NAME_RE.test(nameCandidate) ? '' : nameCandidate)
     .replace(/\s{2,}/g, ' ')
     .trim()
     .slice(0, 100)
@@ -510,12 +520,15 @@ export function normalizeCandidate(profile: CvProfile): CvProfile {
     ? ishBorLocationFromText(rawSourceText) || storedCity
     : storedCity
   const remote = normalizeRemotePreference(profile.remote, originalText, profile.origin)
-  const extractedSalary = profile.salaryMin == null && profile.salaryMax == null
-    ? extractCandidateSalary(originalText, profile.country)
-    : {}
-  const salaryMin = profile.salaryMin ?? extractedSalary.salaryMin
-  const salaryMax = profile.salaryMax ?? extractedSalary.salaryMax
-  const currency = profile.currency ?? extractedSalary.currency
+  const extractedSalary = profile.sourceKey === 'careerist-uz'
+    ? parseWebSalary(originalText, profile.country)
+    : profile.salaryMin == null && profile.salaryMax == null
+      ? extractCandidateSalary(originalText, profile.country)
+      : {}
+  const replaceStoredSalary = profile.sourceKey === 'careerist-uz' && extractedSalary.salaryMin != null
+  const salaryMin = replaceStoredSalary ? extractedSalary.salaryMin : profile.salaryMin ?? extractedSalary.salaryMin
+  const salaryMax = replaceStoredSalary ? extractedSalary.salaryMax : profile.salaryMax ?? extractedSalary.salaryMax
+  const currency = replaceStoredSalary ? extractedSalary.currency : profile.currency ?? extractedSalary.currency
   const education = normalizeCandidateEducation(profile, originalText)
 
   return {
@@ -524,7 +537,9 @@ export function normalizeCandidate(profile: CvProfile): CvProfile {
     originalText,
     description: profile.sourceKey === 'ishbor-uz'
       ? trimIshBorProfileText(stripUiArtifacts(profile.description || originalText))
-      : stripUiArtifacts(profile.description || originalText),
+      : profile.sourceKey === 'careerist-uz'
+        ? trimCareeristProfileText(stripUiArtifacts(profile.description || originalText))
+        : stripUiArtifacts(profile.description || originalText),
     role: professions[0] || normalizeRole(effectiveRole, originalText),
     professions,
     previousProfessions: profile.previousProfessions?.length
@@ -542,7 +557,7 @@ export function normalizeCandidate(profile: CvProfile): CvProfile {
     remote,
     relocationReady: profile.relocationReady ?? detectRelocationReady(originalText),
     employmentTypes,
-    skills: normalizeSkills(profile.skills, originalText),
+    skills: normalizeSkills(profile.sourceKey === 'careerist-uz' ? [] : profile.skills, originalText),
     seniority: profile.seniority ?? detectSeniority(text, experienceYears),
     contact: profile.contact || contacts.telegram || contacts.email || contacts.phone || null,
     contactHours: profile.contactHours ?? extractContactHours(originalText),

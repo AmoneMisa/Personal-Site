@@ -9,6 +9,7 @@ import { removeExistingSocialMeta } from '../server/utils/shareHead.ts'
 import { looksSoftBlocked } from '../server/utils/browserSoftBlock.ts'
 import { normalizeCandidate, normalizeProfessions } from '../server/utils/hiringNormalize.ts'
 import { withProfessionExperience } from '../server/utils/hiringExperience.ts'
+import { trimCareeristProfileText } from '../server/utils/hiringCareeristFields.ts'
 import {
   ishBorLocationFromText,
   ishBorProfileHtml,
@@ -116,6 +117,11 @@ test('script and style contents never reach a candidate profile', () => {
   assert.match(text, /Ташкент/)
 })
 
+test('specific sales and Uzbek CE driver titles normalize to canonical roles', () => {
+  assert.deepEqual(normalizeProfessions('Менеджер экспортных продаж РФ', ''), ['Sales Manager'])
+  assert.deepEqual(normalizeProfessions('СЕ КАТЕГОРИЯ БУЙИЧА', ''), ['Driver'])
+})
+
 test('legacy Careerist rows lose icon ligatures and repeating experience fractions', () => {
   const profile = normalizeCandidate({
     id: 'careerist-1',
@@ -136,6 +142,55 @@ test('legacy Careerist rows lose icon ligatures and repeating experience fractio
   assert.equal(profile.city, 'Ташкент')
   assert.equal(profile.experienceYears, 20.3)
   assert.doesNotMatch(profile.description, /local_shipping/)
+})
+
+test('Careerist drops listing scripts and derives currency from the salary line', () => {
+  const text = [
+    '20 августа, 2026',
+    'Начальник ПТО, инженер ПТО в строительстве',
+    '150 000 руб',
+    'Хабиб Азизович',
+    'Город',
+    'Ташкент local_shipping',
+    'Показать еще',
+    '1',
+    '<!--',
+    '$(document).ready(function(){ window.open(link); });',
+  ].join('\n')
+  const normalized = normalizeCandidate({
+    id: 'careerist-khabib',
+    source: 'telegram',
+    origin: 'web',
+    sourceKey: 'careerist-uz',
+    country: 'UZ',
+    name: 'Хабиб Азизович',
+    role: 'Начальник ПТО, инженер ПТО в строительстве',
+    city: 'Ташкент local_shipping',
+    salaryMin: 150000,
+    salaryMax: 150000,
+    currency: 'USD',
+    skills: ['JavaScript'],
+    url: 'https://tashkent.careerist.ru/resume/example.html',
+    createdAt: '2026-08-20T12:00:00.000Z',
+    originalText: text,
+    description: text,
+  })
+
+  assert.equal(normalized.currency, 'RUB')
+  assert.deepEqual(normalized.skills, [])
+  assert.doesNotMatch(normalized.description, /Показать еще|document\.ready|window\.open/)
+  assert.doesNotMatch(trimCareeristProfileText(text), /Показать еще|document\.ready/)
+})
+
+test('mixed Latin initial in a Cyrillic candidate name is repaired', () => {
+  const normalized = normalizeCandidate({
+    id: 'ishbor-alisher', source: 'telegram', origin: 'web', sourceKey: 'ishbor-uz', country: 'UZ',
+    name: 'Aлишер', role: 'СЕ КАТЕГОРИЯ БУЙИЧА', url: 'https://ish-bor.uz/ru/ishchilar/id/118036',
+    createdAt: '2026-08-20T12:00:00.000Z', originalText: 'СЕ КАТЕГОРИЯ БУЙИЧА\nДжизак\nAлишер',
+    description: 'СЕ КАТЕГОРИЯ БУЙИЧА\nДжизак\nAлишер',
+  })
+  assert.equal(normalized.name, 'Алишер')
+  assert.deepEqual(normalized.professions, ['Driver'])
 })
 
 test('legacy Flagma fields repair hidden names, education and month durations', () => {
