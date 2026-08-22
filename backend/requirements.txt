@@ -3,7 +3,6 @@ uvicorn==0.40.0
 pydantic==2.12.5
 python-multipart==0.0.22
 
-redis[hiredis]
 httpx
 
 pypdf==6.7.2

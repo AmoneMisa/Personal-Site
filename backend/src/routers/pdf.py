@@ -13,7 +13,6 @@ from fastapi.responses import FileResponse, JSONResponse
 from pydantic import BaseModel, Field
 from pypdf import PdfReader
 from pypdf.generic import NameObject
-from redis.asyncio import Redis
 
 from fastapi.concurrency import run_in_threadpool
 
@@ -25,7 +24,7 @@ from ..processors.pdf_text import extract_text_blocks, extract_links
 from ..processors.pdf_textedit import apply_text_edits, apply_links
 from ..processors.pdf_image import extract_images, apply_image_edits
 from ..processors.pdf_pageops import add_design_page
-from ..utils.redis_client import get_redis
+from ..utils.state_store import get_state_store
 
 try:
     import magic  # python-magic
@@ -188,7 +187,7 @@ def k_result(doc_id: str) -> str:
     return f"pdf:result:{doc_id}"
 
 
-async def ensure_doc_exists(r: Redis, doc_id: str):
+async def ensure_doc_exists(r, doc_id: str):
     raw = await r.get(k_doc(doc_id))
     if not raw:
         raise HTTPException(404, "Document not found or expired")
@@ -321,7 +320,7 @@ async def create(files: List[UploadFile] = File(...)):
     else:
         merge_pdfs(tmp_paths, out_src)
 
-    r: Redis = get_redis()
+    r = get_state_store()
     expires_draft = now_ts() + DRAFT_TTL_SECONDS
     await r.set(
         k_doc(doc_id),
@@ -334,7 +333,7 @@ async def create(files: List[UploadFile] = File(...)):
 
 @router.get("/download/{doc_id}")
 async def download_source(doc_id: str):
-    r: Redis = get_redis()
+    r = get_state_store()
     await ensure_doc_exists(r, doc_id)
 
     path = source_path(doc_id)
@@ -346,7 +345,7 @@ async def download_source(doc_id: str):
 
 @router.get("/page-info/{doc_id}")
 async def page_info(doc_id: str):
-    r: Redis = get_redis()
+    r = get_state_store()
     await ensure_doc_exists(r, doc_id)
 
     path = source_path(doc_id)
@@ -367,7 +366,7 @@ async def page_info(doc_id: str):
 async def add_design_page_route(doc_id: str):
     """Append an empty themed page (reuses page 1's coloured columns, no avatar
     or text). Existing pages are untouched, so their cached previews stay valid."""
-    r: Redis = get_redis()
+    r = get_state_store()
     await ensure_doc_exists(r, doc_id)
 
     src = source_path(doc_id)
@@ -398,7 +397,7 @@ async def preview(doc_id: str, page: int, dpi: int = 144):
     if dpi > 220:
         dpi = 220
 
-    r: Redis = get_redis()
+    r = get_state_store()
     await ensure_doc_exists(r, doc_id)
 
     src = source_path(doc_id)
@@ -436,7 +435,7 @@ async def background(doc_id: str, page: int, dpi: int = 144):
     if dpi > 220:
         dpi = 220
 
-    r: Redis = get_redis()
+    r = get_state_store()
     await ensure_doc_exists(r, doc_id)
 
     src = source_path(doc_id)
@@ -474,7 +473,7 @@ async def text_blocks(doc_id: str, page: int, dpi: int = 144):
     if dpi > 220:
         dpi = 220
 
-    r: Redis = get_redis()
+    r = get_state_store()
     await ensure_doc_exists(r, doc_id)
 
     src = source_path(doc_id)
@@ -508,7 +507,7 @@ async def text_blocks(doc_id: str, page: int, dpi: int = 144):
 
 @router.get("/image/{doc_id}/{name}")
 async def get_extracted_image(doc_id: str, name: str):
-    r: Redis = get_redis()
+    r = get_state_store()
     await ensure_doc_exists(r, doc_id)
 
     safe = os.path.basename(name or "")
@@ -524,7 +523,7 @@ async def get_extracted_image(doc_id: str, name: str):
 
 @router.get("/draft/{doc_id}")
 async def get_draft(doc_id: str):
-    r: Redis = get_redis()
+    r = get_state_store()
     await ensure_doc_exists(r, doc_id)
 
     raw = await r.get(k_draft(doc_id))
@@ -535,7 +534,7 @@ async def get_draft(doc_id: str):
 
 @router.put("/draft/{doc_id}")
 async def put_draft(doc_id: str, body: DraftPutBody):
-    r: Redis = get_redis()
+    r = get_state_store()
     await ensure_doc_exists(r, doc_id)
 
     await r.set(k_draft(doc_id), json.dumps(body.draft), ex=DRAFT_TTL_SECONDS)
@@ -544,7 +543,7 @@ async def put_draft(doc_id: str, body: DraftPutBody):
 
 @router.post("/save/{doc_id}")
 async def save(doc_id: str, body: SaveBody):
-    r: Redis = get_redis()
+    r = get_state_store()
     await ensure_doc_exists(r, doc_id)
 
     src = source_path(doc_id)
@@ -635,7 +634,7 @@ async def save(doc_id: str, body: SaveBody):
 
 @router.get("/download-result/{doc_id}")
 async def download_result(doc_id: str):
-    r: Redis = get_redis()
+    r = get_state_store()
 
     raw = await r.get(k_result(doc_id))
     if not raw:
@@ -652,7 +651,7 @@ async def download_result(doc_id: str):
 
 @router.delete("/{doc_id}")
 async def delete_doc(doc_id: str):
-    r: Redis = get_redis()
+    r = get_state_store()
     await r.delete(k_draft(doc_id))
     await r.delete(k_result(doc_id))
     await r.delete(k_doc(doc_id))
@@ -684,7 +683,7 @@ def _ext_from_mime(mime: str) -> str:
 
 @router.post("/assets/{doc_id}")
 async def upload_asset(doc_id: str, file: UploadFile = File(...)):
-    r: Redis = get_redis()
+    r = get_state_store()
     await ensure_doc_exists(r, doc_id)
 
     if not file:
@@ -719,7 +718,7 @@ async def upload_asset(doc_id: str, file: UploadFile = File(...)):
 
 @router.get("/assets/{doc_id}/{asset_id}")
 async def get_asset(doc_id: str, asset_id: str):
-    r: Redis = get_redis()
+    r = get_state_store()
     await ensure_doc_exists(r, doc_id)
 
     folder = assets_folder(doc_id)
@@ -737,7 +736,7 @@ async def get_asset(doc_id: str, asset_id: str):
 
 @router.delete("/assets/{doc_id}/{asset_id}")
 async def delete_asset(doc_id: str, asset_id: str):
-    r: Redis = get_redis()
+    r = get_state_store()
     await ensure_doc_exists(r, doc_id)
 
     for ext in ("png", "jpg", "webp"):
@@ -758,7 +757,7 @@ import asyncio
 async def pdf_storage_cleanup_loop():
     while True:
         try:
-            r: Redis = get_redis()
+            r = get_state_store()
             if os.path.isdir(STORAGE_ROOT):
                 for doc_id in os.listdir(STORAGE_ROOT):
                     folder = doc_folder(doc_id)
@@ -767,7 +766,7 @@ async def pdf_storage_cleanup_loop():
                     try:
                         exists = await r.exists(k_doc(doc_id))
                     except Exception:
-                        exists = 1  # если Redis временно недоступен — не удаляем
+                        exists = 1  # state store temporarily unavailable — do not delete
                     if not exists:
                         safe_remove_doc_folder(doc_id)
         except Exception:
