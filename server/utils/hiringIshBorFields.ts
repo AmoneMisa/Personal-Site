@@ -29,12 +29,20 @@ export function trimIshBorProfileText(text: string): string {
   const lines = text.split('\n').map((line) => line.trim()).filter(Boolean)
   const citiesModal = lines.findIndex((line) => /^Города и области$/iu.test(line))
   const start = citiesModal >= 0 ? citiesModal + 1 : 0
-  const footer = lines.findIndex((line, index) => index > start && (
+  const boilerplate = lines.findIndex((line, index) => index >= start && (
+    /^Чтобы связаться с кандидатом/iu.test(line)
+    || /^Для связи с кандидатом/iu.test(line)
+    || /^Уже зарегистрированы\?/iu.test(line)
+    || /^Нет аккаунта\?/iu.test(line)
+  ))
+  const footer = lines.findIndex((line, index) => index >= start && (
     /^ish[-\s]?bor\.uz$/iu.test(line)
     || /^Если вам нужна работа или работник/iu.test(line)
     || /^©\s*20\d{2}\s+ish-bor\.uz/iu.test(line)
   ))
-  return lines.slice(start, footer >= 0 ? footer : undefined).join('\n').trim()
+  const boundaries = [boilerplate, footer].filter((index) => index >= 0)
+  const end = boundaries.length ? Math.min(...boundaries) : undefined
+  return lines.slice(start, end).join('\n').trim()
 }
 
 /** The page title and profile header are authoritative; SEO/footer prose is not. */

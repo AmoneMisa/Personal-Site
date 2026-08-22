@@ -7,7 +7,23 @@ export function trimCareeristProfileText(text: string): string {
     || /^\$\s*\(\s*document\s*\)/iu.test(line)
     || /^window\./iu.test(line)
   ))
-  return lines.slice(0, boundary >= 0 ? boundary : undefined).join('\n').trim()
+  const profileLines = lines.slice(0, boundary >= 0 ? boundary : undefined)
+  const clean: string[] = []
+  let keptDate = false
+  for (let index = 0; index < profileLines.length; index += 1) {
+    const line = profileLines[index]!
+    if (/^(?:отправить приглашение|подробнее)$/iu.test(line)) continue
+    if (/^\d{1,2}\s+\p{L}+,\s+20\d{2}$/iu.test(line)) {
+      if (keptDate) continue
+      keptDate = true
+    }
+    if (/^возраст$/iu.test(line) && /^0(?:\s|\()/u.test(profileLines[index + 1] || '')) {
+      index += 1
+      continue
+    }
+    clean.push(line)
+  }
+  return clean.join('\n').trim()
 }
 
 /** Careerist listings put the desired role immediately after their date. */

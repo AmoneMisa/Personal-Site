@@ -2,9 +2,11 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import test from 'node:test'
 import { hiringEducationLabel } from '../shared/hiringEducationLabels.ts'
+import { hiringProfessionLabel } from '../shared/hiringProfessionLabels.ts'
 
 import {
   extractCandidateAge,
+  extractCandidateGender,
   extractCandidateName,
 } from '../server/utils/hiringCandidateFields.ts'
 import { removeExistingSocialMeta } from '../server/utils/shareHead.ts'
@@ -55,6 +57,30 @@ test('Uzbek academic tutor roles join the broad teacher profession', () => {
   assert.deepEqual(normalizeProfessions('Tyutorlik', ''), ['Teacher'])
   assert.deepEqual(normalizeProfessions('Тьютор', ''), ['Teacher'])
   assert.deepEqual(normalizeProfessions('Репетитор', ''), ['Tutor'])
+})
+
+test('IshBor oil and gas profiles recover their profession and explicit gender', () => {
+  assert.deepEqual(normalizeProfessions('Neft vagaz sohasida', ''), ['Oil & Gas Worker'])
+  assert.equal(hiringProfessionLabel('Oil & Gas Worker', 'ru'), 'Работник нефтегазовой отрасли')
+  assert.equal(extractCandidateGender('Sanjar Rahmatov (Мужчина)'), 'male')
+  assert.equal(extractCandidateGender('Dilafruz (Ayol)'), 'female')
+
+  const profile = normalizeCandidate({
+    id: 'ishbor-gender',
+    source: 'telegram',
+    origin: 'web',
+    sourceKey: 'ishbor-uz',
+    country: 'UZ',
+    name: 'Sanjar Rahmatov',
+    role: 'Neft vagaz sohasida',
+    professions: ['Neft vagaz sohasida'],
+    url: 'https://ish-bor.uz/ru/ishchilar/id/118057',
+    createdAt: '2026-08-21T12:00:00.000Z',
+    originalText: 'Neft vagaz sohasida\nSanjar Rahmatov (Мужчина)\nВысший',
+    description: 'Neft vagaz sohasida\nSanjar Rahmatov (Мужчина)\nВысший',
+  })
+  assert.equal(profile.role, 'Oil & Gas Worker')
+  assert.equal(profile.gender, 'male')
 })
 
 test('Uzbek structured CV fields keep labels out of the candidate name', () => {
@@ -158,6 +184,72 @@ test('specific sales and Uzbek CE driver titles normalize to canonical roles', (
   assert.deepEqual(normalizeProfessions('Kassa xodimi', ''), ['Cashier'])
   assert.deepEqual(normalizeProfessions('Notarius', ''), ['Notary'])
   assert.deepEqual(normalizeProfessions("Metrologiya, audit, standartlashtirish sohasi bo'yicha", ''), ['Metrology Specialist'])
+})
+
+test('remaining IshBor titles normalize without leaking categories into skills', () => {
+  assert.deepEqual(normalizeProfessions('xavfsizlik, qoriqlash', ''), ['Security Guard'])
+  assert.deepEqual(normalizeProfessions('Bank,soliq , universitetda titur', ''), [
+    'Finance / Banking Specialist',
+    'Teacher',
+  ])
+  assert.deepEqual(normalizeProfessions('Kompyuter boyicha ish', ''), ['IT Specialist'])
+  assert.deepEqual(normalizeProfessions('Biotexnolog, laborant', ''), [
+    'Biotechnologist',
+    'Laboratory Technician',
+  ])
+  assert.equal(hiringProfessionLabel('Security Guard', 'ru'), 'Охранник')
+  assert.equal(hiringProfessionLabel('IT Specialist', 'ru'), 'IT-специалист')
+
+  const normalized = normalizeCandidate({
+    id: 'ishbor-dilnura', source: 'ishbor-uz', origin: 'web', sourceKey: 'ishbor-uz', country: 'UZ',
+    name: 'Dilnura', role: 'Kompyuter boyicha ish', skills: ['Sales', 'Procurement'],
+    url: 'https://ish-bor.uz/ru/ishchilar/id/118046', createdAt: '2026-08-21T12:00:00.000Z',
+    originalText: 'Kompyuter boyicha ish\nТорговля, Продажи, Закупки\n1 год\nDilnura (Женщина)',
+    description: 'Kompyuter boyicha ish\nТорговля, Продажи, Закупки\n1 год\nDilnura (Женщина)',
+  })
+  assert.deepEqual(normalized.professions, ['IT Specialist'])
+  assert.deepEqual(normalized.skills, [])
+})
+
+test('Careerist removes listing controls and rejects remote format as a profession', () => {
+  const text = [
+    '21 августа, 2026',
+    'Работа на удаленной основе',
+    "Bunyod Baxrom o'g'li",
+    'Город',
+    'Ташкент',
+    'Возраст',
+    '20 лет (1 марта 2006)',
+    'отправить приглашение',
+    'подробнее',
+    '21 августа, 2026',
+  ].join('\n')
+  const normalized = normalizeCandidate({
+    id: 'careerist-bunyod', source: 'Careerist UZ', origin: 'web', sourceKey: 'careerist-uz', country: 'UZ',
+    name: "Bunyod Baxrom o'g'li", role: 'Работа на удаленной основе',
+    url: 'https://tashkent.careerist.ru/resume/example.html', createdAt: '2026-08-21T12:00:00.000Z',
+    originalText: text, description: text,
+  })
+  assert.equal(normalized.role, '')
+  assert.deepEqual(normalized.professions, [])
+  assert.equal(normalized.remote, true)
+  assert.doesNotMatch(normalized.originalText, /отправить приглашение|подробнее/iu)
+  assert.equal((normalized.originalText.match(/21 августа, 2026/giu) || []).length, 1)
+
+  const impossibleAge = trimCareeristProfileText([
+    '21 августа, 2026',
+    'Начальник склада( GERMES TEKS )',
+    'Shaxboz',
+    'Город',
+    'Ташкент',
+    'Возраст',
+    '0 (22 августа 2026)',
+    'отправить приглашение',
+    'подробнее',
+    '21 августа, 2026',
+  ].join('\n'))
+  assert.doesNotMatch(impossibleAge, /Возраст\n0|отправить приглашение|подробнее/iu)
+  assert.deepEqual(normalizeProfessions('Начальник склада( GERMES TEKS )', ''), ['Warehouse Manager'])
 })
 
 test('Careerist trusts its listing headline and drops impossible age zero', () => {
@@ -356,6 +448,25 @@ test('IshBor keeps only the profile column and trusts its stated region', () => 
     '21.08.2026',
   ].join('\n'))
 
+  const noisyProfileText = [
+    'Neft vagaz sohasida',
+    'Постоянный',
+    '7 milliyondanyuqori',
+    'Кашкадарья',
+    'У меня нет опыта работы',
+    'Sanjar Rahmatov (Мужчина)',
+    'Высший',
+    'Чтобы связаться с кандидатом, нужно войти на сайт.',
+    'Уже зарегистрированы? Войти .',
+    'Нет аккаунта? Регистрация .',
+    '21.08.2026',
+    '24',
+    '0',
+  ].join('\n')
+  const cleanProfileText = trimIshBorProfileText(noisyProfileText)
+  assert.match(cleanProfileText, /Sanjar Rahmatov \(Мужчина\)\nВысший$/u)
+  assert.doesNotMatch(cleanProfileText, /связаться|зарегистрированы|аккаунта|21\.08\.2026|\n24\n0/iu)
+
   const repaired = normalizeCandidate({
     id: 'web-ishbor-uz-118053',
     source: 'telegram',
@@ -374,6 +485,16 @@ test('IshBor keeps only the profile column and trusts its stated region', () => 
   assert.equal(repaired.city, 'Surkhandarya')
   assert.equal(repaired.experienceYears, 0)
   assert.doesNotMatch(repaired.description, /Фильтр|Если вам нужна работа|Регистрация/)
+
+  const repairedNoisy = normalizeCandidate({
+    ...repaired,
+    id: 'web-ishbor-uz-118057',
+    role: 'Neft vagaz sohasida',
+    originalText: noisyProfileText,
+    description: noisyProfileText,
+  })
+  assert.doesNotMatch(repairedNoisy.originalText, /связаться|зарегистрированы|аккаунта|21\.08\.2026/iu)
+  assert.doesNotMatch(repairedNoisy.description, /связаться|зарегистрированы|аккаунта|21\.08\.2026/iu)
 
   assert.equal(ishBorLocationFromText(
     "Oliy toifali boshlang'ich ta'lim o'qituvchisi (Резюме) - Навои | работа в ташкенте",
