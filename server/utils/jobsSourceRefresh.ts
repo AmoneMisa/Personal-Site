@@ -223,6 +223,14 @@ async function mergeFetchedSource(source: JobSource, jobs: Job[]) {
   }
 }
 
+// A source refresh outlives the request that started it: the route gives up
+// after 150s, but the crawl keeps running, and the queue then retries the same
+// source. Several full crawls of the same boards end up in flight at once,
+// each holding its pages in memory — which is how this process reached a 4GB
+// heap and was killed. One refresh per source at a time; a second caller
+// waits for the first instead of starting another.
+const inFlight = new Map<JobSource, Promise<unknown>>()
+
 export async function refreshJobSource(source: JobSource) {
   if (!ALL_SOURCES.includes(source)) {
     throw new Error(`Unknown job source ${source}`)
@@ -237,6 +245,24 @@ export async function refreshJobSource(source: JobSource) {
     }
   }
 
+  if (inFlight.has(source)) {
+    // Answer at once rather than holding the caller open behind a crawl it
+    // will time out on anyway: the retry that follows would only add another
+    // waiting request to the pile.
+    console.log(`[jobs] ${source} refresh already running; skipping this request`)
+    return { source, skipped: true, reason: 'already_running', fetched: 0 }
+  }
+
+  const started = runJobSourceRefresh(source)
+  inFlight.set(source, started)
+  try {
+    return await started
+  } finally {
+    inFlight.delete(source)
+  }
+}
+
+async function runJobSourceRefresh(source: JobSource) {
   const jobs = await fetchSource(source)
 
   // Fetching is parallel; mutation of the shared Redis store is serialized.
