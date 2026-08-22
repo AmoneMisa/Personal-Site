@@ -1,3 +1,4 @@
+# One-shot patch; the workflow removes this file after applying it.
 from pathlib import Path
 
 
