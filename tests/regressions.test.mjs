@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
 import test from 'node:test'
 
 import {
@@ -23,6 +24,23 @@ import {
   htmlText,
   parseAge,
 } from '../server/utils/hiringWebFields.ts'
+
+test('the search clear button clears and refreshes all three boards', () => {
+  const pages = [
+    '../app/pages/flat-finder/index.vue',
+    '../app/pages/jobs/index.vue',
+    '../app/pages/hiring/index.vue',
+  ]
+  for (const page of pages) {
+    const source = readFileSync(new URL(page, import.meta.url), 'utf8')
+    assert.match(source, /<u-input\s+v-model="query"[^>]*\bclearable\b[^>]*@clear="clearSearch"/u)
+    assert.match(source, /function\s+clearSearch\s*\([^)]*\)\s*\{[\s\S]*?query\.value\s*=\s*"";[\s\S]*?scheduleLoad\(0\)/u)
+  }
+
+  const input = readFileSync(new URL('../app/components/U/Input.vue', import.meta.url), 'utf8')
+  assert.match(input, /@mousedown\.stop\.prevent/u)
+  assert.match(input, /@click\.stop\.prevent="clear"/u)
+})
 
 test('Uzbek structured CV fields keep labels out of the candidate name', () => {
   const text = [

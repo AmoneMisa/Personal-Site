@@ -7,6 +7,7 @@ import { cityFrom, cityRe, htmlText } from './hiringWebFields'
 import { withHiringStoreLock } from './hiringStoreLock'
 import { extractCandidateAge, extractCandidateName } from './hiringCandidateFields'
 import { ishBorProfileHtml } from './hiringIshBorFields'
+import { emptyWebCursor, loadWebCursors, saveWebCursor, type WebCursor } from './hiringCursors'
 
 const UA =
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ' +
@@ -346,30 +347,83 @@ function profileFrom(summary: Summary, detailHtml: string): CvProfile | null {
   })
 }
 
-async function fetchProfiles(): Promise<{ profiles: CvProfile[]; fetched: number }> {
-  const all = new Map<string, Summary>()
-  const maxPages = Math.max(1, Math.min(10, Number(process.env.HIRING_ISHBOR_MAX_PAGES) || MAX_PAGES))
-  for (let page = 1; page <= maxPages; page++) {
+async function fetchProfiles(cursor = emptyWebCursor('ishbor-uz')): Promise<{
+  profiles: CvProfile[]
+  fetched: number
+  cursor: WebCursor
+}> {
+  const all = new Map<string, Summary & { page: number }>()
+  const backfillPages = Math.max(1, Math.min(
+    10,
+    Number(process.env.HIRING_ISHBOR_BACKFILL_PAGES)
+      || Math.max(1, (Number(process.env.HIRING_ISHBOR_MAX_PAGES) || MAX_PAGES) - 1),
+  ))
+  const backfillStart = Math.max(2, cursor.backfillPage || 1)
+  const pages = cursor.bootstrapComplete
+    ? [1]
+    : [1, ...Array.from({ length: backfillPages }, (_, index) => backfillStart + index)]
+  let bootstrapComplete = cursor.bootstrapComplete
+  let lastHistoricalPage = backfillStart - 1
+
+  for (const page of pages) {
     const url = page === 1
       ? 'https://ish-bor.uz/ru/ishchilar'
       : `https://ish-bor.uz/ru/ishchilar?page=${page}`
     const summaries = listSummaries(await fetchHtml(url))
-    if (!summaries.length) break
-    summaries.forEach((item) => all.set(item.url, item))
+    if (page > 1) lastHistoricalPage = page
+    if (!summaries.length) {
+      if (page > 1) bootstrapComplete = true
+      break
+    }
+    summaries.forEach((item) => all.set(item.url, { ...item, page }))
   }
 
   const summaries = [...all.values()]
   const profiles: CvProfile[] = []
+  const recentByPage = new Map<number, number>()
+  const failuresByPage = new Map<number, number>()
   for (let offset = 0; offset < summaries.length; offset += DETAIL_BATCH) {
     const batch = summaries.slice(offset, offset + DETAIL_BATCH)
     const results = await Promise.allSettled(
-      batch.map(async (summary) => profileFrom(summary, await fetchHtml(summary.url))),
+      batch.map(async (summary) => ({ page: summary.page, profile: profileFrom(summary, await fetchHtml(summary.url)) })),
     )
-    results.forEach((result) => {
-      if (result.status === 'fulfilled' && result.value) profiles.push(result.value)
+    results.forEach((result, index) => {
+      if (result.status === 'fulfilled' && result.value.profile) {
+        profiles.push(result.value.profile)
+        recentByPage.set(result.value.page, (recentByPage.get(result.value.page) || 0) + 1)
+      } else if (result.status === 'rejected') {
+        const page = batch[index]!.page
+        failuresByPage.set(page, (failuresByPage.get(page) || 0) + 1)
+      }
     })
   }
-  return { profiles, fetched: summaries.length }
+
+  if (!bootstrapComplete) {
+    for (const page of pages.filter((value) => value > 1)) {
+      if (!recentByPage.get(page) && !failuresByPage.get(page)) {
+        bootstrapComplete = true
+        break
+      }
+    }
+  }
+
+  const newest = summaries.find((summary) => summary.page === 1)
+  const nextBackfillPage = bootstrapComplete
+    ? Math.max(2, cursor.backfillPage || 1)
+    : Math.max(backfillStart + 1, lastHistoricalPage)
+  return {
+    profiles,
+    fetched: summaries.length,
+    cursor: {
+      ...cursor,
+      sourceKey: 'ishbor-uz',
+      lastSeenProfileId: newest?.url.match(/\/id\/(\d+)/)?.[1] || cursor.lastSeenProfileId,
+      lastSeenUrl: newest?.url || cursor.lastSeenUrl,
+      backfillPage: nextBackfillPage,
+      bootstrapComplete,
+      lastSuccessAt: new Date().toISOString(),
+    },
+  }
 }
 
 async function persist(profiles: CvProfile[], diagnostic: SourceRun): Promise<number> {
@@ -405,7 +459,8 @@ async function persist(profiles: CvProfile[], diagnostic: SourceRun): Promise<nu
 
 /** One crawl of the ish-bor board, without storing anything. For diagnostics. */
 export async function crawlIshBorSource() {
-  return fetchProfiles()
+  const cursor = (await loadWebCursors()).get('ishbor-uz') || emptyWebCursor('ishbor-uz')
+  return fetchProfiles(cursor)
 }
 
 export function hiringIshBorSourceHandles(): string[] {
@@ -418,7 +473,8 @@ export async function refreshHiringIshBorSource(
   if (!hiringIshBorSourceHandles().some((item) => item.toLowerCase() === handle.toLowerCase())) return null
   const checkedAt = new Date().toISOString()
   try {
-    const result = await fetchProfiles()
+    const cursor = (await loadWebCursors()).get('ishbor-uz') || emptyWebCursor('ishbor-uz')
+    const result = await fetchProfiles(cursor)
     const diagnostic: SourceRun = {
       handle: 'web:ishbor-uz',
       country: 'UZ',
@@ -428,6 +484,7 @@ export async function refreshHiringIshBorSource(
       checkedAt,
     }
     const stored = await persist(result.profiles, diagnostic)
+    await saveWebCursor(result.cursor)
     console.log(`[hiring:web] ishbor-uz fetched=${result.fetched} candidates=${result.profiles.length} store=${stored}`)
     return { fetched: result.fetched, candidates: result.profiles.length, stored }
   } catch (error) {

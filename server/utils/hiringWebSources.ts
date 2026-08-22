@@ -611,15 +611,19 @@ async function fetchSource(source: WebCvSource, cursor: WebCursor): Promise<WebS
     reachedCursor: false,
   }
 
-  const maxPages = Math.max(1, Number(process.env.HIRING_WEB_CV_MAX_PAGES) || MAX_PAGES)
+  const maxPages = Math.max(1, Math.min(20, Number(process.env.HIRING_WEB_CV_MAX_PAGES) || MAX_PAGES))
+  const backfillPages = Math.max(1, Math.min(10, Number(process.env.HIRING_WEB_CV_BACKFILL_PAGES) || MAX_PAGES - 1))
   let newestSeen: CvProfile | null = null
   let reachedKnown = false
 
-  for (let page = 1; page <= maxPages && !reachedKnown; page++) {
+  const readPage = async (
+    page: number,
+    options: { stopAtCursor: boolean; trackNewest: boolean },
+  ): Promise<{ blocks: number; recent: number }> => {
     const html = await fetchPage(source.pageUrl(page))
     run.pages += 1
     const blocks = blockAnchors(html, source)
-    if (!blocks.length) break
+    if (!blocks.length) return { blocks: 0, recent: 0 }
     run.fetched += blocks.length
 
     let recentOnPage = 0
@@ -637,7 +641,7 @@ async function fetchSource(source: WebCvSource, cursor: WebCursor): Promise<WebS
         if (!run.newestActivityAt || activity > run.newestActivityAt) run.newestActivityAt = activity
         if (!run.oldestActivityAt || activity < run.oldestActivityAt) run.oldestActivityAt = activity
       }
-      if (!newestSeen) newestSeen = profile
+      if (options.trackNewest && !newestSeen) newestSeen = profile
 
       // Reaching the profile that was newest last round means everything below
       // it has already been read. Identity alone decides that: most boards
@@ -648,7 +652,7 @@ async function fetchSource(source: WebCvSource, cursor: WebCursor): Promise<WebS
       // If that profile has since disappeared from the listing, no stop fires
       // and the round falls back to the bounded page walk.
       const identity = webProfileId(profile.url)
-      if (cursor.lastSeenProfileId && identity === cursor.lastSeenProfileId) {
+      if (options.stopAtCursor && cursor.lastSeenProfileId && identity === cursor.lastSeenProfileId) {
         reachedKnown = true
         run.reachedCursor = true
         break
@@ -659,17 +663,58 @@ async function fetchSource(source: WebCvSource, cursor: WebCursor): Promise<WebS
       byUrl.set(profile.url, previous ? mergeSameCandidate(previous, profile) : profile)
     }
 
-    // Listings are sorted newest-first. Once a page has candidate links but no
-    // profiles inside the three-month activity window, deeper pages are older.
-    if (!recentOnPage) break
+    return { blocks: blocks.length, recent: recentOnPage }
+  }
+
+  // The newest-first pass is only for changes since the previous successful
+  // run. On a brand-new source page 1 establishes the cursor; the separate
+  // historical walk below is what progressively fills the retention window.
+  const incrementalPages = cursor.lastSeenProfileId ? maxPages : 1
+  for (let page = 1; page <= incrementalPages && !reachedKnown; page++) {
+    const result = await readPage(page, { stopAtCursor: true, trackNewest: true })
+    if (!result.blocks || !result.recent) break
+  }
+
+  let nextBackfillPage = Math.max(2, cursor.backfillPage || 1)
+  let bootstrapComplete = cursor.bootstrapComplete
+  if (!bootstrapComplete) {
+    const startPage = nextBackfillPage
+    let lastPage = startPage - 1
+    for (let page = startPage; page < startPage + backfillPages; page++) {
+      lastPage = page
+      const result = await readPage(page, { stopAtCursor: false, trackNewest: false })
+      // Listings are newest-first. An empty page, or a page with links but no
+      // profiles inside the three-month window, means every deeper page is too
+      // old as well.
+      if (!result.blocks || !result.recent) {
+        bootstrapComplete = true
+        break
+      }
+    }
+    if (!bootstrapComplete) {
+      // Re-read the last page next cycle. New cards inserted at the front can
+      // shift page boundaries; a one-page overlap prevents gaps.
+      nextBackfillPage = Math.max(startPage + 1, lastPage)
+    }
   }
 
   if (newestSeen) {
     run.cursor = {
+      ...cursor,
       sourceKey: source.key,
       lastSeenProfileId: webProfileId(newestSeen.url),
       lastSeenUrl: newestSeen.url,
       lastSeenUpdatedAt: newestSeen.activityAt || newestSeen.updatedAt || null,
+      backfillPage: nextBackfillPage,
+      bootstrapComplete,
+      lastSuccessAt: new Date().toISOString(),
+    }
+  } else {
+    run.cursor = {
+      ...cursor,
+      sourceKey: source.key,
+      backfillPage: nextBackfillPage,
+      bootstrapComplete,
       lastSuccessAt: new Date().toISOString(),
     }
   }
