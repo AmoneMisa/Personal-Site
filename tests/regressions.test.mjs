@@ -51,6 +51,12 @@ test('Uzbek education levels are localized without losing their subject details'
   assert.equal(hiringEducationLabel("O'rta", 'en'), 'Secondary education')
 })
 
+test('Uzbek academic tutor roles join the broad teacher profession', () => {
+  assert.deepEqual(normalizeProfessions('Tyutorlik', ''), ['Teacher'])
+  assert.deepEqual(normalizeProfessions('Тьютор', ''), ['Teacher'])
+  assert.deepEqual(normalizeProfessions('Репетитор', ''), ['Tutor'])
+})
+
 test('Uzbek structured CV fields keep labels out of the candidate name', () => {
   const text = [
     'Ism-familya: Mavlonova Shahlo Otanazar qizi',

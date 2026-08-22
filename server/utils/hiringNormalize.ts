@@ -117,7 +117,7 @@ const PROFESSION_RULES: ProfessionRule[] = [
   { name: 'Tutor', re: /\btutor\b|репетитор|rep(?:e|i)titor(?:lik)?/iu },
   { name: 'Kindergarten Teacher', re: /\bkindergarten\s+teacher\b|воспитател|виховател|tarbiyachi|(?:xususiy\s+)?bog['’ʻʼ‘`]?cha/iu },
   { name: 'Nanny', re: /\bnanny\b|няня|нянечк|enaga|bola\s+qarash/iu },
-  { name: 'Teacher', re: /\bteacher\b|учитель|вчитель|преподавател|викладач|o['’ʻʼ‘`]?qituvchi(?:lik)?/iu },
+  { name: 'Teacher', re: /\bteacher\b|учитель|вчитель|преподавател|викладач|тьютор|tyutor(?:lik)?|o['’ʻʼ‘`]?qituvchi(?:lik)?/iu },
   { name: 'Psychologist', re: /\bpsychologist\b|психолог|psixolog/iu },
   { name: 'Speech Therapist', re: /\bspeech\s+therapist\b|логопед|logoped/iu },
 
