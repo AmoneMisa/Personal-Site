@@ -727,7 +727,7 @@ test('web CV mirrors with reordered role text collapse to one candidate', () => 
   assert.equal(candidates.length, 1)
 })
 
-test('a candidate who accepts any work is classified as a general laborer', () => {
+test('a candidate who accepts any work keeps an explicit any-role preference', () => {
   for (const role of ["Farqi yo'q.", 'Нет разницы', 'Не важно']) {
     const profile = normalizeCandidate({
       id: `flexible-${role}`,
@@ -743,8 +743,8 @@ test('a candidate who accepts any work is classified as a general laborer', () =
       originalText: `${role}\nCandidate, 30 лет, Ташкент`,
       description: `${role}\nCandidate, 30 лет, Ташкент`,
     })
-    assert.equal(profile.role, 'General Laborer')
-    assert.deepEqual(profile.professions, ['General Laborer'])
+    assert.equal(profile.role, 'Any Role')
+    assert.deepEqual(profile.professions, ['Any Role'])
   }
 })
 
