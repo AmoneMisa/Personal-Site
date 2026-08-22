@@ -81,6 +81,8 @@ interface FeedResult {
   warming?: boolean;
   sourceCounts?: Record<string, number>;
   sourceErrors?: Array<{ source?: string; country?: string; error?: string }>;
+  nextCursor?: string | null;
+  queryMs?: number;
   error?: string;
 }
 interface TranslationResult {
@@ -177,6 +179,7 @@ const loadingMore = ref(false);
 const warming = ref(false);
 const failed = ref(false);
 const sourceErrors = ref<FeedResult["sourceErrors"]>([]);
+const nextCursor = ref<string | null>(null);
 const failedPhotoUrls = ref<Set<string>>(new Set());
 const view = ref<FlatView>("active");
 const favorites = ref<Listing[]>([]);
@@ -546,7 +549,10 @@ function scheduleWarmPoll() {
 async function load(append = false, background = false) {
   const seq = background ? loadSeq : ++loadSeq;
   if (!background) { append ? loadingMore.value = true : loading.value = true; failed.value = false; }
-  const params: Record<string, string> = { limit: String(PAGE_SIZE), offset: String(append ? listings.value.length : 0) };
+  const params: Record<string, string> = { limit: String(PAGE_SIZE) };
+  const cursorSort = sort.value === "newest" || sort.value === "oldest";
+  if (append && cursorSort && nextCursor.value) params.cursor = nextCursor.value;
+  else params.offset = String(append ? listings.value.length : 0);
   if (countries.value.length) params.countries = countries.value.join(",");
   if (city.value) params.city = city.value;
   if (district.value) params.district = district.value;
@@ -594,10 +600,11 @@ async function load(append = false, background = false) {
   const { data, error } = await safeFetch<FeedResult>("/flats-feed", { params });
   if (seq !== loadSeq) { if (!background) { loading.value = false; loadingMore.value = false; } return; }
   if (error || !data || data.error) {
-    if (!background) { failed.value = true; if (!append) { listings.value = []; total.value = 0; } sourceErrors.value = []; loading.value = false; loadingMore.value = false; }
+    if (!background) { failed.value = true; if (!append) { listings.value = []; total.value = 0; nextCursor.value = null; } sourceErrors.value = []; loading.value = false; loadingMore.value = false; }
     return;
   }
   if (background) { total.value = data.count ?? total.value; sourceErrors.value = data.sourceErrors || []; warming.value = !!data.warming; scheduleWarmPoll(); return; }
+  nextCursor.value = data.nextCursor || null;
   const next = Array.isArray(data.listings) ? data.listings : [];
   if (append) {
     const existingKeys = new Set(listings.value.map((item) => `${item.source}:${item.country}:${item.id}`));
