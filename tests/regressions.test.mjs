@@ -211,6 +211,27 @@ test('remaining IshBor titles normalize without leaking categories into skills',
   assert.deepEqual(normalized.skills, [])
 })
 
+test('source-specific role spellings and specialist roles use the shared taxonomy', () => {
+  assert.deepEqual(normalizeProfessions('Matbuot', ''), ['Media Specialist'])
+  assert.deepEqual(normalizeProfessions('Injiner', ''), ['Engineer'])
+  assert.deepEqual(normalizeProfessions('Chat operatori', ''), ['Operator'])
+  assert.deepEqual(normalizeProfessions('Консультант (без разницы)', ''), ['Consultant'])
+  assert.deepEqual(normalizeProfessions('Начальник отряд', ''), ['Supervisor'])
+  assert.deepEqual(normalizeProfessions('Инспектор по качеству (пищевое производство)', ''), ['Quality Inspector'])
+  assert.equal(hiringProfessionLabel('Network Administrator', 'ru'), 'Сетевой администратор')
+  assert.equal(hiringProfessionLabel('System Administrator', 'ru'), 'Системный администратор')
+  assert.equal(hiringProfessionLabel('Penetration Tester', 'ru'), 'Специалист по тестированию на проникновение')
+})
+
+test('candidate detail table explicitly marks missing values for its hide toggle', () => {
+  const component = readFileSync(new URL('../app/components/ui/SpecTable.vue', import.meta.url), 'utf8')
+  const hiringPage = readFileSync(new URL('../app/pages/hiring/index.vue', import.meta.url), 'utf8')
+  assert.match(component, /empty\?: boolean/u)
+  assert.match(component, /!row\.empty/u)
+  assert.match(hiringPage, /empty: profile\.remote == null/u)
+  assert.match(hiringPage, /empty: !profile\.languages\?\.length/u)
+})
+
 test('Careerist removes listing controls and rejects remote format as a profession', () => {
   const text = [
     '21 августа, 2026',
