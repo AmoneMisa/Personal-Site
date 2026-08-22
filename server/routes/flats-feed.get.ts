@@ -20,6 +20,7 @@ const UPSTREAM_TIMEOUT_MS = 25_000
 // below the main proxy budget so a broken OLX detail endpoint cannot hold the
 // share-link request open for the full feed timeout.
 const EXACT_LOOKUP_TIMEOUT_MS = 12_000
+const AVAILABILITY_TIMEOUT_MS = 30_000
 const feedCache = new Map<string, { at: number; data: any }>()
 const feedRefreshes = new Map<string, Promise<any>>()
 
@@ -98,6 +99,38 @@ function findCachedExactListing(listingId: string, source: string, country: stri
     if (exact) return exact
   }
   return null
+}
+
+function queueAvailabilityVerification(response: any): any {
+  const seen = new Set<string>()
+  const items = (Array.isArray(response?.listings) ? response.listings : [])
+    .filter((listing: any) => String(listing?.source || '').toLowerCase() === 'olx')
+    .map((listing: any) => ({
+      source: 'olx',
+      country: String(listing?.country || '').toUpperCase(),
+      id: String(listing?.id ?? ''),
+    }))
+    .filter((item: { source: string; country: string; id: string }) => {
+      if (!/^[A-Z]{2}$/.test(item.country) || !item.id) return false
+      const key = `${item.source}:${item.country}:${item.id}`
+      if (seen.has(key)) return false
+      seen.add(key)
+      return true
+    })
+    .slice(0, 20)
+
+  if (items.length) {
+    // Do not block page rendering on OLX. The flat-finder backend caches each
+    // result in PostgreSQL and deactivates only confidently unavailable rows;
+    // 403/429/timeouts remain active and are retried later.
+    void $fetch(`${FLAT_API_URL}/api/listings/verify`, {
+      method: 'POST',
+      body: { items },
+      timeout: AVAILABILITY_TIMEOUT_MS,
+    }).catch(() => {})
+  }
+
+  return response
 }
 
 export default defineEventHandler(async (event) => {
@@ -184,29 +217,33 @@ export default defineEventHandler(async (event) => {
   const cached = feedCache.get(key)
   if (cached && Date.now() - cached.at < FEED_FRESH_MS) {
     setResponseHeader(event, 'Cache-Control', 'no-store')
-    return await withExactListingFallback(await shapeWithCombinedFallback(cached.data))
+    const response = await withExactListingFallback(await shapeWithCombinedFallback(cached.data))
+    return queueAvailabilityVerification(response)
   }
   if (cached && Date.now() - cached.at < staleWindow(cached)) {
     refreshFeed(key, url).catch(() => {})
     setResponseHeader(event, 'Cache-Control', 'no-store')
-    return {
+    const response = {
       ...await withExactListingFallback(await shapeWithCombinedFallback(cached.data)),
       stale: true,
     }
+    return queueAvailabilityVerification(response)
   }
   try {
     const data = await refreshFeed(key, url)
     setResponseHeader(event, 'Cache-Control', 'no-store')
-    return await withExactListingFallback(await shapeWithCombinedFallback(data))
+    const response = await withExactListingFallback(await shapeWithCombinedFallback(data))
+    return queueAvailabilityVerification(response)
   } catch (err) {
     // A stale answer, however old, beats reporting a failure — but only if it
     // actually has something in it.
     if (cached && Array.isArray(cached.data?.listings) && cached.data.listings.length) {
       setResponseHeader(event, 'Cache-Control', 'no-store')
-      return {
+      const response = {
         ...await withExactListingFallback(await shapeWithCombinedFallback(cached.data)),
         stale: true,
       }
+      return queueAvailabilityVerification(response)
     }
     setResponseStatus(event, 502)
     return { error: (err as Error).message, listings: [], count: 0, upstreamFailed: true }
