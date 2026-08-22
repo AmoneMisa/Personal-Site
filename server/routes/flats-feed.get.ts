@@ -94,7 +94,9 @@ function dedupeTelegramListings(listings: any[]): any[] {
 
 function shapeResponse(raw: any, requestedSources: string[]): any {
   const data = { ...raw }
-  const allowed = requestedSources.length ? requestedSources : ['olx', 'telegram']
+  const allowed = requestedSources.length
+    ? requestedSources
+    : ['olx', 'telegram', 'facebook', 'threads']
   const shaped = Array.isArray(raw?.listings)
     ? raw.listings
         .filter((listing: any) => allowed.includes(String(listing?.source || '').toLowerCase()))
@@ -193,7 +195,7 @@ export default defineEventHandler(async (event) => {
   const requestedSources = (incoming.searchParams.get('sources') || '')
     .split(',')
     .map((source) => source.trim().toLowerCase())
-    .filter((source) => source === 'olx' || source === 'telegram')
+    .filter((source) => ['olx', 'telegram', 'facebook', 'threads'].includes(source))
 
   const upstreamParams = new URLSearchParams(incoming.searchParams)
   const metro = upstreamParams.get('metro')
