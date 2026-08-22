@@ -38,14 +38,69 @@ function shapeListing(listing: any): any {
   }
 }
 
+function normalizeTelegramDedupeText(value: unknown): string {
+  return String(value || '')
+    .toLowerCase()
+    .replace(/https?:\/\/\S+/giu, ' ')
+    .replace(/(?:^|\s)@[\p{L}\p{N}_]{3,}/gu, ' ')
+    .replace(/[\p{P}\p{S}]+/gu, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+function telegramDedupeKey(listing: any): string | null {
+  if (String(listing?.source || '').toLowerCase() !== 'telegram') return null
+
+  const text = normalizeTelegramDedupeText(
+    `${listing?.title || ''}\n${listing?.description || listing?.text || listing?.originalText || ''}`,
+  )
+  // Short cards are too ambiguous to fingerprint safely. Keep their Telegram
+  // message IDs independent instead of risking two real apartments collapsing.
+  if (text.length < 80) return null
+
+  const areaSqm = Number(listing?.areaSqm)
+  const normalizedArea = Number.isFinite(areaSqm) ? Math.round(areaSqm * 2) / 2 : ''
+
+  return [
+    String(listing?.country || '').toUpperCase(),
+    String(listing?.city || '').toLowerCase(),
+    String(listing?.dealType || ''),
+    String(listing?.propertyType || ''),
+    String(listing?.price ?? ''),
+    String(listing?.currency || '').toUpperCase(),
+    String(listing?.rooms ?? ''),
+    String(normalizedArea),
+    text,
+  ].join('|')
+}
+
+function dedupeTelegramListings(listings: any[]): any[] {
+  const seen = new Set<string>()
+  const out: any[] = []
+
+  for (const listing of listings) {
+    const key = telegramDedupeKey(listing)
+    if (!key) {
+      out.push(listing)
+      continue
+    }
+    if (seen.has(key)) continue
+    seen.add(key)
+    out.push(listing)
+  }
+
+  return out
+}
+
 function shapeResponse(raw: any, requestedSources: string[]): any {
   const data = { ...raw }
   const allowed = requestedSources.length ? requestedSources : ['olx', 'telegram']
-  data.listings = Array.isArray(raw?.listings)
+  const shaped = Array.isArray(raw?.listings)
     ? raw.listings
         .filter((listing: any) => allowed.includes(String(listing?.source || '').toLowerCase()))
         .map(shapeListing)
     : []
+  data.listings = dedupeTelegramListings(shaped)
   const backendSources = Array.isArray(raw?.filters?.sources) ? raw.filters.sources : []
   data.count = requestedSources.length && backendSources.length === 0
     ? data.listings.length
