@@ -6,11 +6,7 @@ import { hiringIshBorSourceHandles } from '~~/server/utils/hiringIshBorSource'
 import { hiringSecondaryWebSourceHandles } from '~~/server/utils/hiringSecondaryWebSources'
 import { hiringUzJobsSourceHandles } from '~~/server/utils/hiringUzJobsSource'
 import { loadCursors, loadWebCursors } from '~~/server/utils/hiringCursors'
-import {
-  dispatchDueJobsQueue,
-  jobsQueueDbEnabled,
-  pruneJobsQueueHistory,
-} from '~~/server/utils/jobsPgQueue'
+import { dispatchDueJobsQueue, jobsQueueDbEnabled } from '~~/server/utils/jobsPgQueue'
 
 function authorize(event: any) {
   const expected = String(process.env.QUEUE_INTERNAL_KEY || '')
@@ -60,11 +56,6 @@ export default defineEventHandler(async (event) => {
     hiringRefreshSeconds: Math.max(60, Number(process.env.HIRING_QUEUE_REFRESH_SECONDS) || 1800),
     backfillSeconds: Math.max(60, Number(process.env.HIRING_QUEUE_BACKFILL_SECONDS) || 300),
     hiringEnabled: String(process.env.HIRING_QUEUE_ENABLED || 'on').toLowerCase() !== 'off',
-  })
-
-  // Cheap opportunistic cleanup; failures must not suppress dispatch.
-  void pruneJobsQueueHistory().catch((error) => {
-    console.warn('[jobs:pg-queue] history prune failed:', (error as Error).message)
   })
 
   return { ok: true, ...result }
