@@ -95,18 +95,26 @@ async function fetchProfiles(cursor: WebCursor): Promise<{
     MAX_BACKFILL_PAGES,
     Number(process.env.HIRING_UZJOBS_BACKFILL_PAGES) || DEFAULT_BACKFILL_PAGES,
   ))
-  const backfillStart = Math.max(2, cursor.backfillPage || 2)
-  const historicalPages = cursor.bootstrapComplete || backfillStart > MAX_INDEX_PAGE
+  const savedBackfillPage = Math.max(2, cursor.backfillPage || 2)
+  // The first implementation marked bootstrapComplete as soon as one page had
+  // zero recent visits. Existing production cursors can therefore say "done"
+  // after only a few hundred rows. Only the new sentinel (> MAX_INDEX_PAGE)
+  // proves this implementation actually reached the directory end/hard cap.
+  const legacyPrematureComplete = cursor.bootstrapComplete && savedBackfillPage <= MAX_INDEX_PAGE
+  const backfillStart = savedBackfillPage
+  let bootstrapComplete = cursor.bootstrapComplete && !legacyPrematureComplete
+  if (backfillStart > MAX_INDEX_PAGE) bootstrapComplete = true
+
+  const historicalPages = bootstrapComplete
     ? []
     : Array.from(
       { length: Math.min(backfillPages, MAX_INDEX_PAGE - backfillStart + 1) },
       (_, index) => backfillStart + index,
     )
-  const pages = cursor.bootstrapComplete ? [1] : [1, ...historicalPages]
+  const pages = bootstrapComplete ? [1] : [1, ...historicalPages]
   const byId = new Map<string, CvProfile>()
   let fetched = 0
   let pagesRead = 0
-  let bootstrapComplete = cursor.bootstrapComplete || backfillStart > MAX_INDEX_PAGE
   let lastHistoricalPage = backfillStart - 1
   let reachedDirectoryEnd = false
 
@@ -162,10 +170,11 @@ async function fetchProfiles(cursor: WebCursor): Promise<{
       lastSeenProfileId: newest?.id.replace(`web-${SOURCE_KEY}-`, '') || cursor.lastSeenProfileId,
       lastSeenUrl: newest?.url || cursor.lastSeenUrl,
       lastSeenUpdatedAt: newest?.activityAt || cursor.lastSeenUpdatedAt,
-      // Re-read the last historical page once: the source's newest-first pages
-      // shift when profiles are added between bounded backfill rounds.
+      // Re-read the last historical page once while backfilling because newest-
+      // first pages can shift. Once complete, store a sentinel beyond the hard
+      // cap so legacy premature-complete cursors are distinguishable forever.
       backfillPage: bootstrapComplete
-        ? Math.max(2, cursor.backfillPage || 2)
+        ? MAX_INDEX_PAGE + 1
         : Math.max(2, lastHistoricalPage),
       bootstrapComplete,
       lastSuccessAt: new Date().toISOString(),
