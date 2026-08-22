@@ -486,6 +486,10 @@ function scheduleLoad(delay = 250) {
   loadTimer = setTimeout(() => { loadTimer = undefined; void load(false); }, delay);
   scheduleQuerySync(Math.min(delay, 160));
 }
+function clearSearch() {
+  query.value = "";
+  scheduleLoad(0);
+}
 function selectSource(v: string) {
   if (source.value === v) return;
   source.value = v;
@@ -755,7 +759,7 @@ onBeforeUnmount(() => {
     </div>
 
     <form class="hiring__controls" @submit.prevent="load()">
-      <u-input v-model="query" clearable icon="i-lucide-search" :label="t('search')" :placeholder="t('searchPlaceholder')" />
+      <u-input v-model="query" clearable icon="i-lucide-search" :label="t('search')" :placeholder="t('searchPlaceholder')" @clear="clearSearch" />
       <u-button type="submit" :loading="loading" icon="i-lucide-search">
         {{ loading ? t("searching") : t("search") }}
       </u-button>

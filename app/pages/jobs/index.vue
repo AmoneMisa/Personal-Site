@@ -429,6 +429,12 @@ function scheduleLoad(delay = 250) {
   }, delay);
 }
 
+function clearSearch() {
+  query.value = "";
+  persistState();
+  scheduleLoad(0);
+}
+
 function selectSource(value: string) {
   if (source.value === value) return;
   savedView.value = "active";
@@ -949,7 +955,7 @@ onBeforeUnmount(() => {
 
     <!-- Filters + sort -->
     <form class="jobs__controls" @submit.prevent="load(1)">
-      <u-input v-model="query" clearable icon="i-lucide-search" :label="t('search')" :placeholder="t('searchPlaceholder')" />
+      <u-input v-model="query" clearable icon="i-lucide-search" :label="t('search')" :placeholder="t('searchPlaceholder')" @clear="clearSearch" />
       <u-input v-model.number="salaryMin" type="number" icon="i-lucide-banknote" :label="`${t('salaryMin')} (${displayCurrency}/${periodLabel(displayPeriod)})`" />
       <div class="jobs__sort">
         <u-icon name="i-lucide-arrow-down-wide-narrow" />

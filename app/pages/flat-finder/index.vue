@@ -537,6 +537,7 @@ async function load(append = false, background = false) {
 // swallow a burst of clicks, short enough not to feel unresponsive.
 const FILTER_DEBOUNCE_MS = 350;
 function scheduleLoad(delay = FILTER_DEBOUNCE_MS) { if (loadTimer) clearTimeout(loadTimer); loadTimer = setTimeout(() => { loadTimer = undefined; void load(false); }, delay); }
+function clearSearch() { query.value = ""; scheduleLoad(0); }
 function selectSource(v: string) { if (source.value === v) return; source.value = v; scheduleLoad(); }
 function resetFilters() {
   // Ukraine rather than an empty list: empty means "every country", which is not
@@ -788,7 +789,7 @@ onBeforeUnmount(() => { modalOpen.value = false; lightboxIndex.value = null; rel
 
     <form ref="filtersEl" class="flats__controls flats__controls_redesign" @submit.prevent="load()">
       <div class="flats__searchbar">
-        <u-input v-model="query" clearable icon="i-lucide-search" :label="t('search')" :placeholder="t('searchPlaceholder')" />
+        <u-input v-model="query" clearable icon="i-lucide-search" :label="t('search')" :placeholder="t('searchPlaceholder')" @clear="clearSearch" />
         <u-button type="submit" :loading="loading" icon="i-lucide-search">{{ loading ? t("searching") : t("search") }}</u-button>
       </div>
 

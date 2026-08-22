@@ -114,7 +114,8 @@ const floated = computed(() => floating.value && (focused.value || hasValue.valu
         type="button"
         class="u-input__clear"
         :aria-label="clearLabel || 'Clear'"
-        @click="clear"
+        @mousedown.stop.prevent
+        @click.stop.prevent="clear"
     >
       <UIcon name="i-lucide-x" />
     </button>

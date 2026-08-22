@@ -55,11 +55,23 @@ export interface WebCursor {
   lastSeenProfileId: string
   lastSeenUrl: string
   lastSeenUpdatedAt: string | null
+  /** First historical listing page the next bounded backfill should read. */
+  backfillPage: number
+  /** True after the historical walk reaches the end of the retention window. */
+  bootstrapComplete: boolean
   lastSuccessAt: string | null
 }
 
 export function emptyWebCursor(sourceKey: string): WebCursor {
-  return { sourceKey, lastSeenProfileId: '', lastSeenUrl: '', lastSeenUpdatedAt: null, lastSuccessAt: null }
+  return {
+    sourceKey,
+    lastSeenProfileId: '',
+    lastSeenUrl: '',
+    lastSeenUpdatedAt: null,
+    backfillPage: 1,
+    bootstrapComplete: false,
+    lastSuccessAt: null,
+  }
 }
 
 // Local development runs without a database; cursors then live for the process
@@ -114,10 +126,14 @@ function ensureSchema(): Promise<void> {
         last_seen_profile_id TEXT NOT NULL DEFAULT '',
         last_seen_url TEXT NOT NULL DEFAULT '',
         last_seen_updated_at TIMESTAMPTZ,
+        backfill_page INTEGER NOT NULL DEFAULT 1,
+        bootstrap_complete BOOLEAN NOT NULL DEFAULT FALSE,
         last_success_at TIMESTAMPTZ,
         updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
       );
     `)
+    await db().query(`ALTER TABLE ${name}.web_cursors ADD COLUMN IF NOT EXISTS backfill_page INTEGER NOT NULL DEFAULT 1;`)
+    await db().query(`ALTER TABLE ${name}.web_cursors ADD COLUMN IF NOT EXISTS bootstrap_complete BOOLEAN NOT NULL DEFAULT FALSE;`)
     console.log(`[hiring:cursors] schema ${name} ready`)
   })().catch((error) => {
     ready = undefined
@@ -216,6 +232,8 @@ export async function loadWebCursors(): Promise<Map<string, WebCursor>> {
         lastSeenProfileId: String(row.last_seen_profile_id || ''),
         lastSeenUrl: String(row.last_seen_url || ''),
         lastSeenUpdatedAt: row.last_seen_updated_at ? new Date(row.last_seen_updated_at).toISOString() : null,
+        backfillPage: Math.max(1, Number(row.backfill_page) || 1),
+        bootstrapComplete: row.bootstrap_complete === true,
         lastSuccessAt: row.last_success_at ? new Date(row.last_success_at).toISOString() : null,
       })
     }
@@ -233,12 +251,15 @@ export async function saveWebCursor(next: WebCursor): Promise<void> {
     await ensureSchema()
     await db().query(
       `INSERT INTO ${schema()}.web_cursors (
-         source_key, last_seen_profile_id, last_seen_url, last_seen_updated_at, last_success_at, updated_at
-       ) VALUES ($1, $2, $3, $4::timestamptz, $5::timestamptz, NOW())
+         source_key, last_seen_profile_id, last_seen_url, last_seen_updated_at,
+         backfill_page, bootstrap_complete, last_success_at, updated_at
+       ) VALUES ($1, $2, $3, $4::timestamptz, $5, $6, $7::timestamptz, NOW())
        ON CONFLICT (source_key) DO UPDATE SET
          last_seen_profile_id = EXCLUDED.last_seen_profile_id,
          last_seen_url = EXCLUDED.last_seen_url,
          last_seen_updated_at = EXCLUDED.last_seen_updated_at,
+         backfill_page = GREATEST(${schema()}.web_cursors.backfill_page, EXCLUDED.backfill_page),
+         bootstrap_complete = ${schema()}.web_cursors.bootstrap_complete OR EXCLUDED.bootstrap_complete,
          last_success_at = COALESCE(EXCLUDED.last_success_at, ${schema()}.web_cursors.last_success_at),
          updated_at = NOW();`,
       [
@@ -246,6 +267,8 @@ export async function saveWebCursor(next: WebCursor): Promise<void> {
         next.lastSeenProfileId,
         next.lastSeenUrl,
         next.lastSeenUpdatedAt,
+        Math.max(1, next.backfillPage || 1),
+        next.bootstrapComplete === true,
         next.lastSuccessAt || new Date().toISOString(),
       ],
     )

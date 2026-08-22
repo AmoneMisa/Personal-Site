@@ -1,5 +1,7 @@
 import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
 import test from 'node:test'
+import { hiringEducationLabel } from '../shared/hiringEducationLabels.ts'
 
 import {
   extractCandidateAge,
@@ -23,6 +25,37 @@ import {
   htmlText,
   parseAge,
 } from '../server/utils/hiringWebFields.ts'
+
+test('the search clear button clears and refreshes all three boards', () => {
+  const pages = [
+    '../app/pages/flat-finder/index.vue',
+    '../app/pages/jobs/index.vue',
+    '../app/pages/hiring/index.vue',
+  ]
+  for (const page of pages) {
+    const source = readFileSync(new URL(page, import.meta.url), 'utf8')
+    assert.match(source, /<u-input\s+v-model="query"[^>]*\bclearable\b[^>]*@clear="clearSearch"/u)
+    assert.match(source, /function\s+clearSearch\s*\([^)]*\)\s*\{[\s\S]*?query\.value\s*=\s*"";[\s\S]*?scheduleLoad\(0\)/u)
+  }
+
+  const input = readFileSync(new URL('../app/components/U/Input.vue', import.meta.url), 'utf8')
+  assert.match(input, /@mousedown\.stop\.prevent/u)
+  assert.match(input, /@click\.stop\.prevent="clear"/u)
+})
+
+test('Uzbek education levels are localized without losing their subject details', () => {
+  assert.equal(hiringEducationLabel("O'rta", 'ru'), 'Среднее')
+  assert.equal(hiringEducationLabel('Oliy', 'ru'), 'Высшее')
+  assert.equal(hiringEducationLabel("O'rta maxsus", 'ru'), 'Среднее специальное')
+  assert.equal(hiringEducationLabel("Oliy(Ona tili va adabiyot)", 'ru'), 'Высшее (Ona tili va adabiyot)')
+  assert.equal(hiringEducationLabel("O'rta", 'en'), 'Secondary education')
+})
+
+test('Uzbek academic tutor roles join the broad teacher profession', () => {
+  assert.deepEqual(normalizeProfessions('Tyutorlik', ''), ['Teacher'])
+  assert.deepEqual(normalizeProfessions('Тьютор', ''), ['Teacher'])
+  assert.deepEqual(normalizeProfessions('Репетитор', ''), ['Tutor'])
+})
 
 test('Uzbek structured CV fields keep labels out of the candidate name', () => {
   const text = [
@@ -413,4 +446,44 @@ test('web CV mirrors with reordered role text collapse to one candidate', () => 
     { ...base, id: 'b', role: 'Специалист по маркетингу, рекламе, PR', url: 'https://talent.ua/b' },
   ])
   assert.equal(candidates.length, 1)
+})
+
+test('a candidate who accepts any work is classified as a general laborer', () => {
+  for (const role of ["Farqi yo'q.", 'Нет разницы', 'Не важно']) {
+    const profile = normalizeCandidate({
+      id: `flexible-${role}`,
+      source: 'Flagma UZ',
+      sourceKey: 'flagma-uz',
+      origin: 'web',
+      country: 'UZ',
+      name: 'Candidate',
+      role,
+      professions: [role],
+      url: 'https://example.com/candidate',
+      createdAt: '2026-08-22T10:00:00.000Z',
+      originalText: `${role}\nCandidate, 30 лет, Ташкент`,
+      description: `${role}\nCandidate, 30 лет, Ташкент`,
+    })
+    assert.equal(profile.role, 'General Laborer')
+    assert.deepEqual(profile.professions, ['General Laborer'])
+  }
+})
+
+test('an obvious developer profile without a stated role becomes Software Developer', () => {
+  const profile = repairCandidateProfile(normalizeCandidate({
+    id: 'developer-without-role',
+    source: 'Telegram',
+    sourceKey: 'telegram',
+    origin: 'telegram',
+    country: 'UA',
+    name: '',
+    role: '',
+    skills: ['React'],
+    url: 'https://t.me/example/1',
+    createdAt: '2026-08-22T10:00:00.000Z',
+    originalText: '#react\nШукаю нові можливості. Портфоліо та CV надішлю приватно.',
+    description: '#react\nШукаю нові можливості. Портфоліо та CV надішлю приватно.',
+  }))
+  assert.equal(profile.role, 'Software Developer')
+  assert.deepEqual(profile.professions, ['Software Developer'])
 })
