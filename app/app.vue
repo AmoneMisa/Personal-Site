@@ -94,7 +94,7 @@ useHead({
         ],
         sameAs: [
           "https://github.com/AmoneMisa",
-          "https://www.linkedin.com/in/marharyta-kubai-51520a362",
+          "https://www.linkedin.com/in/whiteslove-marharyta-kubai",
           "https://t.me/WhitesLove"
         ],
         address: {

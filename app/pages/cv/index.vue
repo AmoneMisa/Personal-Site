@@ -18,7 +18,7 @@ const links = {
   github: "https://github.com/AmoneMisa",
   portfolio: "https://amonemisa.github.io/personal/",
   site: SITE_URL,
-  linkedin: "https://www.linkedin.com/in/marharyta-kubai-51520a362",
+  linkedin: "https://www.linkedin.com/in/whiteslove-marharyta-kubai",
   telegram: "https://t.me/WhitesLove",
   email: "kubai.rita5@gmail.com",
   pdfUrl: "/files/Marharyta_Kubai_Frontend_Developer_CV.pdf",

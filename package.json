@@ -11,7 +11,6 @@
     "test": "node --experimental-strip-types --import ./tests/setup.mjs --test tests/*.test.mjs"
   },
   "dependencies": {
-    "@iconify-json/lucide": "^1.2.124",
     "@nuxt/icon": "^2.5.0",
     "@nuxt/image": "^2.1.0",
     "@nuxtjs/i18n": "^10.6.0",
@@ -22,7 +21,7 @@
     "jsonc-parser": "^3.3.1",
     "mammoth": "^1.12.1",
     "mariadb": "^3.5.3",
-    "monaco-editor": "^0.53.0",
+    "monaco-editor": "^0.56.0",
     "nuxt": "^4.5.2",
     "papaparse": "^5.6.0",
     "pdfjs-dist": "^6.2.108",
@@ -35,8 +34,9 @@
     "yaml": "2.9.0"
   },
   "devDependencies": {
+    "@iconify-json/lucide": "^1.2.125",
     "@types/papaparse": "^5.5.2",
     "@types/ws": "^8.18.1",
-    "sass-embedded": "^1.102.0"
+    "sass-embedded": "^1.103.1"
   }
 }

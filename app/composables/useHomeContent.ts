@@ -17,7 +17,7 @@ export interface HeroStat { value: string; label: string }
 export const CONTACTS = {
   telegram: "https://t.me/WhitesLove",
   whatsapp: "https://wa.me/whiteslove",
-  linkedin: "https://www.linkedin.com/in/marharyta-kubai-51520a362",
+  linkedin: "https://www.linkedin.com/in/whiteslove-marharyta-kubai",
   github: "https://github.com/AmoneMisa",
   email: "kubai.rita5@gmail.com",
 };
