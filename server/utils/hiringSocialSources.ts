@@ -15,7 +15,7 @@ type SocialTarget = {
   key: string
   label: string
   platform: SocialPlatform
-  country: 'UZ' | 'KZ' | 'KG' | 'UA'
+  country: 'UZ' | 'KZ' | 'KG' | 'UA' | 'RO'
   city?: string
   target?: string
   query?: string
@@ -49,15 +49,21 @@ const TARGETS: SocialTarget[] = [
   { key: 'facebook-kz-astana-work', label: 'Работа в Астане', platform: 'facebook', country: 'KZ', city: 'Astana', target: 'https://www.facebook.com/groups/astana.rabota.vakansii/', limit: 100 },
   { key: 'facebook-ua-digital-jobs', label: 'Digital Jobs Ukraine', platform: 'facebook', country: 'UA', target: 'https://www.facebook.com/groups/DIGITALJOBSUKR/', limit: 100 },
   { key: 'facebook-ua-freelancers', label: 'Freelancers Ukraine', platform: 'facebook', country: 'UA', target: 'https://www.facebook.com/groups/freelancers.ukraine/', limit: 100 },
+  { key: 'facebook-ro-bucharest-anglojobs', label: 'Bucharest English speaking jobs', platform: 'facebook', country: 'RO', city: 'Bucharest', target: 'https://www.facebook.com/groups/bucharestanglojobs/', limit: 100 },
 
   { key: 'threads-uz-ru', label: 'Threads: ищу работу Ташкент', platform: 'threads', country: 'UZ', city: 'Tashkent', query: 'ищу работу Ташкент', limit: 40 },
   { key: 'threads-uz-uz', label: 'Threads: ish qidiryapman Toshkent', platform: 'threads', country: 'UZ', city: 'Tashkent', query: 'ish qidiryapman Toshkent', limit: 40 },
+  { key: 'threads-uz-uz-short', label: 'Threads: ish kerak Toshkent', platform: 'threads', country: 'UZ', city: 'Tashkent', query: 'ish kerak Toshkent', limit: 40 },
   { key: 'threads-kz-almaty', label: 'Threads: ищу работу Алматы', platform: 'threads', country: 'KZ', city: 'Almaty', query: 'ищу работу Алматы', limit: 40 },
   { key: 'threads-kz-astana', label: 'Threads: ищу работу Астана', platform: 'threads', country: 'KZ', city: 'Astana', query: 'ищу работу Астана', limit: 40 },
+  { key: 'threads-kz-kazakh', label: 'Threads: жұмыс іздеймін Алматы', platform: 'threads', country: 'KZ', city: 'Almaty', query: 'жұмыс іздеймін Алматы', limit: 40 },
   { key: 'threads-kg-bishkek', label: 'Threads: ищу работу Бишкек', platform: 'threads', country: 'KG', city: 'Bishkek', query: 'ищу работу Бишкек', limit: 40 },
   { key: 'threads-kg-cv', label: 'Threads: резюме Бишкек', platform: 'threads', country: 'KG', city: 'Bishkek', query: 'резюме Бишкек', limit: 40 },
+  { key: 'threads-kg-kyrgyz', label: 'Threads: жумуш издейм Бишкек', platform: 'threads', country: 'KG', city: 'Bishkek', query: 'жумуш издейм Бишкек', limit: 40 },
   { key: 'threads-ua-kyiv', label: 'Threads: шукаю роботу Київ', platform: 'threads', country: 'UA', city: 'Kyiv', query: 'шукаю роботу Київ', limit: 40 },
   { key: 'threads-ua-country', label: 'Threads: шукаю роботу Україна', platform: 'threads', country: 'UA', query: 'шукаю роботу Україна', limit: 40 },
+  { key: 'threads-ro-bucharest', label: 'Threads: caut loc de muncă București', platform: 'threads', country: 'RO', city: 'Bucharest', query: 'caut loc de muncă București', limit: 40 },
+  { key: 'threads-ro-job', label: 'Threads: îmi caut job București', platform: 'threads', country: 'RO', city: 'Bucharest', query: 'îmi caut job București', limit: 40 },
 ]
 
 function configuredTargets(): SocialTarget[] {
@@ -107,22 +113,24 @@ function contacts(text: string): DirectContacts {
 
 const INTENT_PREFIX_RE = /(?:^|\n)\s*[^\p{L}\p{N}\n]{0,8}(?:я\s+)?(?:ищу|шукаю)\s+(?:себе\s+)?(?:работу|подработку|роботу|підробіток)\s*[:—-]?\s*/iu
 const UZ_INTENT_PREFIX_RE = /(?:^|\n)\s*[^\p{L}\p{N}\n]{0,8}(?:menga\s+)?(?:ish(?:\s+joyi)?\s+kerak|ish\s+(?:qidiryapman|qidiraman|izlayapman))\s*[:—-]?\s*/iu
+const LOCAL_CANDIDATE_INTENT_RE = /\b(?:жұмыс\s+іздеймін|жумуш\s+(?:издейм|издеп\s+жатам)|иш\s+издейм|caut\s+(?:un\s+)?loc\s+de\s+munc[ăa]|(?:îmi|imi)\s+caut\s+(?:un\s+)?(?:job|loc\s+de\s+munc[ăa]))\b/iu
 
 function roleFrom(text: string): string {
   const intent = text.split('\n')
     .map((line) => line.replace(/\s+/g, ' ').trim())
-    .find((line) => /(?:ищу|шукаю).{0,20}(?:работ|робот)|(?:ish.{0,20}(?:kerak|qidir|izlay))/iu.test(line))
+    .find((line) => /(?:ищу|шукаю).{0,20}(?:работ|робот)|(?:ish.{0,20}(?:kerak|qidir|izlay))|жұмыс\s+іздеймін|жумуш\s+(?:издейм|издеп)|caut\s+(?:un\s+)?loc\s+de\s+munc|(?:îmi|imi)\s+caut\s+(?:un\s+)?job/iu.test(line))
   const role = String(intent || '')
     .replace(INTENT_PREFIX_RE, '')
     .replace(UZ_INTENT_PREFIX_RE, '')
+    .replace(LOCAL_CANDIDATE_INTENT_RE, '')
     .replace(/^\s*[:—-]\s*/, '')
     .trim()
   return role.length >= 2 && role.length <= 180 ? role : ''
 }
 
 function nameFrom(item: SocialItem, text: string): string {
-  const explicit = text.match(/(?:^|\n)\s*(?:имя|ім['’]я|ism(?:i|im)?|name)\s*[:—-]\s*([^\n]{2,80})/iu)?.[1]?.trim()
-  if (explicit && !/ваканс|компан|работ|робот|ish/iu.test(explicit)) return explicit
+  const explicit = text.match(/(?:^|\n)\s*(?:имя|ім['’]я|ism(?:i|im)?|name|nume)\s*[:—-]\s*([^\n]{2,80})/iu)?.[1]?.trim()
+  if (explicit && !/ваканс|компан|работ|робот|ish|job/iu.test(explicit)) return explicit
   const author = String(item.author || '').trim()
   return author && author.length <= 80 && !/^\d+$/.test(author) ? author : ''
 }
@@ -130,7 +138,8 @@ function nameFrom(item: SocialItem, text: string): string {
 function itemToProfile(item: SocialItem, target: SocialTarget): CvProfile | null {
   const text = String(item.text || '').trim()
   const createdAt = recentIso(item.createdAt)
-  if (!createdAt || !item.url || !text || !isLikelyCvPost(text, true)) return null
+  const candidateIntent = isLikelyCvPost(text, true) || LOCAL_CANDIDATE_INTENT_RE.test(text)
+  if (!createdAt || !item.url || !text || !candidateIntent) return null
 
   const publicContacts = contacts(text)
   const direct = publicContacts.telegram || publicContacts.email || publicContacts.phone || null
@@ -150,7 +159,7 @@ function itemToProfile(item: SocialItem, target: SocialTarget): CvProfile | null
     professions: role ? [role] : [],
     city: detectCity(text, target.country) || target.city || null,
     isAdult: true,
-    remote: /remote|удал[её]н|віддален|дистанц|masofaviy|онлайн|online/iu.test(text) ? true : null,
+    remote: /remote|удал[её]н|віддален|дистанц|masofaviy|онлайн|online|la\s+distan(?:ță|ta)|de\s+acas[ăa]/iu.test(text) ? true : null,
     url: item.url,
     publishedAt: createdAt,
     updatedAt: createdAt,
