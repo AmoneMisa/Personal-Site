@@ -3,10 +3,10 @@
 
 import type { Seniority } from './jobTypes'
 
-// `source` stays backwards-compatible with the existing hiring pipeline. Public
-// web/social sources are distinguished by `origin` + `sourceKey`, while the
-// source value identifies the transport family for storage and diagnostics.
-export type HiringSource = 'telegram' | 'social'
+// `source` identifies the transport family. Keep custom adapters assignable
+// without forcing the legacy full-refresh registry to know every queued source;
+// `origin` + `sourceKey` retain the precise provider identity.
+export type HiringSource = 'telegram' | (string & {})
 export type CandidateOrigin = 'telegram' | 'web' | 'facebook' | 'threads'
 export type CandidateEmploymentType = 'full_time' | 'part_time'
 export type CandidateContactType = 'direct' | 'platform'
@@ -17,9 +17,8 @@ export interface ProfessionExperience {
   years: number
 }
 
-// Full-store refresh remains Telegram-only. Social sources are fanned out by
-// the durable per-source queue so a blocked Facebook group cannot delay every
-// other candidate source.
+// Full-store refresh remains Telegram-only. Web/social sources are fanned out
+// by the durable per-source queue so one blocked provider cannot delay all CVs.
 export const HIRING_SOURCES: HiringSource[] = ['telegram']
 
 export interface CvProfile {
