@@ -4,6 +4,14 @@ on:
   push:
     branches: [ master ]
 
+# Multiple rapid pushes used to build/deploy in parallel and could overlap
+# docker compose recreates on the production host. Keep only the newest
+# workflow active before deploy; the remote flock below is the final guard
+# against overlapping SSH deploy commands.
+concurrency:
+  group: personal-site-production
+  cancel-in-progress: true
+
 permissions:
   contents: read
   packages: write
@@ -96,4 +104,4 @@ jobs:
           script: |
             echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
             trap 'docker logout ghcr.io >/dev/null 2>&1 || true' EXIT
-            bash ~/opt/myproject/deploy.sh
+            flock -w 1800 /tmp/personal-site-deploy.lock bash ~/opt/myproject/deploy.sh
