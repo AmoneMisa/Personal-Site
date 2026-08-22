@@ -7,7 +7,7 @@ import type { Seniority } from './jobTypes'
 // without forcing the legacy full-refresh registry to know every queued source;
 // `origin` + `sourceKey` retain the precise provider identity.
 export type HiringSource = 'telegram' | (string & {})
-export type CandidateOrigin = 'telegram' | 'web' | 'facebook' | 'threads'
+export type CandidateOrigin = 'telegram' | 'web' | 'facebook' | 'threads' | 'linkedin'
 export type CandidateEmploymentType = 'full_time' | 'part_time'
 export type CandidateContactType = 'direct' | 'platform'
 export type CandidateGender = 'male' | 'female' | 'unknown'
