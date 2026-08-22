@@ -89,7 +89,9 @@ services:
       - default
       - ai-net
     healthcheck:
-      test: ["CMD", "node", "-e", "fetch('http://localhost:3000/').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      # Do not SSR the homepage for liveness. `/health` is intentionally a tiny
+      # Nitro route so startup job refreshes cannot make the container unhealthy.
+      test: ["CMD", "node", "-e", "fetch('http://localhost:3000/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
       interval: 30s
       timeout: 5s
       retries: 3
