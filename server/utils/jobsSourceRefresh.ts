@@ -4,6 +4,7 @@ import { enrichJob } from './enrich'
 import { syncJobsSearchIndex } from './jobsElastic'
 import { fetchExtraTelegramJobs } from './extraTelegramJobSources'
 import { fetchLinkedInJobs } from './linkedinSource'
+import { fetchFacebookJobs, fetchThreadsJobs } from './socialJobSources'
 import { fetchExtraPublicJobs } from './extraPublicJobSources'
 import { fetchUsaVisaSponsorJobs } from './usaVisaSponsorSource'
 import { fetchSourceExpansionJobs } from './sourceExpansionJobs'
@@ -93,7 +94,6 @@ async function fetchAllTelegram(q: string): Promise<Job[]> {
 async function fetchAllCompanies(q: string): Promise<Job[]> {
   const loaders = [
     { label: 'companies', load: () => fetchCompanies(q) },
-    { label: 'linkedin', load: () => fetchLinkedInJobs(q) },
     { label: 'public-boards', load: () => fetchExtraPublicJobs(q) },
     { label: 'usa-visa-sponsors', load: () => fetchUsaVisaSponsorJobs(q) },
     { label: 'source-expansion', load: () => fetchSourceExpansionJobs(q) },
@@ -129,6 +129,9 @@ const FETCHERS: Record<JobSource, (q: string) => Promise<Job[]>> = {
   jooble: fetchJooble,
   rss: fetchRss,
   companies: fetchAllCompanies,
+  linkedin: fetchLinkedInJobs,
+  facebook: fetchFacebookJobs,
+  threads: fetchThreadsJobs,
   devkg: fetchDevKg,
   ishgo: fetchIshGo,
   itjobsuz: fetchItJobsUz,
@@ -152,6 +155,13 @@ function isConfigured(source: JobSource): boolean {
       return process.env.RSS_DEFAULTS !== 'off' || !!process.env.RSS_FEEDS
     case 'companies':
       return process.env.COMPANIES_SOURCE !== 'off'
+    case 'linkedin':
+      return process.env.LINKEDIN_SOURCE !== 'off'
+    case 'facebook':
+    case 'threads':
+      return String(process.env.SOCIAL_JOB_SOURCE || 'on').toLowerCase() !== 'off'
+        && !!process.env.HIRING_SOCIAL_API_URL
+        && String(process.env.QUEUE_INTERNAL_KEY || '').length >= 16
     case 'devkg':
       return process.env.DEVKG_SOURCE !== 'off'
     case 'ishgo':

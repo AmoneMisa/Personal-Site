@@ -99,6 +99,9 @@ export type JobSource =
   | 'jooble'
   | 'rss'
   | 'companies'
+  | 'linkedin'
+  | 'facebook'
+  | 'threads'
   | 'devkg'
   | 'ishgo'
   | 'itjobsuz'
@@ -113,6 +116,9 @@ export const FREE_SOURCES: JobSource[] = [
   'jobicy',
   'devkg',
   'telegram',
+  'linkedin',
+  'facebook',
+  'threads',
 ]
 
 export const OPTIONAL_SOURCES: JobSource[] = [

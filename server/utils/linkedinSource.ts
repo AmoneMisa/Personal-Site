@@ -111,7 +111,7 @@ function parseCards(html: string): Job[] {
       company,
       location,
       url: `https://www.linkedin.com/jobs/view/${jobId}`,
-      source: 'companies',
+      source: 'linkedin',
       remote: /remote|anywhere|worldwide|удал[её]н|віддален/i.test(`${title} ${location}`),
       tags: ['LinkedIn'],
       postedAt: posted.toISOString(),
