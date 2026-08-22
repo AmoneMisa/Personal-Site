@@ -382,6 +382,25 @@ test('IshBor keeps only the profile column and trusts its stated region', () => 
     '21.08.2026',
   ].join('\n'))
 
+  const noisyProfileText = [
+    'Neft vagaz sohasida',
+    'Постоянный',
+    '7 milliyondanyuqori',
+    'Кашкадарья',
+    'У меня нет опыта работы',
+    'Sanjar Rahmatov (Мужчина)',
+    'Высший',
+    'Чтобы связаться с кандидатом, нужно войти на сайт.',
+    'Уже зарегистрированы? Войти .',
+    'Нет аккаунта? Регистрация .',
+    '21.08.2026',
+    '24',
+    '0',
+  ].join('\n')
+  const cleanProfileText = trimIshBorProfileText(noisyProfileText)
+  assert.match(cleanProfileText, /Sanjar Rahmatov \(Мужчина\)\nВысший$/u)
+  assert.doesNotMatch(cleanProfileText, /связаться|зарегистрированы|аккаунта|21\.08\.2026|\n24\n0/iu)
+
   const repaired = normalizeCandidate({
     id: 'web-ishbor-uz-118053',
     source: 'telegram',
@@ -400,6 +419,16 @@ test('IshBor keeps only the profile column and trusts its stated region', () => 
   assert.equal(repaired.city, 'Surkhandarya')
   assert.equal(repaired.experienceYears, 0)
   assert.doesNotMatch(repaired.description, /Фильтр|Если вам нужна работа|Регистрация/)
+
+  const repairedNoisy = normalizeCandidate({
+    ...repaired,
+    id: 'web-ishbor-uz-118057',
+    role: 'Neft vagaz sohasida',
+    originalText: noisyProfileText,
+    description: noisyProfileText,
+  })
+  assert.doesNotMatch(repairedNoisy.originalText, /связаться|зарегистрированы|аккаунта|21\.08\.2026/iu)
+  assert.doesNotMatch(repairedNoisy.description, /связаться|зарегистрированы|аккаунта|21\.08\.2026/iu)
 
   assert.equal(ishBorLocationFromText(
     "Oliy toifali boshlang'ich ta'lim o'qituvchisi (Резюме) - Навои | работа в ташкенте",
