@@ -43,6 +43,45 @@ type StoredJob = Job & {
   ai?: unknown
 }
 
+/**
+ * A few HTML boards hand the source adapter a whole detail page. If that
+ * adapter strips tags without first removing <script>, the script *contents*
+ * become ordinary text and reach enrichment. That is how Yandex RTB code was
+ * shown in the modal and words such as `JSON` became fake required skills.
+ *
+ * Keep this guard at the storage/enrichment boundary as defence in depth: a
+ * board-specific parser can still be fixed independently, while executable
+ * page plumbing never becomes vacancy content or ATS keywords again.
+ */
+export function sanitizeFetchedJob(job: Job): Job {
+  const raw = String(job.description || '').replace(/\s+/g, ' ').trim()
+  if (!raw) return job
+
+  const embeddedScript = raw.search(
+    /(?:window\.yaContextCb\b|Ya\.Context\.AdvManager\b|yandex_rtb_R-A-\d+|googletag\.cmd\b|dataLayer\.push\s*\()/i,
+  )
+  let description = embeddedScript >= 0 ? raw.slice(0, embeddedScript).trim() : raw
+
+  const isIshBor = (job.tags || []).some((tag) => /ish-bor\.uz/i.test(String(tag)))
+    || /ish-bor\.uz/i.test(job.company || '')
+    || /ish-bor\.uz/i.test(job.url || '')
+
+  if (isIshBor) {
+    // ish-bor appends SEO/navigation copy to the useful one-line summary.
+    description = description
+      .replace(/^Регистрация\s+\d{1,2}[./-]\d{1,2}[./-]20\d{2}(?:\s+\d+){0,3}\s*/iu, '')
+      .replace(/\s+\|?\s*Вакансии,\s*Вакансия,\s*работа(?:\s|,|$)[\s\S]*$/iu, '')
+      .replace(/\s+ish-bor\.uz\s+(?:Фильтр|Если вам нужна работа|Меню|О нас)[\s\S]*$/iu, '')
+      .trim()
+
+    // A detail layout with no textual summary is preferable as a concise card
+    // over exposing registration counters/navigation from the surrounding page.
+    if (!description || /^Регистрация(?:\s|$)/iu.test(description)) description = job.title.trim()
+  }
+
+  return description === raw ? job : { ...job, description: description || undefined }
+}
+
 async function fetchAllTelegram(q: string): Promise<Job[]> {
   const [primary, extra] = await Promise.all([
     fetchTelegram(q),
@@ -187,7 +226,7 @@ async function mergeFetchedSource(source: JobSource, jobs: Job[]) {
   }
 
   for (const job of jobs) {
-    const enriched = enrichJob(job)
+    const enriched = enrichJob(sanitizeFetchedJob(job))
     const key = dedupKey(enriched)
     const previous = byKey.get(key)
 
