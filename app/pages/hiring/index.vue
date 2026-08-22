@@ -557,10 +557,15 @@ function genderLabel(value?: CvProfile["gender"]): string {
   return t("notSpecified");
 }
 
+function experienceLabel(years: number): string {
+  const value = new Intl.NumberFormat(String(locale.value), { maximumFractionDigits: 1 }).format(years);
+  return t("experienceN", { n: value });
+}
+
 function specLine(profile: CvProfile): string {
   const parts: string[] = [];
   if (profile.age != null) parts.push(`${profile.age}`);
-  if (profile.experienceYears != null) parts.push(t("experienceN", { n: profile.experienceYears }));
+  if (profile.experienceYears != null) parts.push(experienceLabel(profile.experienceYears));
   if (profile.city) parts.push(cityLabel(profile.city));
   if (profile.remote) parts.push(t("remoteBadge"));
   return parts.join(" · ");
@@ -578,7 +583,7 @@ const specRows = computed(() => {
     { label: t("specRole"), value: strOr(profile.role) },
     { label: label("Возраст", "Age"), value: profile.age != null ? String(profile.age) : t("notSpecified") },
     { label: label("Пол", "Gender"), value: genderLabel(profile.gender) },
-    { label: t("specExperience"), value: profile.experienceYears != null ? t("experienceN", { n: profile.experienceYears }) : t("notSpecified") },
+    { label: t("specExperience"), value: profile.experienceYears != null ? experienceLabel(profile.experienceYears) : t("notSpecified") },
     { label: t("specSalary"), value: salaryLabel(profile) || t("notSpecified") },
     { label: t("specCity"), value: profile.city ? cityLabel(profile.city) : t("notSpecified") },
     { label: t("specCountry"), value: strOr(meta.value.find((c) => c.code === profile.country)?.name || profile.country) },
@@ -651,7 +656,7 @@ function cardBadges(profile: CvProfile): string[] {
   const badges: string[] = [];
   if (profile.remote) badges.push(t("remoteBadge"));
   if (profile.age != null) badges.push(`${profile.age}`);
-  if (profile.experienceYears != null) badges.push(t("experienceN", { n: profile.experienceYears }));
+  if (profile.experienceYears != null) badges.push(experienceLabel(profile.experienceYears));
   for (const skill of (profile.skills || []).slice(0, 3)) badges.push(skill);
   return badges.slice(0, 5);
 }

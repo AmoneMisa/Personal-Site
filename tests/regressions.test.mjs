@@ -7,7 +7,7 @@ import {
 } from '../server/utils/hiringCandidateFields.ts'
 import { removeExistingSocialMeta } from '../server/utils/shareHead.ts'
 import { looksSoftBlocked } from '../server/utils/browserSoftBlock.ts'
-import { normalizeProfessions } from '../server/utils/hiringNormalize.ts'
+import { normalizeCandidate, normalizeProfessions } from '../server/utils/hiringNormalize.ts'
 import {
   activityDate,
   cityFrom,
@@ -98,13 +98,37 @@ test('script and style contents never reach a candidate profile', () => {
   const html = [
     '<div class="card"><script>window.yaContextCb=window.yaContextCb||[];</script>',
     '<style>.card{color:red}</style>',
-    '<h2>Бухгалтер</h2><span>Ташкент</span></div>',
+    '<h2>Бухгалтер</h2><span>Ташкент</span>',
+    '<i class="material-icons">local_shipping</i></div>',
   ].join('')
 
   const text = htmlText(html)
   assert.doesNotMatch(text, /yaContextCb|color:red/)
+  assert.doesNotMatch(text, /local_shipping/)
   assert.match(text, /Бухгалтер/)
   assert.match(text, /Ташкент/)
+})
+
+test('legacy Careerist rows lose icon ligatures and repeating experience fractions', () => {
+  const profile = normalizeCandidate({
+    id: 'careerist-1',
+    source: 'telegram',
+    origin: 'web',
+    sourceKey: 'careerist-uz',
+    country: 'UZ',
+    name: 'Юрий Садраддинович',
+    role: 'Генеральный менеджер',
+    city: 'Ташкент local_shipping',
+    experienceYears: 20 + 4 / 12,
+    url: 'https://tashkent.careerist.ru/resume/example.html',
+    createdAt: '2026-08-22T12:00:00.000Z',
+    originalText: 'Город\nТашкент local_shipping\nОпыт работы:\n20 лет и 4 месяца',
+    description: 'Город\nТашкент local_shipping\nОпыт работы:\n20 лет и 4 месяца',
+  })
+
+  assert.equal(profile.city, 'Ташкент')
+  assert.equal(profile.experienceYears, 20.3)
+  assert.doesNotMatch(profile.description, /local_shipping/)
 })
 
 test('Uzbek boards that print a region instead of a city still resolve a location', () => {

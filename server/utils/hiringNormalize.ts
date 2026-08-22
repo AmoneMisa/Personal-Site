@@ -437,8 +437,20 @@ export function normalizeEmploymentTypes(text: string, raw?: string | null): Can
   return [...out]
 }
 
+/** Removes text ligatures emitted by icon fonts from older stored web cards. */
+function stripUiArtifacts(value: string): string {
+  return value
+    .replace(/\b(?:local_shipping|location_on|work_outline|account_circle)\b/giu, ' ')
+    .split('\n')
+    .map((line) => line.replace(/[ \t]{2,}/g, ' ').trim())
+    .join('\n')
+    .trim()
+}
+
 export function normalizeCandidate(profile: CvProfile): CvProfile {
-  const originalText = profile.originalText || profile.description || ''
+  // Repair rows parsed before Material Icon ligatures were removed from the
+  // source HTML. Underscored glyph names are presentation markup, not CV text.
+  const originalText = stripUiArtifacts(profile.originalText || profile.description || '')
   const goalRole = extractGoalRole(originalText)
   const effectiveRole = goalRole || profile.role
   // Repair already-stored rows where a loose adapter saved the whole labelled
@@ -466,7 +478,11 @@ export function normalizeCandidate(profile: CvProfile): CvProfile {
   const employmentTypes = profile.employmentTypes?.length
     ? profile.employmentTypes
     : normalizeEmploymentTypes(originalText, profile.employmentType)
-  const experienceYears = normalizeRelevantExperience(profile.experienceYears, professions, originalText)
+  const relevantExperience = normalizeRelevantExperience(profile.experienceYears, professions, originalText)
+  // Month-based durations (20 years 4 months) are repeating IEEE fractions.
+  // One decimal is enough for the source precision and keeps JSON/UI readable.
+  const experienceYears = relevantExperience == null ? null : Number(relevantExperience.toFixed(1))
+  const city = profile.city == null ? profile.city : stripUiArtifacts(profile.city) || null
   const remote = normalizeRemotePreference(profile.remote, originalText, profile.origin)
   const extractedSalary = profile.salaryMin == null && profile.salaryMax == null
     ? extractCandidateSalary(originalText, profile.country)
@@ -479,7 +495,7 @@ export function normalizeCandidate(profile: CvProfile): CvProfile {
     ...profile,
     name,
     originalText,
-    description: profile.description || originalText,
+    description: stripUiArtifacts(profile.description || originalText),
     role: professions[0] || normalizeRole(effectiveRole, originalText),
     professions,
     previousProfessions: profile.previousProfessions?.length
@@ -489,6 +505,7 @@ export function normalizeCandidate(profile: CvProfile): CvProfile {
     age,
     isAdult: age == null ? true : age >= 18,
     experienceYears,
+    city,
     salaryMin,
     salaryMax,
     currency,

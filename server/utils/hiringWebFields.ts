@@ -43,6 +43,9 @@ export function htmlText(value: string): string {
     // Stripping tags alone leaves the *contents* of scripts and styles behind,
     // which is how ad-loader JavaScript ended up inside candidate profiles.
     .replace(/<(script|style|noscript|template)\b[^>]*>[\s\S]*?<\/\1>/gi, ' ')
+    // Material Icons use their text content as a glyph name. Keeping that
+    // content turns a Careerist city into e.g. "Tashkent local_shipping".
+    .replace(/<([a-z][\w:-]*)\b[^>]*class=["'][^"']*(?:material-icons|material-symbols)[^"']*["'][^>]*>[\s\S]*?<\/\1>/gi, ' ')
     .replace(/<br\s*\/?>/gi, '\n')
     .replace(/<\/(?:p|div|li|h[1-6]|tr|section|article)>/gi, '\n')
     .replace(/<[^>]*>/g, ' ')
