@@ -58,6 +58,11 @@ services:
       JOB_BROWSER_PROXY_TIMEOUT_MS: ${JOB_BROWSER_PROXY_TIMEOUT_MS:-65000}
       JOB_BROWSER_ALLOWED_HOSTS: ${JOB_BROWSER_ALLOWED_HOSTS:-}
       QUEUE_INTERNAL_KEY: ${QUEUE_INTERNAL_KEY:-}
+      # Public-only Facebook groups/pages + anonymous Threads Recent search are
+      # proxied by flat-finder-backend over the shared ai-net network.
+      HIRING_SOCIAL_SOURCE: ${HIRING_SOCIAL_SOURCE:-on}
+      HIRING_SOCIAL_SOURCES: ${HIRING_SOCIAL_SOURCES:-}
+      HIRING_SOCIAL_API_URL: ${HIRING_SOCIAL_API_URL:-http://flat-finder-backend:4000/internal/social/fetch}
       # Durable CV storage: the shared Postgres, in its own "hiring" schema.
       HIRING_DATABASE_URL: ${HIRING_DATABASE_URL:-}
       HIRING_DB_SCHEMA: ${HIRING_DB_SCHEMA:-hiring}
