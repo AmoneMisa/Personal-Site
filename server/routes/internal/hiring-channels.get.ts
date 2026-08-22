@@ -1,7 +1,6 @@
-// The source list the queue dispatcher fans out over. Telegram usernames and
-// public web-CV adapters share the same durable RabbitMQ queue; web adapters use
-// a `web:<key>` handle so the Python dispatcher does not need source-specific
-// knowledge.
+// The source list the queue dispatcher fans out over. Telegram usernames,
+// public web-CV adapters and public social targets share the same durable queue;
+// prefixed handles keep the worker source-agnostic.
 
 import { createError, getHeader } from 'h3'
 import { hiringChannelHandles } from '~~/server/utils/hiringSources'
@@ -9,6 +8,7 @@ import { hiringWebSourceHandles } from '~~/server/utils/hiringWebSources'
 import { hiringIshBorSourceHandles } from '~~/server/utils/hiringIshBorSource'
 import { hiringSecondaryWebSourceHandles } from '~~/server/utils/hiringSecondaryWebSources'
 import { hiringUzJobsSourceHandles } from '~~/server/utils/hiringUzJobsSource'
+import { hiringSocialSourceHandles } from '~~/server/utils/hiringSocialSources'
 import { loadCursors, loadWebCursors } from '~~/server/utils/hiringCursors'
 
 export default defineEventHandler(async (event) => {
@@ -39,6 +39,7 @@ export default defineEventHandler(async (event) => {
     ...telegramHandles,
     ...progressiveWebHandles,
     ...hiringSecondaryWebSourceHandles(),
+    ...hiringSocialSourceHandles(),
   ]
   const [telegramCursors, webCursors] = await Promise.all([loadCursors(), loadWebCursors()])
   const backfillHandles = [
