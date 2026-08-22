@@ -95,7 +95,7 @@ function profileSource(profile: CvProfile): string {
 /**
  * Where the profile actually came from. Legacy records carry source
  * 'telegram' regardless of origin — a compatibility shim, not a claim — so a
- * web candidate must be identified by origin and never by that field.
+ * web/social candidate must be identified by origin and never by that field.
  */
 function profileOrigin(profile: CvProfile): string {
   return (profile.origin || 'telegram').toLowerCase()
@@ -105,9 +105,13 @@ const WEB_SOURCE_LABELS = new Map(listWebSources().map((source) => [source.key, 
 
 /** Human name of the provider, for cards and the filter list. */
 function profileProvider(profile: CvProfile): string {
+  if (profile.sourceLabel?.trim()) return profile.sourceLabel.trim()
   const key = profile.sourceKey?.toLowerCase()
   if (key && WEB_SOURCE_LABELS.has(key)) return WEB_SOURCE_LABELS.get(key)!
-  if (profileOrigin(profile) === 'web') return key || 'Web'
+  const origin = profileOrigin(profile)
+  if (origin === 'facebook') return 'Facebook'
+  if (origin === 'threads') return 'Threads'
+  if (origin === 'web') return key || 'Web'
   return 'Telegram'
 }
 
@@ -353,7 +357,7 @@ function publicProfile(profile: CvProfile, locale: HiringProfessionLocale): CvPr
   if (profile.isAdult === false) details.push(localizeDetail('Minor'))
   if (profile.relocationReady === true) details.push(localizeDetail('Open to relocation'))
   if (profile.relocationReady === false) details.push(localizeDetail('Not open to relocation'))
-  if (profile.origin === 'web' && profile.contactType === 'platform') details.push(localizeDetail('Contact via source platform'))
+  if (profile.contactType === 'platform' && profileOrigin(profile) !== 'telegram') details.push(localizeDetail('Contact via source platform'))
 
   const canonical = profile.professions?.length ? profile.professions : [profile.role].filter(Boolean)
   return {
@@ -465,11 +469,11 @@ export default defineEventHandler(async (event) => {
 
   const sourceStatuses = getHiringSourceDiagnostics()
   // In-memory diagnostics disappear on every deploy. Merge the durable run
-  // history so a broken/empty web source remains visible instead of making a
-  // zero-result filter look like a legitimate empty market.
+  // history so a broken/empty web/social source remains visible instead of
+  // making a zero-result filter look like a legitimate empty market.
   const webStatusesByHandle = new Map(
     persistedSourceRuns
-      .filter((item) => /^web:/i.test(item.handle))
+      .filter((item) => /^(?:web|social):/i.test(item.handle))
       .map((item) => [item.handle.toLowerCase(), item]),
   )
   for (const item of getHiringWebDiagnostics()) webStatusesByHandle.set(item.handle.toLowerCase(), item)
@@ -482,7 +486,7 @@ export default defineEventHandler(async (event) => {
     ...webSourceStatuses
       .filter((item) => item.status === 'error')
       .map((item) => ({
-        source: 'key' in item ? item.key : item.handle.replace(/^web:/i, ''),
+        source: 'key' in item ? item.key : item.handle.replace(/^(?:web|social):/i, ''),
         country: item.country,
         handle: item.handle,
         error: item.error || 'source failed',
@@ -528,15 +532,20 @@ export default defineEventHandler(async (event) => {
     meta: {
       countries: HIRING_COUNTRIES,
       professions: professionValues(),
-      // Only origins that actually have candidates: offering "Web" while no
-      // board has stored anything hands the visitor a filter whose only
-      // possible result is an empty page.
+      // Only origins that actually have candidates: don't offer a source filter
+      // whose only possible result is an empty page.
       sources: [
         ...(profiles.some((profile) => profileOrigin(profile) === 'telegram')
           ? [{ value: 'telegram', label: 'Telegram', origin: 'telegram' }]
           : []),
         ...(profiles.some((profile) => profileOrigin(profile) === 'web')
           ? [{ value: 'web', label: 'Web', origin: 'web' }]
+          : []),
+        ...(profiles.some((profile) => profileOrigin(profile) === 'facebook')
+          ? [{ value: 'facebook', label: 'Facebook', origin: 'facebook' }]
+          : []),
+        ...(profiles.some((profile) => profileOrigin(profile) === 'threads')
+          ? [{ value: 'threads', label: 'Threads', origin: 'threads' }]
           : []),
         ...[...listWebSources(), ...listUzJobsSources()]
           .filter((source) => (sourceCounts(profiles)[source.key] || 0) > 0)
