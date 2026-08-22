@@ -1,0 +1,24 @@
+name: Apply PostgreSQL jobs queue regression
+
+on:
+  push:
+    branches: [ perf/postgres-jobs-queue ]
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Update legacy queue regression
+        run: python .github/patches/update-postgres-jobs-queue-regression.py
+      - name: Commit regression update
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add tests/regressions.test.mjs
+          git commit -m 'test: assert Postgres hiring queue behavior'
+          git push origin HEAD:perf/postgres-jobs-queue
