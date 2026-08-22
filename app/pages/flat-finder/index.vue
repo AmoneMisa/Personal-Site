@@ -37,6 +37,9 @@ interface Listing {
   bedrooms?: number | null;
   bathrooms?: number | null;
   balcony?: boolean | null;
+  terrace?: boolean | null;
+  privateYard?: boolean | null;
+  dishwasher?: boolean | null;
   airConditioner?: boolean | null;
   gas?: boolean | null;
   newBuilding?: boolean | null;
@@ -88,6 +91,7 @@ interface TranslationResult {
 }
 interface CountryMeta { code: string; name: string; currency: string; cities?: string[]; locations?: Record<string, { districts?: string[]; metro?: string[] }> }
 type FlatView = "active" | "favorites" | "recent" | "hidden";
+type FlatSort = "newest" | "oldest" | "priceAsc" | "priceDesc" | "titleAsc" | "titleDesc";
 type SearchPreset = { name: string; query: Record<string, string> };
 
 const PAGE_SIZE = 20;
@@ -128,6 +132,15 @@ const petFriendly = ref(false);
 const roomOnlyFilter = ref(false);
 const childrenRequired = ref(false);
 const newBuildingOnly = ref(false);
+const dishwasherOnly = ref(false);
+const airConditionerOnly = ref(false);
+const parkingOnly = ref(false);
+const internetOnly = ref(false);
+const gasOnly = ref(false);
+const balconyOnly = ref(false);
+const terraceOnly = ref(false);
+const privateYardOnly = ref(false);
+const sort = ref<FlatSort>("newest");
 const audience = ref("any");
 const metro = ref("");
 const priceMin = ref<number | undefined>(undefined);
@@ -265,6 +278,49 @@ const currencyItems = computed<Item[]>(() => {
   const rest = keys.filter((c) => !CURRENCY_PRIORITY.includes(c)).sort();
   return [...preferred, ...rest].map((c) => ({ label: c, value: c }));
 });
+const extraLabels = computed(() => locale.value.startsWith("en") ? {
+  amenities: "Amenities",
+  dishwasher: "Dishwasher",
+  ac: "A/C",
+  parking: "Parking",
+  internet: "Internet",
+  gas: "Gas",
+  balcony: "Balcony",
+  terrace: "Terrace",
+  yard: "Private yard",
+  sort: "Sort",
+  newest: "Newest first",
+  oldest: "Oldest first",
+  priceAsc: "Price: low to high",
+  priceDesc: "Price: high to low",
+  titleAsc: "A → Z",
+  titleDesc: "Z → A",
+} : {
+  amenities: "Удобства",
+  dishwasher: "Посудомойка",
+  ac: "Кондиционер",
+  parking: "Паркоместо",
+  internet: "Интернет",
+  gas: "Газ",
+  balcony: "Балкон",
+  terrace: "Терраса",
+  yard: "Личный дворик",
+  sort: "Сортировка",
+  newest: "Сначала новые",
+  oldest: "Сначала старые",
+  priceAsc: "Цена: дешевле",
+  priceDesc: "Цена: дороже",
+  titleAsc: "А → Я",
+  titleDesc: "Я → А",
+});
+const sortItems = computed<Item[]>(() => [
+  { value: "newest", label: extraLabels.value.newest },
+  { value: "oldest", label: extraLabels.value.oldest },
+  { value: "priceAsc", label: extraLabels.value.priceAsc },
+  { value: "priceDesc", label: extraLabels.value.priceDesc },
+  { value: "titleAsc", label: extraLabels.value.titleAsc },
+  { value: "titleDesc", label: extraLabels.value.titleDesc },
+]);
 const districtSel = computed<string>({ get: () => district.value || ANY, set: (v) => (district.value = v === ANY ? "" : v) });
 const metroSel = computed<string>({ get: () => metro.value || ANY, set: (v) => (metro.value = v === ANY ? "" : v) });
 const audienceItems = computed<Item[]>(() => [
@@ -284,7 +340,6 @@ const dealTypeItems = computed<Item[]>(() => [
 const agencyItems = computed<Item[]>(() => [
   { label: t("agAny"), value: "any" }, { label: t("agOwner"), value: "owner" }, { label: t("agAgency"), value: "agency" },
 ]);
-
 
 function readSavedList(key: string, limit = MAX_SAVED_FLATS): Listing[] {
   try {
@@ -353,6 +408,15 @@ function currentFilterQuery(): Record<string, string> {
   if (roomOnlyFilter.value) q.roomOnly = "1";
   if (childrenRequired.value) q.children = "1";
   if (newBuildingOnly.value) q.newBuilding = "1";
+  if (dishwasherOnly.value) q.dishwasher = "1";
+  if (airConditionerOnly.value) q.airConditioner = "1";
+  if (parkingOnly.value) q.parking = "1";
+  if (internetOnly.value) q.internet = "1";
+  if (gasOnly.value) q.gas = "1";
+  if (balconyOnly.value) q.balcony = "1";
+  if (terraceOnly.value) q.terrace = "1";
+  if (privateYardOnly.value) q.privateYard = "1";
+  if (sort.value !== "newest") q.sort = sort.value;
   if (priceMin.value != null) q.priceMin = String(priceMin.value);
   if (priceMax.value != null) q.priceMax = String(priceMax.value);
   if (displayCurrency.value !== "USD") q.currency = displayCurrency.value;
@@ -379,6 +443,7 @@ function currentFilterQuery(): Record<string, string> {
   return q;
 }
 function queryString(value: unknown): string { return Array.isArray(value) ? String(value[0] || "") : String(value || ""); }
+function queryBool(value: unknown): boolean { return ["1", "true"].includes(queryString(value).toLowerCase()); }
 function applyQueryParams(params: Record<string, unknown>) {
   const countryParam = queryString(params.countries);
   if (countryParam) countries.value = countryParam.split(",").filter(Boolean);
@@ -389,10 +454,20 @@ function applyQueryParams(params: Record<string, unknown>) {
   agency.value = ["owner", "agency"].includes(queryString(params.agency)) ? queryString(params.agency) : "any";
   audience.value = ["women", "men", "family"].includes(queryString(params.audience)) ? queryString(params.audience) : "any";
   metro.value = queryString(params.metro);
-  petFriendly.value = ["1", "true"].includes(queryString(params.pets).toLowerCase());
-  roomOnlyFilter.value = ["1", "true"].includes(queryString(params.roomOnly).toLowerCase());
-  childrenRequired.value = ["1", "true"].includes(queryString(params.children).toLowerCase());
-  newBuildingOnly.value = ["1", "true"].includes(queryString(params.newBuilding).toLowerCase());
+  petFriendly.value = queryBool(params.pets);
+  roomOnlyFilter.value = queryBool(params.roomOnly);
+  childrenRequired.value = queryBool(params.children);
+  newBuildingOnly.value = queryBool(params.newBuilding);
+  dishwasherOnly.value = queryBool(params.dishwasher);
+  airConditionerOnly.value = queryBool(params.airConditioner);
+  parkingOnly.value = queryBool(params.parking);
+  internetOnly.value = queryBool(params.internet);
+  gasOnly.value = queryBool(params.gas);
+  balconyOnly.value = queryBool(params.balcony);
+  terraceOnly.value = queryBool(params.terrace);
+  privateYardOnly.value = queryBool(params.privateYard);
+  const sortParam = queryString(params.sort);
+  sort.value = (["newest", "oldest", "priceAsc", "priceDesc", "titleAsc", "titleDesc"].includes(sortParam) ? sortParam : "newest") as FlatSort;
   priceMin.value = Number(queryString(params.priceMin)) || undefined;
   priceMax.value = Number(queryString(params.priceMax)) || undefined;
   if (queryString(params.currency)) displayCurrency.value = queryString(params.currency);
@@ -505,6 +580,15 @@ async function load(append = false, background = false) {
   if (roomOnlyFilter.value) params.roomOnly = "1";
   if (childrenRequired.value) params.children = "1";
   if (newBuildingOnly.value) params.newBuilding = "1";
+  if (dishwasherOnly.value) params.dishwasher = "1";
+  if (airConditionerOnly.value) params.airConditioner = "1";
+  if (parkingOnly.value) params.parking = "1";
+  if (internetOnly.value) params.internet = "1";
+  if (gasOnly.value) params.gas = "1";
+  if (balconyOnly.value) params.balcony = "1";
+  if (terraceOnly.value) params.terrace = "1";
+  if (privateYardOnly.value) params.privateYard = "1";
+  params.sort = sort.value;
   if (query.value.trim()) params.query = query.value.trim();
   params.sources = source.value || SOURCES.join(",");
   const { data, error } = await safeFetch<FeedResult>("/flats-feed", { params });
@@ -545,6 +629,7 @@ function resetFilters() {
   countries.value = [DEFAULT_COUNTRY];
   city.value = ""; district.value = ""; metro.value = ""; propertyType.value = "any"; dealType.value = "any"; agency.value = "any"; audience.value = "any";
   petFriendly.value = false; roomOnlyFilter.value = false; childrenRequired.value = false; newBuildingOnly.value = false;
+  dishwasherOnly.value = false; airConditionerOnly.value = false; parkingOnly.value = false; internetOnly.value = false; gasOnly.value = false; balconyOnly.value = false; terraceOnly.value = false; privateYardOnly.value = false; sort.value = "newest";
   priceMin.value = undefined; priceMax.value = undefined; displayCurrency.value = "USD";
   roomsMin.value = undefined; roomsMax.value = undefined; bedroomsMin.value = undefined; bedroomsMax.value = undefined; areaMin.value = undefined; areaMax.value = undefined; pricePerSqmMin.value = undefined; pricePerSqmMax.value = undefined;
   metroMaxM.value = undefined; nearbyKind.value = ""; nearbyMaxM.value = undefined;
@@ -566,7 +651,18 @@ function toggleHidden(item: Listing) {
   persistList(STORAGE.hidden, hidden.value);
 }
 
-const mapPoints = computed(() => displayedListings.value.filter((l) => l.lat != null && l.lng != null).map((l) => ({ id: l.id, lat: l.lat as number, lng: l.lng as number, title: displayListingTitle(l), priceLabel: priceLabel(l), photo: listingPhoto(l) || undefined, source: l.source })));
+function mapCoordinateLooksSane(listing: Listing): boolean {
+  const lat = Number(listing.lat);
+  const lng = Number(listing.lng);
+  if (!Number.isFinite(lat) || !Number.isFinite(lng) || Math.abs(lat) > 90 || Math.abs(lng) > 180) return false;
+  // Client-side guard for old cached Odesa rows while the backend repairs and
+  // re-geocodes them. Prevents one offshore point from stretching the whole map.
+  if (listing.country === "UA" && listing.city === "Odesa") {
+    return lat >= 46.25 && lat <= 46.65 && lng >= 30.45 && lng <= 30.88;
+  }
+  return true;
+}
+const mapPoints = computed(() => displayedListings.value.filter(mapCoordinateLooksSane).map((l) => ({ id: l.id, lat: l.lat as number, lng: l.lng as number, title: displayListingTitle(l), priceLabel: priceLabel(l), photo: listingPhoto(l) || undefined, source: l.source })));
 
 const active = ref<Listing | null>(null);
 const modalOpen = ref(false);
@@ -830,6 +926,18 @@ onBeforeUnmount(() => { modalOpen.value = false; lightboxIndex.value = null; rel
           <label class="currency-select"><span class="sr-only">{{ t("currency") }}</span><u-select-menu v-model="displayCurrency" :items="currencyItems" value-key="value" label-key="label" class="flats__select currency-select__control" @update:model-value="(priceMin != null || priceMax != null) && scheduleLoad()" /></label>
         </div>
 
+        <div class="filter-amenities-row">
+          <span class="flats__field-label filter-amenities-row__label">{{ extraLabels.amenities }}</span>
+          <u-button type="button" size="xs" color="neutral" icon="i-lucide-sparkles" :variant="dishwasherOnly ? 'solid' : 'outline'" @click="dishwasherOnly = !dishwasherOnly; scheduleLoad()">{{ extraLabels.dishwasher }}</u-button>
+          <u-button type="button" size="xs" color="neutral" icon="i-lucide-snowflake" :variant="airConditionerOnly ? 'solid' : 'outline'" @click="airConditionerOnly = !airConditionerOnly; scheduleLoad()">{{ extraLabels.ac }}</u-button>
+          <u-button type="button" size="xs" color="neutral" icon="i-lucide-square-parking" :variant="parkingOnly ? 'solid' : 'outline'" @click="parkingOnly = !parkingOnly; scheduleLoad()">{{ extraLabels.parking }}</u-button>
+          <u-button type="button" size="xs" color="neutral" icon="i-lucide-wifi" :variant="internetOnly ? 'solid' : 'outline'" @click="internetOnly = !internetOnly; scheduleLoad()">{{ extraLabels.internet }}</u-button>
+          <u-button type="button" size="xs" color="neutral" icon="i-lucide-flame" :variant="gasOnly ? 'solid' : 'outline'" @click="gasOnly = !gasOnly; scheduleLoad()">{{ extraLabels.gas }}</u-button>
+          <u-button type="button" size="xs" color="neutral" icon="i-lucide-panel-top" :variant="balconyOnly ? 'solid' : 'outline'" @click="balconyOnly = !balconyOnly; scheduleLoad()">{{ extraLabels.balcony }}</u-button>
+          <u-button type="button" size="xs" color="neutral" icon="i-lucide-sun" :variant="terraceOnly ? 'solid' : 'outline'" @click="terraceOnly = !terraceOnly; scheduleLoad()">{{ extraLabels.terrace }}</u-button>
+          <u-button type="button" size="xs" color="neutral" icon="i-lucide-tree-pine" :variant="privateYardOnly ? 'solid' : 'outline'" @click="privateYardOnly = !privateYardOnly; scheduleLoad()">{{ extraLabels.yard }}</u-button>
+        </div>
+
         <div class="filter-actions-row">
           <u-button type="button" variant="outline" color="neutral" icon="i-lucide-sliders-horizontal" :trailing-icon="showAdvanced ? 'i-lucide-chevron-up' : 'i-lucide-chevron-down'" :aria-expanded="showAdvanced" class="advanced-button" @click="toggleAdvanced">{{ showAdvanced ? t("hideFilters") : t("moreFilters") }}</u-button>
           <div class="active-filter-chips">
@@ -879,7 +987,10 @@ onBeforeUnmount(() => { modalOpen.value = false; lightboxIndex.value = null; rel
 
     <p v-if="failed" class="flats__error">{{ t("error") }}</p>
     <p v-else-if="source === 'telegram' && !loading && !listings.length && sourceErrors?.some((item) => item.source === 'telegram')" class="flats__source-warning">{{ t("telegramUnavailable") }}</p>
-    <p v-else class="flats__count text-muted">{{ t("found", { n: view === 'active' ? total : displayedListings.length }) }}</p>
+    <div v-else class="flats__results-toolbar">
+      <p class="flats__count text-muted">{{ t("found", { n: view === 'active' ? total : displayedListings.length }) }}</p>
+      <label class="flats__sort"><span class="flats__field-label">{{ extraLabels.sort }}</span><u-select-menu v-model="sort" :items="sortItems" value-key="value" label-key="label" :search-input="false" class="flats__select" @update:model-value="scheduleLoad(0)" /></label>
+    </div>
 
     <section v-if="listings.length" class="flats__map-wrap"><flat-map :points="mapPoints" :draw-label="t('drawArea')" :done-label="t('done')" :clear-label="t('clearArea')" :draw-hint="t('drawHint')" :expand-label="t('mapExpand')" :collapse-label="t('mapCollapse')" @select="openById" @area-change="drawnArea = $event" /></section>
 
@@ -944,7 +1055,11 @@ onBeforeUnmount(() => { modalOpen.value = false; lightboxIndex.value = null; rel
 .flats__back-top:hover { color: var(--accent-pink); border-color: rgba(224,103,154,.48); }
 .flats__error { color: var(--ui-error, #f87171); }
 .flats__source-warning { color: #f6c177; font-size: 13px; margin-bottom: 12px; }
-.flats__count { font-size: 13px; margin-bottom: 12px; }
+.flats__count { font-size: 13px; margin: 0; }
+.flats__results-toolbar { display: flex; align-items: end; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
+.flats__sort { display: flex; align-items: center; gap: 8px; width: min(310px, 100%); }
+.flats__sort > .flats__field-label { flex: 0 0 auto; }
+.flats__sort .flats__select { flex: 1 1 auto; }
 .flats__map-wrap { position: relative; z-index: 0; isolation: isolate; margin-bottom: 18px; scroll-margin-top: 90px; }
 .flats__grid { display: grid; gap: 14px; grid-template-columns: 1fr; align-items: stretch; grid-auto-rows: 1fr; }
 @media (min-width: 640px) { .flats__grid { grid-template-columns: repeat(2, 1fr); } }
@@ -1030,6 +1145,9 @@ onBeforeUnmount(() => { modalOpen.value = false; lightboxIndex.value = null; rel
 .price-separator { text-align: center; color: var(--ui-text-muted); }
 .currency-select { min-width: 0; }
 .currency-select__control :deep(button) { min-height: var(--ui-control-h-md); height: var(--ui-control-h-md); background: var(--bg-panel-2) !important; border-color: rgba(224,103,154,.78) !important; color: var(--text-white); font-weight: 800; letter-spacing: .04em; box-shadow: inset 0 0 0 1px rgba(224,103,154,.08); }
+.filter-amenities-row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--line); }
+.filter-amenities-row__label { margin-right: 4px; white-space: nowrap; }
+.filter-amenities-row :deep(button) { min-height: 30px; height: auto; padding-inline: 9px; white-space: nowrap; }
 .filter-actions-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--line); }
 .advanced-button { flex: 0 0 auto; }
 .active-filter-chips { display: flex; flex: 1 1 300px; gap: 8px; flex-wrap: wrap; min-width: 0; }
@@ -1100,6 +1218,8 @@ onBeforeUnmount(() => { modalOpen.value = false; lightboxIndex.value = null; rel
   .currency-select { grid-column: 1 / -1; }
   .price-input { min-width: 0; padding-left: 7px; gap: 3px; }
   .price-input :deep(.price-number-input) { font-size: 12px; }
+  .filter-amenities-row__label { flex: 0 0 100%; }
+  .filter-amenities-row :deep(button) { flex: 1 1 auto; justify-content: center; }
   .filter-actions-row { align-items: stretch; }
   .advanced-button { flex: 1 1 100%; justify-content: center; }
   .active-filter-chips { flex: 1 1 100%; }
@@ -1111,6 +1231,8 @@ onBeforeUnmount(() => { modalOpen.value = false; lightboxIndex.value = null; rel
   .filter-group:first-child { padding-top: 0; border-top: 0; }
   .filter-group:last-child { padding-bottom: 0; }
   .range-field { grid-template-columns: minmax(0,1fr) 10px minmax(0,1fr); }
+  .flats__results-toolbar { align-items: stretch; flex-direction: column; }
+  .flats__sort { width: 100%; }
   .flat-card__photo { height: 250px; }
   .flat-lightbox__stage { width: 92vw; height: 76vh; }
   .flat-lightbox__nav { width: 42px; height: 56px; font-size: 22px; }
