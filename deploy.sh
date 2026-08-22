@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Unified deployment for the Nuxt frontend, FastAPI backend and shared Redis.
+# Unified deployment for the Nuxt frontend, FastAPI backend and queue workers.
 set -euo pipefail
 
 cd "$(dirname "$0")"
@@ -25,7 +25,9 @@ case "$target" in
     # handshake timeouts), so a local build fails as soon as it needs a base
     # image, and the Nuxt build alone used to exceed the deploy timeout.
     "${compose[@]}" pull
-    "${compose[@]}" up -d --no-build
+    # Remove services retired from compose (for example the second queue worker
+    # and Redis) so old containers cannot keep consuming resources indefinitely.
+    "${compose[@]}" up -d --no-build --remove-orphans
     ;;
   frontend)
     # Frontend depends on the browser-fetcher sidecar used as a WAF fallback for
