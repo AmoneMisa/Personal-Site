@@ -3,6 +3,12 @@ import { readFileSync } from 'node:fs'
 import test from 'node:test'
 import { hiringEducationLabel } from '../shared/hiringEducationLabels.ts'
 import { hiringProfessionLabel } from '../shared/hiringProfessionLabels.ts'
+import {
+  collapseHiringProfessionFilterValues,
+  expandHiringProfessionFilters,
+  hiringProfessionFilterLabel,
+  normalizeHiringProfessionFilterSelections,
+} from '../shared/hiringProfessionGroups.ts'
 
 import {
   extractCandidateAge,
@@ -221,6 +227,31 @@ test('source-specific role spellings and specialist roles use the shared taxonom
   assert.equal(hiringProfessionLabel('Network Administrator', 'ru'), 'Сетевой администратор')
   assert.equal(hiringProfessionLabel('System Administrator', 'ru'), 'Системный администратор')
   assert.equal(hiringProfessionLabel('Penetration Tester', 'ru'), 'Специалист по тестированию на проникновение')
+})
+
+test('related professions collapse into stable combined search facets', () => {
+  assert.deepEqual(normalizeProfessions('Главный бухгалтер', ''), ['Chief Accountant'])
+  assert.deepEqual(normalizeProfessions('Казначей', ''), ['Treasurer'])
+  assert.deepEqual(expandHiringProfessionFilters(['group:accounting-treasury']), [
+    'Accountant',
+    'Chief Accountant',
+    'Treasurer',
+  ])
+  assert.deepEqual(expandHiringProfessionFilters(['group:retail-service']), [
+    'Manager',
+    'Consultant',
+    'Cashier',
+    'Salesperson',
+  ])
+  assert.deepEqual(
+    collapseHiringProfessionFilterValues(['Accountant', 'Chief Accountant', 'Cashier', 'Engineer']),
+    ['group:accounting-treasury', 'group:retail-service', 'Engineer'],
+  )
+  assert.deepEqual(normalizeHiringProfessionFilterSelections(['Treasurer']), ['group:accounting-treasury'])
+  assert.equal(
+    hiringProfessionFilterLabel('group:retail-service', 'ru'),
+    'Менеджер / Консультант / Кассир / Продавец',
+  )
 })
 
 test('candidate detail table explicitly marks missing values for its hide toggle', () => {

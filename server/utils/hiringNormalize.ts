@@ -80,7 +80,9 @@ const PROFESSION_RULES: ProfessionRule[] = [
   { name: 'Administrator', re: /\badministrator\b|администратор|адміністратор/iu },
   { name: 'Receptionist', re: /\breceptionist\b|рецепционист|рецепціоніст|ресепшн/iu },
   { name: 'Manager', re: /\bmanager\b|менеджер|menejer/iu },
-  { name: 'Accountant', re: /\baccountant\b|б[уy]галтер(?:ия)?|b(?:u(?:x|h)?|o)?galter(?:iya)?/iu },
+  { name: 'Chief Accountant', re: /\b(?:chief|head)\s+accountant\b|главн\p{L}*\s+б[уy](?:х|x)?галтер|головн\p{L}*\s+бухгалтер|bosh\s+b(?:u(?:x|h)?|o)?galter/iu },
+  { name: 'Accountant', re: /\baccountant\b|б[уy](?:х|x)?галтер(?:ия)?|b(?:u(?:x|h)?|o)?galter(?:iya)?/iu },
+  { name: 'Treasurer', re: /\btreasurer\b|казначей|скарбник|g['’ʻʼ‘`]?aznachi/iu },
   { name: 'Cashier', re: /\bcashier\b|кассир|касир|kassir|kassa\s+(?:xodimi|mudiri)/iu },
   { name: 'Salesperson', re: /\b(?:salesperson|sales\s+assistant|shop\s+assistant|seller)\b|продавец|продавець|продавчин|sotuvchi/iu },
   { name: 'Merchandiser', re: /\bmerchandiser\b|мерчендайзер|мерчандайзер/iu },
@@ -210,6 +212,10 @@ function collectProfessions(source: string): string[] {
   }
   if (names.includes('Dentist')) {
     const generic = names.indexOf('Doctor')
+    if (generic >= 0) names.splice(generic, 1)
+  }
+  if (names.includes('Chief Accountant')) {
+    const generic = names.indexOf('Accountant')
     if (generic >= 0) names.splice(generic, 1)
   }
   return names

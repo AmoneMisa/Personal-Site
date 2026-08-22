@@ -1,7 +1,12 @@
 <script setup lang="ts">
 import { safeFetch } from "~/utils/safeFetch";
 import { locationLabel } from "~/utils/locationLabels";
-import { hiringProfessionLabel, hiringProfessionLocale } from "~~/shared/hiringProfessionLabels";
+import { hiringProfessionLocale } from "~~/shared/hiringProfessionLabels";
+import {
+  expandHiringProfessionFilters,
+  hiringProfessionFilterLabel,
+  normalizeHiringProfessionFilterSelections,
+} from "~~/shared/hiringProfessionGroups";
 
 // Hiring board — CV/resume profiles from candidates looking for work.
 // Auto-routed at /hiring. UI follows /flat-finder; data from /hiring-feed.
@@ -183,7 +188,7 @@ const genderSel = computed<string>({
   set: (v) => (gender.value = v === ANY ? "" : v),
 });
 const professionItems = computed<Item[]>(() => professionValues.value
-  .map((value) => ({ value, label: hiringProfessionLabel(value, professionLocale.value) }))
+  .map((value) => ({ value, label: hiringProfessionFilterLabel(value, professionLocale.value) }))
   .sort((a, b) => a.label.localeCompare(b.label, professionLocale.value)));
 const SENIORITY_ANY = "__any__";
 const seniorityItems = computed<Item[]>(() => [
@@ -259,7 +264,7 @@ function matchesLocally(profile: CvProfile): boolean {
 
   if (professions.value.length) {
     const owned = new Set([...(profile.professions || []), profile.role].filter(Boolean));
-    if (!professions.value.some((profession) => owned.has(profession))) return false;
+    if (!expandHiringProfessionFilters(professions.value).some((profession) => owned.has(profession))) return false;
   }
 
   if (source.value) {
@@ -317,7 +322,9 @@ function applyQueryParams(params: Record<string, unknown>) {
   ageMin.value = Number(queryString(params.ageMin)) || undefined;
   ageMax.value = Number(queryString(params.ageMax)) || undefined;
   gender.value = ["male", "female", "unknown"].includes(queryString(params.gender)) ? queryString(params.gender) : "";
-  professions.value = queryString(params.professions).split(",").map((v) => v.trim()).filter(Boolean);
+  professions.value = normalizeHiringProfessionFilterSelections(
+    queryString(params.professions).split(",").map((v) => v.trim()).filter(Boolean),
+  );
   query.value = queryString(params.query);
   seniority.value = ["junior", "middle", "senior", "lead"].includes(queryString(params.seniority)) ? queryString(params.seniority) : "";
   skills.value = queryString(params.skills);

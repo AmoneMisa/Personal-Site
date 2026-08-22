@@ -19,6 +19,10 @@ import {
   type HiringProfessionLocale,
 } from '../../shared/hiringProfessionLabels'
 import { hiringEducationLabel } from '../../shared/hiringEducationLabels'
+import {
+  collapseHiringProfessionFilterValues,
+  expandHiringProfessionFilters,
+} from '../../shared/hiringProfessionGroups'
 
 const PAGE_MAX = 60
 
@@ -171,7 +175,7 @@ function matchesFilters(profile: CvProfile, params: URLSearchParams): boolean {
   const professions = list(params, 'professions')
   if (professions.length) {
     const owned = new Set(canonicalProfessions(profile))
-    if (!professions.some((profession) => owned.has(profession))) return false
+    if (!expandHiringProfessionFilters(professions).some((profession) => owned.has(profession))) return false
   }
 
   const seniority = (params.get('seniority') || '').trim().toLowerCase()
@@ -249,7 +253,8 @@ function sourceCounts(profiles: CvProfile[]): Record<string, number> {
 // roles remain searchable in the full text, but only canonical values may be
 // submitted as a structured profession filter.
 function professionValues(): string[] {
-  return Object.keys(HIRING_PROFESSION_LABELS).sort((a, b) => a.localeCompare(b, 'en'))
+  return collapseHiringProfessionFilterValues(Object.keys(HIRING_PROFESSION_LABELS))
+    .sort((a, b) => a.localeCompare(b, 'en'))
 }
 
 function targetedSearchTerm(params: URLSearchParams): string {
@@ -260,7 +265,9 @@ function targetedSearchTerm(params: URLSearchParams): string {
     return query
   }
   return list(params, 'professions')
-    .map((profession) => hiringProfessionLabel(profession, 'ru'))
+    // One representative term keeps the synchronous Flagma backfill bounded;
+    // all group members still participate in the authoritative stored filter.
+    .map((profession) => hiringProfessionLabel(expandHiringProfessionFilters([profession])[0] || profession, 'ru'))
     .join(' ')
     .trim()
 }
