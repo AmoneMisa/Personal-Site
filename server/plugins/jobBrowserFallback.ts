@@ -1,3 +1,5 @@
+import { looksSoftBlocked } from '../utils/browserSoftBlock'
+
 const FALLBACK_STATUSES = new Set([403, 429])
 const FAILURE_STATUSES = new Set([403, 429, 500, 502, 503, 504])
 const DEFAULT_BROWSER_HOSTS = new Set([
@@ -14,24 +16,6 @@ const DEFAULT_BROWSER_HOSTS = new Set([
   'migratemate.co',
   'gcsservices.careers.microsoft.com',
 ])
-
-// A challenge page is served as a successful response: same 200, same
-// content-type, with an interstitial instead of the document. Status alone
-// therefore cannot decide whether the native fetch worked.
-const SOFT_BLOCK_TITLE_RE =
-  /<title[^>]*>[^<]*(?:recaptcha|captcha|just a moment|attention required|access denied|доступ ограничен|проверка браузера|verificare)/i
-const SOFT_BLOCK_BODY_RE =
-  /(?:g-recaptcha|grecaptcha\.|cf-browser-verification|challenge-platform|__cf_chl|hcaptcha\.com\/captcha)/i
-
-/** True when a 200 response carries a challenge rather than the page. */
-export function looksSoftBlocked(html: string): boolean {
-  if (!html) return false
-  const head = html.slice(0, 4_000)
-  if (SOFT_BLOCK_TITLE_RE.test(head)) return true
-  // A real page that merely embeds a captcha widget is much larger than the
-  // interstitial that replaces it, so size keeps false positives down.
-  return html.length < 120_000 && SOFT_BLOCK_BODY_RE.test(head)
-}
 
 type FetchInput = Parameters<typeof globalThis.fetch>[0]
 type FetchInit = Parameters<typeof globalThis.fetch>[1]
@@ -144,6 +128,18 @@ export default defineNitroPlugin(() => {
     try {
       const fallback = await browserFallback(url, input, init)
       if (fallback.ok) {
+        const contentType = fallback.headers.get('content-type') || ''
+        if (contentType.includes('html')) {
+          const html = await fallback.clone().text().catch(() => '')
+          if (looksSoftBlocked(html)) {
+            coolDown(host)
+            console.warn(`[jobs:browser-fallback] ${host} Chrome impersonation still answered a challenge page`)
+            return new Response('upstream challenge persisted after browser fallback', {
+              status: 502,
+              headers: { 'Retry-After': String(Math.ceil(failureCooldownMs / 1000)) },
+            })
+          }
+        }
         failedUntil.delete(host)
         console.info(`[jobs:browser-fallback] ${host} recovered via Chrome impersonation`)
       } else {

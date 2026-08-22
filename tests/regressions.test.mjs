@@ -6,6 +6,8 @@ import {
   extractCandidateName,
 } from '../server/utils/hiringCandidateFields.ts'
 import { removeExistingSocialMeta } from '../server/utils/shareHead.ts'
+import { looksSoftBlocked } from '../server/utils/browserSoftBlock.ts'
+import { normalizeProfessions } from '../server/utils/hiringNormalize.ts'
 import {
   activityDate,
   cityFrom,
@@ -27,6 +29,17 @@ test('Uzbek structured CV fields keep labels out of the candidate name', () => {
   assert.equal(extractCandidateName(text), 'Mavlonova Shahlo Otanazar qizi')
   assert.equal(extractCandidateAge(text, new Date('2026-08-21T12:00:00Z')), 26)
   assert.equal(extractCandidateName('familya: Mavlonova Shahlo Otanazar qizi'), 'Mavlonova Shahlo Otanazar qizi')
+})
+
+test('Uzbek and Russian cashier titles normalize to the canonical profession', () => {
+  assert.deepEqual(normalizeProfessions('Кассир', ''), ['Cashier'])
+  assert.deepEqual(normalizeProfessions('Kassir', ''), ['Cashier'])
+  assert.deepEqual(normalizeProfessions("So'ralgan ish joyi: Kassir", ''), ['Cashier'])
+})
+
+test('successful HTTP captcha pages are treated as blocked responses', () => {
+  assert.equal(looksSoftBlocked('<html><head><title>reCAPTCHA</title></head><body></body></html>'), true)
+  assert.equal(looksSoftBlocked('<html><head><title>Кассир — резюме</title></head><body>Результаты поиска</body></html>'), false)
 })
 
 test('share metadata replacement preserves Nuxt assets in a combined head entry', () => {

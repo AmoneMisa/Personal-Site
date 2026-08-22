@@ -40,7 +40,7 @@ interface FeedResult {
   profiles: CvProfile[];
   warming?: boolean;
   sourceCounts?: Record<string, number>;
-  sourceErrors?: Array<{ source?: string; country?: string; error?: string }>;
+  sourceErrors?: Array<{ source?: string; country?: string; handle?: string; error?: string }>;
   meta?: {
     professions?: string[];
     sources?: Array<{ value: string; label: string; origin?: string }>;
@@ -123,7 +123,26 @@ let warmTimer: ReturnType<typeof setTimeout> | undefined;
 let sharedPostTimer: ReturnType<typeof setTimeout> | undefined;
 let infiniteObserver: IntersectionObserver | undefined;
 
-const sourcesDown = computed(() => !loading.value && !profiles.value.length && (sourceErrors.value?.length ?? 0) > 0);
+const relevantSourceErrors = computed(() => (sourceErrors.value || []).filter((item) => {
+  if (countries.value.length && item.country && !countries.value.includes(item.country.toUpperCase())) return false;
+
+  const selected = source.value.toLowerCase();
+  const failedSource = String(item.source || "").toLowerCase();
+  const isWeb = failedSource !== "telegram" || /^web:/i.test(item.handle || "");
+  if (!selected) return true;
+  if (selected === "web") return isWeb;
+  if (selected === "telegram") return !isWeb;
+  return failedSource === selected;
+}));
+const hasSourceWarning = computed(() =>
+  !loading.value && !profiles.value.length && relevantSourceErrors.value.length > 0
+);
+const sourceWarningKey = computed(() => {
+  if (source.value === "telegram") return "telegramUnavailable";
+  if (source.value === "web") return "webUnavailable";
+  if (source.value) return "sourceUnavailable";
+  return "sourcesUnavailable";
+});
 
 const meta = ref<CountryMeta[]>([]);
 const cityOptions = computed(() => {
@@ -804,8 +823,8 @@ onBeforeUnmount(() => {
     </form>
 
     <p v-if="failed" class="hiring__error">{{ t("error") }}</p>
-    <p v-else-if="sourcesDown" class="hiring__source-warning">
-      {{ t("telegramUnavailable", { n: sourceErrors?.length ?? 0 }) }}
+    <p v-else-if="hasSourceWarning" class="hiring__source-warning">
+      {{ t(sourceWarningKey, { n: relevantSourceErrors.length }) }}
     </p>
     <p v-else-if="warming && !loading" class="hiring__warming text-muted">{{ t("warming") }}</p>
     <p v-else class="hiring__count text-muted">{{ t("found", { n: view === 'active' ? total : displayedProfiles.length }) }}</p>
@@ -845,7 +864,7 @@ onBeforeUnmount(() => {
     </div>
 
     <div v-if="!loading && !displayedProfiles.length && !failed" class="hiring__empty">
-      <div class="text-muted">{{ sourcesDown ? t("emptySourcesDown") : t("empty") }}</div>
+      <div class="text-muted">{{ t("empty") }}</div>
     </div>
 
     <u-modal v-model:open="modalOpen" :title="active?.name || ''" :ui="{ content: 'max-w-3xl' }">

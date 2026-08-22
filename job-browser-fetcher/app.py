@@ -20,6 +20,9 @@ MAX_RETRY_SLEEP = max(0.0, float(os.environ.get("JOB_BROWSER_MAX_RETRY_SLEEP", "
 MAX_REDIRECTS = max(0, min(10, int(os.environ.get("JOB_BROWSER_MAX_REDIRECTS", "5"))))
 
 DEFAULT_ALLOWED_HOSTS = {
+    "flagma.uz",
+    "flagma.ro",
+    "flagma.kg",
     "taskfavour.com",
     "remote.co",
     "simplyhired.com",
