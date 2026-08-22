@@ -414,3 +414,43 @@ test('web CV mirrors with reordered role text collapse to one candidate', () => 
   ])
   assert.equal(candidates.length, 1)
 })
+
+test('a candidate who accepts any work is classified as a general laborer', () => {
+  for (const role of ["Farqi yo'q.", 'Нет разницы', 'Не важно']) {
+    const profile = normalizeCandidate({
+      id: `flexible-${role}`,
+      source: 'Flagma UZ',
+      sourceKey: 'flagma-uz',
+      origin: 'web',
+      country: 'UZ',
+      name: 'Candidate',
+      role,
+      professions: [role],
+      url: 'https://example.com/candidate',
+      createdAt: '2026-08-22T10:00:00.000Z',
+      originalText: `${role}\nCandidate, 30 лет, Ташкент`,
+      description: `${role}\nCandidate, 30 лет, Ташкент`,
+    })
+    assert.equal(profile.role, 'General Laborer')
+    assert.deepEqual(profile.professions, ['General Laborer'])
+  }
+})
+
+test('an obvious developer profile without a stated role becomes Software Developer', () => {
+  const profile = repairCandidateProfile(normalizeCandidate({
+    id: 'developer-without-role',
+    source: 'Telegram',
+    sourceKey: 'telegram',
+    origin: 'telegram',
+    country: 'UA',
+    name: '',
+    role: '',
+    skills: ['React'],
+    url: 'https://t.me/example/1',
+    createdAt: '2026-08-22T10:00:00.000Z',
+    originalText: '#react\nШукаю нові можливості. Портфоліо та CV надішлю приватно.',
+    description: '#react\nШукаю нові можливості. Портфоліо та CV надішлю приватно.',
+  }))
+  assert.equal(profile.role, 'Software Developer')
+  assert.deepEqual(profile.professions, ['Software Developer'])
+})

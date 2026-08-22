@@ -111,9 +111,11 @@ function repairProfessions(profile: CvProfile, text: string): string[] {
   const specific = SPECIAL_PROFESSIONS.filter((rule) => rule.re.test(target)).map((rule) => rule.name)
   if (!specific.length && !current.length) {
     const technologies = field(text, 'texnologiya|technologies|technology|stack') || ''
-    if (/\bflutter\b|\bdart\b/iu.test(technologies)) return ['Mobile Developer']
-    const softwareSignals = (technologies.match(/\b(?:python|java(?:script)?|typescript|php|react|next\.?\s*js|fastapi|flask|sql|html|css)\b/giu) || []).length
-    if (softwareSignals >= 2) return ['Software Developer']
+    const technicalProfile = `${technologies} ${(profile.skills || []).join(' ')}`
+    if (/\bflutter\b|\bdart\b/iu.test(technicalProfile)) return ['Mobile Developer']
+    const strongDeveloperSkill = /\b(?:react|vue\.?\s*js|angular|node\.?\s*js|next\.?\s*js|django|laravel|fastapi|flask|spring|asp\.?net|ruby\s+on\s+rails)\b/iu.test(technicalProfile)
+    const softwareSignals = (technicalProfile.match(/\b(?:python|java(?:script)?|typescript|php|react|vue\.?\s*js|angular|node\.?\s*js|next\.?\s*js|django|laravel|fastapi|flask|spring|asp\.?net|sql|html|css|c\+\+|c#|golang)\b/giu) || []).length
+    if (strongDeveloperSkill || softwareSignals >= 2) return ['Software Developer']
     const headline = text.split('\n').map((line) => line.trim()).filter(Boolean).slice(0, 8).join('\n')
     const headlineProfessions = detectMentionedProfessions(headline)
     if (headlineProfessions.length) return headlineProfessions

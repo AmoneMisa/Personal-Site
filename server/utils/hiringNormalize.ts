@@ -144,7 +144,8 @@ const PROFESSION_RULES: ProfessionRule[] = [
   { name: 'Metrology Specialist', re: /\bmetrolog(?:y|iya)\b|метролог|standartlashtirish/iu },
 
   // Construction / production / warehouse.
-  { name: 'Construction Worker', re: /\b(?:builder|construction\s+worker)\b|строител|будівельник|разнорабоч|різнороб|qurilish/iu },
+  { name: 'General Laborer', re: /\b(?:general\s+laborer|handyman)\b|разнорабоч|різнороб/iu },
+  { name: 'Construction Worker', re: /\b(?:builder|construction\s+worker)\b|строител|будівельник|qurilish/iu },
   { name: 'Welder', re: /\bwelder\b|сварщик|зварювальник|payvandchi/iu },
   { name: 'Electrician', re: /\belectrician\b|электрик|електрик/iu },
   { name: 'Plumber', re: /\bplumber\b|сантехник|сантехнік/iu },
@@ -463,6 +464,7 @@ function stripUiArtifacts(value: string): string {
 
 const HIDDEN_NAME_RE = /^(?:фио|піб|name)?\s*(?:скрыт\p{L}*|прихован\p{L}*|hidden|yashiril\p{L}*|ascuns)$/iu
 const EMPLOYMENT_AS_EDUCATION_RE = /занятост|зайнятіст|удал[её]нн|дистанцион|remote|full[- ]?time|part[- ]?time|график\s+работ|bandlik/iu
+const FLEXIBLE_ROLE_RE = /^(?:нет|без)\s+разницы$|^не\s*важно$|^farqi\s+yo['’ʻʼ‘`]?q$|^любая\s+(?:работа|занятость)$/iu
 const NON_ROLE_RE = /^(?:удал[её]нно|remote|farqi\s+yo['’ʻʼ‘`]?q|bilmaym\p{L}*|ish\s+ker(?:e|a)\s+onlayn|любая\s+(?:работа|занятость)|немає|нет|не\s+указано|not\s+specified)$/iu
 
 function normalizeCandidateEducation(profile: CvProfile, text: string): string | null | undefined {
@@ -514,8 +516,9 @@ export function normalizeCandidate(profile: CvProfile): CvProfile {
     : profile.sourceKey === 'careerist-uz' ? trimCareeristProfileText(rawSourceText) : rawSourceText
   const goalRole = extractGoalRole(originalText)
   const sourceRole = profile.sourceKey === 'careerist-uz' ? careeristRoleFromText(originalText) : null
-  const rawEffectiveRole = goalRole || sourceRole || profile.role
-  const effectiveRole = NON_ROLE_RE.test(rawEffectiveRole || '') ? '' : rawEffectiveRole
+  const rawEffectiveRole = cleanRole(goalRole || sourceRole || profile.role)
+  const flexibleRole = FLEXIBLE_ROLE_RE.test(rawEffectiveRole)
+  const effectiveRole = flexibleRole ? 'General Laborer' : NON_ROLE_RE.test(rawEffectiveRole) ? '' : rawEffectiveRole
   // Repair already-stored rows where a loose adapter saved the whole labelled
   // line ("familya: ...") as the name. New parses and old data then converge.
   const rawName = profile.name?.trim() || ''
@@ -538,7 +541,9 @@ export function normalizeCandidate(profile: CvProfile): CvProfile {
   }
   // AI-enriched/current structured professions must survive subsequent feed and
   // Elasticsearch normalization. Only derive from free text when none exist.
-  const providedProfessions = profile.sourceKey === 'careerist-uz' || !effectiveRole ? [] : normalizeProvidedProfessions(profile.professions)
+  const providedProfessions = profile.sourceKey === 'careerist-uz' || flexibleRole || !effectiveRole
+    ? []
+    : normalizeProvidedProfessions(profile.professions)
   const professions = providedProfessions.length
     ? providedProfessions
     : normalizeProfessions(effectiveRole, originalText)
