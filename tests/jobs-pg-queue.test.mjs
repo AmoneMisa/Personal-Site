@@ -37,12 +37,17 @@ test('Personal-Site no longer depends on flat-finder RabbitMQ', () => {
   assert.match(compose, /JOBS_QUEUE_DATABASE_URL/)
   assert.match(compose, /JOBS_QUEUE_DB_SCHEMA/)
   assert.match(compose, /jobs-queue-worker-1:/)
-  assert.match(compose, /jobs-queue-worker-2:/)
+  assert.doesNotMatch(compose, /jobs-queue-worker-2:/)
 })
 
-test('Redis remains intentionally configured for application state', () => {
-  assert.match(compose, /redis:\n\s+image: redis:8\.4\.0/)
-  assert.match(compose, /REDIS_URL: redis:\/\/redis:6379/)
-  assert.match(compose, /REDIS_HOST: redis/)
-  assert.match(envExample, /REDIS_URL=redis:\/\/localhost:6379/)
+test('application state no longer requires a Redis service', () => {
+  assert.doesNotMatch(compose, /^\s{2}redis:\s*$/m)
+  assert.doesNotMatch(compose, /image:\s*redis:/)
+  assert.doesNotMatch(compose, /REDIS_URL:/)
+  assert.doesNotMatch(compose, /REDIS_HOST:/)
+  assert.doesNotMatch(compose, /REDIS_PORT:/)
+  assert.doesNotMatch(envExample, /^REDIS_/m)
+  assert.match(compose, /^\s{2}site_state:\s*$/m)
+  assert.match(compose, /SITE_STATE_DIR:\s*\/var\/app\/state\/site/)
+  assert.match(compose, /BACKEND_STATE_DIR:\s*\/var\/app\/state\/backend/)
 })
