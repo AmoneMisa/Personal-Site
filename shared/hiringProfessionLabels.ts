@@ -10,6 +10,7 @@ interface ProfessionLabels {
  * This table is display-only and may safely grow without migrating persisted CVs.
  */
 export const HIRING_PROFESSION_LABELS: Record<string, ProfessionLabels> = {
+  'Any Role': { en: 'Any role', ru: 'Любая работа' },
   'Sales Manager': { en: 'Sales Manager', ru: 'Менеджер по продажам' },
   'Project Manager': { en: 'Project Manager', ru: 'Менеджер проектов' },
   'Product Manager': { en: 'Product Manager', ru: 'Продакт-менеджер' },
@@ -38,10 +39,10 @@ export const HIRING_PROFESSION_LABELS: Record<string, ProfessionLabels> = {
 
   Courier: { en: 'Courier', ru: 'Курьер' },
   Driver: { en: 'Driver', ru: 'Водитель' },
+  'Logistics Specialist': { en: 'Logistics Specialist', ru: 'Логист' },
   'Security Guard': { en: 'Security Guard', ru: 'Охранник' },
   Cleaner: { en: 'Cleaner', ru: 'Специалист по уборке' },
   Caregiver: { en: 'Caregiver', ru: 'Сиделка' },
-  'Logistics Specialist': { en: 'Logistics Specialist', ru: 'Логист' },
 
   Bartender: { en: 'Bartender', ru: 'Бармен' },
   Barista: { en: 'Barista', ru: 'Бариста' },
@@ -59,36 +60,33 @@ export const HIRING_PROFESSION_LABELS: Record<string, ProfessionLabels> = {
   'Medical Assistant': { en: 'Medical Assistant', ru: 'Медицинский ассистент' },
 
   Tutor: { en: 'Tutor', ru: 'Репетитор' },
+  'English Teacher': { en: 'English Teacher', ru: 'Преподаватель английского' },
   'Kindergarten Teacher': { en: 'Kindergarten Teacher', ru: 'Воспитатель детского сада' },
   Nanny: { en: 'Nanny', ru: 'Няня' },
   Teacher: { en: 'Teacher', ru: 'Преподаватель' },
   Psychologist: { en: 'Psychologist', ru: 'Психолог' },
   'Speech Therapist': { en: 'Speech Therapist', ru: 'Логопед' },
 
-  // Widely used technical job titles intentionally stay in English in the
-  // Russian UI. Translating them literally makes the board less recognizable
-  // to candidates and recruiters who use the English titles in practice.
-  'Full-stack Developer': { en: 'Full-stack Developer', ru: 'Full-stack Developer' },
-  'Backend Developer': { en: 'Backend Developer', ru: 'Backend Developer' },
-  'Frontend Developer': { en: 'Frontend Developer', ru: 'Frontend Developer' },
-  'Mobile Developer': { en: 'Mobile Developer', ru: 'Mobile Developer' },
-  'IT Specialist': { en: 'IT Specialist', ru: 'IT Specialist' },
+  'Full-stack Developer': { en: 'Full-stack Developer', ru: 'Full-stack-разработчик' },
+  'Backend Developer': { en: 'Backend Developer', ru: 'Backend-разработчик' },
+  'Frontend Developer': { en: 'Frontend Developer', ru: 'Frontend-разработчик' },
+  'Mobile Developer': { en: 'Mobile Developer', ru: 'Мобильный разработчик' },
+  'IT Specialist': { en: 'IT Specialist', ru: 'IT-специалист' },
   'Network Administrator': { en: 'Network Administrator', ru: 'Сетевой администратор' },
   'System Administrator': { en: 'System Administrator', ru: 'Системный администратор' },
-  'Software Developer': { en: 'Software Developer', ru: 'Software Developer' },
+  'Software Developer': { en: 'Software Developer', ru: 'Разработчик ПО' },
   'QA Engineer': { en: 'QA Engineer', ru: 'QA Engineer' },
   'DevOps Engineer': { en: 'DevOps Engineer', ru: 'DevOps Engineer' },
-  'Cybersecurity Specialist': { en: 'Cybersecurity Specialist', ru: 'Cybersecurity Specialist' },
+  'Cybersecurity Specialist': { en: 'Cybersecurity Specialist', ru: 'Специалист по информационной безопасности' },
   'Penetration Tester': { en: 'Pentester', ru: 'Pentester' },
   'AI / ML Engineer': { en: 'AI / ML Engineer', ru: 'AI / ML Engineer' },
   'Data Scientist': { en: 'Data Scientist', ru: 'Data Scientist' },
   'Data Engineer': { en: 'Data Engineer', ru: 'Data Engineer' },
-  'Engineering Manager': { en: 'Engineering Manager', ru: 'Engineering Manager' },
-  'Hardware Engineer': { en: 'Hardware Engineer', ru: 'Hardware Engineer' },
+  'Engineering Manager': { en: 'Engineering Manager', ru: 'Технический руководитель' },
+  'Hardware Engineer': { en: 'Hardware Engineer', ru: 'Инженер-электронщик' },
   Designer: { en: 'Designer', ru: 'Дизайнер' },
   Architect: { en: 'Architect', ru: 'Архитектор' },
   Analyst: { en: 'Analyst', ru: 'Аналитик' },
-  Economist: { en: 'Economist', ru: 'Экономист' },
   Engineer: { en: 'Engineer', ru: 'Инженер' },
   Marketer: { en: 'Marketer', ru: 'Маркетолог' },
   'Media Specialist': { en: 'Media Specialist', ru: 'Специалист по СМИ' },
@@ -97,6 +95,7 @@ export const HIRING_PROFESSION_LABELS: Record<string, ProfessionLabels> = {
   Translator: { en: 'Translator', ru: 'Переводчик' },
   Lawyer: { en: 'Lawyer', ru: 'Юрист' },
   Notary: { en: 'Notary', ru: 'Нотариус' },
+  Economist: { en: 'Economist', ru: 'Экономист' },
   'Metrology Specialist': { en: 'Metrology Specialist', ru: 'Специалист по метрологии и стандартизации' },
   'Finance / Banking Specialist': { en: 'Finance / Banking Specialist', ru: 'Специалист по финансам и банковскому делу' },
   'Oil & Gas Worker': { en: 'Oil & Gas Worker', ru: 'Работник нефтегазовой отрасли' },
@@ -117,46 +116,11 @@ export const HIRING_PROFESSION_LABELS: Record<string, ProfessionLabels> = {
   Seamstress: { en: 'Seamstress', ru: 'Швея' },
 }
 
-interface RawProfessionAlias {
-  canonical?: string
-  re: RegExp
-  en?: string
-  ru?: string
-}
-
-// Some source boards expose a headline instead of a normalized profession.
-// Resolve common Uzbek/Russian/typo variants here as a presentation safety net;
-// canonical parser rules may still normalize them earlier in the pipeline.
-const RAW_PROFESSION_ALIASES: RawProfessionAlias[] = [
-  { canonical: 'Penetration Tester', re: /^(?:pentester|pen\s*tester|penetration\s+tester)$/iu },
-  { canonical: 'Data Scientist', re: /^(?:data\s+scientist|data\s+science\s+specialist)$/iu },
-  { canonical: 'Data Engineer', re: /^data\s+engineer$/iu },
-  { canonical: 'AI / ML Engineer', re: /^(?:ai\s*\/\s*ml|ml|machine\s+learning)\s+(?:engineer|developer)$/iu },
-  { canonical: 'Frontend Developer', re: /(?:^|\s)(?:frontend|front[- ]?end|frontet)(?:\s|$)|\bitishnik\b.*\bfront/iu },
-  { canonical: 'IT Specialist', re: /\b(?:itishnik|it\s*ishnik|it\s+specialist)\b/iu },
-  { canonical: 'Economist', re: /^(?:iqtisodchi|iqtsodchi|iqtisodiy|economist|экономист)$/iu },
-  { canonical: 'Logistics Specialist', re: /^(?:logist|logistic|logistics|logistika|логист)$/iu },
-  { canonical: 'Teacher', re: /\b(?:ingliz\s+tili\s+)?ustoz(?:iman)?\b|\bo['’ʻʼ‘`]?qituvchi\b/iu },
-  { canonical: 'Nanny', re: /\bbola(?:lar)?ga?\s+qarash\b|\bbolalarga\s+qarash\b/iu },
-  { en: 'Remote work', ru: 'Удалённая работа', re: /^(?:onlayn|online)$/iu },
-]
-
-function aliasedProfession(value: string): RawProfessionAlias | undefined {
-  return RAW_PROFESSION_ALIASES.find((alias) => alias.re.test(value))
-}
-
 export function hiringProfessionLocale(value: unknown): HiringProfessionLocale {
   return String(value || '').toLowerCase().startsWith('en') ? 'en' : 'ru'
 }
 
 export function hiringProfessionLabel(value: string, locale: HiringProfessionLocale): string {
   const key = String(value || '').trim()
-  const direct = HIRING_PROFESSION_LABELS[key]
-  if (direct) return direct[locale]
-
-  const alias = aliasedProfession(key)
-  if (alias?.canonical) return HIRING_PROFESSION_LABELS[alias.canonical]?.[locale] || alias.canonical
-  if (alias) return alias[locale] || key
-
-  return key
+  return HIRING_PROFESSION_LABELS[key]?.[locale] || key
 }
