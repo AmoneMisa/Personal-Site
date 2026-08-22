@@ -69,7 +69,7 @@ export const HIRING_PROFESSION_LABELS: Record<string, ProfessionLabels> = {
 
   'Full-stack Developer': { en: 'Full-stack Developer', ru: 'Full-stack-разработчик' },
   'Backend Developer': { en: 'Backend Developer', ru: 'Backend-разработчик' },
-  'Frontend Developer': { en: 'Frontend Developer', ru: 'Frontend-разработчик' },
+  'Frontend Developer': { en: 'Frontend Developer', ru: 'Frontend Developer' },
   'Mobile Developer': { en: 'Mobile Developer', ru: 'Мобильный разработчик' },
   'IT Specialist': { en: 'IT Specialist', ru: 'IT-специалист' },
   'Network Administrator': { en: 'Network Administrator', ru: 'Сетевой администратор' },
@@ -120,7 +120,26 @@ export function hiringProfessionLocale(value: unknown): HiringProfessionLocale {
   return String(value || '').toLowerCase().startsWith('en') ? 'en' : 'ru'
 }
 
+const RAW_PROFESSION_LABELS: Array<{ re: RegExp; key?: string; en?: string; ru?: string }> = [
+  { re: /^iqt(?:i)?sodchi$/iu, key: 'Economist' },
+  { re: /^iqtisodiy$/iu, key: 'Economist' },
+  { re: /^logist$/iu, key: 'Logistics Specialist' },
+  { re: /^ingliz\s+tili\s+ustoz(?:iman)?$/iu, key: 'English Teacher' },
+  { re: /mobilagraf[\s\S]*itishnik[\s\S]*front(?:et|ent|end)/iu, key: 'Frontend Developer' },
+  { re: /farqi\s+yo[\s\S]*bolalarga\s+qarash/iu, key: 'Nanny' },
+  { re: /^(?:sales\s+executive(?:\s+ind)?|роп(?:,?\s*sales\s+executive)?)$/iu, key: 'Sales Manager' },
+  { re: /^onlayn$/iu, en: 'Remote work', ru: 'Удалённая работа' },
+]
+
 export function hiringProfessionLabel(value: string, locale: HiringProfessionLocale): string {
   const key = String(value || '').trim()
-  return HIRING_PROFESSION_LABELS[key]?.[locale] || key
+  const canonical = HIRING_PROFESSION_LABELS[key]
+  if (canonical) return canonical[locale]
+
+  for (const alias of RAW_PROFESSION_LABELS) {
+    if (!alias.re.test(key)) continue
+    if (alias.key) return HIRING_PROFESSION_LABELS[alias.key]?.[locale] || alias.key
+    return alias[locale] || key
+  }
+  return key
 }

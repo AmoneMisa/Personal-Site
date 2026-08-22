@@ -302,6 +302,8 @@ export function normalizeProfessions(rawRole: string | undefined, text: string):
   // Desired-role text wins, except when a loose source parser handed us an
   // explicit work-history/education line instead of a target role.
   const target = cleanRole(rawRole)
+  if (FLEXIBLE_ROLE_RE.test(target)) return ['Any Role']
+  if (NON_ROLE_RE.test(target)) return []
   if (target && !NON_TARGET_CONTEXT_RE.test(target)) {
     const targetMatches = collectProfessions(target)
     if (targetMatches.length) return targetMatches
