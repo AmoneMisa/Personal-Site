@@ -22,6 +22,17 @@ def _path(key: str) -> Path:
     return _STATE_DIR / f"{digest}.json"
 
 
+def _remove_sync(key: str) -> bool:
+    path = _path(key)
+    try:
+        path.unlink()
+        return True
+    except FileNotFoundError:
+        return False
+    except OSError:
+        return False
+
+
 def _read_sync(key: str) -> Optional[str]:
     path = _path(key)
     try:
@@ -33,10 +44,7 @@ def _read_sync(key: str) -> Optional[str]:
 
     expires_at = payload.get("expiresAt")
     if expires_at is not None and float(expires_at) <= time.time():
-        try:
-            path.unlink(missing_ok=True)
-        except OSError:
-            pass
+        _remove_sync(key)
         return None
 
     value = payload.get("value")
@@ -78,28 +86,12 @@ class PersistentFileKV:
         for key in keys:
             lock = _locks.setdefault(key, asyncio.Lock())
             async with lock:
-                path = _path(key)
-                existed = await asyncio.to_thread(path.exists)
-                try:
-                    await asyncio.to_thread(path.unlink, True)
-                except TypeError:
-                    # Python versions where Path.unlink's missing_ok is keyword-only.
-                    try:
-                        await asyncio.to_thread(path.unlink, missing_ok=True)
-                    except OSError:
-                        pass
-                except OSError:
-                    pass
-                if existed:
+                if await asyncio.to_thread(_remove_sync, key):
                     removed += 1
         return removed
 
     async def exists(self, key: str):
         return 1 if await self.get(key) is not None else 0
-
-
-async def _ensure_state_dir() -> None:
-    await asyncio.to_thread(_STATE_DIR.mkdir, parents=True, exist_ok=True)
 
 
 def get_redis():
