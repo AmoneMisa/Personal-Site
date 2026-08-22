@@ -47,6 +47,8 @@ function decodeEntities(value: string): string {
 
 function htmlText(value: string): string {
   return decodeEntities(value)
+    .replace(/<(script|style|noscript|template)\b[^>]*>[\s\S]*?<\/\1>/gi, ' ')
+    .replace(/<!--[\s\S]*?-->/g, ' ')
     .replace(/<br\s*\/?>/gi, '\n')
     .replace(/<\/(?:p|div|li|h[1-6]|tr|section|article)>/gi, '\n')
     .replace(/<[^>]*>/g, ' ')
@@ -150,7 +152,14 @@ function blockAnchors(html: string): CandidateBlock[] {
   return grouped.map((item, index) => {
     const start = Math.max(0, item.first - 350)
     const end = grouped[index + 1]?.first ?? Math.min(html.length, item.end + 5_000)
-    const raw = html.slice(start, end)
+    const sliced = html.slice(start, end)
+    const cut = start > 0 ? sliced.indexOf('>') : -1
+    const trimmed = cut >= 0 && cut < 400 ? sliced.slice(cut + 1) : sliced
+    const orphan = trimmed.search(/<\/(?:script|style)>/i)
+    const opens = trimmed.search(/<(?:script|style)\b/i)
+    const raw = orphan >= 0 && (opens < 0 || orphan < opens)
+      ? trimmed.slice(trimmed.indexOf('>', orphan) + 1)
+      : trimmed
     const title = item.titles.reduce((longest, candidate) => candidate.length > longest.length ? candidate : longest, '')
     return { href: item.href, title, html: raw, text: htmlText(raw) }
   })

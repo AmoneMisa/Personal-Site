@@ -31,6 +31,7 @@ export const HIRING_PROFESSION_LABELS: Record<string, ProfessionLabels> = {
   Merchandiser: { en: 'Merchandiser', ru: 'Мерчендайзер' },
   Promoter: { en: 'Promoter', ru: 'Промоутер' },
   'Customer Support': { en: 'Customer Support', ru: 'Специалист поддержки' },
+  'Call Center Operator': { en: 'Call Center Operator', ru: 'Оператор колл-центра' },
   Operator: { en: 'Operator', ru: 'Оператор' },
   Copywriter: { en: 'Copywriter', ru: 'Копирайтер' },
 
@@ -80,6 +81,7 @@ export const HIRING_PROFESSION_LABELS: Record<string, ProfessionLabels> = {
   'Engineering Manager': { en: 'Engineering Manager', ru: 'Технический руководитель' },
   'Hardware Engineer': { en: 'Hardware Engineer', ru: 'Инженер-электронщик' },
   Designer: { en: 'Designer', ru: 'Дизайнер' },
+  Architect: { en: 'Architect', ru: 'Архитектор' },
   Analyst: { en: 'Analyst', ru: 'Аналитик' },
   Engineer: { en: 'Engineer', ru: 'Инженер' },
   Marketer: { en: 'Marketer', ru: 'Маркетолог' },

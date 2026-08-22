@@ -87,6 +87,7 @@ const PROFESSION_RULES: ProfessionRule[] = [
   { name: 'Salesperson', re: /\b(?:salesperson|sales\s+assistant|shop\s+assistant|seller)\b|продавец|продавець|продавчин|sotuvchi/iu },
   { name: 'Merchandiser', re: /\bmerchandiser\b|мерчендайзер|мерчандайзер/iu },
   { name: 'Promoter', re: /\bpromoter\b|промоутер/iu },
+  { name: 'Call Center Operator', re: /\b(?:call|koll)[-\s]?(?:center|centre|markaz)\s+operator(?:i)?\b|оператор\s+(?:колл|call)[-\s]?центр|(?:колл|call)[-\s]?центр(?:а|у)?\s+оператор/iu },
   { name: 'Customer Support', re: /\b(?:customer\s+support|support\s+specialist|call\s*center)\b|поддержк|підтримк|колл[-\s]?центр|call[-\s]?центр/iu },
   { name: 'Operator', re: /\boperator(?:lik|i)?\b|оператор/iu },
   { name: 'Copywriter', re: /\bcopywriter\b|копирайтер|копірайтер|составлени\p{L}*\s+текст|наборщик\s+текста/iu },
@@ -138,6 +139,7 @@ const PROFESSION_RULES: ProfessionRule[] = [
   { name: 'Engineering Manager', re: /\b(?:cto|vp\s+of\s+engineering|head\s+of\s+engineering|engineering\s+manager)\b|техническ\p{L}*\s+директор/iu },
   { name: 'Hardware Engineer', re: /\b(?:hardware|embedded|pcb)\s*(?:engineer|developer)?\b|друкован\p{L}*\s+плат|печатн\p{L}*\s+плат|мікроконтролер|микроконтроллер/iu },
   { name: 'Designer', re: /\b(?:designer|ui\/?ux)\b|дизайнер/iu },
+  { name: 'Architect', re: /\barchitect\b|архитектор|архітектор|arxitektor(?:\s+loyihachi)?/iu },
   { name: 'Analyst', re: /\banalyst\b|аналитик|аналітик/iu },
   { name: 'Engineer', re: /\bengineer\b|инженер|інженер|muhandis|injiner/iu },
   { name: 'Marketer', re: /\b(?:marketer|marketing(?:\s+specialist)?|smm)\b|маркетинг|маркетолог|smm[-\s]?специалист/iu },
@@ -213,6 +215,12 @@ function collectProfessions(source: string): string[] {
   if (names.includes('Dentist')) {
     const generic = names.indexOf('Doctor')
     if (generic >= 0) names.splice(generic, 1)
+  }
+  if (names.includes('Call Center Operator')) {
+    for (const genericName of ['Customer Support', 'Operator']) {
+      const generic = names.indexOf(genericName)
+      if (generic >= 0) names.splice(generic, 1)
+    }
   }
   if (names.includes('Chief Accountant')) {
     const generic = names.indexOf('Accountant')
@@ -477,6 +485,20 @@ function stripUiArtifacts(value: string): string {
     .trim()
 }
 
+/** Removes ad-loader JavaScript leaked by incomplete Flagma card fragments. */
+function trimFlagmaProfileText(value: string): string {
+  return stripUiArtifacts(value)
+    .replace(
+      /(?:^|\n)\s*try\s*\{\s*(?:\r?\n)?\s*\(?\s*(?:adsbygoogle|window\.adsbygoogle)[\s\S]{0,500}?\}\s*catch\s*\([^)]*\)\s*\{[\s\S]{0,500}?\}(?=\s*\n|$)/giu,
+      '\n',
+    )
+    .split('\n')
+    .filter((line) => !/^\s*(?:\(?\s*adsbygoogle\b|window\.adsbygoogle\b|console\.log\s*\(|try\s*\{|\}?\s*catch\s*\([^)]*\)\s*\{|\}\s*;?)\s*/iu.test(line))
+    .join('\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim()
+}
+
 const HIDDEN_NAME_RE = /^(?:фио|піб|name)?\s*(?:скрыт\p{L}*|прихован\p{L}*|hidden|yashiril\p{L}*|ascuns)$/iu
 const EMPLOYMENT_AS_EDUCATION_RE = /занятост|зайнятіст|удал[её]нн|дистанцион|remote|full[- ]?time|part[- ]?time|график\s+работ|bandlik/iu
 const FLEXIBLE_ROLE_RE = /^(?:нет|без)\s+разницы$|^не\s*важно$|^farqi\s+yo['’ʻʼ‘`]?q$|^любая\s+(?:работа|занятость)$/iu
@@ -528,7 +550,11 @@ export function normalizeCandidate(profile: CvProfile): CvProfile {
   const rawSourceText = stripUiArtifacts(profile.originalText || profile.description || '')
   const originalText = profile.sourceKey === 'ishbor-uz'
     ? trimIshBorProfileText(rawSourceText)
-    : profile.sourceKey === 'careerist-uz' ? trimCareeristProfileText(rawSourceText) : rawSourceText
+    : profile.sourceKey === 'careerist-uz'
+      ? trimCareeristProfileText(rawSourceText)
+      : profile.sourceKey?.startsWith('flagma')
+        ? trimFlagmaProfileText(rawSourceText)
+        : rawSourceText
   const goalRole = extractGoalRole(originalText)
   const sourceRole = profile.sourceKey === 'careerist-uz' ? careeristRoleFromText(originalText) : null
   const rawEffectiveRole = cleanRole(goalRole || sourceRole || profile.role)
@@ -599,7 +625,9 @@ export function normalizeCandidate(profile: CvProfile): CvProfile {
       ? trimIshBorProfileText(stripUiArtifacts(profile.description || originalText))
       : profile.sourceKey === 'careerist-uz'
         ? trimCareeristProfileText(stripUiArtifacts(profile.description || originalText))
-        : stripUiArtifacts(profile.description || originalText),
+        : profile.sourceKey?.startsWith('flagma')
+          ? trimFlagmaProfileText(profile.description || originalText)
+          : stripUiArtifacts(profile.description || originalText),
     role: professions[0] || (effectiveRole ? normalizeRole(effectiveRole, originalText) : ''),
     professions,
     previousProfessions: profile.previousProfessions?.length

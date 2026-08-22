@@ -342,6 +342,30 @@ test('Flagma rejects presentation fields as role, education and contact', () => 
   assert.equal(normalized.contact, normalized.url)
 })
 
+test('Uzbek architect and call-center roles normalize and Flagma ad scripts are removed', () => {
+  assert.deepEqual(normalizeProfessions('Arxitektor loyihachi', ''), ['Architect'])
+  assert.deepEqual(normalizeProfessions('Koll-markaz operatori', ''), ['Call Center Operator'])
+
+  const script = [
+    'try{',
+    '(adsbygoogle = window.adsbygoogle || []).push({});',
+    '}catch(e){',
+    'console.log(e);',
+    '}',
+  ].join('\n')
+  const normalized = normalizeCandidate({
+    id: 'flagma-call-center', source: 'telegram', origin: 'web', sourceKey: 'flagma-uz', country: 'UZ',
+    role: 'Koll-markaz operatori', url: 'https://flagma.uz/ru/resume-example-rr1.html',
+    createdAt: '2026-08-22T12:00:00.000Z',
+    originalText: `${script}\nKoll-markaz operatori\n6 000 000 сум`,
+    description: `${script}\nKoll-markaz operatori\n6 000 000 сум`,
+  })
+
+  assert.equal(normalized.role, 'Call Center Operator')
+  assert.doesNotMatch(normalized.originalText, /adsbygoogle|console\.log|catch\s*\(/iu)
+  assert.doesNotMatch(normalized.description, /adsbygoogle|console\.log|catch\s*\(/iu)
+})
+
 test('legacy Careerist rows lose icon ligatures and repeating experience fractions', () => {
   const profile = normalizeCandidate({
     id: 'careerist-1',
