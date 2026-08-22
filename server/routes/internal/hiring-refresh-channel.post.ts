@@ -1,6 +1,6 @@
-// Refreshes one hiring source on behalf of a RabbitMQ task. Telegram channels
-// and public web-CV adapters share the queue; `web:<key>` identifies a web
-// source and keeps retries isolated per site/channel.
+// Refreshes one hiring source on behalf of a queue task. Telegram channels,
+// public web-CV adapters and public social targets share the queue; prefixes
+// keep retries isolated per site/channel/query.
 
 import { createError, getHeader, readBody } from 'h3'
 import { hiringChannelHandles } from '~~/server/utils/hiringSources'
@@ -12,6 +12,7 @@ import {
   refreshHiringSecondaryWebSource,
 } from '~~/server/utils/hiringSecondaryWebSources'
 import { hiringUzJobsSourceHandles, refreshHiringUzJobsSource } from '~~/server/utils/hiringUzJobsSource'
+import { hiringSocialSourceHandles, refreshHiringSocialSource } from '~~/server/utils/hiringSocialSources'
 
 export default defineEventHandler(async (event) => {
   const expected = String(process.env.QUEUE_INTERNAL_KEY || '')
@@ -31,23 +32,27 @@ export default defineEventHandler(async (event) => {
   const knownIshBor = hiringIshBorSourceHandles().some((item) => item.toLowerCase() === handle.toLowerCase())
   const knownUzJobs = hiringUzJobsSourceHandles().some((item) => item.toLowerCase() === handle.toLowerCase())
   const knownSecondaryWeb = hiringSecondaryWebSourceHandles().some((item) => item.toLowerCase() === handle.toLowerCase())
+  const knownSocial = hiringSocialSourceHandles().some((item) => item.toLowerCase() === handle.toLowerCase())
 
-  if (!handle || (!knownTelegram && !knownWeb && !knownIshBor && !knownUzJobs && !knownSecondaryWeb)) {
+  if (!handle || (!knownTelegram && !knownWeb && !knownIshBor && !knownUzJobs && !knownSecondaryWeb && !knownSocial)) {
     throw createError({ statusCode: 400, statusMessage: `Unknown hiring source: ${handle || '<empty>'}` })
   }
 
-  const result = knownIshBor
-    ? await refreshHiringIshBorSource(handle)
-    : knownUzJobs
-      ? await refreshHiringUzJobsSource(handle)
-      : knownSecondaryWeb
-        ? await refreshHiringSecondaryWebSource(handle)
-        : knownWeb
-          ? await refreshHiringWebSource(handle)
-          : await refreshHiringChannel(handle)
+  const result = knownSocial
+    ? await refreshHiringSocialSource(handle)
+    : knownIshBor
+      ? await refreshHiringIshBorSource(handle)
+      : knownUzJobs
+        ? await refreshHiringUzJobsSource(handle)
+        : knownSecondaryWeb
+          ? await refreshHiringSecondaryWebSource(handle)
+          : knownWeb
+            ? await refreshHiringWebSource(handle)
+            : await refreshHiringChannel(handle)
 
   if (!result) {
-    throw createError({ statusCode: 503, statusMessage: knownTelegram ? 'Telegram source is disabled' : 'Web CV source is disabled' })
+    const kind = knownTelegram ? 'Telegram' : knownSocial ? 'Social' : 'Web CV'
+    throw createError({ statusCode: 503, statusMessage: `${kind} source is disabled` })
   }
 
   return { ok: true, handle, ...result }
