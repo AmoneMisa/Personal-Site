@@ -287,6 +287,47 @@ test('IshBor keeps only the profile column and trusts its stated region', () => 
   assert.equal(ishBorLocationFromText(
     "Oliy toifali boshlang'ich ta'lim o'qituvchisi (Резюме) - Навои | работа в ташкенте",
   ), 'Navoi')
+
+  const tashkentRegionLegacy = [
+    'Tarjimon (Резюме) - Ташкент обл. | работа в ташкенте',
+    'Города и области',
+    'Tarjimon',
+    'Не важно',
+    '8 000 000-15 000 000',
+    'Ташкент обл.',
+    'Другие',
+    'У меня нет опыта работы',
+    'Abror (Мужчина)',
+    'Средний',
+    '19.08.2026',
+    'ish-bor.uz',
+    'Если вам нужна работа или работник, посетите наш сайт',
+    'Войти',
+  ].join('\n')
+  const tashkentRegionProfile = normalizeCandidate({
+    id: 'web-ishbor-uz-118025',
+    source: 'telegram',
+    origin: 'web',
+    sourceKey: 'ishbor-uz',
+    country: 'UZ',
+    name: 'Abror',
+    role: 'Translator',
+    professions: ['Translator'],
+    city: 'Tashkent',
+    experienceYears: 0,
+    salaryMin: 8_000_000,
+    salaryMax: 15_000_000,
+    currency: 'UZS',
+    url: 'https://ish-bor.uz/ru/ishchilar/id/118025',
+    createdAt: '2026-08-19T12:00:00.000Z',
+    originalText: tashkentRegionLegacy,
+    description: tashkentRegionLegacy,
+  })
+  assert.equal(tashkentRegionProfile.city, 'Tashkent Region')
+  assert.equal(tashkentRegionProfile.experienceYears, 0)
+  assert.equal(tashkentRegionProfile.salaryMin, 8_000_000)
+  assert.equal(tashkentRegionProfile.salaryMax, 15_000_000)
+  assert.doesNotMatch(tashkentRegionProfile.description, /работа в ташкенте|Если вам нужна работа|Войти/iu)
 })
 
 test('Uzbek boards that print a region instead of a city still resolve a location', () => {
