@@ -558,6 +558,7 @@ function genderLabel(value?: CvProfile["gender"]): string {
 }
 
 function experienceLabel(years: number): string {
+  if (years === 0) return t("experienceNone");
   const value = new Intl.NumberFormat(String(locale.value), { maximumFractionDigits: 1 }).format(years);
   return t("experienceN", { n: value });
 }

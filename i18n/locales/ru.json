@@ -324,6 +324,7 @@
     "remoteBadge": "Удалёнка",
     "experienceMin": "Опыт от (лет)",
     "experienceN": "{n}+ лет",
+    "experienceNone": "Без опыта",
     "found": "Резюме: {n}",
     "empty": "Нет резюме по вашему запросу.",
     "error": "Не удалось загрузить резюме.",

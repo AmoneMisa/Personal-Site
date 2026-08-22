@@ -324,6 +324,7 @@
     "remoteBadge": "Remote",
     "experienceMin": "Experience from (years)",
     "experienceN": "{n}+ yrs",
+    "experienceNone": "Without experience",
     "found": "{n} CVs",
     "empty": "No CV profiles match your search.",
     "error": "Could not load CV profiles. Please try again.",

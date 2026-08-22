@@ -9,6 +9,11 @@ import { removeExistingSocialMeta } from '../server/utils/shareHead.ts'
 import { looksSoftBlocked } from '../server/utils/browserSoftBlock.ts'
 import { normalizeCandidate, normalizeProfessions } from '../server/utils/hiringNormalize.ts'
 import {
+  ishBorLocationFromText,
+  ishBorProfileHtml,
+  trimIshBorProfileText,
+} from '../server/utils/hiringIshBorFields.ts'
+import {
   activityDate,
   cityFrom,
   dayMonthDate,
@@ -129,6 +134,67 @@ test('legacy Careerist rows lose icon ligatures and repeating experience fractio
   assert.equal(profile.city, 'Ташкент')
   assert.equal(profile.experienceYears, 20.3)
   assert.doesNotMatch(profile.description, /local_shipping/)
+})
+
+test('IshBor keeps only the profile column and trusts its stated region', () => {
+  const html = [
+    '<nav>работа в Ташкенте</nav>',
+    '<div class="flex"><div class="w-full lg:w-2/3">',
+    '<h1>Електрик</h1><iconify-icon icon="lucide:map-pin"></iconify-icon><span>Сурхандаря</span>',
+    '<iconify-icon icon="lucide:clock"></iconify-icon><span>У меня нет опыта работы</span>',
+    '</div><div class="w-full lg:w-1/3">Вакансии Ташкент</div></div>',
+    '<footer>Меню Войти Регистрация</footer>',
+  ].join('')
+  const profileHtml = ishBorProfileHtml(html)
+
+  assert.match(profileHtml, /Електрик|Сурхандаря/)
+  assert.doesNotMatch(profileHtml, /работа в Ташкенте|Вакансии Ташкент|Регистрация/)
+
+  const legacyText = [
+    'Електрик (Резюме) - Сурхандаря | работа в ташкенте',
+    'ish bor.uz',
+    'Фильтр',
+    'Города и области',
+    'Електрик',
+    'Постоянный',
+    'Сурхандаря',
+    'У меня нет опыта работы',
+    'Dilshodbek (Мужчина)',
+    '21.08.2026',
+    'ish-bor.uz',
+    'Если вам нужна работа или работник',
+    'Войти',
+    'Регистрация',
+  ].join('\n')
+
+  assert.equal(ishBorLocationFromText(legacyText), 'Surkhandarya')
+  assert.equal(trimIshBorProfileText(legacyText), [
+    'Електрик',
+    'Постоянный',
+    'Сурхандаря',
+    'У меня нет опыта работы',
+    'Dilshodbek (Мужчина)',
+    '21.08.2026',
+  ].join('\n'))
+
+  const repaired = normalizeCandidate({
+    id: 'web-ishbor-uz-118053',
+    source: 'telegram',
+    origin: 'web',
+    sourceKey: 'ishbor-uz',
+    country: 'UZ',
+    name: 'Dilshodbek',
+    role: 'Электрик',
+    city: 'Tashkent',
+    experienceYears: 0,
+    url: 'https://ish-bor.uz/ru/ishchilar/id/118053',
+    createdAt: '2026-08-21T12:00:00.000Z',
+    originalText: legacyText,
+    description: legacyText,
+  })
+  assert.equal(repaired.city, 'Surkhandarya')
+  assert.equal(repaired.experienceYears, 0)
+  assert.doesNotMatch(repaired.description, /Фильтр|Если вам нужна работа|Регистрация/)
 })
 
 test('Uzbek boards that print a region instead of a city still resolve a location', () => {
