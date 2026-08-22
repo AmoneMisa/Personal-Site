@@ -45,9 +45,6 @@ const TARGETS: SocialTarget[] = [
   { key: 'facebook-uz-tashkent-work', label: 'Работа в Ташкенте', platform: 'facebook', country: 'UZ', city: 'Tashkent', target: 'https://www.facebook.com/groups/210512423334861/', limit: 120 },
   { key: 'facebook-uz-work', label: 'Есть работа! Узбекистан', platform: 'facebook', country: 'UZ', target: 'https://www.facebook.com/groups/182315195189726/', limit: 120 },
   { key: 'facebook-uz-work-search', label: 'РАБОТА-УЗБЕКИСТАН', platform: 'facebook', country: 'UZ', target: 'https://www.facebook.com/groups/1734634446766716/', limit: 120 },
-  { key: 'facebook-kz-almaty-24rabota', label: '24rabota.kz — Алматы', platform: 'facebook', country: 'KZ', city: 'Almaty', target: 'https://www.facebook.com/groups/24rabota.kz/', limit: 100 },
-  { key: 'facebook-kz-astana-work', label: 'Работа в Астане', platform: 'facebook', country: 'KZ', city: 'Astana', target: 'https://www.facebook.com/groups/astana.rabota.vakansii/', limit: 100 },
-  { key: 'facebook-ua-digital-jobs', label: 'Digital Jobs Ukraine', platform: 'facebook', country: 'UA', target: 'https://www.facebook.com/groups/DIGITALJOBSUKR/', limit: 100 },
   { key: 'facebook-ua-freelancers', label: 'Freelancers Ukraine', platform: 'facebook', country: 'UA', target: 'https://www.facebook.com/groups/freelancers.ukraine/', limit: 100 },
   { key: 'facebook-ro-bucharest-anglojobs', label: 'Bucharest English speaking jobs', platform: 'facebook', country: 'RO', city: 'Bucharest', target: 'https://www.facebook.com/groups/bucharestanglojobs/', limit: 100 },
 
