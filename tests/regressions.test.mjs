@@ -766,3 +766,47 @@ test('an obvious developer profile without a stated role becomes Software Develo
   assert.equal(profile.role, 'Software Developer')
   assert.deepEqual(profile.professions, ['Software Developer'])
 })
+
+
+test('hiring technical roles keep industry-standard English labels and Uzbek source roles normalize', () => {
+  assert.equal(hiringProfessionLabel('Data Scientist', 'ru'), 'Data Scientist')
+  assert.equal(hiringProfessionLabel('Penetration Tester', 'ru'), 'Pentester')
+  assert.equal(hiringProfessionLabel('Data Engineer', 'ru'), 'Data Engineer')
+  assert.equal(hiringProfessionLabel('QA Engineer', 'ru'), 'QA Engineer')
+  assert.equal(hiringProfessionLabel('DevOps Engineer', 'ru'), 'DevOps Engineer')
+
+  assert.deepEqual(normalizeProfessions('iqtisodchi', ''), ['Economist'])
+  assert.deepEqual(normalizeProfessions('iqtsodchi', ''), ['Economist'])
+  assert.deepEqual(normalizeProfessions('Iqtisodiy', ''), ['Economist'])
+  assert.deepEqual(normalizeProfessions('Logist', ''), ['Logistics Specialist'])
+  assert.deepEqual(normalizeProfessions('Ingliz tili ustoziman', ''), ['English Teacher'])
+  assert.deepEqual(normalizeProfessions('Mobilagraf ITishnik pdf faylla frontet', ''), ['Frontend Developer'])
+  assert.deepEqual(normalizeProfessions('Farqi yo qande ish bulsa hm, bolalarga qarash menga yoqadi', ''), ['Nanny'])
+  assert.deepEqual(normalizeProfessions('Sales Executive IND', ''), ['Sales Manager'])
+  assert.deepEqual(normalizeProfessions('РОП, Sales Executive', ''), ['Sales Manager'])
+  assert.deepEqual(normalizeProfessions('Data Scientist', ''), ['Data Scientist'])
+  assert.deepEqual(normalizeProfessions('Pentester', ''), ['Penetration Tester'])
+})
+
+test('hiring normalization drops source pseudo-roles and duplicate name-as-role values', () => {
+  const duplicateRole = normalizeCandidate({
+    id: 'ishbor-akbar', source: 'telegram', origin: 'web', sourceKey: 'ishbor-uz', country: 'UZ',
+    name: 'Akbar', role: 'Akbar', professions: ['Akbar'], url: 'https://example.test/akbar',
+    createdAt: '2026-08-22T12:00:00.000Z', originalText: 'Akbar\nToshkent', description: 'Akbar\nToshkent',
+  })
+  assert.equal(duplicateRole.role, '')
+  assert.deepEqual(duplicateRole.professions, [])
+
+  const onlineOnly = normalizeCandidate({
+    id: 'flagma-online', source: 'telegram', origin: 'web', sourceKey: 'flagma-uz', country: 'UZ',
+    name: 'Onlayn', role: 'Onlayn', professions: ['Onlayn'], url: 'https://example.test/online',
+    createdAt: '2026-08-22T12:00:00.000Z', originalText: 'Onlayn\n21 год\nСырдарья', description: 'Onlayn\n21 год\nСырдарья',
+  })
+  assert.equal(onlineOnly.name, '')
+  assert.equal(onlineOnly.role, '')
+  assert.deepEqual(onlineOnly.professions, [])
+  assert.equal(onlineOnly.remote, true)
+
+  assert.deepEqual(normalizeProfessions('Без разницы я быстро учусь', ''), ['Any Role'])
+  assert.equal(hiringProfessionLabel('Any Role', 'ru'), 'Любая работа')
+})
