@@ -87,6 +87,7 @@ const PROFESSION_RULES: ProfessionRule[] = [
   { name: 'Salesperson', re: /\b(?:salesperson|sales\s+assistant|shop\s+assistant|seller)\b|продавец|продавець|продавчин|sotuvchi/iu },
   { name: 'Merchandiser', re: /\bmerchandiser\b|мерчендайзер|мерчандайзер/iu },
   { name: 'Promoter', re: /\bpromoter\b|промоутер/iu },
+  { name: 'Chat Operator', re: /\bchat[-\s]+operator(?:i)?\b|оператор\s+чат(?:а|у)?|чат[-\s]+оператор/iu },
   { name: 'Call Center Operator', re: /\b(?:call|koll)[-\s]?(?:center|centre|markaz)\s+operator(?:i)?\b|оператор\s+(?:колл|call)[-\s]?центр|(?:колл|call)[-\s]?центр(?:а|у)?\s+оператор/iu },
   { name: 'Customer Support', re: /\b(?:customer\s+support|support\s+specialist|call\s*center)\b|поддержк|підтримк|колл[-\s]?центр|call[-\s]?центр/iu },
   { name: 'Operator', re: /\boperator(?:lik|i)?\b|оператор/iu },
@@ -216,7 +217,7 @@ function collectProfessions(source: string): string[] {
     const generic = names.indexOf('Doctor')
     if (generic >= 0) names.splice(generic, 1)
   }
-  if (names.includes('Call Center Operator')) {
+  if (names.includes('Call Center Operator') || names.includes('Chat Operator')) {
     for (const genericName of ['Customer Support', 'Operator']) {
       const generic = names.indexOf(genericName)
       if (generic >= 0) names.splice(generic, 1)
@@ -493,10 +494,37 @@ function trimFlagmaProfileText(value: string): string {
       '\n',
     )
     .split('\n')
-    .filter((line) => !/^\s*(?:\(?\s*adsbygoogle\b|window\.adsbygoogle\b|console\.log\s*\(|try\s*\{|\}?\s*catch\s*\([^)]*\)\s*\{|\}\s*;?)\s*/iu.test(line))
+    .filter((line) => !/^\s*(?:сохранить|save|\(?\s*adsbygoogle\b|window\.adsbygoogle\b|console\.log\s*\(|try\s*\{|\}?\s*catch\s*\([^)]*\)\s*\{|\}\s*;?)\s*$/iu.test(line))
     .join('\n')
     .replace(/\n{3,}/g, '\n\n')
     .trim()
+}
+
+function normalizedCandidateSkills(profile: CvProfile, text: string): string[] {
+  const skipTextExtraction = profile.sourceKey === 'careerist-uz' || profile.sourceKey === 'ishbor-uz'
+  const rawSkills = skipTextExtraction
+    ? []
+    : profile.sourceKey?.startsWith('flagma')
+      ? (profile.skills || []).filter((skill) => canonicalSkillName(skill) != null)
+      : profile.skills
+  const normalized = normalizeSkills(rawSkills, skipTextExtraction ? '' : text)
+  if (!profile.sourceKey?.startsWith('flagma')) return normalized
+
+  const history = workHistoryBlock(text)
+  return normalized.filter((skill) => {
+    const escaped = skill.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+    // Marketplace names are legitimate skills only when stated as skills.
+    // In `Administrator, Uzum market, Buxoro` the same token is the employer.
+    const company = new RegExp(
+      `(?:^|[,;])\\s*${escaped}\\s+(?:market|marketplace|group|company|llc|ooo)\\s*(?:[,.;]|$)`,
+      'iu',
+    )
+    const explicitSkill = new RegExp(
+      `(?:skills|навыки|навички|stack|texnologiya(?:lar)?)\\s*[:—-][^\\n]{0,300}(?<![\\p{L}\\p{N}])${escaped}(?![\\p{L}\\p{N}])`,
+      'iu',
+    )
+    return !company.test(history) || explicitSkill.test(text)
+  })
 }
 
 const HIDDEN_NAME_RE = /^(?:фио|піб|name)?\s*(?:скрыт\p{L}*|прихован\p{L}*|hidden|yashiril\p{L}*|ascuns)$/iu
@@ -646,10 +674,7 @@ export function normalizeCandidate(profile: CvProfile): CvProfile {
     remote,
     relocationReady: profile.relocationReady ?? detectRelocationReady(originalText),
     employmentTypes,
-    skills: normalizeSkills(
-      profile.sourceKey === 'careerist-uz' || profile.sourceKey === 'ishbor-uz' ? [] : profile.skills,
-      profile.sourceKey === 'careerist-uz' || profile.sourceKey === 'ishbor-uz' ? '' : originalText,
-    ),
+    skills: normalizedCandidateSkills(profile, originalText),
     seniority: profile.seniority ?? detectSeniority(text, experienceYears),
     contact: validStoredContact(profile.contact) || contacts.telegram || contacts.email || contacts.phone
       || (profile.contactType === 'platform' ? profile.url : null),

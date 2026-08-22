@@ -113,6 +113,9 @@ function repairProfessions(profile: CvProfile, text: string): string[] {
     const technologies = field(text, 'texnologiya|technologies|technology|stack') || ''
     const technicalProfile = `${technologies} ${(profile.skills || []).join(' ')}`
     if (/\bflutter\b|\bdart\b/iu.test(technicalProfile)) return ['Mobile Developer']
+    if (/\bcisco\b/iu.test(technicalProfile) && /\b(?:linux|windows\s+server|active\s+directory|network(?:ing)?)\b/iu.test(technicalProfile)) {
+      return ['Network Administrator']
+    }
     const strongDeveloperSkill = /\b(?:react|vue\.?\s*js|angular|node\.?\s*js|next\.?\s*js|django|laravel|fastapi|flask|spring|asp\.?net|ruby\s+on\s+rails)\b/iu.test(technicalProfile)
     const softwareSignals = (technicalProfile.match(/\b(?:python|java(?:script)?|typescript|php|react|vue\.?\s*js|angular|node\.?\s*js|next\.?\s*js|django|laravel|fastapi|flask|spring|asp\.?net|sql|html|css|c\+\+|c#|golang)\b/giu) || []).length
     if (strongDeveloperSkill || softwareSignals >= 2) return ['Software Developer']

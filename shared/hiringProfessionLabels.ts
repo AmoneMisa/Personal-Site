@@ -30,6 +30,7 @@ export const HIRING_PROFESSION_LABELS: Record<string, ProfessionLabels> = {
   Salesperson: { en: 'Salesperson', ru: 'Продавец' },
   Merchandiser: { en: 'Merchandiser', ru: 'Мерчендайзер' },
   Promoter: { en: 'Promoter', ru: 'Промоутер' },
+  'Chat Operator': { en: 'Chat Operator', ru: 'Оператор чата' },
   'Customer Support': { en: 'Customer Support', ru: 'Специалист поддержки' },
   'Call Center Operator': { en: 'Call Center Operator', ru: 'Оператор колл-центра' },
   Operator: { en: 'Operator', ru: 'Оператор' },

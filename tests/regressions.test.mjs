@@ -220,7 +220,7 @@ test('remaining IshBor titles normalize without leaking categories into skills',
 test('source-specific role spellings and specialist roles use the shared taxonomy', () => {
   assert.deepEqual(normalizeProfessions('Matbuot', ''), ['Media Specialist'])
   assert.deepEqual(normalizeProfessions('Injiner', ''), ['Engineer'])
-  assert.deepEqual(normalizeProfessions('Chat operatori', ''), ['Operator'])
+  assert.deepEqual(normalizeProfessions('Chat operatori', ''), ['Chat Operator'])
   assert.deepEqual(normalizeProfessions('Консультант (без разницы)', ''), ['Consultant'])
   assert.deepEqual(normalizeProfessions('Начальник отряд', ''), ['Supervisor'])
   assert.deepEqual(normalizeProfessions('Инспектор по качеству (пищевое производство)', ''), ['Quality Inspector'])
@@ -345,6 +345,7 @@ test('Flagma rejects presentation fields as role, education and contact', () => 
 test('Uzbek architect and call-center roles normalize and Flagma ad scripts are removed', () => {
   assert.deepEqual(normalizeProfessions('Arxitektor loyihachi', ''), ['Architect'])
   assert.deepEqual(normalizeProfessions('Koll-markaz operatori', ''), ['Call Center Operator'])
+  assert.deepEqual(normalizeProfessions('Chat operatori', ''), ['Chat Operator'])
 
   const script = [
     'try{',
@@ -364,6 +365,39 @@ test('Uzbek architect and call-center roles normalize and Flagma ad scripts are 
   assert.equal(normalized.role, 'Call Center Operator')
   assert.doesNotMatch(normalized.originalText, /adsbygoogle|console\.log|catch\s*\(/iu)
   assert.doesNotMatch(normalized.description, /adsbygoogle|console\.log|catch\s*\(/iu)
+})
+
+test('Flagma rejects employment dates as contacts and employer names as skills', () => {
+  const text = [
+    'Сохранить',
+    'Koll-markaz operatori',
+    'Sazonova V., 24 года, Бухара | Неполное высшее образование',
+    'Опыт работы: 2 года, Administrator, Uzum market, Buxoro.',
+    'Образование: Бухарский технический университет, Энергетика, Buxoro 2021 - 2023.',
+  ].join('\n')
+  const normalized = normalizeCandidate({
+    id: 'flagma-sazonova', source: 'telegram', origin: 'web', sourceKey: 'flagma-uz', country: 'UZ',
+    name: 'Sazonova V.', role: 'Koll-markaz operatori', skills: ['Uzum'], contact: '2021 - 2023',
+    contactType: 'platform', url: 'https://flagma.uz/ru/resume-call-center-rr2.html',
+    createdAt: '2026-08-22T12:00:00.000Z', originalText: text, description: text,
+  })
+
+  assert.equal(normalized.role, 'Call Center Operator')
+  assert.equal(normalized.contact, normalized.url)
+  assert.deepEqual(normalized.skills, [])
+  assert.doesNotMatch(normalized.description, /^Сохранить$/mu)
+})
+
+test('Cisco and Linux infer a network administrator when the candidate omitted a role', () => {
+  const profile = repairCandidateProfile(normalizeCandidate({
+    id: 'tg-network', source: 'telegram', country: 'UZ', name: 'Akobir Azizov', role: '',
+    skills: ['Cisco', 'Linux'], url: 'https://t.me/example/2', createdAt: '2026-08-22T12:00:00.000Z',
+    originalText: 'Xodim: Akobir Azizov\nTexnologiya: Cisco, Linux\nMaqsad: shu soha bo‘yicha yetuk mutahasis bo‘lish',
+    description: 'Xodim: Akobir Azizov\nTexnologiya: Cisco, Linux\nMaqsad: shu soha bo‘yicha yetuk mutahasis bo‘lish',
+  }))
+
+  assert.deepEqual(profile.professions, ['Network Administrator'])
+  assert.equal(profile.role, 'Network Administrator')
 })
 
 test('legacy Careerist rows lose icon ligatures and repeating experience fractions', () => {
