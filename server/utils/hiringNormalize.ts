@@ -91,7 +91,7 @@ const PROFESSION_RULES: ProfessionRule[] = [
   // Logistics / security / service.
   { name: 'Courier', re: /\bcourier\b|курьер|кур'єр|kuryer/iu },
   { name: 'Driver', re: /\bdriver\b|(?<!\p{L})водитель(?!\p{L})|(?<!\p{L})водій(?!\p{L})|\bhaydovchi\b|\bshafyor\b|(?<!\p{L})[СC][ЕE]\s+категори/iu },
-  { name: 'Security Guard', re: /\bsecurity(?:\s+guard)?\b|охранник|охоронець|охорона|qorovul/iu },
+  { name: 'Security Guard', re: /\bsecurity(?:\s+guard)?\b|охранник|охоронець|охорона|qorovul|qoriqlash|xavfsizlik/iu },
   { name: 'Cleaner', re: /\b(?:cleaner|cleaning|housekeeper)\b|уборщик|уборщица|уборка|прибиральник|прибиральниц|домработниц|farrosh/iu },
   { name: 'Caregiver', re: /\bcaregiver\b|сиделк|доглядальниц|parvarish/iu },
 
@@ -117,7 +117,7 @@ const PROFESSION_RULES: ProfessionRule[] = [
   { name: 'Tutor', re: /\btutor\b|репетитор|rep(?:e|i)titor(?:lik)?/iu },
   { name: 'Kindergarten Teacher', re: /\bkindergarten\s+teacher\b|воспитател|виховател|tarbiyachi|(?:xususiy\s+)?bog['’ʻʼ‘`]?cha/iu },
   { name: 'Nanny', re: /\bnanny\b|няня|нянечк|enaga|bola\s+qarash/iu },
-  { name: 'Teacher', re: /\bteacher\b|учитель|вчитель|преподавател|викладач|тьютор|tyutor(?:lik)?|o['’ʻʼ‘`]?qituvchi(?:lik)?/iu },
+  { name: 'Teacher', re: /\bteacher\b|учитель|вчитель|преподавател|викладач|тьютор|t(?:yutor|itur)(?:lik)?|o['’ʻʼ‘`]?qituvchi(?:lik)?/iu },
   { name: 'Psychologist', re: /\bpsychologist\b|психолог|psixolog/iu },
   { name: 'Speech Therapist', re: /\bspeech\s+therapist\b|логопед|logoped/iu },
 
@@ -127,6 +127,7 @@ const PROFESSION_RULES: ProfessionRule[] = [
   { name: 'Frontend Developer', re: /\bfront[- ]?end\s+(?:developer|engineer|dasturchi)\b|\bfrontend\s+dasturchi\b|фронтенд/iu },
   { name: 'Mobile Developer', re: /\b(?:mobile|android|ios)\s+(?:developer|engineer|dasturchi)\b/iu },
   { name: 'System Administrator', re: /\b(?:system|network|windows\s+server)\s+administrator\b|систем(?:ный|ним)\s+администратор|сисадмин|сетевой\s+администратор|tarmoq\s+administrator|tizim\s+administrator/iu },
+  { name: 'IT Specialist', re: /\bit\s+specialist\b|it[-\s]?специалист|специалист\s+по\s+it|kompyuter\s+bo(?:['’ʻʼ‘`]?yicha|yicha)\s+ish/iu },
   { name: 'Software Developer', re: /\b(?:software\s+)?(?:developer|programmer|frontend|front-end|backend|back-end|full[- ]?stack|android|ios)\b|разработчик|розробник|программист|програміст|dasturchi|dasturlash/iu },
   { name: 'QA Engineer', re: /\b(?:qa|quality\s+assurance|tester|test\s+engineer)\b|тестировщик|тестувальник/iu },
   { name: 'DevOps Engineer', re: /\bdevops\b/iu },
@@ -142,7 +143,10 @@ const PROFESSION_RULES: ProfessionRule[] = [
   { name: 'Lawyer', re: /\b(?:lawyer|attorney|legal\s+specialist)\b|юрист|адвокат|правник|yurist/iu },
   { name: 'Notary', re: /\bnotar(?:y|ius)\b|нотариус/iu },
   { name: 'Metrology Specialist', re: /\bmetrolog(?:y|iya)\b|метролог|standartlashtirish/iu },
+  { name: 'Finance / Banking Specialist', re: /\b(?:finance|banking)\s+specialist\b|специалист\s+по\s+(?:финанс|банков)|moliya|(?<!\p{L})bank(?!\p{L})|soliq/iu },
   { name: 'Oil & Gas Worker', re: /\boil\s*(?:&|and)?\s*gas\b|нефт\p{L}*\s*(?:и|&)?\s*газ\p{L}*|neft\s*(?:va\s*)?gaz(?:\s+soha\p{L}*)?/iu },
+  { name: 'Biotechnologist', re: /\bbiotechnologist\b|биотехнолог|biotexnolog/iu },
+  { name: 'Laboratory Technician', re: /\blaboratory\s+technician\b|лаборант|laborant/iu },
 
   // Construction / production / warehouse.
   { name: 'General Laborer', re: /\b(?:general\s+laborer|handyman)\b|разнорабоч|різнороб/iu },
@@ -151,6 +155,7 @@ const PROFESSION_RULES: ProfessionRule[] = [
   { name: 'Electrician', re: /\belectrician\b|электрик|електрик/iu },
   { name: 'Plumber', re: /\bplumber\b|сантехник|сантехнік/iu },
   { name: 'Mechanic', re: /\bmechanic\b|механик|механік/iu },
+  { name: 'Warehouse Manager', re: /\bwarehouse\s+manager\b|начальник\s+склад|заведующ\p{L}*\s+склад|керівник\s+склад/iu },
   { name: 'Warehouse Worker', re: /\bwarehouse\b|кладовщик|комплектовщик|комірник|склад(?:ской|ський)?\s+работник/iu },
   { name: 'Packer', re: /\bpacker\b|упаковщик|упаковщица|пакувальник|qadoqlovchi/iu },
   { name: 'Factory Worker', re: /\bfactory\s+worker\b|рабоч(?:ий|ая)\s+(?:на\s+)?(?:заводе|производстве)|працівник\s+виробництва|ishlab\s+chiqarish/iu },
@@ -160,7 +165,7 @@ const PROFESSION_RULES: ProfessionRule[] = [
 
 const SPECIFIC_MANAGER_ROLES = new Set([
   'Sales Manager', 'Project Manager', 'Product Manager', 'Store Manager', 'Restaurant Manager',
-  'General Manager', 'HR / Recruiter', 'Office Manager',
+  'General Manager', 'HR / Recruiter', 'Office Manager', 'Warehouse Manager',
 ])
 const SPECIFIC_DEVELOPER_ROLES = new Set([
   'Full-stack Developer', 'Backend Developer', 'Frontend Developer', 'Mobile Developer',
@@ -383,7 +388,7 @@ export function detectRelocationReady(text: string): boolean | null {
   return null
 }
 
-const REMOTE_POSITIVE_RE = /\bremote\b|удал[её]н(?:но|ная|ную|ка)|віддален|дистанцион|masofaviy|online\s+(?:work|job)|онлайн\s+работ/iu
+const REMOTE_POSITIVE_RE = /\bremote\b|удал[её]н\p{L}*|віддален|дистанцион|masofaviy|online\s+(?:work|job)|онлайн\s+работ/iu
 const REMOTE_NEGATIVE_RE = /только\s+офис|офисн(?:ый|ая)\s+формат|офлайн|удал[её]нк\p{L}*\s+не\s+рассматрива|remote\s+(?:not|no)|faqat\s+ofis|ofisda\s+ishlash/iu
 
 export function normalizeRemotePreference(
@@ -466,7 +471,7 @@ function stripUiArtifacts(value: string): string {
 const HIDDEN_NAME_RE = /^(?:фио|піб|name)?\s*(?:скрыт\p{L}*|прихован\p{L}*|hidden|yashiril\p{L}*|ascuns)$/iu
 const EMPLOYMENT_AS_EDUCATION_RE = /занятост|зайнятіст|удал[её]нн|дистанцион|remote|full[- ]?time|part[- ]?time|график\s+работ|bandlik/iu
 const FLEXIBLE_ROLE_RE = /^(?:нет|без)\s+разницы$|^не\s*важно$|^farqi\s+yo['’ʻʼ‘`]?q$|^любая\s+(?:работа|занятость)$/iu
-const NON_ROLE_RE = /^(?:удал[её]нно|remote|farqi\s+yo['’ʻʼ‘`]?q|bilmaym\p{L}*|ish\s+ker(?:e|a)\s+onlayn|любая\s+(?:работа|занятость)|немає|нет|не\s+указано|not\s+specified)$/iu
+const NON_ROLE_RE = /^(?:удал[её]нно|работа\s+на\s+удал[её]н\p{L}*\s+основе|remote|farqi\s+yo['’ʻʼ‘`]?q|bilmaym\p{L}*|ish\s+ker(?:e|a)\s+onlayn|любая\s+(?:работа|занятость)|немає|нет|не\s+указано|not\s+specified)$/iu
 
 function normalizeCandidateEducation(profile: CvProfile, text: string): string | null | undefined {
   const raw = profile.education?.trim() || ''
@@ -586,7 +591,7 @@ export function normalizeCandidate(profile: CvProfile): CvProfile {
       : profile.sourceKey === 'careerist-uz'
         ? trimCareeristProfileText(stripUiArtifacts(profile.description || originalText))
         : stripUiArtifacts(profile.description || originalText),
-    role: professions[0] || normalizeRole(effectiveRole, originalText),
+    role: professions[0] || (effectiveRole ? normalizeRole(effectiveRole, originalText) : ''),
     professions,
     previousProfessions: profile.previousProfessions?.length
       ? normalizeProvidedProfessions(profile.previousProfessions)
@@ -604,7 +609,10 @@ export function normalizeCandidate(profile: CvProfile): CvProfile {
     remote,
     relocationReady: profile.relocationReady ?? detectRelocationReady(originalText),
     employmentTypes,
-    skills: normalizeSkills(profile.sourceKey === 'careerist-uz' ? [] : profile.skills, originalText),
+    skills: normalizeSkills(
+      profile.sourceKey === 'careerist-uz' || profile.sourceKey === 'ishbor-uz' ? [] : profile.skills,
+      profile.sourceKey === 'careerist-uz' || profile.sourceKey === 'ishbor-uz' ? '' : originalText,
+    ),
     seniority: profile.seniority ?? detectSeniority(text, experienceYears),
     contact: validStoredContact(profile.contact) || contacts.telegram || contacts.email || contacts.phone
       || (profile.contactType === 'platform' ? profile.url : null),

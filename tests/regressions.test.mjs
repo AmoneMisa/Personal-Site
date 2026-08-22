@@ -186,6 +186,72 @@ test('specific sales and Uzbek CE driver titles normalize to canonical roles', (
   assert.deepEqual(normalizeProfessions("Metrologiya, audit, standartlashtirish sohasi bo'yicha", ''), ['Metrology Specialist'])
 })
 
+test('remaining IshBor titles normalize without leaking categories into skills', () => {
+  assert.deepEqual(normalizeProfessions('xavfsizlik, qoriqlash', ''), ['Security Guard'])
+  assert.deepEqual(normalizeProfessions('Bank,soliq , universitetda titur', ''), [
+    'Finance / Banking Specialist',
+    'Teacher',
+  ])
+  assert.deepEqual(normalizeProfessions('Kompyuter boyicha ish', ''), ['IT Specialist'])
+  assert.deepEqual(normalizeProfessions('Biotexnolog, laborant', ''), [
+    'Biotechnologist',
+    'Laboratory Technician',
+  ])
+  assert.equal(hiringProfessionLabel('Security Guard', 'ru'), 'Охранник')
+  assert.equal(hiringProfessionLabel('IT Specialist', 'ru'), 'IT-специалист')
+
+  const normalized = normalizeCandidate({
+    id: 'ishbor-dilnura', source: 'ishbor-uz', origin: 'web', sourceKey: 'ishbor-uz', country: 'UZ',
+    name: 'Dilnura', role: 'Kompyuter boyicha ish', skills: ['Sales', 'Procurement'],
+    url: 'https://ish-bor.uz/ru/ishchilar/id/118046', createdAt: '2026-08-21T12:00:00.000Z',
+    originalText: 'Kompyuter boyicha ish\nТорговля, Продажи, Закупки\n1 год\nDilnura (Женщина)',
+    description: 'Kompyuter boyicha ish\nТорговля, Продажи, Закупки\n1 год\nDilnura (Женщина)',
+  })
+  assert.deepEqual(normalized.professions, ['IT Specialist'])
+  assert.deepEqual(normalized.skills, [])
+})
+
+test('Careerist removes listing controls and rejects remote format as a profession', () => {
+  const text = [
+    '21 августа, 2026',
+    'Работа на удаленной основе',
+    "Bunyod Baxrom o'g'li",
+    'Город',
+    'Ташкент',
+    'Возраст',
+    '20 лет (1 марта 2006)',
+    'отправить приглашение',
+    'подробнее',
+    '21 августа, 2026',
+  ].join('\n')
+  const normalized = normalizeCandidate({
+    id: 'careerist-bunyod', source: 'Careerist UZ', origin: 'web', sourceKey: 'careerist-uz', country: 'UZ',
+    name: "Bunyod Baxrom o'g'li", role: 'Работа на удаленной основе',
+    url: 'https://tashkent.careerist.ru/resume/example.html', createdAt: '2026-08-21T12:00:00.000Z',
+    originalText: text, description: text,
+  })
+  assert.equal(normalized.role, '')
+  assert.deepEqual(normalized.professions, [])
+  assert.equal(normalized.remote, true)
+  assert.doesNotMatch(normalized.originalText, /отправить приглашение|подробнее/iu)
+  assert.equal((normalized.originalText.match(/21 августа, 2026/giu) || []).length, 1)
+
+  const impossibleAge = trimCareeristProfileText([
+    '21 августа, 2026',
+    'Начальник склада( GERMES TEKS )',
+    'Shaxboz',
+    'Город',
+    'Ташкент',
+    'Возраст',
+    '0 (22 августа 2026)',
+    'отправить приглашение',
+    'подробнее',
+    '21 августа, 2026',
+  ].join('\n'))
+  assert.doesNotMatch(impossibleAge, /Возраст\n0|отправить приглашение|подробнее/iu)
+  assert.deepEqual(normalizeProfessions('Начальник склада( GERMES TEKS )', ''), ['Warehouse Manager'])
+})
+
 test('Careerist trusts its listing headline and drops impossible age zero', () => {
   const normalized = normalizeCandidate({
     id: 'careerist-erlan', source: 'telegram', origin: 'web', sourceKey: 'careerist-uz', country: 'UZ',
