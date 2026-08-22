@@ -6,6 +6,7 @@ import { hiringIshBorSourceHandles } from '~~/server/utils/hiringIshBorSource'
 import { hiringSecondaryWebSourceHandles } from '~~/server/utils/hiringSecondaryWebSources'
 import { hiringUzJobsSourceHandles } from '~~/server/utils/hiringUzJobsSource'
 import { hiringSocialSourceHandles } from '~~/server/utils/hiringSocialSources'
+import { hiringLinkedInSourceHandles } from '~~/server/utils/hiringLinkedInSources'
 import { loadCursors, loadWebCursors } from '~~/server/utils/hiringCursors'
 import { dispatchDueJobsQueue, jobsQueueDbEnabled } from '~~/server/utils/jobsPgQueue'
 
@@ -40,6 +41,7 @@ export default defineEventHandler(async (event) => {
     ...progressiveWebHandles,
     ...hiringSecondaryWebSourceHandles(),
     ...hiringSocialSourceHandles(),
+    ...hiringLinkedInSourceHandles(),
   ]
   const [telegramCursors, webCursors] = await Promise.all([loadCursors(), loadWebCursors()])
   const backfillHandles = [
