@@ -9,7 +9,7 @@
 
 /** The shape every source run shares; what durable storage needs. */
 export interface SourceRun {
-  /** "@channel" for Telegram, "web:<key>" / "social:<key>" otherwise. */
+  /** "@channel" for Telegram, "web:<key>" / "social:<key>" / "linkedin:<key>" otherwise. */
   handle: string
   country: string
   status: 'ok' | 'empty' | 'error' | 'disabled'
@@ -21,7 +21,7 @@ export interface SourceRun {
 
 /** Telegram handles are bare; web/social sources carry an explicit prefix. */
 export function runOrigin(handle: string): 'telegram' | 'web' | 'social' {
-  if (/^social:/i.test(handle)) return 'social'
+  if (/^(?:social|linkedin):/i.test(handle)) return 'social'
   return /^web:/i.test(handle) ? 'web' : 'telegram'
 }
 
