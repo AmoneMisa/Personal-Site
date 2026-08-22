@@ -10,6 +10,7 @@ interface ProfessionLabels {
  * This table is display-only and may safely grow without migrating persisted CVs.
  */
 export const HIRING_PROFESSION_LABELS: Record<string, ProfessionLabels> = {
+  'Any Role': { en: 'Any role', ru: 'Любая работа' },
   'Sales Manager': { en: 'Sales Manager', ru: 'Менеджер по продажам' },
   'Project Manager': { en: 'Project Manager', ru: 'Менеджер проектов' },
   'Product Manager': { en: 'Product Manager', ru: 'Продакт-менеджер' },
@@ -38,6 +39,7 @@ export const HIRING_PROFESSION_LABELS: Record<string, ProfessionLabels> = {
 
   Courier: { en: 'Courier', ru: 'Курьер' },
   Driver: { en: 'Driver', ru: 'Водитель' },
+  'Logistics Specialist': { en: 'Logistics Specialist', ru: 'Логист' },
   'Security Guard': { en: 'Security Guard', ru: 'Охранник' },
   Cleaner: { en: 'Cleaner', ru: 'Специалист по уборке' },
   Caregiver: { en: 'Caregiver', ru: 'Сиделка' },
@@ -58,6 +60,7 @@ export const HIRING_PROFESSION_LABELS: Record<string, ProfessionLabels> = {
   'Medical Assistant': { en: 'Medical Assistant', ru: 'Медицинский ассистент' },
 
   Tutor: { en: 'Tutor', ru: 'Репетитор' },
+  'English Teacher': { en: 'English Teacher', ru: 'Преподаватель английского' },
   'Kindergarten Teacher': { en: 'Kindergarten Teacher', ru: 'Воспитатель детского сада' },
   Nanny: { en: 'Nanny', ru: 'Няня' },
   Teacher: { en: 'Teacher', ru: 'Преподаватель' },
@@ -72,13 +75,13 @@ export const HIRING_PROFESSION_LABELS: Record<string, ProfessionLabels> = {
   'Network Administrator': { en: 'Network Administrator', ru: 'Сетевой администратор' },
   'System Administrator': { en: 'System Administrator', ru: 'Системный администратор' },
   'Software Developer': { en: 'Software Developer', ru: 'Разработчик ПО' },
-  'QA Engineer': { en: 'QA Engineer', ru: 'QA-инженер' },
-  'DevOps Engineer': { en: 'DevOps Engineer', ru: 'DevOps-инженер' },
+  'QA Engineer': { en: 'QA Engineer', ru: 'QA Engineer' },
+  'DevOps Engineer': { en: 'DevOps Engineer', ru: 'DevOps Engineer' },
   'Cybersecurity Specialist': { en: 'Cybersecurity Specialist', ru: 'Специалист по информационной безопасности' },
-  'Penetration Tester': { en: 'Penetration Tester', ru: 'Специалист по тестированию на проникновение' },
-  'AI / ML Engineer': { en: 'AI / ML Engineer', ru: 'AI / ML-инженер' },
-  'Data Scientist': { en: 'Data Scientist', ru: 'Специалист по Data Science' },
-  'Data Engineer': { en: 'Data Engineer', ru: 'Инженер данных' },
+  'Penetration Tester': { en: 'Pentester', ru: 'Pentester' },
+  'AI / ML Engineer': { en: 'AI / ML Engineer', ru: 'AI / ML Engineer' },
+  'Data Scientist': { en: 'Data Scientist', ru: 'Data Scientist' },
+  'Data Engineer': { en: 'Data Engineer', ru: 'Data Engineer' },
   'Engineering Manager': { en: 'Engineering Manager', ru: 'Технический руководитель' },
   'Hardware Engineer': { en: 'Hardware Engineer', ru: 'Инженер-электронщик' },
   Designer: { en: 'Designer', ru: 'Дизайнер' },
@@ -92,6 +95,7 @@ export const HIRING_PROFESSION_LABELS: Record<string, ProfessionLabels> = {
   Translator: { en: 'Translator', ru: 'Переводчик' },
   Lawyer: { en: 'Lawyer', ru: 'Юрист' },
   Notary: { en: 'Notary', ru: 'Нотариус' },
+  Economist: { en: 'Economist', ru: 'Экономист' },
   'Metrology Specialist': { en: 'Metrology Specialist', ru: 'Специалист по метрологии и стандартизации' },
   'Finance / Banking Specialist': { en: 'Finance / Banking Specialist', ru: 'Специалист по финансам и банковскому делу' },
   'Oil & Gas Worker': { en: 'Oil & Gas Worker', ru: 'Работник нефтегазовой отрасли' },
