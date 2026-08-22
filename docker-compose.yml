@@ -59,10 +59,20 @@ services:
       JOB_BROWSER_ALLOWED_HOSTS: ${JOB_BROWSER_ALLOWED_HOSTS:-}
       QUEUE_INTERNAL_KEY: ${QUEUE_INTERNAL_KEY:-}
       # Durable CV storage: the shared Postgres, in its own "hiring" schema.
-      # Requires flat-finder-postgres to be on ai-net. Unset it and the board
-      # falls back to Redis-only.
       HIRING_DATABASE_URL: ${HIRING_DATABASE_URL:-}
       HIRING_DB_SCHEMA: ${HIRING_DB_SCHEMA:-hiring}
+      # Jobs/hiring queue state is durable in Postgres too. When a dedicated URL
+      # is omitted the queue intentionally reuses HIRING_DATABASE_URL.
+      JOBS_QUEUE_DATABASE_URL: ${JOBS_QUEUE_DATABASE_URL:-}
+      JOBS_QUEUE_DB_SCHEMA: ${JOBS_QUEUE_DB_SCHEMA:-site_queue}
+      JOBS_QUEUE_REFRESH_SECONDS: ${JOBS_QUEUE_REFRESH_SECONDS:-1800}
+      HIRING_QUEUE_REFRESH_SECONDS: ${HIRING_QUEUE_REFRESH_SECONDS:-1800}
+      HIRING_QUEUE_BACKFILL_SECONDS: ${HIRING_QUEUE_BACKFILL_SECONDS:-300}
+      HIRING_QUEUE_ENABLED: ${HIRING_QUEUE_ENABLED:-on}
+      JOBS_QUEUE_MAX_ATTEMPTS: ${JOBS_QUEUE_MAX_ATTEMPTS:-5}
+      JOBS_QUEUE_LEASE_SECONDS: ${JOBS_QUEUE_LEASE_SECONDS:-240}
+      JOBS_QUEUE_RETRY_BASE_MS: ${JOBS_QUEUE_RETRY_BASE_MS:-30000}
+      JOBS_QUEUE_RETRY_MAX_MS: ${JOBS_QUEUE_RETRY_MAX_MS:-300000}
     depends_on:
       backend:
         condition: service_healthy
@@ -83,60 +93,47 @@ services:
       start_period: 30s
 
   jobs-queue-dispatcher:
-    # Built and pushed by GitHub Actions; the deployment server can reach
-    # ghcr.io but not Docker Hub, so it must never build this locally.
+    # Lightweight HTTP ticker. Queue durability, scheduling and locking live in
+    # PostgreSQL inside the frontend; this process only wakes the dispatcher.
     image: ghcr.io/amonemisa/personal-site-jobs-queue:latest
     restart: unless-stopped
     environment:
       QUEUE_MODE: dispatcher
-      RABBITMQ_URL: amqp://${RABBITMQ_USER:-crawler}:${RABBITMQ_PASSWORD:-crawler}@flat-finder-rabbitmq:5672/%2F
       JOBS_FRONTEND_URL: http://frontend:3000
       QUEUE_INTERNAL_KEY: ${QUEUE_INTERNAL_KEY:-}
-      QUEUE_REFRESH_SECONDS: ${JOBS_QUEUE_REFRESH_SECONDS:-1800}
-      HIRING_QUEUE_REFRESH_SECONDS: ${HIRING_QUEUE_REFRESH_SECONDS:-1800}
-      HIRING_QUEUE_BACKFILL_SECONDS: ${HIRING_QUEUE_BACKFILL_SECONDS:-300}
-      HIRING_QUEUE_ENABLED: ${HIRING_QUEUE_ENABLED:-on}
+      QUEUE_DISPATCH_TICK_SECONDS: ${JOBS_QUEUE_DISPATCH_TICK_SECONDS:-10}
     networks:
       - default
-      - ai-net
     depends_on:
       frontend:
         condition: service_healthy
 
   jobs-queue-worker-1:
-    # Built and pushed by GitHub Actions; the deployment server can reach
-    # ghcr.io but not Docker Hub, so it must never build this locally.
     image: ghcr.io/amonemisa/personal-site-jobs-queue:latest
     restart: unless-stopped
     environment:
       QUEUE_MODE: worker
-      RABBITMQ_URL: amqp://${RABBITMQ_USER:-crawler}:${RABBITMQ_PASSWORD:-crawler}@flat-finder-rabbitmq:5672/%2F
       JOBS_FRONTEND_URL: http://frontend:3000
       QUEUE_INTERNAL_KEY: ${QUEUE_INTERNAL_KEY:-}
-      QUEUE_PREFETCH: ${JOBS_QUEUE_PREFETCH:-1}
-      QUEUE_MAX_ATTEMPTS: ${JOBS_QUEUE_MAX_ATTEMPTS:-5}
+      QUEUE_POLL_SECONDS: ${JOBS_QUEUE_POLL_SECONDS:-1}
+      QUEUE_EXECUTE_TIMEOUT_SECONDS: ${JOBS_QUEUE_EXECUTE_TIMEOUT_SECONDS:-180}
     networks:
       - default
-      - ai-net
     depends_on:
       frontend:
         condition: service_healthy
 
   jobs-queue-worker-2:
-    # Built and pushed by GitHub Actions; the deployment server can reach
-    # ghcr.io but not Docker Hub, so it must never build this locally.
     image: ghcr.io/amonemisa/personal-site-jobs-queue:latest
     restart: unless-stopped
     environment:
       QUEUE_MODE: worker
-      RABBITMQ_URL: amqp://${RABBITMQ_USER:-crawler}:${RABBITMQ_PASSWORD:-crawler}@flat-finder-rabbitmq:5672/%2F
       JOBS_FRONTEND_URL: http://frontend:3000
       QUEUE_INTERNAL_KEY: ${QUEUE_INTERNAL_KEY:-}
-      QUEUE_PREFETCH: ${JOBS_QUEUE_PREFETCH:-1}
-      QUEUE_MAX_ATTEMPTS: ${JOBS_QUEUE_MAX_ATTEMPTS:-5}
+      QUEUE_POLL_SECONDS: ${JOBS_QUEUE_POLL_SECONDS:-1}
+      QUEUE_EXECUTE_TIMEOUT_SECONDS: ${JOBS_QUEUE_EXECUTE_TIMEOUT_SECONDS:-180}
     networks:
       - default
-      - ai-net
     depends_on:
       frontend:
         condition: service_healthy
