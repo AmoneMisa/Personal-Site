@@ -8,6 +8,7 @@ import { candidateSearchAvailable, searchCandidates } from '../utils/hiringElast
 import { dedupeCandidates, detectMentionedProfessions, normalizeCandidate } from '../utils/hiringNormalize'
 import { withProfessionExperience } from '../utils/hiringExperience'
 import { listWebSources } from '../utils/hiringWebSources'
+import { listUzJobsSources } from '../utils/hiringUzJobsSource'
 import { getHiringWebDiagnostics } from '../utils/hiringDiagnostics'
 import { loadDbSourceRuns } from '../utils/hiringDb'
 import { searchTargetedHiringProfiles } from '../utils/hiringTargetedSearch'
@@ -537,7 +538,7 @@ export default defineEventHandler(async (event) => {
         ...(profiles.some((profile) => profileOrigin(profile) === 'web')
           ? [{ value: 'web', label: 'Web', origin: 'web' }]
           : []),
-        ...listWebSources()
+        ...[...listWebSources(), ...listUzJobsSources()]
           .filter((source) => (sourceCounts(profiles)[source.key] || 0) > 0)
           .map((source) => ({ value: source.key, label: source.label, origin: 'web' as const })),
       ],

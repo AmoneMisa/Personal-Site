@@ -11,6 +11,7 @@ import {
   hiringSecondaryWebSourceHandles,
   refreshHiringSecondaryWebSource,
 } from '~~/server/utils/hiringSecondaryWebSources'
+import { hiringUzJobsSourceHandles, refreshHiringUzJobsSource } from '~~/server/utils/hiringUzJobsSource'
 
 export default defineEventHandler(async (event) => {
   const expected = String(process.env.QUEUE_INTERNAL_KEY || '')
@@ -28,19 +29,22 @@ export default defineEventHandler(async (event) => {
   const knownTelegram = hiringChannelHandles().some((item) => item.toLowerCase() === handle.toLowerCase())
   const knownWeb = hiringWebSourceHandles().some((item) => item.toLowerCase() === handle.toLowerCase())
   const knownIshBor = hiringIshBorSourceHandles().some((item) => item.toLowerCase() === handle.toLowerCase())
+  const knownUzJobs = hiringUzJobsSourceHandles().some((item) => item.toLowerCase() === handle.toLowerCase())
   const knownSecondaryWeb = hiringSecondaryWebSourceHandles().some((item) => item.toLowerCase() === handle.toLowerCase())
 
-  if (!handle || (!knownTelegram && !knownWeb && !knownIshBor && !knownSecondaryWeb)) {
+  if (!handle || (!knownTelegram && !knownWeb && !knownIshBor && !knownUzJobs && !knownSecondaryWeb)) {
     throw createError({ statusCode: 400, statusMessage: `Unknown hiring source: ${handle || '<empty>'}` })
   }
 
   const result = knownIshBor
     ? await refreshHiringIshBorSource(handle)
-    : knownSecondaryWeb
-      ? await refreshHiringSecondaryWebSource(handle)
-      : knownWeb
-        ? await refreshHiringWebSource(handle)
-        : await refreshHiringChannel(handle)
+    : knownUzJobs
+      ? await refreshHiringUzJobsSource(handle)
+      : knownSecondaryWeb
+        ? await refreshHiringSecondaryWebSource(handle)
+        : knownWeb
+          ? await refreshHiringWebSource(handle)
+          : await refreshHiringChannel(handle)
 
   if (!result) {
     throw createError({ statusCode: 503, statusMessage: knownTelegram ? 'Telegram source is disabled' : 'Web CV source is disabled' })

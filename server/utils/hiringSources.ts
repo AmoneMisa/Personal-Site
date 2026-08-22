@@ -850,7 +850,9 @@ async function readChannel(channel: TelegramChannel, q: string, cursor: ChannelC
 
 /** Configured handles, in fetch order — the queue dispatcher fans these out. */
 export function hiringChannelHandles(): string[] {
-  return telegramChannels().map((channel) => channel.handle)
+  return telegramChannels()
+    .filter((channel) => channel.enabled !== false)
+    .map((channel) => channel.handle)
 }
 
 /**
@@ -861,7 +863,9 @@ export function hiringChannelHandles(): string[] {
 export async function fetchHiringChannel(handle: string, q = ''): Promise<ChannelOutcome | null> {
   if (process.env.TELEGRAM_SOURCE === 'off') return null
   const wanted = handle.replace(/^@/, '').toLowerCase()
-  const channel = telegramChannels().find((item) => item.handle.toLowerCase() === wanted)
+  const channel = telegramChannels().find(
+    (item) => item.enabled !== false && item.handle.toLowerCase() === wanted,
+  )
   if (!channel) return null
 
   const cursors = await loadCursors()

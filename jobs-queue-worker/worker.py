@@ -14,6 +14,8 @@ PREFETCH = max(1, int(os.environ.get("QUEUE_PREFETCH", "1")))
 MAX_ATTEMPTS = max(1, int(os.environ.get("QUEUE_MAX_ATTEMPTS", "5")))
 
 HIRING_REFRESH_SECONDS = max(60, int(os.environ.get("HIRING_QUEUE_REFRESH_SECONDS", "1800")))
+HIRING_BACKFILL_SECONDS = max(60, int(os.environ.get("HIRING_QUEUE_BACKFILL_SECONDS", "300")))
+DISPATCH_TICK_SECONDS = max(5, int(os.environ.get("QUEUE_DISPATCH_TICK_SECONDS", "10")))
 # Kill switch for the CV channel dispatch, so a misbehaving hiring queue can be
 # stopped with an env change and a restart instead of a rebuild. Consumers stay
 # registered either way; this only stops new work being queued.
@@ -62,10 +64,12 @@ def frontend_request(path, payload=None, method="POST"):
         return json.loads(response.read().decode("utf-8"))
 
 
-def hiring_handles():
-    """Channel list straight from the app, so the two never drift apart."""
+def hiring_source_sets():
+    """Regular and unfinished-backfill sources straight from the app."""
     data = frontend_request("/internal/hiring-channels", method="GET")
-    return [str(handle) for handle in (data.get("handles") or []) if handle]
+    handles = [str(handle) for handle in (data.get("handles") or []) if handle]
+    backfill = [str(handle) for handle in (data.get("backfillHandles") or []) if handle]
+    return handles, backfill
 
 
 def publish(channel, queue, payload, attempt=0):
@@ -79,33 +83,58 @@ def publish(channel, queue, payload, attempt=0):
 
 
 def dispatch_forever():
+    jobs_due_at = 0.0
     hiring_due_at = 0.0
+    backfill_due_at = 0.0
     while True:
+        now = time.monotonic()
+        hiring_is_due = HIRING_QUEUE_ENABLED and (now >= hiring_due_at or now >= backfill_due_at)
+        if now < jobs_due_at and not hiring_is_due:
+            time.sleep(DISPATCH_TICK_SECONDS)
+            continue
         try:
             connection = connect()
             channel = connection.channel()
             channel.confirm_delivery()
             declare(channel)
-            for source in SOURCES:
-                publish(channel, MAIN_QUEUE, {"type": "jobs.refresh.source", "source": source, "queuedAt": int(time.time())})
-            print(f"[jobs:queue:dispatcher] queued {len(SOURCES)} source tasks", flush=True)
+            if now >= jobs_due_at:
+                for source in SOURCES:
+                    publish(channel, MAIN_QUEUE, {"type": "jobs.refresh.source", "source": source, "queuedAt": int(time.time())})
+                print(f"[jobs:queue:dispatcher] queued {len(SOURCES)} source tasks", flush=True)
+                jobs_due_at = now + REFRESH_SECONDS
 
             # CV channels run on their own cadence, and a failure to read the
             # handle list must not cost us the vacancy dispatch above.
-            if HIRING_QUEUE_ENABLED and time.monotonic() >= hiring_due_at:
+            if HIRING_QUEUE_ENABLED and (now >= hiring_due_at or now >= backfill_due_at):
                 try:
-                    handles = hiring_handles()
-                    for handle in handles:
-                        publish(channel, HIRING_QUEUE, {"type": "hiring.refresh.channel", "handle": handle, "queuedAt": int(time.time())})
-                    print(f"[hiring:queue:dispatcher] queued {len(handles)} channel tasks", flush=True)
-                    hiring_due_at = time.monotonic() + HIRING_REFRESH_SECONDS
+                    handles, backfill_handles = hiring_source_sets()
+                    if now >= hiring_due_at:
+                        for handle in handles:
+                            publish(channel, HIRING_QUEUE, {"type": "hiring.refresh.channel", "handle": handle, "queuedAt": int(time.time())})
+                        print(f"[hiring:queue:dispatcher] queued {len(handles)} regular source tasks", flush=True)
+                        hiring_due_at = now + HIRING_REFRESH_SECONDS
+                        backfill_due_at = now + HIRING_BACKFILL_SECONDS
+                    elif now >= backfill_due_at:
+                        queue_state = channel.queue_declare(queue=HIRING_QUEUE, passive=True)
+                        pending = int(queue_state.method.message_count)
+                        if pending == 0:
+                            for handle in backfill_handles:
+                                publish(channel, HIRING_QUEUE, {"type": "hiring.refresh.channel", "handle": handle, "queuedAt": int(time.time())})
+                            print(f"[hiring:queue:dispatcher] queued {len(backfill_handles)} backfill source tasks", flush=True)
+                        else:
+                            print(f"[hiring:queue:dispatcher] backfill sweep skipped; queue has {pending} pending tasks", flush=True)
+                        backfill_due_at = now + HIRING_BACKFILL_SECONDS
                 except Exception as exc:
                     print(f"[hiring:queue:dispatcher] error: {exc}", flush=True)
+                    if now >= hiring_due_at:
+                        hiring_due_at = now + 60
+                    if now >= backfill_due_at:
+                        backfill_due_at = now + 60
 
             connection.close()
         except Exception as exc:
             print(f"[jobs:queue:dispatcher] error: {exc}", flush=True)
-        time.sleep(REFRESH_SECONDS)
+        time.sleep(DISPATCH_TICK_SECONDS)
 
 
 def execute_task(payload):
