@@ -113,8 +113,11 @@ function repairProfessions(profile: CvProfile, text: string): string[] {
     const technologies = field(text, 'texnologiya|technologies|technology|stack') || ''
     const technicalProfile = `${technologies} ${(profile.skills || []).join(' ')}`
     if (/\bflutter\b|\bdart\b/iu.test(technicalProfile)) return ['Mobile Developer']
-    if (/\bcisco\b/iu.test(technicalProfile) && /\b(?:linux|windows\s+server|active\s+directory|network(?:ing)?)\b/iu.test(technicalProfile)) {
-      return ['Network Administrator']
+    const sysadminBase = /\bcisco\b/iu.test(technicalProfile)
+      && /\b(?:linux|windows\s+server|active\s+directory|network(?:ing)?)\b/iu.test(technicalProfile)
+    const specializedTools = /\b(?:devops|sre|docker|kubernetes|k8s|terraform|ansible|jenkins|gitlab\s+ci|github\s+actions|ci\/?cd|aws|azure|gcp|ai|ml|mlops|artificial\s+intelligence|machine\s+learning|deep\s+learning|data\s+scien(?:ce|tist)|tensorflow|pytorch|scikit[- ]?learn|llm|langchain|developer|software\s+engineer|programmer|разработчик|программист|react|angular|vue(?:\.js)?|next(?:\.js)?|node(?:\.js)?|django|laravel|spring\s+boot|asp\.net)\b/iu.test(technicalProfile)
+    if (sysadminBase && !specializedTools) {
+      return ['System Administrator']
     }
     const strongDeveloperSkill = /\b(?:react|vue\.?\s*js|angular|node\.?\s*js|next\.?\s*js|django|laravel|fastapi|flask|spring|asp\.?net|ruby\s+on\s+rails)\b/iu.test(technicalProfile)
     const softwareSignals = (technicalProfile.match(/\b(?:python|java(?:script)?|typescript|php|react|vue\.?\s*js|angular|node\.?\s*js|next\.?\s*js|django|laravel|fastapi|flask|spring|asp\.?net|sql|html|css|c\+\+|c#|golang)\b/giu) || []).length

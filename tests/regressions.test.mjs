@@ -388,7 +388,7 @@ test('Flagma rejects employment dates as contacts and employer names as skills',
   assert.doesNotMatch(normalized.description, /^Сохранить$/mu)
 })
 
-test('Cisco and Linux infer a network administrator when the candidate omitted a role', () => {
+test('Cisco and Linux infer a system administrator only without specialized tooling', () => {
   const profile = repairCandidateProfile(normalizeCandidate({
     id: 'tg-network', source: 'telegram', country: 'UZ', name: 'Akobir Azizov', role: '',
     skills: ['Cisco', 'Linux'], url: 'https://t.me/example/2', createdAt: '2026-08-22T12:00:00.000Z',
@@ -396,8 +396,24 @@ test('Cisco and Linux infer a network administrator when the candidate omitted a
     description: 'Xodim: Akobir Azizov\nTexnologiya: Cisco, Linux\nMaqsad: shu soha bo‘yicha yetuk mutahasis bo‘lish',
   }))
 
-  assert.deepEqual(profile.professions, ['Network Administrator'])
-  assert.equal(profile.role, 'Network Administrator')
+  assert.deepEqual(profile.professions, ['System Administrator'])
+  assert.equal(profile.role, 'System Administrator')
+
+  const devops = repairCandidateProfile(normalizeCandidate({
+    id: 'tg-devops', source: 'telegram', country: 'UZ', name: 'Candidate', role: '',
+    skills: ['Cisco', 'Linux', 'Terraform'], url: 'https://t.me/example/3', createdAt: '2026-08-22T12:00:00.000Z',
+    originalText: 'Xodim: Candidate\nTexnologiya: Cisco, Linux, Terraform',
+    description: 'Xodim: Candidate\nTexnologiya: Cisco, Linux, Terraform',
+  }))
+  assert.notEqual(devops.role, 'System Administrator')
+
+  const developer = repairCandidateProfile(normalizeCandidate({
+    id: 'tg-developer-network', source: 'telegram', country: 'UZ', name: 'Candidate', role: '',
+    skills: ['Cisco', 'Linux', 'Software Developer'], url: 'https://t.me/example/4', createdAt: '2026-08-22T12:00:00.000Z',
+    originalText: 'Xodim: Candidate\nTexnologiya: Cisco, Linux\nKasbi: Software Developer',
+    description: 'Xodim: Candidate\nTexnologiya: Cisco, Linux\nKasbi: Software Developer',
+  }))
+  assert.notEqual(developer.role, 'System Administrator')
 })
 
 test('legacy Careerist rows lose icon ligatures and repeating experience fractions', () => {
