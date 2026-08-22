@@ -7,7 +7,7 @@
 // filtering happens inside.
 import { computed, ref } from "vue";
 
-export interface SpecRow { label: string; value: string }
+export interface SpecRow { label: string; value: string; empty?: boolean }
 
 const props = withDefaults(defineProps<{
   rows: SpecRow[];
@@ -23,7 +23,10 @@ const hideEmpty = ref(props.hideEmptyDefault);
 
 const visibleRows = computed(() => {
   if (!props.hideEmptyLabel || !hideEmpty.value || !props.emptyValue) return props.rows;
-  return props.rows.filter((row) => row.value !== props.emptyValue);
+  const empty = props.emptyValue.trim().toLocaleLowerCase();
+  return props.rows.filter((row) => (
+    !row.empty && row.value.trim().toLocaleLowerCase() !== empty
+  ));
 });
 </script>
 
