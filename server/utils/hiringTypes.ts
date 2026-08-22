@@ -4,10 +4,10 @@
 import type { Seniority } from './jobTypes'
 
 // `source` stays backwards-compatible with the existing hiring pipeline. Public
-// web boards are distinguished by `origin` + `sourceKey` so the current store,
-// search index and source filters do not need a flag-day migration.
-export type HiringSource = 'telegram'
-export type CandidateOrigin = 'telegram' | 'web'
+// web/social sources are distinguished by `origin` + `sourceKey`, while the
+// source value identifies the transport family for storage and diagnostics.
+export type HiringSource = 'telegram' | 'social'
+export type CandidateOrigin = 'telegram' | 'web' | 'facebook' | 'threads'
 export type CandidateEmploymentType = 'full_time' | 'part_time'
 export type CandidateContactType = 'direct' | 'platform'
 export type CandidateGender = 'male' | 'female' | 'unknown'
@@ -17,6 +17,9 @@ export interface ProfessionExperience {
   years: number
 }
 
+// Full-store refresh remains Telegram-only. Social sources are fanned out by
+// the durable per-source queue so a blocked Facebook group cannot delay every
+// other candidate source.
 export const HIRING_SOURCES: HiringSource[] = ['telegram']
 
 export interface CvProfile {
