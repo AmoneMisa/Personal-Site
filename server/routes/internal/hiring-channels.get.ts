@@ -8,8 +8,10 @@ import { hiringChannelHandles } from '~~/server/utils/hiringSources'
 import { hiringWebSourceHandles } from '~~/server/utils/hiringWebSources'
 import { hiringIshBorSourceHandles } from '~~/server/utils/hiringIshBorSource'
 import { hiringSecondaryWebSourceHandles } from '~~/server/utils/hiringSecondaryWebSources'
+import { hiringUzJobsSourceHandles } from '~~/server/utils/hiringUzJobsSource'
+import { loadCursors, loadWebCursors } from '~~/server/utils/hiringCursors'
 
-export default defineEventHandler((event) => {
+export default defineEventHandler(async (event) => {
   const expected = String(process.env.QUEUE_INTERNAL_KEY || '')
   const provided = String(getHeader(event, 'x-queue-key') || '')
 
@@ -27,11 +29,30 @@ export default defineEventHandler((event) => {
     })
   }
 
-  const handles = [
-    ...hiringChannelHandles(),
+  const telegramHandles = hiringChannelHandles()
+  const progressiveWebHandles = [
     ...hiringWebSourceHandles(),
     ...hiringIshBorSourceHandles(),
+    ...hiringUzJobsSourceHandles(),
+  ]
+  const handles = [
+    ...telegramHandles,
+    ...progressiveWebHandles,
     ...hiringSecondaryWebSourceHandles(),
   ]
-  return { ok: true, count: handles.length, handles }
+  const [telegramCursors, webCursors] = await Promise.all([loadCursors(), loadWebCursors()])
+  const backfillHandles = [
+    ...telegramHandles.filter((handle) => !telegramCursors.get(handle)?.bootstrapComplete),
+    ...progressiveWebHandles.filter((handle) => {
+      const key = handle.replace(/^web:/i, '')
+      return !webCursors.get(key)?.bootstrapComplete
+    }),
+  ]
+  return {
+    ok: true,
+    count: handles.length,
+    handles,
+    backfillCount: backfillHandles.length,
+    backfillHandles,
+  }
 })

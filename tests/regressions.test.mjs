@@ -21,6 +21,7 @@ import { dedupeCandidates, normalizeCandidate, normalizeProfessions } from '../s
 import { repairCandidateProfile } from '../server/utils/hiringQuality.ts'
 import { withProfessionExperience } from '../server/utils/hiringExperience.ts'
 import { trimCareeristProfileText } from '../server/utils/hiringCareeristFields.ts'
+import { parseUzJobsRows } from '../server/utils/hiringUzJobsFields.ts'
 import {
   ishBorLocationFromText,
   ishBorProfileHtml,
@@ -33,6 +34,35 @@ import {
   htmlText,
   parseAge,
 } from '../server/utils/hiringWebFields.ts'
+
+test('hiring dispatcher skips disabled Telegram feeds and fast-tracks unfinished backfills', () => {
+  const source = readFileSync(new URL('../server/utils/hiringSources.ts', import.meta.url), 'utf8')
+  assert.match(source, /hiringChannelHandles[\s\S]*?filter\(\(channel\)\s*=>\s*channel\.enabled\s*!==\s*false\)/u)
+
+  const worker = readFileSync(new URL('../jobs-queue-worker/worker.py', import.meta.url), 'utf8')
+  assert.match(worker, /HIRING_BACKFILL_SECONDS[\s\S]*?"300"/u)
+  assert.match(worker, /jobs_due_at\s*=\s*0\.0[\s\S]*?backfill_due_at\s*=\s*0\.0/u)
+  assert.match(worker, /queue_declare\(queue=HIRING_QUEUE, passive=True\)/u)
+})
+
+test('UzJobs public anonymous resume rows become recent platform-contact candidates', () => {
+  const html = `
+    <table>
+      <tr>
+        <td class="td_left_id">99924</td>
+        <td>Наука, образование / Главный специалист<br>Наука, образование / Преподаватель</td>
+        <td class="td_region" align="center">Ташкент</td>
+        <td class="td_kol_vak">16.08.2026 13:25:13</td>
+      </tr>
+    </table>
+  `
+  const [row] = parseUzJobsRows(html)
+  assert.ok(row)
+  assert.equal(row.id, '99924')
+  assert.deepEqual(row.roles, ['Главный специалист', 'Преподаватель'])
+  assert.equal(row.region, 'Ташкент')
+  assert.equal(row.activityAt, '2026-08-16T08:25:13.000Z')
+})
 
 test('the search clear button clears and refreshes all three boards', () => {
   const pages = [

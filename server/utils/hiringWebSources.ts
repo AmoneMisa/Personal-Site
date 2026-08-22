@@ -753,7 +753,7 @@ function storeKey(profile: CvProfile): string {
   return profile.url || profile.id
 }
 
-interface PersistResult {
+export interface PersistResult {
   /** Everything in the store after the write, all sources included. */
   stored: number
   /** Profiles from this source still inside the retention window. */
@@ -762,7 +762,7 @@ interface PersistResult {
   expired: number
 }
 
-async function persistWebProfiles(
+export async function persistWebProfiles(
   profiles: CvProfile[],
   diagnostic: SourceRun,
   sourceKey: string,
