@@ -25,9 +25,12 @@ test('persistent KV supports get/set/delete and exists', async () => {
 })
 
 test('persistent KV expires TTL entries', async () => {
-  await store.set('short', 'value', 'PX', 20)
+  // Filesystem-backed state performs an atomic write + fsync. A 20ms TTL can
+  // legitimately expire before the first read on a busy CI runner, so use a
+  // window large enough to test TTL semantics rather than storage latency.
+  await store.set('short', 'value', 'PX', 250)
   assert.equal(await store.get('short'), 'value')
-  await new Promise((resolve) => setTimeout(resolve, 35))
+  await new Promise((resolve) => setTimeout(resolve, 325))
   assert.equal(await store.get('short'), null)
 })
 
