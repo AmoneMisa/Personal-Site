@@ -13,6 +13,10 @@ import {
 } from '~~/server/utils/hiringSecondaryWebSources'
 import { hiringUzJobsSourceHandles, refreshHiringUzJobsSource } from '~~/server/utils/hiringUzJobsSource'
 import { hiringSocialSourceHandles, refreshHiringSocialSource } from '~~/server/utils/hiringSocialSources'
+import {
+  hiringLinkedInSourceHandles,
+  refreshHiringLinkedInSource,
+} from '~~/server/utils/hiringLinkedInSources'
 
 export default defineEventHandler(async (event) => {
   const expected = String(process.env.QUEUE_INTERNAL_KEY || '')
@@ -33,25 +37,34 @@ export default defineEventHandler(async (event) => {
   const knownUzJobs = hiringUzJobsSourceHandles().some((item) => item.toLowerCase() === handle.toLowerCase())
   const knownSecondaryWeb = hiringSecondaryWebSourceHandles().some((item) => item.toLowerCase() === handle.toLowerCase())
   const knownSocial = hiringSocialSourceHandles().some((item) => item.toLowerCase() === handle.toLowerCase())
+  const knownLinkedIn = hiringLinkedInSourceHandles().some((item) => item.toLowerCase() === handle.toLowerCase())
 
-  if (!handle || (!knownTelegram && !knownWeb && !knownIshBor && !knownUzJobs && !knownSecondaryWeb && !knownSocial)) {
+  if (!handle || (!knownTelegram && !knownWeb && !knownIshBor && !knownUzJobs && !knownSecondaryWeb && !knownSocial && !knownLinkedIn)) {
     throw createError({ statusCode: 400, statusMessage: `Unknown hiring source: ${handle || '<empty>'}` })
   }
 
-  const result = knownSocial
-    ? await refreshHiringSocialSource(handle)
-    : knownIshBor
-      ? await refreshHiringIshBorSource(handle)
-      : knownUzJobs
-        ? await refreshHiringUzJobsSource(handle)
-        : knownSecondaryWeb
-          ? await refreshHiringSecondaryWebSource(handle)
-          : knownWeb
-            ? await refreshHiringWebSource(handle)
-            : await refreshHiringChannel(handle)
+  const result = knownLinkedIn
+    ? await refreshHiringLinkedInSource(handle)
+    : knownSocial
+      ? await refreshHiringSocialSource(handle)
+      : knownIshBor
+        ? await refreshHiringIshBorSource(handle)
+        : knownUzJobs
+          ? await refreshHiringUzJobsSource(handle)
+          : knownSecondaryWeb
+            ? await refreshHiringSecondaryWebSource(handle)
+            : knownWeb
+              ? await refreshHiringWebSource(handle)
+              : await refreshHiringChannel(handle)
 
   if (!result) {
-    const kind = knownTelegram ? 'Telegram' : knownSocial ? 'Social' : 'Web CV'
+    const kind = knownTelegram
+      ? 'Telegram'
+      : knownLinkedIn
+        ? 'LinkedIn'
+        : knownSocial
+          ? 'Social'
+          : 'Web CV'
     throw createError({ statusCode: 503, statusMessage: `${kind} source is disabled` })
   }
 
