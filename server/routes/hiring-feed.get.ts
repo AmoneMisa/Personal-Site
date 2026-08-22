@@ -18,6 +18,7 @@ import {
   hiringProfessionLocale,
   type HiringProfessionLocale,
 } from '../../shared/hiringProfessionLabels'
+import { hiringEducationLabel } from '../../shared/hiringEducationLabels'
 
 const PAGE_MAX = 60
 
@@ -358,6 +359,7 @@ function publicProfile(profile: CvProfile, locale: HiringProfessionLocale): CvPr
     employmentType: profile.employmentTypes?.length
       ? profile.employmentTypes.map(localizeEmploymentType).join(', ')
       : profile.employmentType ? localizeEmploymentType(profile.employmentType) : profile.employmentType,
+    education: hiringEducationLabel(profile.education, locale),
     tags: [...new Set(details)].slice(0, 20),
     origin: profileOrigin(profile) as CvProfile['origin'],
     sourceKey: profileSource(profile),

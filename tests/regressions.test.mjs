@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import test from 'node:test'
+import { hiringEducationLabel } from '../shared/hiringEducationLabels.ts'
 
 import {
   extractCandidateAge,
@@ -40,6 +41,14 @@ test('the search clear button clears and refreshes all three boards', () => {
   const input = readFileSync(new URL('../app/components/U/Input.vue', import.meta.url), 'utf8')
   assert.match(input, /@mousedown\.stop\.prevent/u)
   assert.match(input, /@click\.stop\.prevent="clear"/u)
+})
+
+test('Uzbek education levels are localized without losing their subject details', () => {
+  assert.equal(hiringEducationLabel("O'rta", 'ru'), 'Среднее')
+  assert.equal(hiringEducationLabel('Oliy', 'ru'), 'Высшее')
+  assert.equal(hiringEducationLabel("O'rta maxsus", 'ru'), 'Среднее специальное')
+  assert.equal(hiringEducationLabel("Oliy(Ona tili va adabiyot)", 'ru'), 'Высшее (Ona tili va adabiyot)')
+  assert.equal(hiringEducationLabel("O'rta", 'en'), 'Secondary education')
 })
 
 test('Uzbek structured CV fields keep labels out of the candidate name', () => {
