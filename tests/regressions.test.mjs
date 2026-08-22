@@ -8,6 +8,7 @@ import {
 import { removeExistingSocialMeta } from '../server/utils/shareHead.ts'
 import { looksSoftBlocked } from '../server/utils/browserSoftBlock.ts'
 import { normalizeCandidate, normalizeProfessions } from '../server/utils/hiringNormalize.ts'
+import { withProfessionExperience } from '../server/utils/hiringExperience.ts'
 import {
   ishBorLocationFromText,
   ishBorProfileHtml,
@@ -66,6 +67,7 @@ test('Cyrillic city, age and date patterns match at all', () => {
   assert.equal(cityFrom('Роман Киев (возможен переезд)', 'UA'), 'Kyiv')
   assert.equal(cityFrom('Александр Харьков', 'UA'), 'Kharkiv')
   assert.equal(cityFrom('г. Ташкент, Чиланзарский район', 'UZ'), 'Tashkent')
+  assert.equal(cityFrom('Ташкент обл.', 'UZ'), 'Tashkent Region')
   assert.equal(cityFrom('Астана', 'KZ'), 'Astana')
   assert.equal(cityFrom('Bucuresti', 'RO'), 'Bucharest')
   assert.equal(cityFrom('Тбилиси', 'UA'), null)
@@ -136,6 +138,37 @@ test('legacy Careerist rows lose icon ligatures and repeating experience fractio
   assert.doesNotMatch(profile.description, /local_shipping/)
 })
 
+test('legacy Flagma fields repair hidden names, education and month durations', () => {
+  const text = [
+    'Оператор чата',
+    'ФИО скрыто , 20 лет, Ташкент | Среднее образование',
+    'неполная занятость, удаленно',
+    'Опыт работы: 2 мес, Administrator, Language Centre, Tashkent',
+  ].join('\n')
+  const normalized = normalizeCandidate({
+    id: 'flagma-8199',
+    source: 'telegram',
+    origin: 'web',
+    sourceKey: 'flagma-uz',
+    country: 'UZ',
+    name: 'ФИО скрыто',
+    role: 'Оператор чата',
+    education: 'неполная занятость, удаленно',
+    employmentTypes: ['full_time', 'part_time'],
+    professionExperience: [{ profession: 'Administrator', years: 2 }],
+    url: 'https://flagma.uz/ru/resume-operator-chata-rr8199.html',
+    createdAt: '2026-08-22T12:00:00.000Z',
+    originalText: text,
+    description: text,
+  })
+  const repaired = withProfessionExperience(normalized)
+
+  assert.equal(repaired.name, '')
+  assert.equal(repaired.education, 'Среднее образование')
+  assert.deepEqual(repaired.employmentTypes, ['part_time'])
+  assert.equal(repaired.professionExperience?.find((item) => item.profession === 'Administrator')?.years, 0.2)
+})
+
 test('IshBor keeps only the profile column and trusts its stated region', () => {
   const html = [
     '<nav>работа в Ташкенте</nav>',
@@ -195,6 +228,10 @@ test('IshBor keeps only the profile column and trusts its stated region', () => 
   assert.equal(repaired.city, 'Surkhandarya')
   assert.equal(repaired.experienceYears, 0)
   assert.doesNotMatch(repaired.description, /Фильтр|Если вам нужна работа|Регистрация/)
+
+  assert.equal(ishBorLocationFromText(
+    "Oliy toifali boshlang'ich ta'lim o'qituvchisi (Резюме) - Навои | работа в ташкенте",
+  ), 'Navoi')
 })
 
 test('Uzbek boards that print a region instead of a city still resolve a location', () => {

@@ -199,6 +199,7 @@ export function cityRe(alternatives: string): RegExp {
 
 export const CITIES: Record<string, Array<[string, RegExp]>> = {
   UZ: [
+    ['Tashkent Region', cityRe('ташкент(?:ская)?\\s+(?:обл(?:асть)?\\.?|region)|toshkent\\s+viloyati|tashkent\\s+region')],
     ['Tashkent', cityRe('ташкент|tashkent|toshkent')], ['Samarkand', cityRe('самарканд|samarqand|samarkand')],
     ['Bukhara', cityRe('бухара|buxoro|bukhara')], ['Namangan', cityRe('наманган\\p{L}*|namangan')],
     ['Andijan', cityRe('андижан|andijon|andijan')], ['Fergana', cityRe("фергана|фаргана|farg(?:'|’)ona|fergana")],
@@ -242,7 +243,7 @@ export function cityFrom(text: string, country: string): string | null {
 
 export function employment(text: string): CvProfile['employmentTypes'] {
   const out = new Set<'full_time' | 'part_time'>()
-  if (/полная занятость|полный день|full[- ]?time|to['’]?liq bandlik|normă întreagă/iu.test(text)) out.add('full_time')
+  if (/(?<!\p{L})(?:полная занятость|полный день)|full[- ]?time|to['’]?liq bandlik|normă întreagă/iu.test(text)) out.add('full_time')
   if (/неполная занятость|неполный день|частичная занятость|part[- ]?time|qisman bandlik|part[- ]time/iu.test(text)) out.add('part_time')
   return [...out]
 }

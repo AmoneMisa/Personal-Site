@@ -314,6 +314,16 @@ function requestLocale(event: Parameters<typeof getCookie>[0]): HiringProfession
 }
 
 function formatYears(years: number, locale: HiringProfessionLocale): string {
+  if (years > 0 && years < 1) {
+    const months = Math.max(1, Math.round(years * 12))
+    if (locale === 'en') return `${months} ${months === 1 ? 'month' : 'months'}`
+    const mod10 = months % 10
+    const mod100 = months % 100
+    const unit = mod10 === 1 && mod100 !== 11 ? 'месяц'
+      : mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14) ? 'месяца'
+        : 'месяцев'
+    return `${months} ${unit}`
+  }
   if (locale === 'en') return `${years} ${years === 1 ? 'year' : 'years'}`
   const integer = Math.abs(Math.trunc(years))
   const mod10 = integer % 10

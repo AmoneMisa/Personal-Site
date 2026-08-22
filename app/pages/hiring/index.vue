@@ -545,6 +545,9 @@ function salaryLabel(profile: CvProfile): string | null {
   if (profile.salaryMin == null && profile.salaryMax == null) return null;
   const cur = profile.currency || "";
   if (profile.salaryMin != null && profile.salaryMax != null) {
+    if (profile.salaryMin === profile.salaryMax) {
+      return `${profile.salaryMin.toLocaleString()} ${cur}`.trim();
+    }
     return `${profile.salaryMin.toLocaleString()}–${profile.salaryMax.toLocaleString()} ${cur}`.trim();
   }
   const value = profile.salaryMin ?? profile.salaryMax;
@@ -575,6 +578,14 @@ function specLine(profile: CvProfile): string {
 const fmtBool = (v?: boolean | null) => (v === true ? t("yes") : v === false ? t("no") : t("notSpecified"));
 const strOr = (v?: string | null) => (v ? v : t("notSpecified"));
 const listOr = (v?: string[] | null) => (v?.length ? v.join(", ") : t("notSpecified"));
+const employmentLabel = (value?: string | null) => value
+  ? value.split(",").map((item) => {
+      const key = item.trim();
+      if (key === "full_time") return t("employmentFull");
+      if (key === "part_time") return t("employmentPart");
+      return key;
+    }).join(", ")
+  : t("notSpecified");
 
 const specRows = computed(() => {
   const profile = active.value;
@@ -590,7 +601,7 @@ const specRows = computed(() => {
     { label: t("specCountry"), value: strOr(meta.value.find((c) => c.code === profile.country)?.name || profile.country) },
     { label: t("specRemote"), value: fmtBool(profile.remote) },
     { label: t("specContactHours"), value: strOr(profile.contactHours) },
-    { label: t("specEmployment"), value: strOr(profile.employmentType) },
+    { label: t("specEmployment"), value: employmentLabel(profile.employmentType) },
     { label: t("specEducation"), value: strOr(profile.education) },
     { label: t("specLanguages"), value: listOr(profile.languages) },
     { label: t("specSkills"), value: listOr(profile.skills) },

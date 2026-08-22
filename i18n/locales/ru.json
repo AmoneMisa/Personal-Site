@@ -345,6 +345,8 @@
     "specCountry": "Страна",
     "specRemote": "Удалёнка",
     "specEmployment": "Занятость",
+    "employmentFull": "Полная занятость",
+    "employmentPart": "Частичная занятость",
     "specEducation": "Образование",
     "specLanguages": "Языки",
     "specSkills": "Навыки",

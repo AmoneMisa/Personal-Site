@@ -433,8 +433,8 @@ export function normalizeRelevantExperience(
 export function normalizeEmploymentTypes(text: string, raw?: string | null): CandidateEmploymentType[] {
   const source = `${raw || ''}\n${text}`
   const out = new Set<CandidateEmploymentType>()
-  if (/full[-\s]?time|полный\s+(?:рабочий\s+)?день|полная\s+занятость|повн(?:ий|а)\s+(?:робочий\s+)?день|повна\s+зайнятість|to(?:'|’)liq\s+(?:ish|stavka)/iu.test(source)) out.add('full_time')
-  if (/part[-\s]?time|неполный\s+(?:рабочий\s+)?день|частичная\s+занятость|подработк|неповн(?:ий|а)\s+(?:робочий\s+)?день|часткова\s+зайнятість|підробіт|yarim\s+stavka/iu.test(source)) out.add('part_time')
+  if (/full[-\s]?time|(?<!\p{L})полный\s+(?:рабочий\s+)?день|(?<!\p{L})полная\s+занятость|(?<!\p{L})повн(?:ий|а)\s+(?:робочий\s+)?день|(?<!\p{L})повна\s+зайнятість|to(?:'|’)liq\s+(?:ish|stavka)/iu.test(source)) out.add('full_time')
+  if (/part[-\s]?time|неполный\s+(?:рабочий\s+)?день|неполная\s+занятость|частичная\s+занятость|подработк|неповн(?:ий|а)\s+(?:робочий\s+)?день|часткова\s+зайнятість|підробіт|yarim\s+stavka/iu.test(source)) out.add('part_time')
   return [...out]
 }
 
@@ -446,6 +446,21 @@ function stripUiArtifacts(value: string): string {
     .map((line) => line.replace(/[ \t]{2,}/g, ' ').trim())
     .join('\n')
     .trim()
+}
+
+const HIDDEN_NAME_RE = /^(?:фио|піб|name)?\s*(?:скрыт\p{L}*|прихован\p{L}*|hidden|yashiril\p{L}*|ascuns)$/iu
+const EMPLOYMENT_AS_EDUCATION_RE = /занятост|зайнятіст|удал[её]нн|дистанцион|remote|full[- ]?time|part[- ]?time|график\s+работ|bandlik/iu
+
+function normalizeCandidateEducation(profile: CvProfile, text: string): string | null | undefined {
+  const raw = profile.education?.trim() || ''
+  if (raw && !EMPLOYMENT_AS_EDUCATION_RE.test(raw)) return raw
+  if (profile.sourceKey?.startsWith('flagma')) {
+    const demographics = text.match(
+      /\|\s*([^\n|]{0,120}(?:образован\p{L}*|освіт\p{L}*|studii|ta(?:['’])?lim)[^\n|]{0,120})/iu,
+    )?.[1]?.trim()
+    if (demographics && !EMPLOYMENT_AS_EDUCATION_RE.test(demographics)) return demographics
+  }
+  return raw ? null : profile.education
 }
 
 export function normalizeCandidate(profile: CvProfile): CvProfile {
@@ -460,7 +475,10 @@ export function normalizeCandidate(profile: CvProfile): CvProfile {
   // Repair already-stored rows where a loose adapter saved the whole labelled
   // line ("familya: ...") as the name. New parses and old data then converge.
   const rawName = profile.name?.trim() || ''
-  const name = (rawName ? extractCandidateName(rawName) || rawName : extractCandidateName(originalText))
+  const nameCandidate = rawName && !HIDDEN_NAME_RE.test(rawName)
+    ? extractCandidateName(rawName) || rawName
+    : extractCandidateName(originalText)
+  const name = (HIDDEN_NAME_RE.test(nameCandidate) ? '' : nameCandidate)
     .replace(/\s{2,}/g, ' ')
     .trim()
     .slice(0, 100)
@@ -479,9 +497,10 @@ export function normalizeCandidate(profile: CvProfile): CvProfile {
     ? providedProfessions
     : normalizeProfessions(effectiveRole, originalText)
   const age = profile.age ?? extractAge(originalText)
-  const employmentTypes = profile.employmentTypes?.length
-    ? profile.employmentTypes
-    : normalizeEmploymentTypes(originalText, profile.employmentType)
+  const parsedEmploymentTypes = normalizeEmploymentTypes(originalText, profile.employmentType)
+  const employmentTypes = profile.sourceKey?.startsWith('flagma')
+    ? parsedEmploymentTypes
+    : profile.employmentTypes?.length ? profile.employmentTypes : parsedEmploymentTypes
   const relevantExperience = normalizeRelevantExperience(profile.experienceYears, professions, originalText)
   // Month-based durations (20 years 4 months) are repeating IEEE fractions.
   // One decimal is enough for the source precision and keeps JSON/UI readable.
@@ -497,6 +516,7 @@ export function normalizeCandidate(profile: CvProfile): CvProfile {
   const salaryMin = profile.salaryMin ?? extractedSalary.salaryMin
   const salaryMax = profile.salaryMax ?? extractedSalary.salaryMax
   const currency = profile.currency ?? extractedSalary.currency
+  const education = normalizeCandidateEducation(profile, originalText)
 
   return {
     ...profile,
@@ -515,6 +535,7 @@ export function normalizeCandidate(profile: CvProfile): CvProfile {
     isAdult: age == null ? true : age >= 18,
     experienceYears,
     city,
+    education,
     salaryMin,
     salaryMax,
     currency,

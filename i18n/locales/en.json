@@ -345,6 +345,8 @@
     "specCountry": "Country",
     "specRemote": "Remote",
     "specEmployment": "Employment",
+    "employmentFull": "Full-time",
+    "employmentPart": "Part-time",
     "specEducation": "Education",
     "specLanguages": "Languages",
     "specSkills": "Skills",
