@@ -12,7 +12,7 @@ import {
   pruneJobsQueueHistory,
 } from '~~/server/utils/jobsPgQueue'
 
-function authorize(event: Parameters<typeof getHeader>[0]) {
+function authorize(event: any) {
   const expected = String(process.env.QUEUE_INTERNAL_KEY || '')
   const provided = String(getHeader(event, 'x-queue-key') || '')
   if (expected.length < 16) {
@@ -53,7 +53,7 @@ export default defineEventHandler(async (event) => {
   ]
 
   const result = await dispatchDueJobsQueue({
-    sources: ALL_SOURCES,
+    sources: [...ALL_SOURCES],
     hiringHandles,
     backfillHandles,
     jobsRefreshSeconds: Math.max(60, Number(process.env.JOBS_QUEUE_REFRESH_SECONDS) || 1800),
