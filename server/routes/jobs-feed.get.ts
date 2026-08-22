@@ -35,6 +35,13 @@ function isConfigured(source: JobSource): boolean {
     case 'companies':
       // On by default thanks to the built-in Greenhouse/Lever seed boards.
       return process.env.COMPANIES_SOURCE !== 'off'
+    case 'linkedin':
+      return process.env.LINKEDIN_SOURCE !== 'off'
+    case 'facebook':
+    case 'threads':
+      return String(process.env.SOCIAL_JOB_SOURCE || 'on').toLowerCase() !== 'off'
+        && !!process.env.HIRING_SOCIAL_API_URL
+        && String(process.env.QUEUE_INTERNAL_KEY || '').length >= 16
     case 'devkg':
       // On by default — DevKG's public vacancies RSS feed, no key required.
       return process.env.DEVKG_SOURCE !== 'off'
@@ -102,7 +109,7 @@ export default defineEventHandler(async (event) => {
     ? activeSources
     : requested.length
       ? []
-      : FREE_SOURCES
+      : FREE_SOURCES.filter(isConfigured)
 
   let remote: boolean | undefined
   if (q.remote === 'true') remote = true
