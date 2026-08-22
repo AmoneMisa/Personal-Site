@@ -122,6 +122,30 @@ export default defineNuxtConfig({
         }
     },
     icon: {
-        localApiEndpoint: "/_nuxt_icon"
+        // Never make SSR depend on Iconify/network availability. All literal
+        // icon usages are collected at build time; unresolved/dynamic icons fail
+        // visually instead of blocking the entire HTML response and causing 504s.
+        provider: 'none',
+        serverBundle: false,
+        fallbackToApi: false,
+        clientBundle: {
+            scan: true,
+            icons: [
+                'lucide:search',
+                'lucide:bookmark-plus',
+                'lucide:share-2',
+                'lucide:chevron-down',
+                'lucide:sparkles',
+                'lucide:snowflake',
+                'lucide:square-parking',
+                'lucide:wifi',
+                'lucide:flame',
+                'lucide:panel-top',
+                'lucide:sun',
+                'lucide:tree-pine',
+                'lucide:sliders-horizontal',
+                'lucide:rotate-ccw',
+            ],
+        },
     }
 });
