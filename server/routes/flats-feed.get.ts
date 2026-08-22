@@ -16,6 +16,10 @@ const EMPTY_STALE_MS = 60_000
 // The flat API answers an uncached query in ~6s and slower under load; 15s left
 // legitimate searches failing as if nothing matched.
 const UPSTREAM_TIMEOUT_MS = 25_000
+// A direct single-offer lookup should be faster than a country refresh. Keep it
+// below the main proxy budget so a broken OLX detail endpoint cannot hold the
+// share-link request open for the full feed timeout.
+const EXACT_LOOKUP_TIMEOUT_MS = 12_000
 const feedCache = new Map<string, { at: number; data: any }>()
 const feedRefreshes = new Map<string, Promise<any>>()
 
@@ -25,17 +29,21 @@ function rewritePhoto(p: unknown): unknown {
     : p
 }
 
+function shapeListing(listing: any): any {
+  return {
+    ...listing,
+    photo: rewritePhoto(listing?.photo),
+    photos: Array.isArray(listing?.photos) ? listing.photos.map(rewritePhoto) : [],
+  }
+}
+
 function shapeResponse(raw: any, requestedSources: string[]): any {
   const data = { ...raw }
   const allowed = requestedSources.length ? requestedSources : ['olx', 'telegram']
   data.listings = Array.isArray(raw?.listings)
     ? raw.listings
         .filter((listing: any) => allowed.includes(String(listing?.source || '').toLowerCase()))
-        .map((listing: any) => ({
-          ...listing,
-          photo: rewritePhoto(listing.photo),
-          photos: Array.isArray(listing.photos) ? listing.photos.map(rewritePhoto) : [],
-        }))
+        .map(shapeListing)
     : []
   const backendSources = Array.isArray(raw?.filters?.sources) ? raw.filters.sources : []
   data.count = requestedSources.length && backendSources.length === 0
@@ -64,6 +72,32 @@ function refreshFeed(key: string, url: string): Promise<any> {
     .finally(() => feedRefreshes.delete(key))
   feedRefreshes.set(key, request)
   return request
+}
+
+function exactCountry(params: URLSearchParams): string {
+  const countries = (params.get('countries') || '')
+    .split(',')
+    .map((country) => country.trim().toUpperCase())
+    .filter((country) => /^[A-Z]{2}$/.test(country))
+  return countries.length === 1 ? countries[0]! : ''
+}
+
+function findCachedExactListing(listingId: string, source: string, country: string): any | null {
+  const now = Date.now()
+  for (const entry of feedCache.values()) {
+    // A detail link may outlive the exact filtered cache key that produced it,
+    // but we should not resurrect an arbitrarily old/deleted advert from memory.
+    if (now - entry.at > FEED_STALE_MS) continue
+    const listings = Array.isArray(entry.data?.listings) ? entry.data.listings : []
+    const exact = listings.find((listing: any) => {
+      if (String(listing?.id ?? '') !== listingId) return false
+      if (source && String(listing?.source || '').toLowerCase() !== source) return false
+      if (country && String(listing?.country || '').toUpperCase() !== country) return false
+      return true
+    })
+    if (exact) return exact
+  }
+  return null
 }
 
 export default defineEventHandler(async (event) => {
@@ -104,26 +138,75 @@ export default defineEventHandler(async (event) => {
     const combined = shapeResponse(combinedRaw, requestedSources)
     return enforcePage(combined.listings.length ? { ...combined, compatibilityFallback: true } : shaped)
   }
+
+  const withExactListingFallback = async (response: any) => {
+    const listingId = String(upstreamParams.get('listingId') || '').trim()
+    if (!listingId || (Array.isArray(response?.listings) && response.listings.length)) return response
+
+    const source = requestedSources.length === 1 ? requestedSources[0]! : ''
+    const country = exactCountry(upstreamParams)
+    const cachedListing = findCachedExactListing(listingId, source, country)
+    if (cachedListing) {
+      return {
+        ...response,
+        count: 1,
+        listings: [shapeListing(cachedListing)],
+        exactListingFallback: 'cache',
+      }
+    }
+
+    // Shared OLX links should not depend on the current rotating country
+    // snapshot. The flat-finder backend already exposes a single-offer endpoint;
+    // use it as the last resort when listingId was not present in the snapshot.
+    if (source === 'olx' && country) {
+      try {
+        const exact = await $fetch<any>(
+          `${FLAT_API_URL}/api/listing/olx/${encodeURIComponent(listingId)}?country=${encodeURIComponent(country)}`,
+          { timeout: EXACT_LOOKUP_TIMEOUT_MS },
+        )
+        if (exact?.listing && String(exact.listing.id ?? '') === listingId) {
+          return {
+            ...response,
+            count: 1,
+            listings: [shapeListing(exact.listing)],
+            exactListingFallback: 'source',
+          }
+        }
+      } catch {
+        // Keep the original empty response. The UI may retry while the country
+        // store is warming; a failed direct lookup must not turn the feed into 502.
+      }
+    }
+
+    return response
+  }
+
   const cached = feedCache.get(key)
   if (cached && Date.now() - cached.at < FEED_FRESH_MS) {
     setResponseHeader(event, 'Cache-Control', 'no-store')
-    return await shapeWithCombinedFallback(cached.data)
+    return await withExactListingFallback(await shapeWithCombinedFallback(cached.data))
   }
   if (cached && Date.now() - cached.at < staleWindow(cached)) {
     refreshFeed(key, url).catch(() => {})
     setResponseHeader(event, 'Cache-Control', 'no-store')
-    return { ...await shapeWithCombinedFallback(cached.data), stale: true }
+    return {
+      ...await withExactListingFallback(await shapeWithCombinedFallback(cached.data)),
+      stale: true,
+    }
   }
   try {
     const data = await refreshFeed(key, url)
     setResponseHeader(event, 'Cache-Control', 'no-store')
-    return await shapeWithCombinedFallback(data)
+    return await withExactListingFallback(await shapeWithCombinedFallback(data))
   } catch (err) {
     // A stale answer, however old, beats reporting a failure — but only if it
     // actually has something in it.
     if (cached && Array.isArray(cached.data?.listings) && cached.data.listings.length) {
       setResponseHeader(event, 'Cache-Control', 'no-store')
-      return { ...await shapeWithCombinedFallback(cached.data), stale: true }
+      return {
+        ...await withExactListingFallback(await shapeWithCombinedFallback(cached.data)),
+        stale: true,
+      }
     }
     setResponseStatus(event, 502)
     return { error: (err as Error).message, listings: [], count: 0, upstreamFailed: true }
