@@ -7,7 +7,8 @@ import {
 } from '../server/utils/hiringCandidateFields.ts'
 import { removeExistingSocialMeta } from '../server/utils/shareHead.ts'
 import { looksSoftBlocked } from '../server/utils/browserSoftBlock.ts'
-import { normalizeCandidate, normalizeProfessions } from '../server/utils/hiringNormalize.ts'
+import { dedupeCandidates, normalizeCandidate, normalizeProfessions } from '../server/utils/hiringNormalize.ts'
+import { repairCandidateProfile } from '../server/utils/hiringQuality.ts'
 import { withProfessionExperience } from '../server/utils/hiringExperience.ts'
 import { trimCareeristProfileText } from '../server/utils/hiringCareeristFields.ts'
 import {
@@ -120,6 +121,48 @@ test('script and style contents never reach a candidate profile', () => {
 test('specific sales and Uzbek CE driver titles normalize to canonical roles', () => {
   assert.deepEqual(normalizeProfessions('Менеджер экспортных продаж РФ', ''), ['Sales Manager'])
   assert.deepEqual(normalizeProfessions('СЕ КАТЕГОРИЯ БУЙИЧА', ''), ['Driver'])
+  assert.deepEqual(normalizeProfessions('Bugalteriya bo`yicha ish kerak', ''), ['Accountant'])
+  assert.deepEqual(normalizeProfessions('Kassa xodimi', ''), ['Cashier'])
+  assert.deepEqual(normalizeProfessions('Notarius', ''), ['Notary'])
+  assert.deepEqual(normalizeProfessions("Metrologiya, audit, standartlashtirish sohasi bo'yicha", ''), ['Metrology Specialist'])
+})
+
+test('Careerist trusts its listing headline and drops impossible age zero', () => {
+  const normalized = normalizeCandidate({
+    id: 'careerist-erlan', source: 'telegram', origin: 'web', sourceKey: 'careerist-uz', country: 'UZ',
+    name: 'Эрлан', role: 'Cybersecurity Specialist, Водитель', professions: ['Cybersecurity Specialist', 'Driver'], age: 0,
+    url: 'https://tashkent.careerist.ru/resume/erlan-6854116.html', createdAt: '2026-08-07T12:00:00.000Z',
+    originalText: '7 августа, 2026\nРуководитель по информационной безопасности (CISO)\nЭрлан\nГород\nТашкент\nВозраст\n0',
+    description: '7 августа, 2026\nРуководитель по информационной безопасности (CISO)\nЭрлан\nГород\nТашкент\nВозраст\n0',
+  })
+  assert.deepEqual(normalized.professions, ['Cybersecurity Specialist'])
+  assert.equal(normalized.age, null)
+})
+
+test('Telegram technology cards recover candidate role and structured names', () => {
+  assert.equal(extractCandidateName("F.I.SH: Rajabboyev Rajabboy Bahodir o‘g‘li\nTug'ilgan yili: 1999-yil"), 'Rajabboyev Rajabboy Bahodir o‘g‘li')
+  assert.equal(extractCandidateAge('YOSHIM 26 DA OILALIMAN', new Date('2026-08-22T12:00:00Z')), 26)
+  const flutter = repairCandidateProfile(normalizeCandidate({
+    id: 'tg-flutter', source: 'telegram', country: 'UZ', name: 'Sarvar', role: '',
+    url: 'https://t.me/example/1', createdAt: '2026-08-20T12:00:00.000Z',
+    originalText: 'Xodim: Sarvar\nTexnologiya: Flutter, Dart\nHudud: Toshkent sh',
+    description: 'Xodim: Sarvar\nTexnologiya: Flutter, Dart\nHudud: Toshkent sh',
+  }))
+  assert.deepEqual(flutter.professions, ['Mobile Developer'])
+})
+
+test('Flagma rejects presentation fields as role, education and contact', () => {
+  const normalized = normalizeCandidate({
+    id: 'flagma-invalid', source: 'telegram', origin: 'web', sourceKey: 'flagma-uz', country: 'UZ',
+    name: 'ФИО скрыто', role: 'УДАЛЕННО', professions: ['УДАЛЕННО'], education: 'удаленно', contact: '9 990 000',
+    contactType: 'platform', url: 'https://flagma.uz/ru/resume-example.html', createdAt: '2026-08-20T12:00:00.000Z',
+    originalText: 'УДАЛЕННО\n9 990 000 сум\nФИО скрыто, 39 лет, Ташкент | Среднее-специальное\nнеполная занятость, удаленно',
+    description: 'УДАЛЕННО\n9 990 000 сум\nФИО скрыто, 39 лет, Ташкент | Среднее-специальное\nнеполная занятость, удаленно',
+  })
+  assert.equal(normalized.name, '')
+  assert.equal(normalized.role, '')
+  assert.equal(normalized.education, 'Среднее-специальное')
+  assert.equal(normalized.contact, normalized.url)
 })
 
 test('legacy Careerist rows lose icon ligatures and repeating experience fractions', () => {
@@ -191,6 +234,21 @@ test('mixed Latin initial in a Cyrillic candidate name is repaired', () => {
   })
   assert.equal(normalized.name, 'Алишер')
   assert.deepEqual(normalized.professions, ['Driver'])
+})
+
+test('Uzbek teacher noun forms with modifier-letter apostrophes normalize to Teacher', () => {
+  const normalized = normalizeCandidate({
+    id: 'ishbor-durdona', source: 'telegram', origin: 'web', sourceKey: 'ishbor-uz', country: 'UZ',
+    name: 'Durdona', role: 'Oʻqituvchilik', professions: ['Oʻqituvchilik'],
+    city: 'Tashkent', experienceYears: 0, salaryMin: 2_000_000, salaryMax: 3_000_000, currency: 'UZS',
+    url: 'https://ish-bor.uz/ru/ishchilar/id/118029', createdAt: '2026-08-19T12:00:00.000Z',
+    originalText: 'Oʻqituvchilik (Резюме) - Джизак | работа в ташкенте\nГорода и области\nOʻqituvchilik\nДжизак\nУ меня нет опыта работы\nDurdona (Женщина)',
+    description: 'Oʻqituvchilik\nДжизак\nУ меня нет опыта работы\nDurdona (Женщина)',
+  })
+  assert.deepEqual(normalized.professions, ['Teacher'])
+  assert.equal(normalized.role, 'Teacher')
+  assert.equal(normalized.city, 'Jizzakh')
+  assert.equal(normalized.experienceYears, 0)
 })
 
 test('legacy Flagma fields repair hidden names, education and month durations', () => {
@@ -334,4 +392,25 @@ test('Uzbek boards that print a region instead of a city still resolve a locatio
   assert.equal(cityFrom('Резюме - Кашкадаря', 'UZ'), 'Kashkadarya')
   assert.equal(cityFrom('Qoraqalpog’iston', 'UZ'), 'Karakalpakstan')
   assert.equal(cityFrom('Яшнабад, Ташкент', 'UZ'), 'Tashkent')
+})
+
+test('web CV mirrors with reordered role text collapse to one candidate', () => {
+  const base = {
+    source: 'Talent.UA',
+    sourceKey: 'talent-ua',
+    origin: 'web',
+    country: 'UA',
+    name: 'Игорь',
+    city: 'Kharkiv',
+    professions: ['Marketer'],
+    salaryMin: 20_000,
+    salaryMax: 20_000,
+    currency: 'UAH',
+    createdAt: '2026-08-20T10:00:00.000Z',
+  }
+  const candidates = dedupeCandidates([
+    { ...base, id: 'a', role: 'Специалист по рекламе, PR и маркетингу', url: 'https://talent.ua/a' },
+    { ...base, id: 'b', role: 'Специалист по маркетингу, рекламе, PR', url: 'https://talent.ua/b' },
+  ])
+  assert.equal(candidates.length, 1)
 })

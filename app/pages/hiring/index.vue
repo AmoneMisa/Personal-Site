@@ -884,10 +884,10 @@ onBeforeUnmount(() => {
       <div class="text-muted">{{ t("empty") }}</div>
     </div>
 
-    <u-modal v-model:open="modalOpen" :title="active?.name || ''" :ui="{ content: 'max-w-3xl' }">
+    <u-modal v-model:open="modalOpen" :title="active?.name || active?.role || t('notSpecified')" :ui="{ content: 'max-w-3xl' }">
       <template #title>
-        <h2 class="hiring-modal__title">{{ active?.name || "" }}</h2>
-        <p v-if="active" class="hiring-modal__role">{{ active.role }}</p>
+        <h2 class="hiring-modal__title">{{ active?.name || active?.role || t("notSpecified") }}</h2>
+        <p v-if="active?.name && active?.role" class="hiring-modal__role">{{ active.role }}</p>
       </template>
       <template #body>
         <div v-if="active" class="hiring-modal">
