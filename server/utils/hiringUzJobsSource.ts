@@ -16,8 +16,14 @@ import { parseUzJobsRows } from './hiringUzJobsFields'
 const SOURCE_KEY = 'uzjobs-uz'
 const SOURCE_LABEL = 'UzJobs'
 const REQUEST_TIMEOUT_MS = 25_000
-const MAX_BACKFILL_PAGES = 20
-const DEFAULT_BACKFILL_PAGES = 15
+// The public directory currently contains several thousand rows. Its pages are
+// NOT sorted monotonically by last visit: an old profile can be active today,
+// while the next page can temporarily contain no recently active rows. A one-
+// page "no recent candidates" cutoff therefore loses most of the directory.
+const MAX_BACKFILL_PAGES = 60
+const DEFAULT_BACKFILL_PAGES = 40
+const MAX_INDEX_PAGE = 260
+const FETCH_CONCURRENCY = 4
 const UA =
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ' +
   '(KHTML, like Gecko) Chrome/126.0 Safari/537.36'
@@ -90,37 +96,59 @@ async function fetchProfiles(cursor: WebCursor): Promise<{
     Number(process.env.HIRING_UZJOBS_BACKFILL_PAGES) || DEFAULT_BACKFILL_PAGES,
   ))
   const backfillStart = Math.max(2, cursor.backfillPage || 2)
-  const pages = cursor.bootstrapComplete
-    ? [1]
-    : [1, ...Array.from({ length: backfillPages }, (_, index) => backfillStart + index)]
+  const historicalPages = cursor.bootstrapComplete || backfillStart > MAX_INDEX_PAGE
+    ? []
+    : Array.from(
+      { length: Math.min(backfillPages, MAX_INDEX_PAGE - backfillStart + 1) },
+      (_, index) => backfillStart + index,
+    )
+  const pages = cursor.bootstrapComplete ? [1] : [1, ...historicalPages]
   const byId = new Map<string, CvProfile>()
   let fetched = 0
   let pagesRead = 0
-  let bootstrapComplete = cursor.bootstrapComplete
+  let bootstrapComplete = cursor.bootstrapComplete || backfillStart > MAX_INDEX_PAGE
   let lastHistoricalPage = backfillStart - 1
+  let reachedDirectoryEnd = false
 
-  for (const page of pages) {
-    const parsed = parseUzJobsPage(await fetchPage(page))
-    pagesRead += 1
-    fetched += parsed.length
-    if (page > 1) lastHistoricalPage = page
-    if (!parsed.length) {
-      if (page > 1) bootstrapComplete = true
-      break
+  // Four parallel page reads keep a 40-page backfill round comfortably inside
+  // the queue request timeout without hammering the public board. Results are
+  // still processed in page order so the cursor remains deterministic.
+  for (let offset = 0; offset < pages.length; offset += FETCH_CONCURRENCY) {
+    const batch = pages.slice(offset, offset + FETCH_CONCURRENCY)
+    const results = await Promise.all(batch.map(async (page) => ({
+      page,
+      parsed: parseUzJobsPage(await fetchPage(page)),
+    })))
+
+    for (const { page, parsed } of results) {
+      pagesRead += 1
+      fetched += parsed.length
+      if (page > 1) lastHistoricalPage = page
+
+      // Empty pagination is the only reliable end-of-directory signal. Do not
+      // stop on zero recent rows: last-visit freshness is interleaved across
+      // pages and later pages can contain candidates active this month.
+      if (!parsed.length) {
+        if (page > 1) {
+          bootstrapComplete = true
+          reachedDirectoryEnd = true
+        }
+        continue
+      }
+
+      const recent = parsed.filter((profile) => {
+        const time = Date.parse(profile.activityAt || '')
+        return Number.isFinite(time)
+          && time >= cutoffDate().getTime()
+          && time <= Date.now() + 48 * 60 * 60 * 1000
+      })
+      for (const profile of recent) byId.set(profile.id, profile)
     }
 
-    const recent = parsed.filter((profile) => {
-      const time = Date.parse(profile.activityAt || '')
-      return Number.isFinite(time)
-        && time >= cutoffDate().getTime()
-        && time <= Date.now() + 48 * 60 * 60 * 1000
-    })
-    for (const profile of recent) byId.set(profile.id, profile)
-    if (page > 1 && recent.length === 0) {
-      bootstrapComplete = true
-      break
-    }
+    if (reachedDirectoryEnd) break
   }
+
+  if (!bootstrapComplete && lastHistoricalPage >= MAX_INDEX_PAGE) bootstrapComplete = true
 
   const newest = [...byId.values()]
     .sort((a, b) => Date.parse(b.activityAt || '') - Date.parse(a.activityAt || ''))[0]
@@ -136,7 +164,9 @@ async function fetchProfiles(cursor: WebCursor): Promise<{
       lastSeenUpdatedAt: newest?.activityAt || cursor.lastSeenUpdatedAt,
       // Re-read the last historical page once: the source's newest-first pages
       // shift when profiles are added between bounded backfill rounds.
-      backfillPage: bootstrapComplete ? Math.max(2, cursor.backfillPage || 2) : Math.max(2, lastHistoricalPage),
+      backfillPage: bootstrapComplete
+        ? Math.max(2, cursor.backfillPage || 2)
+        : Math.max(2, lastHistoricalPage),
       bootstrapComplete,
       lastSuccessAt: new Date().toISOString(),
     },
