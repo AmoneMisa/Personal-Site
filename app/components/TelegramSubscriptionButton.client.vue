@@ -7,6 +7,7 @@ const busy = ref(false)
 const failed = ref(false)
 const editToken = ref('')
 const editPath = ref('')
+const showBackToFilters = ref(false)
 
 const searchKind = computed(() => {
   const path = route.path.replace(/^\/(?:ru|en|kk)(?=\/)/, '')
@@ -15,6 +16,9 @@ const searchKind = computed(() => {
   if (path === '/hiring') return 'candidates'
   return null
 })
+
+const normalizedPath = computed(() => route.path.replace(/^\/(?:ru|en|kk)(?=\/)/, ''))
+const canScrollToFilters = computed(() => normalizedPath.value === '/flat-finder')
 
 watch(
   () => [route.path, route.query._tgEdit] as const,
@@ -33,7 +37,31 @@ watch(
   { immediate: true },
 )
 
+function filtersElement(): HTMLElement | null {
+  if (!import.meta.client || !canScrollToFilters.value) return null
+  return document.querySelector<HTMLElement>('.flats__controls_redesign')
+}
+
+function updateBackToFilters() {
+  if (!import.meta.client || !canScrollToFilters.value) {
+    showBackToFilters.value = false
+    return
+  }
+  const filters = filtersElement()
+  showBackToFilters.value = !!filters && filters.getBoundingClientRect().bottom < 88
+}
+
+function scrollToFilters() {
+  const filters = filtersElement()
+  if (!filters) return
+  filters.scrollIntoView({ behavior: 'smooth', block: 'start' })
+}
+
 onMounted(async () => {
+  window.addEventListener('scroll', updateBackToFilters, { passive: true })
+  window.addEventListener('resize', updateBackToFilters, { passive: true })
+  updateBackToFilters()
+
   try {
     const status = await $fetch<{ enabled: boolean }>('/subscription-status')
     available.value = status.enabled === true
@@ -42,6 +70,16 @@ onMounted(async () => {
   }
 })
 
+onBeforeUnmount(() => {
+  window.removeEventListener('scroll', updateBackToFilters)
+  window.removeEventListener('resize', updateBackToFilters)
+})
+
+watch(
+  () => route.path,
+  () => nextTick(updateBackToFilters),
+)
+
 const editing = computed(() => !!editToken.value && editPath.value === route.path)
 const isEnglish = computed(() => String(locale.value).toLowerCase().startsWith('en'))
 const label = computed(() => {
@@ -49,9 +87,11 @@ const label = computed(() => {
   if (editing.value) return isEnglish.value ? 'Update subscription' : 'Обновить подписку'
   return isEnglish.value ? 'Subscribe to new results' : 'Подписаться на новые'
 })
+const backLabel = computed(() => isEnglish.value ? 'Back to filters' : 'Наверх к фильтрам')
 const errorText = computed(() => isEnglish.value
   ? 'Could not create the Telegram subscription link.'
   : 'Не удалось создать ссылку подписки в Telegram.')
+const showStack = computed(() => showBackToFilters.value || (!!searchKind.value && available.value))
 
 async function subscribe() {
   if (!searchKind.value || busy.value) return
@@ -77,50 +117,214 @@ async function subscribe() {
 </script>
 
 <template>
-  <div v-if="searchKind && available" class="tg-subscribe">
-    <p v-if="failed" class="tg-subscribe__error">{{ errorText }}</p>
-    <u-button
-      icon="i-lucide-bell-plus"
-      size="lg"
-      :loading="busy"
-      :disabled="busy"
-      @click="subscribe"
-    >
-      {{ label }}
-    </u-button>
+  <div v-if="showStack" class="search-actions">
+    <p v-if="failed" class="search-actions__error">{{ errorText }}</p>
+
+    <div class="search-actions__stack">
+      <button
+        v-if="showBackToFilters"
+        type="button"
+        class="search-action"
+        :aria-label="backLabel"
+        :title="backLabel"
+        @click="scrollToFilters"
+      >
+        <u-icon name="i-lucide-arrow-up" class="search-action__icon" aria-hidden="true" />
+        <span class="search-action__label">{{ backLabel }}</span>
+      </button>
+
+      <button
+        v-if="searchKind && available"
+        type="button"
+        class="search-action search-action_accent"
+        :class="{ 'search-action_busy': busy }"
+        :aria-label="label"
+        :title="label"
+        :disabled="busy"
+        @click="subscribe"
+      >
+        <u-icon
+          :name="busy ? 'i-lucide-loader-circle' : 'i-lucide-bell-plus'"
+          class="search-action__icon"
+          :class="{ 'search-action__icon_spin': busy }"
+          aria-hidden="true"
+        />
+        <span class="search-action__label">{{ label }}</span>
+      </button>
+    </div>
   </div>
 </template>
 
 <style scoped>
-.tg-subscribe {
+/* The old Flat Finder pill is intentionally suppressed: its action now lives in
+   this shared floating stack together with Telegram subscriptions. */
+:global(.flats__back-top) {
+  display: none !important;
+}
+
+.search-actions {
   position: fixed;
   right: max(18px, env(safe-area-inset-right));
   bottom: max(18px, env(safe-area-inset-bottom));
-  z-index: 45;
+  z-index: 60;
   display: flex;
   max-width: min(360px, calc(100vw - 36px));
   flex-direction: column;
   align-items: flex-end;
   gap: 8px;
+  pointer-events: none;
 }
 
-.tg-subscribe__error {
+.search-actions__stack {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 10px;
+  pointer-events: auto;
+}
+
+.search-action {
+  width: 48px;
+  min-width: 48px;
+  height: 48px;
+  padding: 0 13px;
+  display: inline-flex;
+  flex-direction: row-reverse;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 10px;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--bg-panel);
+  color: var(--text-primary);
+  box-shadow: 0 8px 26px rgba(0, 0, 0, .28);
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    width 190ms ease,
+    border-color 160ms ease,
+    color 160ms ease,
+    background-color 160ms ease,
+    box-shadow 160ms ease;
+}
+
+.search-action:hover,
+.search-action:focus-visible {
+  color: var(--accent-pink);
+  border-color: rgba(224, 103, 154, .56);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, .34);
+  outline: none;
+}
+
+.search-action_accent {
+  border-color: rgba(224, 103, 154, .46);
+  background: color-mix(in srgb, var(--bg-panel) 86%, var(--accent-pink) 14%);
+}
+
+.search-action:disabled {
+  cursor: wait;
+  opacity: .78;
+}
+
+.search-action__icon {
+  width: 20px;
+  height: 20px;
+  flex: 0 0 20px;
+}
+
+.search-action__label {
+  display: block;
+  min-width: 0;
+  max-width: 0;
+  overflow: hidden;
+  opacity: 0;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1;
+  transition:
+    max-width 190ms ease,
+    opacity 120ms ease;
+}
+
+.search-action:focus-visible {
+  width: min(260px, calc(100vw - 36px));
+}
+
+.search-action:focus-visible .search-action__label {
+  max-width: 210px;
+  opacity: 1;
+}
+
+.search-action__icon_spin {
+  animation: search-action-spin .75s linear infinite;
+}
+
+.search-actions__error {
   margin: 0;
+  max-width: min(340px, calc(100vw - 36px));
   padding: 8px 10px;
-  border: 1px solid rgba(239, 68, 68, 0.35);
+  border: 1px solid rgba(239, 68, 68, .35);
   border-radius: 10px;
-  background: rgba(15, 23, 42, 0.94);
+  background: rgba(15, 23, 42, .94);
   color: #fecaca;
   font-size: 12px;
   line-height: 1.35;
-  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.28);
+  box-shadow: 0 8px 30px rgba(0, 0, 0, .28);
+  pointer-events: auto;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .search-action:hover {
+    width: min(260px, calc(100vw - 36px));
+  }
+
+  .search-action:hover .search-action__label {
+    max-width: 210px;
+    opacity: 1;
+  }
 }
 
 @media (max-width: 640px) {
-  .tg-subscribe {
-    right: 12px;
+  .search-actions {
+    right: max(12px, env(safe-area-inset-right));
     bottom: max(12px, env(safe-area-inset-bottom));
     max-width: calc(100vw - 24px);
+  }
+
+  .search-actions__stack {
+    gap: 8px;
+  }
+
+  .search-action {
+    width: 46px;
+    min-width: 46px;
+    height: 46px;
+    padding-inline: 12px;
+  }
+
+  .search-action:focus-visible {
+    width: 46px;
+  }
+
+  .search-action:focus-visible .search-action__label {
+    max-width: 0;
+    opacity: 0;
+  }
+}
+
+@keyframes search-action-spin {
+  to { transform: rotate(360deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .search-action,
+  .search-action__label {
+    transition: none;
+  }
+
+  .search-action__icon_spin {
+    animation-duration: 1.5s;
   }
 }
 </style>
