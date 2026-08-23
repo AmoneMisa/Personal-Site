@@ -3,8 +3,8 @@ import { readFile } from 'node:fs/promises'
 import test from 'node:test'
 
 const jobs = await readFile(new URL('../server/utils/socialJobSources.ts', import.meta.url), 'utf8')
-const hiring = await readFile(new URL('../server/utils/hiringSocialSources.ts', import.meta.url), 'utf8')
-const linkedin = await readFile(new URL('../server/utils/hiringLinkedInSources.ts', import.meta.url), 'utf8')
+const hiring = await readFile(new URL('../server/hiring/sources/socialRefresh.ts', import.meta.url), 'utf8')
+const linkedin = await readFile(new URL('../server/hiring/sources/linkedInRefresh.ts', import.meta.url), 'utf8')
 const envExample = await readFile(new URL('../.env.example', import.meta.url), 'utf8')
 
 test('Threads vacancy discovery uses the shared keyword-search contract', () => {
