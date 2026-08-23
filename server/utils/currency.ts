@@ -7,13 +7,13 @@
 // stored as USD-per-1-unit (e.g. UAH -> ~0.024), so `amount * rate = USD`.
 //
 // The static table below is only a FALLBACK for a cold cache or an API outage —
-// the live fetch overwrites it. Russia/Belarus intentionally omitted.
+// the live fetch overwrites it.
 
 import { useRedis } from '~~/server/utils/redis'
 
 const FALLBACK_USD_RATES: Record<string, number> = {
   USD: 1, EUR: 1.09, GBP: 1.27, PLN: 0.25, UAH: 0.024, KZT: 0.0019,
-  UZS: 0.000079, AZN: 0.59, GEL: 0.37, AMD: 0.0026, KGS: 0.011, MDL: 0.056,
+  UZS: 0.000079, RUB: 0.012, AZN: 0.59, GEL: 0.37, AMD: 0.0026, KGS: 0.011, MDL: 0.056,
   TJS: 0.092, TMT: 0.286, TRY: 0.030, CAD: 0.73, CHF: 1.12, INR: 0.012,
   CNY: 0.14, JPY: 0.0064, KRW: 0.00072,
 }
@@ -26,7 +26,7 @@ const FX_API_URLS = [
   'https://raw.githubusercontent.com/fawazahmed0/exchange-api/main/v1/latest/currencies/usd.json',
   'https://cdn.staticaly.com/gh/fawazahmed0/exchange-api@latest/v1/latest/currencies/usd.json',
 ]
-const EXCLUDED_CURRENCIES = new Set(['RUB', 'BYN'])
+const EXCLUDED_CURRENCIES = new Set(['BYN'])
 
 // In-memory cache (USD-per-unit). Seeded with the fallback so toUsd() works even
 // before the first load; overwritten by loadRates()/refreshRates().
