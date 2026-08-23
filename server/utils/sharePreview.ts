@@ -1,16 +1,14 @@
 export const SHARE_SITE_URL = (process.env.PUBLIC_SITE_URL || 'https://whiteslove.me').replace(/\/$/, '')
 const FLAT_API_URL = process.env.FLAT_API_URL || 'http://185.5.206.229:8082'
-const JOBS_API_URL = (process.env.JOBS_API_URL || 'http://jobs-api:3000').replace(/\/$/, '')
 const VALID_FLAT_SOURCES = new Set(['olx', 'telegram'])
 
 // Social crawlers abandon a preview after only a few seconds (Telegram is the
-// strictest), and these lookups run inside the SSR render hook. Keep the budget
+// strictest), and flat lookups still cross a service boundary. Keep the budget
 // well below the reverse-proxy timeout.
 const SHARE_LOOKUP_TIMEOUT_MS = Number(process.env.SHARE_LOOKUP_TIMEOUT_MS) || 2500
 
 // Crawlers fetch the same URL several times (and users re-share links), so cache
-// resolved lookups briefly. Negative results are cached too, for less time, so a
-// cold backend cannot be hammered once per crawl.
+// resolved lookups briefly. Negative results are cached too, for less time.
 const shareCache = new Map<string, { at: number; value: any }>()
 const SHARE_CACHE_HIT_MS = 10 * 60_000
 const SHARE_CACHE_MISS_MS = 30_000
@@ -91,15 +89,12 @@ export async function findSharedJob(id: string): Promise<any | null> {
   if (cached) return cached.value
 
   try {
-    // SSR never imports the vacancy ingestion store. A tiny read-only API lookup
-    // is enough for the social card and keeps crawler work out of the renderer.
-    const response = await fetch(`${JOBS_API_URL}/jobs-vacancy?id=${encodeURIComponent(wanted)}`, {
-      signal: AbortSignal.timeout(SHARE_LOOKUP_TIMEOUT_MS),
-      headers: { Accept: 'application/json' },
-    })
-    if (!response.ok) return cacheSet(`job:${wanted}`, null)
-    const data = await response.json() as { job?: any }
-    return cacheSet(`job:${wanted}`, data?.job || null)
+    // Jobs API lives directly in Nuxt. Read the same persisted snapshot instead
+    // of making a loopback HTTP call, but keep ingestion modules out of SSR.
+    const { getStoredJobsSnapshot } = await import('./jobsSnapshot')
+    const jobs = await getStoredJobsSnapshot()
+    const found = jobs.find((job) => job.id === wanted || job.url === wanted) || null
+    return cacheSet(`job:${wanted}`, found)
   } catch {
     return null
   }
