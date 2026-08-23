@@ -2,4 +2,4 @@ export {
   extractCandidateAge,
   extractCandidateGender,
   extractCandidateName,
-} from '../hiring/candidateFields'
+} from '../../shared/hiring/candidateFields'
