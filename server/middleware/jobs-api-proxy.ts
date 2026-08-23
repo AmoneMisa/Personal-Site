@@ -1,10 +1,7 @@
 import { getRequestURL, proxyRequest } from 'h3'
 
 function isJobsApiPath(pathname: string): boolean {
-  return pathname.startsWith('/jobs-')
-    || pathname.startsWith('/hiring-')
-    || pathname.startsWith('/internal/jobs-')
-    || pathname.startsWith('/internal/hiring-')
+  return pathname.startsWith('/jobs-') || pathname.startsWith('/hiring-')
 }
 
 export default defineEventHandler((event) => {
