@@ -98,15 +98,18 @@ function dedupeFeedListings(listings: any[]): any[] {
 
 function shapeResponse(raw: any, requestedSources: string[]): any {
   const data = { ...raw }
-  const allowed = requestedSources.length
-    ? requestedSources
-    : [...ALL_FEED_SOURCES]
-  const shaped = Array.isArray(raw?.listings)
-    ? raw.listings
-        .filter((listing: any) => allowed.includes(String(listing?.source || '').toLowerCase()))
-        .map(shapeListing)
-    : []
-  data.listings = dedupeFeedListings(shaped)
+  const rawListings = Array.isArray(raw?.listings) ? raw.listings : []
+
+  // An empty requestedSources list means "all sources". Do not run that result
+  // through a second hardcoded allow-list: the upstream may add/rename a source
+  // before this proxy is updated, which previously produced the impossible UI
+  // state `count > 0` together with an empty listings array. Explicit source
+  // filters still get the defensive client-side check below.
+  const selectedListings = requestedSources.length
+    ? rawListings.filter((listing: any) => requestedSources.includes(String(listing?.source || '').toLowerCase()))
+    : rawListings
+
+  data.listings = dedupeFeedListings(selectedListings.map(shapeListing))
   const backendSources = Array.isArray(raw?.filters?.sources) ? raw.filters.sources : []
   data.count = requestedSources.length && backendSources.length === 0
     ? data.listings.length
