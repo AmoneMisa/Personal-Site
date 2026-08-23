@@ -1,4 +1,10 @@
 import type { Job, JobSource } from './jobTypes'
+import {
+  REMOTE_JOB_QUERIES,
+  USA_RELOCATION_QUERIES,
+  rotatingSlice,
+  threadsJobCoverage,
+} from './jobSearchCoverage'
 
 type Platform = 'facebook' | 'threads'
 
@@ -27,10 +33,6 @@ type SocialResponse = {
   error?: string
 }
 
-// The shared social sidecar serializes Chromium with SOCIAL_BROWSER_CONCURRENCY=1.
-// Threads queries therefore need enough budget to wait behind another browser
-// request and still complete their own navigation/scroll pass. Keep both below
-// the flat-finder social proxy's 180s hard timeout.
 const FACEBOOK_REQUEST_TIMEOUT_MS = Math.max(
   30_000,
   Math.min(170_000, Number(process.env.FACEBOOK_JOB_REQUEST_TIMEOUT_MS) || 90_000),
@@ -39,11 +41,18 @@ const THREADS_REQUEST_TIMEOUT_MS = Math.max(
   60_000,
   Math.min(170_000, Number(process.env.THREADS_JOB_REQUEST_TIMEOUT_MS) || 150_000),
 )
+const THREADS_REGIONAL_QUERIES_PER_CYCLE = Math.max(
+  4,
+  Math.min(24, Number(process.env.THREADS_JOB_REGIONAL_QUERIES_PER_CYCLE) || 8),
+)
+const THREADS_PRIORITY_QUERIES_PER_CYCLE = Math.max(
+  2,
+  Math.min(8, Number(process.env.THREADS_JOB_PRIORITY_QUERIES_PER_CYCLE) || 4),
+)
 const MAX_AGE_MS = 14 * 24 * 60 * 60 * 1000
 
-// Keep the social vacancy layer intentionally small and vacancy-biased. The
-// social fetcher is a shared browser service, so this source must not fan out
-// into dozens of concurrent searches and starve the main site again.
+// Facebook still needs verified public groups/pages. Keep known public targets
+// explicit instead of fabricating group URLs for every region.
 const FACEBOOK_TARGETS: Target[] = [
   { key: 'fb-uz-tashkent-work', platform: 'facebook', country: 'UZ', city: 'Tashkent', target: 'https://www.facebook.com/groups/210512423334861/', limit: 80 },
   { key: 'fb-uz-work', platform: 'facebook', country: 'UZ', target: 'https://www.facebook.com/groups/182315195189726/', limit: 80 },
@@ -52,17 +61,54 @@ const FACEBOOK_TARGETS: Target[] = [
   { key: 'fb-ro-bucharest-jobs', platform: 'facebook', country: 'RO', city: 'Bucharest', target: 'https://www.facebook.com/groups/bucharestanglojobs/', limit: 60 },
 ]
 
-const THREADS_TARGETS: Target[] = [
-  { key: 'threads-remote', platform: 'threads', country: 'REMOTE', query: 'Remote Jobs hiring', limit: 30 },
-  { key: 'threads-uz', platform: 'threads', country: 'UZ', city: 'Tashkent', query: 'Вакансии Ташкент', limit: 30 },
-  { key: 'threads-kz', platform: 'threads', country: 'KZ', city: 'Almaty', query: 'Вакансии Алматы', limit: 30 },
-  { key: 'threads-kg', platform: 'threads', country: 'KG', city: 'Bishkek', query: 'Вакансии Бишкек', limit: 30 },
-  { key: 'threads-ua', platform: 'threads', country: 'UA', query: 'Вакансії Україна', limit: 30 },
-  { key: 'threads-ro', platform: 'threads', country: 'RO', city: 'Bucharest', query: 'job București', limit: 30 },
-]
+function priorityThreadsTargets(): Target[] {
+  const remote = REMOTE_JOB_QUERIES.map((query, index) => ({
+    key: `threads-remote-${index}`,
+    platform: 'threads' as const,
+    country: 'REMOTE',
+    query,
+    limit: 30,
+  }))
+  const usa = USA_RELOCATION_QUERIES.map((query, index) => ({
+    key: `threads-usa-relocation-${index}`,
+    platform: 'threads' as const,
+    country: 'US',
+    query,
+    limit: 30,
+  }))
+  return [...remote, ...usa]
+}
 
-const VACANCY_RE = /(?:we(?:'|’)re\s+hiring|we\s+are\s+hiring|now\s+hiring|hiring\s+(?:for|a|an)|job\s+opening|open\s+(?:role|position)|vacanc(?:y|ies)|ваканси[яи]|требу(?:ется|ются)|ищем\s+(?:сотрудник|специалист|менеджер|разработчик|дизайнер|оператор|кассир)|шукаємо\s+(?:співробітник|фахівц|менеджер|розробник)|потріб(?:ен|на|ні)\s+(?:співробітник|фахівець|менеджер)|ish(?:ga)?\s+(?:taklif|qabul)|xodim\s+kerak|vakansiya|loc\s+de\s+munc[ăa]|angajez|angajăm)/iu
+function regionalThreadsTargets(): Target[] {
+  return threadsJobCoverage().map((target) => ({
+    key: target.key,
+    platform: 'threads' as const,
+    country: target.country,
+    city: target.city,
+    query: target.query,
+    limit: 30,
+  }))
+}
+
+function threadsTargetsForCycle(): Target[] {
+  const priority = rotatingSlice(
+    priorityThreadsTargets(),
+    THREADS_PRIORITY_QUERIES_PER_CYCLE,
+    30,
+  )
+  const regional = rotatingSlice(
+    regionalThreadsTargets(),
+    THREADS_REGIONAL_QUERIES_PER_CYCLE,
+    30,
+  )
+  return [...priority, ...regional]
+}
+
+const VACANCY_RE = /(?:we(?:'|’)re\s+hiring|we\s+are\s+hiring|now\s+hiring|hiring\s+(?:for|a|an)|job\s+opening|open\s+(?:role|position)|vacanc(?:y|ies)|ваканси[яи]|требу(?:ется|ются)|ищем\s+(?:сотрудник|специалист|менеджер|разработчик|дизайнер|оператор|кассир)|шукаємо\s+(?:співробітник|фахівц|менеджер|розробник)|потріб(?:ен|на|ні)\s+(?:співробітник|фахівець|менеджер)|ish(?:ga)?\s+(?:taklif|qabul)|xodim\s+kerak|vakansiya|бос\s+жұмыс\s+орны|қызметкер\s+керек|loc\s+de\s+munc[ăa]|angajez|angajăm)/iu
 const CANDIDATE_RE = /(?:open\s+to\s+work|looking\s+for\s+(?:a\s+)?(?:job|role|work)|seeking\s+(?:a\s+)?(?:job|role|opportunit)|ищу\s+(?:работу|подработку)|шукаю\s+(?:роботу|підробіток)|ish\s+(?:qidir|izlay)|ish\s+kerak|жұмыс\s+іздеймін|жумуш\s+издейм|caut\s+(?:un\s+)?loc\s+de\s+munc[ăa]|(?:îmi|imi)\s+caut\s+(?:un\s+)?job)/iu
+const VISA_RE = /(?:visa\s+sponsor|visa\s+sponsorship|sponsorship\s+available|work\s+permit\s+support|h-?1b|o-?1\b|green\s+card\s+sponsor)/iu
+const RELOCATION_RE = /(?:relocat(?:e|ion)|relocation\s+(?:support|package|provided)|переезд|релокаци|релокац|relocare)/iu
+const USA_RE = /(?:\bUSA\b|United\s+States|\bUS\b|America|США)/iu
 
 function validDate(value: string | null | undefined): string | null {
   if (!value) return null
@@ -78,15 +124,11 @@ function titleFrom(text: string): string {
     .map((line) => line.replace(/^[^\p{L}\p{N}]+/u, '').replace(/\s+/g, ' ').trim())
     .filter(Boolean)
   const vacancyLine = lines.find((line) => VACANCY_RE.test(line)) || lines[0] || 'Vacancy'
-  return vacancyLine
-    .replace(/https?:\/\/\S+/giu, '')
-    .replace(/\s+/g, ' ')
-    .trim()
-    .slice(0, 160) || 'Vacancy'
+  return vacancyLine.replace(/https?:\/\/\S+/giu, '').replace(/\s+/g, ' ').trim().slice(0, 160) || 'Vacancy'
 }
 
 function remoteFrom(text: string): boolean {
-  return /(?:remote|worldwide|anywhere|work\s+from\s+home|wfh|удал[её]н|віддален|дистанц|masofaviy|онлайн|online|la\s+distan(?:ță|ta)|de\s+acas[ăa])/iu.test(text)
+  return /(?:remote|worldwide|anywhere|work\s+from\s+home|wfh|удал[её]н|віддален|дистанц|masofaviy|қашықтан|онлайн|online|la\s+distan(?:ță|ta)|de\s+acas[ăa])/iu.test(text)
 }
 
 function toJob(item: SocialItem, target: Target): Job | null {
@@ -103,8 +145,16 @@ function toJob(item: SocialItem, target: Target): Job | null {
   const location = target.city
     ? `${target.city}, ${target.country}`
     : target.country === 'REMOTE'
-      ? 'Remote'
-      : target.country
+      ? 'Remote / Worldwide'
+      : target.country === 'US'
+        ? 'United States / Relocation'
+        : target.country
+
+  const tags = [target.platform === 'facebook' ? 'Facebook' : 'Threads', target.country, target.key]
+  if (VISA_RE.test(text)) tags.push('Visa sponsorship')
+  if (RELOCATION_RE.test(text)) tags.push('Relocation')
+  if (RELOCATION_RE.test(text) && USA_RE.test(`${text} ${target.query || ''}`)) tags.push('USA relocation')
+  if (/worldwide|anywhere|global\s+remote/iu.test(`${text} ${target.query || ''}`)) tags.push('Worldwide remote')
 
   return {
     id: `${target.platform}-${target.key}-${idPart}`,
@@ -114,7 +164,7 @@ function toJob(item: SocialItem, target: Target): Job | null {
     url,
     source,
     remote: remoteFrom(text) || target.country === 'REMOTE',
-    tags: [target.platform === 'facebook' ? 'Facebook' : 'Threads', target.country, target.key],
+    tags,
     postedAt,
     description: text.slice(0, 6_000),
   }
@@ -129,10 +179,7 @@ async function fetchTarget(target: Target): Promise<Job[]> {
   const payload = target.platform === 'facebook'
     ? { source: 'facebook', target: target.target, limit: target.limit || 60 }
     : { source: 'threads', mode: 'search', query: target.query, limit: target.limit || 30 }
-
-  const timeoutMs = target.platform === 'threads'
-    ? THREADS_REQUEST_TIMEOUT_MS
-    : FACEBOOK_REQUEST_TIMEOUT_MS
+  const timeoutMs = target.platform === 'threads' ? THREADS_REQUEST_TIMEOUT_MS : FACEBOOK_REQUEST_TIMEOUT_MS
 
   const response = await fetch(endpoint, {
     method: 'POST',
@@ -145,29 +192,23 @@ async function fetchTarget(target: Target): Promise<Job[]> {
     throw new Error(body.error || `${target.platform} social fetch -> HTTP ${response.status}`)
   }
 
-  return (Array.isArray(body.items) ? body.items : [])
-    .map((item) => toJob(item, target))
-    .filter((job): job is Job => Boolean(job))
+  const items = Array.isArray(body.items) ? body.items : []
+  const recent = items.filter((item) => Boolean(validDate(item.createdAt))).length
+  const jobs = items.map((item) => toJob(item, target)).filter((job): job is Job => Boolean(job))
+  console.log(`[jobs:${target.platform}] ${target.key}: fetched=${items.length} recent=${recent} classified=${jobs.length}`)
+  return jobs
 }
 
 async function fetchPlatform(targets: Target[], platform: Platform): Promise<Job[]> {
   if (String(process.env.SOCIAL_JOB_SOURCE || 'on').toLowerCase() === 'off') return []
-
   const byUrl = new Map<string, Job>()
 
   if (platform === 'threads') {
-    // The sidecar serializes Chromium anyway. Starting every search at once only
-    // starts every caller timeout at once, so later requests can expire while
-    // waiting for the browser semaphore. Submit them in the order we want them
-    // executed instead.
     for (const target of targets) {
       try {
         for (const job of await fetchTarget(target)) byUrl.set(job.url, job)
       } catch (error) {
-        console.warn(
-          `[jobs:${platform}] ${target.key} failed:`,
-          error instanceof Error ? error.message : String(error),
-        )
+        console.warn(`[jobs:${platform}] ${target.key} failed:`, error instanceof Error ? error.message : String(error))
       }
     }
     return [...byUrl.values()]
@@ -179,13 +220,10 @@ async function fetchPlatform(targets: Target[], platform: Platform): Promise<Job
       for (const job of result.value) byUrl.set(job.url, job)
       return
     }
-    console.warn(
-      `[jobs:${platform}] ${targets[index]?.key || 'target'} failed:`,
-      result.reason instanceof Error ? result.reason.message : String(result.reason),
-    )
+    console.warn(`[jobs:${platform}] ${targets[index]?.key || 'target'} failed:`, result.reason instanceof Error ? result.reason.message : String(result.reason))
   })
   return [...byUrl.values()]
 }
 
 export const fetchFacebookJobs = (_q = '') => fetchPlatform(FACEBOOK_TARGETS, 'facebook')
-export const fetchThreadsJobs = (_q = '') => fetchPlatform(THREADS_TARGETS, 'threads')
+export const fetchThreadsJobs = (_q = '') => fetchPlatform(threadsTargetsForCycle(), 'threads')
