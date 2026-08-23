@@ -1,7 +1,7 @@
 import type { CvProfile } from '../../../../shared/contracts/hiring'
 import { activityDate, cityFrom, htmlText, isRecent, parseAge } from '../../../../shared/hiring/webFields'
 import { fetchSecondaryHtml, safeAbsoluteUrl } from './http'
-import { buildSecondaryProfile } from './profile'
+import { buildSecondaryProfile, parseSecondaryChipSalary } from './profile'
 
 function field(card: string, cls: string): string {
   const match = card.match(new RegExp(`class="${cls}"[^>]*>([\\s\\S]{0,300}?)</`, 'i'))
@@ -12,23 +12,6 @@ function cards(html: string): string[] {
   const marker = /<div class="resume_one[^"]*">/g
   const starts = [...html.matchAll(marker)].map((match) => match.index!)
   return starts.map((from, index) => html.slice(from, starts[index + 1] ?? html.length))
-}
-
-function salary(chip: string): Pick<CvProfile, 'salaryMin' | 'salaryMax' | 'currency'> {
-  const amounts = [...chip.matchAll(/\d[\d\s]*/g)]
-    .map((match) => Number(match[0].replace(/\s+/g, '')))
-    .filter((value) => Number.isFinite(value) && value > 0)
-  if (!amounts.length) return {}
-  const currency = /\$|usd/iu.test(chip) ? 'USD'
-    : /руб|rub|₽/iu.test(chip) ? 'RUB'
-      : /€|eur/iu.test(chip) ? 'EUR'
-        : /₸|тенге|kzt/iu.test(chip) ? 'KZT'
-          : /грн|uah|₴/iu.test(chip) ? 'UAH'
-            : /lei|ron/iu.test(chip) ? 'RON'
-              : ''
-  return currency
-    ? { salaryMin: Math.min(...amounts), salaryMax: Math.max(...amounts), currency }
-    : {}
 }
 
 export async function crawlNovaRobota(): Promise<{ profiles: CvProfile[]; fetched: number }> {
@@ -69,7 +52,7 @@ export async function crawlNovaRobota(): Promise<{ profiles: CvProfile[]; fetche
         url,
         text: htmlText(card),
         salaryCurrency: 'UAH',
-        salary: salary(field(card, 'price')),
+        salary: parseSecondaryChipSalary(field(card, 'price')),
         contactType: 'platform',
       })
       byUrl.set(profile.url, profile)
