@@ -1,6 +1,6 @@
 import { getRequestURL, proxyRequest } from 'h3'
 
-function isJobsBackendPath(pathname: string): boolean {
+function isJobsApiPath(pathname: string): boolean {
   return pathname.startsWith('/jobs-')
     || pathname.startsWith('/hiring-')
     || pathname.startsWith('/internal/jobs-')
@@ -8,14 +8,13 @@ function isJobsBackendPath(pathname: string): boolean {
 }
 
 export default defineEventHandler((event) => {
-  // The dedicated jobs-backend container uses the same built image but executes
-  // the real jobs/hiring routes locally. The public frontend never executes
-  // scraping, queue orchestration, candidate normalization or search indexing.
-  if (String(process.env.JOBS_EXECUTION_ENABLED || 'off').toLowerCase() === 'on') return
+  // Only the public renderer proxies these routes. jobs-api serves them locally;
+  // jobs-worker is a standalone process and never starts Nitro at all.
+  if (String(process.env.JOBS_RUNTIME_ROLE || 'frontend').toLowerCase() !== 'frontend') return
 
   const url = getRequestURL(event)
-  if (!isJobsBackendPath(url.pathname)) return
+  if (!isJobsApiPath(url.pathname)) return
 
-  const backend = String(process.env.JOBS_BACKEND_URL || 'http://jobs-backend:3000').replace(/\/$/, '')
-  return proxyRequest(event, `${backend}${url.pathname}${url.search}`)
+  const api = String(process.env.JOBS_API_URL || 'http://jobs-api:3000').replace(/\/$/, '')
+  return proxyRequest(event, `${api}${url.pathname}${url.search}`)
 })
