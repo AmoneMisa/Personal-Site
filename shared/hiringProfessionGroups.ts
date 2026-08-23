@@ -6,39 +6,176 @@ interface HiringProfessionGroup {
   members: string[]
 }
 
-/** Search-only facets. Candidate cards keep their exact canonical profession. */
+/**
+ * Legacy search facets kept only so old saved/shared URLs continue to work.
+ * New filter options are always the exact canonical professions and may be
+ * selected together as a multi-select OR query.
+ */
 export const HIRING_PROFESSION_GROUPS: Record<string, HiringProfessionGroup> = {
-  'group:accounting-treasury': {
-    en: 'Accountant / Chief Accountant / Treasurer',
-    ru: 'Бухгалтер / Главный бухгалтер / Казначей',
-    members: ['Accountant', 'Chief Accountant', 'Treasurer'],
+  'group:accounting-finance': {
+    en: 'Accounting / Finance',
+    ru: 'Бухгалтерия / Финансы',
+    members: [
+      'Accountant',
+      'Chief Accountant',
+      'Treasurer',
+      'Economist',
+      'Finance / Banking Specialist',
+      'Bank Operations Specialist',
+      'Insurance Specialist',
+    ],
   },
-  'group:retail-service': {
-    en: 'Manager / Consultant / Cashier / Salesperson',
-    ru: 'Менеджер / Консультант / Кассир / Продавец',
-    members: ['Manager', 'Consultant', 'Cashier', 'Salesperson'],
+  'group:sales-retail': {
+    en: 'Sales / Retail',
+    ru: 'Продажи / Ритейл',
+    members: [
+      'Sales Manager',
+      'Salesperson',
+      'Retail Worker',
+      'Consultant',
+      'Cashier',
+      'Merchandiser',
+      'Promoter',
+      'Brand Ambassador',
+      'Store Manager',
+    ],
+  },
+  'group:support-contact-center': {
+    en: 'Support / Contact Center',
+    ru: 'Поддержка / Колл-центр',
+    members: ['Customer Support', 'Chat Operator', 'Call Center Operator'],
+  },
+  'group:office-admin': {
+    en: 'Office / Administration',
+    ru: 'Офис / Администрирование',
+    members: ['Office Manager', 'Administrator', 'Receptionist'],
+  },
+  'group:logistics-warehouse': {
+    en: 'Logistics / Warehouse',
+    ru: 'Логистика / Склад',
+    members: [
+      'Logistics Specialist',
+      'Warehouse Manager',
+      'Warehouse Worker',
+      'Packer',
+      'Loader',
+      'Courier',
+      'Driver',
+    ],
+  },
+  'group:horeca': {
+    en: 'HoReCa',
+    ru: 'HoReCa',
+    members: [
+      'Restaurant Manager',
+      'Restaurant / Cafe Worker',
+      'Bartender',
+      'Barista',
+      'Waiter',
+      'Hostess',
+      'Cook / Chef',
+      'Confectioner',
+    ],
+  },
+  'group:medicine': {
+    en: 'Medicine / Healthcare',
+    ru: 'Медицина / Здравоохранение',
+    members: [
+      'Doctor',
+      'Dentist',
+      'Nurse',
+      'Medical Assistant',
+      'Pharmacist',
+      'Healthcare Specialist',
+    ],
+  },
+  'group:education': {
+    en: 'Teaching / Education',
+    ru: 'Преподавание / Образование',
+    members: ['Teacher', 'English Teacher', 'Tutor', 'Kindergarten Teacher'],
+  },
+  'group:software-development': {
+    en: 'Software Development',
+    ru: 'Разработка ПО',
+    members: [
+      'Full-stack Developer',
+      'Backend Developer',
+      'Frontend Developer',
+      'Mobile Developer',
+      'Software Developer',
+    ],
+  },
+  'group:it-infrastructure': {
+    en: 'IT / Infrastructure',
+    ru: 'IT / Инфраструктура',
+    members: [
+      'IT Specialist',
+      'Network Administrator',
+      'System Administrator',
+      'ERP Administrator',
+      'DevOps Engineer',
+      'Hardware Engineer',
+      'CCTV / Intercom Technician',
+    ],
+  },
+  'group:data-ai': {
+    en: 'Data / AI',
+    ru: 'Данные / AI',
+    members: ['AI / ML Engineer', 'Data Scientist', 'Data Engineer'],
+  },
+  'group:cybersecurity': {
+    en: 'Cybersecurity',
+    ru: 'Кибербезопасность',
+    members: ['Cybersecurity Specialist', 'Penetration Tester'],
+  },
+  'group:marketing-media': {
+    en: 'Marketing / Media',
+    ru: 'Маркетинг / Медиа',
+    members: ['Marketer', 'Media Specialist', 'Copywriter', 'Mobile Content Creator'],
+  },
+  'group:legal': {
+    en: 'Legal / Notary',
+    ru: 'Юриспруденция / Нотариат',
+    members: ['Lawyer', 'Notary', 'Notary Assistant'],
+  },
+  'group:security': {
+    en: 'Security',
+    ru: 'Безопасность',
+    members: ['Security Guard', 'Security Specialist', 'Operative Officer'],
+  },
+  'group:production-trades': {
+    en: 'Production / Skilled Trades',
+    ru: 'Производство / Рабочие специальности',
+    members: [
+      'General Laborer',
+      'Factory Worker',
+      'Construction Worker',
+      'Welder',
+      'Electrician',
+      'Plumber',
+      'Mechanic',
+      'Seamstress',
+      'HVAC Technician',
+    ],
   },
 }
-
-const MEMBER_GROUP = new Map(
-  Object.entries(HIRING_PROFESSION_GROUPS)
-    .flatMap(([group, value]) => value.members.map((member) => [member, group] as const)),
-)
 
 export function expandHiringProfessionFilters(values: string[]): string[] {
   return [...new Set(values.flatMap((value) => HIRING_PROFESSION_GROUPS[value]?.members || [value]))]
 }
 
-/** Replaces individual selector entries with their shared search facet. */
+/**
+ * Keep every canonical profession as a separate selector option. The UI is a
+ * multi-select, so users explicitly choose several professions when they want
+ * an OR search across adjacent directions.
+ */
 export function collapseHiringProfessionFilterValues(values: string[]): string[] {
-  const out = new Set<string>()
-  for (const value of values) out.add(MEMBER_GROUP.get(value) || value)
-  return [...out]
+  return [...new Set(values)]
 }
 
-/** Keeps old saved/share links compatible with the collapsed selector. */
+/** Expand legacy grouped URL values into the equivalent explicit selections. */
 export function normalizeHiringProfessionFilterSelections(values: string[]): string[] {
-  return collapseHiringProfessionFilterValues(values)
+  return expandHiringProfessionFilters(values)
 }
 
 export function hiringProfessionFilterLabel(value: string, locale: HiringProfessionLocale): string {
