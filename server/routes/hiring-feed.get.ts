@@ -1,8 +1,9 @@
-// GET /hiring-feed — candidate CV/resume profiles (not employer vacancies).
-// Search runs through Elasticsearch when available and falls back to memory.
+// GET /hiring-feed — read-only candidate CV/resume feed.
+// Search uses the persisted snapshot and Elasticsearch only; crawling, targeted
+// web search, normalization writes and backfill belong exclusively to jobs-worker.
 
 import { getHiringSourceDiagnostics, HIRING_COUNTRIES } from '../utils/hiringSources'
-import { DERIVED_VERSION, getStoreFunnel, getStoredCvProfiles, isHiringStoreCold, refreshHiringStore } from '../utils/hiringStore'
+import { DERIVED_VERSION, getStoredCvProfilesSnapshot } from '../utils/hiringSnapshot'
 import { getStoredWebCvProfiles } from '../utils/hiringWebStore'
 import { candidateSearchAvailable, searchCandidates } from '../utils/hiringElastic'
 import { dedupeCandidates, detectMentionedProfessions, normalizeCandidate } from '../utils/hiringNormalize'
@@ -11,7 +12,6 @@ import { listWebSources } from '../utils/hiringWebSources'
 import { listUzJobsSources } from '../utils/hiringUzJobsSource'
 import { getHiringWebDiagnostics } from '../utils/hiringDiagnostics'
 import { loadDbSourceRuns } from '../utils/hiringDb'
-import { searchTargetedHiringProfiles } from '../utils/hiringTargetedSearch'
 import type { CvProfile } from '../utils/hiringTypes'
 import {
   HIRING_PROFESSION_LABELS,
@@ -92,18 +92,12 @@ function profileSource(profile: CvProfile): string {
   return (profile.sourceKey || profile.source || 'unknown').toLowerCase()
 }
 
-/**
- * Where the profile actually came from. Legacy records carry source
- * 'telegram' regardless of origin — a compatibility shim, not a claim — so a
- * web/social candidate must be identified by origin and never by that field.
- */
 function profileOrigin(profile: CvProfile): string {
   return (profile.origin || 'telegram').toLowerCase()
 }
 
 const WEB_SOURCE_LABELS = new Map(listWebSources().map((source) => [source.key, source.label]))
 
-/** Human name of the provider, for cards and the filter list. */
 function profileProvider(profile: CvProfile): string {
   if (profile.sourceLabel?.trim()) return profile.sourceLabel.trim()
   const key = profile.sourceKey?.toLowerCase()
@@ -213,11 +207,6 @@ function matchesFilters(profile: CvProfile, params: URLSearchParams): boolean {
   return true
 }
 
-// Normalizing one real CV costs about 7ms — profession detection, skills,
-// languages, contacts, the lot — so a store of a few hundred is seconds of
-// work, and it was being redone from scratch on every request. The result
-// depends only on the stored snapshot, so it is cached against a cheap
-// signature of it and recomputed when the snapshot moves.
 const SNAPSHOT_TTL_MS = 60_000
 let snapshotCache: CvProfile[] = []
 let snapshotKey = ''
@@ -234,9 +223,6 @@ function snapshotSignature(stored: CvProfile[]): string {
 function normalizedSnapshot(stored: CvProfile[]): CvProfile[] {
   const key = snapshotSignature(stored)
   if (key === snapshotKey && Date.now() - snapshotAt < SNAPSHOT_TTL_MS) return snapshotCache
-  // Profiles the store has already derived are used as they are; only rows
-  // written by another adapter, or from before the current parser version,
-  // pay for normalization here.
   snapshotCache = dedupeCandidates(stored.map((profile) => (
     profile.derived === DERIVED_VERSION ? profile : withProfessionExperience(normalizeCandidate(profile))
   )))
@@ -254,36 +240,9 @@ function sourceCounts(profiles: CvProfile[]): Record<string, number> {
   return counts
 }
 
-// The selector is a taxonomy, not an index of arbitrary CV headlines. Raw
-// roles remain searchable in the full text, but only canonical values may be
-// submitted as a structured profession filter.
 function professionValues(): string[] {
   return collapseHiringProfessionFilterValues(Object.keys(HIRING_PROFESSION_LABELS))
     .sort((a, b) => a.localeCompare(b, 'en'))
-}
-
-function targetedSearchTerm(params: URLSearchParams): string {
-  const query = (params.get('query') || '').trim()
-  if (query) {
-    const mentioned = detectMentionedProfessions(query)
-    if (mentioned.length) return mentioned.map((profession) => hiringProfessionLabel(profession, 'ru')).join(' ')
-    return query
-  }
-  return list(params, 'professions')
-    // One representative term keeps the synchronous Flagma backfill bounded;
-    // all group members still participate in the authoritative stored filter.
-    .map((profession) => hiringProfessionLabel(expandHiringProfessionFilters([profession])[0] || profession, 'ru'))
-    .join(' ')
-    .trim()
-}
-
-function shouldSearchFlagma(params: URLSearchParams, term: string): boolean {
-  if (!term) return false
-  const countries = list(params, 'countries').map((value) => value.toUpperCase())
-  if (countries.length && !countries.includes('UZ')) return false
-  const sources = list(params, 'sources').map((value) => value.toLowerCase())
-  if (sources.length && !sources.includes('web') && !sources.includes('flagma-uz')) return false
-  return true
 }
 
 function requestLocale(event: Parameters<typeof getCookie>[0]): HiringProfessionLocale {
@@ -386,39 +345,17 @@ export default defineEventHandler(async (event) => {
   const offset = Math.max(0, Number(params.get('offset')) || 0)
   const limit = Math.min(PAGE_MAX, Math.max(1, Number(params.get('limit')) || 20))
 
-  let warming = false
   const [telegramStored, webStored, persistedSourceRuns] = await Promise.all([
-    getStoredCvProfiles(),
+    getStoredCvProfilesSnapshot(),
     getStoredWebCvProfiles(),
     loadDbSourceRuns(),
   ])
 
-  const term = targetedSearchTerm(params)
-  let targetedProfiles: CvProfile[] = []
-  let targetedError = ''
-  if (shouldSearchFlagma(params, term)) {
-    try {
-      targetedProfiles = await searchTargetedHiringProfiles(term)
-    } catch (error) {
-      targetedError = (error as Error).message
-      console.warn('[hiring-feed] targeted Flagma search failed:', targetedError)
-    }
-  }
-
   const storedByUrl = new Map<string, CvProfile>()
-  for (const profile of [...telegramStored, ...webStored, ...targetedProfiles]) {
+  for (const profile of [...telegramStored, ...webStored]) {
     storedByUrl.set(profile.url || profile.id, profile)
   }
-  const stored = [...storedByUrl.values()]
-
-  if (!stored.length && isHiringStoreCold()) {
-    warming = true
-    refreshHiringStore().catch((error) => {
-      console.error('[hiring-feed] background refresh failed:', (error as Error).message)
-    })
-  }
-
-  const profiles = normalizedSnapshot(stored)
+  const profiles = normalizedSnapshot([...storedByUrl.values()])
   const byId = new Map(profiles.map((profile) => [profile.id, profile]))
 
   const query = (params.get('query') || '').trim()
@@ -429,7 +366,7 @@ export default defineEventHandler(async (event) => {
     || params.get('gender'),
   )
   const professionQuery = query ? detectMentionedProfessions(query).length > 0 : false
-  const hasWebProfiles = webStored.length > 0 || targetedProfiles.length > 0
+  const hasWebProfiles = webStored.length > 0
   let page: CvProfile[] = []
   let count = 0
   let engine: 'elasticsearch' | 'memory' = 'memory'
@@ -468,9 +405,6 @@ export default defineEventHandler(async (event) => {
   }
 
   const sourceStatuses = getHiringSourceDiagnostics()
-  // In-memory diagnostics disappear on every deploy. Merge the durable run
-  // history so a broken/empty web/social source remains visible instead of
-  // making a zero-result filter look like a legitimate empty market.
   const webStatusesByHandle = new Map(
     persistedSourceRuns
       .filter((item) => /^(?:web|social):/i.test(item.handle))
@@ -491,7 +425,6 @@ export default defineEventHandler(async (event) => {
         handle: item.handle,
         error: item.error || 'source failed',
       })),
-    ...(targetedError ? [{ source: 'flagma-uz', country: 'UZ', handle: 'web:flagma-uz:search', error: targetedError }] : []),
   ]
 
   setResponseHeader(event, 'Cache-Control', 'no-store')
@@ -502,15 +435,12 @@ export default defineEventHandler(async (event) => {
     sourceStatuses,
     webSourceStatuses,
     sourceErrors,
-    // When crawling stops — a dead queue worker, a broker that refuses the
-    // login — the board keeps serving what it already had and looks healthy.
-    // This is the one field that gives that away.
     lastCrawlAt: [...persistedSourceRuns.map((run) => run.lastSuccessAt || ''), ...sourceStatuses.map((item) => item.checkedAt)]
       .filter(Boolean)
       .sort()
       .pop() || null,
-    funnel: getStoreFunnel(),
-    warming,
+    funnel: { parsed: 0, duplicate: 0, expired: 0, visibilityRejected: 0, shown: profiles.length },
+    warming: false,
     engine,
     filters: {
       countries: params.get('countries') || '',
@@ -532,8 +462,6 @@ export default defineEventHandler(async (event) => {
     meta: {
       countries: HIRING_COUNTRIES,
       professions: professionValues(),
-      // Only origins that actually have candidates: don't offer a source filter
-      // whose only possible result is an empty page.
       sources: [
         ...(profiles.some((profile) => profileOrigin(profile) === 'telegram')
           ? [{ value: 'telegram', label: 'Telegram', origin: 'telegram' }]
