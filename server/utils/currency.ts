@@ -2,14 +2,14 @@
 //
 // Rates come from fawazahmed0/currency-api (the same source used by the Android
 // Rustic Price Converter), with jsDelivr npm, GitHub raw and Staticaly fallbacks.
-// They are cached in Redis (24h) and mirrored in memory so the hot path
-// (enrich.ts, called per job per request) stays synchronous. Every value is
-// stored as USD-per-1-unit (e.g. UAH -> ~0.024), so `amount * rate = USD`.
+// They are cached in the persistent state store (24h) and mirrored in memory so
+// the hot path (enrich.ts, called per job per request) stays synchronous. Every
+// value is stored as USD-per-1-unit (e.g. UAH -> ~0.024), so `amount * rate = USD`.
 //
 // The static table below is only a FALLBACK for a cold cache or an API outage —
 // the live fetch overwrites it.
 
-import { useRedis } from '~~/server/utils/redis'
+import { useStateStore } from '~~/server/utils/stateStore'
 
 const FALLBACK_USD_RATES: Record<string, number> = {
   USD: 1, EUR: 1.09, GBP: 1.27, PLN: 0.25, UAH: 0.024, KZT: 0.0019,
@@ -125,21 +125,21 @@ export function convertCurrency(
 }
 
 /**
- * Populate memory from the shared Redis cache. If the cache is missing or was
- * written by an older build that omitted a required currency (notably RUB),
+ * Populate memory from the shared persistent cache. If the cache is missing or
+ * was written by an older build that omitted a required currency (notably RUB),
  * refresh it from the live API once instead of inventing a local rate.
  */
 export async function loadRates(): Promise<void> {
   if (memLoaded) return
   try {
-    const raw = await useRedis().get(RATES_KEY)
+    const raw = await useStateStore().get(RATES_KEY)
     if (raw) {
       memRates = { ...FALLBACK_USD_RATES, ...sanitizeUsdPerUnit(JSON.parse(raw)) }
       memLoaded = true
       if (memRates.RUB) return
     }
   } catch {
-    /* Redis down — try the live provider below. */
+    /* Persistent cache unavailable — try the live provider below. */
   }
 
   await refreshRates()
@@ -150,9 +150,9 @@ export async function loadRates(): Promise<void> {
 }
 
 /**
- * Fetch live rates from the API, then persist to Redis + memory. Called by the
- * daily refresh worker and the cold-start warmup. Never throws — on failure the
- * previous (or fallback) table stays in use.
+ * Fetch live rates from the API, then persist to the state store + memory. Called
+ * by the daily refresh worker and the cold-start warmup. Never throws — on
+ * failure the previous (or fallback) table stays in use.
  */
 export async function refreshRates(): Promise<void> {
   try {
@@ -161,7 +161,7 @@ export async function refreshRates(): Promise<void> {
     memRates = { ...FALLBACK_USD_RATES, ...usdPerUnit }
     memLoaded = true
     try {
-      await useRedis().set(RATES_KEY, JSON.stringify(usdPerUnit), 'EX', RATES_TTL_SECONDS)
+      await useStateStore().set(RATES_KEY, JSON.stringify(usdPerUnit), 'EX', RATES_TTL_SECONDS)
     } catch {
       /* best-effort persist */
     }
