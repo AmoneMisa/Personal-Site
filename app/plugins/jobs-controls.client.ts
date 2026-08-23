@@ -38,10 +38,18 @@ export default defineNuxtPlugin((nuxtApp) => {
     if (!filters) return
 
     const current = new URLSearchParams(window.location.search).get('source') || ''
+    const nativePill = filters.querySelector<HTMLButtonElement>('button.jobs__pill:not([data-extra-job-source])')
+
     for (const option of SOURCE_BUTTONS) {
       let button = filters.querySelector<HTMLButtonElement>(`[data-extra-job-source="${option.value}"]`)
       if (!button) {
-        button = document.createElement('button')
+        // jobs/index.vue uses scoped styles. A button created from scratch does not
+        // receive Vue's generated scope attribute, so it renders as plain text.
+        // Clone a native source pill to inherit that attribute and the exact same
+        // desktop/mobile styling, then attach our own source behaviour.
+        button = nativePill
+          ? nativePill.cloneNode(false) as HTMLButtonElement
+          : document.createElement('button')
         button.type = 'button'
         button.className = 'jobs__pill'
         button.dataset.extraJobSource = option.value
