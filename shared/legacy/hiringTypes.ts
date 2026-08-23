@@ -1,4 +1,4 @@
-export { HIRING_SOURCES } from '../../../shared/contracts/hiring'
+export { HIRING_SOURCES } from '../contracts/hiring'
 export type {
   CandidateContactType,
   CandidateEmploymentType,
@@ -8,4 +8,4 @@ export type {
   CvProfile,
   HiringSource,
   ProfessionExperience,
-} from '../../../shared/contracts/hiring'
+} from '../contracts/hiring'
