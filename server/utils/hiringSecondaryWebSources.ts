@@ -1,4 +1,4 @@
-import { useRedis } from '~~/server/utils/redis'
+import { useStateStore } from '~~/server/utils/stateStore'
 import { hiringDbEnabled, loadDbCandidates, saveDbCandidates } from './hiringDb'
 import { normalizeCandidate } from './hiringNormalize'
 import type { SourceRun } from './hiringDiagnostics'
@@ -448,7 +448,7 @@ async function persist(profiles: CvProfile[], diagnostic: SourceRun): Promise<nu
     const now = new Date().toISOString()
     let existing: StoredProfile[] = []
     try {
-      const raw = await useRedis().get(STORE_KEY)
+      const raw = await useStateStore().get(STORE_KEY)
       if (raw) existing = JSON.parse(raw) as StoredProfile[]
     } catch {
       // Postgres fallback below.
@@ -466,7 +466,7 @@ async function persist(profiles: CvProfile[], diagnostic: SourceRun): Promise<nu
       const time = Date.parse(item.activityAt || item.updatedAt || item.createdAt || '')
       return Number.isFinite(time) && time >= oldest && time <= Date.now() + 48 * 60 * 60 * 1000
     })
-    await useRedis().set(STORE_KEY, JSON.stringify(kept), 'EX', STORE_TTL_SECONDS)
+    await useStateStore().set(STORE_KEY, JSON.stringify(kept), 'EX', STORE_TTL_SECONDS)
     return kept.length
   })
   if (hiringDbEnabled()) await saveDbCandidates(profiles, diagnostic)
