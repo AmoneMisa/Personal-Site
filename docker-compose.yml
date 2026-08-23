@@ -76,8 +76,6 @@ services:
       JOBS_ELASTICSEARCH_INDEX: job-listings-v1
       HIRING_DATABASE_URL: ${HIRING_DATABASE_URL:-}
       HIRING_DB_SCHEMA: ${HIRING_DB_SCHEMA:-hiring}
-      JOBS_QUEUE_DATABASE_URL: ${JOBS_QUEUE_DATABASE_URL:-}
-      JOBS_QUEUE_DB_SCHEMA: ${JOBS_QUEUE_DB_SCHEMA:-site_queue}
     volumes:
       - site_state:/var/app/state
     networks:
