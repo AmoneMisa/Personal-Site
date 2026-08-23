@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Unified deployment for the Nuxt frontend, FastAPI backend and queue workers.
+# Unified deployment for the public Nuxt frontend, internal jobs runtime,
+# FastAPI tools backend and queue workers.
 set -euo pipefail
 
 cd "$(dirname "$0")"
@@ -21,26 +22,29 @@ target="${1:-all}"
 case "$target" in
   all)
     # Every image is pre-built in GitHub Actions and published to GHCR. Nothing
-    # is built here: this server cannot reach Docker Hub (auth.docker.io TLS
-    # handshake timeouts), so a local build fails as soon as it needs a base
-    # image, and the Nuxt build alone used to exceed the deploy timeout.
+    # is built here: this server cannot reach Docker Hub, and keeping builds out
+    # of production also avoids competing with the running application.
     "${compose[@]}" pull
-    # Remove services retired from compose (for example the second queue worker
-    # and Redis) so old containers cannot keep consuming resources indefinitely.
+    # Remove services retired from compose so stale containers cannot keep
+    # consuming resources indefinitely.
     "${compose[@]}" up -d --no-build --remove-orphans
     ;;
   frontend)
-    # Frontend depends on the browser-fetcher sidecar used as a WAF fallback for
-    # selected public job sites, so a targeted frontend deploy must refresh both.
-    "${compose[@]}" pull job-browser-fetcher frontend
-    "${compose[@]}" up -d --no-build job-browser-fetcher frontend
+    # Frontend and jobs-backend use the same application image. Refresh the queue
+    # image too because workers now talk only to jobs-backend, never to frontend.
+    "${compose[@]}" pull frontend jobs-backend job-browser-fetcher jobs-queue-dispatcher jobs-queue-worker-1
+    "${compose[@]}" up -d --no-build job-browser-fetcher jobs-backend jobs-queue-dispatcher jobs-queue-worker-1 frontend
+    ;;
+  jobs)
+    "${compose[@]}" pull jobs-backend job-browser-fetcher jobs-queue-dispatcher jobs-queue-worker-1
+    "${compose[@]}" up -d --no-build job-browser-fetcher jobs-backend jobs-queue-dispatcher jobs-queue-worker-1
     ;;
   backend)
     "${compose[@]}" pull backend
     "${compose[@]}" up -d --no-build backend
     ;;
   *)
-    echo "Usage: $0 [all|frontend|backend]" >&2
+    echo "Usage: $0 [all|frontend|jobs|backend]" >&2
     exit 2
     ;;
 esac
@@ -50,5 +54,9 @@ esac
 if [ "$target" = "all" ] || [ "$target" = "frontend" ]; then
   curl --fail --silent --show-error --retry 20 --retry-all-errors --retry-delay 3 \
     http://127.0.0.1:8080/ >/dev/null
-  echo "Personal Site is healthy."
+  curl --fail --silent --show-error --retry 20 --retry-all-errors --retry-delay 3 \
+    http://127.0.0.1:8080/jobs >/dev/null
+  curl --fail --silent --show-error --retry 20 --retry-all-errors --retry-delay 3 \
+    http://127.0.0.1:8080/hiring >/dev/null
+  echo "Personal Site frontend is healthy."
 fi
