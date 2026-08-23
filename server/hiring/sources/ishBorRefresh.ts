@@ -1,5 +1,5 @@
 import type { SourceRun } from '../../utils/hiringDiagnostics'
-import { hiringDbEnabled, saveDbCandidates } from '../../utils/hiringDb'
+import { hiringDbEnabled, saveDbCandidates } from '../infrastructure/database'
 import { emptyWebCursor, loadWebCursors, saveWebCursor } from '../../utils/hiringCursors'
 import { normalizeCandidate } from '../../utils/hiringNormalize'
 import { persistWebProfiles } from '../webProfilePersistence'
