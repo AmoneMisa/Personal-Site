@@ -4,9 +4,9 @@
 // bundled, so the site's `npm ci` deploy needs no new dependency / lockfile change.
 //
 // Nearby listings are clustered by pixel proximity at the current zoom so they
-// don't stack into one unreadable blob. Clicking a cluster shows exactly one
-// ring of apartment cards; the center arrows paginate through additional cards
-// instead of creating concentric rings around the marker.
+// don't stack into one unreadable blob. Clicking a cluster fans its listings out
+// as small "tablet" cards in a radial menu (Sims-style) instead of hiding them
+// behind each other; clicking a lone point selects it directly.
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
 
 interface FlatPoint {
@@ -38,20 +38,14 @@ const LEAFLET_CSS = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.css";
 const CLUSTER_PX = 38;
 const MAX_RADIAL = 24;
 const SPREAD_PX = 50;
-const RADIAL_PAGE_SIZE = 8;
+const RING_SIZE = 9;
 
 const el = ref<HTMLElement | null>(null);
 const failed = ref(false);
 const drawing = ref(false);
 const area = ref<Array<{ lat: number; lng: number }>>([]);
-const radial = ref<{ x: number; y: number; items: FlatPoint[]; page: number } | null>(null);
-const radialPageCount = computed(() => Math.max(1, Math.ceil((radial.value?.items.length ?? 0) / RADIAL_PAGE_SIZE)));
-const visibleRadialItems = computed(() => {
-  const current = radial.value;
-  if (!current) return [];
-  const start = current.page * RADIAL_PAGE_SIZE;
-  return current.items.slice(start, start + RADIAL_PAGE_SIZE);
-});
+const radial = ref<{ x: number; y: number; items: FlatPoint[] } | null>(null);
+const visibleRadialItems = computed(() => radial.value?.items.slice(0, MAX_RADIAL) ?? []);
 let map: any = null;
 const expanded = ref(false);
 
@@ -76,7 +70,7 @@ function onKeydown(event: KeyboardEvent) {
       return;
     }
     if (event.key === "ArrowLeft" || event.key === "ArrowRight") {
-      pageRadial(event.key === "ArrowRight" ? 1 : -1);
+      rotateRadial(event.key === "ArrowRight" ? 1 : -1);
       event.preventDefault();
       return;
     }
@@ -182,19 +176,25 @@ function openCluster(c: Cluster) {
   const pt = map.latLngToContainerPoint([c.lat, c.lng]);
   const rect = el.value?.getBoundingClientRect();
   if (!rect) return;
-  radial.value = { x: rect.left + pt.x, y: rect.top + pt.y, items: [...c.items], page: 0 };
+  radial.value = { x: rect.left + pt.x, y: rect.top + pt.y, items: [...c.items] };
 }
 
 function closeRadial() {
   radial.value = null;
 }
 
-function pageRadial(direction: -1 | 1) {
+function rotateRadial(direction: -1 | 1) {
   const current = radial.value;
-  const pageCount = radialPageCount.value;
-  if (!current || pageCount <= 1) return;
-  const page = (current.page + direction + pageCount) % pageCount;
-  radial.value = { ...current, page };
+  if (!current || current.items.length < 2) return;
+  const items = [...current.items];
+  if (direction > 0) {
+    const first = items.shift();
+    if (first) items.push(first);
+  } else {
+    const last = items.pop();
+    if (last) items.unshift(last);
+  }
+  radial.value = { ...current, items };
 }
 
 function pick(id: string) {
@@ -203,8 +203,11 @@ function pick(id: string) {
 }
 
 function slotStyle(i: number, n: number) {
-  const radius = 150;
-  const angle = (-90 + (360 / Math.max(1, n)) * i) * (Math.PI / 180);
+  const ring = Math.floor(i / RING_SIZE);
+  const inRing = i % RING_SIZE;
+  const countThisRing = Math.min(RING_SIZE, n - ring * RING_SIZE);
+  const radius = 76 + ring * 74;
+  const angle = (-90 + (360 / countThisRing) * inRing) * (Math.PI / 180);
   const x = Math.cos(angle) * radius;
   const y = Math.sin(angle) * radius;
   return {
@@ -326,21 +329,9 @@ onBeforeUnmount(() => {
     <div v-if="radial" class="flat-radial" @click.self="closeRadial">
       <div class="flat-radial__anchor" :style="{ left: `${radial.x}px`, top: `${radial.y}px` }">
         <div class="flat-radial__hub" role="group" aria-label="Browse apartments in this cluster">
-          <button
-              type="button"
-              class="flat-radial__hub-arrow"
-              aria-label="Previous apartments"
-              :disabled="radialPageCount <= 1"
-              @click.stop="pageRadial(-1)"
-          >‹</button>
-          <span class="flat-radial__hub-count" :title="`${radial.items.length} apartments`">{{ radial.page + 1 }}/{{ radialPageCount }}</span>
-          <button
-              type="button"
-              class="flat-radial__hub-arrow"
-              aria-label="Next apartments"
-              :disabled="radialPageCount <= 1"
-              @click.stop="pageRadial(1)"
-          >›</button>
+          <button type="button" class="flat-radial__hub-arrow" aria-label="Previous apartment" @click.stop="rotateRadial(-1)">‹</button>
+          <span class="flat-radial__hub-count">{{ radial.items.length }}</span>
+          <button type="button" class="flat-radial__hub-arrow" aria-label="Next apartment" @click.stop="rotateRadial(1)">›</button>
         </div>
         <div
             v-for="(item, i) in visibleRadialItems"
@@ -406,8 +397,8 @@ onBeforeUnmount(() => {
 .flat-radial__anchor { position: absolute; width: 0; height: 0; }
 .flat-radial__hub {
   position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
-  display: grid; grid-template-columns: 17px 18px 17px; align-items: center; justify-content: center;
-  width: 56px; height: 56px; border-radius: 50%; overflow: hidden;
+  display: grid; grid-template-columns: 17px 16px 17px; align-items: center; justify-content: center;
+  width: 52px; height: 52px; border-radius: 50%; overflow: hidden;
   background: var(--accent-pink, #e0679a); color: #fff;
   border: 2px solid #fff; box-shadow: 0 3px 12px rgba(0,0,0,0.5);
 }
@@ -416,10 +407,9 @@ onBeforeUnmount(() => {
   border: 0; background: transparent; color: #fff; cursor: pointer;
   font-size: 25px; line-height: 1; transition: background-color 120ms ease, transform 120ms ease;
 }
-.flat-radial__hub-arrow:hover:not(:disabled), .flat-radial__hub-arrow:focus-visible:not(:disabled) { background: rgba(0,0,0,.16); outline: none; }
-.flat-radial__hub-arrow:active:not(:disabled) { transform: scale(.9); }
-.flat-radial__hub-arrow:disabled { opacity: .35; cursor: default; }
-.flat-radial__hub-count { text-align: center; font-size: 10px; font-weight: 800; line-height: 1; pointer-events: none; white-space: nowrap; }
+.flat-radial__hub-arrow:hover, .flat-radial__hub-arrow:focus-visible { background: rgba(0,0,0,.16); outline: none; }
+.flat-radial__hub-arrow:active { transform: scale(.9); }
+.flat-radial__hub-count { text-align: center; font-size: 11px; font-weight: 800; line-height: 1; pointer-events: none; }
 .flat-radial__slot {
   position: absolute; top: 0; left: 0;
   animation: flat-radial-in 0.24s cubic-bezier(0.34, 1.56, 0.64, 1) backwards;
