@@ -1,7 +1,7 @@
 services:
   backend:
-    # Built and pushed by GitHub Actions; the deployment server can reach
-    # ghcr.io but not Docker Hub, so it must never build this locally.
+    # Existing auxiliary site backend. Jobs/hiring do NOT use this service:
+    # their API lives in Nuxt/Nitro and ingestion runs in `jobs-worker`.
     image: ghcr.io/amonemisa/personal-site-backend:latest
     restart: unless-stopped
     environment:
@@ -36,18 +36,19 @@ services:
       start_period: 10s
 
   frontend:
-    # Public Nuxt runtime. It renders pages and proxies jobs/hiring API traffic to
-    # jobs-backend, but never executes scraping, queue work or refresh jobs itself.
-    # It has no startup dependency on jobs-backend: the site must stay available
-    # even when every jobs/hiring worker is down.
+    # One Nuxt/Nitro runtime owns UI, SSR and lightweight read-only jobs/hiring
+    # API routes. It never schedules or executes scraping/refresh/queue work.
     image: ghcr.io/amonemisa/personal-site:latest
     restart: unless-stopped
     env_file:
       - ${SITE_ENV_FILE:-./db.env}
     environment:
       SITE_STATE_DIR: /var/app/state/site
-      JOBS_EXECUTION_ENABLED: "off"
-      JOBS_BACKEND_URL: http://jobs-backend:3000
+      JOBS_RUNTIME_ROLE: frontend
+      ELASTICSEARCH_URL: http://flat-finder-elasticsearch:9200
+      JOBS_ELASTICSEARCH_INDEX: job-listings-v1
+      HIRING_DATABASE_URL: ${HIRING_DATABASE_URL:-}
+      HIRING_DB_SCHEMA: ${HIRING_DB_SCHEMA:-hiring}
     volumes:
       - site_state:/var/app/state
     ports:
@@ -62,18 +63,17 @@ services:
       retries: 3
       start_period: 30s
 
-  jobs-backend:
-    # Dedicated internal runtime for vacancy/candidate feeds, queue orchestration,
-    # scraping, normalization and indexing. It intentionally shares the existing
-    # application image so the mature TypeScript ingestion code does not need a
-    # risky rewrite, but it is isolated from the user-facing Nuxt process.
-    image: ghcr.io/amonemisa/personal-site:latest
+  jobs-worker:
+    # The ONE jobs/hiring worker. It directly owns scheduling, Postgres queue
+    # claim/complete/fail, scraping, parsing, normalization, AI enrichment and
+    # Elasticsearch indexing. No HTTP execution hop through Nuxt exists.
+    image: ghcr.io/amonemisa/personal-site-jobs-worker:latest
     restart: unless-stopped
     env_file:
       - ${SITE_ENV_FILE:-./db.env}
     environment:
       SITE_STATE_DIR: /var/app/state/site
-      JOBS_EXECUTION_ENABLED: "on"
+      JOBS_RUNTIME_ROLE: worker
       AI_WORKER_URL: http://ai-worker:4030
       ELASTICSEARCH_URL: http://flat-finder-elasticsearch:9200
       JOBS_ELASTICSEARCH_INDEX: job-listings-v1
@@ -81,16 +81,11 @@ services:
       JOB_BROWSER_PROXY_TIMEOUT_MS: ${JOB_BROWSER_PROXY_TIMEOUT_MS:-65000}
       JOB_BROWSER_ALLOWED_HOSTS: ${JOB_BROWSER_ALLOWED_HOSTS:-}
       QUEUE_INTERNAL_KEY: ${QUEUE_INTERNAL_KEY:-}
-      # Public-only Facebook groups/pages + anonymous Threads Recent search are
-      # proxied by flat-finder-backend over the shared ai-net network.
       HIRING_SOCIAL_SOURCE: ${HIRING_SOCIAL_SOURCE:-on}
       HIRING_SOCIAL_SOURCES: ${HIRING_SOCIAL_SOURCES:-}
       HIRING_SOCIAL_API_URL: ${HIRING_SOCIAL_API_URL:-http://flat-finder-backend:4000/internal/social/fetch}
-      # Durable CV storage: shared Postgres, in its own "hiring" schema.
       HIRING_DATABASE_URL: ${HIRING_DATABASE_URL:-}
       HIRING_DB_SCHEMA: ${HIRING_DB_SCHEMA:-hiring}
-      # Jobs/hiring queue state is durable in Postgres too. When a dedicated URL
-      # is omitted the queue intentionally reuses HIRING_DATABASE_URL.
       JOBS_QUEUE_DATABASE_URL: ${JOBS_QUEUE_DATABASE_URL:-}
       JOBS_QUEUE_DB_SCHEMA: ${JOBS_QUEUE_DB_SCHEMA:-site_queue}
       JOBS_QUEUE_REFRESH_SECONDS: ${JOBS_QUEUE_REFRESH_SECONDS:-1800}
@@ -101,53 +96,22 @@ services:
       JOBS_QUEUE_LEASE_SECONDS: ${JOBS_QUEUE_LEASE_SECONDS:-240}
       JOBS_QUEUE_RETRY_BASE_MS: ${JOBS_QUEUE_RETRY_BASE_MS:-30000}
       JOBS_QUEUE_RETRY_MAX_MS: ${JOBS_QUEUE_RETRY_MAX_MS:-300000}
+      JOBS_QUEUE_POLL_SECONDS: ${JOBS_QUEUE_POLL_SECONDS:-1}
+      JOBS_QUEUE_DISPATCH_TICK_SECONDS: ${JOBS_QUEUE_DISPATCH_TICK_SECONDS:-10}
     volumes:
       - site_state:/var/app/state
     depends_on:
-      backend:
-        condition: service_healthy
       job-browser-fetcher:
         condition: service_healthy
     networks:
       - default
       - ai-net
     healthcheck:
-      test: ["CMD", "node", "-e", "fetch('http://localhost:3000/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      test: ["CMD-SHELL", "kill -0 1"]
       interval: 30s
       timeout: 5s
       retries: 3
-      start_period: 30s
-
-  jobs-queue-dispatcher:
-    # Lightweight HTTP ticker. Queue durability, scheduling and locking live in
-    # PostgreSQL; the dedicated jobs-backend owns queue orchestration.
-    image: ghcr.io/amonemisa/personal-site-jobs-queue:latest
-    restart: unless-stopped
-    environment:
-      QUEUE_MODE: dispatcher
-      JOBS_BACKEND_URL: http://jobs-backend:3000
-      QUEUE_INTERNAL_KEY: ${QUEUE_INTERNAL_KEY:-}
-      QUEUE_DISPATCH_TICK_SECONDS: ${JOBS_QUEUE_DISPATCH_TICK_SECONDS:-10}
-    networks:
-      - default
-    depends_on:
-      jobs-backend:
-        condition: service_healthy
-
-  jobs-queue-worker-1:
-    image: ghcr.io/amonemisa/personal-site-jobs-queue:latest
-    restart: unless-stopped
-    environment:
-      QUEUE_MODE: worker
-      JOBS_BACKEND_URL: http://jobs-backend:3000
-      QUEUE_INTERNAL_KEY: ${QUEUE_INTERNAL_KEY:-}
-      QUEUE_POLL_SECONDS: ${JOBS_QUEUE_POLL_SECONDS:-1}
-      QUEUE_EXECUTE_TIMEOUT_SECONDS: ${JOBS_QUEUE_EXECUTE_TIMEOUT_SECONDS:-180}
-    networks:
-      - default
-    depends_on:
-      jobs-backend:
-        condition: service_healthy
+      start_period: 20s
 
 volumes:
   site_state:

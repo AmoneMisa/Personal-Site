@@ -1,16 +1,13 @@
-// GET /jobs-vacancy?id=<job id> — returns a single stored vacancy (enriched), or
-// { job: null } if it isn't in the store (e.g. aged out past the 14-day window).
-// Powers shareable vacancy links and the "recently viewed" strip, which must open
-// a specific posting regardless of the current filters/page. Lives outside /api
-// for the same reason as /jobs-feed (that prefix proxies to FastAPI).
+// GET /jobs-vacancy?id=<job id> — read-only lookup in the persisted vacancy
+// snapshot. Ingestion and enrichment happen in jobs-worker before persistence.
 
-import { getStoredJobs } from '../utils/jobsStore'
-import { enrichJob } from '../utils/enrich'
+import { getStoredJobsSnapshot } from '../utils/jobsSnapshot'
 
 export default defineEventHandler(async (event) => {
   const id = String(getQuery(event).id ?? '').trim()
   if (!id) return { job: null }
-  const jobs = await getStoredJobs()
+
+  const jobs = await getStoredJobsSnapshot()
   const found = jobs.find((job) => job.id === id || job.url === id)
-  return { job: found ? enrichJob(found) : null }
+  return { job: found || null }
 })

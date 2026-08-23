@@ -3,9 +3,11 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 
 const queue = readFileSync(new URL('../server/utils/jobsPgQueue.ts', import.meta.url), 'utf8')
-const worker = readFileSync(new URL('../jobs-queue-worker/worker.py', import.meta.url), 'utf8')
-const dockerfile = readFileSync(new URL('../jobs-queue-worker/Dockerfile', import.meta.url), 'utf8')
+const worker = readFileSync(new URL('../jobs-worker/worker.ts', import.meta.url), 'utf8')
+const dockerfile = readFileSync(new URL('../jobs-worker/Dockerfile', import.meta.url), 'utf8')
 const compose = readFileSync(new URL('../docker-compose.yml', import.meta.url), 'utf8')
+const jobsFeed = readFileSync(new URL('../server/routes/jobs-feed.get.ts', import.meta.url), 'utf8')
+const hiringFeed = readFileSync(new URL('../server/routes/hiring-feed.get.ts', import.meta.url), 'utf8')
 const envExample = readFileSync(new URL('../.env.example', import.meta.url), 'utf8')
 const packageJson = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'))
 const packageLock = JSON.parse(readFileSync(new URL('../package-lock.json', import.meta.url), 'utf8'))
@@ -25,15 +27,33 @@ test('jobs and hiring tasks use a durable PostgreSQL queue', () => {
   assert.match(queue, /ON CONFLICT \(task_key\) DO NOTHING/)
 })
 
-test('workers poll the internal Postgres queue API and preserve retries', () => {
-  assert.match(worker, /\/internal\/jobs-queue-claim/)
-  assert.match(worker, /\/internal\/jobs-queue-complete/)
-  assert.match(worker, /\/internal\/jobs-queue-fail/)
-  assert.match(worker, /\/internal\/jobs-queue-dispatch/)
-  assert.match(worker, /target = "dead" if outcome\.get\("dead"\) else "retry"/)
-  assert.doesNotMatch(worker, /import pika/)
-  assert.doesNotMatch(worker, /basic_consume|basic_publish|start_consuming/)
-  assert.doesNotMatch(dockerfile, /pip install/)
+test('one TypeScript worker owns queue transitions and ingestion directly', () => {
+  assert.match(worker, /dispatchDueJobsQueue/)
+  assert.match(worker, /claimJobsQueueTask/)
+  assert.match(worker, /completeJobsQueueTask/)
+  assert.match(worker, /failJobsQueueTask/)
+  assert.match(worker, /refreshJobSource/)
+  assert.match(worker, /refreshHiringChannel/)
+  assert.match(worker, /refreshHiringWebSource/)
+  assert.match(worker, /refreshHiringSocialSource/)
+  assert.doesNotMatch(worker, /\/internal\/jobs-/)
+  assert.doesNotMatch(worker, /\/internal\/hiring-/)
+  assert.doesNotMatch(worker, /JOBS_FRONTEND_URL|JOBS_BACKEND_URL|JOBS_API_URL/)
+  assert.match(dockerfile, /jobs-worker\/worker\.ts/)
+  assert.doesNotMatch(dockerfile, /pip install|python/)
+})
+
+test('jobs and hiring API stay in Nuxt while heavy execution stays out', () => {
+  assert.match(jobsFeed, /read-only vacancy feed/u)
+  assert.match(hiringFeed, /read-only candidate CV\/resume feed/u)
+  assert.match(compose, /^\s{2}frontend:\s*$/m)
+  assert.match(compose, /^\s{2}jobs-worker:\s*$/m)
+  assert.doesNotMatch(compose, /^\s{2}jobs-api:\s*$/m)
+  assert.doesNotMatch(compose, /jobs-backend/)
+  assert.doesNotMatch(compose, /jobs-queue-worker/)
+  assert.doesNotMatch(compose, /jobs-queue-dispatcher/)
+  assert.match(compose, /JOBS_RUNTIME_ROLE:\s*frontend/)
+  assert.match(compose, /JOBS_RUNTIME_ROLE:\s*worker/)
 })
 
 test('Personal-Site no longer depends on flat-finder RabbitMQ', () => {
@@ -41,8 +61,6 @@ test('Personal-Site no longer depends on flat-finder RabbitMQ', () => {
   assert.doesNotMatch(compose, /RABBITMQ_/)
   assert.match(compose, /JOBS_QUEUE_DATABASE_URL/)
   assert.match(compose, /JOBS_QUEUE_DB_SCHEMA/)
-  assert.match(compose, /jobs-queue-worker-1:/)
-  assert.doesNotMatch(compose, /jobs-queue-worker-2:/)
 })
 
 test('application state no longer requires a Redis runtime', () => {
@@ -53,10 +71,8 @@ test('application state no longer requires a Redis runtime', () => {
   assert.doesNotMatch(compose, /REDIS_PORT:/)
   assert.doesNotMatch(envExample, /^REDIS_/m)
 
-  // Nitro itself currently brings ioredis transitively for optional storage
-  // drivers. Personal-Site must not depend on it directly; removing Nitro's
-  // transitive package would require replacing/patching Nuxt rather than
-  // removing our Redis runtime.
+  // Nitro can bring ioredis transitively for optional storage drivers; this
+  // application must not depend on it directly or run a Redis service.
   assert.equal(packageJson.dependencies?.ioredis, undefined)
   assert.equal(packageLock.packages?.['']?.dependencies?.ioredis, undefined)
 

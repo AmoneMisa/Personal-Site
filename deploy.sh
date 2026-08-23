@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Unified deployment for the public Nuxt frontend, internal jobs runtime,
-# FastAPI tools backend and queue workers.
+# Unified deployment for Nuxt (UI + lightweight API), the direct jobs worker
+# and the site's existing auxiliary services.
 set -euo pipefail
 
 cd "$(dirname "$0")"
@@ -29,25 +29,22 @@ target="${1:-all}"
 
 case "$target" in
   all)
-    # Every image is pre-built in GitHub Actions and published to GHCR. Nothing
-    # is built here: this server cannot reach Docker Hub, and keeping builds out
-    # of production also avoids competing with the running application.
     "${compose[@]}" pull
-    # Remove services retired from compose so stale containers cannot keep
-    # consuming resources indefinitely.
+    # Remove retired jobs-backend / jobs-api / Python queue containers automatically.
     "${compose[@]}" up -d --no-build --remove-orphans
     ;;
   frontend)
-    # Frontend and jobs-backend use the same application image. Refresh the queue
-    # image too because workers now talk only to jobs-backend, never to frontend.
-    "${compose[@]}" pull frontend jobs-backend job-browser-fetcher jobs-queue-dispatcher jobs-queue-worker-1
-    "${compose[@]}" up -d --no-build job-browser-fetcher jobs-backend jobs-queue-dispatcher jobs-queue-worker-1 frontend
+    # Nuxt serves both the UI/SSR and lightweight jobs/hiring API routes.
+    "${compose[@]}" pull frontend
+    "${compose[@]}" up -d --no-build frontend
     ;;
   jobs)
-    "${compose[@]}" pull jobs-backend job-browser-fetcher jobs-queue-dispatcher jobs-queue-worker-1
-    "${compose[@]}" up -d --no-build job-browser-fetcher jobs-backend jobs-queue-dispatcher jobs-queue-worker-1
+    # API changes are part of the Nuxt image; execution is the separate worker.
+    "${compose[@]}" pull frontend jobs-worker job-browser-fetcher
+    "${compose[@]}" up -d --no-build job-browser-fetcher frontend jobs-worker
     ;;
   backend)
+    # Existing auxiliary FastAPI service; unrelated to jobs/hiring ingestion.
     "${compose[@]}" pull backend
     "${compose[@]}" up -d --no-build backend
     ;;
@@ -59,12 +56,12 @@ esac
 
 "${compose[@]}" ps
 
-if [ "$target" = "all" ] || [ "$target" = "frontend" ]; then
+if [ "$target" = "all" ] || [ "$target" = "frontend" ] || [ "$target" = "jobs" ]; then
   curl --fail --silent --show-error --retry 20 --retry-all-errors --retry-delay 3 \
     http://127.0.0.1:8080/ >/dev/null
   curl --fail --silent --show-error --retry 20 --retry-all-errors --retry-delay 3 \
     http://127.0.0.1:8080/jobs >/dev/null
   curl --fail --silent --show-error --retry 20 --retry-all-errors --retry-delay 3 \
     http://127.0.0.1:8080/hiring >/dev/null
-  echo "Personal Site frontend is healthy."
+  echo "Personal Site Nuxt runtime is healthy."
 fi
