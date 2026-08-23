@@ -109,6 +109,9 @@ const sourceOptions = [
   { value: "ishgo", label: "ishGO.uz" },
   { value: "telegram", label: "Telegram" },
   { value: "olx", label: "OLX" },
+  { value: "linkedin", label: "LinkedIn" },
+  { value: "facebook", label: "Facebook" },
+  { value: "threads", label: "Threads" },
 ];
 
 // CIS-focused country list (RU/BY excluded by the backend). "Remote" is NOT a
