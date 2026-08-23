@@ -18,7 +18,13 @@ const searchKind = computed(() => {
 })
 
 const normalizedPath = computed(() => route.path.replace(/^\/(?:ru|en|kk)(?=\/)/, ''))
-const canScrollToFilters = computed(() => normalizedPath.value === '/flat-finder')
+const filterSelector = computed(() => {
+  if (normalizedPath.value === '/flat-finder') return '.flats__controls_redesign'
+  if (normalizedPath.value === '/jobs') return '.jobs__controls'
+  if (normalizedPath.value === '/hiring') return '.hiring__controls'
+  return ''
+})
+const canScrollToFilters = computed(() => !!filterSelector.value)
 
 watch(
   () => [route.path, route.query._tgEdit] as const,
@@ -38,8 +44,8 @@ watch(
 )
 
 function filtersElement(): HTMLElement | null {
-  if (!import.meta.client || !canScrollToFilters.value) return null
-  return document.querySelector<HTMLElement>('.flats__controls_redesign')
+  if (!import.meta.client || !filterSelector.value) return null
+  return document.querySelector<HTMLElement>(filterSelector.value)
 }
 
 function updateBackToFilters() {
@@ -54,7 +60,8 @@ function updateBackToFilters() {
 function scrollToFilters() {
   const filters = filtersElement()
   if (!filters) return
-  filters.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  const top = window.scrollY + filters.getBoundingClientRect().top - 84
+  window.scrollTo({ top: Math.max(0, top), behavior: 'smooth' })
 }
 
 onMounted(async () => {
@@ -158,6 +165,23 @@ async function subscribe() {
 <style scoped>
 :global(.flats__back-top) {
   display: none !important;
+}
+
+/* ATS adds a score badge to the same row as four card actions. Keeping all of
+   that beside the title squeezed long vacancy names into a very narrow column.
+   Give ATS cards a full-width title row, then put score + actions underneath. */
+:global(.job-card__head:has(.job-card__ats)) {
+  grid-template-columns: minmax(0, 1fr);
+  align-items: start;
+}
+
+:global(.job-card__head:has(.job-card__ats) .job-card__actions) {
+  width: 100%;
+  justify-self: stretch;
+}
+
+:global(.job-card__head:has(.job-card__ats) .job-card__ats) {
+  margin-right: auto;
 }
 
 .search-actions {
