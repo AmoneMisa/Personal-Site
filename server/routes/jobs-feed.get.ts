@@ -160,45 +160,52 @@ export default defineEventHandler(async (event) => {
     ? pool.filter((job) => searchMatches!.rank.has(jobSearchKey(job)))
     : pool
 
-  // For USA the old boolean was far too strict: `unknown` was effectively
-  // treated as `false`, collapsing thousands of roles to a few dozen. When the
-  // user asks for foreigner-friendly US jobs, keep unknown + sponsor-history
-  // roles and remove only explicit sponsorship refusals. The regular boolean
-  // filter stays unchanged for every other country.
+  // USA uses evidence-based sponsorship classification instead of the legacy
+  // boolean. Keep explicit/verified/historical sponsor evidence and reject
+  // unknown or explicitly negative sponsorship cases.
   const searchPool = usaBroadForeignerFilter
     ? matchedPool.filter(keepUsaForeignerCandidate)
     : matchedPool
 
   setResponseHeader(event, 'Cache-Control', 'private, max-age=30')
 
+  const result = filterAndPaginate(searchPool, {
+    q: searchMatches ? '' : search,
+    location: String(q.location ?? '').trim(),
+    remote,
+    sources: finalSources,
+    sort,
+    maxAgeDays: clampInt(q.maxAgeDays, 14, 1, 14),
+    salaryMin,
+    countries,
+    cities,
+    includeRu,
+    includeBy,
+    workMode,
+    relocation,
+    employmentKind,
+    hasSalary,
+    maxExperienceYears,
+    foreignerFriendly: usaBroadForeignerFilter ? undefined : foreignerFriendly,
+    hideRiskyIndustries,
+    noExperience,
+    language,
+    languageLevel,
+    excludeLanguages,
+    skills,
+    page: clampInt(q.page, 1, 1, 10000),
+    pageSize: clampInt(q.pageSize, 20, 1, 100),
+  })
+
+  // The USA foreigner filter is applied before aggregate.ts because it uses a
+  // richer sponsorship classifier than the legacy `job.foreignerFriendly` flag.
+  // Therefore every vacancy remaining in `result` is foreigner/sponsor-friendly
+  // by the exact predicate used for this request. Keep the statistics consistent
+  // with the visible filtered set instead of counting only the legacy flag.
+  if (usaBroadForeignerFilter) result.stats.foreignerFriendly = result.total
+
   return {
-    ...filterAndPaginate(searchPool, {
-      q: searchMatches ? '' : search,
-      location: String(q.location ?? '').trim(),
-      remote,
-      sources: finalSources,
-      sort,
-      maxAgeDays: clampInt(q.maxAgeDays, 14, 1, 14),
-      salaryMin,
-      countries,
-      cities,
-      includeRu,
-      includeBy,
-      workMode,
-      relocation,
-      employmentKind,
-      hasSalary,
-      maxExperienceYears,
-      foreignerFriendly: usaBroadForeignerFilter ? undefined : foreignerFriendly,
-      hideRiskyIndustries,
-      noExperience,
-      language,
-      languageLevel,
-      excludeLanguages,
-      skills,
-      page: clampInt(q.page, 1, 1, 10000),
-      pageSize: clampInt(q.pageSize, 20, 1, 100),
-    }),
+    ...result,
     rates: getRates(),
     warming: false,
     loadedSources: [...new Set(pool.map((job) => job.source))],
