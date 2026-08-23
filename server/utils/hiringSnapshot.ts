@@ -5,9 +5,9 @@ import type { CvProfile } from './hiringTypes'
 const STORE_KEY = 'hiring:store:v4'
 const MEMORY_TTL_MS = 60_000
 
-// Keep in sync with the derivation version stamped by hiringStore. The API only
-// reads this marker; the worker owns normalization/repair and writes it.
-export const DERIVED_VERSION = 'd18'
+// Keep in sync with the derivation version stamped by hiringStore. The Nuxt API
+// only reads this marker; the worker owns normalization/repair and writes it.
+export const HIRING_SNAPSHOT_DERIVED_VERSION = 'd18'
 
 type StoredProfile = CvProfile & {
   lastSeen?: string
@@ -26,7 +26,7 @@ function publicProfiles(list: StoredProfile[]): CvProfile[] {
 }
 
 /**
- * Read-only candidate snapshot used by jobs-api.
+ * Read-only candidate snapshot used by the Nuxt jobs/hiring API.
  *
  * No Telegram/web source adapters, AI scheduling, write locks or refresh logic
  * are imported here. If the file snapshot is cold, Postgres is used strictly as
