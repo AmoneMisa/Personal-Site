@@ -1,4 +1,4 @@
-import { useRedis } from './redis'
+import { useStateStore } from './stateStore'
 import type { Job } from './jobTypes'
 
 const STORE_KEY = 'jobs:store:v4'
@@ -27,7 +27,7 @@ export async function getStoredJobsSnapshot(): Promise<Job[]> {
   if (Date.now() < memoryValidUntil) return memoryStore
 
   try {
-    const raw = await useRedis().get(STORE_KEY)
+    const raw = await useStateStore().get(STORE_KEY)
     if (raw) {
       memoryStore = publicJobs(JSON.parse(raw) as StoredJob[])
       memoryValidUntil = Date.now() + MEMORY_TTL_MS
