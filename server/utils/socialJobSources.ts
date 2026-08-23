@@ -13,6 +13,7 @@ type Target = {
   platform: Platform
   country: string
   city?: string
+  region?: string
   target?: string
   query?: string
   limit?: number
@@ -85,6 +86,7 @@ function regionalThreadsTargets(): Target[] {
     platform: 'threads' as const,
     country: target.country,
     city: target.city,
+    region: target.region,
     query: target.query,
     limit: 30,
   }))
@@ -144,11 +146,13 @@ function toJob(item: SocialItem, target: Target): Job | null {
     || (target.platform === 'facebook' ? 'Facebook' : 'Threads')
   const location = target.city
     ? `${target.city}, ${target.country}`
-    : target.country === 'REMOTE'
-      ? 'Remote / Worldwide'
-      : target.country === 'US'
-        ? 'United States / Relocation'
-        : target.country
+    : target.region
+      ? `${target.region}, ${target.country}`
+      : target.country === 'REMOTE'
+        ? 'Remote / Worldwide'
+        : target.country === 'US'
+          ? 'United States / Relocation'
+          : target.country
 
   const tags = [target.platform === 'facebook' ? 'Facebook' : 'Threads', target.country, target.key]
   if (VISA_RE.test(text)) tags.push('Visa sponsorship')
