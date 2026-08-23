@@ -58,6 +58,10 @@ function forwardedHeaders(input: FetchInput, init?: FetchInit) {
 }
 
 export default defineNitroPlugin(() => {
+  // Never patch global fetch in the public renderer. Browser impersonation is a
+  // jobs/hiring ingestion concern and belongs only to the isolated jobs runtime.
+  if (String(process.env.JOBS_EXECUTION_ENABLED || 'off').toLowerCase() !== 'on') return
+
   const endpoint = (process.env.JOB_BROWSER_FETCHER_URL || '').trim().replace(/\/+$/, '')
   if (!endpoint) return
 
