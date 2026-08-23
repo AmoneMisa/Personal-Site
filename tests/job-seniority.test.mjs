@@ -4,7 +4,7 @@ import test from 'node:test'
 import {
   detectDetailedJobSeniority,
   normalizeJobSeniority,
-} from '../server/utils/jobSeniority.ts'
+} from '../shared/jobs/jobSeniority.ts'
 
 test('keeps principal, staff and lead as distinct levels', () => {
   assert.equal(detectDetailedJobSeniority('Principal Software Engineer'), 'principal')
