@@ -1,4 +1,4 @@
-export { refreshHiringChannel } from '../sources/telegramRefresh'
+export { refreshHiringChannel } from './refreshTelegramChannel'
 export { refreshHiringWebSource } from '../sources/webCvRefresh'
 export { refreshHiringIshBorSource } from '../sources/ishBorRefresh'
 export { refreshHiringSecondaryWebSource } from '../sources/secondaryWebRefresh'
