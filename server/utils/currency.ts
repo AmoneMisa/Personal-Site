@@ -124,7 +124,11 @@ export function convertCurrency(
   return Math.round((amount * fromRate) / toRate)
 }
 
-/** Populate memory from the Redis cache once (fast path for the request handler). */
+/**
+ * Populate memory from the shared Redis cache. If the cache is missing or was
+ * written by an older build that omitted a required currency (notably RUB),
+ * refresh it from the live API once instead of inventing a local rate.
+ */
 export async function loadRates(): Promise<void> {
   if (memLoaded) return
   try {
@@ -132,10 +136,17 @@ export async function loadRates(): Promise<void> {
     if (raw) {
       memRates = { ...FALLBACK_USD_RATES, ...sanitizeUsdPerUnit(JSON.parse(raw)) }
       memLoaded = true
+      if (memRates.RUB) return
     }
   } catch {
-    /* redis down — keep the fallback table */
+    /* Redis down — try the live provider below. */
   }
+
+  await refreshRates()
+  // Avoid hitting external providers on every request during an outage. The
+  // scheduled jobs refresh will retry later; until then existing fallback rates
+  // remain available for currencies that have one.
+  if (!memLoaded) memLoaded = true
 }
 
 /**
