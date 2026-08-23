@@ -5,7 +5,7 @@ import time
 import urllib.error
 import urllib.request
 
-FRONTEND_URL = os.environ.get("JOBS_FRONTEND_URL", "http://frontend:3000").rstrip("/")
+BACKEND_URL = os.environ.get("JOBS_BACKEND_URL", "http://jobs-backend:3000").rstrip("/")
 QUEUE_INTERNAL_KEY = os.environ.get("QUEUE_INTERNAL_KEY", "")
 MODE = os.environ.get("QUEUE_MODE", "worker").strip().lower()
 DISPATCH_TICK_SECONDS = max(5, int(os.environ.get("QUEUE_DISPATCH_TICK_SECONDS", "10")))
@@ -15,7 +15,7 @@ EXECUTE_TIMEOUT_SECONDS = max(60, int(os.environ.get("QUEUE_EXECUTE_TIMEOUT_SECO
 WORKER_ID = os.environ.get("QUEUE_WORKER_ID") or f"{socket.gethostname()}:jobs"
 
 
-def frontend_request(path, payload=None, method="POST", timeout=30):
+def backend_request(path, payload=None, method="POST", timeout=30):
     if len(QUEUE_INTERNAL_KEY) < 16:
         raise RuntimeError("QUEUE_INTERNAL_KEY must be at least 16 characters")
 
@@ -29,7 +29,7 @@ def frontend_request(path, payload=None, method="POST", timeout=30):
         headers["Content-Type"] = "application/json"
 
     request = urllib.request.Request(
-        f"{FRONTEND_URL}{path}",
+        f"{BACKEND_URL}{path}",
         method=method,
         data=data,
         headers=headers,
@@ -49,10 +49,10 @@ def frontend_request(path, payload=None, method="POST", timeout=30):
 
 
 def dispatch_forever():
-    print("[jobs:queue:dispatcher] using PostgreSQL queue via frontend", flush=True)
+    print("[jobs:queue:dispatcher] using PostgreSQL queue via jobs-backend", flush=True)
     while True:
         try:
-            result = frontend_request(
+            result = backend_request(
                 "/internal/jobs-queue-dispatch",
                 payload={},
                 timeout=180,
@@ -81,7 +81,7 @@ def execute_task(payload):
         source = str(payload.get("source") or "")
         if not source:
             raise ValueError("jobs task has no source")
-        return frontend_request(
+        return backend_request(
             "/internal/jobs-refresh-source",
             {"source": source},
             timeout=EXECUTE_TIMEOUT_SECONDS,
@@ -91,7 +91,7 @@ def execute_task(payload):
         handle = str(payload.get("handle") or "")
         if not handle:
             raise ValueError("hiring task has no handle")
-        return frontend_request(
+        return backend_request(
             "/internal/hiring-refresh-channel",
             {"handle": handle},
             timeout=EXECUTE_TIMEOUT_SECONDS,
@@ -107,7 +107,7 @@ def describe(payload):
 
 
 def fail_task(task_id, lock_token, exc):
-    return frontend_request(
+    return backend_request(
         "/internal/jobs-queue-fail",
         {
             "id": task_id,
@@ -127,7 +127,7 @@ def process_claim(task):
 
     try:
         result = execute_task(payload)
-        completion = frontend_request(
+        completion = backend_request(
             "/internal/jobs-queue-complete",
             {
                 "id": task_id,
@@ -163,7 +163,7 @@ def worker_forever():
     print(f"[jobs:queue:worker] polling PostgreSQL queue worker={WORKER_ID}", flush=True)
     while True:
         try:
-            response = frontend_request(
+            response = backend_request(
                 "/internal/jobs-queue-claim",
                 {"workerId": WORKER_ID},
                 timeout=30,
