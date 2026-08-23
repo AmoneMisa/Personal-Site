@@ -1,11 +1,11 @@
-export * from './hiringCandidatePresentationLegacy'
+export * from '../hiring/legacy/hiringCandidatePresentationCore'
 
 import type { CvProfile } from './hiringTypes'
 import {
   publicCandidateLanguages as legacyLanguages,
   publicCandidateProfessionKeys as legacyProfessionKeys,
   type HiringCandidateLocale,
-} from './hiringCandidatePresentationLegacy'
+} from '../hiring/legacy/hiringCandidatePresentationCore'
 
 const STANDALONE_REMOTE_ROLE_RE = /^(?:онлайн|onlayn|online)$/iu
 
@@ -36,38 +36,40 @@ const LEVELS = [
   { ru: 'базовый', en: 'basic', re: /базов\p{L}*|basic|boshlang['’ʻʼ‘`]?ich/giu },
 ] as const
 
-function nearestLanguageLevel(text: string, languageIndex: number, locale: HiringCandidateLocale): string | null {
-  const start = Math.max(0, languageIndex - 60)
-  const end = Math.min(text.length, languageIndex + 80)
-  const local = text.slice(start, end)
-  const target = languageIndex - start
+function nearestLevelIn(text: string, target: number, locale: HiringCandidateLocale) {
   const candidates: Array<{ distance: number; value: string }> = []
-
-  for (const match of local.matchAll(/(?:^|[^A-Z])(A1|A2|B1|B2|C1|C2)(?=$|[^A-Z])/gi)) {
+  for (const match of text.matchAll(/(?:^|[^A-Z])(A1|A2|B1|B2|C1|C2)(?=$|[^A-Z])/gi)) {
     const index = (match.index || 0) + match[0].indexOf(match[1]!)
     candidates.push({ distance: Math.abs(index - target), value: match[1]!.toUpperCase() })
   }
   for (const level of LEVELS) {
     level.re.lastIndex = 0
-    for (const match of local.matchAll(level.re)) {
+    for (const match of text.matchAll(level.re)) {
       candidates.push({
         distance: Math.abs((match.index || 0) - target),
         value: locale === 'en' ? level.en : level.ru,
       })
     }
   }
-
   candidates.sort((a, b) => a.distance - b.distance)
   return candidates[0]?.value || null
+}
+
+function nearestLanguageLevel(text: string, languageIndex: number, locale: HiringCandidateLocale): string | null {
+  const beforeStart = Math.max(0, languageIndex - 40)
+  const before = text.slice(beforeStart, languageIndex)
+  const beforeLevel = nearestLevelIn(before, before.length, locale)
+  if (beforeLevel) return beforeLevel
+
+  const after = text.slice(languageIndex, Math.min(text.length, languageIndex + 55))
+  return nearestLevelIn(after, 0, locale)
 }
 
 export function publicCandidateLanguages(profile: CvProfile, locale: HiringCandidateLocale): string[] {
   const text = profile.originalText || profile.description || ''
   if (!text) return legacyLanguages(profile, locale)
 
-  const legacy = legacyLanguages(profile, locale)
-  const out = new Set<string>(legacy)
-
+  const out = new Set<string>(legacyLanguages(profile, locale))
   for (const language of LANGUAGES) {
     language.re.lastIndex = 0
     const match = language.re.exec(text)
@@ -79,6 +81,5 @@ export function publicCandidateLanguages(profile: CvProfile, locale: HiringCandi
     const level = nearestLanguageLevel(text, match.index, locale)
     out.add(level ? `${label} — ${level}` : label)
   }
-
   return [...out]
 }
