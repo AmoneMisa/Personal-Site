@@ -37,6 +37,17 @@ const SOURCE_TIMEOUT_MS = 30_000
 // pages, regional boards and aviation sources all run as isolated sub-loaders.
 // Give that fan-out room to finish while keeping one source refresh bounded.
 const COMPANIES_SOURCE_TIMEOUT_MS = 150_000
+// Regional LinkedIn pagination and serialized Threads searches intentionally do
+// more work than ordinary API/RSS sources. Keep them below the queue worker's
+// execution budget, but do not abort them at the generic 30-second ceiling.
+const LINKEDIN_SOURCE_TIMEOUT_MS = Math.max(
+  60_000,
+  Math.min(170_000, Number(process.env.LINKEDIN_SOURCE_TIMEOUT_MS) || 150_000),
+)
+const SOCIAL_SOURCE_TIMEOUT_MS = Math.max(
+  60_000,
+  Math.min(170_000, Number(process.env.SOCIAL_JOB_SOURCE_TIMEOUT_MS) || 150_000),
+)
 
 type StoredJob = Job & {
   lastSeen: string
@@ -202,9 +213,16 @@ function prune(list: StoredJob[], now: number): StoredJob[] {
   })
 }
 
+function sourceTimeoutMs(source: JobSource): number {
+  if (source === 'companies') return COMPANIES_SOURCE_TIMEOUT_MS
+  if (source === 'linkedin') return LINKEDIN_SOURCE_TIMEOUT_MS
+  if (source === 'facebook' || source === 'threads') return SOCIAL_SOURCE_TIMEOUT_MS
+  return SOURCE_TIMEOUT_MS
+}
+
 async function fetchSource(source: JobSource): Promise<Job[]> {
   let timer: ReturnType<typeof setTimeout> | undefined
-  const timeoutMs = source === 'companies' ? COMPANIES_SOURCE_TIMEOUT_MS : SOURCE_TIMEOUT_MS
+  const timeoutMs = sourceTimeoutMs(source)
 
   try {
     return await Promise.race([
