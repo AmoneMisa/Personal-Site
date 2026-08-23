@@ -48,7 +48,7 @@ function parseCareerist(block: CandidateBlock, source: WebCvAdapter): CvProfile 
   })
 }
 
-const CAREERIST_SOURCE: WebCvAdapter = {
+export const CAREERIST_SOURCE: WebCvAdapter = {
   key: 'careerist-uz',
   label: 'Careerist UZ',
   country: 'UZ',
