@@ -1,4 +1,4 @@
-import { redisReady, useRedis } from '~~/server/utils/redis'
+import { stateStoreReady, useStateStore } from '~~/server/utils/stateStore'
 import { hiringDbEnabled, loadDbCandidates } from './hiringDb'
 import type { CvProfile } from './hiringTypes'
 
@@ -47,18 +47,15 @@ async function withTimeout<T>(operation: Promise<T>, fallback: T, ms: number): P
 export async function getStoredWebCvProfiles(): Promise<CvProfile[]> {
   let stored: StoredProfile[] = []
   try {
-    // On the first request after a restart the socket may still be
-    // connecting, and with the offline queue disabled that reads as a hard
-    // failure rather than as "not yet".
-    await redisReady()
-    const raw = await useRedis().get(STORE_KEY)
+    await stateStoreReady()
+    const raw = await useStateStore().get(STORE_KEY)
     if (raw) stored = JSON.parse(raw) as StoredProfile[]
   } catch (error) {
     console.warn('[hiring:web] store read failed:', (error as Error).message)
   }
 
   let web = stored.filter(active)
-  // A racing Telegram writer could previously leave a healthy Redis snapshot
+  // A racing Telegram writer could previously leave a healthy snapshot
   // containing only Telegram rows. Treat "no web rows" as a web-cache miss and
   // recover the durable board profiles instead of returning a false zero.
   if (!web.length && hiringDbEnabled()) {
