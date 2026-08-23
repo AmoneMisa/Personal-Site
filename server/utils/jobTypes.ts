@@ -8,7 +8,7 @@ import type { RiskCategory } from './suspicious'
 export type WorkMode = 'remote' | 'hybrid' | 'office' | 'unknown'
 export type Relocation = 'offered' | 'none' | 'unknown'
 export type SalaryPeriod = 'hour' | 'month' | 'year'
-export type Seniority = 'junior' | 'middle' | 'senior' | 'lead'
+export type Seniority = 'intern' | 'junior' | 'middle' | 'senior' | 'staff' | 'principal' | 'lead'
 export type EmployerType = 'direct' | 'agency' | 'board' | 'telegram'
 export type SponsorshipConfidence = 'explicit' | 'verified' | 'historical'
 // Normalized employment type. "project"/freelance/B2B collapse into 'contract'.

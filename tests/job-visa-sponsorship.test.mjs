@@ -32,6 +32,15 @@ test('explicit negative wording wins over sponsor history', () => {
   assert.equal(keepUsaForeignerCandidate(posting), false)
 })
 
+test('legal wording that may not support future H-1B sponsorship is negative', () => {
+  const posting = job({
+    description: 'For US based roles only, the Company may not be able to employ candidates for this role who have United States work authorization related to certain U.S. visa categories, or support future H-1B sponsorship at this time.',
+    sponsorshipConfidence: 'historical',
+  })
+  assert.equal(visaSponsorshipStatus(posting), 'not_offered')
+  assert.equal(keepUsaForeignerCandidate(posting), false)
+})
+
 test('generic work authorization alone remains unknown and is not included', () => {
   const posting = job({ description: 'Candidates must be legally authorized to work in the United States.' })
   assert.equal(visaSponsorshipStatus(posting), 'unknown')
