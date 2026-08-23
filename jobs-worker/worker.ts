@@ -13,7 +13,7 @@ import {
 import { hiringUzJobsSourceHandles, refreshHiringUzJobsSource } from '../server/utils/hiringUzJobsSource'
 import { hiringSocialSourceHandles, refreshHiringSocialSource } from '../server/utils/hiringSocialSources'
 import { hiringLinkedInSourceHandles, refreshHiringLinkedInSource } from '../server/utils/hiringLinkedInSources'
-import { loadCursors, loadWebCursors } from '../server/utils/hiringCursors'
+import { loadCursors, loadWebCursors } from '../shared/hiring/hiringCursors'
 import {
   claimJobsQueueTask,
   completeJobsQueueTask,
@@ -321,8 +321,6 @@ async function main() {
     throw new Error('JOBS_QUEUE_DATABASE_URL or HIRING_DATABASE_URL is required')
   }
 
-  // Match the old Nitro ingestion runtime: browser fallback wraps native fetch,
-  // then source overrides wrap that result.
   installJobBrowserFallback()
   installJobSourceOverrides()
 
