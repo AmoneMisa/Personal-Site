@@ -2,17 +2,6 @@ import { hostname } from 'node:os'
 
 import { looksSoftBlocked } from '../shared/http/browserSoftBlock'
 import { configuredJobSources, refreshJobSource } from '../server/utils/jobsSourceRefresh'
-import { hiringChannelHandles } from '../server/utils/hiringSources'
-import { refreshHiringChannel } from '../server/utils/hiringStore'
-import { hiringWebSourceHandles, refreshHiringWebSource } from '../server/utils/hiringWebSources'
-import { hiringIshBorSourceHandles, refreshHiringIshBorSource } from '../server/utils/hiringIshBorSource'
-import {
-  hiringSecondaryWebSourceHandles,
-  refreshHiringSecondaryWebSource,
-} from '../server/utils/hiringSecondaryWebSources'
-import { hiringUzJobsSourceHandles, refreshHiringUzJobsSource } from '../server/utils/hiringUzJobsSource'
-import { hiringSocialSourceHandles, refreshHiringSocialSource } from '../server/utils/hiringSocialSources'
-import { hiringLinkedInSourceHandles, refreshHiringLinkedInSource } from '../server/utils/hiringLinkedInSources'
 import { loadCursors, loadWebCursors } from '../shared/hiring/hiringCursors'
 import {
   claimJobsQueueTask,
@@ -22,6 +11,7 @@ import {
   jobsQueueDbEnabled,
   pruneJobsQueueHistory,
 } from '../shared/jobs/jobsPgQueue'
+import { allHiringTargets, refreshHiringTarget } from './hiringRuntime'
 
 const POLL_MS = Math.max(250, Number(process.env.JOBS_QUEUE_POLL_MS) || Number(process.env.JOBS_QUEUE_POLL_SECONDS || 1) * 1000)
 const ERROR_RETRY_MS = Math.max(1_000, Number(process.env.JOBS_QUEUE_ERROR_RETRY_MS) || 5_000)
@@ -181,23 +171,6 @@ function installJobBrowserFallback() {
   }) as typeof globalThis.fetch
 }
 
-function allHiringTargets() {
-  const telegramHandles = hiringChannelHandles()
-  const progressiveWebHandles = [
-    ...hiringWebSourceHandles(),
-    ...hiringIshBorSourceHandles(),
-    ...hiringUzJobsSourceHandles(),
-  ]
-  const hiringHandles = [
-    ...telegramHandles,
-    ...progressiveWebHandles,
-    ...hiringSecondaryWebSourceHandles(),
-    ...hiringSocialSourceHandles(),
-    ...hiringLinkedInSourceHandles(),
-  ]
-  return { telegramHandles, progressiveWebHandles, hiringHandles }
-}
-
 async function dispatchDueTasks() {
   const { telegramHandles, progressiveWebHandles, hiringHandles } = allHiringTargets()
   const [telegramCursors, webCursors] = await Promise.all([loadCursors(), loadWebCursors()])
@@ -225,39 +198,6 @@ async function dispatchDueTasks() {
       `[jobs:worker] queued jobs=${result.jobsQueued} hiring=${result.hiringQueued} backfill=${result.backfillQueued}`,
     )
   }
-}
-
-async function refreshHiringTarget(rawHandle: string) {
-  const handle = String(rawHandle || '').replace(/^@/, '')
-  const lower = handle.toLowerCase()
-  const knownTelegram = hiringChannelHandles().some((item) => item.toLowerCase() === lower)
-  const knownWeb = hiringWebSourceHandles().some((item) => item.toLowerCase() === lower)
-  const knownIshBor = hiringIshBorSourceHandles().some((item) => item.toLowerCase() === lower)
-  const knownUzJobs = hiringUzJobsSourceHandles().some((item) => item.toLowerCase() === lower)
-  const knownSecondaryWeb = hiringSecondaryWebSourceHandles().some((item) => item.toLowerCase() === lower)
-  const knownSocial = hiringSocialSourceHandles().some((item) => item.toLowerCase() === lower)
-  const knownLinkedIn = hiringLinkedInSourceHandles().some((item) => item.toLowerCase() === lower)
-
-  if (!handle || (!knownTelegram && !knownWeb && !knownIshBor && !knownUzJobs && !knownSecondaryWeb && !knownSocial && !knownLinkedIn)) {
-    throw new Error(`Unknown hiring source: ${handle || '<empty>'}`)
-  }
-
-  const result = knownLinkedIn
-    ? await refreshHiringLinkedInSource(handle)
-    : knownSocial
-      ? await refreshHiringSocialSource(handle)
-      : knownIshBor
-        ? await refreshHiringIshBorSource(handle)
-        : knownUzJobs
-          ? await refreshHiringUzJobsSource(handle)
-          : knownSecondaryWeb
-            ? await refreshHiringSecondaryWebSource(handle)
-            : knownWeb
-              ? await refreshHiringWebSource(handle)
-              : await refreshHiringChannel(handle)
-
-  if (!result) throw new Error(`Hiring source is disabled: ${handle}`)
-  return { handle, ...result }
 }
 
 async function executeTask(task: Awaited<ReturnType<typeof claimJobsQueueTask>>) {
