@@ -6,9 +6,10 @@ import {
   hiringSecondaryWebSourceHandles,
   refreshHiringSecondaryWebSource,
 } from '../server/utils/hiringSecondaryWebSources'
-import { hiringUzJobsSourceHandles, refreshHiringUzJobsSource } from '../server/utils/hiringUzJobsSource'
+import { refreshHiringUzJobsSource } from '../server/utils/hiringUzJobsSource'
 import { hiringSocialSourceHandles, refreshHiringSocialSource } from '../server/utils/hiringSocialSources'
 import { hiringLinkedInSourceHandles, refreshHiringLinkedInSource } from '../server/utils/hiringLinkedInSources'
+import { hiringUzJobsSourceHandles } from '../shared/hiring/sources/uzJobsSource'
 
 type HiringAdapter = {
   handles: () => string[]
