@@ -9,7 +9,7 @@ from pathlib import Path
 
 import httpx
 
-from ..utils.redis_client import get_redis
+from ..utils.state_store import get_state_store
 
 router = APIRouter(prefix="/indices", tags=["Indices"])
 TTL_SECONDS = 60 * 60 * 24 * 30  # 30 days
@@ -357,13 +357,13 @@ def normalize_us_state_from_acs(extracted: Dict[str, Optional[float]]) -> Normal
 
 
 # -------------------------------------------------
-# Core builder with Redis cache
+# Core builder with persistent state cache
 # -------------------------------------------------
 async def build_bundle(key: str, include_raw: bool) -> BundleDTO:
-    redis = get_redis()
+    store = get_state_store()
     cache_key = f"indices:bundle:{key}:raw={1 if include_raw else 0}"
 
-    cached = await redis.get(cache_key)
+    cached = await store.get(cache_key)
     if cached:
         return BundleDTO.model_validate_json(cached)
 
@@ -439,7 +439,7 @@ async def build_bundle(key: str, include_raw: bool) -> BundleDTO:
                 raw=raw_out if include_raw else {}
             )
 
-            await redis.set(cache_key, bundle.model_dump_json(), ex=TTL_SECONDS)
+            await store.set(cache_key, bundle.model_dump_json(), ex=TTL_SECONDS)
             return bundle
 
         # ---- WORLD BANK (countries) ----
@@ -479,7 +479,7 @@ async def build_bundle(key: str, include_raw: bool) -> BundleDTO:
         raw=raw_out if include_raw else {}
     )
 
-    await redis.set(cache_key, bundle.model_dump_json(), ex=TTL_SECONDS)
+    await store.set(cache_key, bundle.model_dump_json(), ex=TTL_SECONDS)
     return bundle
 
 
