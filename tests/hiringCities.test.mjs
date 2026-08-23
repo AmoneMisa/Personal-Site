@@ -18,7 +18,7 @@ test('Telegram posts written in Cyrillic resolve a city and a district', () => {
 })
 
 test('city names are matched through their case endings, but not into other words', async () => {
-  const { cityFrom } = await import('../server/utils/hiringWebFields.ts')
+  const { cityFrom } = await import('../shared/hiring/webFields.ts')
 
   // Place names are almost never written in the nominative in running text.
   assert.equal(cityFrom('живу в Ташкенте', 'UZ'), 'Tashkent')
