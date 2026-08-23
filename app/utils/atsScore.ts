@@ -1,9 +1,9 @@
-export * from '~~/shared/legacy/atsScoreCore'
+export * from '../../shared/legacy/atsScoreCore'
 
 import {
   scoreJob as legacyScoreJob,
   type CvProfile,
-} from '~~/shared/legacy/atsScoreCore'
+} from '../../shared/legacy/atsScoreCore'
 
 type AtsJob = Parameters<typeof legacyScoreJob>[1]
 type AtsResult = ReturnType<typeof legacyScoreJob>
