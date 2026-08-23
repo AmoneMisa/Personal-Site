@@ -1,3 +1,16 @@
+/** Returns the likely start of a neighbouring Careerist card before its marker. */
+function neighbouringProfileStart(lines: string[], markerIndex: number): number {
+  // Typical fragments are either:
+  //   role, name, Город
+  // or role, salary, name, Город.
+  let start = Math.max(0, markerIndex - 2)
+  const maybeSalary = lines[markerIndex - 2] || ''
+  if (/\d[\d\s.,]*\s*(?:руб|₽|сум|so['’ʻʼ‘`]?m|UZS|USD|\$|тенге|₸)\b/iu.test(maybeSalary)) {
+    start = Math.max(0, markerIndex - 3)
+  }
+  return start
+}
+
 /** Removes listing pagination, appended neighbouring CVs and inline JavaScript. */
 export function trimCareeristProfileText(text: string): string {
   const lines = text.split('\n').map((line) => line.trim()).filter(Boolean)
@@ -28,14 +41,14 @@ export function trimCareeristProfileText(text: string): string {
     if (/^город$/iu.test(line)) {
       cityBlocks += 1
       if (cityBlocks > 1) {
-        nextProfileAt = Math.max(0, index - 2)
+        nextProfileAt = neighbouringProfileStart(sourceLines, index)
         break
       }
     }
     if (/^возраст$/iu.test(line)) {
       ageBlocks += 1
       if (ageBlocks > 1) {
-        nextProfileAt = Math.max(0, index - 2)
+        nextProfileAt = neighbouringProfileStart(sourceLines, index)
         break
       }
     }
