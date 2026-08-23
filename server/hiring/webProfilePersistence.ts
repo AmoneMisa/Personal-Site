@@ -3,7 +3,7 @@ import { useStateStore } from '~~/server/utils/stateStore'
 import type { CvProfile } from '../../shared/contracts/hiring'
 import type { SourceRun } from '../../shared/hiring/hiringDiagnostics'
 import { cutoffDate } from '../../shared/hiring/webFields'
-import { hiringDbEnabled, loadDbCandidates, saveDbCandidates } from '../utils/hiringDb'
+import { hiringDbEnabled, loadDbCandidates, saveDbCandidates } from './infrastructure/database'
 import { withHiringStoreLock } from './infrastructure/storeLock'
 
 const STORE_KEY = 'hiring:store:v4'
