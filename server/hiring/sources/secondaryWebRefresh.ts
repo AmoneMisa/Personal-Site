@@ -4,10 +4,14 @@ import {
   type SecondaryWebSourceKey,
 } from '../../../shared/hiring/sources/secondaryWebSources'
 import { hiringDbEnabled, saveDbCandidates } from '../../utils/hiringDb'
-import { crawlSecondaryWebSource } from '../../utils/hiringSecondaryWebSources'
+import { crawlSecondaryWebSource as crawlLegacySecondaryWebSource } from '../../utils/hiringSecondaryWebSources'
 import { persistWebProfiles } from '../webProfilePersistence'
+import { crawlNovaRobota } from './secondary/novaRobota'
 
-export { crawlSecondaryWebSource }
+export async function crawlSecondaryWebSource(key: string) {
+  if (key === 'novarobota-ua') return crawlNovaRobota()
+  return crawlLegacySecondaryWebSource(key)
+}
 
 export async function refreshHiringSecondaryWebSource(
   handle: string,
