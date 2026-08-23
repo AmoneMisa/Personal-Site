@@ -11,6 +11,14 @@ if [ ! -f db.env ]; then
 fi
 
 if [ -d .git ]; then
+  # docker-compose.yml is version-controlled deployment config. Legacy CI used
+  # to SCP-overwrite it before this pull, leaving the checkout dirty and making
+  # `git pull --ff-only` abort. Restore only this deployment-managed file; do not
+  # discard any unrelated local changes someone may be working on.
+  if ! git diff --quiet -- docker-compose.yml || ! git diff --cached --quiet -- docker-compose.yml; then
+    echo "Restoring deployment-managed docker-compose.yml before update..."
+    git restore --source=HEAD --staged --worktree -- docker-compose.yml
+  fi
   git pull --ff-only
 fi
 
