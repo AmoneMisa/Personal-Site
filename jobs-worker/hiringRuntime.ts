@@ -1,7 +1,7 @@
 import { hiringChannelHandles } from '../server/utils/hiringSources'
 import { refreshHiringChannel } from '../server/utils/hiringStore'
 import { hiringWebSourceHandles, refreshHiringWebSource } from '../server/utils/hiringWebSources'
-import { hiringIshBorSourceHandles, refreshHiringIshBorSource } from '../server/utils/hiringIshBorSource'
+import { refreshHiringIshBorSource } from '../server/utils/hiringIshBorSource'
 import {
   hiringSecondaryWebSourceHandles,
   refreshHiringSecondaryWebSource,
@@ -9,6 +9,7 @@ import {
 import { refreshHiringUzJobsSource } from '../server/utils/hiringUzJobsSource'
 import { hiringSocialSourceHandles, refreshHiringSocialSource } from '../server/utils/hiringSocialSources'
 import { hiringLinkedInSourceHandles, refreshHiringLinkedInSource } from '../server/utils/hiringLinkedInSources'
+import { hiringIshBorSourceHandles } from '../shared/hiring/sources/ishBorSource'
 import { hiringUzJobsSourceHandles } from '../shared/hiring/sources/uzJobsSource'
 
 type HiringAdapter = {
