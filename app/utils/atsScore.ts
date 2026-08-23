@@ -8,7 +8,11 @@ import {
 type AtsJob = Parameters<typeof legacyScoreJob>[1]
 type AtsResult = ReturnType<typeof legacyScoreJob>
 
-const LONG_FORM_NO_SPONSORSHIP_RE = /(?:\bmay\s+not\s+be\s+able\s+to\b[^.!?]{0,450}\b(?:sponsor|support|provide)\b[^.!?]{0,180}\bsponsorship\b|\b(?:will|can|may)\s+not\b[^.!?]{0,220}\b(?:sponsor|support|provide)\b[^.!?]{0,160}\bsponsorship\b|\bnot\s+(?:currently\s+)?(?:able\s+to\s+)?(?:sponsor|support|provide)\b[^.!?]{0,160}\bsponsorship\b)/i
+// Legal boilerplate often contains abbreviations such as "U.S." between the
+// negative modal and "support future H-1B sponsorship". Do not treat a period
+// inside that clause as a sentence boundary; line breaks/question/exclamation
+// marks remain hard boundaries.
+const LONG_FORM_NO_SPONSORSHIP_RE = /(?:\bmay\s+not\s+be\s+able\s+to\b[^\n!?]{0,450}\b(?:sponsor|support|provide)\b[^\n!?]{0,180}\bsponsorship\b|\b(?:will|can|may)\s+not\b[^\n!?]{0,220}\b(?:sponsor|support|provide)\b[^\n!?]{0,160}\bsponsorship\b|\bnot\s+(?:currently\s+)?(?:able\s+to\s+)?(?:sponsor|support|provide)\b[^\n!?]{0,160}\bsponsorship\b)/i
 
 function isUsRole(job: AtsJob): boolean {
   if (String(job.country || '').toUpperCase() === 'US') return true
