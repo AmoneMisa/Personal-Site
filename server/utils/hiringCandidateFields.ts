@@ -1,9 +1,36 @@
 import type { CandidateGender } from './hiringTypes'
 
-/** Reads only an explicitly stated gender; never guesses from the name. */
+const EXPLICIT_FEMALE_RE = /(?:^|[^\p{L}])(?:женщина|female|ayol)(?=$|[^\p{L}])/iu
+const EXPLICIT_MALE_RE = /(?:^|[^\p{L}])(?:мужчина|male|erkak)(?=$|[^\p{L}])/iu
+
+// High-confidence Central Asian patronymic markers. These are grammatical sex
+// markers in Uzbek names, not guesses from a first name.
+const FEMALE_LINEAGE_RE = /(?:^|[^\p{L}])qizi(?=$|[^\p{L}])/iu
+const MALE_LINEAGE_RE = /(?:^|[^\p{L}])o(?:['’ʻʼ‘`])g(?:['’ʻʼ‘`])li(?=$|[^\p{L}])/iu
+
+// Russian/Cyrillic surnames commonly used across the former USSR have distinct
+// masculine/feminine forms. Match capitalized surname-shaped tokens only so a
+// random prose word ending in -а/-я cannot classify the candidate.
+const FEMALE_SURNAME_RE = /(?:^|[^\p{L}])\p{Lu}[\p{Ll}ёЁ-]{2,}(?:ова|ева|ёва|ина|ына|ская|цкая|ая)(?=$|[^\p{L}])/u
+const MALE_SURNAME_RE = /(?:^|[^\p{L}])\p{Lu}[\p{Ll}ёЁ-]{2,}(?:ов|ев|ёв|ин|ын|ский|цкий|ой)(?=$|[^\p{L}])/u
+
+/**
+ * Extracts candidate gender with an explicit-source-first policy.
+ *
+ * Priority:
+ * 1. Explicit gender stated by the source.
+ * 2. Grammatical Central Asian lineage markers (`qizi`, `o'g'li`).
+ * 3. High-confidence masculine/feminine Cyrillic surname morphology.
+ *
+ * We deliberately do not infer gender from a first name alone.
+ */
 export function extractCandidateGender(text: string): CandidateGender | undefined {
-  if (/(?:^|[^\p{L}])(?:женщина|female|ayol)(?=$|[^\p{L}])/iu.test(text)) return 'female'
-  if (/(?:^|[^\p{L}])(?:мужчина|male|erkak)(?=$|[^\p{L}])/iu.test(text)) return 'male'
+  if (EXPLICIT_FEMALE_RE.test(text)) return 'female'
+  if (EXPLICIT_MALE_RE.test(text)) return 'male'
+  if (FEMALE_LINEAGE_RE.test(text)) return 'female'
+  if (MALE_LINEAGE_RE.test(text)) return 'male'
+  if (FEMALE_SURNAME_RE.test(text)) return 'female'
+  if (MALE_SURNAME_RE.test(text)) return 'male'
   return undefined
 }
 
