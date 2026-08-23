@@ -1,3 +1,5 @@
+import { decodeEntities } from '../../../../shared/hiring/webFields'
+
 const UA =
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 '
   + '(KHTML, like Gecko) Chrome/126.0 Safari/537.36'
@@ -18,7 +20,7 @@ export async function fetchSecondaryHtml(url: string): Promise<string> {
 
 export function safeAbsoluteUrl(raw: string, base: string): string | null {
   try {
-    const url = new URL(raw, base)
+    const url = new URL(decodeEntities(raw), base)
     if (!/^https?:$/.test(url.protocol)) return null
     url.hash = ''
     return url.toString()
