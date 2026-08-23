@@ -75,6 +75,46 @@
 }
 
 @media (max-width: 520px) {
-  .modal-footer { grid-template-columns: 1fr; }
+  /* Mobile popups are height-constrained. Keep icon actions as proper 44px touch
+     targets in one compact row and give text links/primary CTA the remaining
+     width. Button labels stay in the DOM for accessibility, but are visually
+     suppressed on this breakpoint. */
+  .modal-footer {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: stretch;
+  }
+
+  .modal-footer :deep(> button) {
+    flex: 0 0 44px;
+    width: 44px;
+    min-width: 44px;
+    min-height: 44px;
+    height: 44px;
+    padding: 0;
+    font-size: 0;
+    white-space: nowrap;
+    overflow-wrap: normal;
+  }
+
+  /* Nuxt UI/Lucide icons can size through either explicit dimensions or em, so
+     restore a readable icon size after zeroing the visual label text. */
+  .modal-footer :deep(> button svg),
+  .modal-footer :deep(> button [class*="icon"]) {
+    width: 20px;
+    height: 20px;
+    min-width: 20px;
+    min-height: 20px;
+    font-size: 20px;
+  }
+
+  .modal-footer :deep(> .modal-footer__primary),
+  .modal-footer :deep(> .modal-footer__secondary) {
+    flex: 1 1 180px;
+    width: auto;
+    min-width: 0;
+    min-height: 44px;
+  }
 }
 </style>
