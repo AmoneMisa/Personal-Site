@@ -847,67 +847,56 @@ onBeforeUnmount(() => {
         <div class="hiring__presets">
           <span class="hiring__field-label">{{ t("presets") }}</span>
           <button v-for="preset in presets" :key="preset.name" type="button" class="hiring__preset" @click="applyPreset(preset)">
-            <span>{{ preset.name }}</span>
-            <span class="hiring__preset-remove" role="button" :aria-label="t('deletePreset')" @click.stop="removePreset(preset.name)">×</span>
+            <span>{{ preset.name }}</span><span class="hiring__preset-remove" role="button" :aria-label="t('deletePreset')" @click.stop="removePreset(preset.name)">×</span>
           </button>
-          <u-button type="button" variant="outline" color="neutral" size="sm" icon="i-lucide-bookmark-plus" @click="presetModalOpen = true">
-            {{ t("savePreset") }}
-          </u-button>
-          <u-button type="button" variant="outline" color="neutral" size="sm" icon="i-lucide-share-2" @click="sharedLinkOpened = false; shareModalOpen = true">
-            {{ t("shareSearch") }}
-          </u-button>
+          <u-button type="button" variant="outline" color="neutral" size="sm" icon="i-lucide-bookmark-plus" @click="presetModalOpen = true">{{ t("savePreset") }}</u-button>
+          <u-button type="button" variant="outline" color="neutral" size="sm" icon="i-lucide-share-2" @click="sharedLinkOpened = false; shareModalOpen = true">{{ t("shareSearch") }}</u-button>
         </div>
-        <div class="hiring__field">
-          <u-select-menu :label="t('country')" v-model="countries" :items="countryItems" value-key="value" label-key="label"
-              multiple :placeholder="t('countryAny')" class="hiring__select" @update:model-value="scheduleLoad()" />
-        </div>
-        <div class="hiring__field">
-          <u-select-menu :label="t('city')" v-model="citySel" :items="cityItems" value-key="value" label-key="label"
-              class="hiring__select" @update:model-value="scheduleLoad()" />
-        </div>
-        <div class="hiring__field">
-          <u-select-menu :label="t('remote')" v-model="remoteSel" :items="remoteItems" value-key="value" label-key="label"
-              :search-input="false" class="hiring__select" @update:model-value="scheduleLoad()" />
-        </div>
-        <div class="hiring__field">
-          <u-input v-model.number="experienceMin" type="number" min="0" icon="i-lucide-briefcase" :label="t('experienceMin')" @change="scheduleLoad()" />
-        </div>
-        <div class="hiring__field hiring__salary-range">
-          <u-input v-model.number="salaryFrom" type="number" min="0" icon="i-lucide-banknote" :label="label('Желаемая ЗП от', 'Desired salary from')" @change="scheduleLoad()" />
-          <u-input v-model.number="salaryTo" type="number" min="0" icon="i-lucide-banknote" :label="label('Желаемая ЗП до', 'Desired salary to')" @change="scheduleLoad()" />
-        </div>
-        <div class="hiring__field">
-          <u-select-menu :label="label('Валюта ЗП', 'Salary currency')" v-model="salaryCurrency" :items="salaryCurrencyItems" value-key="value" label-key="label"
-              :search-input="false" class="hiring__select" @update:model-value="(salaryFrom != null || salaryTo != null || sort.startsWith('salary')) && scheduleLoad(0)" />
-        </div>
-        <div class="hiring__field hiring__age-range">
-          <u-input v-model.number="ageMin" type="number" min="14" max="99" icon="i-lucide-user-round" :label="label('Возраст от', 'Age from')" @change="scheduleLoad()" />
-          <u-input v-model.number="ageMax" type="number" min="14" max="99" icon="i-lucide-user-round" :label="label('Возраст до', 'Age to')" @change="scheduleLoad()" />
-        </div>
-        <div class="hiring__field">
-          <u-select-menu :label="label('Пол', 'Gender')" v-model="genderSel" :items="genderItems" value-key="value" label-key="label"
-              :search-input="false" class="hiring__select" @update:model-value="scheduleLoad()" />
-        </div>
-        <div class="hiring__field hiring__field_wide hiring__profession-field">
-          <u-select-menu :label="label('Желаемые должности', 'Desired positions')" v-model="professions" :items="professionItems"
-              value-key="value" label-key="label" multiple searchable :placeholder="label('Любые должности', 'Any positions')"
-              class="hiring__select" @update:model-value="scheduleLoad()" />
-          <button v-if="professions.length" type="button" class="hiring__profession-clear" @click="clearProfessions">
-            <u-icon name="i-lucide-x" /> {{ label("Сбросить профессии", "Clear positions") }} · {{ professions.length }}
-          </button>
-        </div>
-        <div class="hiring__field">
-          <u-select-menu :label="t('seniority')" v-model="senioritySel" :items="seniorityItems" value-key="value" label-key="label"
-              :search-input="false" class="hiring__select" @update:model-value="scheduleLoad()" />
-        </div>
-        <div class="hiring__field">
-          <u-input v-model="skills" icon="i-lucide-code" :label="t('skills')" :placeholder="t('skillsPlaceholder')" @change="scheduleLoad()" />
-        </div>
-        <u-button type="button" variant="ghost" color="neutral" size="sm" icon="i-lucide-rotate-ccw" @click="resetFilters">
-          {{ t("reset") }}
-        </u-button>
+
+        <section class="hiring-filter-group">
+          <div class="hiring-filter-group__title"><u-icon name="i-lucide-map-pin" /> {{ label("Местоположение", "Location") }}</div>
+          <div class="hiring-filter-group__grid">
+            <div class="hiring__field"><u-select-menu :label="t('country')" v-model="countries" :items="countryItems" value-key="value" label-key="label" multiple :placeholder="t('countryAny')" class="hiring__select" @update:model-value="scheduleLoad()" /></div>
+            <div class="hiring__field"><u-select-menu :label="t('city')" v-model="citySel" :items="cityItems" value-key="value" label-key="label" class="hiring__select" @update:model-value="scheduleLoad()" /></div>
+            <div class="hiring__field"><u-select-menu :label="t('remote')" v-model="remoteSel" :items="remoteItems" value-key="value" label-key="label" :search-input="false" class="hiring__select" @update:model-value="scheduleLoad()" /></div>
+          </div>
+        </section>
+
+        <section class="hiring-filter-group hiring-filter-group_salary">
+          <div class="hiring-filter-group__title"><u-icon name="i-lucide-banknote" /> {{ label("Желаемая зарплата", "Desired salary") }}</div>
+          <div class="hiring-filter-group__grid hiring-filter-group__grid_salary">
+            <div class="hiring__field hiring__salary-range">
+              <u-input v-model.number="salaryFrom" type="number" min="0" icon="i-lucide-banknote" :label="label('От', 'From')" @change="scheduleLoad()" />
+              <u-input v-model.number="salaryTo" type="number" min="0" icon="i-lucide-banknote" :label="label('До', 'To')" @change="scheduleLoad()" />
+            </div>
+            <div class="hiring__field"><u-select-menu :label="label('Валюта', 'Currency')" v-model="salaryCurrency" :items="salaryCurrencyItems" value-key="value" label-key="label" :search-input="false" class="hiring__select" @update:model-value="(salaryFrom != null || salaryTo != null || sort.startsWith('salary')) && scheduleLoad(0)" /></div>
+          </div>
+        </section>
+
+        <section class="hiring-filter-group">
+          <div class="hiring-filter-group__title"><u-icon name="i-lucide-user-round" /> {{ label("Профиль кандидата", "Candidate profile") }}</div>
+          <div class="hiring-filter-group__grid">
+            <div class="hiring__field"><u-input v-model.number="experienceMin" type="number" min="0" icon="i-lucide-briefcase" :label="t('experienceMin')" @change="scheduleLoad()" /></div>
+            <div class="hiring__field hiring__age-range"><u-input v-model.number="ageMin" type="number" min="14" max="99" icon="i-lucide-user-round" :label="label('Возраст от', 'Age from')" @change="scheduleLoad()" /><u-input v-model.number="ageMax" type="number" min="14" max="99" icon="i-lucide-user-round" :label="label('Возраст до', 'Age to')" @change="scheduleLoad()" /></div>
+            <div class="hiring__field"><u-select-menu :label="label('Пол', 'Gender')" v-model="genderSel" :items="genderItems" value-key="value" label-key="label" :search-input="false" class="hiring__select" @update:model-value="scheduleLoad()" /></div>
+            <div class="hiring__field"><u-select-menu :label="t('seniority')" v-model="senioritySel" :items="seniorityItems" value-key="value" label-key="label" :search-input="false" class="hiring__select" @update:model-value="scheduleLoad()" /></div>
+          </div>
+        </section>
+
+        <section class="hiring-filter-group hiring-filter-group_role">
+          <div class="hiring-filter-group__title"><u-icon name="i-lucide-briefcase-business" /> {{ label("Должность и навыки", "Role & skills") }}</div>
+          <div class="hiring-filter-group__grid">
+            <div class="hiring__field hiring__field_wide hiring__profession-field">
+              <u-select-menu :label="label('Желаемые должности', 'Desired positions')" v-model="professions" :items="professionItems" value-key="value" label-key="label" multiple searchable :placeholder="label('Любые должности', 'Any positions')" class="hiring__select" @update:model-value="scheduleLoad()" />
+              <button v-if="professions.length" type="button" class="hiring__profession-clear" @click="clearProfessions"><u-icon name="i-lucide-x" /> {{ label("Сбросить профессии", "Clear positions") }} · {{ professions.length }}</button>
+            </div>
+            <div class="hiring__field hiring__field_wide"><u-input v-model="skills" icon="i-lucide-code" :label="t('skills')" :placeholder="t('skillsPlaceholder')" @change="scheduleLoad()" /></div>
+          </div>
+        </section>
+
+        <div class="hiring-filter-actions"><u-button type="button" variant="ghost" color="neutral" size="sm" icon="i-lucide-rotate-ccw" @click="resetFilters">{{ t("reset") }}</u-button></div>
       </div>
-    </form>
+
 
     <p v-if="failed" class="hiring__error">{{ t("error") }}</p>
     <p v-else-if="hasSourceWarning" class="hiring__source-warning">
@@ -1038,8 +1027,8 @@ onBeforeUnmount(() => {
 .hiring__pill:hover { color: var(--text-white); }
 .hiring__pill_active { color: var(--text-white); border-color: rgba(113,137,217,0.45); background: rgba(113,137,217,0.18); }
 .hiring__advanced {
-  grid-column: 1 / -1; display: grid; gap: 12px 14px; align-items: end; grid-template-columns: 1fr;
-  padding: 14px; border-radius: 8px; border: 1px solid var(--line); background: rgba(255,255,255,0.02);
+  grid-column: 1 / -1; display: grid; grid-template-columns: 1fr; gap: 12px;
+  padding: 14px; border-radius: 10px; border: 1px solid var(--line); background: rgba(255,255,255,0.02);
 }
 .hiring__presets {
   grid-column: 1 / -1; display: flex; flex-wrap: wrap; align-items: center; gap: 8px;
@@ -1051,8 +1040,18 @@ onBeforeUnmount(() => {
 }
 .hiring__preset-remove { color: var(--text-muted); font-size: 18px; line-height: 1; }
 .hiring__preset-remove:hover { color: var(--accent-pink); }
-@media (min-width: 700px) { .hiring__advanced { grid-template-columns: repeat(3, 1fr); } }
-@media (min-width: 1000px) { .hiring__advanced { grid-template-columns: repeat(4, 1fr); } .hiring__field_wide { grid-column: span 2; } }
+.hiring-filter-group { min-width: 0; padding: 14px; border: 1px solid var(--line); border-radius: 9px; background: rgba(255,255,255,0.025); }
+.hiring-filter-group__title { display: flex; align-items: center; gap: 7px; margin-bottom: 12px; color: var(--ui-text-muted); font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: .04em; }
+.hiring-filter-group__title :deep(svg) { color: var(--accent-pink); }
+.hiring-filter-group__grid { display: grid; grid-template-columns: 1fr; gap: 12px; align-items: end; }
+.hiring-filter-actions { display: flex; justify-content: flex-end; }
+@media (min-width: 700px) {
+  .hiring__advanced { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .hiring-filter-group__grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .hiring-filter-group__grid_salary { grid-template-columns: minmax(0, 1.5fr) minmax(110px, .6fr); }
+  .hiring__field_wide { grid-column: span 2; }
+  .hiring-filter-actions { grid-column: 1 / -1; }
+}
 .hiring__field { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
 .hiring__age-range, .hiring__salary-range { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
 .hiring__profession-clear {
@@ -1121,7 +1120,6 @@ onBeforeUnmount(() => {
 .hiring-modal__desc { font-size: 13.5px; line-height: 1.55; white-space: pre-wrap; color: var(--text-soft, inherit); margin-top: 8px; }
 .hiring-modal__tags { display: flex; flex-wrap: wrap; gap: 6px; }
 .hiring-modal__tag { font-size: 11px; padding: 2px 8px; border-radius: 6px; border: 1px solid var(--line); color: var(--ui-text-muted); }
-.hiring-modal-footer { --modal-footer-accent: #7189d9; --modal-footer-accent-text: #101428; }
 .hiring-share__hint { margin: 0 0 12px; color: var(--text-muted); font-size: 13px; line-height: 1.5; }
 @media (max-width: 700px) {
   .hiring__controls { grid-template-columns: 1fr; }

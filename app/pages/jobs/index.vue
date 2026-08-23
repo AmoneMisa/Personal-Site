@@ -81,9 +81,10 @@ interface JobResult {
   failedSources?: string[];
 }
 
-const { t: translate } = useI18n();
+const { t: translate, locale } = useI18n();
 const t = (key: string, params: Record<string, unknown> = {}) =>
   translate(`jobs.${key}`, params);
+const label = (ru: string, en: string) => String(locale.value).toLowerCase().startsWith("ru") ? ru : en;
 const localePath = useLocalePath();
 
 useSeoMeta({
@@ -959,7 +960,6 @@ onBeforeUnmount(() => {
     <!-- Filters + sort -->
     <form class="jobs__controls" @submit.prevent="load(1)">
       <u-input v-model="query" clearable icon="i-lucide-search" :label="t('search')" :placeholder="t('searchPlaceholder')" @clear="clearSearch" />
-      <u-input v-model.number="salaryMin" type="number" icon="i-lucide-banknote" :label="`${t('salaryMin')} (${displayCurrency}/${periodLabel(displayPeriod)})`" />
       <div class="jobs__sort">
         <u-icon name="i-lucide-arrow-down-wide-narrow" />
         <u-select-menu
@@ -1020,113 +1020,85 @@ onBeforeUnmount(() => {
         </button>
       </div>
       <div v-if="showAdvanced" class="jobs__advanced">
-        <div class="jobs__field">
-          <u-select-menu :label="t('country')"
-              v-model="countries" :items="countryItems" value-key="value" label-key="label"
-              multiple :placeholder="t('countryPlaceholder')"
-              class="jobs__select" @update:model-value="scheduleLoad()"
-          />
+        <section class="jobs-filter-group">
+          <div class="jobs-filter-group__title"><u-icon name="i-lucide-map-pin" /> {{ label("Местоположение", "Location") }}</div>
+          <div class="jobs-filter-group__grid jobs-filter-group__grid_location">
+            <div class="jobs__field">
+              <u-select-menu :label="t('country')" v-model="countries" :items="countryItems" value-key="value" label-key="label"
+                  multiple :placeholder="t('countryPlaceholder')" class="jobs__select" @update:model-value="scheduleLoad()" />
+            </div>
+            <div class="jobs__field jobs__field_wide">
+              <u-input v-model="cities" icon="i-lucide-map-pin" :label="t('cities')" :placeholder="t('citiesPlaceholder')"
+                  @keyup.enter="load(1)" @change="scheduleLoad()" />
+            </div>
+          </div>
+        </section>
+
+        <section class="jobs-filter-group jobs-filter-group_salary">
+          <div class="jobs-filter-group__title"><u-icon name="i-lucide-banknote" /> {{ label("Зарплата", "Salary") }}</div>
+          <div class="jobs-filter-group__grid jobs-filter-group__grid_salary">
+            <div class="jobs__field">
+              <u-input v-model.number="salaryMin" type="number" min="0" icon="i-lucide-banknote"
+                  :label="`${t('salaryMin')} (${displayCurrency}/${periodLabel(displayPeriod)})`" @change="scheduleLoad()" />
+            </div>
+            <div class="jobs__field">
+              <u-select-menu :label="t('currency')" v-model="displayCurrency" :items="currencyItems" value-key="value" label-key="label"
+                  class="jobs__select" @update:model-value="salaryMin && scheduleLoad()" />
+            </div>
+            <div class="jobs__field">
+              <u-select-menu :label="t('period')" v-model="displayPeriod" :items="periodItems" value-key="value" label-key="label"
+                  :search-input="false" class="jobs__select" @update:model-value="salaryMin && scheduleLoad()" />
+            </div>
+            <label class="jobs__remote jobs__field_inline">
+              <u-switch v-model="hasSalary" @update:model-value="scheduleLoad()" />
+              <span>{{ t("hasSalary") }}</span>
+            </label>
+          </div>
+        </section>
+
+        <section class="jobs-filter-group">
+          <div class="jobs-filter-group__title"><u-icon name="i-lucide-briefcase-business" /> {{ label("Условия работы", "Work conditions") }}</div>
+          <div class="jobs-filter-group__grid">
+            <div class="jobs__field"><u-select-menu :label="t('workMode')" v-model="workModeSelect" :items="workModeItems" value-key="value" label-key="label" :search-input="false" class="jobs__select" @update:model-value="scheduleLoad()" /></div>
+            <div class="jobs__field"><u-select-menu :label="t('relocation')" v-model="relocationSelect" :items="relocationItems" value-key="value" label-key="label" :search-input="false" class="jobs__select" @update:model-value="scheduleLoad()" /></div>
+            <div class="jobs__field"><u-select-menu :label="t('employment')" v-model="employmentKindSelect" :items="employmentKindItems" value-key="value" label-key="label" :search-input="false" class="jobs__select" @update:model-value="scheduleLoad()" /></div>
+            <div class="jobs__field"><u-input v-model.number="maxExperience" type="number" min="0" max="40" icon="i-lucide-briefcase" :label="t('experienceMax')" :placeholder="t('experienceMaxPlaceholder')" @keyup.enter="load(1)" @change="scheduleLoad()" /></div>
+            <label class="jobs__remote jobs__field_inline"><u-switch v-model="noExperience" @update:model-value="scheduleLoad()" /><span>{{ t("noExperience") }}</span></label>
+            <label class="jobs__remote jobs__field_inline"><u-switch v-model="foreignerOnly" @update:model-value="scheduleLoad()" /><span>{{ t("foreigner") }}</span></label>
+          </div>
+        </section>
+
+        <section class="jobs-filter-group">
+          <div class="jobs-filter-group__title"><u-icon name="i-lucide-languages" /> {{ label("Навыки и языки", "Skills & languages") }}</div>
+          <div class="jobs-filter-group__grid">
+            <div class="jobs__field"><u-select-menu :label="t('language')" v-model="languageSelect" :items="languageItems" value-key="value" label-key="label" class="jobs__select" @update:model-value="scheduleLoad()" /></div>
+            <div class="jobs__field"><u-select-menu :label="t('languageLevel')" v-model="languageLevelSelect" :items="levelItems" value-key="value" label-key="label" :search-input="false" :disabled="!language" class="jobs__select" @update:model-value="scheduleLoad()" /></div>
+            <div class="jobs__field"><u-select-menu :label="t('excludeLanguage')" v-model="excludeLanguages" :items="excludeLanguageItems" value-key="value" label-key="label" multiple :placeholder="t('excludeLangPlaceholder')" class="jobs__select" @update:model-value="scheduleLoad()" /></div>
+            <div class="jobs__field jobs__field_wide"><u-input v-model="skills" icon="i-lucide-wrench" :label="t('skills')" :placeholder="t('skillsPlaceholder')" @keyup.enter="load(1)" /></div>
+          </div>
+        </section>
+
+        <section class="jobs-filter-group jobs-filter-group_flags">
+          <div class="jobs-filter-group__title"><u-icon name="i-lucide-shield-check" /> {{ label("Исключения и охват", "Exclusions & coverage") }}</div>
+          <div class="jobs-filter-group__flags">
+            <label class="jobs__remote" :title="t('hideRiskyHint')"><u-switch v-model="hideRisky" @update:model-value="scheduleLoad()" /><span>{{ t("hideRisky") }}</span></label>
+            <label class="jobs__remote"><u-switch v-model="includeRu" @update:model-value="scheduleLoad()" /><span>{{ t("includeRu") }}</span></label>
+            <label class="jobs__remote"><u-switch v-model="includeBy" @update:model-value="scheduleLoad()" /><span>{{ t("includeBy") }}</span></label>
+          </div>
+        </section>
+
+        <div class="jobs-filter-actions">
+          <u-button type="button" variant="ghost" color="neutral" size="sm" icon="i-lucide-rotate-ccw" @click="resetFilters">{{ t("reset") }}</u-button>
         </div>
-        <div class="jobs__field jobs__field_wide">
-          <u-input
-              v-model="cities" icon="i-lucide-map-pin" :label="t('cities')" :placeholder="t('citiesPlaceholder')"
-              @keyup.enter="load(1)" @change="scheduleLoad()"
-          />
-        </div>
-        <div class="jobs__field">
-          <u-select-menu :label="t('currency')"
-              v-model="displayCurrency" :items="currencyItems" value-key="value" label-key="label"
-              class="jobs__select" @update:model-value="salaryMin && scheduleLoad()"
-          />
-        </div>
-        <div class="jobs__field">
-          <u-select-menu :label="t('period')"
-              v-model="displayPeriod" :items="periodItems" value-key="value" label-key="label"
-              :search-input="false" class="jobs__select" @update:model-value="salaryMin && scheduleLoad()"
-          />
-        </div>
-        <div class="jobs__field">
-          <u-select-menu :label="t('workMode')"
-              v-model="workModeSelect" :items="workModeItems" value-key="value" label-key="label"
-              :search-input="false" class="jobs__select" @update:model-value="scheduleLoad()"
-          />
-        </div>
-        <div class="jobs__field">
-          <u-select-menu :label="t('relocation')"
-              v-model="relocationSelect" :items="relocationItems" value-key="value" label-key="label"
-              :search-input="false" class="jobs__select" @update:model-value="scheduleLoad()"
-          />
-        </div>
-        <div class="jobs__field">
-          <u-select-menu :label="t('employment')"
-              v-model="employmentKindSelect" :items="employmentKindItems" value-key="value" label-key="label"
-              :search-input="false" class="jobs__select" @update:model-value="scheduleLoad()"
-          />
-        </div>
-        <div class="jobs__field">
-          <u-input
-              v-model.number="maxExperience" type="number" min="0" max="40"
-              icon="i-lucide-briefcase" :label="t('experienceMax')" :placeholder="t('experienceMaxPlaceholder')"
-              @keyup.enter="load(1)" @change="scheduleLoad()"
-          />
-        </div>
-        <div class="jobs__field">
-          <u-select-menu :label="t('language')"
-              v-model="languageSelect" :items="languageItems" value-key="value" label-key="label"
-              class="jobs__select" @update:model-value="scheduleLoad()"
-          />
-        </div>
-        <div class="jobs__field">
-          <u-select-menu :label="t('languageLevel')"
-              v-model="languageLevelSelect" :items="levelItems" value-key="value" label-key="label"
-              :search-input="false" :disabled="!language" class="jobs__select" @update:model-value="scheduleLoad()"
-          />
-        </div>
-        <div class="jobs__field">
-          <u-select-menu :label="t('excludeLanguage')"
-              v-model="excludeLanguages" :items="excludeLanguageItems" value-key="value" label-key="label"
-              multiple :placeholder="t('excludeLangPlaceholder')"
-              class="jobs__select" @update:model-value="scheduleLoad()"
-          />
-        </div>
-        <div class="jobs__field jobs__field_wide">
-          <u-input v-model="skills" icon="i-lucide-wrench" :label="t('skills')" :placeholder="t('skillsPlaceholder')" @keyup.enter="load(1)" />
-        </div>
-        <label class="jobs__remote jobs__field_inline">
-          <u-switch v-model="hasSalary" @update:model-value="scheduleLoad()" />
-          <span>{{ t("hasSalary") }}</span>
-        </label>
-        <label class="jobs__remote jobs__field_inline">
-          <u-switch v-model="foreignerOnly" @update:model-value="scheduleLoad()" />
-          <span>{{ t("foreigner") }}</span>
-        </label>
-        <label class="jobs__remote jobs__field_inline" :title="t('hideRiskyHint')">
-          <u-switch v-model="hideRisky" @update:model-value="scheduleLoad()" />
-          <span>{{ t("hideRisky") }}</span>
-        </label>
-        <label class="jobs__remote jobs__field_inline">
-          <u-switch v-model="noExperience" @update:model-value="scheduleLoad()" />
-          <span>{{ t("noExperience") }}</span>
-        </label>
-        <label class="jobs__remote jobs__field_inline">
-          <u-switch v-model="includeRu" @update:model-value="scheduleLoad()" />
-          <span>{{ t("includeRu") }}</span>
-        </label>
-        <label class="jobs__remote jobs__field_inline">
-          <u-switch v-model="includeBy" @update:model-value="scheduleLoad()" />
-          <span>{{ t("includeBy") }}</span>
-        </label>
-        <u-button type="button" variant="ghost" color="neutral" size="sm" icon="i-lucide-rotate-ccw" @click="resetFilters">
-          {{ t("reset") }}
-        </u-button>
       </div>
-    </form>
+
 
     <p v-if="failed" class="jobs__error">{{ t("error") }}</p>
     <p v-else-if="warming && savedView === 'active'" class="jobs__warming" role="status" aria-live="polite">
       <span class="jobs__warming-dot" aria-hidden="true"></span>
       {{ t("warming", { loaded: loadedSourceCount, pending: pendingSourceCount }) }}
     </p>
+    <p v-else-if="loading && !stats && !jobs.length" class="jobs__count text-muted">{{ t("searching") }}…</p>
     <p v-else class="jobs__count text-muted">{{ t("jobsFound", { n: displayedTotal }) }}</p>
 
     <!-- Statistics panel -->
@@ -1494,16 +1466,30 @@ onBeforeUnmount(() => {
 }
 .jobs__advbtn:hover { color: var(--text-white); }
 .jobs__advanced {
-  grid-column: 1 / -1; display: grid; gap: 12px 14px; align-items: end;
-  grid-template-columns: 1fr;
-  padding: 14px; border-radius: 8px; border: 1px solid var(--line); background: rgba(255,255,255,0.02);
-  @media (min-width: 700px) { grid-template-columns: repeat(3, 1fr); }
-  @media (min-width: 1000px) { grid-template-columns: repeat(4, 1fr); }
+  grid-column: 1 / -1; display: grid; grid-template-columns: 1fr; gap: 12px;
+  padding: 14px; border-radius: 10px; border: 1px solid var(--line); background: rgba(255,255,255,0.02);
 }
-.jobs__field { display: flex; flex-direction: column; gap: 5px; }
+.jobs-filter-group { min-width: 0; padding: 14px; border: 1px solid var(--line); border-radius: 9px; background: rgba(255,255,255,0.025); }
+.jobs-filter-group__title { display: flex; align-items: center; gap: 7px; margin-bottom: 12px; color: var(--ui-text-muted); font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: .04em; }
+.jobs-filter-group__title :deep(svg) { color: var(--accent-pink); }
+.jobs-filter-group__grid { display: grid; grid-template-columns: 1fr; gap: 12px; align-items: end; }
+.jobs-filter-group__flags { display: flex; flex-wrap: wrap; gap: 14px 24px; align-items: center; }
+.jobs-filter-actions { display: flex; justify-content: flex-end; }
+.jobs__field { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
 .jobs__field-label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; opacity: 0.7; }
-.jobs__field_wide { @media (min-width: 700px) { grid-column: span 2; } }
-.jobs__field_inline { align-self: center; margin-top: 14px; }
+.jobs__field_inline { align-self: center; min-height: var(--ui-control-h-md); }
+@media (min-width: 700px) {
+  .jobs__advanced { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .jobs-filter-group__grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .jobs-filter-group__grid_salary { grid-template-columns: minmax(0, 1.4fr) minmax(110px, .7fr) minmax(130px, .8fr); }
+  .jobs-filter-group__grid_salary .jobs__field_inline { grid-column: 1 / -1; }
+  .jobs__field_wide { grid-column: span 2; }
+  .jobs-filter-actions { grid-column: 1 / -1; }
+}
+@media (min-width: 1200px) {
+  .jobs__advanced { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .jobs-filter-group__grid_location { grid-template-columns: minmax(180px, .8fr) minmax(0, 1.6fr); }
+}
 
 .stats {
   margin: 4px 0 26px; padding: 16px; border-radius: 10px;
