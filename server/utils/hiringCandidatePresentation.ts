@@ -1,11 +1,21 @@
-export * from '../../shared/legacy/hiringCandidatePresentationCore'
-
 import type { CvProfile } from './hiringTypes'
 import {
+  publicCandidateGender,
   publicCandidateLanguages as legacyLanguages,
+  publicCandidateName,
   publicCandidateProfessionKeys as legacyProfessionKeys,
+  publicCandidateRemote,
+  publicCandidateSalary,
   type HiringCandidateLocale,
-} from '../../shared/legacy/hiringCandidatePresentationCore'
+} from '../../internal/legacy/hiringCandidatePresentationCore'
+
+export {
+  publicCandidateGender,
+  publicCandidateName,
+  publicCandidateRemote,
+  publicCandidateSalary,
+}
+export type { HiringCandidateLocale }
 
 const STANDALONE_REMOTE_ROLE_RE = /^(?:онлайн|onlayn|online)$/iu
 
@@ -56,9 +66,6 @@ function nearestLevelIn(text: string, target: number, locale: HiringCandidateLoc
 }
 
 function cefrAfterLanguage(text: string, languageIndex: number): string | null {
-  // CEFR markers written after a language name ("English level: B2") are
-  // explicit for that language. Keep the search inside the same clause so a B2
-  // from the next sentence cannot overwrite a preceding Russian/Tajik level.
   const clause = text.slice(languageIndex, Math.min(text.length, languageIndex + 70)).split(/[.;\n]/u, 1)[0] || ''
   return clause.match(/(?:^|[^A-Z])(A1|A2|B1|B2|C1|C2)(?=$|[^A-Z])/i)?.[1]?.toUpperCase() || null
 }
