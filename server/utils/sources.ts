@@ -20,10 +20,10 @@ function stripHtml(html: string | undefined | null): string {
     .trim()
 }
 
-// Kept long enough that skill/requirement keywords further down a posting
-// (e.g. a "Nice to have" or tools list) still reach the enrichment + ATS scan.
-// The UI clamps the card to a few lines, so this only affects matching, not layout.
-const DESC_MAX = 4000
+// Keep complete vacancy descriptions for enrichment. US sponsorship/work-
+// authorization disclaimers are frequently near the end of long postings; the
+// UI can clamp presentation without discarding parser input.
+const DESC_MAX = Number.POSITIVE_INFINITY
 
 async function fetchJson<T>(url: string, init?: RequestInit): Promise<T> {
   const res = await fetch(url, {
