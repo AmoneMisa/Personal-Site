@@ -6,10 +6,12 @@ import {
 import { hiringDbEnabled, saveDbCandidates } from '../../utils/hiringDb'
 import { crawlSecondaryWebSource as crawlLegacySecondaryWebSource } from '../../utils/hiringSecondaryWebSources'
 import { persistWebProfiles } from '../webProfilePersistence'
+import { crawlLayboard } from './secondary/layboard'
 import { crawlNovaRobota } from './secondary/novaRobota'
 
 export async function crawlSecondaryWebSource(key: string) {
   if (key === 'novarobota-ua') return crawlNovaRobota()
+  if (key === 'layboard-kz') return crawlLayboard()
   return crawlLegacySecondaryWebSource(key)
 }
 
