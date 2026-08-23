@@ -12,12 +12,14 @@ import {
   type WebSourceAudit,
 } from '../../utils/hiringWebSources'
 import { persistWebProfiles } from '../webProfilePersistence'
+import { crawlCareerist } from './web/careerist'
 import { crawlFlagma, isFlagmaSource } from './web/flagma'
 
 export { auditWebSource, listWebSources, type WebSourceAudit }
 
 export async function crawlWebSource(key: string, cursor?: WebCursor) {
   if (isFlagmaSource(key)) return crawlFlagma(key, cursor)
+  if (key === 'careerist-uz') return crawlCareerist(cursor)
   return crawlLegacyWebSource(key, cursor)
 }
 
