@@ -7,15 +7,15 @@ import test from 'node:test'
 const dir = await mkdtemp(join(tmpdir(), 'personal-site-state-'))
 process.env.SITE_STATE_DIR = dir
 
-const { useRedis, redisReady } = await import('../server/utils/redis.ts')
-const store = useRedis()
+const { useStateStore, stateStoreReady } = await import('../server/utils/stateStore.ts')
+const store = useStateStore()
 
 test.after(async () => {
   await rm(dir, { recursive: true, force: true })
 })
 
 test('persistent KV supports get/set/delete and exists', async () => {
-  assert.equal(await redisReady(), true)
+  assert.equal(await stateStoreReady(), true)
   assert.equal(await store.get('plain'), null)
   assert.equal(await store.set('plain', 'value'), 'OK')
   assert.equal(await store.get('plain'), 'value')
@@ -34,11 +34,11 @@ test('persistent KV expires TTL entries', async () => {
   assert.equal(await store.get('short'), null)
 })
 
-test('persistent KV preserves Redis NX compare-and-delete lock contract', async () => {
+test('persistent KV preserves NX and compare-and-delete lock semantics', async () => {
   assert.equal(await store.set('lock', 'owner-a', 'PX', 5_000, 'NX'), 'OK')
   assert.equal(await store.set('lock', 'owner-b', 'PX', 5_000, 'NX'), null)
-  assert.equal(await store.eval('ignored', 1, 'lock', 'owner-b'), 0)
+  assert.equal(await store.compareAndDelete('lock', 'owner-b'), false)
   assert.equal(await store.get('lock'), 'owner-a')
-  assert.equal(await store.eval('ignored', 1, 'lock', 'owner-a'), 1)
+  assert.equal(await store.compareAndDelete('lock', 'owner-a'), true)
   assert.equal(await store.get('lock'), null)
 })
