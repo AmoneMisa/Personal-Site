@@ -54,7 +54,9 @@ interface FeedResult {
 }
 interface CountryMeta { code: string; name: string; currency: string; cities?: string[] }
 type HiringView = "active" | "favorites" | "recent" | "hidden";
+type HiringSort = "recent" | "name_asc" | "name_desc" | "experience_desc" | "experience_asc" | "age_asc" | "age_desc" | "salary_desc" | "salary_asc";
 type SearchPreset = { name: string; query: Record<string, string> };
+const HIRING_SORTS: HiringSort[] = ["recent", "name_asc", "name_desc", "experience_desc", "experience_asc", "age_asc", "age_desc", "salary_desc", "salary_asc"];
 
 const PAGE_SIZE = 20;
 const MAX_SAVED = 200;
@@ -88,6 +90,10 @@ const countries = ref<string[]>([]);
 const city = ref("");
 const remote = ref("any");
 const experienceMin = ref<number | undefined>(undefined);
+const salaryFrom = ref<number | undefined>(undefined);
+const salaryTo = ref<number | undefined>(undefined);
+const salaryCurrency = ref("USD");
+const sort = ref<HiringSort>("recent");
 const ageMin = ref<number | undefined>(undefined);
 const ageMax = ref<number | undefined>(undefined);
 const gender = ref("");
@@ -202,6 +208,21 @@ const senioritySel = computed<string>({
   get: () => seniority.value || SENIORITY_ANY,
   set: (v) => (seniority.value = v === SENIORITY_ANY ? "" : v),
 });
+const salaryCurrencyItems = computed<Item[]>(() => {
+  const currencies = [...new Set(["USD", "EUR", ...meta.value.map((item) => item.currency).filter(Boolean)])];
+  return currencies.map((value) => ({ value, label: value }));
+});
+const sortItems = computed<Item[]>(() => [
+  { value: "recent", label: label("Сначала новые", "Newest first") },
+  { value: "name_asc", label: label("Имя: А → Я", "Name: A → Z") },
+  { value: "name_desc", label: label("Имя: Я → А", "Name: Z → A") },
+  { value: "experience_desc", label: label("Опыт: больше → меньше", "Experience: high → low") },
+  { value: "experience_asc", label: label("Опыт: меньше → больше", "Experience: low → high") },
+  { value: "age_asc", label: label("Возраст: младше → старше", "Age: younger → older") },
+  { value: "age_desc", label: label("Возраст: старше → младше", "Age: older → younger") },
+  { value: "salary_desc", label: label("Желаемая ЗП: выше → ниже", "Desired salary: high → low") },
+  { value: "salary_asc", label: label("Желаемая ЗП: ниже → выше", "Desired salary: low → high") },
+]);
 
 function readSavedList(key: string, limit = MAX_SAVED): CvProfile[] {
   try {
@@ -297,6 +318,10 @@ function currentFilterQuery(): Record<string, string> {
   if (remote.value === "yes") queryParams.remote = "1";
   if (remote.value === "no") queryParams.remote = "0";
   if (experienceMin.value != null) queryParams.experienceMin = String(experienceMin.value);
+  if (salaryFrom.value != null) queryParams.salaryFrom = String(salaryFrom.value);
+  if (salaryTo.value != null) queryParams.salaryTo = String(salaryTo.value);
+  if (salaryCurrency.value !== "USD" || salaryFrom.value != null || salaryTo.value != null || sort.value.startsWith("salary")) queryParams.salaryCurrency = salaryCurrency.value;
+  if (sort.value !== "recent") queryParams.sort = sort.value;
   if (ageMin.value != null) queryParams.ageMin = String(ageMin.value);
   if (ageMax.value != null) queryParams.ageMax = String(ageMax.value);
   if (gender.value) queryParams.gender = gender.value;
@@ -319,6 +344,12 @@ function applyQueryParams(params: Record<string, unknown>) {
   city.value = queryString(params.city);
   remote.value = params.remote === "1" ? "yes" : params.remote === "0" ? "no" : "any";
   experienceMin.value = Number(queryString(params.experienceMin)) || undefined;
+  salaryFrom.value = Number(queryString(params.salaryFrom)) || undefined;
+  salaryTo.value = Number(queryString(params.salaryTo)) || undefined;
+  const requestedSalaryCurrency = queryString(params.salaryCurrency).toUpperCase();
+  salaryCurrency.value = /^[A-Z]{3}$/.test(requestedSalaryCurrency) ? requestedSalaryCurrency : "USD";
+  const requestedSort = queryString(params.sort) as HiringSort;
+  sort.value = HIRING_SORTS.includes(requestedSort) ? requestedSort : "recent";
   ageMin.value = Number(queryString(params.ageMin)) || undefined;
   ageMax.value = Number(queryString(params.ageMax)) || undefined;
   gender.value = ["male", "female", "unknown"].includes(queryString(params.gender)) ? queryString(params.gender) : "";
@@ -442,6 +473,10 @@ async function load(append = false, background = false) {
   if (remote.value === "yes") params.remote = "1";
   if (remote.value === "no") params.remote = "0";
   if (experienceMin.value != null) params.experienceMin = String(experienceMin.value);
+  if (salaryFrom.value != null) params.salaryFrom = String(salaryFrom.value);
+  if (salaryTo.value != null) params.salaryTo = String(salaryTo.value);
+  if (salaryFrom.value != null || salaryTo.value != null || sort.value.startsWith("salary")) params.salaryCurrency = salaryCurrency.value;
+  if (sort.value !== "recent") params.sort = sort.value;
   if (ageMin.value != null) params.ageMin = String(ageMin.value);
   if (ageMax.value != null) params.ageMax = String(ageMax.value);
   if (gender.value) params.gender = gender.value;
@@ -507,6 +542,10 @@ function resetFilters() {
   city.value = "";
   remote.value = "any";
   experienceMin.value = undefined;
+  salaryFrom.value = undefined;
+  salaryTo.value = undefined;
+  salaryCurrency.value = "USD";
+  sort.value = "recent";
   ageMin.value = undefined;
   ageMax.value = undefined;
   gender.value = "";
@@ -516,6 +555,11 @@ function resetFilters() {
   skills.value = "";
   source.value = "";
   scheduleLoad(80);
+}
+function clearProfessions() {
+  if (!professions.value.length) return;
+  professions.value = [];
+  scheduleLoad(0);
 }
 function setView(next: HiringView) { view.value = next; }
 
@@ -767,6 +811,10 @@ onBeforeUnmount(() => {
 
     <form class="hiring__controls" @submit.prevent="load()">
       <u-input v-model="query" clearable icon="i-lucide-search" :label="t('search')" :placeholder="t('searchPlaceholder')" @clear="clearSearch" />
+      <div class="hiring__sort">
+        <u-select-menu :label="label('Сортировка', 'Sort')" v-model="sort" :items="sortItems" value-key="value" label-key="label"
+            :search-input="false" class="hiring__select" @update:model-value="scheduleLoad(0)" />
+      </div>
       <u-button type="submit" :loading="loading" icon="i-lucide-search">
         {{ loading ? t("searching") : t("search") }}
       </u-button>
@@ -824,6 +872,14 @@ onBeforeUnmount(() => {
         <div class="hiring__field">
           <u-input v-model.number="experienceMin" type="number" min="0" icon="i-lucide-briefcase" :label="t('experienceMin')" @change="scheduleLoad()" />
         </div>
+        <div class="hiring__field hiring__salary-range">
+          <u-input v-model.number="salaryFrom" type="number" min="0" icon="i-lucide-banknote" :label="label('Желаемая ЗП от', 'Desired salary from')" @change="scheduleLoad()" />
+          <u-input v-model.number="salaryTo" type="number" min="0" icon="i-lucide-banknote" :label="label('Желаемая ЗП до', 'Desired salary to')" @change="scheduleLoad()" />
+        </div>
+        <div class="hiring__field">
+          <u-select-menu :label="label('Валюта ЗП', 'Salary currency')" v-model="salaryCurrency" :items="salaryCurrencyItems" value-key="value" label-key="label"
+              :search-input="false" class="hiring__select" @update:model-value="(salaryFrom != null || salaryTo != null || sort.startsWith('salary')) && scheduleLoad(0)" />
+        </div>
         <div class="hiring__field hiring__age-range">
           <u-input v-model.number="ageMin" type="number" min="14" max="99" icon="i-lucide-user-round" :label="label('Возраст от', 'Age from')" @change="scheduleLoad()" />
           <u-input v-model.number="ageMax" type="number" min="14" max="99" icon="i-lucide-user-round" :label="label('Возраст до', 'Age to')" @change="scheduleLoad()" />
@@ -832,10 +888,13 @@ onBeforeUnmount(() => {
           <u-select-menu :label="label('Пол', 'Gender')" v-model="genderSel" :items="genderItems" value-key="value" label-key="label"
               :search-input="false" class="hiring__select" @update:model-value="scheduleLoad()" />
         </div>
-        <div class="hiring__field hiring__field_wide">
+        <div class="hiring__field hiring__field_wide hiring__profession-field">
           <u-select-menu :label="label('Желаемые должности', 'Desired positions')" v-model="professions" :items="professionItems"
               value-key="value" label-key="label" multiple searchable :placeholder="label('Любые должности', 'Any positions')"
               class="hiring__select" @update:model-value="scheduleLoad()" />
+          <button v-if="professions.length" type="button" class="hiring__profession-clear" @click="clearProfessions">
+            <u-icon name="i-lucide-x" /> {{ label("Сбросить профессии", "Clear positions") }} · {{ professions.length }}
+          </button>
         </div>
         <div class="hiring__field">
           <u-select-menu :label="t('seniority')" v-model="senioritySel" :items="seniorityItems" value-key="value" label-key="label"
@@ -966,7 +1025,8 @@ onBeforeUnmount(() => {
 .hiring { padding-top: 24px; padding-bottom: 96px; }
 .hiring__title { font-size: 32px; font-weight: 600; }
 .hiring__subtitle { max-width: 720px; font-size: 14px; }
-.hiring__controls { margin: 20px 0 20px; display: grid; gap: 12px; grid-template-columns: 1fr auto; align-items: start; }
+.hiring__controls { margin: 20px 0 20px; display: grid; gap: 12px; grid-template-columns: minmax(0, 1fr) minmax(220px, 280px) auto; align-items: start; }
+.hiring__sort { min-width: 0; }
 .hiring__row { grid-column: 1 / -1; display: flex; flex-wrap: wrap; justify-content: space-between; gap: 12px; }
 .hiring__filters, .hiring__views { display: flex; flex-wrap: wrap; gap: 8px; }
 .hiring__views { padding-left: 12px; border-left: 1px solid var(--line); }
@@ -994,7 +1054,12 @@ onBeforeUnmount(() => {
 @media (min-width: 700px) { .hiring__advanced { grid-template-columns: repeat(3, 1fr); } }
 @media (min-width: 1000px) { .hiring__advanced { grid-template-columns: repeat(4, 1fr); } .hiring__field_wide { grid-column: span 2; } }
 .hiring__field { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
-.hiring__age-range { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.hiring__age-range, .hiring__salary-range { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.hiring__profession-clear {
+  align-self: flex-start; display: inline-flex; align-items: center; gap: 5px; padding: 2px 0; border: 0;
+  background: transparent; color: var(--accent-pink); font-size: 11px; font-weight: 700; cursor: pointer;
+}
+.hiring__profession-clear:hover { text-decoration: underline; }
 .hiring__field-label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; opacity: 0.7; }
 .hiring__select { width: 100%; min-width: 0; }
 .hiring__select :deep(button) { width: 100%; min-width: 0; }
@@ -1062,7 +1127,7 @@ onBeforeUnmount(() => {
   .hiring__controls { grid-template-columns: 1fr; }
   .hiring__controls > :deep(button) { width: 100%; }
   .hiring__views { padding-left: 0; border-left: 0; }
-  .hiring__age-range { grid-template-columns: 1fr 1fr; }
+  .hiring__age-range, .hiring__salary-range { grid-template-columns: 1fr 1fr; }
   .hiring-card { height: 184px; }
 }
 </style>

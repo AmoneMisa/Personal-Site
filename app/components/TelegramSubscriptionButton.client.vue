@@ -213,7 +213,7 @@ async function subscribe() {
   display: inline-flex;
   flex-direction: row-reverse;
   align-items: center;
-  justify-content: flex-start;
+  justify-content: center;
   gap: 0;
   overflow: hidden;
   border: 1px solid rgba(113, 137, 217, .28);

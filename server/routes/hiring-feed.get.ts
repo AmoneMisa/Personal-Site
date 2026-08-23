@@ -151,6 +151,19 @@ function profileSearchText(profile: CvProfile): string {
   ].join(' ').toLocaleLowerCase('ru')
 }
 
+function salaryBounds(profile: CvProfile, targetCurrency: string): { low: number; high: number } | null {
+  const sourceCurrency = profile.currency?.trim().toUpperCase()
+  if (!sourceCurrency) return null
+  const rawLow = profile.salaryMin ?? profile.salaryMax
+  const rawHigh = profile.salaryMax ?? profile.salaryMin
+  const low = convertCurrency(rawLow, sourceCurrency, targetCurrency)
+  const high = convertCurrency(rawHigh, sourceCurrency, targetCurrency)
+  if (low == null && high == null) return null
+  const first = low ?? high!
+  const second = high ?? low!
+  return { low: Math.min(first, second), high: Math.max(first, second) }
+}
+
 function matchesFilters(profile: CvProfile, params: URLSearchParams): boolean {
   const countries = list(params, 'countries').map((code) => code.toUpperCase())
   if (countries.length && !countries.includes((profile.country || '').toUpperCase())) return false
@@ -175,6 +188,19 @@ function matchesFilters(profile: CvProfile, params: URLSearchParams): boolean {
   const ageMax = Number(params.get('ageMax'))
   if (Number.isFinite(ageMax) && ageMax > 0) {
     if (profile.age == null || profile.age > ageMax) return false
+  }
+
+  const salaryFrom = Number(params.get('salaryFrom'))
+  const salaryTo = Number(params.get('salaryTo'))
+  if ((Number.isFinite(salaryFrom) && salaryFrom > 0) || (Number.isFinite(salaryTo) && salaryTo > 0)) {
+    const targetCurrency = (params.get('salaryCurrency') || 'USD').trim().toUpperCase()
+    const salary = salaryBounds(profile, targetCurrency)
+    if (!salary) return false
+    // Range-overlap semantics: a candidate is kept when their desired range has
+    // at least one value inside the selected range. This makes "до 1000" include
+    // e.g. a candidate asking for 800–1200, because 800 is still acceptable.
+    if (Number.isFinite(salaryFrom) && salaryFrom > 0 && salary.high < salaryFrom) return false
+    if (Number.isFinite(salaryTo) && salaryTo > 0 && salary.low > salaryTo) return false
   }
 
   const gender = (params.get('gender') || '').trim().toLowerCase()
@@ -214,6 +240,60 @@ function matchesFilters(profile: CvProfile, params: URLSearchParams): boolean {
   if (profileId && profile.id !== profileId) return false
 
   return true
+}
+
+function activityTimestamp(profile: CvProfile): number {
+  const value = Date.parse(profile.activityAt || profile.updatedAt || profile.createdAt || '')
+  return Number.isFinite(value) ? value : 0
+}
+
+function compareOptionalNumber(a: number | null | undefined, b: number | null | undefined, descending: boolean): number {
+  const av = a == null || !Number.isFinite(a) ? null : a
+  const bv = b == null || !Number.isFinite(b) ? null : b
+  if (av == null && bv == null) return 0
+  if (av == null) return 1
+  if (bv == null) return -1
+  return descending ? bv - av : av - bv
+}
+
+function desiredSalary(profile: CvProfile, targetCurrency: string): number | null {
+  const bounds = salaryBounds(profile, targetCurrency)
+  return bounds ? Math.round((bounds.low + bounds.high) / 2) : null
+}
+
+function sortCandidateProfiles(profiles: CvProfile[], sort: string, salaryCurrency: string): void {
+  const recent = (a: CvProfile, b: CvProfile) => activityTimestamp(b) - activityTimestamp(a)
+  profiles.sort((a, b) => {
+    let primary = 0
+    switch (sort) {
+      case 'name_asc': {
+        const an = (a.name || '').trim()
+        const bn = (b.name || '').trim()
+        if (!an && !bn) primary = 0
+        else if (!an) primary = 1
+        else if (!bn) primary = -1
+        else primary = an.localeCompare(bn, undefined, { sensitivity: 'base' })
+        break
+      }
+      case 'name_desc': {
+        const an = (a.name || '').trim()
+        const bn = (b.name || '').trim()
+        if (!an && !bn) primary = 0
+        else if (!an) primary = 1
+        else if (!bn) primary = -1
+        else primary = bn.localeCompare(an, undefined, { sensitivity: 'base' })
+        break
+      }
+      case 'experience_desc': primary = compareOptionalNumber(a.experienceYears, b.experienceYears, true); break
+      case 'experience_asc': primary = compareOptionalNumber(a.experienceYears, b.experienceYears, false); break
+      case 'age_desc': primary = compareOptionalNumber(a.age, b.age, true); break
+      case 'age_asc': primary = compareOptionalNumber(a.age, b.age, false); break
+      case 'salary_desc': primary = compareOptionalNumber(desiredSalary(a, salaryCurrency), desiredSalary(b, salaryCurrency), true); break
+      case 'salary_asc': primary = compareOptionalNumber(desiredSalary(a, salaryCurrency), desiredSalary(b, salaryCurrency), false); break
+      default: primary = recent(a, b)
+    }
+    return primary || recent(a, b)
+  })
 }
 
 const SNAPSHOT_TTL_MS = 60_000
@@ -426,7 +506,10 @@ export default defineEventHandler(async (event) => {
     list(params, 'professions').length
     || params.get('ageMin')
     || params.get('ageMax')
-    || params.get('gender'),
+    || params.get('gender')
+    || params.get('salaryFrom')
+    || params.get('salaryTo')
+    || ((params.get('sort') || 'recent') !== 'recent'),
   )
   const professionQuery = query ? detectMentionedProfessions(query).length > 0 : false
   const hasWebProfiles = webStored.length > 0
@@ -462,7 +545,11 @@ export default defineEventHandler(async (event) => {
 
   if (engine === 'memory') {
     const filtered = profiles.filter((profile) => matchesFilters(profile, params))
-    filtered.sort((a, b) => Date.parse(b.activityAt || b.updatedAt || b.createdAt || '') - Date.parse(a.activityAt || a.updatedAt || a.createdAt || ''))
+    sortCandidateProfiles(
+      filtered,
+      (params.get('sort') || 'recent').trim().toLowerCase(),
+      (params.get('salaryCurrency') || 'USD').trim().toUpperCase(),
+    )
     count = filtered.length
     page = filtered.slice(offset, offset + limit)
   }
@@ -511,6 +598,10 @@ export default defineEventHandler(async (event) => {
       query: params.get('query') || '',
       remote: params.get('remote') || '',
       experienceMin: params.get('experienceMin') || '',
+      salaryFrom: params.get('salaryFrom') || '',
+      salaryTo: params.get('salaryTo') || '',
+      salaryCurrency: params.get('salaryCurrency') || 'USD',
+      sort: params.get('sort') || 'recent',
       ageMin: params.get('ageMin') || '',
       ageMax: params.get('ageMax') || '',
       gender: params.get('gender') || '',
