@@ -2,7 +2,8 @@
 // Search uses the persisted snapshot and Elasticsearch only; crawling, targeted
 // web search, normalization writes and backfill belong exclusively to jobs-worker.
 
-import { getHiringSourceDiagnostics, HIRING_COUNTRIES } from '../utils/hiringSources'
+import { getHiringSourceDiagnostics } from '../utils/hiringSources'
+import { HIRING_COUNTRIES } from '../../shared/hiring/hiringMarkets'
 import { DERIVED_VERSION, getStoredCvProfilesSnapshot } from '../utils/hiringSnapshot'
 import { getStoredWebCvProfiles } from '../utils/hiringWebStore'
 import { candidateSearchAvailable, searchCandidates } from '../utils/hiringElastic'
