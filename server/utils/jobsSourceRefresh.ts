@@ -1,4 +1,4 @@
-import { useRedis } from '~~/server/utils/redis'
+import { useStateStore } from '~~/server/utils/stateStore'
 import { ALL_SOURCES, type Job, type JobSource } from './jobTypes'
 import { enrichJob } from './enrich'
 import { syncJobsSearchIndex } from './jobsElastic'
@@ -35,8 +35,7 @@ const STALE_DAYS = 4
 const SOURCE_TIMEOUT_MS = 30_000
 // `companies` is intentionally an umbrella source: official ATS feeds, career
 // pages, regional boards and aviation sources all run as isolated sub-loaders.
-// Give that fan-out room to finish, but stay below the Rabbit worker's 180s
-// frontend request timeout so retries remain controlled by RabbitMQ.
+// Give that fan-out room to finish while keeping one source refresh bounded.
 const COMPANIES_SOURCE_TIMEOUT_MS = 150_000
 
 type StoredJob = Job & {
@@ -225,9 +224,9 @@ async function fetchSource(source: JobSource): Promise<Job[]> {
 async function mergeFetchedSource(source: JobSource, jobs: Job[]) {
   const now = Date.now()
   const nowIso = new Date(now).toISOString()
-  const redis = useRedis()
+  const store = useStateStore()
 
-  const raw = await redis.get(STORE_KEY)
+  const raw = await store.get(STORE_KEY)
   const existing = raw ? JSON.parse(raw) as StoredJob[] : []
   const byKey = new Map<string, StoredJob>()
 
@@ -249,7 +248,7 @@ async function mergeFetchedSource(source: JobSource, jobs: Job[]) {
 
   const kept = prune([...byKey.values()], now)
 
-  await redis.set(
+  await store.set(
     STORE_KEY,
     JSON.stringify(kept),
     'EX',
@@ -314,7 +313,7 @@ export async function refreshJobSource(source: JobSource) {
 async function runJobSourceRefresh(source: JobSource) {
   const jobs = await fetchSource(source)
 
-  // Fetching is parallel; mutation of the shared Redis store is serialized.
+  // Fetching is parallel; mutation of the shared persistent store is serialized.
   const operation = mergeLock.then(
     () => mergeFetchedSource(source, jobs),
     () => mergeFetchedSource(source, jobs),
