@@ -14,5 +14,5 @@ test('long social reposts dedupe across networks without touching OLX', () => {
   assert.match(route, /SOCIAL_FEED_SOURCES = new Set\(\['telegram', 'facebook', 'threads'\]\)/)
   assert.match(route, /if \(!SOCIAL_FEED_SOURCES\.has\(source\)\) return null/)
   assert.match(route, /Source is deliberately omitted/)
-  assert.match(route, /data\.listings = dedupeFeedListings\(shaped\)/)
+  assert.match(route, /data\.listings = dedupeFeedListings\(selectedListings\.map\(shapeListing\)\)/)
 })
