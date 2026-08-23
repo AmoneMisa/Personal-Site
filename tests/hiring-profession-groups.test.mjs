@@ -4,44 +4,46 @@ import test from 'node:test'
 import {
   collapseHiringProfessionFilterValues,
   expandHiringProfessionFilters,
-  hiringProfessionFilterLabel,
+  normalizeHiringProfessionFilterSelections,
 } from '../shared/hiringProfessionGroups.ts'
 
-test('obviously adjacent professions collapse to one filter facet', () => {
-  assert.deepEqual(
-    collapseHiringProfessionFilterValues(['Accountant', 'Chief Accountant', 'Finance / Banking Specialist']),
-    ['group:accounting-finance'],
-  )
+test('distinct professions stay individually selectable', () => {
   assert.deepEqual(
     collapseHiringProfessionFilterValues(['Frontend Developer', 'Backend Developer', 'Mobile Developer']),
-    ['group:software-development'],
+    ['Frontend Developer', 'Backend Developer', 'Mobile Developer'],
+  )
+  assert.deepEqual(
+    collapseHiringProfessionFilterValues(['Accountant', 'Chief Accountant', 'Finance / Banking Specialist']),
+    ['Accountant', 'Chief Accountant', 'Finance / Banking Specialist'],
   )
   assert.deepEqual(
     collapseHiringProfessionFilterValues(['Waiter', 'Barista', 'Cook / Chef']),
-    ['group:horeca'],
+    ['Waiter', 'Barista', 'Cook / Chef'],
   )
 })
 
-test('collapsed facets expand back to all searchable professions', () => {
+test('filter option normalization only removes duplicates', () => {
+  assert.deepEqual(
+    collapseHiringProfessionFilterValues(['Frontend Developer', 'Frontend Developer', 'Backend Developer']),
+    ['Frontend Developer', 'Backend Developer'],
+  )
+})
+
+test('legacy grouped links expand into explicit multi-select values', () => {
+  assert.deepEqual(
+    normalizeHiringProfessionFilterSelections(['group:software-development']),
+    ['Full-stack Developer', 'Backend Developer', 'Frontend Developer', 'Mobile Developer', 'Software Developer'],
+  )
+
   const support = expandHiringProfessionFilters(['group:support-contact-center'])
   assert.ok(support.includes('Customer Support'))
   assert.ok(support.includes('Chat Operator'))
   assert.ok(support.includes('Call Center Operator'))
-
-  const logistics = expandHiringProfessionFilters(['group:logistics-warehouse'])
-  assert.ok(logistics.includes('Logistics Specialist'))
-  assert.ok(logistics.includes('Warehouse Worker'))
-  assert.ok(logistics.includes('Driver'))
 })
 
-test('group labels are compact and localized', () => {
-  assert.equal(hiringProfessionFilterLabel('group:sales-retail', 'ru'), 'Продажи / Ритейл')
-  assert.equal(hiringProfessionFilterLabel('group:medicine', 'ru'), 'Медицина / Здравоохранение')
-  assert.equal(hiringProfessionFilterLabel('group:software-development', 'en'), 'Software Development')
-})
-
-test('unrelated professions are not collapsed into broad catch-all groups', () => {
-  assert.deepEqual(collapseHiringProfessionFilterValues(['Architect']), ['Architect'])
-  assert.deepEqual(collapseHiringProfessionFilterValues(['Psychologist']), ['Psychologist'])
-  assert.deepEqual(collapseHiringProfessionFilterValues(['Project Manager']), ['Project Manager'])
+test('multiple explicit professions remain an OR-search list', () => {
+  assert.deepEqual(
+    expandHiringProfessionFilters(['Frontend Developer', 'Mobile Developer']),
+    ['Frontend Developer', 'Mobile Developer'],
+  )
 })
