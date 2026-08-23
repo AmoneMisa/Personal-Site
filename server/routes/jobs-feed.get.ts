@@ -16,6 +16,7 @@ import { filterAndPaginate } from '../utils/aggregate'
 import { getStoredJobsSnapshot } from '../utils/jobsSnapshot'
 import { getRates, loadRates } from '../utils/currency'
 import { jobSearchKey, searchJobMatches } from '../utils/jobsElastic'
+import { keepUsaForeignerCandidate } from '../utils/jobVisaSponsorship'
 
 function isConfigured(source: JobSource): boolean {
   switch (source) {
@@ -126,6 +127,7 @@ export default defineEventHandler(async (event) => {
   let foreignerFriendly: boolean | undefined
   if (q.foreignerFriendly === 'true') foreignerFriendly = true
   else if (q.foreignerFriendly === 'false') foreignerFriendly = false
+  const usaBroadForeignerFilter = foreignerFriendly === true && countries.includes('US')
   const hideRiskyIndustries = q.hideRiskyIndustries !== 'false'
   const noExperience = q.noExperience === 'true'
   const language = String(q.language ?? '').trim() || undefined
@@ -154,9 +156,18 @@ export default defineEventHandler(async (event) => {
     }
   }
 
-  const searchPool = searchMatches
+  const matchedPool = searchMatches
     ? pool.filter((job) => searchMatches!.rank.has(jobSearchKey(job)))
     : pool
+
+  // For USA the old boolean was far too strict: `unknown` was effectively
+  // treated as `false`, collapsing thousands of roles to a few dozen. When the
+  // user asks for foreigner-friendly US jobs, keep unknown + sponsor-history
+  // roles and remove only explicit sponsorship refusals. The regular boolean
+  // filter stays unchanged for every other country.
+  const searchPool = usaBroadForeignerFilter
+    ? matchedPool.filter(keepUsaForeignerCandidate)
+    : matchedPool
 
   setResponseHeader(event, 'Cache-Control', 'private, max-age=30')
 
@@ -178,7 +189,7 @@ export default defineEventHandler(async (event) => {
       employmentKind,
       hasSalary,
       maxExperienceYears,
-      foreignerFriendly,
+      foreignerFriendly: usaBroadForeignerFilter ? undefined : foreignerFriendly,
       hideRiskyIndustries,
       noExperience,
       language,
