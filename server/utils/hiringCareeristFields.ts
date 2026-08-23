@@ -5,7 +5,9 @@ function neighbouringProfileStart(lines: string[], markerIndex: number): number 
   // or role, salary, name, Город.
   let start = Math.max(0, markerIndex - 2)
   const maybeSalary = lines[markerIndex - 2] || ''
-  if (/\d[\d\s.,]*\s*(?:руб|₽|сум|so['’ʻʼ‘`]?m|UZS|USD|\$|тенге|₸)\b/iu.test(maybeSalary)) {
+  // JavaScript \b is ASCII-only and does not form a reliable boundary after
+  // Cyrillic currency words such as "руб". Use an explicit Unicode boundary.
+  if (/\d[\d\s.,]*\s*(?:руб|₽|сум|so['’ʻʼ‘`]?m|UZS|USD|\$|тенге|₸)(?=$|[^\p{L}\p{N}])/iu.test(maybeSalary)) {
     start = Math.max(0, markerIndex - 3)
   }
   return start
