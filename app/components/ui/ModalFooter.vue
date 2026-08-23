@@ -1,13 +1,7 @@
 <script setup lang="ts">
-// Action row for the details popups (flat, vacancy, candidate).
-//
-// All three had their own copy of this grid, which is why the same defect kept
-// reappearing: a fixed four-column track list squeezes the longest label onto
-// two lines at narrower widths, so one button ends up taller than its
-// neighbours. It was fixed separately in two pages and was still present in the
-// third. One implementation now, so a fix lands everywhere.
-//
-// Buttons are passed in as the default slot; this owns only the layout.
+// Shared action row for flat, vacancy and candidate detail popups.
+// Secondary icon actions stay compact on every breakpoint; the primary
+// navigation/apply action keeps the available width and remains text-first.
 </script>
 
 <template>
@@ -19,55 +13,86 @@
 <style scoped>
 .modal-footer {
   width: 100%;
-  display: grid;
-  /* auto-fit, not a fixed count: the actions reflow onto a second row instead of
-     compressing until a label wraps. */
-  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  display: flex;
+  flex-wrap: wrap;
   gap: 8px;
   align-items: stretch;
 }
 
-/* Every action is the same size whatever element it is — some are buttons, some
-   are links — and long labels wrap inside the button rather than overflowing. */
-.modal-footer :deep(> *) {
-  width: 100%;
-  min-width: 0;
-  min-height: 44px;
+/* Favorite / hide / share are utility actions, not competing CTAs. Keep them
+   square on desktop too; their labels remain in the DOM for accessibility while
+   only the icon is shown visually. */
+.modal-footer :deep(> button) {
+  flex: 0 0 40px;
+  width: 40px;
+  min-width: 40px;
+  min-height: 40px;
+  height: 40px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0;
+  white-space: nowrap;
+  overflow-wrap: normal;
+}
+
+.modal-footer :deep(> button svg),
+.modal-footer :deep(> button [class*="icon"]) {
+  width: 18px;
+  height: 18px;
+  min-width: 18px;
+  min-height: 18px;
+  font-size: 18px;
+}
+
+/* The confirming action (Open / Apply) remains the visual anchor. Pin the
+   default accent to the site's pink instead of inheriting Nuxt UI's blue
+   primary colour on vacancy pages. Pages may still intentionally override the
+   two variables (the candidate popup currently does). */
+.modal-footer :deep(.modal-footer__primary) {
+  flex: 1 1 220px;
+  width: auto;
+  min-width: 180px;
+  min-height: 40px;
   height: auto;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  text-align: center;
-  white-space: normal;
-  overflow-wrap: anywhere;
-  line-height: 1.25;
-}
-
-/* The confirming action ("Open", "Apply") is a plain <a>, not a UButton, so it
-   needs its own appearance. Each page keeps its own accent — the candidate popup
-   is blue where the others are pink — by setting the two variables below on the
-   footer; only the colour differs, so only the colour is overridable. */
-.modal-footer :deep(.modal-footer__primary) {
-  padding: 8px 11px;
+  padding: 8px 14px;
   border: 1px solid var(--modal-footer-accent, var(--accent-pink, #e0679a));
   border-radius: var(--ui-control-radius, 8px);
   background: var(--modal-footer-accent, var(--accent-pink, #e0679a));
   color: var(--modal-footer-accent-text, #1a0e14);
   font-size: 13.5px;
   font-weight: 600;
+  line-height: 1.25;
+  text-align: center;
   text-decoration: none;
+  white-space: normal;
 }
 .modal-footer :deep(.modal-footer__primary:hover) { filter: brightness(1.06); }
 
-/* A second, non-confirming link action — the vacancy popup's "view at source". */
+/* A second text link, when present (for example "view at source"), stays
+   secondary and compact rather than taking the same weight as the main CTA. */
 .modal-footer :deep(.modal-footer__secondary) {
+  flex: 0 1 auto;
+  width: auto;
+  min-width: 0;
+  min-height: 40px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   padding: 8px 11px;
   border: 1px solid var(--line);
   border-radius: var(--ui-control-radius, 8px);
   color: var(--text-primary);
   font-size: 13px;
   font-weight: 600;
+  line-height: 1.25;
+  text-align: center;
   text-decoration: none;
+  white-space: normal;
 }
 .modal-footer :deep(.modal-footer__secondary:hover) {
   border-color: rgba(224, 103, 154, 0.45);
@@ -75,31 +100,14 @@
 }
 
 @media (max-width: 520px) {
-  /* Mobile popups are height-constrained. Keep icon actions as proper 44px touch
-     targets in one compact row and give text links/primary CTA the remaining
-     width. Button labels stay in the DOM for accessibility, but are visually
-     suppressed on this breakpoint. */
-  .modal-footer {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px;
-    align-items: stretch;
-  }
-
   .modal-footer :deep(> button) {
-    flex: 0 0 44px;
+    flex-basis: 44px;
     width: 44px;
     min-width: 44px;
     min-height: 44px;
     height: 44px;
-    padding: 0;
-    font-size: 0;
-    white-space: nowrap;
-    overflow-wrap: normal;
   }
 
-  /* Nuxt UI/Lucide icons can size through either explicit dimensions or em, so
-     restore a readable icon size after zeroing the visual label text. */
   .modal-footer :deep(> button svg),
   .modal-footer :deep(> button [class*="icon"]) {
     width: 20px;
@@ -111,10 +119,11 @@
 
   .modal-footer :deep(> .modal-footer__primary),
   .modal-footer :deep(> .modal-footer__secondary) {
-    flex: 1 1 180px;
-    width: auto;
-    min-width: 0;
     min-height: 44px;
+  }
+
+  .modal-footer :deep(> .modal-footer__primary) {
+    flex: 1 1 180px;
   }
 }
 </style>
