@@ -1,7 +1,7 @@
 services:
   backend:
-    # Built and pushed by GitHub Actions; the deployment server can reach
-    # ghcr.io but not Docker Hub, so it must never build this locally.
+    # Existing auxiliary site backend. Jobs/hiring do NOT use this service:
+    # their read API is Nuxt/Nitro (`jobs-api`) and ingestion is `jobs-worker`.
     image: ghcr.io/amonemisa/personal-site-backend:latest
     restart: unless-stopped
     environment:
@@ -37,7 +37,8 @@ services:
 
   frontend:
     # Public Nuxt renderer. No queue, crawler, source adapter or ingestion task
-    # executes here. Jobs/hiring data requests are proxied to the read-only API.
+    # executes here. Jobs/hiring data requests are proxied to another Nitro
+    # process built from this same Personal-Site image.
     image: ghcr.io/amonemisa/personal-site:latest
     restart: unless-stopped
     env_file:
@@ -45,7 +46,6 @@ services:
     environment:
       SITE_STATE_DIR: /var/app/state/site
       JOBS_RUNTIME_ROLE: frontend
-      JOBS_EXECUTION_ENABLED: "off"
       JOBS_API_URL: http://jobs-api:3000
     volumes:
       - site_state:/var/app/state
@@ -62,8 +62,8 @@ services:
       start_period: 30s
 
   jobs-api:
-    # Read-only jobs/hiring API. It serves persisted snapshots and search only;
-    # it never crawls sources or dispatches/executes queue work.
+    # Read-only Nuxt/Nitro jobs+hiring API from the SAME application image.
+    # It serves stored snapshots/search only and has no refresh/queue endpoints.
     image: ghcr.io/amonemisa/personal-site:latest
     restart: unless-stopped
     env_file:
@@ -71,7 +71,6 @@ services:
     environment:
       SITE_STATE_DIR: /var/app/state/site
       JOBS_RUNTIME_ROLE: api
-      JOBS_EXECUTION_ENABLED: "off"
       JOBS_API_URL: http://jobs-api:3000
       ELASTICSEARCH_URL: http://flat-finder-elasticsearch:9200
       JOBS_ELASTICSEARCH_INDEX: job-listings-v1
@@ -92,9 +91,9 @@ services:
       start_period: 30s
 
   jobs-worker:
-    # The single ingestion worker owns scheduling, Postgres queue claim/complete,
-    # scraping, parsing, normalization, AI enrichment and search indexing.
-    # It does not expose HTTP and cannot block the public Nuxt event loop.
+    # The ONE jobs/hiring worker. It directly owns scheduling, Postgres queue
+    # claim/complete/fail, scraping, parsing, normalization, AI enrichment and
+    # Elasticsearch indexing. No HTTP execution hop through Nuxt exists.
     image: ghcr.io/amonemisa/personal-site-jobs-worker:latest
     restart: unless-stopped
     env_file:
@@ -102,7 +101,6 @@ services:
     environment:
       SITE_STATE_DIR: /var/app/state/site
       JOBS_RUNTIME_ROLE: worker
-      JOBS_EXECUTION_ENABLED: "on"
       AI_WORKER_URL: http://ai-worker:4030
       ELASTICSEARCH_URL: http://flat-finder-elasticsearch:9200
       JOBS_ELASTICSEARCH_INDEX: job-listings-v1
