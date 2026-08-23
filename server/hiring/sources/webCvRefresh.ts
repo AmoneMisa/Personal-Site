@@ -7,7 +7,6 @@ import { hiringDbEnabled, saveDbCandidates } from '../../utils/hiringDb'
 import { recordWebDiagnostic, type WebSourceDiagnostic } from '../../utils/hiringDiagnostics'
 import {
   auditWebSource,
-  crawlWebSource as crawlLegacyWebSource,
   listWebSources,
   type WebSourceAudit,
 } from '../../utils/hiringWebSources'
@@ -15,6 +14,7 @@ import { persistWebProfiles } from '../webProfilePersistence'
 import { crawlCareerist } from './web/careerist'
 import { crawlFlagma, isFlagmaSource } from './web/flagma'
 import { crawlRabotaKz } from './web/rabotaKz'
+import { crawlTalentUa } from './web/talentUa'
 
 export { auditWebSource, listWebSources, type WebSourceAudit }
 
@@ -22,7 +22,8 @@ export async function crawlWebSource(key: string, cursor?: WebCursor) {
   if (isFlagmaSource(key)) return crawlFlagma(key, cursor)
   if (key === 'careerist-uz') return crawlCareerist(cursor)
   if (key === 'rabotakz') return crawlRabotaKz(cursor)
-  return crawlLegacyWebSource(key, cursor)
+  if (key === 'talent-ua') return crawlTalentUa(cursor)
+  throw new Error(`unknown web source: ${key}`)
 }
 
 export async function refreshHiringWebSource(
