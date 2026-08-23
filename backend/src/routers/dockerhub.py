@@ -4,7 +4,7 @@ from typing import Optional, List, Dict, Any
 import httpx
 import re
 import json
-from ..utils.redis_client import get_redis
+from ..utils.state_store import get_state_store
 import asyncio
 
 router = APIRouter(prefix="/dockerhub", tags=["DockerHub"])
@@ -73,17 +73,17 @@ def pick_best_for_base(base: str, tags: List[str]) -> str:
 
 
 # -----------------------------
-# Redis helpers
+# Persistent cache helpers
 # -----------------------------
-async def rget_json(redis, key: str):
-    raw = await redis.get(key)
+async def get_json(store, key: str):
+    raw = await store.get(key)
     if not raw:
         return None
     return json.loads(raw)
 
 
-async def rset_json(redis, key: str, obj, ttl: int):
-    await redis.set(key, json.dumps(obj, ensure_ascii=False), ex=ttl)
+async def set_json(store, key: str, obj, ttl: int):
+    await store.set(key, json.dumps(obj, ensure_ascii=False), ex=ttl)
 
 
 # -----------------------------
@@ -264,15 +264,15 @@ async def resolve_tag(
         repo: str,
         major: int,
         variant: Optional[str] = None,
-        redis=Depends(get_redis),
+        store=Depends(get_state_store),
 ):
     cache_key = f"dockerhub:tags:{repo}:name={major}"
-    cached = await rget_json(redis, cache_key)
+    cached = await get_json(store, cache_key)
 
     if cached is None:
         raw = await dockerhub_list_tags(repo, name_filter=str(major), page_size=100)
         cached = [{"name": t.get("name"), "images": t.get("images", [])} for t in raw]
-        await rset_json(redis, cache_key, cached, ttl=900)  # 15 минут
+        await set_json(store, cache_key, cached, ttl=900)  # 15 минут
 
     names = [t["name"] for t in cached if t.get("name")]
     best, fallbacks, reason = pick_best(names, major, variant)
@@ -318,28 +318,28 @@ async def registry_digest_map_for_tags(repo: str, tags: List[str], token: str, c
 async def tag_aliases(
         repo: str,
         tag: str,
-        redis=Depends(get_redis),
+        store=Depends(get_state_store),
 ):
     # digest cache
     digest_key = f"dockerhub:digest:{repo}:{tag}"
-    digest = await rget_json(redis, digest_key)
+    digest = await get_json(store, digest_key)
 
     if digest is None:
         token_key = f"dockerhub:registry_token:{repo}"
-        token = await rget_json(redis, token_key)
+        token = await get_json(store, token_key)
         if token is None:
             token = await registry_get_token(repo)
-            await rset_json(redis, token_key, token, ttl=1800)  # 30 мин
+            await set_json(store, token_key, token, ttl=1800)  # 30 мин
 
         digest = await registry_get_manifest_digest(repo, tag, token)
-        await rset_json(redis, digest_key, digest, ttl=6 * 3600)
+        await set_json(store, digest_key, digest, ttl=6 * 3600)
 
     if not digest:
         return AliasesResponse(repo=repo, tag=tag, digest=None, aliases=[], reason="digest_not_found")
 
     # aliases cache
     aliases_key = f"dockerhub:aliases:{repo}:{digest}"
-    aliases = await rget_json(redis, aliases_key)
+    aliases = await get_json(store, aliases_key)
 
     if aliases is None:
         p = parse_tag(tag)
@@ -348,22 +348,22 @@ async def tag_aliases(
         raw = await dockerhub_list_tags(repo, name_filter=name_filter, page_size=100)
         tag_names = [t.get("name") for t in raw if t.get("name")]
 
-        # токен
+        # token
         token_key = f"dockerhub:registry_token:{repo}"
-        token = await rget_json(redis, token_key)
+        token = await get_json(store, token_key)
         if token is None:
             token = await registry_get_token(repo)
-            await rset_json(redis, token_key, token, ttl=1800)
+            await set_json(store, token_key, token, ttl=1800)
 
         digest_map_key = f"dockerhub:digest_map:{repo}:filter={name_filter or 'all'}"
-        digest_to_tags = await rget_json(redis, digest_map_key)
+        digest_to_tags = await get_json(store, digest_map_key)
 
         if digest_to_tags is None:
             digest_to_tags = await registry_digest_map_for_tags(repo, tag_names, token, concurrency=10)
-            await rset_json(redis, digest_map_key, digest_to_tags, ttl=1800)  # 30 мин
+            await set_json(store, digest_map_key, digest_to_tags, ttl=1800)  # 30 мин
 
         aliases = sorted(set(digest_to_tags.get(digest, [])))
-        await rset_json(redis, aliases_key, aliases, ttl=1800)
+        await set_json(store, aliases_key, aliases, ttl=1800)
 
     return AliasesResponse(repo=repo, tag=tag, digest=digest, aliases=aliases, reason="ok")
 
@@ -372,7 +372,7 @@ async def tag_aliases(
 async def simple_search_tags(
         repo: str,
         q: str,
-        redis=Depends(get_redis),
+        store=Depends(get_state_store),
 ):
     q = (q or "").strip().lower()
     if not q:
@@ -380,11 +380,11 @@ async def simple_search_tags(
 
     # кешируем список тегов по q
     cache_key = f"dockerhub:simple_search:{repo}:q={q}"
-    cached = await rget_json(redis, cache_key)
+    cached = await get_json(store, cache_key)
     if cached is None:
         raw = await dockerhub_list_tags(repo, name_filter=q, page_size=100)
         names = [t.get("name") for t in raw if t.get("name")]
-        await rset_json(redis, cache_key, names, ttl=600)  # 10 минут
+        await set_json(store, cache_key, names, ttl=600)  # 10 минут
     else:
         names = cached
 
