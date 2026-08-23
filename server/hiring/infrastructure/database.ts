@@ -1,9 +1,10 @@
 // Durable candidate storage in the shared Postgres, in its own `hiring` schema
 // so the site's tables never collide with flat-finder's public ones.
 //
-// Redis stays the hot path. Postgres survives a Redis flush, cold container
-// restart or Telegram worker outage. Every operation is best-effort: database
-// failures must not take the candidate board down with them.
+// The filesystem-backed state store on SITE_STATE_DIR is the hot snapshot path.
+// Postgres is the durable fallback across snapshot loss, cold container restarts
+// and Telegram worker outages. Every operation is best-effort: database failures
+// must not take the candidate board down with them.
 
 import { Pool } from 'pg'
 import { normalizeCandidate } from '../../utils/hiringNormalize'
