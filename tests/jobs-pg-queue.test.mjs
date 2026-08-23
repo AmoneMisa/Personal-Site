@@ -4,6 +4,8 @@ import { readFileSync } from 'node:fs'
 
 const queue = readFileSync(new URL('../shared/jobs/jobsPgQueue.ts', import.meta.url), 'utf8')
 const worker = readFileSync(new URL('../jobs-worker/worker.ts', import.meta.url), 'utf8')
+const jobsRuntime = readFileSync(new URL('../jobs-worker/jobsRuntime.ts', import.meta.url), 'utf8')
+const hiringAdapters = readFileSync(new URL('../jobs-worker/hiringAdapters.ts', import.meta.url), 'utf8')
 const dockerfile = readFileSync(new URL('../jobs-worker/Dockerfile', import.meta.url), 'utf8')
 const compose = readFileSync(new URL('../docker-compose.yml', import.meta.url), 'utf8')
 const jobsFeed = readFileSync(new URL('../server/routes/jobs-feed.get.ts', import.meta.url), 'utf8')
@@ -27,19 +29,24 @@ test('jobs and hiring tasks use a durable PostgreSQL queue', () => {
   assert.match(queue, /ON CONFLICT \(task_key\) DO NOTHING/)
 })
 
-test('one TypeScript worker owns queue transitions and ingestion directly', () => {
+test('one TypeScript worker owns queue transitions and ingestion through local runtime boundaries', () => {
   assert.match(worker, /dispatchDueJobsQueue/)
   assert.match(worker, /claimJobsQueueTask/)
   assert.match(worker, /completeJobsQueueTask/)
   assert.match(worker, /failJobsQueueTask/)
-  assert.match(worker, /refreshJobSource/)
-  assert.match(worker, /refreshHiringChannel/)
-  assert.match(worker, /refreshHiringWebSource/)
-  assert.match(worker, /refreshHiringSocialSource/)
+  assert.match(worker, /refreshSource\(source\)/)
+  assert.match(worker, /refreshHiringTarget\(handle\)/)
   assert.doesNotMatch(worker, /\/internal\/jobs-/)
   assert.doesNotMatch(worker, /\/internal\/hiring-/)
   assert.doesNotMatch(worker, /JOBS_FRONTEND_URL|JOBS_BACKEND_URL|JOBS_API_URL/)
   assert.match(worker, /\.\.\/shared\/jobs\/jobsPgQueue/)
+
+  assert.match(jobsRuntime, /refreshJobSource/)
+  assert.match(hiringAdapters, /refreshHiringChannel/)
+  assert.match(hiringAdapters, /refreshHiringWebSource/)
+  assert.match(hiringAdapters, /refreshHiringSocialSource/)
+  assert.match(hiringAdapters, /refreshHiringLinkedInSource/)
+
   assert.match(dockerfile, /jobs-worker\/worker\.ts/)
   assert.doesNotMatch(dockerfile, /pip install|python/)
 })
