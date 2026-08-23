@@ -1,7 +1,7 @@
 export { refreshHiringChannel } from '../../utils/hiringStore'
 export { refreshHiringWebSource } from '../../utils/hiringWebSources'
 export { refreshHiringIshBorSource } from '../sources/ishBorRefresh'
-export { refreshHiringSecondaryWebSource } from '../../utils/hiringSecondaryWebSources'
+export { refreshHiringSecondaryWebSource } from '../sources/secondaryWebRefresh'
 export { refreshHiringUzJobsSource } from '../sources/uzJobsRefresh'
 export { refreshHiringSocialSource } from '../sources/socialRefresh'
 export { refreshHiringLinkedInSource } from '../sources/linkedInRefresh'
