@@ -7,7 +7,7 @@ const MEMORY_TTL_MS = 60_000
 
 // Keep in sync with the derivation version stamped by hiringStore. The Nuxt API
 // only reads this marker; the worker owns normalization/repair and writes it.
-export const HIRING_SNAPSHOT_DERIVED_VERSION = 'd18'
+export const DERIVED_VERSION = 'd18'
 
 type StoredProfile = CvProfile & {
   lastSeen?: string
