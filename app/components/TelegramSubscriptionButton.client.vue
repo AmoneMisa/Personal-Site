@@ -85,9 +85,9 @@ const isEnglish = computed(() => String(locale.value).toLowerCase().startsWith('
 const label = computed(() => {
   if (busy.value) return isEnglish.value ? 'Opening Telegram…' : 'Открываю Telegram…'
   if (editing.value) return isEnglish.value ? 'Update subscription' : 'Обновить подписку'
-  return isEnglish.value ? 'Subscribe to new results' : 'Подписаться на новые'
+  return isEnglish.value ? 'Subscribe to updates' : 'Подписаться на обновления'
 })
-const backLabel = computed(() => isEnglish.value ? 'Back to filters' : 'Наверх к фильтрам')
+const backLabel = computed(() => isEnglish.value ? 'Top' : 'Наверх')
 const errorText = computed(() => isEnglish.value
   ? 'Could not create the Telegram subscription link.'
   : 'Не удалось создать ссылку подписки в Telegram.')
@@ -136,7 +136,7 @@ async function subscribe() {
       <button
         v-if="searchKind && available"
         type="button"
-        class="search-action search-action_accent"
+        class="search-action search-action_subscription"
         :class="{ 'search-action_busy': busy }"
         :aria-label="label"
         :title="label"
@@ -156,8 +156,6 @@ async function subscribe() {
 </template>
 
 <style scoped>
-/* The old Flat Finder pill is intentionally suppressed: its action now lives in
-   this shared floating stack together with Telegram subscriptions. */
 :global(.flats__back-top) {
   display: none !important;
 }
@@ -166,9 +164,9 @@ async function subscribe() {
   position: fixed;
   right: max(18px, env(safe-area-inset-right));
   bottom: max(18px, env(safe-area-inset-bottom));
-  z-index: 60;
+  z-index: 4000;
   display: flex;
-  max-width: min(360px, calc(100vw - 36px));
+  max-width: calc(100vw - 36px);
   flex-direction: column;
   align-items: flex-end;
   gap: 8px;
@@ -184,25 +182,24 @@ async function subscribe() {
 }
 
 .search-action {
-  width: 48px;
-  min-width: 48px;
-  height: 48px;
-  padding: 0 13px;
+  width: auto;
+  min-width: 44px;
+  height: 44px;
+  padding: 0 11px;
   display: inline-flex;
   flex-direction: row-reverse;
   align-items: center;
   justify-content: flex-start;
-  gap: 10px;
+  gap: 0;
   overflow: hidden;
-  border: 1px solid var(--line);
+  border: 1px solid rgba(113, 137, 217, .28);
   border-radius: 999px;
-  background: var(--bg-panel);
+  background: rgba(16, 20, 48, .96);
   color: var(--text-primary);
-  box-shadow: 0 8px 26px rgba(0, 0, 0, .28);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, .24);
   white-space: nowrap;
   cursor: pointer;
   transition:
-    width 190ms ease,
     border-color 160ms ease,
     color 160ms ease,
     background-color 160ms ease,
@@ -211,15 +208,15 @@ async function subscribe() {
 
 .search-action:hover,
 .search-action:focus-visible {
-  color: var(--accent-pink);
-  border-color: rgba(224, 103, 154, .56);
-  box-shadow: 0 10px 30px rgba(0, 0, 0, .34);
+  color: var(--text-white, #fff);
+  border-color: rgba(224, 103, 154, .58);
+  background: rgba(26, 27, 58, .98);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, .3);
   outline: none;
 }
 
-.search-action_accent {
-  border-color: rgba(224, 103, 154, .46);
-  background: color-mix(in srgb, var(--bg-panel) 86%, var(--accent-pink) 14%);
+.search-action_subscription .search-action__icon {
+  color: var(--accent-pink);
 }
 
 .search-action:disabled {
@@ -235,24 +232,22 @@ async function subscribe() {
 
 .search-action__label {
   display: block;
-  min-width: 0;
   max-width: 0;
+  margin-right: 0;
   overflow: hidden;
   opacity: 0;
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 600;
   line-height: 1;
   transition:
-    max-width 190ms ease,
+    max-width 180ms ease,
+    margin-right 180ms ease,
     opacity 120ms ease;
 }
 
-.search-action:focus-visible {
-  width: min(260px, calc(100vw - 36px));
-}
-
 .search-action:focus-visible .search-action__label {
-  max-width: 210px;
+  max-width: 220px;
+  margin-right: 9px;
   opacity: 1;
 }
 
@@ -266,7 +261,7 @@ async function subscribe() {
   padding: 8px 10px;
   border: 1px solid rgba(239, 68, 68, .35);
   border-radius: 10px;
-  background: rgba(15, 23, 42, .94);
+  background: rgba(15, 23, 42, .96);
   color: #fecaca;
   font-size: 12px;
   line-height: 1.35;
@@ -275,12 +270,9 @@ async function subscribe() {
 }
 
 @media (hover: hover) and (pointer: fine) {
-  .search-action:hover {
-    width: min(260px, calc(100vw - 36px));
-  }
-
   .search-action:hover .search-action__label {
-    max-width: 210px;
+    max-width: 220px;
+    margin-right: 9px;
     opacity: 1;
   }
 }
@@ -297,18 +289,14 @@ async function subscribe() {
   }
 
   .search-action {
-    width: 46px;
-    min-width: 46px;
-    height: 46px;
-    padding-inline: 12px;
-  }
-
-  .search-action:focus-visible {
-    width: 46px;
+    min-width: 42px;
+    height: 42px;
+    padding-inline: 10px;
   }
 
   .search-action:focus-visible .search-action__label {
     max-width: 0;
+    margin-right: 0;
     opacity: 0;
   }
 }
