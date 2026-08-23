@@ -6,6 +6,8 @@ const queue = readFileSync(new URL('../server/utils/jobsPgQueue.ts', import.meta
 const worker = readFileSync(new URL('../jobs-worker/worker.ts', import.meta.url), 'utf8')
 const dockerfile = readFileSync(new URL('../jobs-worker/Dockerfile', import.meta.url), 'utf8')
 const compose = readFileSync(new URL('../docker-compose.yml', import.meta.url), 'utf8')
+const jobsFeed = readFileSync(new URL('../server/routes/jobs-feed.get.ts', import.meta.url), 'utf8')
+const hiringFeed = readFileSync(new URL('../server/routes/hiring-feed.get.ts', import.meta.url), 'utf8')
 const envExample = readFileSync(new URL('../.env.example', import.meta.url), 'utf8')
 const packageJson = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'))
 const packageLock = JSON.parse(readFileSync(new URL('../package-lock.json', import.meta.url), 'utf8'))
@@ -36,23 +38,29 @@ test('one TypeScript worker owns queue transitions and ingestion directly', () =
   assert.match(worker, /refreshHiringSocialSource/)
   assert.doesNotMatch(worker, /\/internal\/jobs-/)
   assert.doesNotMatch(worker, /\/internal\/hiring-/)
-  assert.doesNotMatch(worker, /JOBS_FRONTEND_URL|JOBS_BACKEND_URL/)
+  assert.doesNotMatch(worker, /JOBS_FRONTEND_URL|JOBS_BACKEND_URL|JOBS_API_URL/)
   assert.match(dockerfile, /jobs-worker\/worker\.ts/)
   assert.doesNotMatch(dockerfile, /pip install|python/)
 })
 
-test('Personal-Site has one jobs worker and a read-only Nuxt jobs API', () => {
+test('jobs and hiring API stay in Nuxt while heavy execution stays out', () => {
+  assert.match(jobsFeed, /read-only vacancy feed/u)
+  assert.match(hiringFeed, /read-only candidate CV\/resume feed/u)
+  assert.match(compose, /^\s{2}frontend:\s*$/m)
+  assert.match(compose, /^\s{2}jobs-worker:\s*$/m)
+  assert.doesNotMatch(compose, /^\s{2}jobs-api:\s*$/m)
+  assert.doesNotMatch(compose, /jobs-backend/)
+  assert.doesNotMatch(compose, /jobs-queue-worker/)
+  assert.doesNotMatch(compose, /jobs-queue-dispatcher/)
+  assert.match(compose, /JOBS_RUNTIME_ROLE:\s*frontend/)
+  assert.match(compose, /JOBS_RUNTIME_ROLE:\s*worker/)
+})
+
+test('Personal-Site no longer depends on flat-finder RabbitMQ', () => {
   assert.doesNotMatch(compose, /flat-finder-rabbitmq/)
   assert.doesNotMatch(compose, /RABBITMQ_/)
   assert.match(compose, /JOBS_QUEUE_DATABASE_URL/)
   assert.match(compose, /JOBS_QUEUE_DB_SCHEMA/)
-  assert.match(compose, /^\s{2}jobs-worker:\s*$/m)
-  assert.match(compose, /^\s{2}jobs-api:\s*$/m)
-  assert.doesNotMatch(compose, /jobs-queue-worker/)
-  assert.doesNotMatch(compose, /jobs-queue-dispatcher/)
-  assert.doesNotMatch(compose, /jobs-backend/)
-  assert.match(compose, /JOBS_RUNTIME_ROLE:\s*api/)
-  assert.match(compose, /JOBS_RUNTIME_ROLE:\s*worker/)
 })
 
 test('application state no longer requires a Redis runtime', () => {
