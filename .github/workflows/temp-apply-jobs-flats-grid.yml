@@ -1,0 +1,40 @@
+name: Apply jobs and flats grid fixes
+
+on:
+  push:
+    branches:
+      - feature/hiring-sort-salary-filter
+    paths:
+      - .tmp/apply_jobs_flats_grid.py
+      - .github/workflows/temp-apply-jobs-flats-grid.yml
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout feature branch
+        uses: actions/checkout@v4
+        with:
+          ref: feature/hiring-sort-salary-filter
+          fetch-depth: 0
+
+      - name: Apply source changes
+        run: python .tmp/apply_jobs_flats_grid.py
+
+      - name: Remove temporary patcher
+        run: |
+          rm -f .tmp/apply_jobs_flats_grid.py
+          rm -f .github/workflows/temp-apply-jobs-flats-grid.yml
+          rmdir .tmp 2>/dev/null || true
+
+      - name: Commit source changes
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git diff --cached --quiet && exit 0
+          git commit -m "Polish vacancy titles and responsive grids"
+          git push origin HEAD:feature/hiring-sort-salary-filter
