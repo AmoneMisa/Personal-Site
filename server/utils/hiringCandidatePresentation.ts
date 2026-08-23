@@ -1,11 +1,11 @@
-export * from '../hiring/legacy/hiringCandidatePresentationCore'
+export * from '../../shared/legacy/hiringCandidatePresentationCore'
 
 import type { CvProfile } from './hiringTypes'
 import {
   publicCandidateLanguages as legacyLanguages,
   publicCandidateProfessionKeys as legacyProfessionKeys,
   type HiringCandidateLocale,
-} from '../hiring/legacy/hiringCandidatePresentationCore'
+} from '../../shared/legacy/hiringCandidatePresentationCore'
 
 const STANDALONE_REMOTE_ROLE_RE = /^(?:онлайн|onlayn|online)$/iu
 
@@ -36,7 +36,7 @@ const LEVELS = [
   { ru: 'базовый', en: 'basic', re: /базов\p{L}*|basic|boshlang['’ʻʼ‘`]?ich/giu },
 ] as const
 
-function nearestLevelIn(text: string, target: number, locale: HiringCandidateLocale) {
+function nearestLevelIn(text: string, target: number, locale: HiringCandidateLocale): string | null {
   const candidates: Array<{ distance: number; value: string }> = []
   for (const match of text.matchAll(/(?:^|[^A-Z])(A1|A2|B1|B2|C1|C2)(?=$|[^A-Z])/gi)) {
     const index = (match.index || 0) + match[0].indexOf(match[1]!)
@@ -55,7 +55,18 @@ function nearestLevelIn(text: string, target: number, locale: HiringCandidateLoc
   return candidates[0]?.value || null
 }
 
+function cefrAfterLanguage(text: string, languageIndex: number): string | null {
+  // CEFR markers written after a language name ("English level: B2") are
+  // explicit for that language. Keep the search inside the same clause so a B2
+  // from the next sentence cannot overwrite a preceding Russian/Tajik level.
+  const clause = text.slice(languageIndex, Math.min(text.length, languageIndex + 70)).split(/[.;\n]/u, 1)[0] || ''
+  return clause.match(/(?:^|[^A-Z])(A1|A2|B1|B2|C1|C2)(?=$|[^A-Z])/i)?.[1]?.toUpperCase() || null
+}
+
 function nearestLanguageLevel(text: string, languageIndex: number, locale: HiringCandidateLocale): string | null {
+  const explicitCefr = cefrAfterLanguage(text, languageIndex)
+  if (explicitCefr) return explicitCefr
+
   const beforeStart = Math.max(0, languageIndex - 40)
   const before = text.slice(beforeStart, languageIndex)
   const beforeLevel = nearestLevelIn(before, before.length, locale)
