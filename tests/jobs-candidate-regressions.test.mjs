@@ -41,7 +41,7 @@ test('ish-bor registration-only detail text falls back to the vacancy title', ()
 })
 
 test('UzJobs backfill no longer stops on a page with zero recent visits', () => {
-  const source = readFileSync(new URL('../server/utils/hiringUzJobsSource.ts', import.meta.url), 'utf8')
+  const source = readFileSync(new URL('../shared/hiring/sources/uzJobsCrawler.ts', import.meta.url), 'utf8')
 
   assert.doesNotMatch(source, /recent\.length\s*===\s*0/u)
   assert.match(source, /legacyPrematureComplete/u)
