@@ -1,6 +1,6 @@
 // Application-facing boundary for Telegram hiring channel refreshes.
 //
-// `server/utils/hiringStore.ts` still owns the store merge/AI/persistence details
-// during the incremental migration. Keeping the queue/application layer behind
-// this module lets that legacy store be split without leaking its internals.
-export { refreshHiringChannel } from '../../utils/hiringStore'
+// The queue/application layer depends on the canonical application service;
+// legacy server/utils/hiringStore.ts is no longer part of the per-channel
+// worker path.
+export { refreshHiringChannel } from '../application/refreshTelegramChannel'
