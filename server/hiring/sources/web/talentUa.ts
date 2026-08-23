@@ -40,7 +40,7 @@ function parseTalent(sourceBlock: CandidateBlock, source: WebCvAdapter): CvProfi
   })
 }
 
-const TALENT_SOURCE: WebCvAdapter = {
+export const TALENT_SOURCE: WebCvAdapter = {
   key: 'talent-ua',
   label: 'Talent.UA',
   country: 'UA',
