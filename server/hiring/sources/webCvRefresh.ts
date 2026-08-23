@@ -4,8 +4,8 @@ import {
   type WebCvSourceKey,
 } from '../../../shared/hiring/sources/webCvSources'
 import { emptyWebCursor, loadWebCursors, saveWebCursor, type WebCursor } from '../../utils/hiringCursors'
-import { hiringDbEnabled, saveDbCandidates } from '../../utils/hiringDb'
 import { recordWebDiagnostic, type WebSourceDiagnostic } from '../../utils/hiringDiagnostics'
+import { hiringDbEnabled, saveDbCandidates } from '../infrastructure/database'
 import { persistWebProfiles } from '../webProfilePersistence'
 import { crawlCareerist } from './web/careerist'
 import { crawlFlagma, isFlagmaSource } from './web/flagma'
