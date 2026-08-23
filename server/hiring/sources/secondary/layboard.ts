@@ -1,7 +1,7 @@
 import type { CvProfile } from '../../../../shared/contracts/hiring'
 import { activityDate, cityFrom, htmlText, isRecent, parseAge } from '../../../../shared/hiring/webFields'
 import { fetchSecondaryHtml, safeAbsoluteUrl } from './http'
-import { buildSecondaryProfile } from './profile'
+import { buildSecondaryProfile, parseSecondaryChipSalary } from './profile'
 
 function maxActivity(...values: Array<string | null>): string | null {
   const times = values
@@ -31,23 +31,6 @@ function cards(html: string): string[] {
     const stop = part.indexOf('<div class="pagination')
     return stop > 0 ? part.slice(0, stop) : part
   })
-}
-
-function chipSalary(chip: string): Pick<CvProfile, 'salaryMin' | 'salaryMax' | 'currency'> {
-  const amounts = [...chip.matchAll(/\d[\d\s]*/g)]
-    .map((match) => Number(match[0].replace(/\s+/g, '')))
-    .filter((value) => Number.isFinite(value) && value > 0)
-  if (!amounts.length) return {}
-  const currency = /\$|usd/iu.test(chip) ? 'USD'
-    : /руб|rub|₽/iu.test(chip) ? 'RUB'
-      : /€|eur/iu.test(chip) ? 'EUR'
-        : /₸|тенге|kzt/iu.test(chip) ? 'KZT'
-          : /грн|uah|₴/iu.test(chip) ? 'UAH'
-            : /lei|ron/iu.test(chip) ? 'RON'
-              : ''
-  return currency
-    ? { salaryMin: Math.min(...amounts), salaryMax: Math.max(...amounts), currency }
-    : {}
 }
 
 export async function crawlLayboard(): Promise<{ profiles: CvProfile[]; fetched: number }> {
@@ -80,7 +63,7 @@ export async function crawlLayboard(): Promise<{ profiles: CvProfile[]; fetched:
         .filter(Boolean)
       const age = chips.map((chip) => parseAge(chip)).find((value) => value != null) ?? null
       const place = chips.find((chip) => !/\d/.test(chip)) || ''
-      const salary = chips.map(chipSalary).find((value) => value.salaryMin != null) || {}
+      const salary = chips.map(parseSecondaryChipSalary).find((value) => value.salaryMin != null) || {}
 
       const profile = buildSecondaryProfile({
         key: 'layboard-kz',
