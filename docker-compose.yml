@@ -1,7 +1,7 @@
 services:
   backend:
     # Existing auxiliary site backend. Jobs/hiring do NOT use this service:
-    # their read API is Nuxt/Nitro (`jobs-api`) and ingestion is `jobs-worker`.
+    # their API lives in Nuxt/Nitro and ingestion runs in `jobs-worker`.
     image: ghcr.io/amonemisa/personal-site-backend:latest
     restart: unless-stopped
     environment:
@@ -36,9 +36,8 @@ services:
       start_period: 10s
 
   frontend:
-    # Public Nuxt renderer. No queue, crawler, source adapter or ingestion task
-    # executes here. Jobs/hiring data requests are proxied to another Nitro
-    # process built from this same Personal-Site image.
+    # One Nuxt/Nitro runtime owns UI, SSR and lightweight read-only jobs/hiring
+    # API routes. It never schedules or executes scraping/refresh/queue work.
     image: ghcr.io/amonemisa/personal-site:latest
     restart: unless-stopped
     env_file:
@@ -46,38 +45,14 @@ services:
     environment:
       SITE_STATE_DIR: /var/app/state/site
       JOBS_RUNTIME_ROLE: frontend
-      JOBS_API_URL: http://jobs-api:3000
-    volumes:
-      - site_state:/var/app/state
-    ports:
-      - "127.0.0.1:8080:3000"
-    networks:
-      - default
-      - ai-net
-    healthcheck:
-      test: ["CMD", "node", "-e", "fetch('http://localhost:3000/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
-      interval: 30s
-      timeout: 5s
-      retries: 3
-      start_period: 30s
-
-  jobs-api:
-    # Read-only Nuxt/Nitro jobs+hiring API from the SAME application image.
-    # It serves stored snapshots/search only and has no refresh/queue endpoints.
-    image: ghcr.io/amonemisa/personal-site:latest
-    restart: unless-stopped
-    env_file:
-      - ${SITE_ENV_FILE:-./db.env}
-    environment:
-      SITE_STATE_DIR: /var/app/state/site
-      JOBS_RUNTIME_ROLE: api
-      JOBS_API_URL: http://jobs-api:3000
       ELASTICSEARCH_URL: http://flat-finder-elasticsearch:9200
       JOBS_ELASTICSEARCH_INDEX: job-listings-v1
       HIRING_DATABASE_URL: ${HIRING_DATABASE_URL:-}
       HIRING_DB_SCHEMA: ${HIRING_DB_SCHEMA:-hiring}
     volumes:
       - site_state:/var/app/state
+    ports:
+      - "127.0.0.1:8080:3000"
     networks:
       - default
       - ai-net
