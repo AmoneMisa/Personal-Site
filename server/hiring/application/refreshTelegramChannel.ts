@@ -15,7 +15,6 @@ import type { CandidateEmploymentType, CvProfile } from '../../../shared/contrac
 
 const STORE_KEY = 'hiring:store:v4'
 const STORE_TTL_SECONDS = 100 * 86_400
-const MEMORY_TTL_MS = 5 * 60_000
 const MAX_AGE_MONTHS = 3
 const AI_MIN_CONFIDENCE = 0.7
 const AI_CANDIDATE_PARSER_VERSION = 'candidate-semantic-v2'
@@ -63,7 +62,6 @@ type StoredProfile = CvProfile & {
 }
 
 let memoryStore: StoredProfile[] = []
-let memoryValidUntil = 0
 let dbHydratedAt = 0
 
 function dedupKey(profile: CvProfile): string {
@@ -187,7 +185,6 @@ function derive(profile: StoredProfile): StoredProfile {
 async function persistStore(input: StoredProfile[]) {
   const list = input.map(derive)
   memoryStore = list
-  memoryValidUntil = Date.now() + MEMORY_TTL_MS
   try {
     await useStateStore().set(STORE_KEY, JSON.stringify(list), 'EX', STORE_TTL_SECONDS)
   } catch (error) {
@@ -196,14 +193,9 @@ async function persistStore(input: StoredProfile[]) {
 }
 
 async function loadStored(): Promise<StoredProfile[]> {
-  if (memoryStore.length && Date.now() < memoryValidUntil) return memoryStore
   try {
     const raw = await useStateStore().get(STORE_KEY)
-    if (raw) {
-      memoryStore = JSON.parse(raw) as StoredProfile[]
-      memoryValidUntil = Date.now() + MEMORY_TTL_MS
-      return memoryStore
-    }
+    if (raw) return JSON.parse(raw) as StoredProfile[]
   } catch {
     // Fall through to memory/Postgres.
   }
