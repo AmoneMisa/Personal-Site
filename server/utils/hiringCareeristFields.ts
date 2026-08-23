@@ -1,13 +1,47 @@
-/** Removes listing pagination and legacy inline JavaScript after the last CV. */
+/** Removes listing pagination, appended neighbouring CVs and inline JavaScript. */
 export function trimCareeristProfileText(text: string): string {
   const lines = text.split('\n').map((line) => line.trim()).filter(Boolean)
-  const boundary = lines.findIndex((line) => (
+  const technicalBoundary = lines.findIndex((line) => (
     /^Показать еще$/iu.test(line)
     || /^<!--/u.test(line)
     || /^\$\s*\(\s*document\s*\)/iu.test(line)
     || /^window\./iu.test(line)
   ))
-  const profileLines = lines.slice(0, boundary >= 0 ? boundary : undefined)
+  const sourceLines = lines.slice(0, technicalBoundary >= 0 ? technicalBoundary : undefined)
+
+  // Careerist search fragments sometimes contain the beginning of the next CV
+  // after the requested profile. The second literal "Город"/"Возраст" block is
+  // a much safer boundary than trying to guess where the first work history ends.
+  let cityBlocks = 0
+  let ageBlocks = 0
+  let dateBlocks = 0
+  let nextProfileAt = -1
+  for (let index = 0; index < sourceLines.length; index += 1) {
+    const line = sourceLines[index]!
+    if (/^\d{1,2}\s+\p{L}+,\s+20\d{2}$/iu.test(line)) {
+      dateBlocks += 1
+      if (dateBlocks > 1) {
+        nextProfileAt = index
+        break
+      }
+    }
+    if (/^город$/iu.test(line)) {
+      cityBlocks += 1
+      if (cityBlocks > 1) {
+        nextProfileAt = Math.max(0, index - 2)
+        break
+      }
+    }
+    if (/^возраст$/iu.test(line)) {
+      ageBlocks += 1
+      if (ageBlocks > 1) {
+        nextProfileAt = Math.max(0, index - 2)
+        break
+      }
+    }
+  }
+
+  const profileLines = sourceLines.slice(0, nextProfileAt >= 0 ? nextProfileAt : undefined)
   const clean: string[] = []
   let keptDate = false
   for (let index = 0; index < profileLines.length; index += 1) {
