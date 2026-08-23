@@ -1,6 +1,6 @@
 import { hiringChannelHandles } from '../server/utils/hiringSources'
 import { refreshHiringChannel } from '../server/utils/hiringStore'
-import { hiringWebSourceHandles, refreshHiringWebSource } from '../server/utils/hiringWebSources'
+import { refreshHiringWebSource } from '../server/utils/hiringWebSources'
 import { refreshHiringIshBorSource } from '../server/utils/hiringIshBorSource'
 import { refreshHiringSecondaryWebSource } from '../server/utils/hiringSecondaryWebSources'
 import { refreshHiringUzJobsSource } from '../server/utils/hiringUzJobsSource'
@@ -11,6 +11,7 @@ import { hiringUzJobsSourceHandles } from '../shared/hiring/sources/uzJobsSource
 import { hiringSocialSourceHandles } from '../shared/hiring/sources/socialSources'
 import { hiringLinkedInSourceHandles } from '../shared/hiring/sources/linkedInSources'
 import { hiringSecondaryWebSourceHandles } from '../shared/hiring/sources/secondaryWebSources'
+import { hiringWebSourceHandles } from '../shared/hiring/sources/webCvSources'
 
 type HiringAdapter = {
   handles: () => string[]
