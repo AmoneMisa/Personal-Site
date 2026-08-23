@@ -79,21 +79,6 @@ jobs:
     environment: Production
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-
-      # Runtime queue wiring lives in compose. Sync it with the exact image
-      # revision being deployed so the server cannot keep a stale RabbitMQ URL
-      # after the workers themselves have moved to PostgreSQL.
-      - name: Sync compose runtime config
-        uses: appleboy/scp-action@v0.1.7
-        with:
-          host: ${{ vars.SERVER_HOST }}
-          username: ${{ vars.SERVER_USER }}
-          key: ${{ secrets.SERVER_SSH_KEY }}
-          source: "docker-compose.yml"
-          target: "~/opt/myproject"
-          overwrite: true
-
       - name: Deploy via SSH
         uses: appleboy/ssh-action@v1.0.0
         with:
@@ -104,4 +89,16 @@ jobs:
           script: |
             echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
             trap 'docker logout ghcr.io >/dev/null 2>&1 || true' EXIT
-            flock -w 1800 /tmp/personal-site-deploy.lock bash ~/opt/myproject/deploy.sh
+
+            cd ~/opt/myproject
+
+            # docker-compose.yml is deployment-managed by Git. Older workflows
+            # copied it over the checkout before `git pull`, which made the tree
+            # dirty and caused pull/deploy to fail. Heal that legacy dirty file
+            # once, then update the checkout normally. No SCP overwrite is used.
+            if [ -d .git ]; then
+              git restore --source=HEAD --staged --worktree -- docker-compose.yml
+              git pull --ff-only
+            fi
+
+            flock -w 1800 /tmp/personal-site-deploy.lock bash ./deploy.sh
