@@ -8,11 +8,8 @@ export default defineNuxtConfig({
             },
             script: [
                 {
-                    // The site is dark-only. Lock the color-mode storage/cookie to
-                    // "dark" BEFORE @nuxtjs/color-mode's own inline script reads it,
-                    // so a stale "system"/"light" value from the old theme toggle can
-                    // never resolve to light (which would apply the .light class and
-                    // strip Nuxt UI's dark tokens). Runs pre-paint, so no flash.
+                    // The site is dark-only. Lock the persisted preference before paint
+                    // so stale values from the removed theme toggle cannot flash a light theme.
                     tagPriority: 'critical',
                     innerHTML:
                         "try{localStorage.setItem('nuxt-color-mode','dark');" +
@@ -43,12 +40,6 @@ export default defineNuxtConfig({
     devtools: {enabled: true},
     modules: ['@nuxtjs/i18n', '@nuxt/icon', '@nuxt/image'],
     css: ['~/assets/css/main.css'],
-    // The redesign is a dark-only theme. Kept for @nuxtjs/color-mode if present;
-    // with Nuxt UI removed the palette is pinned by our own CSS variables.
-    colorMode: {
-        preference: 'dark',
-        fallback: 'dark',
-    },
     sourcemap: {
         client: false,
         server: true
