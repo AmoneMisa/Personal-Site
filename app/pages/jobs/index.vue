@@ -1091,7 +1091,7 @@ onBeforeUnmount(() => {
           <u-button type="button" variant="ghost" color="neutral" size="sm" icon="i-lucide-rotate-ccw" @click="resetFilters">{{ t("reset") }}</u-button>
         </div>
       </div>
-
+    </form>
 
     <p v-if="failed" class="jobs__error">{{ t("error") }}</p>
     <p v-else-if="warming && savedView === 'active'" class="jobs__warming" role="status" aria-live="polite">

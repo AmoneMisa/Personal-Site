@@ -896,7 +896,7 @@ onBeforeUnmount(() => {
 
         <div class="hiring-filter-actions"><u-button type="button" variant="ghost" color="neutral" size="sm" icon="i-lucide-rotate-ccw" @click="resetFilters">{{ t("reset") }}</u-button></div>
       </div>
-
+    </form>
 
     <p v-if="failed" class="hiring__error">{{ t("error") }}</p>
     <p v-else-if="hasSourceWarning" class="hiring__source-warning">
