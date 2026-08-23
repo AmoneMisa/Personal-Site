@@ -4,7 +4,7 @@ import { extractCandidateGender } from './hiringCandidateFields'
 export type HiringCandidateLocale = 'en' | 'ru'
 
 const HIDDEN_NAME_RE = /^(?:[?？�\uFFFD]{2,}|(?:фио|имя|name|full name)?\s*(?:скрыт\p{L}*|hidden|yashiril\p{L}*|ascuns)|не\s+указано|not\s+specified|anonymous|аноним)$/iu
-const GENERIC_ROLE_RE = /^(?:ищу\s+(?:работу|подработку)(?:\s+(?:онлайн|удал[её]нно))?|удал[её]нн\p{L}*\s+подработк\p{L}*(?:\s+за\s+компьютером)?(?:\s+для\s+студентов)?|работа\s+студентам|подработка|работа|работу|любая\s+работа|любая\s+занятость|не\s*важно|без\s+разницы|нет\s+разницы|farqi\s+yo['’ʻʼ‘`]?q|farqi\s+yuq|boshqa\s+ishlar?|ish|ish\s+kerak|ish\s+qidir(?:yapman|aman)|ish\s+izlayapman|onlayn\s+ish(?:chi)?|online\s+ish(?:chi)?|onlayn|online|удал[её]нно|remote(?:\s+work)?|tungi|bilmaym\p{L}*|noma['’ʻʼ‘`]?lum(?:\s+\p{L}+)?|va)$/iu
+const GENERIC_ROLE_RE = /^(?:ищу\s+(?:работу|подработку)(?:\s+(?:онлайн|удал[её]нно))?|удал[её]нн\p{L}*\s+подработк\p{L}*(?:\s+за\s+компьютером)?(?:\s+для\s+студентов)?|работа\s+студентам|подработка|работа|работу|любая\s+работа|любая\s+занятость|не\s*важно|без\s+разницы|нет\s+разницы|farqi\s+yo['’ʻʼ‘`]?q|farqi\s+yuq|boshqa\s+ishlar?|ish|ish\s+kerak|ish\s+qidir(?:yapman|aman)|ish\s+izlayapman|onlayn\s+is(?:h|ch)(?:i|chi)?|online\s+is(?:h|ch)(?:i|chi)?|onlayn|online|удал[её]нно|remote(?:\s+work)?|tungi|uyda|ofisda|bilmaym\p{L}*|noma['’ʻʼ‘`]?lum(?:\s+\p{L}+)?|ba|va)$/iu
 const REMOTE_GENERIC_RE = /(?:онлайн|online|onlayn|удал[её]н|remote|masofaviy)/iu
 const HORECA_GENERIC_RE = /(?:ищу|нужна|нужен|работа|ишу)?[^\n]{0,40}(?:кафе|кафетер|ресторан|общепит|horeca)(?:[^\n]{0,40}(?:работ|подработ))?/iu
 const FINANCE_GENERIC_RE = /^(?:финансы?\s*[,/&+]\s*банки?|банки?\s*[,/&+]\s*финансы?|finance\s*[,/&+]\s*banking)$/iu
@@ -20,7 +20,7 @@ interface RoleAliasRule { keys: string[]; re: RegExp }
 const ROLE_ALIAS_RULES: RoleAliasRule[] = [
   { keys: ['Commercial Director'], re: /^коммерческ\p{L}*\s+директор|\bchief\s+commercial\s+officer\b|\bCCO\b/iu },
   { keys: ['Bank Operations Specialist'], re: /^(?:стаж[её]р\s+)?операционист$/iu },
-  { keys: ['Driver'], re: /^(?:xaydovchilik|haydovchilik|shafyorlik|shofyorlik)$/iu },
+  { keys: ['Driver'], re: /^(?:xaydovchilik|haydovchilik|shafyo['’ʻʼ‘`]?rlik|shofyo['’ʻʼ‘`]?rlik)$/iu },
   { keys: ['Retail Worker'], re: /^do['’ʻʼ‘`]?kon$/iu },
   { keys: ['Salesperson'], re: /^(?:savdo|sotuvchi)$/iu },
   { keys: ['Logistics Specialist'], re: /^logistika(?:\s+updater)?$/iu },
@@ -28,8 +28,8 @@ const ROLE_ALIAS_RULES: RoleAliasRule[] = [
   { keys: ['Lawyer', 'Teacher'], re: /huquqshunos[^\n,;]*(?:,|\/|\s)+(?:pedagog|o['’ʻʼ‘`]?qituvchi)|pedagog[^\n,;]*(?:,|\/|\s)+huquqshunos/iu },
   { keys: ['Lawyer'], re: /^(?:yurisprudensiya\s+)?huquq(?:shunos)?[^\n]*|^yur(?:isprudensiya|ist)[^\n]*$/iu },
   { keys: ['Teacher'], re: /^(?:matematika\s+)?o['’ʻʼ‘`]?qituvchi(?:lik)?$/iu },
-  { keys: ['Insurance Specialist'], re: /^sug['’ʻʼ‘`]?urta$/iu },
-  { keys: ['Finance / Banking Specialist'], re: /^kredit\s+bo['’ʻʼ‘`]?yicha\s+mutaxassis?$/iu },
+  { keys: ['Insurance Specialist'], re: /sug['’ʻʼ‘`]?urta/iu },
+  { keys: ['Finance / Banking Specialist'], re: /^kredit\s+bo['’ʻʼ‘`]?yicha\s+mutaxa(?:s|ss)is$/iu },
   { keys: ['Welder'], re: /^(?:svarchik|svarshik)$/iu },
   { keys: ['Confectioner'], re: /qandolat|qandolatchi/iu },
   { keys: ['Factory Worker'], re: /^(?:jizzax\s+)?kia\s+zavodidan\s+ish\s+kerak$|^zavod\s+ishlari(?:\s+.*)?$/iu },
@@ -44,7 +44,9 @@ const ROLE_ALIAS_RULES: RoleAliasRule[] = [
   { keys: ['Restaurant Manager'], re: /^(?:restoran|restaurant)[^\n]*(?:boshqaruv|manager|menejer)/iu },
   { keys: ['ERP Administrator', 'Analyst'], re: /^erp\s+administrator\p{L}*\s*(?:&|,|\/|va)\s*data\s+tahlilchi$/iu },
   { keys: ['Administrator'], re: /^virtual\s+asistent$/iu },
-  { keys: ['Engineer'], re: /^(?:texnolog|technolog)\s+(?:injener|inженер)|^(?:injener|inженер)\s+(?:texnolog|technolog)/iu },
+  { keys: ['Engineer'], re: /^(?:texnolog|technolog)\s+(?:injener|инженер)|^(?:injener|инженер)\s+(?:texnolog|technolog)/iu },
+  { keys: ['Electrician'], re: /^elektrik$/iu },
+  { keys: ['Construction Worker'], re: /^(?:yo['’ʻʼ‘`]?l|йул|йўл)\s+qurilish|^(?:yo['’ʻʼ‘`]?l|йул|йўл)\s+курилиш/iu },
   { keys: ['Barista'], re: /^(?:koffe|coffee)\s+ledy$/iu },
   { keys: ['Translator', 'Operator'], re: /tarjimon\p{L}*[^\n]*(?:operator|data\s+otish)|operator\p{L}*[^\n]*tarjimon/iu },
   { keys: ['Librarian'], re: /^kutubxonachi$/iu },
@@ -54,7 +56,7 @@ const ROLE_ALIAS_RULES: RoleAliasRule[] = [
   { keys: ['Healthcare Specialist'], re: /^(?:mededsina|meditsina|медицина)$/iu },
   { keys: ['Tourism / Hospitality Specialist'], re: /^mehmonxona[^\n]*turfirma|^turfirma[^\n]*mehmonxona/iu },
   { keys: ['Chief Accountant'], re: /^bosh\s+b(?:u(?:x|h)?|o)?galter$/iu },
-  { keys: ['Accountant'], re: /word[^\n]*excel[^\n]*hisob\s+kitob/iu },
+  { keys: ['Accountant'], re: /word[^\n]*excel[^\n]*hisob\s+kitob|^помо(?:ш|щ)ник\s+бухгалт/iu },
 ]
 
 function smartNameCase(value: string): string {
@@ -115,8 +117,9 @@ export function publicCandidateProfessionKeys(profile: CvProfile): string[] {
 }
 
 export function publicCandidateRemote(profile: CvProfile): boolean | null | undefined {
-  const text = `${profile.role || ''}\n${profile.originalText || profile.description || ''}`
-  if (REMOTE_GENERIC_RE.test(text)) return true
+  const role = (profile.role || '').trim()
+  const text = `${role}\n${profile.originalText || profile.description || ''}`
+  if (REMOTE_GENERIC_RE.test(text) || /^uyda$/iu.test(role)) return true
   return profile.remote
 }
 
