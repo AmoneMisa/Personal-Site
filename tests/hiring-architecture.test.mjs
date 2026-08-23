@@ -10,7 +10,7 @@ test('hiring application and extracted sources use canonical infrastructure path
     'server/hiring/application/readWebProfiles.ts',
     'server/hiring/application/refreshTelegramChannel.ts',
     'server/hiring/sources/ishBorRefresh.ts',
-    'server/hiring/sources/linkedinRefresh.ts',
+    'server/hiring/sources/linkedInRefresh.ts',
     'server/hiring/sources/secondaryWebRefresh.ts',
     'server/hiring/sources/socialRefresh.ts',
     'server/hiring/sources/uzJobsRefresh.ts',
@@ -23,18 +23,16 @@ test('hiring application and extracted sources use canonical infrastructure path
   }
 })
 
-test('Telegram per-channel refresh no longer depends on the legacy store', async () => {
-  const boundary = await read('server/hiring/sources/telegramRefresh.ts')
+test('Telegram per-channel refresh is owned by the application layer', async () => {
   const application = await read('server/hiring/application/refreshSources.ts')
   const channelRefresh = await read('server/hiring/application/refreshTelegramChannel.ts')
 
-  assert.match(boundary, /application\/refreshTelegramChannel/)
-  assert.doesNotMatch(boundary, /utils\/hiringStore/)
-  assert.doesNotMatch(application, /utils\/hiringStore/)
+  assert.match(application, /\.\/refreshTelegramChannel/)
+  assert.doesNotMatch(application, /sources\/telegramRefresh|utils\/hiringStore/)
   assert.doesNotMatch(channelRefresh, /utils\/hiringStore|utils\/hiringDb|utils\/hiringStoreLock/)
 })
 
-test('legacy store does not export its derivation marker into Nitro auto-imports', async () => {
-  const store = await read('server/utils/hiringStore.ts')
-  assert.doesNotMatch(store, /export\s+const\s+DERIVED_VERSION/)
+test('legacy Telegram hiring store and facade are removed', async () => {
+  await assert.rejects(read('server/utils/hiringStore.ts'), { code: 'ENOENT' })
+  await assert.rejects(read('server/hiring/sources/telegramRefresh.ts'), { code: 'ENOENT' })
 })
