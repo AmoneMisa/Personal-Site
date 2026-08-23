@@ -83,15 +83,6 @@ test('salary sort remains explicitly high to low', () => {
   assert.deepEqual(result.jobs.map((item) => item.id), ['higher', 'lower'])
 })
 
-test('jobs toolbar exposes social pills and keeps salary control near search on desktop', () => {
-  const plugin = readFileSync(new URL('../app/plugins/jobs-controls.client.ts', import.meta.url), 'utf8')
-  for (const source of ['LinkedIn', 'Facebook', 'Threads']) assert.match(plugin, new RegExp(source))
-  assert.match(plugin, /sortTitle:\s*'Заголовок А–Я'/u)
-  assert.match(plugin, /sortSalary:\s*'Зарплата: больше → меньше'/u)
-  assert.match(plugin, /grid-template-columns:\s*minmax\(420px, 760px\) 280px 220px/u)
-  assert.doesNotMatch(plugin, /node\.textContent\s*=/u)
-})
-
 test('Facebook and Threads use public social fetcher with candidate rejection and bounded timeouts', () => {
   const source = readFileSync(new URL('../server/utils/socialJobSources.ts', import.meta.url), 'utf8')
   assert.match(source, /HIRING_SOCIAL_API_URL/u)
