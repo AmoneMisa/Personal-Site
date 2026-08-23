@@ -32,10 +32,10 @@ test('explicit negative wording wins over sponsor history', () => {
   assert.equal(keepUsaForeignerCandidate(posting), false)
 })
 
-test('generic work authorization alone remains unknown', () => {
+test('generic work authorization alone remains unknown and is not included', () => {
   const posting = job({ description: 'Candidates must be legally authorized to work in the United States.' })
   assert.equal(visaSponsorshipStatus(posting), 'unknown')
-  assert.equal(keepUsaForeignerCandidate(posting), true)
+  assert.equal(keepUsaForeignerCandidate(posting), false)
 })
 
 test('historical sponsor feed is kept but not promoted to explicit', () => {
@@ -47,9 +47,21 @@ test('historical sponsor feed is kept but not promoted to explicit', () => {
   assert.equal(keepUsaForeignerCandidate(posting), true)
 })
 
-test('unknown sponsorship is kept for broad USA foreigner filter', () => {
+test('unknown sponsorship is excluded from USA foreigner filter', () => {
   const posting = job({ description: 'Build reliable distributed systems with our platform team.' })
   assert.equal(visaSponsorshipStatus(posting), 'unknown')
+  assert.equal(keepUsaForeignerCandidate(posting), false)
+})
+
+test('empty description does not pass USA foreigner filter', () => {
+  const posting = job({ description: undefined })
+  assert.equal(visaSponsorshipStatus(posting), 'unknown')
+  assert.equal(keepUsaForeignerCandidate(posting), false)
+})
+
+test('legacy positive foreignerFriendly enrichment remains accepted', () => {
+  const posting = job({ foreignerFriendly: true })
+  assert.equal(visaSponsorshipStatus(posting), 'explicit')
   assert.equal(keepUsaForeignerCandidate(posting), true)
 })
 
@@ -57,6 +69,7 @@ test('OPT/CPT/STEM OPT alone is not treated as H-1B sponsorship', () => {
   const posting = job({ description: 'Applicants on STEM OPT or CPT are welcome to apply.' })
   assert.equal(TEMPORARY_WORK_AUTH_RE.test(posting.description), true)
   assert.equal(visaSponsorshipStatus(posting), 'unknown')
+  assert.equal(keepUsaForeignerCandidate(posting), false)
 })
 
 test('verified visa-board metadata is kept', () => {
