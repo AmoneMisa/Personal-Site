@@ -61,7 +61,7 @@ function parseFlagma(block: CandidateBlock, source: WebCvAdapter): CvProfile | n
   })
 }
 
-const FLAGMA_SOURCES: Record<'flagma-uz' | 'flagma-ro', WebCvAdapter> = {
+export const FLAGMA_SOURCES: Record<'flagma-uz' | 'flagma-ro', WebCvAdapter> = {
   'flagma-uz': {
     key: 'flagma-uz',
     label: 'Flagma UZ',
