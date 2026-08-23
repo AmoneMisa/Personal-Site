@@ -1,5 +1,6 @@
 import {
   enabledWebCvSources,
+  WEB_CV_SOURCES,
   type WebCvSourceKey,
 } from '../../../shared/hiring/sources/webCvSources'
 import { emptyWebCursor, loadWebCursors, saveWebCursor, type WebCursor } from '../../utils/hiringCursors'
@@ -7,7 +8,6 @@ import { hiringDbEnabled, saveDbCandidates } from '../../utils/hiringDb'
 import { recordWebDiagnostic, type WebSourceDiagnostic } from '../../utils/hiringDiagnostics'
 import {
   auditWebSource,
-  listWebSources,
   type WebSourceAudit,
 } from '../../utils/hiringWebSources'
 import { persistWebProfiles } from '../webProfilePersistence'
@@ -16,7 +16,11 @@ import { crawlFlagma, isFlagmaSource } from './web/flagma'
 import { crawlRabotaKz } from './web/rabotaKz'
 import { crawlTalentUa } from './web/talentUa'
 
-export { auditWebSource, listWebSources, type WebSourceAudit }
+export { auditWebSource, type WebSourceAudit }
+
+export function listWebSources(): Array<{ key: string; label: string; country: string }> {
+  return WEB_CV_SOURCES.map((source) => ({ ...source }))
+}
 
 export async function crawlWebSource(key: string, cursor?: WebCursor) {
   if (isFlagmaSource(key)) return crawlFlagma(key, cursor)
