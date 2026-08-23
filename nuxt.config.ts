@@ -102,9 +102,9 @@ export default defineNuxtConfig({
         }
     },
     nitro: {
-        // No jobs/hiring scheduler or crawler is registered in Nitro. The public
-        // renderer proxies those read routes to a second Nuxt/Nitro process
-        // (`jobs-api`); the standalone Node worker owns every ingestion task.
+        // Jobs/hiring read APIs live directly in Nitro server routes. No crawler,
+        // scheduler or queue execution is registered in this process; the separate
+        // Node jobs-worker owns every ingestion task.
         compressPublicAssets: {gzip: true, brotli: true},
         routeRules: {
             '/api/**': {proxy: 'http://backend:8000/**'}, //http://backend:8000/** - prod
