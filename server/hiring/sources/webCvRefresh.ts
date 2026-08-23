@@ -6,15 +6,12 @@ import {
 import { emptyWebCursor, loadWebCursors, saveWebCursor, type WebCursor } from '../../utils/hiringCursors'
 import { hiringDbEnabled, saveDbCandidates } from '../../utils/hiringDb'
 import { recordWebDiagnostic, type WebSourceDiagnostic } from '../../utils/hiringDiagnostics'
-import {
-  auditWebSource,
-  type WebSourceAudit,
-} from '../../utils/hiringWebSources'
 import { persistWebProfiles } from '../webProfilePersistence'
 import { crawlCareerist } from './web/careerist'
 import { crawlFlagma, isFlagmaSource } from './web/flagma'
 import { crawlRabotaKz } from './web/rabotaKz'
 import { crawlTalentUa } from './web/talentUa'
+import { auditWebSource, type WebSourceAudit } from './webAudit'
 
 export { auditWebSource, type WebSourceAudit }
 
