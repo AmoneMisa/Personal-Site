@@ -1,4 +1,4 @@
-import { useRedis } from '~~/server/utils/redis'
+import { useStateStore } from '~~/server/utils/stateStore'
 import { hiringDbEnabled, loadDbCandidates, saveDbCandidates } from './hiringDb'
 import { emptyWebCursor, loadWebCursors, saveWebCursor, type WebCursor } from './hiringCursors'
 import { normalizeCandidate } from './hiringNormalize'
@@ -102,7 +102,7 @@ function blockAnchors(html: string, source: WebCvSource): CandidateBlock[] {
     // the tail of an ad loader in the card: script contents only get stripped
     // when both tags are present. Drop anything before an unmatched closer.
     const orphan = trimmed.search(/<\/(?:script|style)>/i)
-    const opens = trimmed.search(/<(?:script|style)/i)
+    const opens = trimmed.search(/<(?:script|style)\b/i)
     const raw = orphan >= 0 && (opens < 0 || orphan < opens)
       ? trimmed.slice(trimmed.indexOf('>', orphan) + 1)
       : trimmed
@@ -771,10 +771,10 @@ export async function persistWebProfiles(
     const now = new Date().toISOString()
     let existing: StoredProfile[] = []
     try {
-      const raw = await useRedis().get(STORE_KEY)
+      const raw = await useStateStore().get(STORE_KEY)
       if (raw) existing = JSON.parse(raw) as StoredProfile[]
     } catch {
-      // If Redis is cold, hydrate from Postgres below before writing a new store.
+      // If the persistent snapshot is cold, hydrate from Postgres below before writing a new store.
     }
     if (!existing.length && hiringDbEnabled()) {
       existing = (await loadDbCandidates()).map((profile) => ({ ...profile, lastSeen: now }))
@@ -794,7 +794,7 @@ export async function persistWebProfiles(
       return Number.isFinite(time) && time >= cutoff && time <= Date.now() + 48 * 60 * 60 * 1000
     })
 
-    await useRedis().set(STORE_KEY, JSON.stringify(kept), 'EX', STORE_TTL_SECONDS)
+    await useStateStore().set(STORE_KEY, JSON.stringify(kept), 'EX', STORE_TTL_SECONDS)
     const shown = kept.filter(fromSource).length
     return { stored: kept.length, shown, expired: Math.max(0, beforeRetention - shown) }
   })
