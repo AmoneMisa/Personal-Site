@@ -4,10 +4,6 @@ on:
   push:
     branches: [ master ]
 
-# Multiple rapid pushes used to build/deploy in parallel and could overlap
-# docker compose recreates on the production host. Keep only the newest
-# workflow active before deploy; the remote flock below is the final guard
-# against overlapping SSH deploy commands.
 concurrency:
   group: personal-site-production
   cancel-in-progress: true
@@ -19,14 +15,12 @@ permissions:
 env:
   FRONTEND_IMAGE: ghcr.io/amonemisa/personal-site
   BACKEND_IMAGE: ghcr.io/amonemisa/personal-site-backend
-  QUEUE_IMAGE: ghcr.io/amonemisa/personal-site-jobs-queue
+  JOBS_WORKER_IMAGE: ghcr.io/amonemisa/personal-site-jobs-worker
   JOB_BROWSER_FETCHER_IMAGE: ghcr.io/amonemisa/personal-site-job-browser-fetcher
 
 jobs:
-  # Every image is built here rather than on the deployment server. The server
-  # can reach ghcr.io but not Docker Hub (auth.docker.io TLS handshake timeouts),
-  # so any server-side build that needs a `python:*-slim` base fails outright.
-  # Building in CI also keeps the slow Nuxt build off the deploy command timeout.
+  # All runtime images are built in CI. Production only pulls immutable build
+  # outputs; it never compiles Nuxt or installs dependencies during deployment.
   build:
     runs-on: ubuntu-latest
     strategy:
@@ -41,10 +35,10 @@ jobs:
             context: ./backend
             file: ./backend/Dockerfile
             image: ghcr.io/amonemisa/personal-site-backend
-          - name: jobs-queue
-            context: ./jobs-queue-worker
-            file: ./jobs-queue-worker/Dockerfile
-            image: ghcr.io/amonemisa/personal-site-jobs-queue
+          - name: jobs-worker
+            context: .
+            file: ./jobs-worker/Dockerfile
+            image: ghcr.io/amonemisa/personal-site-jobs-worker
           - name: job-browser-fetcher
             context: ./job-browser-fetcher
             file: ./job-browser-fetcher/Dockerfile
@@ -92,10 +86,8 @@ jobs:
 
             cd ~/opt/myproject
 
-            # docker-compose.yml is deployment-managed by Git. Older workflows
-            # copied it over the checkout before `git pull`, which made the tree
-            # dirty and caused pull/deploy to fail. Heal that legacy dirty file
-            # once, then update the checkout normally. No SCP overwrite is used.
+            # docker-compose.yml is deployment-managed by Git. Heal the dirty
+            # file left by the retired SCP workflow before updating the checkout.
             if [ -d .git ]; then
               git restore --source=HEAD --staged --worktree -- docker-compose.yml
               git pull --ff-only
