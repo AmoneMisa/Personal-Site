@@ -16,6 +16,7 @@ export const HIRING_PROFESSION_LABELS: Record<string, ProfessionLabels> = {
   'Product Manager': { en: 'Product Manager', ru: 'Продакт-менеджер' },
   'Store Manager': { en: 'Store Manager', ru: 'Управляющий магазином' },
   'Restaurant Manager': { en: 'Restaurant Manager', ru: 'Управляющий рестораном' },
+  'Restaurant / Cafe Worker': { en: 'Restaurant / cafe worker', ru: 'Работник кафе / ресторана' },
   'General Manager': { en: 'General Manager', ru: 'Генеральный менеджер' },
   Supervisor: { en: 'Supervisor', ru: 'Супервайзер' },
   Consultant: { en: 'Consultant', ru: 'Консультант' },
@@ -41,6 +42,7 @@ export const HIRING_PROFESSION_LABELS: Record<string, ProfessionLabels> = {
   Driver: { en: 'Driver', ru: 'Водитель' },
   'Logistics Specialist': { en: 'Logistics Specialist', ru: 'Логист' },
   'Security Guard': { en: 'Security Guard', ru: 'Охранник' },
+  'Operative Officer': { en: 'Operative Officer', ru: 'Оперуполномоченный' },
   Cleaner: { en: 'Cleaner', ru: 'Специалист по уборке' },
   Caregiver: { en: 'Caregiver', ru: 'Сиделка' },
 
@@ -98,6 +100,7 @@ export const HIRING_PROFESSION_LABELS: Record<string, ProfessionLabels> = {
   Economist: { en: 'Economist', ru: 'Экономист' },
   'Metrology Specialist': { en: 'Metrology Specialist', ru: 'Специалист по метрологии и стандартизации' },
   'Finance / Banking Specialist': { en: 'Finance / Banking Specialist', ru: 'Специалист по финансам и банковскому делу' },
+  'Water Supply Specialist': { en: 'Water Supply Specialist', ru: 'Специалист по водоснабжению' },
   'Oil & Gas Worker': { en: 'Oil & Gas Worker', ru: 'Работник нефтегазовой отрасли' },
   Biotechnologist: { en: 'Biotechnologist', ru: 'Биотехнолог' },
   'Laboratory Technician': { en: 'Laboratory Technician', ru: 'Лаборант' },
@@ -128,7 +131,10 @@ const RAW_PROFESSION_LABELS: Array<{ re: RegExp; key?: string; en?: string; ru?:
   { re: /mobilagraf[\s\S]*itishnik[\s\S]*front(?:et|ent|end)/iu, key: 'Frontend Developer' },
   { re: /farqi\s+yo[\s\S]*bolalarga\s+qarash/iu, key: 'Nanny' },
   { re: /^(?:sales\s+executive(?:\s+ind)?|роп(?:,?\s*sales\s+executive)?)$/iu, key: 'Sales Manager' },
-  { re: /^onlayn$/iu, en: 'Remote work', ru: 'Удалённая работа' },
+  { re: /^(?:оперативник|оперуполномоченн\p{L}*|оперативный\s+уполномоченн\p{L}*)$/iu, key: 'Operative Officer' },
+  { re: /^(?:suv\s+ta['’ʻʼ‘`]?minoti|водоснабжение)$/iu, key: 'Water Supply Specialist' },
+  { re: /^(?:onlayn|online|онлайн|удал[её]нно|ищу\s+(?:работу\s+)?(?:онлайн|удал[её]нно))$/iu, key: 'Any Role' },
+  { re: /^ищу\s+работу\s+(?:в\s+)?(?:кафе|ресторанах?|кафе\s+или\s+ресторанах)$/iu, key: 'Restaurant / Cafe Worker' },
 ]
 
 export function hiringProfessionLabel(value: string, locale: HiringProfessionLocale): string {

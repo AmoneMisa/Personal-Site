@@ -1,18 +1,26 @@
 import type { CandidateGender } from './hiringTypes'
 
-const EXPLICIT_FEMALE_RE = /(?:^|[^\p{L}])(?:женщина|female|ayol)(?=$|[^\p{L}])/iu
-const EXPLICIT_MALE_RE = /(?:^|[^\p{L}])(?:мужчина|male|erkak)(?=$|[^\p{L}])/iu
+const EXPLICIT_FEMALE_RE = /(?:^|[^\p{L}])(?:женщина|женский|девушка|female|ayol)(?=$|[^\p{L}])/iu
+const EXPLICIT_MALE_RE = /(?:^|[^\p{L}])(?:мужчина|мужской|парень|male|erkak)(?=$|[^\p{L}])/iu
 
-// High-confidence Central Asian patronymic markers. These are grammatical sex
+// High-confidence Central Asian lineage markers. These are grammatical sex
 // markers in Uzbek names, not guesses from a first name.
 const FEMALE_LINEAGE_RE = /(?:^|[^\p{L}])qizi(?=$|[^\p{L}])/iu
 const MALE_LINEAGE_RE = /(?:^|[^\p{L}])o(?:['’ʻʼ‘`])g(?:['’ʻʼ‘`])li(?=$|[^\p{L}])/iu
 
 // Russian/Cyrillic surnames commonly used across the former USSR have distinct
-// masculine/feminine forms. Match capitalized surname-shaped tokens only so a
-// random prose word ending in -а/-я cannot classify the candidate.
-const FEMALE_SURNAME_RE = /(?:^|[^\p{L}])\p{Lu}[\p{Ll}ёЁ-]{2,}(?:ова|ева|ёва|ина|ына|ская|цкая|ая)(?=$|[^\p{L}])/u
-const MALE_SURNAME_RE = /(?:^|[^\p{L}])\p{Lu}[\p{Ll}ёЁ-]{2,}(?:ов|ев|ёв|ин|ын|ский|цкий|ой)(?=$|[^\p{L}])/u
+// masculine/feminine forms. Case-insensitive matching also covers boards that
+// publish names in ALL CAPS.
+const FEMALE_SURNAME_RE = /(?:^|[^\p{L}])\p{L}[\p{L}ёЁ-]{2,}(?:ова|ева|ёва|ина|ына|ская|цкая|ая)(?=$|[^\p{L}])/iu
+const MALE_SURNAME_RE = /(?:^|[^\p{L}])\p{L}[\p{L}ёЁ-]{2,}(?:ов|ев|ёв|ин|ын|ский|цкий|ой)(?=$|[^\p{L}])/iu
+const FEMALE_LATIN_SURNAME_RE = /(?:^|[^\p{L}])\p{L}[\p{L}'’ʻʼ‘`-]{2,}(?:ova|eva|ina|skaya|tskaya|aya)(?=$|[^\p{L}])/iu
+const MALE_LATIN_SURNAME_RE = /(?:^|[^\p{L}])\p{L}[\p{L}'’ʻʼ‘`-]{2,}(?:ov|ev|in|skiy|sky|tskiy|oy)(?=$|[^\p{L}])/iu
+
+// Patronymics are an even stronger grammatical signal than a first name and
+// occur frequently on Careerist/ish-bor profiles where the gender field itself
+// is missing from the parsed card.
+const FEMALE_PATRONYMIC_RE = /(?:^|[^\p{L}])\p{L}[\p{L}ёЁ-]{2,}(?:овна|евна|ична|инична)(?=$|[^\p{L}])/iu
+const MALE_PATRONYMIC_RE = /(?:^|[^\p{L}])\p{L}[\p{L}ёЁ-]{2,}(?:ович|евич|ич)(?=$|[^\p{L}])/iu
 
 /**
  * Extracts candidate gender with an explicit-source-first policy.
@@ -20,7 +28,7 @@ const MALE_SURNAME_RE = /(?:^|[^\p{L}])\p{Lu}[\p{Ll}ёЁ-]{2,}(?:ов|ев|ёв|
  * Priority:
  * 1. Explicit gender stated by the source.
  * 2. Grammatical Central Asian lineage markers (`qizi`, `o'g'li`).
- * 3. High-confidence masculine/feminine Cyrillic surname morphology.
+ * 3. Patronymics and high-confidence masculine/feminine surname morphology.
  *
  * We deliberately do not infer gender from a first name alone.
  */
@@ -29,8 +37,10 @@ export function extractCandidateGender(text: string): CandidateGender | undefine
   if (EXPLICIT_MALE_RE.test(text)) return 'male'
   if (FEMALE_LINEAGE_RE.test(text)) return 'female'
   if (MALE_LINEAGE_RE.test(text)) return 'male'
-  if (FEMALE_SURNAME_RE.test(text)) return 'female'
-  if (MALE_SURNAME_RE.test(text)) return 'male'
+  if (FEMALE_PATRONYMIC_RE.test(text)) return 'female'
+  if (MALE_PATRONYMIC_RE.test(text)) return 'male'
+  if (FEMALE_SURNAME_RE.test(text) || FEMALE_LATIN_SURNAME_RE.test(text)) return 'female'
+  if (MALE_SURNAME_RE.test(text) || MALE_LATIN_SURNAME_RE.test(text)) return 'male'
   return undefined
 }
 

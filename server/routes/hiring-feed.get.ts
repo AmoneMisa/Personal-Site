@@ -15,6 +15,14 @@ import { loadDbSourceRuns } from '../utils/hiringDb'
 import { convertCurrency, loadRates } from '../utils/currency'
 import type { CvProfile } from '../utils/hiringTypes'
 import {
+  publicCandidateGender,
+  publicCandidateLanguages,
+  publicCandidateName,
+  publicCandidateProfessionKeys,
+  publicCandidateRemote,
+  publicCandidateSalary,
+} from '../utils/hiringCandidatePresentation'
+import {
   HIRING_PROFESSION_LABELS,
   hiringProfessionLabel,
   hiringProfessionLocale,
@@ -221,11 +229,23 @@ function snapshotSignature(stored: CvProfile[]): string {
   return `${stored.length}:${newest}:${stored[0]?.id || ''}:${stored[stored.length - 1]?.id || ''}`
 }
 
+function repairPublicFacts(profile: CvProfile): CvProfile {
+  const professions = publicCandidateProfessionKeys(profile)
+  return {
+    ...profile,
+    ...publicCandidateSalary(profile),
+    role: professions[0] || profile.role,
+    professions: professions.length ? professions : profile.professions,
+    gender: publicCandidateGender(profile),
+    remote: publicCandidateRemote(profile),
+  }
+}
+
 function normalizedSnapshot(stored: CvProfile[]): CvProfile[] {
   const key = snapshotSignature(stored)
   if (key === snapshotKey && Date.now() - snapshotAt < SNAPSHOT_TTL_MS) return snapshotCache
-  snapshotCache = dedupeCandidates(stored.map((profile) => (
-    profile.derived === DERIVED_VERSION ? profile : withProfessionExperience(normalizeCandidate(profile))
+  snapshotCache = dedupeCandidates(stored.map((profile) => repairPublicFacts(
+    profile.derived === DERIVED_VERSION ? profile : withProfessionExperience(normalizeCandidate(profile)),
   )))
   snapshotKey = key
   snapshotAt = Date.now()
@@ -354,15 +374,20 @@ function publicProfile(profile: CvProfile, locale: HiringProfessionLocale): CvPr
   if (profile.relocationReady === false) details.push(localizeDetail('Not open to relocation'))
   if (profile.contactType === 'platform' && profileOrigin(profile) !== 'telegram') details.push(localizeDetail('Contact via source platform'))
 
-  const canonical = profile.professions?.length ? profile.professions : [profile.role].filter(Boolean)
+  const canonical = publicCandidateProfessionKeys(profile)
   return {
     ...profile,
+    name: publicCandidateName(profile.name, locale),
     role: canonical.map((profession) => hiringProfessionLabel(profession, locale)).join(', '),
+    professions: canonical,
     previousProfessions: (profile.previousProfessions || []).map((profession) => hiringProfessionLabel(profession, locale)),
     professionExperience: (profile.professionExperience || []).map((item) => ({
       ...item,
       profession: hiringProfessionLabel(item.profession, locale),
     })),
+    gender: publicCandidateGender(profile),
+    remote: publicCandidateRemote(profile),
+    languages: publicCandidateLanguages(profile, locale),
     employmentType: profile.employmentTypes?.length
       ? profile.employmentTypes.map(localizeEmploymentType).join(', ')
       : profile.employmentType ? localizeEmploymentType(profile.employmentType) : profile.employmentType,
