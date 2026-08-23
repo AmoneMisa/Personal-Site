@@ -4,7 +4,7 @@ import type { CvProfile } from '../../shared/contracts/hiring'
 import type { SourceRun } from '../../shared/hiring/hiringDiagnostics'
 import { cutoffDate } from '../../shared/hiring/webFields'
 import { hiringDbEnabled, loadDbCandidates, saveDbCandidates } from '../utils/hiringDb'
-import { withHiringStoreLock } from '../utils/hiringStoreLock'
+import { withHiringStoreLock } from './infrastructure/storeLock'
 
 const STORE_KEY = 'hiring:store:v4'
 const STORE_TTL_SECONDS = 100 * 86_400
