@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { extractCandidateGender } from '../server/utils/hiringCandidateFields.ts'
+import { extractCandidateGender } from '../shared/hiring/candidateFields.ts'
 
 test('uses explicit gender from source text first', () => {
   assert.equal(extractCandidateGender('Наиля Абдулбакиева (Женщина)'), 'female')
