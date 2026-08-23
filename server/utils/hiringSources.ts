@@ -6,12 +6,12 @@ import { emptyCursor, loadCursors, saveCursor, type ChannelCursor } from './hiri
 import { isLikelyTelegramVacancy } from './sources'
 import { cityRe } from './hiringWebFields'
 import { extractCandidateName } from './hiringCandidateFields'
+import {
+  HIRING_TELEGRAM_CHANNELS,
+  type HiringTelegramChannelDescriptor,
+} from '../../shared/hiring/sources/telegramChannels'
 
 const UA = 'hiringFinder/1.0 (CV board; contact: admin@whiteslove.me)'
-// Mixed UZ boards can publish hundreds of vacancies between two candidate
-// posts. A 200-message window therefore covers too little of the required
-// three-month retention period. Per-channel minimums below drive the initial
-// backfill; the date cutoff stops paging as soon as the eligible window ends.
 const DEFAULT_HISTORY_LIMIT = 600
 const MAX_HISTORY_LIMIT = 5_000
 const MIN_HISTORY_LIMIT = 50
@@ -32,27 +32,7 @@ const TELEGRAM_PARALLEL_CHANNELS = 4
 const MAX_CANDIDATE_AGE_MONTHS = 3
 const FUTURE_DATE_TOLERANCE_MS = 48 * 60 * 60 * 1000
 
-interface TelegramChannel {
-  handle: string
-  label: string
-  country: string
-  location: string
-  tags: string[]
-  cvFeed?: boolean
-  includeAny?: string[]
-  /** Mixed boards must contain an explicit job-seeker marker before parsing. */
-  requireCandidateMarker?: boolean
-  /**
-   * Crawling is skipped for a disabled channel, but its parsing rules, aliases
-   * and labels stay in place: a source that stopped posting candidates today
-   * may resume, and an audit needs the entry to compare against.
-   */
-  enabled?: boolean
-  /** Backfill order. High-yield feeds get their history first. */
-  priority?: 'high' | 'normal' | 'low'
-  /** Minimum number of recent messages to inspect before the date cutoff wins. */
-  historyLimit?: number
-}
+type TelegramChannel = HiringTelegramChannelDescriptor
 
 export interface HiringSourceDiagnostic {
   handle: string
@@ -113,50 +93,6 @@ const UZ_EMPLOYER_RE =
 const CANDIDATE_FORM_RE =
   /(?:^|\n)\s*[^\p{L}\p{N}\n]{0,8}(?:ism(?:i|im)?(?:\s*[-–—]\s*(?:familya|familiya))?|familya|familiya|f\.?i\.?o\.?|фио|имя|yoshi|yoshim|tug(?:['’‘])ilgan\s+yili|возраст|qidirayotgan\s+kasb|so(?:['’‘])ralgan\s+ish\s+(?:joyi|turi)|yashash\s+manzili|ma(?:['’‘])lumoti|ожидаемая\s+работа|желаемая\s+(?:должность|работа)|tajribasi?|опыт\s+работы)\s*[:—-]/imu
 
-// Verified during the August 2026 audit. Mixed boards are listed only when
-// recent candidate posts were found; vacancy-only/dead/wrong-entity handles are
-// deliberately absent.
-const DEFAULT_CV_CHANNELS: TelegramChannel[] = [
-  // Uzbekistan — Tashkent + regions, broad mass-market coverage. Every mixed
-  // source requires an explicit candidate marker so its vacancy stream cannot
-  // leak into /hiring.
-  { handle: 'ISH_QIDIR', label: 'Ish Qidir', country: 'UZ', location: 'Uzbekistan', tags: ['Resume', 'Mass market'], requireCandidateMarker: true, historyLimit: 3_000 },
-  { handle: 'myrabota_uz', label: 'Работа в Ташкенте', country: 'UZ', location: 'Tashkent', tags: ['Resume', 'Mass market'], requireCandidateMarker: true, historyLimit: 2_000 },
-  { handle: 'UzJobs', label: 'UzJobs', country: 'UZ', location: 'Uzbekistan', tags: ['Resume', 'Mass market'], requireCandidateMarker: true, historyLimit: 5_000 },
-  { handle: 'uzb_vakansiya', label: 'UZB Vakansiya', country: 'UZ', location: 'Uzbekistan', tags: ['Resume', 'Mass market'], requireCandidateMarker: true, historyLimit: 3_000 },
-  { handle: 'ishchi', label: 'ISHCHI', country: 'UZ', location: 'Uzbekistan', tags: ['Resume', 'Mass market'], requireCandidateMarker: true, historyLimit: 3_000 },
-  { handle: 'ishbor_olx_uz', label: 'OLX.UZ Ish', country: 'UZ', location: 'Uzbekistan', tags: ['Resume', 'Mass market'], requireCandidateMarker: true, historyLimit: 5_000, enabled: false /* dead: newest post 2022-01 */ },
-  { handle: 'ISH_QAYERDA', label: 'Ish Qayerda', country: 'UZ', location: 'Uzbekistan', tags: ['Resume', 'Education'], requireCandidateMarker: true, historyLimit: 3_000 },
-  { handle: 'UstozShogird', label: 'Ustoz Shogird', country: 'UZ', location: 'Uzbekistan', tags: ['Resume', 'IT', 'Student'], requireCandidateMarker: true, historyLimit: 3_000, priority: 'high' },
-  { handle: 'TALIMDAN_ISH_TOPISH', label: 'Taʼlimdan ish topish', country: 'UZ', location: 'Tashkent', tags: ['Resume', 'Education'], requireCandidateMarker: true, historyLimit: 3_000 },
-  { handle: 'SAMARQAND_ISH', label: 'Samarqand ish', country: 'UZ', location: 'Samarkand', tags: ['Resume', 'Mass market'], requireCandidateMarker: true, historyLimit: 2_000, enabled: false /* vacancy-only in the audited window */ },
-  { handle: 'Fargona_ishlar', label: 'Fargona ishlar', country: 'UZ', location: 'Fergana', tags: ['Resume', 'Mass market'], requireCandidateMarker: true, historyLimit: 2_000 },
-  { handle: 'Ishga_marhamat_andijon_elonlar', label: 'Andijon ish', country: 'UZ', location: 'Andijan', tags: ['Resume', 'Mass market'], requireCandidateMarker: true, historyLimit: 2_000, enabled: false /* vacancy-only in the audited window */ },
-  { handle: 'namanganishbor', label: 'Namangan ish', country: 'UZ', location: 'Namangan', tags: ['Resume', 'Mass market'], requireCandidateMarker: true, historyLimit: 2_000, enabled: false /* vacancy-only in the audited window */ },
-  { handle: 'buxoroda_ish', label: 'Buxoroda ish', country: 'UZ', location: 'Bukhara', tags: ['Resume', 'Mass market'], requireCandidateMarker: true, historyLimit: 2_000, enabled: false /* vacancy-only in the audited window */ },
-  { handle: 'Xorazm_ish', label: 'Xorazm ish', country: 'UZ', location: 'Uzbekistan', tags: ['Resume', 'Mass market'], requireCandidateMarker: true, historyLimit: 2_000 },
-
-  // Kazakhstan — verified current resume flow; primarily IT for now.
-  { handle: 'workitkz', label: 'workITkz', country: 'KZ', location: 'Kazakhstan', tags: ['Resume', 'IT'], historyLimit: 1_500, enabled: false /* repurposed: now an employer #вакансия feed */ },
-
-  // Kyrgyzstan.
-  { handle: 'jobslbish', label: 'Jobs.bish', country: 'KG', location: 'Bishkek', tags: ['Resume', 'Mass market'], historyLimit: 1_500, priority: 'low' },
-  {
-    handle: 'Cvflow',
-    label: 'CV Flow',
-    country: 'KG',
-    location: 'Kyrgyzstan',
-    tags: ['Resume', 'IT'],
-    cvFeed: true,
-    includeAny: ['kyrgyzstan', 'кыргызстан', 'bishkek', 'бишкек', 'osh', 'ош'],
-    historyLimit: 1_500,
-  },
-
-  // Ukraine — candidate-heavy professional feeds. City is parsed from each post.
-  { handle: 'itcandidatesUA', label: 'IT Candidates UA', country: 'UA', location: 'Ukraine', tags: ['Resume', 'IT'], cvFeed: true, historyLimit: 1_500 },
-  { handle: 'hr_recruiter_ua', label: 'HR & Recruiters UA', country: 'UA', location: 'Ukraine', tags: ['Resume', 'HR'], historyLimit: 1_500 },
-]
-
 const CITY_ALIASES: Record<string, Array<[string, RegExp]>> = {
   UZ: [
     ['Tashkent', cityRe('tashkent|toshkent|ташкент|тошкент')],
@@ -208,20 +144,33 @@ const TASHKENT_DISTRICTS: Array<[string, RegExp]> = [
   ['Yashnabad', cityRe('yashnabad|yashnobod|яшнабад|яшнобод')],
 ]
 
+function telegramCountry(value: string): HiringTelegramChannelDescriptor['country'] {
+  const normalized = value.trim().toUpperCase()
+  if (normalized === 'UA' || normalized === 'KZ' || normalized === 'KG') return normalized
+  return 'UZ'
+}
+
 function telegramChannels(): TelegramChannel[] {
   const raw = process.env.HIRING_TELEGRAM_CHANNELS
-  if (!raw?.trim()) return DEFAULT_CV_CHANNELS
+  if (!raw?.trim()) {
+    return HIRING_TELEGRAM_CHANNELS.map((channel) => ({
+      ...channel,
+      tags: [...channel.tags],
+      includeAny: channel.includeAny ? [...channel.includeAny] : undefined,
+    }))
+  }
   return raw.split(',').map((entry) => {
     const [handle = '', label = '', country = 'UZ'] = entry.split(':').map((part) => part.trim())
+    const normalizedCountry = telegramCountry(country)
     return {
       handle,
       label: label || handle,
-      country: country.toUpperCase(),
+      country: normalizedCountry,
       location: label || country,
       tags: ['Resume'],
       cvFeed: true,
-      requireCandidateMarker: country.toUpperCase() === 'UZ',
-      historyLimit: country.toUpperCase() === 'UZ' ? 2_000 : 1_500,
+      requireCandidateMarker: normalizedCountry === 'UZ',
+      historyLimit: normalizedCountry === 'UZ' ? 2_000 : 1_500,
     }
   }).filter((channel) => channel.handle)
 }
@@ -951,10 +900,3 @@ export function isHiringSourceConfigured(source: HiringSource): boolean {
 export async function fetchHiringSource(source: HiringSource, q = ''): Promise<CvProfile[]> {
   return FETCHERS[source](q)
 }
-
-export const HIRING_COUNTRIES = [
-  { code: 'UZ', name: 'Uzbekistan', currency: 'UZS', cities: ['Tashkent', 'Samarkand', 'Bukhara', 'Namangan', 'Andijan', 'Fergana', 'Qarshi', 'Nukus', 'Urgench', 'Khiva'] },
-  { code: 'UA', name: 'Ukraine', currency: 'UAH', cities: ['Kyiv', 'Lviv', 'Odesa', 'Kharkiv', 'Dnipro', 'Vinnytsia', 'Zaporizhzhia'] },
-  { code: 'KZ', name: 'Kazakhstan', currency: 'KZT', cities: ['Almaty', 'Astana', 'Shymkent', 'Karaganda', 'Atyrau', 'Aktobe'] },
-  { code: 'KG', name: 'Kyrgyzstan', currency: 'KGS', cities: ['Bishkek', 'Osh', 'Karakol'] },
-] as const
