@@ -1,11 +1,6 @@
-// GET /jobs-feed — Nitro server route. Deliberately NOT under "/api/**": in the
-// host site that whole prefix is a routeRules proxy to the FastAPI backend (a
-// global middleware that runs before file routes), so an /api/* handler would be
-// forwarded to FastAPI and 404. Living at /jobs-feed keeps it served by Nitro.
-//
-// Reads the progressively populated vacancy store, then filters/sorts/paginates
-// its current snapshot. Optional sources activate only when their env keys are set.
-// Shared contract for the web page + Android app.
+// GET /jobs-feed — read-only vacancy feed served by the isolated jobs API.
+// Ingestion lives exclusively in jobs-worker; this request path only reads the
+// persisted snapshot, filters/sorts it and optionally queries Elasticsearch.
 
 import {
   ALL_SOURCES,
@@ -17,12 +12,11 @@ import {
   type SortKey,
   type WorkMode,
 } from '../utils/jobTypes'
-import {filterAndPaginate} from '../utils/aggregate'
-import {getJobRefreshState, getStoredJobs, refreshJobStore} from '../utils/jobsStore'
-import {getRates, loadRates} from '../utils/currency'
-import {jobSearchKey, searchJobMatches,} from '../utils/jobsElastic'
+import { filterAndPaginate } from '../utils/aggregate'
+import { getStoredJobsSnapshot } from '../utils/jobsSnapshot'
+import { getRates, loadRates } from '../utils/currency'
+import { jobSearchKey, searchJobMatches } from '../utils/jobsElastic'
 
-// Optional sources are only queried when configured, to avoid wasted calls.
 function isConfigured(source: JobSource): boolean {
   switch (source) {
     case 'adzuna':
@@ -30,20 +24,15 @@ function isConfigured(source: JobSource): boolean {
     case 'jooble':
       return !!process.env.JOOBLE_KEY
     case 'rss':
-      // On by default thanks to the built-in Ukraine (DOU.ua) feed.
       return process.env.RSS_DEFAULTS !== 'off' || !!process.env.RSS_FEEDS
     case 'companies':
-      // On by default thanks to the built-in Greenhouse/Lever seed boards.
       return process.env.COMPANIES_SOURCE !== 'off'
     case 'linkedin':
       return process.env.LINKEDIN_SOURCE !== 'off'
     case 'facebook':
     case 'threads':
       return String(process.env.SOCIAL_JOB_SOURCE || 'on').toLowerCase() !== 'off'
-        && !!process.env.HIRING_SOCIAL_API_URL
-        && String(process.env.QUEUE_INTERNAL_KEY || '').length >= 16
     case 'devkg':
-      // On by default — DevKG's public vacancies RSS feed, no key required.
       return process.env.DEVKG_SOURCE !== 'off'
     case 'ishgo':
       return process.env.ISHGO_SOURCE !== 'off'
@@ -52,7 +41,6 @@ function isConfigured(source: JobSource): boolean {
     case 'telegram':
       return process.env.TELEGRAM_SOURCE !== 'off'
     case 'olx':
-      // Explicit opt-in: OLX currently blocks the public endpoint on some IPs.
       return process.env.OLX_SOURCE === 'on'
     default:
       return true
@@ -68,12 +56,12 @@ function clampInt(value: unknown, def: number, min: number, max: number): number
   return Number.isNaN(n) ? def : Math.min(max, Math.max(min, n))
 }
 
-async function getStoredSnapshot(): Promise<Awaited<ReturnType<typeof getStoredJobs>>> {
+async function getStoredSnapshot(): Promise<Awaited<ReturnType<typeof getStoredJobsSnapshot>>> {
   let timer: ReturnType<typeof setTimeout> | undefined
   try {
     return await Promise.race([
-      getStoredJobs(),
-      new Promise<Awaited<ReturnType<typeof getStoredJobs>>>((resolve) => {
+      getStoredJobsSnapshot(),
+      new Promise<Awaited<ReturnType<typeof getStoredJobsSnapshot>>>((resolve) => {
         timer = setTimeout(() => resolve([]), 750)
       }),
     ])
@@ -103,8 +91,6 @@ export default defineEventHandler(async (event) => {
         'olx' as JobSource,
       ]
   const activeSources = chosen.filter(isConfigured)
-  // An explicitly selected but disabled/unconfigured source must return an
-  // empty result, not silently fall back to unrelated boards.
   const finalSources = activeSources.length
     ? activeSources
     : requested.length
@@ -118,7 +104,6 @@ export default defineEventHandler(async (event) => {
   const sort = (SORT_KEYS.includes(q.sort as SortKey) ? q.sort : 'date') as SortKey
   const salaryMin = q.salaryMin ? clampInt(q.salaryMin, 0, 0, 100_000_000) : undefined
 
-  // Advanced enriched filters (all optional).
   const countries = String(q.country ?? '')
     .split(',')
     .map((s) => s.trim().toUpperCase())
@@ -141,7 +126,6 @@ export default defineEventHandler(async (event) => {
   let foreignerFriendly: boolean | undefined
   if (q.foreignerFriendly === 'true') foreignerFriendly = true
   else if (q.foreignerFriendly === 'false') foreignerFriendly = false
-  // Default ON: only an explicit "false" shows gambling/adult/scam postings.
   const hideRiskyIndustries = q.hideRiskyIndustries !== 'false'
   const noExperience = q.noExperience === 'true'
   const language = String(q.language ?? '').trim() || undefined
@@ -155,73 +139,29 @@ export default defineEventHandler(async (event) => {
     .map((s) => s.trim())
     .filter(Boolean)
 
-  // Populate live FX rates opportunistically. The static fallback is already in
-  // memory, so a Redis/network issue must never hold the feed response open.
+  // Rate refresh is independent of ingestion and never awaited by the feed.
   loadRates().catch(() => {})
 
-  // Read only the current snapshot. A cold or newly added source starts the
-  // deduplicated refresh in the background and returns partial data immediately.
-  // Redis is normally local and fast, but a broken container/network must not
-  // turn this endpoint into another gateway timeout. Continue with an empty
-  // snapshot after a short budget; getStoredJobs handles its own late failure.
-  const pool = await getStoredSnapshot();
-  let searchMatches:
-      Awaited<
-          ReturnType<
-              typeof searchJobMatches
-          >
-      > = null
+  const pool = await getStoredSnapshot()
+  let searchMatches: Awaited<ReturnType<typeof searchJobMatches>> = null
 
   if (search) {
     try {
-      searchMatches =
-          await searchJobMatches(
-              search,
-          )
+      searchMatches = await searchJobMatches(search)
     } catch (err) {
-      /*
-       * ES недоступен —
-       * /jobs продолжает работать
-       * через старый includes().
-       */
-      console.warn(
-          '[jobs:elasticsearch] search fallback:',
-          (err as Error).message,
-      )
-
+      console.warn('[jobs:elasticsearch] search fallback:', (err as Error).message)
       searchMatches = null
     }
   }
 
-  const searchPool =
-      searchMatches
-          ? pool.filter(
-              (job) =>
-                  searchMatches!
-                      .rank
-                      .has(
-                          jobSearchKey(
-                              job,
-                          ),
-                      ),
-          )
-          : pool;
-  if (!pool.length && finalSources.length) {
-    refreshJobStore().catch(() => {})
-  }
+  const searchPool = searchMatches
+    ? pool.filter((job) => searchMatches!.rank.has(jobSearchKey(job)))
+    : pool
 
-  const refresh = getJobRefreshState()
-  setResponseHeader(event, 'Cache-Control', refresh.inProgress ? 'no-store' : 'private, max-age=30')
+  setResponseHeader(event, 'Cache-Control', 'private, max-age=30')
 
   return {
     ...filterAndPaginate(searchPool, {
-      /*
-       * ES уже выполнил text search.
-       *
-       * Если ES недоступен —
-       * передаём исходный q и остаётся
-       * старый String.includes fallback.
-       */
       q: searchMatches ? '' : search,
       location: String(q.location ?? '').trim(),
       remote,
@@ -249,9 +189,9 @@ export default defineEventHandler(async (event) => {
       pageSize: clampInt(q.pageSize, 20, 1, 100),
     }),
     rates: getRates(),
-    warming: refresh.inProgress,
-    loadedSources: refresh.loadedSources,
-    pendingSources: refresh.pendingSources,
-    failedSources: refresh.failedSources,
+    warming: false,
+    loadedSources: [...new Set(pool.map((job) => job.source))],
+    pendingSources: [],
+    failedSources: [],
   }
 })
