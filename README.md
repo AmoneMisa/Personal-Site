@@ -29,7 +29,7 @@ so its history remains available in this repository.
 
 ## Local frontend development
 
-Requires Node.js 20.19+ (Node.js 22 recommended).
+Requires Node.js 24 LTS (Krypton), matching the production Docker runtime.
 
 ```bash
 npm install
