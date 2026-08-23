@@ -48,10 +48,14 @@ jobs:
           ! grep -q 'RABBITMQ_' docker-compose.yml
           ! grep -q 'flat-finder-rabbitmq' docker-compose.yml
           ! grep -q 'jobs-backend' docker-compose.yml
+          ! grep -q '^  jobs-api:' docker-compose.yml
           ! grep -q 'jobs-queue-worker' docker-compose.yml
+          ! grep -q 'jobs-queue-dispatcher' docker-compose.yml
           ! test -e jobs-queue-worker/worker.py
-          grep -q 'jobs-api:' docker-compose.yml
-          grep -q 'jobs-worker:' docker-compose.yml
+          grep -q '^  frontend:' docker-compose.yml
+          grep -q '^  jobs-worker:' docker-compose.yml
+          test -e server/routes/jobs-feed.get.ts
+          test -e server/routes/hiring-feed.get.ts
       - name: Run application tests
         run: npm test
       - name: Build Nuxt application
