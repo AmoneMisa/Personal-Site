@@ -39,14 +39,19 @@ jobs:
           cache: npm
       - name: Install dependencies
         run: npm ci
-      - name: Syntax and compose checks
+      - name: Worker syntax and compose checks
         run: |
-          python -m py_compile jobs-queue-worker/worker.py
+          node --experimental-transform-types --check jobs-worker/worker.ts
+          node --check jobs-worker/alias-loader.mjs
           touch db.env
           docker compose config >/dev/null
           ! grep -q 'RABBITMQ_' docker-compose.yml
           ! grep -q 'flat-finder-rabbitmq' docker-compose.yml
-          ! grep -q 'import pika' jobs-queue-worker/worker.py
+          ! grep -q 'jobs-backend' docker-compose.yml
+          ! grep -q 'jobs-queue-worker' docker-compose.yml
+          ! test -e jobs-queue-worker/worker.py
+          grep -q 'jobs-api:' docker-compose.yml
+          grep -q 'jobs-worker:' docker-compose.yml
       - name: Run application tests
         run: npm test
       - name: Build Nuxt application
