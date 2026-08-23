@@ -36,7 +36,7 @@ function parseRabotaKz(block: CandidateBlock, source: WebCvAdapter): CvProfile |
   })
 }
 
-const RABOTA_KZ_SOURCE: WebCvAdapter = {
+export const RABOTA_KZ_SOURCE: WebCvAdapter = {
   key: 'rabotakz',
   label: 'Rabota.kz',
   country: 'KZ',
