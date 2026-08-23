@@ -4,9 +4,10 @@ const EXPLICIT_FEMALE_RE = /(?:^|[^\p{L}])(?:женщина|женский|де�
 const EXPLICIT_MALE_RE = /(?:^|[^\p{L}])(?:мужчина|мужской|парень|male|erkak)(?=$|[^\p{L}])/iu
 
 // High-confidence Central Asian lineage markers. These are grammatical sex
-// markers in Uzbek names, not guesses from a first name.
-const FEMALE_LINEAGE_RE = /(?:^|[^\p{L}])qizi(?=$|[^\p{L}])/iu
-const MALE_LINEAGE_RE = /(?:^|[^\p{L}])o(?:['’ʻʼ‘`])g(?:['’ʻʼ‘`])li(?=$|[^\p{L}])/iu
+// markers in Uzbek names, not guesses from a first name. Boards use both Latin
+// and Cyrillic spellings, and often omit apostrophes in o'g'li.
+const FEMALE_LINEAGE_RE = /(?:^|[^\p{L}])(?:qizi|қизи|кизи|қызы)(?=$|[^\p{L}])/iu
+const MALE_LINEAGE_RE = /(?:^|[^\p{L}])(?:o(?:['’ʻʼ‘`])?g(?:['’ʻʼ‘`])?li|ўғли|угли|оғли|огли)(?=$|[^\p{L}])/iu
 
 // Russian/Cyrillic surnames commonly used across the former USSR have distinct
 // masculine/feminine forms. Case-insensitive matching also covers boards that
