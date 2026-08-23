@@ -102,9 +102,9 @@ export default defineNuxtConfig({
         }
     },
     nitro: {
-        // Keep the user-facing Nitro process as a renderer/proxy only. Jobs and
-        // hiring refreshes are driven by the dedicated jobs-backend runtime and
-        // PostgreSQL queue workers, never by Nitro scheduled tasks.
+        // No jobs/hiring scheduler or crawler is registered in Nitro. The public
+        // renderer proxies those read routes to a second Nuxt/Nitro process
+        // (`jobs-api`); the standalone Node worker owns every ingestion task.
         compressPublicAssets: {gzip: true, brotli: true},
         routeRules: {
             '/api/**': {proxy: 'http://backend:8000/**'}, //http://backend:8000/** - prod
