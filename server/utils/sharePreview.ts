@@ -1,14 +1,10 @@
-import { enrichJob } from './enrich'
-import { getStoredJobs } from './jobsStore'
-
 export const SHARE_SITE_URL = (process.env.PUBLIC_SITE_URL || 'https://whiteslove.me').replace(/\/$/, '')
 const FLAT_API_URL = process.env.FLAT_API_URL || 'http://185.5.206.229:8082'
 const VALID_FLAT_SOURCES = new Set(['olx', 'telegram'])
 
 // Social crawlers abandon a preview after only a few seconds (Telegram is the
-// strictest), and this lookup runs inside the SSR render hook — so a slow
-// upstream used to hang the whole page render and the crawler simply gave up,
-// leaving "generating preview…" forever. Keep the budget well under that.
+// strictest), and these lookups run inside the SSR render hook. Keep the budget
+// well below the reverse-proxy timeout.
 const SHARE_LOOKUP_TIMEOUT_MS = Number(process.env.SHARE_LOOKUP_TIMEOUT_MS) || 2500
 
 // Crawlers fetch the same URL several times (and users re-share links), so cache
@@ -92,7 +88,26 @@ export async function findSharedJob(id: string): Promise<any | null> {
   if (!wanted) return null
   const cached = cacheGet(`job:${wanted}`)
   if (cached) return cached.value
+
   try {
+    // The public renderer never imports the vacancy store. It asks the isolated
+    // jobs runtime for the one record needed by the social-preview hook.
+    if (String(process.env.JOBS_EXECUTION_ENABLED || 'off').toLowerCase() !== 'on') {
+      const backend = String(process.env.JOBS_BACKEND_URL || 'http://jobs-backend:3000').replace(/\/$/, '')
+      const response = await fetch(`${backend}/jobs-vacancy?id=${encodeURIComponent(wanted)}`, {
+        signal: AbortSignal.timeout(SHARE_LOOKUP_TIMEOUT_MS),
+        headers: { Accept: 'application/json' },
+      })
+      if (!response.ok) return cacheSet(`job:${wanted}`, null)
+      const data = await response.json() as { job?: any }
+      return cacheSet(`job:${wanted}`, data?.job || null)
+    }
+
+    // jobs-backend owns the actual store and enriches the record locally.
+    const [{ getStoredJobs }, { enrichJob }] = await Promise.all([
+      import('./jobsStore'),
+      import('./enrich'),
+    ])
     const jobs = await getStoredJobs()
     const found = jobs.find((job: any) => job.id === wanted || job.url === wanted)
     return cacheSet(`job:${wanted}`, found ? enrichJob(found) : null)
