@@ -1,24 +1,27 @@
 # WhitesLove Personal Site
 
 Monorepo for [whiteslove.me](https://whiteslove.me). It contains the Nuxt
-application and the FastAPI tool backend, with one Docker Compose stack and one
-deployment workflow.
+application, FastAPI tool backend, jobs/hiring worker, browser fetch helper and
+Telegram subscription bot, deployed through one Docker Compose stack.
 
 ## Repository layout
 
 ```text
 Personal-Site/
-├── app/                 Nuxt pages, components and composables
-├── server/              Nitro routes, jobs and server utilities
-├── backend/             FastAPI tool API
+├── app/                   Nuxt pages, components and composables
+├── server/                Nitro routes and server-side jobs/hiring utilities
+├── backend/               FastAPI tool API
 │   ├── src/
 │   ├── Dockerfile
 │   └── requirements.txt
-├── i18n/                Russian and English locale files
-├── public/              Static assets
-├── Dockerfile           Nuxt production image
-├── docker-compose.yml   Nuxt + FastAPI + Redis
-└── deploy.sh            Unified production deployment
+├── jobs-worker/           Background jobs/hiring ingestion worker
+├── job-browser-fetcher/   Browser-like HTTP fetch helper for protected job pages
+├── subscription-bot/      Telegram subscriptions service
+├── i18n/                  Russian and English locale files
+├── public/                Static assets
+├── Dockerfile             Nuxt production image
+├── docker-compose.yml     Unified production stack
+└── deploy.sh              Unified production deployment
 ```
 
 The previous `Personal-Site-Backend` repository was imported as a Git subtree,
@@ -84,17 +87,22 @@ cd ~/opt/myproject
 bash deploy.sh
 ```
 
-Using the same `~/opt/myproject` directory preserves the Compose project name
-and therefore reuses the existing Redis volume. `docker compose down` deliberately
-omits `--volumes`, so Redis data survives while obsolete containers are removed.
+Using the same `~/opt/myproject` directory preserves the Compose project name.
+The current stack uses the `site_state` volume for filesystem-backed application
+state; there is no standalone Redis service in this repository.
 
 ## Services
 
 - Nuxt SSR site with static i18n, portfolio/CV pages and browser tools.
-- Vacancy aggregator with deterministic parsing and background AI enrichment.
+- Nitro read APIs for jobs and hiring data.
+- `jobs-worker` for scheduling, queue processing, scraping, normalization,
+  enrichment and indexing of jobs/hiring data.
+- `job-browser-fetcher` for job pages that require browser-like TLS/HTTP behavior.
 - Flat Finder proxy backed by the separately deployed `flat-finder` service.
 - FastAPI PDF, conversion, DockerHub and country-index APIs.
-- Redis persistence for jobs, rates, PDF state and backend caches.
+- Telegram bot for apartment, job and candidate subscriptions.
+- Shared `site_state` filesystem volume plus PostgreSQL/Elasticsearch integrations
+  configured through the environment.
 
 ## License
 
