@@ -1,6 +1,10 @@
 const STALE_INTELLIAS_LEVER = /^https:\/\/api\.lever\.co\/v0\/postings\/intellias(?:\?|$)/i
 
 export default defineNitroPlugin(() => {
+  // Job-source fetch overrides belong to the isolated jobs runtime. The public
+  // Nuxt renderer must leave global fetch untouched.
+  if (String(process.env.JOBS_EXECUTION_ENABLED || 'off').toLowerCase() !== 'on') return
+
   const originalFetch = globalThis.fetch.bind(globalThis)
 
   globalThis.fetch = (async (input: Parameters<typeof fetch>[0], init?: Parameters<typeof fetch>[1]) => {
