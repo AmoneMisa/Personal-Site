@@ -12,6 +12,7 @@ import { listWebSources } from '../utils/hiringWebSources'
 import { listUzJobsSources } from '../utils/hiringUzJobsSource'
 import { getHiringWebDiagnostics } from '../utils/hiringDiagnostics'
 import { loadDbSourceRuns } from '../utils/hiringDb'
+import { convertCurrency, loadRates } from '../utils/currency'
 import type { CvProfile } from '../utils/hiringTypes'
 import {
   HIRING_PROFESSION_LABELS,
@@ -292,6 +293,41 @@ function previousExperienceSummary(profile: CvProfile, locale: HiringProfessionL
   })
 }
 
+function convertedSalaryRange(
+  profile: CvProfile,
+  targetCurrency: string,
+  locale: HiringProfessionLocale,
+): string | null {
+  const sourceCurrency = profile.currency?.trim().toUpperCase()
+  if (!sourceCurrency || (profile.salaryMin == null && profile.salaryMax == null)) return null
+  const min = convertCurrency(profile.salaryMin, sourceCurrency, targetCurrency)
+  const max = convertCurrency(profile.salaryMax, sourceCurrency, targetCurrency)
+  if (min == null && max == null) return null
+
+  const number = new Intl.NumberFormat(locale === 'en' ? 'en-US' : 'ru-RU', { maximumFractionDigits: 0 })
+  const low = min ?? max!
+  const high = max ?? min!
+  const range = low === high ? number.format(low) : `${number.format(Math.min(low, high))}–${number.format(Math.max(low, high))}`
+  return targetCurrency === 'USD' ? `$${range}` : `${range} ${targetCurrency}`
+}
+
+function salaryDisplayCurrency(profile: CvProfile, locale: HiringProfessionLocale): string | null | undefined {
+  const sourceCurrency = profile.currency?.trim().toUpperCase()
+  if (!sourceCurrency || (profile.salaryMin == null && profile.salaryMax == null)) return profile.currency
+
+  const localCurrency = HIRING_COUNTRIES.find((item) => item.code === profile.country?.toUpperCase())?.currency
+  const suffixes: string[] = []
+  if (localCurrency && localCurrency !== sourceCurrency) {
+    const local = convertedSalaryRange(profile, localCurrency, locale)
+    if (local) suffixes.push(`≈ ${local}`)
+  }
+  if (sourceCurrency !== 'USD') {
+    const usd = convertedSalaryRange(profile, 'USD', locale)
+    if (usd) suffixes.push(`≈ ${usd}`)
+  }
+  return suffixes.length ? `${sourceCurrency} · ${suffixes.join(' · ')}` : sourceCurrency
+}
+
 function publicProfile(profile: CvProfile, locale: HiringProfessionLocale): CvProfile {
   const localizeEmploymentType = (value: string): string => value === 'full_time'
     ? locale === 'en' ? 'Full-time' : 'Полная занятость'
@@ -331,6 +367,7 @@ function publicProfile(profile: CvProfile, locale: HiringProfessionLocale): CvPr
       ? profile.employmentTypes.map(localizeEmploymentType).join(', ')
       : profile.employmentType ? localizeEmploymentType(profile.employmentType) : profile.employmentType,
     education: hiringEducationLabel(profile.education, locale),
+    currency: salaryDisplayCurrency(profile, locale),
     tags: [...new Set(details)].slice(0, 20),
     origin: profileOrigin(profile) as CvProfile['origin'],
     sourceKey: profileSource(profile),
@@ -349,6 +386,7 @@ export default defineEventHandler(async (event) => {
     getStoredCvProfilesSnapshot(),
     getStoredWebCvProfiles(),
     loadDbSourceRuns(),
+    loadRates(),
   ])
 
   const storedByUrl = new Map<string, CvProfile>()
