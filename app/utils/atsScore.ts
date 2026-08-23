@@ -1,17 +1,13 @@
-export * from './atsScoreLegacy'
+export * from '~~/shared/legacy/atsScoreCore'
 
 import {
   scoreJob as legacyScoreJob,
   type CvProfile,
-} from './atsScoreLegacy'
+} from '~~/shared/legacy/atsScoreCore'
 
 type AtsJob = Parameters<typeof legacyScoreJob>[1]
 type AtsResult = ReturnType<typeof legacyScoreJob>
 
-// Legal boilerplate often contains abbreviations such as "U.S." between the
-// negative modal and "support future H-1B sponsorship". Do not treat a period
-// inside that clause as a sentence boundary; line breaks/question/exclamation
-// marks remain hard boundaries.
 const LONG_FORM_NO_SPONSORSHIP_RE = /(?:\bmay\s+not\s+be\s+able\s+to\b[^\n!?]{0,450}\b(?:sponsor|support|provide)\b[^\n!?]{0,180}\bsponsorship\b|\b(?:will|can|may)\s+not\b[^\n!?]{0,220}\b(?:sponsor|support|provide)\b[^\n!?]{0,160}\bsponsorship\b|\bnot\s+(?:currently\s+)?(?:able\s+to\s+)?(?:sponsor|support|provide)\b[^\n!?]{0,160}\bsponsorship\b)/i
 
 function isUsRole(job: AtsJob): boolean {
@@ -21,12 +17,6 @@ function isUsRole(job: AtsJob): boolean {
   )
 }
 
-/**
- * Compatibility policy around the established scorer. The legacy scorer keeps
- * all professional-fit math; this boundary only closes long-form US legal
- * wording that can otherwise hide a no-sponsorship blocker behind hundreds of
- * characters of visa-category text.
- */
 export function scoreJob(profile: CvProfile, job: AtsJob): AtsResult {
   const result = legacyScoreJob(profile, job)
   if (
