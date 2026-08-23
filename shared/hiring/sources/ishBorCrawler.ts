@@ -1,5 +1,5 @@
 import type { WebCursor } from '../hiringCursors'
-import { absoluteUrl, htmlText } from '../webFields'
+import { decodeEntities, htmlText } from '../webFields'
 import { ISHBOR_SOURCE_KEY } from './ishBorSource'
 
 const REQUEST_TIMEOUT_MS = 25_000
@@ -21,6 +21,16 @@ function htmlLines(value: string): string[] {
 
 function stripHtml(value: string): string {
   return htmlLines(value).join(' ').replace(/\s+/g, ' ').trim()
+}
+
+function absoluteUrl(raw: string, base: string): string {
+  try {
+    const url = new URL(decodeEntities(raw), base)
+    url.hash = ''
+    return url.toString()
+  } catch {
+    return base
+  }
 }
 
 async function fetchHtml(url: string): Promise<string> {
