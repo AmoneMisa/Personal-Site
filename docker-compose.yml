@@ -38,6 +38,8 @@ services:
   frontend:
     # Public Nuxt runtime. It renders pages and proxies jobs/hiring API traffic to
     # jobs-backend, but never executes scraping, queue work or refresh jobs itself.
+    # It has no startup dependency on jobs-backend: the site must stay available
+    # even when every jobs/hiring worker is down.
     image: ghcr.io/amonemisa/personal-site:latest
     restart: unless-stopped
     env_file:
@@ -48,11 +50,6 @@ services:
       JOBS_BACKEND_URL: http://jobs-backend:3000
     volumes:
       - site_state:/var/app/state
-    depends_on:
-      backend:
-        condition: service_healthy
-      jobs-backend:
-        condition: service_healthy
     ports:
       - "127.0.0.1:8080:3000"
     networks:
