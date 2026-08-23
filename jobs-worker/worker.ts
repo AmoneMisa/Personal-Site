@@ -1,6 +1,6 @@
 import { hostname } from 'node:os'
 
-import { looksSoftBlocked } from '../server/utils/browserSoftBlock'
+import { looksSoftBlocked } from '../shared/http/browserSoftBlock'
 import { configuredJobSources, refreshJobSource } from '../server/utils/jobsSourceRefresh'
 import { hiringChannelHandles } from '../server/utils/hiringSources'
 import { refreshHiringChannel } from '../server/utils/hiringStore'
@@ -21,7 +21,7 @@ import {
   failJobsQueueTask,
   jobsQueueDbEnabled,
   pruneJobsQueueHistory,
-} from '../server/utils/jobsPgQueue'
+} from '../shared/jobs/jobsPgQueue'
 
 const POLL_MS = Math.max(250, Number(process.env.JOBS_QUEUE_POLL_MS) || Number(process.env.JOBS_QUEUE_POLL_SECONDS || 1) * 1000)
 const ERROR_RETRY_MS = Math.max(1_000, Number(process.env.JOBS_QUEUE_ERROR_RETRY_MS) || 5_000)

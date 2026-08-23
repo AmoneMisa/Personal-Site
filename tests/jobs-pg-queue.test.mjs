@@ -2,7 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 
-const queue = readFileSync(new URL('../server/utils/jobsPgQueue.ts', import.meta.url), 'utf8')
+const queue = readFileSync(new URL('../shared/jobs/jobsPgQueue.ts', import.meta.url), 'utf8')
 const worker = readFileSync(new URL('../jobs-worker/worker.ts', import.meta.url), 'utf8')
 const dockerfile = readFileSync(new URL('../jobs-worker/Dockerfile', import.meta.url), 'utf8')
 const compose = readFileSync(new URL('../docker-compose.yml', import.meta.url), 'utf8')
@@ -39,6 +39,7 @@ test('one TypeScript worker owns queue transitions and ingestion directly', () =
   assert.doesNotMatch(worker, /\/internal\/jobs-/)
   assert.doesNotMatch(worker, /\/internal\/hiring-/)
   assert.doesNotMatch(worker, /JOBS_FRONTEND_URL|JOBS_BACKEND_URL|JOBS_API_URL/)
+  assert.match(worker, /\.\.\/shared\/jobs\/jobsPgQueue/)
   assert.match(dockerfile, /jobs-worker\/worker\.ts/)
   assert.doesNotMatch(dockerfile, /pip install|python/)
 })

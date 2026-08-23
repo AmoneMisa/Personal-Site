@@ -56,6 +56,8 @@ jobs:
           grep -q '^  jobs-worker:' docker-compose.yml
           test -e server/routes/jobs-feed.get.ts
           test -e server/routes/hiring-feed.get.ts
+          test -e shared/jobs/jobsPgQueue.ts
+          test -e shared/http/browserSoftBlock.ts
       - name: Run application tests
         run: npm test
       - name: Build Nuxt application
@@ -65,7 +67,7 @@ jobs:
           node --experimental-strip-types --input-type=module <<'NODE'
           import assert from 'node:assert/strict'
           import { Pool } from 'pg'
-          const q = await import('./server/utils/jobsPgQueue.ts')
+          const q = await import('./shared/jobs/jobsPgQueue.ts')
           await q.initJobsPgQueue()
           const dispatched = await q.dispatchDueJobsQueue({
             sources: ['source-a', 'source-b'],
