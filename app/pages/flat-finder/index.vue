@@ -1069,8 +1069,9 @@ onBeforeUnmount(() => { modalOpen.value = false; lightboxIndex.value = null; rel
 .flats__sort .flats__select { flex: 1 1 auto; }
 .flats__map-wrap { position: relative; z-index: 0; isolation: isolate; margin-bottom: 18px; scroll-margin-top: 90px; }
 .flats__grid { display: grid; gap: 14px; grid-template-columns: 1fr; align-items: stretch; grid-auto-rows: 1fr; }
-@media (min-width: 640px) { .flats__grid { grid-template-columns: repeat(2, 1fr); } }
-@media (min-width: 1024px) { .flats__grid { grid-template-columns: repeat(3, 1fr); } }
+@media (min-width: 640px) { .flats__grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (min-width: 1024px) { .flats__grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (min-width: 1440px) { .flats__grid { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
 .flats__grid_loading { opacity: 0.4; pointer-events: none; }
 .flat-card { height: 100%; border: 1px solid var(--line); border-radius: 12px; overflow: hidden; background: rgba(255,255,255,0.03); cursor: pointer; transition: transform 140ms ease, border-color 180ms ease; display: flex; flex-direction: column; }
 .flat-card__body { flex: 1 1 auto; position: relative; padding: 12px 14px; display: flex; flex-direction: column; gap: 4px; }

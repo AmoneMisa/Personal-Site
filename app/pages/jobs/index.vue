@@ -1531,8 +1531,9 @@ onBeforeUnmount(() => {
 .jobs__grid {
   display: grid; gap: 12px; grid-template-columns: 1fr; align-items: stretch;
   grid-auto-rows: 1fr; /* every card the same height across all rows */
-  @media (min-width: 640px) { grid-template-columns: repeat(2, 1fr); }
-  @media (min-width: 1024px) { grid-template-columns: repeat(3, 1fr); }
+  @media (min-width: 640px) { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  @media (min-width: 1024px) { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  @media (min-width: 1440px) { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 }
 /* Dim + lock the current results while a new page/filter is loading, and float a
    spinner over them so it's clear the list is refreshing (not empty). */
@@ -1555,15 +1556,14 @@ onBeforeUnmount(() => {
    details button's margin-top:auto, so every card's footer sits at the bottom. */
 .job-card:hover { transform: translateY(-2px); border-color: rgba(224, 103, 154,0.40); }
 .job-card__head {
-  display: grid; grid-template-columns: minmax(0, 1fr) auto;
-  /* Centred, not start-aligned: the action buttons are taller than the title's
-     line box, so a shared top edge left the title text above the icon centres. */
-  align-items: center; column-gap: 10px; row-gap: 4px;
+  display: grid; grid-template-columns: minmax(0, 1fr);
+  align-items: start; row-gap: 8px;
 }
 .job-card__actions {
-  justify-self: end; display: flex; flex-wrap: wrap; justify-content: flex-end;
+  width: 100%; justify-self: stretch; display: flex; flex-wrap: wrap; justify-content: flex-end;
   align-items: center; gap: 5px; max-width: 100%;
 }
+.job-card__actions .job-card__ats { margin-right: auto; }
 .job-card__action {
   width: 28px; height: 28px; display: inline-grid; place-items: center;
   padding: 0; border: 1px solid var(--line); border-radius: 6px;
@@ -1572,7 +1572,7 @@ onBeforeUnmount(() => {
 .job-card__action:hover { color: var(--accent-pink, #e0679a); border-color: rgba(224,103,154,0.45); }
 .job-card__action_active { color: var(--accent-pink, #e0679a); background: rgba(224,103,154,0.12); }
 .job-card__title {
-  min-width: 0; overflow-wrap: anywhere;
+  width: 100%; min-width: 0; overflow-wrap: break-word; word-break: normal;
   font-weight: 600; font-size: 16px; line-height: 1.35;
   padding: 0; border: 0; background: transparent; cursor: pointer; text-align: left;
   text-decoration: none; color: var(--text-white, inherit);
