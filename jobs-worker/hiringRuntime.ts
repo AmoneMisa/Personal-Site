@@ -7,10 +7,12 @@ import {
   refreshHiringSecondaryWebSource,
 } from '../server/utils/hiringSecondaryWebSources'
 import { refreshHiringUzJobsSource } from '../server/utils/hiringUzJobsSource'
-import { hiringSocialSourceHandles, refreshHiringSocialSource } from '../server/utils/hiringSocialSources'
-import { hiringLinkedInSourceHandles, refreshHiringLinkedInSource } from '../server/utils/hiringLinkedInSources'
+import { refreshHiringSocialSource } from '../server/utils/hiringSocialSources'
+import { refreshHiringLinkedInSource } from '../server/utils/hiringLinkedInSources'
 import { hiringIshBorSourceHandles } from '../shared/hiring/sources/ishBorSource'
 import { hiringUzJobsSourceHandles } from '../shared/hiring/sources/uzJobsSource'
+import { hiringSocialSourceHandles } from '../shared/hiring/sources/socialSources'
+import { hiringLinkedInSourceHandles } from '../shared/hiring/sources/linkedInSources'
 
 type HiringAdapter = {
   handles: () => string[]
