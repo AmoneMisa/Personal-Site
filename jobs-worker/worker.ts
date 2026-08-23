@@ -1,7 +1,6 @@
 import { hostname } from 'node:os'
 
 import { looksSoftBlocked } from '../shared/http/browserSoftBlock'
-import { configuredJobSources, refreshJobSource } from '../server/utils/jobsSourceRefresh'
 import { loadCursors, loadWebCursors } from '../shared/hiring/hiringCursors'
 import {
   claimJobsQueueTask,
@@ -12,6 +11,7 @@ import {
   pruneJobsQueueHistory,
 } from '../shared/jobs/jobsPgQueue'
 import { allHiringTargets, refreshHiringTarget } from './hiringRuntime'
+import { configuredSources, refreshSource } from './jobsRuntime'
 
 const POLL_MS = Math.max(250, Number(process.env.JOBS_QUEUE_POLL_MS) || Number(process.env.JOBS_QUEUE_POLL_SECONDS || 1) * 1000)
 const ERROR_RETRY_MS = Math.max(1_000, Number(process.env.JOBS_QUEUE_ERROR_RETRY_MS) || 5_000)
@@ -183,7 +183,7 @@ async function dispatchDueTasks() {
   ]
 
   const result = await dispatchDueJobsQueue({
-    sources: configuredJobSources(),
+    sources: configuredSources(),
     hiringHandles,
     backfillHandles,
     jobsRefreshSeconds: Math.max(60, Number(process.env.JOBS_QUEUE_REFRESH_SECONDS) || 1800),
@@ -207,7 +207,7 @@ async function executeTask(task: Awaited<ReturnType<typeof claimJobsQueueTask>>)
   if (task.type === 'jobs.refresh.source') {
     const source = String(payload.source || task.target || '')
     if (!source) throw new Error('jobs task has no source')
-    return { source, ...(await refreshJobSource(source as never)) }
+    return { source, ...(await refreshSource(source)) }
   }
 
   if (task.type === 'hiring.refresh.channel') {
