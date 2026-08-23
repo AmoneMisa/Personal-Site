@@ -36,19 +36,47 @@ services:
       start_period: 10s
 
   frontend:
-    # Deliberately NO build context: the Nuxt image is built and pushed by GitHub
-    # Actions (see .github/workflows/deploy.yml, which builds ./Dockerfile
-    # directly and does not use compose). With a build section here, any
-    # `docker compose up -d --build` on the server re-ran the Nuxt build — the
-    # source of the deployment command timeouts — and the jobs-queue-worker
-    # services depend_on frontend, so even building only those triggered it.
-    # To build locally: docker build -t ghcr.io/amonemisa/personal-site:latest .
+    # Public Nuxt runtime. It renders pages and proxies jobs/hiring API traffic to
+    # jobs-backend, but never executes scraping, queue work or refresh jobs itself.
     image: ghcr.io/amonemisa/personal-site:latest
     restart: unless-stopped
     env_file:
       - ${SITE_ENV_FILE:-./db.env}
     environment:
       SITE_STATE_DIR: /var/app/state/site
+      JOBS_EXECUTION_ENABLED: "off"
+      JOBS_BACKEND_URL: http://jobs-backend:3000
+    volumes:
+      - site_state:/var/app/state
+    depends_on:
+      backend:
+        condition: service_healthy
+      jobs-backend:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:8080:3000"
+    networks:
+      - default
+      - ai-net
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://localhost:3000/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+
+  jobs-backend:
+    # Dedicated internal runtime for vacancy/candidate feeds, queue orchestration,
+    # scraping, normalization and indexing. It intentionally shares the existing
+    # application image so the mature TypeScript ingestion code does not need a
+    # risky rewrite, but it is isolated from the user-facing Nuxt process.
+    image: ghcr.io/amonemisa/personal-site:latest
+    restart: unless-stopped
+    env_file:
+      - ${SITE_ENV_FILE:-./db.env}
+    environment:
+      SITE_STATE_DIR: /var/app/state/site
+      JOBS_EXECUTION_ENABLED: "on"
       AI_WORKER_URL: http://ai-worker:4030
       ELASTICSEARCH_URL: http://flat-finder-elasticsearch:9200
       JOBS_ELASTICSEARCH_INDEX: job-listings-v1
@@ -61,7 +89,7 @@ services:
       HIRING_SOCIAL_SOURCE: ${HIRING_SOCIAL_SOURCE:-on}
       HIRING_SOCIAL_SOURCES: ${HIRING_SOCIAL_SOURCES:-}
       HIRING_SOCIAL_API_URL: ${HIRING_SOCIAL_API_URL:-http://flat-finder-backend:4000/internal/social/fetch}
-      # Durable CV storage: the shared Postgres, in its own "hiring" schema.
+      # Durable CV storage: shared Postgres, in its own "hiring" schema.
       HIRING_DATABASE_URL: ${HIRING_DATABASE_URL:-}
       HIRING_DB_SCHEMA: ${HIRING_DB_SCHEMA:-hiring}
       # Jobs/hiring queue state is durable in Postgres too. When a dedicated URL
@@ -83,14 +111,10 @@ services:
         condition: service_healthy
       job-browser-fetcher:
         condition: service_healthy
-    ports:
-      - "127.0.0.1:8080:3000"
     networks:
       - default
       - ai-net
     healthcheck:
-      # Do not SSR the homepage for liveness. `/health` is intentionally a tiny
-      # Nitro route so startup job refreshes cannot make the container unhealthy.
       test: ["CMD", "node", "-e", "fetch('http://localhost:3000/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
       interval: 30s
       timeout: 5s
@@ -99,18 +123,18 @@ services:
 
   jobs-queue-dispatcher:
     # Lightweight HTTP ticker. Queue durability, scheduling and locking live in
-    # PostgreSQL inside the frontend; this process only wakes the dispatcher.
+    # PostgreSQL; the dedicated jobs-backend owns queue orchestration.
     image: ghcr.io/amonemisa/personal-site-jobs-queue:latest
     restart: unless-stopped
     environment:
       QUEUE_MODE: dispatcher
-      JOBS_FRONTEND_URL: http://frontend:3000
+      JOBS_BACKEND_URL: http://jobs-backend:3000
       QUEUE_INTERNAL_KEY: ${QUEUE_INTERNAL_KEY:-}
       QUEUE_DISPATCH_TICK_SECONDS: ${JOBS_QUEUE_DISPATCH_TICK_SECONDS:-10}
     networks:
       - default
     depends_on:
-      frontend:
+      jobs-backend:
         condition: service_healthy
 
   jobs-queue-worker-1:
@@ -118,14 +142,14 @@ services:
     restart: unless-stopped
     environment:
       QUEUE_MODE: worker
-      JOBS_FRONTEND_URL: http://frontend:3000
+      JOBS_BACKEND_URL: http://jobs-backend:3000
       QUEUE_INTERNAL_KEY: ${QUEUE_INTERNAL_KEY:-}
       QUEUE_POLL_SECONDS: ${JOBS_QUEUE_POLL_SECONDS:-1}
       QUEUE_EXECUTE_TIMEOUT_SECONDS: ${JOBS_QUEUE_EXECUTE_TIMEOUT_SECONDS:-180}
     networks:
       - default
     depends_on:
-      frontend:
+      jobs-backend:
         condition: service_healthy
 
 volumes:
