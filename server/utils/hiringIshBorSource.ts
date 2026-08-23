@@ -7,66 +7,18 @@ import { cityFrom, cityRe, htmlText } from './hiringWebFields'
 import { withHiringStoreLock } from './hiringStoreLock'
 import { extractCandidateAge, extractCandidateName } from './hiringCandidateFields'
 import { ishBorProfileHtml } from './hiringIshBorFields'
-import { emptyWebCursor, loadWebCursors, saveWebCursor, type WebCursor } from './hiringCursors'
+import { emptyWebCursor, loadWebCursors, saveWebCursor } from './hiringCursors'
+import { crawlIshBorPages, type IshBorSummary as Summary } from '../../shared/hiring/sources/ishBorCrawler'
+import { hiringIshBorSourceHandles, ISHBOR_SOURCE_KEY } from '../../shared/hiring/sources/ishBorSource'
 
-const UA =
-  'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ' +
-  '(KHTML, like Gecko) Chrome/126.0 Safari/537.36'
-const REQUEST_TIMEOUT_MS = 25_000
 const STORE_KEY = 'hiring:store:v4'
 const STORE_TTL_SECONDS = 100 * 86_400
 const MAX_AGE_MONTHS = 3
-const MAX_PAGES = 3
-const DETAIL_BATCH = 6
 
 type StoredProfile = CvProfile & { lastSeen?: string; ai?: unknown }
-type Summary = { url: string; role: string; text: string }
-
-function decodeEntities(value: string): string {
-  const named: Record<string, string> = {
-    amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", nbsp: ' ', ndash: '–', mdash: '—',
-  }
-  return value.replace(/&(#x?[0-9a-f]+|[a-z]+);/gi, (match, entity: string) => {
-    if (entity.startsWith('#')) {
-      const hex = entity[1]?.toLowerCase() === 'x'
-      const code = Number.parseInt(entity.slice(hex ? 2 : 1), hex ? 16 : 10)
-      return Number.isFinite(code) ? String.fromCodePoint(code) : match
-    }
-    return named[entity.toLowerCase()] ?? match
-  })
-}
 
 function htmlLines(value: string): string[] {
-  // One shared reader, so script and style contents stay out of the profile
-  // text here too.
   return htmlText(value).split('\n').filter(Boolean)
-}
-
-function stripHtml(value: string): string {
-  return htmlLines(value).join(' ').replace(/\s+/g, ' ').trim()
-}
-
-function absoluteUrl(raw: string, base: string): string {
-  try {
-    const url = new URL(decodeEntities(raw), base)
-    url.hash = ''
-    return url.toString()
-  } catch {
-    return base
-  }
-}
-
-async function fetchHtml(url: string): Promise<string> {
-  const response = await fetch(url, {
-    headers: {
-      'User-Agent': UA,
-      Accept: 'text/html,application/xhtml+xml',
-      'Accept-Language': 'ru,en;q=0.8',
-    },
-    signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
-  })
-  if (!response.ok) throw new Error(`${new URL(url).host} -> ${response.status}`)
-  return response.text()
 }
 
 function cutoff(): number {
@@ -88,12 +40,7 @@ function dottedIso(day: string, month: string, year: string): string | null {
     : null
 }
 
-/**
- * Do not accept an arbitrary date from the page. CV pages can contain footer,
- * copyright, education and work-history dates that are unrelated to activity.
- * Only machine-readable publication metadata or a date explicitly labelled as
- * published/updated is accepted as the 3-month freshness proof.
- */
+/** Only explicit publication/update metadata is accepted as freshness proof. */
 function detailActivity(html: string, text: string): string | null {
   const candidates: number[] = []
   for (const match of html.matchAll(
@@ -106,9 +53,6 @@ function detailActivity(html: string, text: string): string | null {
     const time = Date.parse(match[1]!)
     if (Number.isFinite(time) && time <= Date.now() + 48 * 60 * 60 * 1000) candidates.push(time)
   }
-  // The board no longer publishes JSON-LD or a <time> element. Its only date
-  // is the one in the share row, marked by a calendar icon and followed by a
-  // view counter — still explicit, just no longer labelled in words.
   for (const match of html.matchAll(
     /lucide:calendar[\s\S]{0,80}?(\d{1,2})[./-](\d{1,2})[./-](20\d{2})/gi,
   )) {
@@ -122,24 +66,6 @@ function detailActivity(html: string, text: string): string | null {
     if (iso) candidates.push(Date.parse(iso))
   }
   return candidates.length ? new Date(Math.max(...candidates)).toISOString() : null
-}
-
-function listSummaries(html: string): Summary[] {
-  const base = 'https://ish-bor.uz/ru/ishchilar'
-  const matches = [...html.matchAll(
-    /<a\b[^>]*href=["']([^"']*\/ru\/ishchilar\/id\/\d+[^"']*)["'][^>]*>([\s\S]*?)<\/a>/gi,
-  )]
-  const byUrl = new Map<string, Summary>()
-  for (let index = 0; index < matches.length; index++) {
-    const match = matches[index]!
-    const role = stripHtml(match[2])
-    if (role.length < 2 || role.length > 220 || /подробнее/iu.test(role)) continue
-    const start = match.index || 0
-    const end = matches[index + 1]?.index ?? Math.min(html.length, start + 4_500)
-    const url = absoluteUrl(match[1]!, base)
-    byUrl.set(url, { url, role, text: htmlLines(html.slice(start, end)).join('\n') })
-  }
-  return [...byUrl.values()]
 }
 
 function field(text: string, names: string): string | null {
@@ -204,8 +130,6 @@ function detect(text: string, aliases: Array<[string, RegExp]>): string | null {
 }
 
 function contacts(text: string): CvProfile['contacts'] {
-  // Prefer explicit Uzbekistan-format numbers; do not treat arbitrary 7-digit
-  // IDs, salaries or dates as phones.
   const phone = text.match(/(?:\+998|998)\s*\(?\d{2}\)?[\s-]*\d{3}[\s-]*\d{2}[\s-]*\d{2}/)?.[0]
     || text.match(/\b\d{2}[\s-]\d{3}[\s-]\d{2}[\s-]\d{2}\b/)?.[0]
   const email = text.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/iu)?.[0]
@@ -217,17 +141,7 @@ function contacts(text: string): CvProfile['contacts'] {
   }
 }
 
-/**
- * The detail page labels its fields with icons instead of words: `map-pin`
- * marks the location, `user` the name and gender, `graduation-cap` the
- * education, `clock` the experience. Reading the span that follows the icon
- * beats searching the page text, where the same words also appear in the
- * navigation, the filter panel and the footer.
- */
 function iconField(html: string, icon: string): string | null {
-  // The value is the span that immediately follows the icon. Anything looser
-  // matches the navigation, which uses the same icon set — and the icon name
-  // must be terminated, or "user" also matches the nav's "users".
   const match = html.match(new RegExp(
     `lucide:${icon}"[^>]*></iconify-icon>\\s*(?:</div>\\s*)?<span[^>]*>([^<]{1,200})</span>`,
     'i',
@@ -235,12 +149,6 @@ function iconField(html: string, icon: string): string | null {
   return match ? htmlText(match[1]!).trim() || null : null
 }
 
-/**
- * The board's own page summary carries the asked salary after a 💵 marker, in
- * whatever shape the candidate typed it: "4000000", "2-4 mln", "5 mlndan 15
- * mlngacha", "7 milliyondanyuqori". A number under a thousand alongside a
- * "million" word is millions; anything else is a plain sum.
- */
 function metaSalary(html: string): Pick<CvProfile, 'salaryMin' | 'salaryMax' | 'currency'> {
   const raw = html.match(/name="description"\s+content="[^"]*?💵:\s*([^."]{1,40})/i)?.[1]
   if (!raw) return {}
@@ -255,7 +163,6 @@ function metaSalary(html: string): Pick<CvProfile, 'salaryMin' | 'salaryMax' | '
   return { salaryMin: Math.min(...values), salaryMax: Math.max(...values), currency: usd ? 'USD' : 'UZS' }
 }
 
-/** "1 год", "У меня нет опыта работы" — the clock field, not free text. */
 function iconExperience(html: string): number | null {
   const value = iconField(html, 'clock')
   if (!value) return null
@@ -264,7 +171,6 @@ function iconExperience(html: string): number | null {
   return match ? Number(match[1]!.replace(',', '.')) : null
 }
 
-/** "Hilola (Женщина)" — the board prints the gender next to the name. */
 function iconName(html: string): string {
   const value = iconField(html, 'user') || ''
   const name = value.replace(/\s*\((?:женщина|мужчина|ayol|erkak|female|male)\)\s*$/iu, '').trim()
@@ -305,10 +211,10 @@ function profileFrom(summary: Summary, detailHtml: string): CvProfile | null {
   )
 
   return normalizeCandidate({
-    id: `web-ishbor-uz-${sourceId}`,
+    id: `web-${ISHBOR_SOURCE_KEY}-${sourceId}`,
     source: 'telegram',
     origin: 'web',
-    sourceKey: 'ishbor-uz',
+    sourceKey: ISHBOR_SOURCE_KEY,
     country: 'UZ',
     name: iconName(profileHtml) || parseName(detailText),
     role,
@@ -318,7 +224,6 @@ function profileFrom(summary: Summary, detailHtml: string): CvProfile | null {
     age,
     isAdult: age == null ? true : age >= 18,
     experienceYears: iconExperience(profileHtml) ?? parseExperience(combined),
-    // The shared list also knows the regions this board prints instead of a city.
     city: cityFrom(iconField(profileHtml, 'map-pin') || '', 'UZ') || cityFrom(combined, 'UZ'),
     district: detect(combined, DISTRICT_ALIASES),
     remote,
@@ -341,89 +246,13 @@ function profileFrom(summary: Summary, detailHtml: string): CvProfile | null {
     contacts: publicContacts,
     contact: publicContacts.telegram || publicContacts.email || publicContacts.phone || summary.url,
     contactType: hasDirect ? 'direct' : 'platform',
-    // The summary line is the board's own field; the page text is a guess.
     ...parseSalary(combined),
     ...metaSalary(detailHtml),
   })
 }
 
-async function fetchProfiles(cursor = emptyWebCursor('ishbor-uz')): Promise<{
-  profiles: CvProfile[]
-  fetched: number
-  cursor: WebCursor
-}> {
-  const all = new Map<string, Summary & { page: number }>()
-  const backfillPages = Math.max(1, Math.min(
-    10,
-    Number(process.env.HIRING_ISHBOR_BACKFILL_PAGES)
-      || Math.max(1, (Number(process.env.HIRING_ISHBOR_MAX_PAGES) || MAX_PAGES) - 1),
-  ))
-  const backfillStart = Math.max(2, cursor.backfillPage || 1)
-  const pages = cursor.bootstrapComplete
-    ? [1]
-    : [1, ...Array.from({ length: backfillPages }, (_, index) => backfillStart + index)]
-  let bootstrapComplete = cursor.bootstrapComplete
-  let lastHistoricalPage = backfillStart - 1
-
-  for (const page of pages) {
-    const url = page === 1
-      ? 'https://ish-bor.uz/ru/ishchilar'
-      : `https://ish-bor.uz/ru/ishchilar?page=${page}`
-    const summaries = listSummaries(await fetchHtml(url))
-    if (page > 1) lastHistoricalPage = page
-    if (!summaries.length) {
-      if (page > 1) bootstrapComplete = true
-      break
-    }
-    summaries.forEach((item) => all.set(item.url, { ...item, page }))
-  }
-
-  const summaries = [...all.values()]
-  const profiles: CvProfile[] = []
-  const recentByPage = new Map<number, number>()
-  const failuresByPage = new Map<number, number>()
-  for (let offset = 0; offset < summaries.length; offset += DETAIL_BATCH) {
-    const batch = summaries.slice(offset, offset + DETAIL_BATCH)
-    const results = await Promise.allSettled(
-      batch.map(async (summary) => ({ page: summary.page, profile: profileFrom(summary, await fetchHtml(summary.url)) })),
-    )
-    results.forEach((result, index) => {
-      if (result.status === 'fulfilled' && result.value.profile) {
-        profiles.push(result.value.profile)
-        recentByPage.set(result.value.page, (recentByPage.get(result.value.page) || 0) + 1)
-      } else if (result.status === 'rejected') {
-        const page = batch[index]!.page
-        failuresByPage.set(page, (failuresByPage.get(page) || 0) + 1)
-      }
-    })
-  }
-
-  if (!bootstrapComplete) {
-    for (const page of pages.filter((value) => value > 1)) {
-      if (!recentByPage.get(page) && !failuresByPage.get(page)) {
-        bootstrapComplete = true
-        break
-      }
-    }
-  }
-
-  const newest = summaries.find((summary) => summary.page === 1)
-  const nextBackfillPage = bootstrapComplete
-    ? Math.max(2, cursor.backfillPage || 1)
-    : Math.max(backfillStart + 1, lastHistoricalPage)
-  return {
-    profiles,
-    fetched: summaries.length,
-    cursor: {
-      ...cursor,
-      sourceKey: 'ishbor-uz',
-      lastSeenProfileId: newest?.url.match(/\/id\/(\d+)/)?.[1] || cursor.lastSeenProfileId,
-      lastSeenUrl: newest?.url || cursor.lastSeenUrl,
-      backfillPage: nextBackfillPage,
-      bootstrapComplete,
-      lastSuccessAt: new Date().toISOString(),
-    },
-  }
+async function fetchProfiles(cursor = emptyWebCursor(ISHBOR_SOURCE_KEY)) {
+  return crawlIshBorPages(cursor, profileFrom)
 }
 
 async function persist(profiles: CvProfile[], diagnostic: SourceRun): Promise<number> {
@@ -459,13 +288,11 @@ async function persist(profiles: CvProfile[], diagnostic: SourceRun): Promise<nu
 
 /** One crawl of the ish-bor board, without storing anything. For diagnostics. */
 export async function crawlIshBorSource() {
-  const cursor = (await loadWebCursors()).get('ishbor-uz') || emptyWebCursor('ishbor-uz')
+  const cursor = (await loadWebCursors()).get(ISHBOR_SOURCE_KEY) || emptyWebCursor(ISHBOR_SOURCE_KEY)
   return fetchProfiles(cursor)
 }
 
-export function hiringIshBorSourceHandles(): string[] {
-  return process.env.HIRING_ISHBOR_CV_SOURCE === 'off' ? [] : ['web:ishbor-uz']
-}
+export { hiringIshBorSourceHandles }
 
 export async function refreshHiringIshBorSource(
   handle: string,
@@ -473,10 +300,10 @@ export async function refreshHiringIshBorSource(
   if (!hiringIshBorSourceHandles().some((item) => item.toLowerCase() === handle.toLowerCase())) return null
   const checkedAt = new Date().toISOString()
   try {
-    const cursor = (await loadWebCursors()).get('ishbor-uz') || emptyWebCursor('ishbor-uz')
+    const cursor = (await loadWebCursors()).get(ISHBOR_SOURCE_KEY) || emptyWebCursor(ISHBOR_SOURCE_KEY)
     const result = await fetchProfiles(cursor)
     const diagnostic: SourceRun = {
-      handle: 'web:ishbor-uz',
+      handle: `web:${ISHBOR_SOURCE_KEY}`,
       country: 'UZ',
       status: result.profiles.length ? 'ok' : 'empty',
       fetched: result.fetched,
@@ -485,11 +312,11 @@ export async function refreshHiringIshBorSource(
     }
     const stored = await persist(result.profiles, diagnostic)
     await saveWebCursor(result.cursor)
-    console.log(`[hiring:web] ishbor-uz fetched=${result.fetched} candidates=${result.profiles.length} store=${stored}`)
+    console.log(`[hiring:web] ${ISHBOR_SOURCE_KEY} fetched=${result.fetched} candidates=${result.profiles.length} store=${stored}`)
     return { fetched: result.fetched, candidates: result.profiles.length, stored }
   } catch (error) {
     const diagnostic: SourceRun = {
-      handle: 'web:ishbor-uz',
+      handle: `web:${ISHBOR_SOURCE_KEY}`,
       country: 'UZ',
       status: 'error',
       fetched: 0,
