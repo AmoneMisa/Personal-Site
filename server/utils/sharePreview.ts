@@ -1,5 +1,6 @@
 export const SHARE_SITE_URL = (process.env.PUBLIC_SITE_URL || 'https://whiteslove.me').replace(/\/$/, '')
 const FLAT_API_URL = process.env.FLAT_API_URL || 'http://185.5.206.229:8082'
+const JOBS_API_URL = (process.env.JOBS_API_URL || 'http://jobs-api:3000').replace(/\/$/, '')
 const VALID_FLAT_SOURCES = new Set(['olx', 'telegram'])
 
 // Social crawlers abandon a preview after only a few seconds (Telegram is the
@@ -90,27 +91,15 @@ export async function findSharedJob(id: string): Promise<any | null> {
   if (cached) return cached.value
 
   try {
-    // The public renderer never imports the vacancy store. It asks the isolated
-    // jobs runtime for the one record needed by the social-preview hook.
-    if (String(process.env.JOBS_EXECUTION_ENABLED || 'off').toLowerCase() !== 'on') {
-      const backend = String(process.env.JOBS_BACKEND_URL || 'http://jobs-backend:3000').replace(/\/$/, '')
-      const response = await fetch(`${backend}/jobs-vacancy?id=${encodeURIComponent(wanted)}`, {
-        signal: AbortSignal.timeout(SHARE_LOOKUP_TIMEOUT_MS),
-        headers: { Accept: 'application/json' },
-      })
-      if (!response.ok) return cacheSet(`job:${wanted}`, null)
-      const data = await response.json() as { job?: any }
-      return cacheSet(`job:${wanted}`, data?.job || null)
-    }
-
-    // jobs-backend owns the actual store and enriches the record locally.
-    const [{ getStoredJobs }, { enrichJob }] = await Promise.all([
-      import('./jobsStore'),
-      import('./enrich'),
-    ])
-    const jobs = await getStoredJobs()
-    const found = jobs.find((job: any) => job.id === wanted || job.url === wanted)
-    return cacheSet(`job:${wanted}`, found ? enrichJob(found) : null)
+    // SSR never imports the vacancy ingestion store. A tiny read-only API lookup
+    // is enough for the social card and keeps crawler work out of the renderer.
+    const response = await fetch(`${JOBS_API_URL}/jobs-vacancy?id=${encodeURIComponent(wanted)}`, {
+      signal: AbortSignal.timeout(SHARE_LOOKUP_TIMEOUT_MS),
+      headers: { Accept: 'application/json' },
+    })
+    if (!response.ok) return cacheSet(`job:${wanted}`, null)
+    const data = await response.json() as { job?: any }
+    return cacheSet(`job:${wanted}`, data?.job || null)
   } catch {
     return null
   }
