@@ -4,12 +4,14 @@
     <u-main class="site-app__main" as="main">
       <NuxtPage />
     </u-main>
+    <telegram-subscription-button />
     <site-footer class="site-app__footer" />
   </u-app>
 </template>
 <script setup lang="ts">
 import HeaderNav from "~/components/redesign/HeaderNav.vue";
 import SiteFooter from "~/components/redesign/SiteFooter.vue";
+import TelegramSubscriptionButton from "~/components/TelegramSubscriptionButton.client.vue";
 
 const SITE_URL = "https://whiteslove.me";
 

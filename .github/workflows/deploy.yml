@@ -17,6 +17,7 @@ env:
   BACKEND_IMAGE: ghcr.io/amonemisa/personal-site-backend
   JOBS_WORKER_IMAGE: ghcr.io/amonemisa/personal-site-jobs-worker
   JOB_BROWSER_FETCHER_IMAGE: ghcr.io/amonemisa/personal-site-job-browser-fetcher
+  SUBSCRIPTION_BOT_IMAGE: ghcr.io/amonemisa/personal-site-subscription-bot
 
 jobs:
   # All runtime images are built in CI. Production only pulls immutable build
@@ -43,6 +44,10 @@ jobs:
             context: ./job-browser-fetcher
             file: ./job-browser-fetcher/Dockerfile
             image: ghcr.io/amonemisa/personal-site-job-browser-fetcher
+          - name: subscription-bot
+            context: ./subscription-bot
+            file: ./subscription-bot/Dockerfile
+            image: ghcr.io/amonemisa/personal-site-subscription-bot
     steps:
       - uses: actions/checkout@v4
 
