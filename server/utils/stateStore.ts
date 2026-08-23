@@ -16,8 +16,6 @@ type Entry = {
 
 type SetOption = string | number
 
-type EventHandler = (...args: unknown[]) => void
-
 const keyQueues = new Map<string, Promise<unknown>>()
 let dirReady: Promise<void> | undefined
 
@@ -105,12 +103,6 @@ function parseSetOptions(options: SetOption[]): { expiresAt: number | null; nx: 
 }
 
 export class PersistentStateStore {
-  readonly status = 'ready'
-
-  on(_event: string, _handler: EventHandler) { return this }
-  once(_event: string, _handler: EventHandler) { return this }
-  off(_event: string, _handler: EventHandler) { return this }
-
   async get(key: string): Promise<string | null> {
     return (await readEntry(key))?.value ?? null
   }
@@ -154,12 +146,6 @@ export class PersistentStateStore {
       await rm(keyPath(key), { force: true })
       return true
     })
-  }
-
-  // Compatibility for the current hiring lock while it is migrated to
-  // compareAndDelete(). No script engine is involved.
-  async eval(_script: string, _numKeys: number, key: string, expected: string): Promise<number> {
-    return (await this.compareAndDelete(key, expected)) ? 1 : 0
   }
 }
 
