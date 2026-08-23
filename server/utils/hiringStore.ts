@@ -1,7 +1,7 @@
-// Redis-backed store for candidate CV/resume profiles. Refreshed by
+// Persistent store for candidate CV/resume profiles. Refreshed by
 // server/tasks/hiring/refresh.ts on a schedule and on cold boot.
 
-import { useRedis } from '~~/server/utils/redis'
+import { useStateStore } from '~~/server/utils/stateStore'
 import {
   fetchHiringChannel,
   fetchHiringSource,
@@ -43,7 +43,7 @@ const AI_PENDING_STALE_MS = 30 * 60_000
 // legitimately empty result, not an outage.
 const COLD_RETRY_MIN_MS = 60_000
 const COLD_RETRY_MAX_MS = 15 * 60_000
-// Postgres is only consulted when Redis has nothing; this stops a permanently
+// Postgres is only consulted when the persistent snapshot has nothing; this stops a permanently
 // empty database from being re-queried on every single request.
 const DB_HYDRATE_COOLDOWN_MS = 60_000
 
@@ -129,7 +129,7 @@ function channelHandle(profile: CvProfile): string {
 }
 
 /**
- * Refills the store from Postgres when Redis is cold. Candidates keep their
+ * Refills the store from Postgres when the persistent snapshot is cold. Candidates keep their
  * original createdAt (that is what the age prune judges); lastSeen is stamped
  * now because Postgres already dropped anything outside the retention window.
  */
@@ -326,7 +326,7 @@ async function persistStore(input: StoredProfile[]) {
   memoryStore = list
   memoryValidUntil = Date.now() + MEMORY_TTL_MS
   try {
-    await useRedis().set(STORE_KEY, JSON.stringify(list), 'EX', STORE_TTL_SECONDS)
+    await useStateStore().set(STORE_KEY, JSON.stringify(list), 'EX', STORE_TTL_SECONDS)
   } catch (error) {
     console.error('[hiring] failed to persist store:', (error as Error).message)
   }
@@ -427,7 +427,7 @@ async function fetchSource(source: HiringSource): Promise<CvProfile[]> {
 export async function getStoredCvProfiles(): Promise<CvProfile[]> {
   if (memoryStore.length && Date.now() < memoryValidUntil) return publicProfiles(memoryStore)
   try {
-    const raw = await useRedis().get(STORE_KEY)
+    const raw = await useStateStore().get(STORE_KEY)
     if (raw) {
       const list = JSON.parse(raw) as StoredProfile[]
       memoryStore = list
@@ -435,7 +435,7 @@ export async function getStoredCvProfiles(): Promise<CvProfile[]> {
       return publicProfiles(list)
     }
   } catch {
-    // Redis unavailable — Postgres below is the next best source.
+    // Persistent snapshot unavailable — Postgres below is the next best source.
   }
   if (memoryStore.length) return publicProfiles(memoryStore)
   return publicProfiles(await hydrateFromDb())
@@ -446,7 +446,7 @@ export const getStoredHiringPosts = getStoredCvProfiles
 
 async function loadStored(): Promise<StoredProfile[]> {
   try {
-    const raw = await useRedis().get(STORE_KEY)
+    const raw = await useStateStore().get(STORE_KEY)
     if (raw) return JSON.parse(raw) as StoredProfile[]
   } catch {
     // Fall through to memory/Postgres.
@@ -588,7 +588,7 @@ async function performRefresh(): Promise<{ fetched: number; stored: number }> {
 
 /**
  * Refreshes one channel and folds it into the store. This is the unit of work
- * the RabbitMQ tasks carry: a channel that times out is retried on its own,
+ * carried by the queue worker: a channel that times out is retried on its own,
  * instead of a whole-source refresh failing and taking the good channels with
  * it. Returns null when the handle is not configured.
  */
