@@ -2,7 +2,7 @@ import { recordWebDiagnostic, type WebSourceDiagnostic } from './hiringDiagnosti
 import { normalizeCandidate } from './hiringNormalize'
 import { detectCity } from './hiringSources'
 import type { CvProfile } from './hiringTypes'
-import { persistWebProfiles } from './hiringWebSources'
+import { persistWebProfiles } from '../hiring/webProfilePersistence'
 
 const REQUEST_TIMEOUT_MS = 180_000
 const DEFAULT_LIMIT = 24
