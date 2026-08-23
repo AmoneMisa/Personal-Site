@@ -22,6 +22,8 @@ const UPSTREAM_TIMEOUT_MS = 25_000
 const EXACT_LOOKUP_TIMEOUT_MS = 12_000
 const feedCache = new Map<string, { at: number; data: any }>()
 const feedRefreshes = new Map<string, Promise<any>>()
+const ALL_FEED_SOURCES = ['olx', 'telegram', 'facebook', 'threads'] as const
+const SOCIAL_FEED_SOURCES = new Set(['telegram', 'facebook', 'threads'])
 
 function rewritePhoto(p: unknown): unknown {
   return typeof p === 'string' && p.startsWith('/api/tg-photo/')
@@ -37,7 +39,7 @@ function shapeListing(listing: any): any {
   }
 }
 
-function normalizeTelegramDedupeText(value: unknown): string {
+function normalizeFeedDedupeText(value: unknown): string {
   return String(value || '')
     .toLowerCase()
     .replace(/https?:\/\/\S+/giu, ' ')
@@ -47,19 +49,22 @@ function normalizeTelegramDedupeText(value: unknown): string {
     .trim()
 }
 
-function telegramDedupeKey(listing: any): string | null {
-  if (String(listing?.source || '').toLowerCase() !== 'telegram') return null
+function socialDedupeKey(listing: any): string | null {
+  const source = String(listing?.source || '').toLowerCase()
+  if (!SOCIAL_FEED_SOURCES.has(source)) return null
 
-  const text = normalizeTelegramDedupeText(
+  const text = normalizeFeedDedupeText(
     `${listing?.title || ''}\n${listing?.description || listing?.text || listing?.originalText || ''}`,
   )
-  // Short cards are too ambiguous to fingerprint safely. Keep their Telegram
-  // message IDs independent instead of risking two real apartments collapsing.
+  // Short cards are too ambiguous to fingerprint safely. Keep their source IDs
+  // independent instead of risking two real apartments collapsing.
   if (text.length < 80) return null
 
   const areaSqm = Number(listing?.areaSqm)
   const normalizedArea = Number.isFinite(areaSqm) ? Math.round(areaSqm * 2) / 2 : ''
 
+  // Source is deliberately omitted: exact Telegram/Facebook/Threads reposts of
+  // the same housing ad should produce one card, not one card per network.
   return [
     String(listing?.country || '').toUpperCase(),
     String(listing?.city || '').toLowerCase(),
@@ -73,12 +78,12 @@ function telegramDedupeKey(listing: any): string | null {
   ].join('|')
 }
 
-function dedupeTelegramListings(listings: any[]): any[] {
+function dedupeFeedListings(listings: any[]): any[] {
   const seen = new Set<string>()
   const out: any[] = []
 
   for (const listing of listings) {
-    const key = telegramDedupeKey(listing)
+    const key = socialDedupeKey(listing)
     if (!key) {
       out.push(listing)
       continue
@@ -95,13 +100,13 @@ function shapeResponse(raw: any, requestedSources: string[]): any {
   const data = { ...raw }
   const allowed = requestedSources.length
     ? requestedSources
-    : ['olx', 'telegram', 'facebook', 'threads']
+    : [...ALL_FEED_SOURCES]
   const shaped = Array.isArray(raw?.listings)
     ? raw.listings
         .filter((listing: any) => allowed.includes(String(listing?.source || '').toLowerCase()))
         .map(shapeListing)
     : []
-  data.listings = dedupeTelegramListings(shaped)
+  data.listings = dedupeFeedListings(shaped)
   const backendSources = Array.isArray(raw?.filters?.sources) ? raw.filters.sources : []
   data.count = requestedSources.length && backendSources.length === 0
     ? data.listings.length
@@ -159,12 +164,22 @@ function findCachedExactListing(listingId: string, source: string, country: stri
 
 export default defineEventHandler(async (event) => {
   const incoming = getRequestURL(event)
-  const requestedSources = (incoming.searchParams.get('sources') || '')
+  const rawRequestedSources = (incoming.searchParams.get('sources') || '')
     .split(',')
     .map((source) => source.trim().toLowerCase())
-    .filter((source) => ['olx', 'telegram', 'facebook', 'threads'].includes(source))
+    .filter((source) => ALL_FEED_SOURCES.includes(source as typeof ALL_FEED_SOURCES[number]))
+
+  // The current web UI historically sent `olx,telegram` to mean "all" because
+  // those were the only sources when the page was built. Social housing is now
+  // persisted too, so preserve the UI contract while letting the default feed
+  // return every available source. A single explicit source remains a real filter.
+  const legacyAllSources = rawRequestedSources.length === 2
+    && rawRequestedSources.includes('olx')
+    && rawRequestedSources.includes('telegram')
+  const requestedSources = legacyAllSources ? [] : rawRequestedSources
 
   const upstreamParams = new URLSearchParams(incoming.searchParams)
+  if (legacyAllSources) upstreamParams.delete('sources')
   const metro = upstreamParams.get('metro')
   if (metro) upstreamParams.set('metro', canonicalMetroValue(metro))
 
