@@ -1,4 +1,3 @@
-import { hiringChannelHandles } from '../server/utils/hiringSources'
 import { refreshHiringChannel } from '../server/utils/hiringStore'
 import { refreshHiringWebSource } from '../server/utils/hiringWebSources'
 import { refreshHiringIshBorSource } from '../server/utils/hiringIshBorSource'
@@ -12,6 +11,7 @@ import { hiringSocialSourceHandles } from '../shared/hiring/sources/socialSource
 import { hiringLinkedInSourceHandles } from '../shared/hiring/sources/linkedInSources'
 import { hiringSecondaryWebSourceHandles } from '../shared/hiring/sources/secondaryWebSources'
 import { hiringWebSourceHandles } from '../shared/hiring/sources/webCvSources'
+import { hiringTelegramChannelHandles } from '../shared/hiring/sources/telegramChannels'
 
 type HiringAdapter = {
   handles: () => string[]
@@ -25,7 +25,7 @@ const refreshAdapters: HiringAdapter[] = [
   { handles: hiringUzJobsSourceHandles, refresh: refreshHiringUzJobsSource },
   { handles: hiringSecondaryWebSourceHandles, refresh: refreshHiringSecondaryWebSource },
   { handles: hiringWebSourceHandles, refresh: refreshHiringWebSource },
-  { handles: hiringChannelHandles, refresh: refreshHiringChannel },
+  { handles: hiringTelegramChannelHandles, refresh: refreshHiringChannel },
 ]
 
 function hasHandle(handles: string[], normalized: string): boolean {
@@ -33,7 +33,7 @@ function hasHandle(handles: string[], normalized: string): boolean {
 }
 
 export function allHiringTargets() {
-  const telegramHandles = hiringChannelHandles()
+  const telegramHandles = hiringTelegramChannelHandles()
   const progressiveWebHandles = [
     ...hiringWebSourceHandles(),
     ...hiringIshBorSourceHandles(),
