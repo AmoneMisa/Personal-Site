@@ -2,18 +2,24 @@ import {
   enabledWebCvSources,
   type WebCvSourceKey,
 } from '../../../shared/hiring/sources/webCvSources'
-import { emptyWebCursor, loadWebCursors, saveWebCursor } from '../../utils/hiringCursors'
+import { emptyWebCursor, loadWebCursors, saveWebCursor, type WebCursor } from '../../utils/hiringCursors'
 import { hiringDbEnabled, saveDbCandidates } from '../../utils/hiringDb'
 import { recordWebDiagnostic, type WebSourceDiagnostic } from '../../utils/hiringDiagnostics'
 import {
   auditWebSource,
-  crawlWebSource,
+  crawlWebSource as crawlLegacyWebSource,
   listWebSources,
   type WebSourceAudit,
 } from '../../utils/hiringWebSources'
 import { persistWebProfiles } from '../webProfilePersistence'
+import { crawlFlagma, isFlagmaSource } from './web/flagma'
 
-export { auditWebSource, crawlWebSource, listWebSources, type WebSourceAudit }
+export { auditWebSource, listWebSources, type WebSourceAudit }
+
+export async function crawlWebSource(key: string, cursor?: WebCursor) {
+  if (isFlagmaSource(key)) return crawlFlagma(key, cursor)
+  return crawlLegacyWebSource(key, cursor)
+}
 
 export async function refreshHiringWebSource(
   handle: string,
@@ -56,7 +62,6 @@ export async function refreshHiringWebSource(
     diagnostic.shown = persisted.shown
     diagnostic.expired = persisted.expired
     recordWebDiagnostic(diagnostic)
-    // Advance only after a successful write so a failed persistence round is retried.
     await saveWebCursor(run.cursor)
 
     console.log(
