@@ -46,6 +46,25 @@ function contacts(text: string): CvProfile['contacts'] {
   }
 }
 
+export function parseSecondaryChipSalary(
+  chip: string,
+): Pick<CvProfile, 'salaryMin' | 'salaryMax' | 'currency'> {
+  const amounts = [...chip.matchAll(/\d[\d\s]*/g)]
+    .map((match) => Number(match[0].replace(/\s+/g, '')))
+    .filter((value) => Number.isFinite(value) && value > 0)
+  if (!amounts.length) return {}
+  const currency = /\$|usd/iu.test(chip) ? 'USD'
+    : /руб|rub|₽/iu.test(chip) ? 'RUB'
+      : /€|eur/iu.test(chip) ? 'EUR'
+        : /₸|тенге|kzt/iu.test(chip) ? 'KZT'
+          : /грн|uah|₴/iu.test(chip) ? 'UAH'
+            : /lei|ron/iu.test(chip) ? 'RON'
+              : ''
+  return currency
+    ? { salaryMin: Math.min(...amounts), salaryMax: Math.max(...amounts), currency }
+    : {}
+}
+
 export function buildSecondaryProfile(input: {
   key: SecondarySourceKey
   country: 'UA' | 'KZ' | 'RO'
