@@ -4,15 +4,21 @@ import {
   type SecondaryWebSourceKey,
 } from '../../../shared/hiring/sources/secondaryWebSources'
 import { hiringDbEnabled, saveDbCandidates } from '../../utils/hiringDb'
-import { crawlSecondaryWebSource as crawlLegacySecondaryWebSource } from '../../utils/hiringSecondaryWebSources'
 import { persistWebProfiles } from '../webProfilePersistence'
+import { crawlAmountwork } from './secondary/amountwork'
 import { crawlLayboard } from './secondary/layboard'
 import { crawlNovaRobota } from './secondary/novaRobota'
 
+const CRAWLERS = {
+  'novarobota-ua': crawlNovaRobota,
+  'layboard-kz': crawlLayboard,
+  'amountwork-ro': crawlAmountwork,
+} as const
+
 export async function crawlSecondaryWebSource(key: string) {
-  if (key === 'novarobota-ua') return crawlNovaRobota()
-  if (key === 'layboard-kz') return crawlLayboard()
-  return crawlLegacySecondaryWebSource(key)
+  const crawl = CRAWLERS[key as SecondaryWebSourceKey]
+  if (!crawl) throw new Error(`unknown secondary web source: ${key}`)
+  return crawl()
 }
 
 export async function refreshHiringSecondaryWebSource(
