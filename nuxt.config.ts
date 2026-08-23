@@ -102,17 +102,10 @@ export default defineNuxtConfig({
         }
     },
     nitro: {
-        // Pre-compress public assets (brotli + gzip) at build time so fonts, CSS,
-        // JS and SVGs ship smaller without relying on the proxy to compress.
+        // Keep the user-facing Nitro process as a renderer/proxy only. Jobs and
+        // hiring refreshes are driven by the dedicated jobs-backend runtime and
+        // PostgreSQL queue workers, never by Nitro scheduled tasks.
         compressPublicAssets: {gzip: true, brotli: true},
-        experimental: {
-            tasks: true // enable Nitro tasks (jobs:refresh vacancy worker)
-        },
-        // Daily worker: refresh the Redis vacancy store + prune closed/old postings.
-        scheduledTasks: {
-            '0 3 * * *': ['jobs:refresh'],
-            '0 4 * * *': ['hiring:refresh'],
-        },
         routeRules: {
             '/api/**': {proxy: 'http://backend:8000/**'}, //http://backend:8000/** - prod
             '/fonts/**': {headers: {'cache-control': 'public, max-age=31536000, immutable'}},
