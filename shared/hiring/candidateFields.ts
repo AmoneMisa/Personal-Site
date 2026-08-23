@@ -23,6 +23,9 @@ const MALE_LATIN_SURNAME_RE = /(?:^|[^\p{L}])\p{L}[\p{L}'’ʻʼ‘`-]{2,}(?:ov|
 const FEMALE_PATRONYMIC_RE = /(?:^|[^\p{L}])\p{L}[\p{L}ёЁ-]{2,}(?:овна|евна|ична|инична)(?=$|[^\p{L}])/iu
 const MALE_PATRONYMIC_RE = /(?:^|[^\p{L}])\p{L}[\p{L}ёЁ-]{2,}(?:ович|евич|ич)(?=$|[^\p{L}])/iu
 
+const NAME_LINE_RE = /^[\p{L}'’ʻʼ‘`-]+(?:\s+[\p{L}'’ʻʼ‘`-]+){1,5}$/u
+const NON_NAME_LINE_RE = /(?:^|\s)(?:работ\p{L}*|робот\p{L}*|онлайн|удал[её]н\p{L}*|remote|job|role|ish|любая|любую|подработ\p{L}*)(?=$|\s)/iu
+
 export function extractCandidateGender(text: string): CandidateGender | undefined {
   if (EXPLICIT_FEMALE_RE.test(text)) return 'female'
   if (EXPLICIT_MALE_RE.test(text)) return 'male'
@@ -30,6 +33,11 @@ export function extractCandidateGender(text: string): CandidateGender | undefine
   if (MALE_LINEAGE_RE.test(text)) return 'male'
 
   const nameLine = text.split(/\r?\n/u).map((line) => line.trim()).find(Boolean) || ''
+  // Surname morphology is useful only on a plausible personal-name line. Words
+  // such as "Любая" also end in -ая and used to turn generic role text into a
+  // false female signal.
+  if (!NAME_LINE_RE.test(nameLine) || NON_NAME_LINE_RE.test(nameLine)) return undefined
+
   if (FEMALE_PATRONYMIC_RE.test(nameLine)) return 'female'
   if (MALE_PATRONYMIC_RE.test(nameLine)) return 'male'
   if (FEMALE_SURNAME_RE.test(nameLine) || FEMALE_LATIN_SURNAME_RE.test(nameLine)) return 'female'
