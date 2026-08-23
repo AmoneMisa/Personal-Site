@@ -31,17 +31,22 @@ const MALE_PATRONYMIC_RE = /(?:^|[^\p{L}])\p{L}[\p{L}ёЁ-]{2,}(?:ович|ев�
  * 2. Grammatical Central Asian lineage markers (`qizi`, `o'g'li`).
  * 3. Patronymics and high-confidence masculine/feminine surname morphology.
  *
- * We deliberately do not infer gender from a first name alone.
+ * Surname morphology is intentionally applied only to the first line. Public
+ * presentation prepends the parsed candidate name before source text, which
+ * prevents ordinary CV phrases such as "любая работа" from being mistaken for
+ * a feminine surname ending in -ая.
  */
 export function extractCandidateGender(text: string): CandidateGender | undefined {
   if (EXPLICIT_FEMALE_RE.test(text)) return 'female'
   if (EXPLICIT_MALE_RE.test(text)) return 'male'
   if (FEMALE_LINEAGE_RE.test(text)) return 'female'
   if (MALE_LINEAGE_RE.test(text)) return 'male'
-  if (FEMALE_PATRONYMIC_RE.test(text)) return 'female'
-  if (MALE_PATRONYMIC_RE.test(text)) return 'male'
-  if (FEMALE_SURNAME_RE.test(text) || FEMALE_LATIN_SURNAME_RE.test(text)) return 'female'
-  if (MALE_SURNAME_RE.test(text) || MALE_LATIN_SURNAME_RE.test(text)) return 'male'
+
+  const nameLine = text.split(/\r?\n/u).map((line) => line.trim()).find(Boolean) || ''
+  if (FEMALE_PATRONYMIC_RE.test(nameLine)) return 'female'
+  if (MALE_PATRONYMIC_RE.test(nameLine)) return 'male'
+  if (FEMALE_SURNAME_RE.test(nameLine) || FEMALE_LATIN_SURNAME_RE.test(nameLine)) return 'female'
+  if (MALE_SURNAME_RE.test(nameLine) || MALE_LATIN_SURNAME_RE.test(nameLine)) return 'male'
   return undefined
 }
 
