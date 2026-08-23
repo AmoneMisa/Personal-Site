@@ -7,31 +7,31 @@ export type SearchPlace = {
 }
 
 export const UKRAINE_OBLASTS: SearchPlace[] = [
-  ['Vinnytsia Oblast', 'Вінницька область', 'Vinnytsia'],
-  ['Volyn Oblast', 'Волинська область', 'Lutsk'],
-  ['Dnipropetrovsk Oblast', 'Дніпропетровська область', 'Dnipro'],
-  ['Donetsk Oblast', 'Донецька область', 'Kramatorsk'],
-  ['Zhytomyr Oblast', 'Житомирська область', 'Zhytomyr'],
-  ['Zakarpattia Oblast', 'Закарпатська область', 'Uzhhorod'],
-  ['Zaporizhzhia Oblast', 'Запорізька область', 'Zaporizhzhia'],
-  ['Ivano-Frankivsk Oblast', 'Івано-Франківська область', 'Ivano-Frankivsk'],
-  ['Kyiv Oblast', 'Київська область', 'Kyiv'],
-  ['Kirovohrad Oblast', 'Кіровоградська область', 'Kropyvnytskyi'],
-  ['Luhansk Oblast', 'Луганська область', 'Sievierodonetsk'],
-  ['Lviv Oblast', 'Львівська область', 'Lviv'],
-  ['Mykolaiv Oblast', 'Миколаївська область', 'Mykolaiv'],
-  ['Odesa Oblast', 'Одеська область', 'Odesa'],
-  ['Poltava Oblast', 'Полтавська область', 'Poltava'],
-  ['Rivne Oblast', 'Рівненська область', 'Rivne'],
-  ['Sumy Oblast', 'Сумська область', 'Sumy'],
-  ['Ternopil Oblast', 'Тернопільська область', 'Ternopil'],
-  ['Kharkiv Oblast', 'Харківська область', 'Kharkiv'],
-  ['Kherson Oblast', 'Херсонська область', 'Kherson'],
-  ['Khmelnytskyi Oblast', 'Хмельницька область', 'Khmelnytskyi'],
-  ['Cherkasy Oblast', 'Черкаська область', 'Cherkasy'],
-  ['Chernivtsi Oblast', 'Чернівецька область', 'Chernivtsi'],
-  ['Chernihiv Oblast', 'Чернігівська область', 'Chernihiv'],
-].map(([location, label, city]) => ({ country: 'UA', location, label, city, region: location }))
+  ['Vinnytsia Oblast', 'Вінницька область'],
+  ['Volyn Oblast', 'Волинська область'],
+  ['Dnipropetrovsk Oblast', 'Дніпропетровська область'],
+  ['Donetsk Oblast', 'Донецька область'],
+  ['Zhytomyr Oblast', 'Житомирська область'],
+  ['Zakarpattia Oblast', 'Закарпатська область'],
+  ['Zaporizhzhia Oblast', 'Запорізька область'],
+  ['Ivano-Frankivsk Oblast', 'Івано-Франківська область'],
+  ['Kyiv Oblast', 'Київська область'],
+  ['Kirovohrad Oblast', 'Кіровоградська область'],
+  ['Luhansk Oblast', 'Луганська область'],
+  ['Lviv Oblast', 'Львівська область'],
+  ['Mykolaiv Oblast', 'Миколаївська область'],
+  ['Odesa Oblast', 'Одеська область'],
+  ['Poltava Oblast', 'Полтавська область'],
+  ['Rivne Oblast', 'Рівненська область'],
+  ['Sumy Oblast', 'Сумська область'],
+  ['Ternopil Oblast', 'Тернопільська область'],
+  ['Kharkiv Oblast', 'Харківська область'],
+  ['Kherson Oblast', 'Херсонська область'],
+  ['Khmelnytskyi Oblast', 'Хмельницька область'],
+  ['Cherkasy Oblast', 'Черкаська область'],
+  ['Chernivtsi Oblast', 'Чернівецька область'],
+  ['Chernihiv Oblast', 'Чернігівська область'],
+].map(([location, label]) => ({ country: 'UA' as const, location, label, region: label }))
 
 const MAJOR_CITIES: SearchPlace[] = [
   ...[
@@ -68,7 +68,12 @@ export type ThreadsJobTarget = SearchPlace & {
 }
 
 function slug(value: string): string {
-  return value.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 70)
+  return value
+    .normalize('NFKC')
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}]+/gu, '-')
+    .replace(/^-|-$/g, '')
+    .slice(0, 70)
 }
 
 export function threadsJobCoverage(): ThreadsJobTarget[] {
