@@ -107,6 +107,23 @@ export function toUsd(amount: number | undefined, currency: string | undefined):
   return Math.round(amount * rate)
 }
 
+/** Convert between any two currencies available in the shared live FX table. */
+export function convertCurrency(
+  amount: number | null | undefined,
+  fromCurrency: string | null | undefined,
+  toCurrency: string | null | undefined,
+): number | undefined {
+  if (amount == null || !Number.isFinite(amount) || amount <= 0) return undefined
+  const from = (fromCurrency || '').toUpperCase()
+  const to = (toCurrency || '').toUpperCase()
+  if (!from || !to) return undefined
+  if (from === to) return Math.round(amount)
+  const fromRate = memRates[from]
+  const toRate = memRates[to]
+  if (!fromRate || !toRate) return undefined
+  return Math.round((amount * fromRate) / toRate)
+}
+
 /** Populate memory from the Redis cache once (fast path for the request handler). */
 export async function loadRates(): Promise<void> {
   if (memLoaded) return
