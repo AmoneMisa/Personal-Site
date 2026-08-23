@@ -5,10 +5,10 @@
 // region and last-visit date are stored, and contact remains "via platform".
 
 import { emptyWebCursor, loadWebCursors, saveWebCursor } from '../../utils/hiringCursors'
-import { hiringDbEnabled, saveDbCandidates } from '../../utils/hiringDb'
 import { recordWebDiagnostic, type SourceRun, type WebSourceDiagnostic } from '../../utils/hiringDiagnostics'
 import { normalizeCandidate } from '../../utils/hiringNormalize'
 import type { CvProfile } from '../../utils/hiringTypes'
+import { hiringDbEnabled, saveDbCandidates } from '../infrastructure/database'
 import { persistWebProfiles } from '../webProfilePersistence'
 import { cityFrom } from '../../../shared/hiring/webFields'
 import { parseUzJobsRows } from '../../../shared/hiring/uzJobsFields'
