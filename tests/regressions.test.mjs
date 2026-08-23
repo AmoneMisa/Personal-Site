@@ -39,7 +39,7 @@ test('hiring dispatcher skips disabled Telegram feeds and fast-tracks unfinished
   const source = readFileSync(new URL('../server/utils/hiringSources.ts', import.meta.url), 'utf8')
   assert.match(source, /hiringChannelHandles[\s\S]*?filter\(\(channel\)\s*=>\s*channel\.enabled\s*!==\s*false\)/u)
 
-  const queue = readFileSync(new URL('../server/utils/jobsPgQueue.ts', import.meta.url), 'utf8')
+  const queue = readFileSync(new URL('../shared/jobs/jobsPgQueue.ts', import.meta.url), 'utf8')
   const dispatch = readFileSync(new URL('../server/routes/internal/jobs-queue-dispatch.post.ts', import.meta.url), 'utf8')
   assert.match(dispatch, /HIRING_QUEUE_BACKFILL_SECONDS[\s\S]*?300/u)
   assert.match(queue, /backfill_due_at/u)
@@ -160,9 +160,6 @@ test('share metadata replacement preserves Nuxt assets in a combined head entry'
 })
 
 test('Cyrillic city, age and date patterns match at all', () => {
-  // JavaScript's \b is ASCII-only, so every Cyrillic alternative in these
-  // patterns used to match nothing: cities, ages and freshness stamps were
-  // silently dropped from every board that writes in Russian or Ukrainian.
   assert.equal(cityFrom('Роман Киев (возможен переезд)', 'UA'), 'Kyiv')
   assert.equal(cityFrom('Александр Харьков', 'UA'), 'Kharkiv')
   assert.equal(cityFrom('г. Ташкент, Чиланзарский район', 'UZ'), 'Tashkent')
@@ -187,14 +184,10 @@ test('a day and month with no year resolve to the most recent past date', () => 
   assert.ok(Date.parse(august) <= Date.now() + 48 * 60 * 60 * 1000)
   assert.equal(new Date(august).getUTCMonth(), 7)
   assert.equal(new Date(august).getUTCDate(), 19)
-
-  // A work-history duration is not a date.
   assert.equal(dayMonthDate('5 лет'), null)
 })
 
 test('relative durations in a work history are not read as an activity date', () => {
-  // "опыт работы более 5 лет" and "5 месяцев" must not make a stale card look
-  // fresh; only an explicit "ago" marker counts.
   assert.equal(activityDate('Высшее образование, опыт работы более 5 лет.'), null)
   assert.equal(activityDate('Менеджер, 5 месяцев'), null)
   assert.match(activityDate('5 месяцев назад') ?? '', /^\d{4}-\d{2}-\d{2}T/)
@@ -261,29 +254,26 @@ test('source-specific role spellings and specialist roles use the shared taxonom
   assert.equal(hiringProfessionLabel('Penetration Tester', 'ru'), 'Pentester')
 })
 
-test('related professions collapse into stable combined search facets', () => {
+test('legacy profession groups expand while explicit selections stay exact', () => {
   assert.deepEqual(normalizeProfessions('Главный бухгалтер', ''), ['Chief Accountant'])
   assert.deepEqual(normalizeProfessions('Казначей', ''), ['Treasurer'])
-  assert.deepEqual(expandHiringProfessionFilters(['group:accounting-treasury']), [
-    'Accountant',
-    'Chief Accountant',
-    'Treasurer',
-  ])
-  assert.deepEqual(expandHiringProfessionFilters(['group:retail-service']), [
-    'Manager',
-    'Consultant',
-    'Cashier',
-    'Salesperson',
-  ])
+
+  const accounting = expandHiringProfessionFilters(['group:accounting-finance'])
+  assert.ok(accounting.includes('Accountant'))
+  assert.ok(accounting.includes('Chief Accountant'))
+  assert.ok(accounting.includes('Treasurer'))
+
+  const sales = expandHiringProfessionFilters(['group:sales-retail'])
+  assert.ok(sales.includes('Consultant'))
+  assert.ok(sales.includes('Cashier'))
+  assert.ok(sales.includes('Salesperson'))
+
   assert.deepEqual(
     collapseHiringProfessionFilterValues(['Accountant', 'Chief Accountant', 'Cashier', 'Engineer']),
-    ['group:accounting-treasury', 'group:retail-service', 'Engineer'],
+    ['Accountant', 'Chief Accountant', 'Cashier', 'Engineer'],
   )
-  assert.deepEqual(normalizeHiringProfessionFilterSelections(['Treasurer']), ['group:accounting-treasury'])
-  assert.equal(
-    hiringProfessionFilterLabel('group:retail-service', 'ru'),
-    'Менеджер / Консультант / Кассир / Продавец',
-  )
+  assert.deepEqual(normalizeHiringProfessionFilterSelections(['Treasurer']), ['Treasurer'])
+  assert.equal(hiringProfessionFilterLabel('group:sales-retail', 'ru'), 'Продажи / Ритейл')
 })
 
 test('candidate detail table explicitly marks missing values for its hide toggle', () => {
@@ -580,13 +570,13 @@ test('IshBor keeps only the profile column and trusts its stated region', () => 
   assert.doesNotMatch(profileHtml, /работа в Ташкенте|Вакансии Ташкент|Регистрация/)
 
   const legacyText = [
-    'Електрик (Резюме) - Сурхандаря | работа в ташкенте',
+    'Електрик (Резюме) - Сурхандарья | работа в ташкенте',
     'ish bor.uz',
     'Фильтр',
     'Города и области',
     'Електрик',
     'Постоянный',
-    'Сурхандаря',
+    'Сурхандарья',
     'У меня нет опыта работы',
     'Dilshodbek (Мужчина)',
     '21.08.2026',
@@ -600,7 +590,7 @@ test('IshBor keeps only the profile column and trusts its stated region', () => 
   assert.equal(trimIshBorProfileText(legacyText), [
     'Електрик',
     'Постоянный',
-    'Сурхандаря',
+    'Сурхандарья',
     'У меня нет опыта работы',
     'Dilshodbek (Мужчина)',
     '21.08.2026',
@@ -766,7 +756,6 @@ test('an obvious developer profile without a stated role becomes Software Develo
   assert.equal(profile.role, 'Software Developer')
   assert.deepEqual(profile.professions, ['Software Developer'])
 })
-
 
 test('hiring technical roles keep industry-standard English labels and Uzbek source roles normalize', () => {
   assert.equal(hiringProfessionLabel('Data Scientist', 'ru'), 'Data Scientist')
