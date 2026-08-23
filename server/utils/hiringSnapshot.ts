@@ -1,4 +1,4 @@
-import { useRedis } from './redis'
+import { useStateStore } from './stateStore'
 import { hiringDbEnabled, loadDbCandidates } from './hiringDb'
 import type { CvProfile } from './hiringTypes'
 
@@ -36,7 +36,7 @@ export async function getStoredCvProfilesSnapshot(): Promise<CvProfile[]> {
   if (Date.now() < memoryValidUntil) return memoryStore
 
   try {
-    const raw = await useRedis().get(STORE_KEY)
+    const raw = await useStateStore().get(STORE_KEY)
     if (raw) {
       memoryStore = publicProfiles(JSON.parse(raw) as StoredProfile[])
       memoryValidUntil = Date.now() + MEMORY_TTL_MS
