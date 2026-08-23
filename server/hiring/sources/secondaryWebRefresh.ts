@@ -3,7 +3,7 @@ import {
   enabledSecondaryWebSources,
   type SecondaryWebSourceKey,
 } from '../../../shared/hiring/sources/secondaryWebSources'
-import { hiringDbEnabled, saveDbCandidates } from '../../utils/hiringDb'
+import { hiringDbEnabled, saveDbCandidates } from '../infrastructure/database'
 import { persistWebProfiles } from '../webProfilePersistence'
 import { crawlAmountwork } from './secondary/amountwork'
 import { crawlLayboard } from './secondary/layboard'
