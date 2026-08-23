@@ -111,5 +111,33 @@ useHead({
 });
 </script>
 <style lang="scss">
+/* The radial apartment cards are teleported to <body>. Their slots are rendered
+   after the centre pager, so without an explicit stacking order they can paint
+   over the pager and hide/cut off its arrows. Keep the pager above every card. */
+.flat-radial__hub {
+  z-index: 50 !important;
+  width: 64px !important;
+  height: 64px !important;
+  grid-template-columns: 20px 20px 20px !important;
+  overflow: visible !important;
+}
 
+.flat-radial__hub-arrow {
+  position: relative;
+  z-index: 2;
+  min-width: 20px;
+  min-height: 44px;
+  font-size: 28px !important;
+  font-weight: 700;
+}
+
+.flat-radial__hub-count {
+  position: relative;
+  z-index: 2;
+  font-size: 12px !important;
+}
+
+.flat-radial__slot {
+  z-index: 1;
+}
 </style>
