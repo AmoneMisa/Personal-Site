@@ -14,7 +14,9 @@ import { listUzJobsSources } from '../utils/hiringUzJobsSource'
 import { getHiringWebDiagnostics } from '../utils/hiringDiagnostics'
 import { loadDbSourceRuns } from '../utils/hiringDb'
 import { convertCurrency, getRates, loadRates } from '../utils/currency'
+import { buildHiringStatistics } from '../../shared/hiringStatistics'
 import type { CvProfile } from '../utils/hiringTypes'
+import { canonicalCityKey, cityAliases, normalizeCityValue } from '../../shared/locationCatalog'
 import {
   publicCandidateGender,
   publicCandidateLanguages,
@@ -37,58 +39,11 @@ import {
 
 const PAGE_MAX = 60
 
-const CITY_ALIASES: Record<string, string[]> = {
-  tashkent: ['tashkent', 'toshkent', 'ташкент', 'тошкент'],
-  samarkand: ['samarkand', 'samarqand', 'самарканд', 'самарқанд'],
-  bukhara: ['bukhara', 'buxoro', 'бухара', 'бухоро'],
-  namangan: ['namangan', 'наманган'],
-  andijan: ['andijan', 'andijon', 'андижан', 'андижон'],
-  fergana: ['fergana', "farg'ona", 'fargona', 'фаргана', 'фергана'],
-  qarshi: ['qarshi', 'karshi', 'карши', 'қарши'],
-  nukus: ['nukus', 'нукус'],
-  urgench: ['urgench', 'urganch', 'ургенч', 'урганч'],
-  khiva: ['khiva', 'xiva', 'хива'],
-  kyiv: ['kyiv', 'kiev', 'киев', 'київ'],
-  lviv: ['lviv', 'львов', 'львів'],
-  odesa: ['odesa', 'odessa', 'одесса', 'одеса'],
-  kharkiv: ['kharkiv', 'kharkov', 'харьков', 'харків'],
-  dnipro: ['dnipro', 'днепр', 'дніпро'],
-  vinnytsia: ['vinnytsia', 'vinnitsa', 'винница', 'вінниця'],
-  zaporizhzhia: ['zaporizhzhia', 'zaporozhye', 'запорожье', 'запоріжжя'],
-  almaty: ['almaty', 'алматы'],
-  astana: ['astana', 'астана'],
-  shymkent: ['shymkent', 'chimkent', 'шымкент', 'чимкент'],
-  karaganda: ['karaganda', 'караганда'],
-  atyrau: ['atyrau', 'атырау'],
-  aktobe: ['aktobe', 'актобе'],
-  bishkek: ['bishkek', 'бишкек'],
-  osh: ['osh', 'ош'],
-  karakol: ['karakol', 'каракол'],
-  bucharest: ['bucharest', 'bucuresti', 'bucurești', 'бухарест'],
-  'cluj-napoca': ['cluj-napoca', 'cluj napoca', 'cluj', 'клуж-напока', 'клуж'],
-  iasi: ['iasi', 'iași', 'яссы'],
-  timisoara: ['timisoara', 'timișoara', 'тимишоара'],
-  brasov: ['brasov', 'brașov', 'брашов'],
-}
-
-function normalizeCity(value: string): string {
-  return value.trim().toLocaleLowerCase('ru').replace(/ё/g, 'е')
-}
-
-function canonicalCity(value: string): string {
-  const normalized = normalizeCity(value)
-  for (const [canonical, aliases] of Object.entries(CITY_ALIASES)) {
-    if (aliases.some((alias) => normalizeCity(alias) === normalized)) return canonical
-  }
-  return normalized
-}
-
 function cityMatches(profile: CvProfile, requested: string): boolean {
-  const canonical = canonicalCity(requested)
-  if (profile.city && canonicalCity(profile.city) === canonical) return true
+  const canonical = canonicalCityKey(requested)
+  if (profile.city && canonicalCityKey(profile.city) === canonical) return true
   const hay = `${profile.city || ''} ${profile.district || ''} ${profile.description || ''}`.toLocaleLowerCase('ru')
-  const aliases = CITY_ALIASES[canonical] || [requested]
-  return aliases.some((alias) => hay.includes(normalizeCity(alias)))
+  return cityAliases(requested).some((alias) => hay.includes(normalizeCityValue(alias)))
 }
 
 function list(params: URLSearchParams, key: string): string[] {
@@ -515,6 +470,7 @@ export default defineEventHandler(async (event) => {
   const professionQuery = query ? detectMentionedProfessions(query).length > 0 : false
   const hasWebProfiles = webStored.length > 0
   let page: CvProfile[] = []
+  let statisticsProfiles: CvProfile[] = []
   let count = 0
   let engine: 'elasticsearch' | 'memory' = 'memory'
 
@@ -541,6 +497,7 @@ export default defineEventHandler(async (event) => {
           return profile ? { ...profile, score } : null
         })
         .filter((profile): profile is CvProfile => profile != null)
+      statisticsProfiles = profiles.filter((profile) => matchesFilters(profile, params))
     }
   }
 
@@ -552,6 +509,7 @@ export default defineEventHandler(async (event) => {
       (params.get('salaryCurrency') || 'USD').trim().toUpperCase(),
     )
     count = filtered.length
+    statisticsProfiles = filtered
     page = filtered.slice(offset, offset + limit)
   }
 
@@ -582,6 +540,10 @@ export default defineEventHandler(async (event) => {
   return {
     count,
     profiles: page.map((profile) => publicProfile(profile, locale)),
+    statistics: buildHiringStatistics(statisticsProfiles, {
+      provider: profileProvider,
+      toUsd: (amount, currency) => convertCurrency(amount, currency, 'USD'),
+    }),
     rates: getRates(),
     sourceCounts: sourceCounts(profiles),
     sourceStatuses,

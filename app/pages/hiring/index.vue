@@ -66,7 +66,7 @@ const {
 } = hiringFilters;
 
 const {
-  profiles, total, loading, loadingMore, filtersPending, warming, failed,
+  profiles, total, statistics, loading, loadingMore, filtersPending, warming, failed,
   sourceErrors, usdRates, loadFeed,
 } = useHiringFeed();
 const view = ref<HiringView>("active");
@@ -563,6 +563,7 @@ onBeforeUnmount(() => {
       v-if="displayedProfiles.length"
       :profiles="displayedProfiles"
       :rates="usdRates"
+      :statistics="view === 'active' ? statistics : null"
     />
     <CandidateGrid :profiles="displayedProfiles" :dense="denseGrid">
       <template #default="{ profile }">

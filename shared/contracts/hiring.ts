@@ -6,6 +6,20 @@ export type CandidateEmploymentType = 'full_time' | 'part_time'
 export type CandidateContactType = 'direct' | 'platform'
 export type CandidateGender = 'male' | 'female' | 'unknown'
 
+export interface HiringStatisticsItem {
+  label: string
+  value: number
+}
+
+export interface HiringStatistics {
+  genders: Record<CandidateGender, number>
+  platforms: HiringStatisticsItem[]
+  locations: HiringStatisticsItem[]
+  activity: Array<{ date: string; value: number }>
+  salaryByExperience: Array<number | null>
+  salarySamples: number
+}
+
 export interface ProfessionExperience {
   profession: string
   years: number

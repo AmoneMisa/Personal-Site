@@ -1,54 +1,45 @@
 <script setup lang="ts">
-import type { HiringCvProfile } from "~/types/hiring";
+import type { HiringCvProfile, HiringStatistics } from "~/types/hiring";
+import { locationLabel } from "~/utils/locationLabels";
+import { buildHiringStatistics } from "~~/shared/hiringStatistics";
 
-const props = defineProps<{ profiles: HiringCvProfile[]; rates: Record<string, number> }>();
-const { t: translate } = useI18n();
+const props = defineProps<{ profiles: HiringCvProfile[]; rates: Record<string, number>; statistics?: HiringStatistics | null }>();
+const { t: translate, locale } = useI18n();
 const t = (key: string, params: Record<string, unknown> = {}) => translate(`hiring.${key}`, params);
 const activityDays = ref<7 | 30 | 60>(30);
 const activityOptions: Array<7 | 30 | 60> = [7, 30, 60];
 const palette = ["#e0679a", "#24a7d6", "#10b981", "#d99a0b", "#8b5cf6"];
 
-function countBy(getKey: (profile: HiringCvProfile) => string) {
-  const counts = new Map<string, number>();
-  for (const profile of props.profiles) { const key = getKey(profile).trim(); if (key) counts.set(key, (counts.get(key) || 0) + 1); }
-  return [...counts.entries()].sort((a, b) => b[1] - a[1]);
-}
-function median(values: number[]) { const sorted = [...values].sort((a, b) => a - b); if (!sorted.length) return null; const i = Math.floor(sorted.length / 2); return sorted.length % 2 ? sorted[i] : (sorted[i - 1] + sorted[i]) / 2; }
-function usdSalary(profile: HiringCvProfile): number | null {
-  const values = [profile.salaryMin, profile.salaryMax].filter((value): value is number => value != null && value > 0);
-  if (!values.length) return null;
-  const value = values.reduce((sum, item) => sum + item, 0) / values.length;
-  const currency = String(profile.currency || "USD").toUpperCase(); const rate = props.rates[currency]; const usd = props.rates.USD || 1;
-  return currency === "USD" ? value : rate ? value * rate / usd : null;
-}
+const localStatistics = computed(() => buildHiringStatistics(props.profiles, {
+  provider: (profile) => profile.sourceLabel || profile.sourceKey || profile.source || profile.origin || "__unknown__",
+  toUsd: (amount, currency) => {
+    const rate = props.rates[currency];
+    const usd = props.rates.USD || 1;
+    return currency === "USD" ? amount : rate ? amount * rate / usd : undefined;
+  },
+}));
+const currentStatistics = computed(() => props.statistics || localStatistics.value);
 
 const genderItems = computed(() => {
-  const counts = countBy((profile) => profile.gender || "unknown");
-  return ["female", "male", "unknown"].map((key, index) => ({ label: t(`gender${key.charAt(0).toUpperCase()}${key.slice(1)}`), value: counts.find(([item]) => item === key)?.[1] || 0, color: palette[index] }));
+  return (["female", "male", "unknown"] as const).map((key, index) => ({ label: t(`gender${key.charAt(0).toUpperCase()}${key.slice(1)}`), value: currentStatistics.value.genders[key], color: palette[index] }));
 });
-const locationBars = computed(() => countBy((profile) => profile.city || profile.country || t("statsUnknown")).slice(0, 6).map(([label, value], index) => ({ label, value, color: palette[index % palette.length] })));
-const platformBars = computed(() => countBy((profile) => profile.sourceLabel || profile.source || profile.origin || t("statsUnknown")).slice(0, 6).map(([label, value], index) => ({ label, value, color: palette[index % palette.length] })));
+const locationBars = computed(() => currentStatistics.value.locations.slice(0, 6).map((item, index) => ({ label: item.label === "__unknown__" ? t("statsUnknown") : locationLabel(item.label, locale.value, "city"), value: item.value, color: palette[index % palette.length] })));
+const platformBars = computed(() => currentStatistics.value.platforms.slice(0, 6).map((item, index) => ({ label: item.label === "__unknown__" ? t("statsUnknown") : item.label, value: item.value, color: palette[index % palette.length] })));
 
 const experienceSalary = computed(() => {
-  const brackets = [
-    { label: "0–1", from: 0, to: 2 }, { label: "2–3", from: 2, to: 4 }, { label: "4–6", from: 4, to: 7 },
-    { label: "7–10", from: 7, to: 11 }, { label: "10+", from: 11, to: Infinity },
-  ];
-  const values = brackets.map((bracket) => median(props.profiles.flatMap((profile) => {
-    const salary = usdSalary(profile); const years = profile.experienceYears;
-    return salary != null && years != null && years >= bracket.from && years < bracket.to ? [salary] : [];
-  })));
-  return { labels: brackets.map((item) => item.label), series: [{ label: t("statsDesiredSalary"), color: "#e0679a", values }] };
+  const labels = ["0–1", "2–3", "4–6", "7–10", "10+"];
+  const values = currentStatistics.value.salaryByExperience;
+  return { labels, series: [{ label: t("statsDesiredSalary"), color: "#e0679a", values }] };
 });
 
 const activity = computed(() => {
   const count = activityDays.value === 7 ? 7 : activityDays.value === 30 ? 10 : 12;
   const end = Date.now(); const start = end - activityDays.value * 86_400_000; const bucket = (end - start) / count; const values = Array.from({ length: count }, () => 0);
-  for (const profile of props.profiles) { const at = new Date(profile.createdAt || "").getTime(); if (!Number.isFinite(at) || at < start || at > end) continue; values[Math.min(count - 1, Math.floor((at - start) / bucket))] += 1; }
+  for (const point of currentStatistics.value.activity) { const at = new Date(`${point.date}T00:00:00.000Z`).getTime(); if (!Number.isFinite(at) || at < start || at > end) continue; values[Math.min(count - 1, Math.floor((at - start) / bucket))] += point.value; }
   const labels = Array.from({ length: count }, (_, index) => new Date(start + index * bucket).toLocaleDateString([], { day: "2-digit", month: "2-digit" }));
   return { labels, series: [{ label: t("statsCandidates"), color: "#24a7d6", values }] };
 });
-const salarySamples = computed(() => props.profiles.filter((profile) => usdSalary(profile) != null).length);
+const salarySamples = computed(() => currentStatistics.value.salarySamples);
 </script>
 
 <template>

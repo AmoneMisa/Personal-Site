@@ -1,5 +1,6 @@
 import { canonicalMetroValue } from '../utils/tashkentMetroLabels'
 import { normalizeFlatDealType, normalizeFlatPrice, normalizeFlatRoomOnly } from '../utils/flatDealType'
+import { canonicalCityValue } from '../../shared/locationCatalog'
 
 // GET /flats-feed — server-side proxy to the flat-finder backend's /api/listings.
 // The flat API is plain HTTP and the site is HTTPS, so a direct browser call is
@@ -78,7 +79,7 @@ function socialDedupeKey(listing: any): string | null {
   // the same housing ad should produce one card, not one card per network.
   return [
     String(listing?.country || '').toUpperCase(),
-    String(listing?.city || '').toLowerCase(),
+    canonicalCityValue(String(listing?.city || '')).toLowerCase(),
     String(listing?.dealType || ''),
     String(listing?.propertyType || ''),
     String(listing?.price ?? ''),

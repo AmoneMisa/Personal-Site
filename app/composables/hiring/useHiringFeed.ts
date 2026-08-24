@@ -1,11 +1,12 @@
 import { ref } from "vue";
-import type { HiringCvProfile, HiringFeedResult } from "~/types/hiring";
+import type { HiringCvProfile, HiringFeedResult, HiringStatistics } from "~/types/hiring";
 import { safeFetch } from "~/utils/safeFetch";
 import { useLatestRequest } from "~/composables/search/useLatestRequest";
 
 export function useHiringFeed() {
   const profiles = ref<HiringCvProfile[]>([]);
   const total = ref(0);
+  const statistics = ref<HiringStatistics | null>(null);
   const loading = ref(false);
   const loadingMore = ref(false);
   const filtersPending = ref(false);
@@ -51,6 +52,7 @@ export function useHiringFeed() {
         ? [...new Map([...profiles.value, ...nextProfiles].map((item) => [item.id, item])).values()]
         : nextProfiles;
       total.value = data.count ?? profiles.value.length;
+      statistics.value = data.statistics || null;
       sourceErrors.value = data.sourceErrors || [];
       if (data.rates && typeof data.rates === "object") usdRates.value = data.rates;
       warming.value = !!data.warming;
@@ -69,5 +71,5 @@ export function useHiringFeed() {
     requests.cancelPending();
   });
 
-  return { profiles, total, loading, loadingMore, filtersPending, warming, failed, sourceErrors, usdRates, loadFeed };
+  return { profiles, total, statistics, loading, loadingMore, filtersPending, warming, failed, sourceErrors, usdRates, loadFeed };
 }

@@ -1,0 +1,94 @@
+import type { CandidateGender, HiringStatistics, HiringStatisticsItem } from './contracts/hiring'
+import { canonicalCityValue } from './locationCatalog'
+
+export interface HiringStatisticsProfile {
+  gender?: CandidateGender
+  country: string
+  city?: string | null
+  activityAt?: string | null
+  updatedAt?: string | null
+  createdAt: string | null
+  salaryMin?: number | null
+  salaryMax?: number | null
+  currency?: string | null
+  experienceYears?: number | null
+}
+
+const DAY_MS = 86_400_000
+const EXPERIENCE_BRACKETS = [
+  { from: 0, to: 2 },
+  { from: 2, to: 4 },
+  { from: 4, to: 7 },
+  { from: 7, to: 11 },
+  { from: 11, to: Infinity },
+]
+
+function median(values: number[]): number | null {
+  const sorted = [...values].sort((a, b) => a - b)
+  if (!sorted.length) return null
+  const middle = Math.floor(sorted.length / 2)
+  return sorted.length % 2 ? sorted[middle]! : (sorted[middle - 1]! + sorted[middle]!) / 2
+}
+
+function rankedItems(values: string[]): HiringStatisticsItem[] {
+  const counts = new Map<string, number>()
+  for (const value of values) {
+    const label = value.trim()
+    if (label) counts.set(label, (counts.get(label) || 0) + 1)
+  }
+  return [...counts.entries()]
+    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+    .map(([label, value]) => ({ label, value }))
+}
+
+export function buildHiringStatistics<T extends HiringStatisticsProfile>(
+  profiles: T[],
+  options: {
+    provider: (profile: T) => string
+    toUsd: (amount: number, currency: string) => number | undefined
+    now?: number
+  },
+): HiringStatistics {
+  const genders = { female: 0, male: 0, unknown: 0 }
+  const activity = new Map<string, number>()
+  const now = options.now ?? Date.now()
+  const start = now - 60 * DAY_MS
+  let salarySamples = 0
+  const salaryByExperience = EXPERIENCE_BRACKETS.map(() => [] as number[])
+
+  for (const profile of profiles) {
+    genders[profile.gender === 'female' || profile.gender === 'male' ? profile.gender : 'unknown'] += 1
+
+    const timestamp = Date.parse(profile.activityAt || profile.updatedAt || profile.createdAt || '')
+    if (Number.isFinite(timestamp) && timestamp >= start && timestamp <= now) {
+      const date = new Date(timestamp).toISOString().slice(0, 10)
+      activity.set(date, (activity.get(date) || 0) + 1)
+    }
+
+    const salaryValues = [profile.salaryMin, profile.salaryMax]
+      .filter((value): value is number => value != null && Number.isFinite(value) && value > 0)
+    const years = profile.experienceYears
+    const currency = String(profile.currency || 'USD').trim().toUpperCase()
+    if (salaryValues.length && years != null && Number.isFinite(years)) {
+      const average = salaryValues.reduce((sum, value) => sum + value, 0) / salaryValues.length
+      const usd = options.toUsd(average, currency)
+      const bracket = EXPERIENCE_BRACKETS.findIndex((item) => years >= item.from && years < item.to)
+      if (usd != null && bracket >= 0) {
+        salaryByExperience[bracket]!.push(usd)
+        salarySamples += 1
+      }
+    }
+  }
+
+  return {
+    genders,
+    platforms: rankedItems(profiles.map(options.provider)),
+    locations: rankedItems(profiles.map((profile) => {
+      const location = profile.city?.trim()
+      return location ? canonicalCityValue(location) : profile.country || '__unknown__'
+    })),
+    activity: [...activity.entries()].sort((a, b) => a[0].localeCompare(b[0])).map(([date, value]) => ({ date, value })),
+    salaryByExperience: salaryByExperience.map(median),
+    salarySamples,
+  }
+}

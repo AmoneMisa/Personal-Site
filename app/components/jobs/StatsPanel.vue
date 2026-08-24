@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import type { Job, JobStats } from "~/types/jobs";
+import { locationLabel } from "~/utils/locationLabels";
+import { canonicalCityValue } from "~~/shared/locationCatalog";
 
 const props = defineProps<{
   jobs: Job[];
@@ -10,7 +12,7 @@ const props = defineProps<{
   countryLabel: (code: string) => string;
 }>();
 
-const { t: translate } = useI18n();
+const { t: translate, locale } = useI18n();
 const t = (key: string, params: Record<string, unknown> = {}) => translate(`jobs.${key}`, params);
 const activeTab = ref<"overview" | "trends">("overview");
 const trendDays = ref<1 | 3 | 7 | 60>(7);
@@ -38,7 +40,7 @@ function salary(job: Job): number | null {
 
 function groupKey(job: Job): string {
   if (trendScope.value === "country") return job.country || t("trendUnknown");
-  if (trendScope.value === "city") return job.city || job.location || t("trendUnknown");
+  if (trendScope.value === "city") return canonicalCityValue(job.city || job.location || t("trendUnknown"));
   if (trendScope.value === "position") return job.title || t("trendUnknown");
   if (trendScope.value === "positions") return t("trendPositionSet");
   return t("trendWorld");
@@ -66,7 +68,13 @@ const chart = computed(() => {
     }
     return { group, values: buckets.map((bucket) => bucket.length ? bucket.sort((a, b) => a - b)[Math.floor(bucket.length / 2)] : null) };
   });
-  const lines = raw.map((line, lineIndex) => ({ label: trendScope.value === "country" ? props.countryLabel(line.group) : line.group, color: colors[lineIndex], values: line.values }));
+  const lines = raw.map((line, lineIndex) => ({
+    label: trendScope.value === "country"
+      ? props.countryLabel(line.group)
+      : trendScope.value === "city" ? locationLabel(line.group, locale.value, "city") : line.group,
+    color: colors[lineIndex],
+    values: line.values,
+  }));
   const labels = Array.from({ length: bucketCount }, (_, index) => {
     const date = new Date(start + index * bucketMs);
     return trendDays.value === 1

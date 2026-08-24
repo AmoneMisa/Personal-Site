@@ -1,3 +1,6 @@
+import type { HiringStatistics } from "~~/shared/contracts/hiring";
+export type { HiringStatistics } from "~~/shared/contracts/hiring";
+
 export interface HiringCvProfile {
   id: string
   source: string
@@ -20,6 +23,7 @@ export interface HiringCvProfile {
   remote?: boolean | null
   url: string
   createdAt: string | null
+  activityAt?: string | null
   description: string
   skills?: string[]
   languages?: string[]
@@ -36,6 +40,7 @@ export interface HiringFeedResult {
   rates?: Record<string, number>
   warming?: boolean
   sourceCounts?: Record<string, number>
+  statistics?: HiringStatistics
   sourceErrors?: Array<{ source?: string; country?: string; handle?: string; error?: string }>
   meta?: {
     professions?: string[]

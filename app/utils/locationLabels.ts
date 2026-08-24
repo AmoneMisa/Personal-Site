@@ -4,30 +4,7 @@
 // state, URL params and API requests — and are translated only at render time.
 // A value with no entry falls through unchanged, so this is safe to apply to any
 // string (including one that is already localized, or a name we don't know yet).
-
-const CITY_RU: Record<string, string> = {
-  // UZ
-  Tashkent: 'Ташкент', Samarkand: 'Самарканд', Bukhara: 'Бухара', Namangan: 'Наманган',
-  Andijan: 'Андижан', Fergana: 'Фергана', Nukus: 'Нукус', Navoi: 'Навои', Navoiy: 'Навои', Jizzakh: 'Джизак',
-  Termez: 'Термез', Qarshi: 'Карши', Urgench: 'Ургенч', Gulistan: 'Гулистан', Chirchiq: 'Чирчик',
-  'Tashkent Region': 'Ташкентская область',
-  Karakalpakstan: 'Каракалпакстан', Kashkadarya: 'Кашкадарья', Surkhandarya: 'Сурхандарья',
-  Syrdarya: 'Сырдарья', Khorezm: 'Хорезм',
-  // KZ
-  Almaty: 'Алматы', Astana: 'Астана', Shymkent: 'Шымкент', Karaganda: 'Караганда',
-  Aktobe: 'Актобе', Atyrau: 'Атырау', Oral: 'Уральск', Taraz: 'Тараз', Pavlodar: 'Павлодар',
-  Semey: 'Семей', Kostanay: 'Костанай', Kyzylorda: 'Кызылорда', Aktau: 'Актау',
-  // UA
-  Kyiv: 'Киев', Lviv: 'Львов', Odesa: 'Одесса', Kharkiv: 'Харьков', Dnipro: 'Днепр',
-  Vinnytsia: 'Винница', 'Ivano-Frankivsk': 'Ивано-Франковск', Lutsk: 'Луцк',
-  Chernivtsi: 'Черновцы', Zaporizhzhia: 'Запорожье', Poltava: 'Полтава', Rivne: 'Ровно',
-  Ternopil: 'Тернополь', Uzhhorod: 'Ужгород', Khmelnytskyi: 'Хмельницкий',
-  Zhytomyr: 'Житомир', Cherkasy: 'Черкассы', Chernihiv: 'Чернигов', Sumy: 'Сумы',
-  Mykolaiv: 'Николаев', Kropyvnytskyi: 'Кропивницкий',
-  // RO
-  Bucharest: 'Бухарест', 'Cluj-Napoca': 'Клуж-Напока', Timisoara: 'Тимишоара',
-  Iasi: 'Яссы', Brasov: 'Брашов', Constanta: 'Констанца', Oradea: 'Орадя',
-};
+import { cityDisplayLabel } from "~~/shared/locationCatalog";
 
 const DISTRICT_RU: Record<string, string> = {
   // Tashkent
@@ -97,8 +74,7 @@ export function metroLabelWithAlias(value: string | null | undefined, locale: st
 
 export type LocationKind = 'city' | 'district' | 'metro' | 'any';
 
-const MAPS: Record<Exclude<LocationKind, 'any'>, Record<string, string>> = {
-  city: CITY_RU,
+const MAPS: Record<Exclude<LocationKind, 'any' | 'city'>, Record<string, string>> = {
   district: DISTRICT_RU,
   metro: METRO_RU,
 };
@@ -107,7 +83,9 @@ const MAPS: Record<Exclude<LocationKind, 'any'>, Record<string, string>> = {
 // already in the target language) are returned unchanged.
 export function locationLabel(value: string | null | undefined, locale: string, kind: LocationKind = 'any'): string {
   if (!value) return '';
+  if (kind === 'city') return cityDisplayLabel(value, locale);
   if (!locale.toLowerCase().startsWith('ru')) return value;
   if (kind !== 'any') return MAPS[kind][value] || value;
-  return CITY_RU[value] || DISTRICT_RU[value] || METRO_RU[value] || value;
+  const city = cityDisplayLabel(value, locale);
+  return city !== value ? city : DISTRICT_RU[value] || METRO_RU[value] || value;
 }
