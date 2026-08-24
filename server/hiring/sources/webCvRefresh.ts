@@ -3,7 +3,7 @@ import {
   WEB_CV_SOURCES,
   type WebCvSourceKey,
 } from '../../../shared/hiring/sources/webCvSources'
-import { emptyWebCursor, loadWebCursors, saveWebCursor, type WebCursor } from '../../utils/hiringCursors'
+import { emptyWebCursor, loadWebCursors, saveWebCursor, type WebCursor } from '../../../shared/hiring/hiringCursors'
 import { recordWebDiagnostic, type WebSourceDiagnostic } from '../../utils/hiringDiagnostics'
 import { hiringDbEnabled, saveDbCandidates } from '../infrastructure/database'
 import { persistWebProfiles } from '../webProfilePersistence'
