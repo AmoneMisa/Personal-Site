@@ -1,5 +1,5 @@
 import { useStateStore } from '~~/server/utils/stateStore'
-import { isLikelyCvPost } from '../../utils/hiringSources'
+import { isLikelyCvPost } from '../domain/telegramCandidateParser'
 import { normalizeCandidate } from '../../utils/hiringNormalize'
 import { withProfessionExperience } from '../../utils/hiringExperience'
 import { isCharityAppeal, isRecruitingOpportunity, repairCandidateProfile } from '../../utils/hiringQuality'
