@@ -7,52 +7,12 @@ const props = defineProps<{
   }
 }>();
 
-const { locale } = useI18n();
+const { t } = useI18n();
 const localePath = useLocalePath();
 
 const code = computed(() => props.error?.statusCode ?? 500);
 const is404 = computed(() => code.value === 404);
-const isRu = computed(() => locale.value === "ru");
-
-const copy = computed(() => {
-  if (is404.value) {
-    return isRu.value
-      ? {
-          kicker: "Упс!",
-          title: "Страница уплыла",
-          text: "Похоже, акулка утащила страницу, а котик уже мчится по следу.",
-          hint: "Попробуйте вернуться на главную или открыть нужный раздел ещё раз.",
-          primary: "На главную",
-          secondary: "Назад",
-        }
-      : {
-          kicker: "Oops!",
-          title: "This page swam away",
-          text: "Looks like the little shark carried this page off, and the cat is already on the trail.",
-          hint: "Head back home or try opening the section you need again.",
-          primary: "Home",
-          secondary: "Back",
-        };
-  }
-
-  return isRu.value
-    ? {
-        kicker: "Ошибка сервера",
-        title: "Что-то пошло не так",
-        text: "Похоже, акулка устроила переполох на сервере, а котик уже всё чинит.",
-        hint: "Попробуйте обновить страницу или вернуться позже — скоро всё снова будет мур-мур.",
-        primary: "На главную",
-        secondary: "Повторить",
-      }
-    : {
-        kicker: "Server error",
-        title: "Something went wrong",
-        text: "Looks like the little shark caused some chaos on the server, and the cat is already fixing it.",
-        hint: "Try refreshing the page or come back a little later — everything should be purring again soon.",
-        primary: "Home",
-        secondary: "Retry",
-      };
-});
+const errorCopyKey = computed(() => `errors.${is404.value ? "404" : "500"}`);
 
 const artworkSrc = computed(() =>
   is404.value ? "/images/errors/error-404.png" : "/images/errors/error-500.png",
@@ -61,6 +21,10 @@ const artworkSrc = computed(() =>
 const details = computed(
   () => props.error?.statusMessage || props.error?.message || "Server Error",
 );
+
+function copy(field: "kicker" | "title" | "text" | "hint") {
+  return t(`${errorCopyKey.value}.${field}`);
+}
 
 function goHome() {
   clearError({ redirect: localePath("/") });
@@ -93,15 +57,15 @@ function retry() {
         <div class="error-copy">
           <span class="error-code">{{ code }}</span>
 
-          <p class="error-kicker">{{ copy.kicker }}</p>
-          <h1 class="error-title">{{ copy.title }}</h1>
-          <p class="error-text">{{ copy.text }}</p>
-          <p class="error-hint">{{ copy.hint }}</p>
+          <p class="error-kicker">{{ copy("kicker") }}</p>
+          <h1 class="error-title">{{ copy("title") }}</h1>
+          <p class="error-text">{{ copy("text") }}</p>
+          <p class="error-hint">{{ copy("hint") }}</p>
 
           <div class="error-actions">
             <button type="button" class="error-button error-button--primary" @click="goHome">
               <u-icon name="i-lucide-house" aria-hidden="true" />
-              <span>{{ copy.primary }}</span>
+              <span>{{ t("errors.actions.home") }}</span>
             </button>
 
             <button
@@ -110,14 +74,14 @@ function retry() {
               @click="is404 ? goBack() : retry()"
             >
               <u-icon :name="is404 ? 'i-lucide-arrow-left' : 'i-lucide-refresh-cw'" aria-hidden="true" />
-              <span>{{ copy.secondary }}</span>
+              <span>{{ is404 ? t("errors.actions.back") : t("errors.actions.retry") }}</span>
             </button>
           </div>
 
           <details v-if="!is404" class="error-details">
             <summary>
               <u-icon name="i-lucide-chevron-down" aria-hidden="true" />
-              <span>{{ isRu ? "Технические детали" : "Technical details" }}</span>
+              <span>{{ t("errors.details") }}</span>
             </summary>
             <pre>{{ details }}</pre>
           </details>
@@ -131,15 +95,15 @@ function retry() {
         </div>
       </div>
 
-      <nav class="error-nav" :aria-label="isRu ? 'Навигация' : 'Navigation'">
+      <nav class="error-nav" :aria-label="t('errors.navigationLabel')">
         <NuxtLink :to="localePath('/')" class="error-nav__link error-nav__link--active">
           <u-icon name="i-lucide-house" aria-hidden="true" />
-          <span>{{ isRu ? "Главная" : "Home" }}</span>
+          <span>{{ t("errors.links.main") }}</span>
         </NuxtLink>
         <span class="error-nav__divider" aria-hidden="true" />
         <NuxtLink :to="localePath('/services')" class="error-nav__link">
           <u-icon name="i-lucide-layout-grid" aria-hidden="true" />
-          <span>{{ isRu ? "Сервисы" : "Services" }}</span>
+          <span>{{ t("errors.links.services") }}</span>
         </NuxtLink>
       </nav>
     </section>
