@@ -2,7 +2,7 @@
 import { safeFetch } from "~/utils/safeFetch";
 import JobCard from "~/components/jobs/JobCard.vue";
 import JobGrid from "~/components/jobs/JobGrid.vue";
-import JobDetailsModal from "~/components/jobs/JobDetailsModal.vue";
+import SearchDetailsModal from "~/components/search/SearchDetailsModal.vue";
 import SearchPageShell from "~/components/search/SearchPageShell.vue";
 import SearchSavedTabs from "~/components/search/SearchSavedTabs.vue";
 import SearchFilterPanel from "~/components/search/SearchFilterPanel.vue";
@@ -871,7 +871,7 @@ onBeforeUnmount(() => {
     </UiResultsLoader>
 
     <!-- Full vacancy popup -->
-    <JobDetailsModal v-model:open="jobModalOpen" :title="activeJob?.title || ''" :ui="{ content: 'max-w-2xl' }">
+    <SearchDetailsModal v-model:open="jobModalOpen" :title="activeJob?.title || ''" :ui="{ content: 'max-w-2xl' }">
       <template #body>
         <div v-if="activeJob" class="job-modal">
           <div class="job-modal__meta text-muted">
@@ -953,7 +953,7 @@ onBeforeUnmount(() => {
         >{{ shareCopied ? t("shareCopied") : t("share") }}</u-button>
         </UiModalFooter>
       </template>
-    </JobDetailsModal>
+    </SearchDetailsModal>
   </SearchPageShell>
 </template>
 

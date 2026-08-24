@@ -3,7 +3,7 @@ import { safeFetch } from "~/utils/safeFetch";
 import { locationLabel } from "~/utils/locationLabels";
 import CandidateCard from "~/components/hiring/CandidateCard.vue";
 import CandidateGrid from "~/components/hiring/CandidateGrid.vue";
-import CandidateDetailsModal from "~/components/hiring/CandidateDetailsModal.vue";
+import SearchDetailsModal from "~/components/search/SearchDetailsModal.vue";
 import SearchPageShell from "~/components/search/SearchPageShell.vue";
 import SearchSavedTabs from "~/components/search/SearchSavedTabs.vue";
 import SearchFilterPanel from "~/components/search/SearchFilterPanel.vue";
@@ -743,7 +743,7 @@ onBeforeUnmount(() => {
 
     </UiResultsLoader>
 
-    <CandidateDetailsModal v-model:open="modalOpen" :title="active?.name || active?.role || t('notSpecified')" :ui="{ content: 'max-w-3xl' }">
+    <SearchDetailsModal v-model:open="modalOpen" :title="active?.name || active?.role || t('notSpecified')" :ui="{ content: 'max-w-3xl' }">
       <template #title>
         <h2 class="hiring-modal__title">{{ active?.name || active?.role || t("notSpecified") }}</h2>
         <p v-if="active?.name && active?.role" class="hiring-modal__role">{{ active.role }}</p>
@@ -774,7 +774,7 @@ onBeforeUnmount(() => {
           <a class="modal-footer__primary" :href="active.url" target="_blank" rel="noopener noreferrer">{{ t("open") }} →</a>
         </UiModalFooter>
       </template>
-    </CandidateDetailsModal>
+    </SearchDetailsModal>
 
     <u-modal v-model:open="presetModalOpen" :title="t('savePreset')">
       <template #body>
