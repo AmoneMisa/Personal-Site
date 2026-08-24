@@ -12,6 +12,10 @@ import {
   telegramMessageToProfile,
   type TelegramCandidateChannel,
 } from '../hiring/domain/telegramCandidateParser'
+import {
+  recordHiringSourceDiagnostic,
+  type HiringSourceDiagnostic,
+} from '../hiring/sources/telegramDiagnostics'
 
 const UA = 'hiringFinder/1.0 (CV board; contact: admin@whiteslove.me)'
 const TELEGRAM_PAGE_SIZE = Math.min(
@@ -21,24 +25,6 @@ const TELEGRAM_PAGE_SIZE = Math.min(
 const TELEGRAM_WORKER_TIMEOUT_MS = 60_000
 
 type TelegramChannel = TelegramCandidateChannel
-
-export interface HiringSourceDiagnostic {
-  handle: string
-  country: string
-  status: 'ok' | 'empty' | 'error' | 'disabled'
-  fetched: number
-  candidateMarkerMatched: number
-  rejectedVacancy: number
-  rejectedQuality: number
-  candidates: number
-  mode: 'incremental' | 'backfill' | 'idle'
-  newestMessageId: number
-  oldestMessageId: number
-  bootstrapComplete: boolean
-  fetchDurationMs: number
-  checkedAt: string
-  error?: string
-}
 
 export interface ChannelFunnel {
   fetched: number
@@ -56,8 +42,6 @@ interface TelegramFetchResult {
   profiles: CvProfile[]
   fetched: number
 }
-
-let telegramDiagnostics: HiringSourceDiagnostic[] = []
 
 function telegramCountry(value: string): HiringTelegramChannelDescriptor['country'] {
   const normalized = value.trim().toUpperCase()
@@ -377,12 +361,8 @@ export async function fetchHiringChannel(handle: string, q = ''): Promise<Channe
 
   const cursors = await loadCursors()
   const outcome = await readChannel(channel, q, cursors.get(channel.handle) || emptyCursor(channel.handle))
-  const index = telegramDiagnostics.findIndex((item) => item.handle.toLowerCase() === wanted)
-  if (index >= 0) telegramDiagnostics[index] = outcome.diagnostic
-  else telegramDiagnostics = [...telegramDiagnostics, outcome.diagnostic]
+  recordHiringSourceDiagnostic(outcome.diagnostic)
   return outcome
 }
 
-export function getHiringSourceDiagnostics(): HiringSourceDiagnostic[] {
-  return telegramDiagnostics.map((item) => ({ ...item }))
-}
+export { getHiringSourceDiagnostics } from '../hiring/sources/telegramDiagnostics'
