@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { useId } from "vue"
+
 type Props = {
   modelValue?: boolean
   label?: string
@@ -23,7 +25,7 @@ const emit = defineEmits<{
   (e: "update:modelValue", v: boolean): void
 }>()
 
-const id = `cb_${Math.random().toString(16).slice(2)}`
+const id = useId()
 </script>
 
 <template>
@@ -71,14 +73,17 @@ const id = `cb_${Math.random().toString(16).slice(2)}`
   display: inline-flex;
   align-items: center;
   gap: 10px;
-  padding: 6px 8px;
-  border-radius: 6px;
+  min-height: 38px;
+  padding: 7px 10px;
+  border-radius: var(--ui-control-radius, 8px);
   border: 1px solid var(--ui-border);
-  background: rgba(255, 255, 255, 0.02);
+  background: var(--ui-control-bg, rgba(255, 255, 255, 0.035));
   color: var(--ui-text);
   cursor: pointer;
   user-select: none;
+  transition: border-color var(--ui-transition, 150ms ease), background-color var(--ui-transition, 150ms ease), box-shadow var(--ui-transition, 150ms ease);
 }
+.cb__row:hover { border-color: rgba(224, 103, 154, 0.48); background: rgba(224, 103, 154, 0.055); }
 
 .cb__native {
   position: absolute;
@@ -89,13 +94,15 @@ const id = `cb_${Math.random().toString(16).slice(2)}`
 .cb__box {
   width: 18px;
   height: 18px;
-  border-radius: 6px;
+  border-radius: 5px;
   border: 1px solid var(--ui-border);
   background: rgba(0, 0, 0, 0.12);
   display: inline-flex;
   align-items: center;
   justify-content: center;
   flex: 0 0 auto;
+  color: #fff;
+  transition: border-color var(--ui-transition, 150ms ease), background-color var(--ui-transition, 150ms ease), box-shadow var(--ui-transition, 150ms ease);
 }
 
 .cb__tick {
@@ -110,10 +117,19 @@ const id = `cb_${Math.random().toString(16).slice(2)}`
   opacity: 1;
   transform: scale(1);
 }
+.cb__row:has(input:checked) .cb__box {
+  border-color: var(--accent-pink, #e0679a);
+  background: linear-gradient(135deg, var(--accent-pink, #e0679a), #a855f7);
+  box-shadow: 0 0 0 3px rgba(224, 103, 154, 0.13);
+}
+.cb__row:has(input:focus-visible) {
+  border-color: var(--accent-pink, #e0679a);
+  box-shadow: var(--ui-focus-ring, 0 0 0 3px rgba(224, 103, 154, 0.2));
+}
 
 .cb__label {
   font-size: 12px;
-  font-weight: 900;
+  font-weight: 700;
   color: var(--ui-text-muted);
 }
 

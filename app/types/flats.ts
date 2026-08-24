@@ -11,6 +11,8 @@ export interface FlatListing {
   areaSqm: number | null;
   city: string;
   district?: string | null;
+  region?: string | null;
+  microdistrict?: string | null;
   metro?: string | null;
   address?: string | null;
   roomOnly?: boolean;
@@ -67,6 +69,42 @@ export interface FlatListing {
   tags?: string[];
 }
 
+export interface FlatStatsPriceGroup {
+  key: "sale" | "longRent" | "shortRent" | "roomRent" | "unknown";
+  count: number;
+  priceCount: number;
+  medianUsd: number | null;
+  averageUsd: number | null;
+}
+
+export interface FlatStatsGeoRow {
+  label: string;
+  count: number;
+  priceCount: number;
+  medianUsd: number | null;
+}
+
+export type FlatStatsGeoDimension = "country" | "city" | "district" | "microdistrict" | "metro";
+
+export interface FlatStatistics {
+  total: number;
+  rawTotal: number;
+  currency: "USD";
+  dealTypes: FlatStatsPriceGroup[];
+  geographies: Partial<Record<FlatStatsGeoDimension, FlatStatsGeoRow[]>>;
+  ownership: {
+    owners: number;
+    agencies: number;
+    commission: number;
+    noCommission: number;
+  };
+  activity: Array<{ date: string; count: number }>;
+  quality: {
+    duplicatesRejected: number;
+    suspectedFake: number;
+  };
+}
+
 export interface FlatFeedResult {
   count: number;
   listings: FlatListing[];
@@ -77,6 +115,9 @@ export interface FlatFeedResult {
   queryMs?: number;
   error?: string;
   exactListingFallback?: "source" | "source-inactive" | string;
+  statistics?: FlatStatistics;
+  availabilityFiltered?: number;
+  availabilityChecked?: string[];
 }
 
 export interface FlatTranslationResult {
@@ -92,6 +133,18 @@ export interface FlatCountryMeta {
   currency: string;
   cities?: string[];
   locations?: Record<string, { districts?: string[]; metro?: string[] }>;
+}
+
+export interface FlatCardPresentation {
+  title: string;
+  price: string;
+  convertedPrice: string | null;
+  specification: string;
+  location: string;
+  dealLabel: string;
+  dealTone: "sale" | "rent" | "room" | "short" | "";
+  badges: string[];
+  dateLabel: string;
 }
 
 export type FlatView = "active" | "favorites" | "recent" | "hidden";

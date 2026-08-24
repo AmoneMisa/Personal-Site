@@ -3,10 +3,10 @@ import { safeFetch } from "~/utils/safeFetch";
 import JobCard from "~/components/jobs/JobCard.vue";
 import JobGrid from "~/components/jobs/JobGrid.vue";
 import JobDetailsModal from "~/components/jobs/JobDetailsModal.vue";
-import JobFilters from "~/components/jobs/JobFilters.vue";
-import JobAdvancedFilters from "~/components/jobs/JobAdvancedFilters.vue";
 import SearchPageShell from "~/components/search/SearchPageShell.vue";
 import SearchSavedTabs from "~/components/search/SearchSavedTabs.vue";
+import SearchFilterPanel from "~/components/search/SearchFilterPanel.vue";
+import SearchFilterBlocks from "~/components/search/SearchFilterBlocks.vue";
 import AtsPanel from "~/components/jobs/AtsPanel.vue";
 import RecentlyViewed from "~/components/jobs/RecentlyViewed.vue";
 import StatsPanel from "~/components/jobs/StatsPanel.vue";
@@ -20,6 +20,7 @@ import { useJobRouteState } from "~/composables/jobs/useJobRouteState";
 import { useSavedCollections } from "~/composables/search/useSavedCollections";
 import { useLatestRequest } from "~/composables/search/useLatestRequest";
 import { useInfiniteFeed } from "~/composables/search/useInfiniteFeed";
+import type { SearchFilterBlock, SearchFilterValue } from "~/types/search";
 
 // Job Finder service. Auto-routed at /jobs. Aggregates many boards, enforces a
 // 14-day freshness cap server-side, offers full sort + advanced filters, shows
@@ -88,7 +89,7 @@ const {
   query, source, salaryMin, displayCurrency, displayPeriod, sort, countries, cities,
   includeRu, includeBy, workMode, relocation, employmentKind, hasSalary, maxExperience,
   foreignerOnly, hideRisky, noExperience, language, languageLevel, excludeLanguages,
-  skills, showAdvanced, resetValues: resetFilterValues,
+  skills, showAdvanced, buildFeedParams, resetValues: resetFilterValues,
 } = useJobFilters();
 
 // Reka UI reserves an empty string for clearing a combobox and throws when an
@@ -335,34 +336,13 @@ async function load(
     else loading.value = true;
     failed.value = false;
   }
-  const serverSort = sort.value === "ats" ? "date" : sort.value; // ATS sorts client-side
-  const params: Record<string, string> = {
-    page: String(toPage), pageSize: String(cvProfile.value ? 50 : pageSize.value), sort: serverSort,
-  };
-  if (query.value) params.q = query.value;
-  if (source.value) params.source = source.value;
-  if (salaryMin.value) {
-    // salaryMin is entered in the chosen currency + period; the server filters on
-    // the ANNUAL-USD salaryUsd, so convert currency→USD then period→year.
-    const inUsd = convertCurrency(salaryMin.value, displayCurrency.value, "USD");
-    if (inUsd) params.salaryMin = String(convertPeriod(inUsd, displayPeriod.value, "year"));
-  }
-  if (countries.value.length) params.country = countries.value.join(",");
-  if (cities.value.trim()) params.cities = cities.value.trim();
-  if (includeRu.value) params.includeRu = "true";
-  if (includeBy.value) params.includeBy = "true";
-  if (workMode.value) params.workMode = workMode.value;
-  if (relocation.value) params.relocation = relocation.value;
-  if (employmentKind.value) params.employmentKind = employmentKind.value;
-  if (hasSalary.value) params.hasSalary = "true";
-  if (maxExperience.value != null) params.maxExperienceYears = String(maxExperience.value);
-  if (foreignerOnly.value) params.foreignerFriendly = "true";
-  if (!hideRisky.value) params.hideRiskyIndustries = "false";
-  if (noExperience.value) params.noExperience = "true";
-  if (language.value) params.language = language.value;
-  if (languageLevel.value) params.languageLevel = languageLevel.value;
-  if (excludeLanguages.value.length) params.excludeLanguage = excludeLanguages.value.join(",");
-  if (skills.value.trim()) params.skills = skills.value.trim();
+  const params = buildFeedParams({
+    page: toPage,
+    pageSize: pageSize.value,
+    cvReady: Boolean(cvProfile.value),
+    convertCurrency,
+    convertPeriod,
+  });
 
   // Served by Nitro at /jobs-feed (NOT under /api, which the host site proxies to FastAPI).
   const { data, error } = await fetchFeed(params);
@@ -675,6 +655,69 @@ const levelItems = computed<Item[]>(() => [
   ...levelOptions.map((l) => ({ label: l, value: l })),
 ]);
 
+function updateFilter<T>(target: { value: T }) {
+  return (value: SearchFilterValue) => {
+    target.value = value as T;
+  };
+}
+
+const jobFilterBlocks = computed<SearchFilterBlock[]>(() => [
+  {
+    id: "location",
+    title: t("filterLocation"),
+    icon: "i-lucide-map-pin",
+    fields: [
+      { id: "countries", control: "multi-select", label: t("country"), value: countries.value, options: countryItems.value, placeholder: t("countryPlaceholder"), onUpdate: updateFilter(countries), onCommit: scheduleLoad },
+      { id: "cities", control: "text", class: "jobs__field_wide", label: t("cities"), value: cities.value, placeholder: t("citiesPlaceholder"), icon: "i-lucide-map-pin", onUpdate: updateFilter(cities), onCommit: scheduleLoad, onEnter: () => load(1) },
+    ],
+  },
+  {
+    id: "salary",
+    title: t("filterSalary"),
+    icon: "i-lucide-banknote",
+    fields: [
+      { id: "salary-min", control: "number", label: `${t("salaryMin")} (${displayCurrency.value}/${periodLabel(displayPeriod.value)})`, value: salaryMin.value, min: 0, icon: "i-lucide-banknote", onUpdate: updateFilter(salaryMin), onCommit: scheduleLoad },
+      { id: "currency", control: "select", label: t("currency"), value: displayCurrency.value, options: currencyItems.value, onUpdate: updateFilter(displayCurrency), onCommit: () => salaryMin.value && scheduleLoad() },
+      { id: "period", control: "select", label: t("period"), value: displayPeriod.value, options: periodItems.value, searchable: false, onUpdate: updateFilter(displayPeriod), onCommit: () => salaryMin.value && scheduleLoad() },
+      { id: "has-salary", control: "checkbox", label: t("hasSalary"), value: hasSalary.value, onUpdate: updateFilter(hasSalary), onCommit: scheduleLoad },
+    ],
+  },
+  {
+    id: "work",
+    title: t("filterWork"),
+    icon: "i-lucide-briefcase-business",
+    fields: [
+      { id: "work-mode", control: "select", label: t("workMode"), value: workModeSelect.value, options: workModeItems.value, searchable: false, onUpdate: updateFilter(workModeSelect), onCommit: scheduleLoad },
+      { id: "relocation", control: "select", label: t("relocation"), value: relocationSelect.value, options: relocationItems.value, searchable: false, onUpdate: updateFilter(relocationSelect), onCommit: scheduleLoad },
+      { id: "employment", control: "select", label: t("employment"), value: employmentKindSelect.value, options: employmentKindItems.value, searchable: false, onUpdate: updateFilter(employmentKindSelect), onCommit: scheduleLoad },
+      { id: "max-experience", control: "number", label: t("experienceMax"), value: maxExperience.value, placeholder: t("experienceMaxPlaceholder"), min: 0, max: 40, icon: "i-lucide-briefcase", onUpdate: updateFilter(maxExperience), onCommit: scheduleLoad, onEnter: () => load(1) },
+      { id: "no-experience", control: "checkbox", label: t("noExperience"), value: noExperience.value, onUpdate: updateFilter(noExperience), onCommit: scheduleLoad },
+      { id: "foreigner", control: "checkbox", label: t("foreigner"), value: foreignerOnly.value, onUpdate: updateFilter(foreignerOnly), onCommit: scheduleLoad },
+    ],
+  },
+  {
+    id: "skills",
+    title: t("filterSkills"),
+    icon: "i-lucide-languages",
+    fields: [
+      { id: "language", control: "select", label: t("language"), value: languageSelect.value, options: languageItems.value, onUpdate: updateFilter(languageSelect), onCommit: scheduleLoad },
+      { id: "language-level", control: "select", label: t("languageLevel"), value: languageLevelSelect.value, options: levelItems.value, searchable: false, disabled: !language.value, onUpdate: updateFilter(languageLevelSelect), onCommit: scheduleLoad },
+      { id: "exclude-language", control: "multi-select", label: t("excludeLanguage"), value: excludeLanguages.value, options: excludeLanguageItems.value, placeholder: t("excludeLangPlaceholder"), onUpdate: updateFilter(excludeLanguages), onCommit: scheduleLoad },
+      { id: "skills-query", control: "text", class: "jobs__field_wide", label: t("skills"), value: skills.value, placeholder: t("skillsPlaceholder"), icon: "i-lucide-wrench", onUpdate: updateFilter(skills), onEnter: () => load(1) },
+    ],
+  },
+  {
+    id: "coverage",
+    title: t("filterCoverage"),
+    icon: "i-lucide-shield-check",
+    fields: [
+      { id: "hide-risky", control: "checkbox", label: t("hideRisky"), title: t("hideRiskyHint"), value: hideRisky.value, onUpdate: updateFilter(hideRisky), onCommit: scheduleLoad },
+      { id: "include-ru", control: "checkbox", label: t("includeRu"), value: includeRu.value, onUpdate: updateFilter(includeRu), onCommit: scheduleLoad },
+      { id: "include-by", control: "checkbox", label: t("includeBy"), value: includeBy.value, onUpdate: updateFilter(includeBy), onCommit: scheduleLoad },
+    ],
+  },
+]);
+
 // Do not suspend SSR/hydration on the aggregated feed. A cold job store can
 // take several seconds while upstream boards time out; keeping that request at
 // top level leaves all filters rendered but inert until it finishes.
@@ -719,7 +762,7 @@ onBeforeUnmount(() => {
     />
 
     <!-- Filters + sort -->
-    <JobFilters class="jobs__controls" @submit="load(1)">
+    <SearchFilterPanel tag="form" class="jobs__controls" @submit="load(1)">
       <u-input v-model="query" clearable icon="i-lucide-search" :label="t('search')" :placeholder="t('searchPlaceholder')" @clear="clearSearch" />
       <UiSortSelect
         v-model="sort"
@@ -759,72 +802,12 @@ onBeforeUnmount(() => {
           {{ t("advanced") }}
         </button>
       </div>
-      <JobAdvancedFilters v-if="showAdvanced" class="jobs__advanced">
-        <UiFilterSection class="jobs-filter-group" icon="i-lucide-map-pin" :title="t('filterLocation')">
-          <div class="jobs-filter-group__grid jobs-filter-group__grid_location">
-            <div class="jobs__field">
-              <u-select-menu :label="t('country')" v-model="countries" :items="countryItems" value-key="value" label-key="label"
-                  multiple :placeholder="t('countryPlaceholder')" class="jobs__select" @update:model-value="scheduleLoad()" />
-            </div>
-            <div class="jobs__field jobs__field_wide">
-              <u-input v-model="cities" icon="i-lucide-map-pin" :label="t('cities')" :placeholder="t('citiesPlaceholder')"
-                  @keyup.enter="load(1)" @change="scheduleLoad()" />
-            </div>
-          </div>
-        </UiFilterSection>
-
-        <UiFilterSection class="jobs-filter-group jobs-filter-group_salary" icon="i-lucide-banknote" :title="t('filterSalary')">
-          <div class="jobs-filter-group__grid jobs-filter-group__grid_salary">
-            <div class="jobs__field">
-              <u-input v-model.number="salaryMin" type="number" min="0" icon="i-lucide-banknote"
-                  :label="`${t('salaryMin')} (${displayCurrency}/${periodLabel(displayPeriod)})`" @change="scheduleLoad()" />
-            </div>
-            <div class="jobs__field">
-              <u-select-menu :label="t('currency')" v-model="displayCurrency" :items="currencyItems" value-key="value" label-key="label"
-                  class="jobs__select" @update:model-value="salaryMin && scheduleLoad()" />
-            </div>
-            <div class="jobs__field">
-              <u-select-menu :label="t('period')" v-model="displayPeriod" :items="periodItems" value-key="value" label-key="label"
-                  :search-input="false" class="jobs__select" @update:model-value="salaryMin && scheduleLoad()" />
-            </div>
-            <label class="jobs__remote jobs__field_inline">
-              <u-switch v-model="hasSalary" @update:model-value="scheduleLoad()" />
-              <span>{{ t("hasSalary") }}</span>
-            </label>
-          </div>
-        </UiFilterSection>
-
-        <UiFilterSection class="jobs-filter-group" icon="i-lucide-briefcase-business" :title="t('filterWork')">
-          <div class="jobs-filter-group__grid">
-            <div class="jobs__field"><u-select-menu :label="t('workMode')" v-model="workModeSelect" :items="workModeItems" value-key="value" label-key="label" :search-input="false" class="jobs__select" @update:model-value="scheduleLoad()" /></div>
-            <div class="jobs__field"><u-select-menu :label="t('relocation')" v-model="relocationSelect" :items="relocationItems" value-key="value" label-key="label" :search-input="false" class="jobs__select" @update:model-value="scheduleLoad()" /></div>
-            <div class="jobs__field"><u-select-menu :label="t('employment')" v-model="employmentKindSelect" :items="employmentKindItems" value-key="value" label-key="label" :search-input="false" class="jobs__select" @update:model-value="scheduleLoad()" /></div>
-            <div class="jobs__field"><u-input v-model.number="maxExperience" type="number" min="0" max="40" icon="i-lucide-briefcase" :label="t('experienceMax')" :placeholder="t('experienceMaxPlaceholder')" @keyup.enter="load(1)" @change="scheduleLoad()" /></div>
-            <label class="jobs__remote jobs__field_inline"><u-switch v-model="noExperience" @update:model-value="scheduleLoad()" /><span>{{ t("noExperience") }}</span></label>
-            <label class="jobs__remote jobs__field_inline"><u-switch v-model="foreignerOnly" @update:model-value="scheduleLoad()" /><span>{{ t("foreigner") }}</span></label>
-          </div>
-        </UiFilterSection>
-
-        <UiFilterSection class="jobs-filter-group" icon="i-lucide-languages" :title="t('filterSkills')">
-          <div class="jobs-filter-group__grid">
-            <div class="jobs__field"><u-select-menu :label="t('language')" v-model="languageSelect" :items="languageItems" value-key="value" label-key="label" class="jobs__select" @update:model-value="scheduleLoad()" /></div>
-            <div class="jobs__field"><u-select-menu :label="t('languageLevel')" v-model="languageLevelSelect" :items="levelItems" value-key="value" label-key="label" :search-input="false" :disabled="!language" class="jobs__select" @update:model-value="scheduleLoad()" /></div>
-            <div class="jobs__field"><u-select-menu :label="t('excludeLanguage')" v-model="excludeLanguages" :items="excludeLanguageItems" value-key="value" label-key="label" multiple :placeholder="t('excludeLangPlaceholder')" class="jobs__select" @update:model-value="scheduleLoad()" /></div>
-            <div class="jobs__field jobs__field_wide"><u-input v-model="skills" icon="i-lucide-wrench" :label="t('skills')" :placeholder="t('skillsPlaceholder')" @keyup.enter="load(1)" /></div>
-          </div>
-        </UiFilterSection>
-
-        <UiFilterSection class="jobs-filter-group jobs-filter-group_flags" icon="i-lucide-shield-check" :title="t('filterCoverage')">
-          <div class="jobs-filter-group__flags">
-            <label class="jobs__remote" :title="t('hideRiskyHint')"><u-switch v-model="hideRisky" @update:model-value="scheduleLoad()" /><span>{{ t("hideRisky") }}</span></label>
-            <label class="jobs__remote"><u-switch v-model="includeRu" @update:model-value="scheduleLoad()" /><span>{{ t("includeRu") }}</span></label>
-            <label class="jobs__remote"><u-switch v-model="includeBy" @update:model-value="scheduleLoad()" /><span>{{ t("includeBy") }}</span></label>
-          </div>
-        </UiFilterSection>
+      <div v-if="showAdvanced" class="jobs__advanced">
+        <SearchFilterBlocks :blocks="jobFilterBlocks" class="jobs__filter-blocks" />
 
         <UiFilterFooter class="jobs-filter-actions" :reset-label="t('reset')" @reset="resetFilters" />
-      </JobAdvancedFilters>
-    </JobFilters>
+      </div>
+    </SearchFilterPanel>
 
     <p v-if="failed" class="jobs__error">{{ t("error") }}</p>
     <p v-else-if="warming && savedView === 'active'" class="jobs__warming" role="status" aria-live="polite">
@@ -1018,6 +1001,8 @@ onBeforeUnmount(() => {
   padding: 14px; border-radius: 10px; border: 1px solid var(--line); background: var(--ocean-form-surface);
   box-shadow: 0 18px 42px rgba(2, 5, 18, 0.22);
 }
+.jobs__filter-blocks { grid-column: 1 / -1; }
+.jobs__filter-blocks :deep(.search-filter-blocks__grid) { align-items: end; }
 .jobs-filter-group__grid { display: grid; grid-template-columns: 1fr; gap: 12px; align-items: end; }
 .jobs-filter-group__flags { display: flex; flex-wrap: wrap; gap: 14px 24px; align-items: center; }
 .jobs__field { display: flex; flex-direction: column; gap: 5px; min-width: 0; }

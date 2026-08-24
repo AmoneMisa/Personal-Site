@@ -102,21 +102,30 @@
 }
 
 @media (max-width: 520px) {
-  .modal-footer :deep(> button) {
-    flex-basis: 44px;
-    width: 44px;
-    min-width: 44px;
-    min-height: 44px;
-    height: 44px;
+  .modal-footer {
+    display: grid;
+    grid-template-columns: repeat(3, 40px) minmax(0, 1fr);
+    gap: 6px;
   }
+
+  .modal-footer :deep(> button) {
+    width: 40px;
+    min-width: 40px;
+    min-height: 40px;
+    height: 40px;
+  }
+
+  .modal-footer :deep(> button:nth-of-type(1)) { grid-column: 1; grid-row: 1; }
+  .modal-footer :deep(> button:nth-of-type(2)) { grid-column: 2; grid-row: 1; }
+  .modal-footer :deep(> button:nth-of-type(3)) { grid-column: 3; grid-row: 1; }
 
   .modal-footer :deep(> button svg),
   .modal-footer :deep(> button [class*="icon"]) {
-    width: 20px;
-    height: 20px;
-    min-width: 20px;
-    min-height: 20px;
-    font-size: 20px;
+    width: 18px;
+    height: 18px;
+    min-width: 18px;
+    min-height: 18px;
+    font-size: 18px;
   }
 
   .modal-footer :deep(> .modal-footer__primary),
@@ -125,7 +134,21 @@
   }
 
   .modal-footer :deep(> .modal-footer__primary) {
-    flex: 1 1 180px;
+    grid-column: 4;
+    grid-row: 1;
+    min-width: 0;
+    min-height: 40px;
+    padding-inline: 8px;
+    font-size: 12px;
+    white-space: nowrap;
+  }
+
+  .modal-footer :deep(> .modal-footer__secondary) {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    min-height: 36px;
+    padding-block: 6px;
+    font-size: 12px;
   }
 }
 </style>

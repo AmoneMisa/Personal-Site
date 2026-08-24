@@ -49,6 +49,66 @@ export function useFlatFilters() {
   const source = ref("");
   const showAdvanced = ref(false);
 
+  function buildFeedParams(options: {
+    limit: number;
+    append: boolean;
+    loadedCount: number;
+    nextCursor: string | null;
+    sources: string[];
+  }): Record<string, string> {
+    const params: Record<string, string> = { limit: String(options.limit) };
+    const cursorSort = sort.value === "newest" || sort.value === "oldest";
+    if (options.append && cursorSort && options.nextCursor) params.cursor = options.nextCursor;
+    else params.offset = String(options.append ? options.loadedCount : 0);
+    if (countries.value.length) params.countries = countries.value.join(",");
+    if (city.value) params.city = city.value;
+    if (district.value) params.district = district.value;
+    if (propertyType.value !== "any") params.propertyType = propertyType.value;
+    if (dealType.value !== "any") params.dealType = dealType.value === "roomRent" ? "longRent" : dealType.value;
+    if (agency.value !== "any") params.agency = agency.value;
+    if (priceMin.value != null) params.priceMin = String(priceMin.value);
+    if (priceMax.value != null) params.priceMax = String(priceMax.value);
+    if (priceMin.value != null || priceMax.value != null) params.priceCurrency = displayCurrency.value;
+    if (roomsMin.value != null) params.roomsMin = String(roomsMin.value);
+    if (roomsMax.value != null) params.roomsMax = String(roomsMax.value);
+    if (bedroomsMin.value != null) params.bedroomsMin = String(bedroomsMin.value);
+    if (bedroomsMax.value != null) params.bedroomsMax = String(bedroomsMax.value);
+    if (areaMin.value != null) params.areaMin = String(areaMin.value);
+    if (areaMax.value != null) params.areaMax = String(areaMax.value);
+    if (pricePerSqmMin.value != null) params.pricePerSqmMin = String(pricePerSqmMin.value);
+    if (pricePerSqmMax.value != null) params.pricePerSqmMax = String(pricePerSqmMax.value);
+    if (metroMaxM.value != null) params.metroMaxM = String(metroMaxM.value);
+    if (nearbyKind.value) params.nearbyKind = nearbyKind.value;
+    if (nearbyMaxM.value != null) params.nearbyMaxM = String(nearbyMaxM.value);
+    if (floorMin.value != null) params.floorMin = String(floorMin.value);
+    if (floorMax.value != null) params.floorMax = String(floorMax.value);
+    if (totalFloorsMin.value != null) params.totalFloorsMin = String(totalFloorsMin.value);
+    if (totalFloorsMax.value != null) params.totalFloorsMax = String(totalFloorsMax.value);
+    if (yearMin.value != null) params.yearMin = String(yearMin.value);
+    if (yearMax.value != null) params.yearMax = String(yearMax.value);
+    if (maxAgeDays.value != null) params.maxAgeDays = String(maxAgeDays.value);
+    if (metro.value) params.metro = metro.value;
+    if (audience.value !== "any") params.audience = audience.value;
+    if (petFriendly.value) params.pets = "1";
+    if (roomOnlyFilter.value || dealType.value === "roomRent") params.roomOnly = "1";
+    if (onlyWithPhotos.value) params.withPhotos = "1";
+    if (childrenRequired.value) params.children = "1";
+    if (newBuildingOnly.value) params.newBuilding = "1";
+    if (dishwasherOnly.value) params.dishwasher = "1";
+    if (airConditionerOnly.value) params.airConditioner = "1";
+    if (parkingOnly.value) params.parking = "1";
+    if (internetOnly.value) params.internet = "1";
+    if (gasOnly.value) params.gas = "1";
+    if (balconyOnly.value) params.balcony = "1";
+    if (terraceOnly.value) params.terrace = "1";
+    if (privateYardOnly.value) params.privateYard = "1";
+    params.sort = sort.value;
+    if (query.value.trim()) params.query = query.value.trim();
+    params.sources = source.value || options.sources.join(",");
+    if (!options.append) params.includeStats = "1";
+    return params;
+  }
+
   function resetValues(defaultCountry: string) {
     countries.value = [defaultCountry];
     city.value = "";
@@ -104,6 +164,6 @@ export function useFlatFilters() {
     audience, metro, priceMin, priceMax, roomsMin, roomsMax, bedroomsMin, bedroomsMax,
     areaMin, areaMax, pricePerSqmMin, pricePerSqmMax, metroMaxM, nearbyKind, nearbyMaxM,
     floorMin, floorMax, totalFloorsMin, totalFloorsMax, yearMin, yearMax, maxAgeDays,
-    displayCurrency, query, source, showAdvanced, resetValues,
+    displayCurrency, query, source, showAdvanced, buildFeedParams, resetValues,
   };
 }

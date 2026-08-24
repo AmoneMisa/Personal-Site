@@ -19,24 +19,28 @@ test('shared OLX lookup verifies the live source before any cached fallback', ()
 
 test('cached feed filters OLX rows already persisted as inactive', () => {
   assert.match(route, /\/api\/listings\/verify/)
-  assert.match(route, /result\?\.status === 'inactive'/)
+  assert.match(route, /result\?\.status !== 'active' && result\?\.status !== 'inactive'/)
   assert.match(route, /filterPersistedInactiveOlx/)
   assert.match(route, /availabilityFiltered:\s*removed/)
+  assert.match(route, /AVAILABILITY_FRESH_MS = 15 \* 60_000/)
+  assert.match(route, /availabilityChecked/)
   assert.match(route, /const finalize = async \(raw: any\) => filterPersistedInactiveOlx/)
 })
 
-test('client never trusts a locally loaded OLX row without a live exact lookup', () => {
+test('client reuses a recent OLX availability check and otherwise performs a live lookup', () => {
   assert.match(page, /const toast = useToast\(\)/)
   assert.match(page, /async function verifyOlxListing/)
   assert.match(page, /listingId:\s*l\.id/)
   assert.match(page, /sources:\s*"olx"/)
   assert.match(page, /exactListingFallback === "source-inactive"/)
   assert.match(page, /async function openListing/)
+  assert.match(page, /!isAvailabilityFresh\(key\)/)
   assert.match(page, /await verifyOlxListing\(l\)/)
+  assert.match(page, /markAvailabilityFresh\(key\)/)
   assert.match(page, /showListingUnavailableToast\(\)/)
 
   const sharedStart = page.indexOf('async function openSharedListing')
-  const sharedEnd = page.indexOf('\nfunction timeAgo', sharedStart)
+  const sharedEnd = page.indexOf('\nonMounted', sharedStart)
   const shared = page.slice(sharedStart, sharedEnd)
   assert.match(shared, /if \(local\) \{ await openListing\(local\); return; \}/)
   assert.doesNotMatch(shared, /if \(local\) \{ openListing\(local\); return; \}/)

@@ -4,26 +4,27 @@ import { locationLabel } from "~/utils/locationLabels";
 import CandidateCard from "~/components/hiring/CandidateCard.vue";
 import CandidateGrid from "~/components/hiring/CandidateGrid.vue";
 import CandidateDetailsModal from "~/components/hiring/CandidateDetailsModal.vue";
-import HiringFilters from "~/components/hiring/HiringFilters.vue";
-import HiringAdvancedFilters from "~/components/hiring/HiringAdvancedFilters.vue";
 import SearchPageShell from "~/components/search/SearchPageShell.vue";
 import SearchSavedTabs from "~/components/search/SearchSavedTabs.vue";
+import SearchFilterPanel from "~/components/search/SearchFilterPanel.vue";
+import SearchFilterBlocks from "~/components/search/SearchFilterBlocks.vue";
 import { useHiringFilters } from "~/composables/hiring/useHiringFilters";
 import { useHiringFeed } from "~/composables/hiring/useHiringFeed";
 import { useHiringMatch } from "~/composables/hiring/useHiringMatch";
 import { useHiringRouteState } from "~/composables/hiring/useHiringRouteState";
+import { useHiringMeta } from "~/composables/hiring/useHiringMeta";
 import { useSavedCollections } from "~/composables/search/useSavedCollections";
 import { useLatestRequest } from "~/composables/search/useLatestRequest";
 import { useInfiniteFeed } from "~/composables/search/useInfiniteFeed";
 import {
   HIRING_SORTS,
-  type HiringCountryMeta as CountryMeta,
   type HiringCvProfile as CvProfile,
   type HiringFeedResult as FeedResult,
   type HiringSort,
   type HiringSourceOption as SourceOption,
   type HiringView,
 } from "~/types/hiring";
+import type { SearchFilterBlock, SearchFilterValue } from "~/types/search";
 import { queryString } from "~/utils/queryParams";
 import { hiringProfessionLocale } from "~~/shared/hiringProfessionLabels";
 import {
@@ -58,7 +59,7 @@ useSeoMeta({
 const {
   countries, city, remote, experienceMin, salaryFrom, salaryTo, salaryCurrency, sort,
   ageMin, ageMax, gender, professions, professionValues, query, seniority, skills, source,
-  showAdvanced, resetValues: resetFilterValues,
+  showAdvanced, buildFeedParams, resetValues: resetFilterValues,
 } = useHiringFilters();
 
 const {
@@ -139,11 +140,12 @@ const sourceWarningKey = computed(() => {
   return "sourcesUnavailable";
 });
 
-const meta = ref<CountryMeta[]>([]);
-const cityOptions = computed(() => {
-  const picked = countries.value.length ? meta.value.filter((c) => countries.value.includes(c.code)) : meta.value;
-  return [...new Set(picked.flatMap((c) => c.cities ?? []))]
-    .sort((a, b) => cityLabel(a).localeCompare(cityLabel(b), String(locale.value)));
+const { meta, countryItems, cityItems, salaryCurrencyItems, loadMeta } = useHiringMeta({
+  countries,
+  city,
+  locale,
+  t,
+  cityLabel,
 });
 
 const availableSources = ref<SourceOption[]>([]);
@@ -154,11 +156,6 @@ const sourceOptions = computed<SourceOption[]>(() => [
 
 const ANY = "__any__";
 type Item = { label: string; value: string };
-const countryItems = computed<Item[]>(() => meta.value.map((c) => ({ value: c.code, label: c.name })));
-const cityItems = computed<Item[]>(() => [
-  { label: t("cityAny"), value: ANY },
-  ...cityOptions.value.map((c) => ({ label: cityLabel(c), value: c })),
-]);
 const citySel = computed<string>({ get: () => city.value || ANY, set: (v) => (city.value = v === ANY ? "" : v) });
 const remoteItems = computed<Item[]>(() => [
   { label: t("remoteAny"), value: "any" },
@@ -191,10 +188,6 @@ const senioritySel = computed<string>({
   get: () => seniority.value || SENIORITY_ANY,
   set: (v) => (seniority.value = v === SENIORITY_ANY ? "" : v),
 });
-const salaryCurrencyItems = computed<Item[]>(() => {
-  const currencies = [...new Set(["USD", "EUR", ...meta.value.map((item) => item.currency).filter(Boolean)])];
-  return currencies.map((value) => ({ value, label: value }));
-});
 const sortItems = computed<Item[]>(() => [
   { value: "recent", label: t("sortRecent") },
   { value: "name_asc", label: t("sortNameAsc") },
@@ -205,6 +198,56 @@ const sortItems = computed<Item[]>(() => [
   { value: "age_desc", label: t("sortAgeDesc") },
   { value: "salary_desc", label: t("sortSalaryDesc") },
   { value: "salary_asc", label: t("sortSalaryAsc") },
+]);
+
+function updateFilter<T>(target: { value: T }) {
+  return (value: SearchFilterValue) => {
+    target.value = value as T;
+  };
+}
+
+const hiringFilterBlocks = computed<SearchFilterBlock[]>(() => [
+  {
+    id: "location",
+    title: t("filterLocation"),
+    icon: "i-lucide-map-pin",
+    fields: [
+      { id: "countries", control: "multi-select", label: t("country"), value: countries.value, options: countryItems.value, placeholder: t("countryAny"), onUpdate: updateFilter(countries), onCommit: scheduleLoad },
+      { id: "city", control: "select", label: t("city"), value: citySel.value, options: cityItems.value, onUpdate: updateFilter(citySel), onCommit: scheduleLoad },
+      { id: "remote", control: "select", label: t("remote"), value: remoteSel.value, options: remoteItems.value, searchable: false, onUpdate: updateFilter(remoteSel), onCommit: scheduleLoad },
+    ],
+  },
+  {
+    id: "salary",
+    title: t("filterSalary"),
+    icon: "i-lucide-banknote",
+    fields: [
+      { id: "salary-from", control: "number", label: t("salaryFrom"), value: salaryFrom.value, min: 0, icon: "i-lucide-banknote", onUpdate: updateFilter(salaryFrom), onCommit: scheduleLoad },
+      { id: "salary-to", control: "number", label: t("salaryTo"), value: salaryTo.value, min: 0, icon: "i-lucide-banknote", onUpdate: updateFilter(salaryTo), onCommit: scheduleLoad },
+      { id: "salary-currency", control: "select", label: t("currency"), value: salaryCurrency.value, options: salaryCurrencyItems.value, searchable: false, onUpdate: updateFilter(salaryCurrency), onCommit: () => (salaryFrom.value != null || salaryTo.value != null || sort.value.startsWith("salary")) && scheduleLoad(0) },
+    ],
+  },
+  {
+    id: "candidate",
+    title: t("filterCandidate"),
+    icon: "i-lucide-user-round",
+    fields: [
+      { id: "experience-min", control: "number", label: t("experienceMin"), value: experienceMin.value, min: 0, icon: "i-lucide-briefcase", onUpdate: updateFilter(experienceMin), onCommit: scheduleLoad },
+      { id: "age-min", control: "number", label: t("ageFrom"), value: ageMin.value, min: 14, max: 99, icon: "i-lucide-user-round", onUpdate: updateFilter(ageMin), onCommit: scheduleLoad },
+      { id: "age-max", control: "number", label: t("ageTo"), value: ageMax.value, min: 14, max: 99, icon: "i-lucide-user-round", onUpdate: updateFilter(ageMax), onCommit: scheduleLoad },
+      { id: "gender", control: "select", label: t("gender"), value: genderSel.value, options: genderItems.value, searchable: false, onUpdate: updateFilter(genderSel), onCommit: scheduleLoad },
+      { id: "seniority", control: "select", label: t("seniority"), value: senioritySel.value, options: seniorityItems.value, searchable: false, onUpdate: updateFilter(senioritySel), onCommit: scheduleLoad },
+    ],
+  },
+  {
+    id: "role",
+    title: t("filterRoleSkills"),
+    icon: "i-lucide-briefcase-business",
+    fields: [
+      { id: "professions", control: "custom", class: "hiring__field_wide" },
+      { id: "skills", control: "text", class: "hiring__field_wide", label: t("skills"), value: skills.value, placeholder: t("skillsPlaceholder"), icon: "i-lucide-code", onUpdate: updateFilter(skills), onCommit: scheduleLoad },
+    ],
+  },
 ]);
 
 function loadPersonalState() {
@@ -327,14 +370,6 @@ function savePreset() {
   if (saveSearchPreset()) presetModalOpen.value = false;
 }
 
-async function loadMeta() {
-  const { data } = await safeFetch<CountryMeta[]>("/hiring-meta");
-  if (Array.isArray(data)) {
-    meta.value = data;
-    if (!countries.value.length) countries.value = data.map((c) => c.code);
-  }
-}
-
 function scheduleWarmPoll() {
   if (warmTimer) clearTimeout(warmTimer);
   if (!warming.value) return;
@@ -350,25 +385,11 @@ async function load(append = false, background = false) {
     else loading.value = !profiles.value.length;
     failed.value = false;
   }
-  const params: Record<string, string> = { limit: String(PAGE_SIZE), offset: append ? String(profiles.value.length) : "0" };
-  if (countries.value.length) params.countries = countries.value.join(",");
-  if (city.value) params.city = city.value;
-  if (remote.value === "yes") params.remote = "1";
-  if (remote.value === "no") params.remote = "0";
-  if (experienceMin.value != null) params.experienceMin = String(experienceMin.value);
-  if (salaryFrom.value != null) params.salaryFrom = String(salaryFrom.value);
-  if (salaryTo.value != null) params.salaryTo = String(salaryTo.value);
-  if (salaryFrom.value != null || salaryTo.value != null || sort.value.startsWith("salary")) params.salaryCurrency = salaryCurrency.value;
-  if (sort.value !== "recent") params.sort = sort.value;
-  if (ageMin.value != null) params.ageMin = String(ageMin.value);
-  if (ageMax.value != null) params.ageMax = String(ageMax.value);
-  if (gender.value) params.gender = gender.value;
-  if (professions.value.length) params.professions = professions.value.join(",");
-  if (query.value.trim()) params.query = query.value.trim();
-  if (seniority.value) params.seniority = seniority.value;
-  const skillQuery = canonicalSkillQuery();
-  if (skillQuery) params.skills = skillQuery;
-  if (source.value) params.sources = source.value;
+  const params = buildFeedParams({
+    limit: PAGE_SIZE,
+    offset: append ? profiles.value.length : 0,
+    skillQuery: canonicalSkillQuery(),
+  });
 
   const { data, error } = await fetchFeed(params);
   if (!isLatestLoadRequest(requestId)) {
@@ -632,7 +653,7 @@ onBeforeUnmount(() => {
     </template>
 
     <UiResultsLoader :loading="loading" :label="t('searching')" min-height="420px">
-    <HiringFilters class="hiring__controls" @submit="load()">
+    <SearchFilterPanel tag="form" class="hiring__controls" @submit="load()">
       <u-input v-model="query" clearable icon="i-lucide-search" :label="t('search')" :placeholder="t('searchPlaceholder')" @clear="clearSearch" />
       <UiSortSelect v-model="sort" :items="sortItems" :label="t('sort')" @update:model-value="scheduleLoad(0)" />
       <u-button type="submit" icon="i-lucide-search">
@@ -655,7 +676,7 @@ onBeforeUnmount(() => {
         />
       </div>
 
-      <HiringAdvancedFilters v-if="showAdvanced" class="hiring__advanced">
+      <div v-if="showAdvanced" class="hiring__advanced">
         <UiSearchPresets
           :presets="presets"
           :label="t('presets')"
@@ -668,42 +689,14 @@ onBeforeUnmount(() => {
           @share="sharedLinkOpened = false; shareModalOpen = true"
         />
 
-        <UiFilterSection class="hiring-filter-group" icon="i-lucide-map-pin" :title="t('filterLocation')">
-          <div class="hiring-filter-group__grid">
-            <div class="hiring__field"><u-select-menu :label="t('country')" v-model="countries" :items="countryItems" value-key="value" label-key="label" multiple :placeholder="t('countryAny')" class="hiring__select" @update:model-value="scheduleLoad()" /></div>
-            <div class="hiring__field"><u-select-menu :label="t('city')" v-model="citySel" :items="cityItems" value-key="value" label-key="label" class="hiring__select" @update:model-value="scheduleLoad()" /></div>
-            <div class="hiring__field"><u-select-menu :label="t('remote')" v-model="remoteSel" :items="remoteItems" value-key="value" label-key="label" :search-input="false" class="hiring__select" @update:model-value="scheduleLoad()" /></div>
-          </div>
-        </UiFilterSection>
-
-        <UiFilterSection class="hiring-filter-group hiring-filter-group_salary" icon="i-lucide-banknote" :title="t('filterSalary')">
-          <div class="hiring-filter-group__grid hiring-filter-group__grid_salary">
-            <div class="hiring__field hiring__salary-range">
-              <u-input v-model.number="salaryFrom" type="number" min="0" icon="i-lucide-banknote" :label="t('salaryFrom')" @change="scheduleLoad()" />
-              <u-input v-model.number="salaryTo" type="number" min="0" icon="i-lucide-banknote" :label="t('salaryTo')" @change="scheduleLoad()" />
-            </div>
-            <div class="hiring__field"><u-select-menu :label="t('currency')" v-model="salaryCurrency" :items="salaryCurrencyItems" value-key="value" label-key="label" :search-input="false" class="hiring__select" @update:model-value="(salaryFrom != null || salaryTo != null || sort.startsWith('salary')) && scheduleLoad(0)" /></div>
-          </div>
-        </UiFilterSection>
-
-        <UiFilterSection class="hiring-filter-group" icon="i-lucide-user-round" :title="t('filterCandidate')">
-          <div class="hiring-filter-group__grid">
-            <div class="hiring__field"><u-input v-model.number="experienceMin" type="number" min="0" icon="i-lucide-briefcase" :label="t('experienceMin')" @change="scheduleLoad()" /></div>
-            <div class="hiring__field hiring__age-range"><u-input v-model.number="ageMin" type="number" min="14" max="99" icon="i-lucide-user-round" :label="t('ageFrom')" @change="scheduleLoad()" /><u-input v-model.number="ageMax" type="number" min="14" max="99" icon="i-lucide-user-round" :label="t('ageTo')" @change="scheduleLoad()" /></div>
-            <div class="hiring__field"><u-select-menu :label="t('gender')" v-model="genderSel" :items="genderItems" value-key="value" label-key="label" :search-input="false" class="hiring__select" @update:model-value="scheduleLoad()" /></div>
-            <div class="hiring__field"><u-select-menu :label="t('seniority')" v-model="senioritySel" :items="seniorityItems" value-key="value" label-key="label" :search-input="false" class="hiring__select" @update:model-value="scheduleLoad()" /></div>
-          </div>
-        </UiFilterSection>
-
-        <UiFilterSection class="hiring-filter-group hiring-filter-group_role" icon="i-lucide-briefcase-business" :title="t('filterRoleSkills')">
-          <div class="hiring-filter-group__grid">
-            <div class="hiring__field hiring__field_wide hiring__profession-field">
+        <SearchFilterBlocks :blocks="hiringFilterBlocks" class="hiring__filter-blocks">
+          <template #field-professions>
+            <div class="hiring__profession-field">
               <u-select-menu :label="t('desiredPositions')" v-model="professions" :items="professionItems" value-key="value" label-key="label" multiple searchable :placeholder="t('anyPositions')" class="hiring__select" @update:model-value="scheduleLoad()" />
               <button v-if="professions.length" type="button" class="hiring__profession-clear" @click="clearProfessions"><u-icon name="i-lucide-x" /> {{ t("clearPositions") }} · {{ professions.length }}</button>
             </div>
-            <div class="hiring__field hiring__field_wide"><u-input v-model="skills" icon="i-lucide-code" :label="t('skills')" :placeholder="t('skillsPlaceholder')" @change="scheduleLoad()" /></div>
-          </div>
-        </UiFilterSection>
+          </template>
+        </SearchFilterBlocks>
 
         <UiFilterFooter
           class="hiring-filter-actions"
@@ -711,8 +704,8 @@ onBeforeUnmount(() => {
           :reset-label="t('reset')"
           @reset="resetFilters"
         />
-      </HiringAdvancedFilters>
-    </HiringFilters>
+      </div>
+    </SearchFilterPanel>
 
     <p v-if="failed" class="hiring__error">{{ t("error") }}</p>
     <p v-else-if="hasSourceWarning" class="hiring__source-warning">
@@ -857,6 +850,8 @@ onBeforeUnmount(() => {
   box-shadow: 0 250px 0 -1px rgba(118, 83, 226, 0.07);
 }
 .hiring__advanced > * { position: relative; z-index: 1; }
+.hiring__filter-blocks { grid-column: 1 / -1; }
+.hiring__filter-blocks :deep(.search-filter-blocks__grid) { align-items: end; }
 .hiring-filter-group__grid { display: grid; grid-template-columns: 1fr; gap: 12px; align-items: end; }
 @media (min-width: 700px) {
   .hiring__advanced { grid-template-columns: repeat(2, minmax(0, 1fr)); }

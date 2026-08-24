@@ -3,6 +3,7 @@ import { scoreColor } from "~/utils/atsScore";
 import type { Job, JobAtsResult } from "~/types/jobs";
 import { formatRelativeDate } from "~/utils/search/relativeDate";
 import SearchMatchBadge from "~/components/search/SearchMatchBadge.vue";
+import type { DraggablePillItem } from "~/components/ui/DraggablePills.vue";
 
 const props = defineProps<{
   job: Job;
@@ -29,8 +30,6 @@ const t = (key: string, params: Record<string, unknown> = {}) => translate(`jobs
 const empLabel = (kind?: string) => kind ? t("emp" + kind.charAt(0).toUpperCase() + kind.slice(1)) : "";
 const seniorityLabel = (value?: Job["seniority"]) => value ? t("seniority" + value.charAt(0).toUpperCase() + value.slice(1)) : "";
 const employerTypeLabel = (value?: Job["employerType"]) => value ? t("employer" + value.charAt(0).toUpperCase() + value.slice(1)) : "";
-const isToday = (iso: string) => new Date(iso).toDateString() === new Date().toDateString();
-
 function timeAgo(iso: string): string {
   return formatRelativeDate(iso, {
     today: () => t("today"),
@@ -47,7 +46,6 @@ function suspicionHint(job: Job): string {
 
 const cardBadges = computed(() => [
   employerTypeLabel(props.job.employerType) ? { label: employerTypeLabel(props.job.employerType), kind: "source" } : null,
-  isToday(props.job.postedAt) ? { label: t("newToday"), kind: "new" } : null,
   props.seen ? { label: t("seen"), kind: "seen" } : null,
   props.job.workMode && props.job.workMode !== "unknown" ? { label: t("wm" + props.job.workMode.charAt(0).toUpperCase() + props.job.workMode.slice(1)), kind: "mode" } : props.job.remote ? { label: t("remote"), kind: "mode" } : null,
   empLabel(props.job.employmentKind) ? { label: empLabel(props.job.employmentKind), kind: "employment" } : null,
@@ -61,23 +59,19 @@ const cardBadges = computed(() => [
 ].filter((item): item is { label: string; kind: string; title?: string } => !!item));
 const visibleBadges = computed(() => cardBadges.value.slice(0, 6));
 const hiddenBadgeCount = computed(() => Math.max(0, cardBadges.value.length - visibleBadges.value.length));
-const moreKeywords = (items?: unknown[]) => Math.max(0, (items?.length || 0) - 3);
+const countryLabel = computed(() => props.job.country || props.job.location.split(",").at(-1)?.trim() || "");
+const bylineTitle = computed(() => [props.job.company, props.job.location].filter(Boolean).join(" · "));
 
-let dragTarget: HTMLElement | null = null;
-let dragStartX = 0;
-let dragStartScroll = 0;
-let suppressCardOpen = false;
-function startDrag(event: PointerEvent) {
-  if (event.pointerType === "touch") return;
-  dragTarget = event.currentTarget as HTMLElement;
-  dragStartX = event.clientX;
-  dragStartScroll = dragTarget.scrollLeft;
-  dragTarget.setPointerCapture(event.pointerId);
-  dragTarget.classList.add("is-dragging");
-}
-function moveDrag(event: PointerEvent) { if (dragTarget) { if (Math.abs(event.clientX - dragStartX) > 4) suppressCardOpen = true; dragTarget.scrollLeft = dragStartScroll - (event.clientX - dragStartX); } }
-function stopDrag(event: PointerEvent) { dragTarget?.releasePointerCapture?.(event.pointerId); dragTarget?.classList.remove("is-dragging"); dragTarget = null; }
-function openCard() { if (suppressCardOpen) { suppressCardOpen = false; return; } emit("open", props.job); }
+const pills = (items: string[] | undefined, className: string, prefix = ""): DraggablePillItem[] =>
+  (items || []).map((label, index) => ({ key: `${prefix}${label}:${index}`, label: prefix ? `${prefix}${label}` : label, className }));
+const atsMatchedPills = computed(() => pills(props.ats?.matched, "job-card__tag job-card__tag_match"));
+const atsMissingPills = computed(() => pills(props.ats?.missing, "job-card__tag job-card__tag_miss"));
+const skillPills = computed(() => [
+  ...pills(props.job.skills, "job-card__tag job-card__tag_skill"),
+  ...pills(props.job.niceToHave, "job-card__tag job-card__tag_plus", "+"),
+]);
+const tagPills = computed(() => pills(props.job.tags, "job-card__tag"));
+function openCard() { emit("open", props.job); }
 </script>
 
 <template>
@@ -107,6 +101,7 @@ function openCard() { if (suppressCardOpen) { suppressCardOpen = false; return; 
     </div>
 
     <div class="job-card__meta-row">
+      <span class="job-card__date text-muted">{{ timeAgo(job.postedAt) }}</span>
       <div class="job-card__actions">
         <button type="button" class="job-card__action" :aria-label="t('share')" :title="t('share')" @click.stop="emit('share', job)">
           <u-icon :name="shareCopied ? 'i-lucide-check' : 'i-lucide-share-2'" />
@@ -147,23 +142,23 @@ function openCard() { if (suppressCardOpen) { suppressCardOpen = false; return; 
       <template v-if="ats">
         <div v-if="ats.matched.length" class="job-card__skills">
           <span class="job-card__skills-label">{{ t("atsMatched") }}</span>
-          <div class="job-card__tag-scroll" @pointerdown.stop="startDrag" @pointermove.stop="moveDrag" @pointerup.stop="stopDrag" @pointercancel.stop="stopDrag"><span v-for="keyword in ats.matched" :key="keyword" class="job-card__tag job-card__tag_match">{{ keyword }}</span></div><span v-if="moreKeywords(ats.matched)" class="job-card__tag-more">+{{ moreKeywords(ats.matched) }}</span>
+          <UiDraggablePills :items="atsMatchedPills" :visible-hint-count="3" />
         </div>
         <div v-if="ats.missing.length" class="job-card__skills">
           <span class="job-card__skills-label">{{ t("atsMissing") }}</span>
-          <div class="job-card__tag-scroll" @pointerdown.stop="startDrag" @pointermove.stop="moveDrag" @pointerup.stop="stopDrag" @pointercancel.stop="stopDrag"><span v-for="keyword in ats.missing" :key="keyword" class="job-card__tag job-card__tag_miss">{{ keyword }}</span></div><span v-if="moreKeywords(ats.missing)" class="job-card__tag-more">+{{ moreKeywords(ats.missing) }}</span>
+          <UiDraggablePills :items="atsMissingPills" :visible-hint-count="3" />
         </div>
         <div v-if="!ats.matched.length && !ats.missing.length" class="job-card__skills">
           <span class="job-card__skills-label">{{ t("atsNoSkills") }}</span>
         </div>
       </template>
       <div v-else-if="job.skills?.length" class="job-card__tags">
-        <div class="job-card__tag-scroll" @pointerdown.stop="startDrag" @pointermove.stop="moveDrag" @pointerup.stop="stopDrag" @pointercancel.stop="stopDrag"><span v-for="skill in job.skills" :key="skill" class="job-card__tag job-card__tag_skill">{{ skill }}</span><span v-for="skill in (job.niceToHave || [])" :key="'plus-' + skill" class="job-card__tag job-card__tag_plus" :title="t('vNiceToHave')">+{{ skill }}</span></div><span v-if="moreKeywords([...(job.skills || []), ...(job.niceToHave || [])])" class="job-card__tag-more">+{{ moreKeywords([...(job.skills || []), ...(job.niceToHave || [])]) }}</span>
+        <UiDraggablePills :items="skillPills" :visible-hint-count="3" />
       </div>
       <div v-else-if="job.tags.length" class="job-card__tags">
-        <div class="job-card__tag-scroll" @pointerdown.stop="startDrag" @pointermove.stop="moveDrag" @pointerup.stop="stopDrag" @pointercancel.stop="stopDrag"><span v-for="tag in job.tags" :key="tag" class="job-card__tag">{{ tag }}</span></div><span v-if="moreKeywords(job.tags)" class="job-card__tag-more">+{{ moreKeywords(job.tags) }}</span>
+        <UiDraggablePills :items="tagPills" :visible-hint-count="3" />
       </div>
-      <div class="job-card__byline text-muted"><span class="job-card__company">{{ job.company }}</span><span class="job-card__dot">·</span><span>{{ job.location }}</span><span class="job-card__dot">·</span><span>{{ timeAgo(job.postedAt) }}</span></div>
+      <div class="job-card__byline text-muted" :title="bylineTitle"><span class="job-card__company">{{ job.company }}</span><span v-if="countryLabel" class="job-card__dot">·</span><span v-if="countryLabel">{{ countryLabel }}</span></div>
     </div>
   </article>
 </template>
@@ -177,9 +172,11 @@ function openCard() { if (suppressCardOpen) { suppressCardOpen = false; return; 
 .job-card__head { display: grid; grid-template-columns: minmax(0,1fr) auto; align-items: start; gap: 12px; }
 .job-card__title { width: 100%; min-width: 0; margin: 0; overflow-wrap: break-word; font-weight: 700; font-size: 15px; line-height: 1.4; color: var(--text-white, inherit); }
 .job-card__ats { justify-self: end; white-space: nowrap; font-size: 11px; font-weight: 700; padding: 2px 8px; border: 1px solid; border-radius: 7px; background: rgba(2,6,23,.18); }
-.job-card__meta-row { display: flex; justify-content: flex-end; align-items: flex-start; gap: 10px; margin-top: 8px; }
-.job-card__byline { display: flex; flex: 1 1 auto; min-width: 0; flex-wrap: wrap; align-items: center; gap: 5px; padding-top: 4px; font-size: 12px; line-height: 1.35; }
-.job-card__company { font-weight: 600; }
+.job-card__meta-row { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-top: 8px; }
+.job-card__date { min-width: 0; font-size: 11.5px; white-space: nowrap; }
+.job-card__byline { display: flex; min-width: 0; align-items: center; gap: 5px; padding-top: 4px; font-size: 12px; line-height: 1.35; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.job-card__byline > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.job-card__company { font-weight: 600; flex: 0 1 auto; }
 .job-card__dot { opacity: .5; }
 .job-card__actions { flex: 0 0 auto; display: flex; justify-content: flex-end; align-items: center; gap: 4px; }
 .job-card__action { width: 27px; height: 27px; display: inline-grid; place-items: center; padding: 0; border: 1px solid var(--line); border-radius: 8px; background: var(--bg-panel-2); color: var(--ui-text-muted); cursor: pointer; transition: color 160ms ease, border-color 160ms ease, background 160ms ease; }
@@ -213,15 +210,11 @@ function openCard() { if (suppressCardOpen) { suppressCardOpen = false; return; 
 .job-card__skills { flex-wrap: wrap; }
 .job-card__skills + .job-card__skills { margin-top: 9px; }
 .job-card__skills-label { flex-basis: 100%; font-size: 11px; line-height: 1.3; opacity: .72; }
-.job-card__tag-scroll { min-width: 0; display: flex; flex: 1 1 auto; gap: 6px; overflow-x: auto; overscroll-behavior-inline: contain; scrollbar-width: none; touch-action: pan-y; cursor: grab; user-select: none; }
-.job-card__tag-scroll::-webkit-scrollbar { display: none; }
-.job-card__tag-scroll.is-dragging { cursor: grabbing; }
-.job-card__tag { flex: 0 0 auto; white-space: nowrap; border-radius: 6px; padding: 3px 8px; font-size: 11px; line-height: 1.3; border: 1px solid var(--line); color: var(--ui-text-muted); }
-.job-card__tag-more { position: relative; z-index: 2; flex: 0 0 auto; padding: 3px 7px; border: 1px solid rgba(148,163,184,.25); border-radius: 6px; background: var(--bg-panel); color: var(--ui-text-muted); font-size: 11px; line-height: 1.3; }
-.job-card__tag_skill { border-color: rgba(224,103,154,.3); color: #e79ec0; }
-.job-card__tag_plus { border-color: rgba(52,211,153,.35); color: #6ee7b7; }
-.job-card__tag_match { border-color: rgba(52,211,153,.45); color: #34d399; background: rgba(52,211,153,.1); }
-.job-card__tag_miss { border-color: rgba(248,113,113,.4); color: #f87171; }
+.job-card__tags :deep(.draggable-pills), .job-card__skills :deep(.draggable-pills) { min-width: 0; flex: 1 1 auto; }
+.job-card :deep(.job-card__tag_skill) { border-color: rgba(224,103,154,.3); color: #e79ec0; }
+.job-card :deep(.job-card__tag_plus) { border-color: rgba(52,211,153,.35); color: #6ee7b7; }
+.job-card :deep(.job-card__tag_match) { border-color: rgba(52,211,153,.45); color: #34d399; background: rgba(52,211,153,.1); }
+.job-card :deep(.job-card__tag_miss) { border-color: rgba(248,113,113,.4); color: #f87171; }
 .job-card__byline { margin-top: 10px; padding-top: 8px; border-top: 1px solid rgba(86,96,135,.22); }
 .job-card_seen { opacity: .72; }
 .job-card_seen:hover { opacity: 1; }
@@ -231,8 +224,8 @@ function openCard() { if (suppressCardOpen) { suppressCardOpen = false; return; 
   .job-card { min-height: 0; padding: 15px; }
   .job-card__head { grid-template-columns: 1fr; gap: 8px; }
   .job-card__ats { justify-self: start; }
-  .job-card__meta-row { flex-direction: column; }
-  .job-card__actions { order: -1; align-self: flex-end; margin-bottom: -30px; }
+  .job-card__meta-row { flex-direction: row; align-items: center; margin-top: 7px; }
+  .job-card__actions { margin: 0; }
   .job-card__byline { padding-right: 0; }
 }
 </style>

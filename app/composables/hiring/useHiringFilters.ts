@@ -21,6 +21,28 @@ export function useHiringFilters() {
   const source = ref("");
   const showAdvanced = ref(true);
 
+  function buildFeedParams(options: { limit: number; offset: number; skillQuery?: string }): Record<string, string> {
+    const params: Record<string, string> = { limit: String(options.limit), offset: String(options.offset) };
+    if (countries.value.length) params.countries = countries.value.join(",");
+    if (city.value) params.city = city.value;
+    if (remote.value === "yes") params.remote = "1";
+    if (remote.value === "no") params.remote = "0";
+    if (experienceMin.value != null) params.experienceMin = String(experienceMin.value);
+    if (salaryFrom.value != null) params.salaryFrom = String(salaryFrom.value);
+    if (salaryTo.value != null) params.salaryTo = String(salaryTo.value);
+    if (salaryFrom.value != null || salaryTo.value != null || sort.value.startsWith("salary")) params.salaryCurrency = salaryCurrency.value;
+    if (sort.value !== "recent") params.sort = sort.value;
+    if (ageMin.value != null) params.ageMin = String(ageMin.value);
+    if (ageMax.value != null) params.ageMax = String(ageMax.value);
+    if (gender.value) params.gender = gender.value;
+    if (professions.value.length) params.professions = professions.value.join(",");
+    if (query.value.trim()) params.query = query.value.trim();
+    if (seniority.value) params.seniority = seniority.value;
+    if (options.skillQuery) params.skills = options.skillQuery;
+    if (source.value) params.sources = source.value;
+    return params;
+  }
+
   function resetValues() {
     countries.value = [];
     city.value = "";
@@ -43,6 +65,6 @@ export function useHiringFilters() {
   return {
     countries, city, remote, experienceMin, salaryFrom, salaryTo, salaryCurrency, sort,
     ageMin, ageMax, gender, professions, professionValues, query, seniority, skills, source,
-    showAdvanced, resetValues,
+    showAdvanced, buildFeedParams, resetValues,
   };
 }

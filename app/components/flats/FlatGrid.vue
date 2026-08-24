@@ -13,4 +13,5 @@ defineSlots<{ default(props: { listing: FlatListing }): unknown }>();
 @media (min-width: 640px) { .flat-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (min-width: 1024px) { .flat-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
 @media (min-width: 1440px) { .flat-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+@media (min-width: 1800px) { .flat-grid { grid-template-columns: repeat(5, minmax(0, 1fr)); } }
 </style>

@@ -22,8 +22,10 @@ const UPSTREAM_TIMEOUT_MS = 25_000
 // share-link request open for the full feed timeout.
 const EXACT_LOOKUP_TIMEOUT_MS = 12_000
 const AVAILABILITY_TIMEOUT_MS = 5_000
+const AVAILABILITY_FRESH_MS = 15 * 60_000
 const feedCache = new Map<string, { at: number; data: any }>()
 const feedRefreshes = new Map<string, Promise<any>>()
+const availabilityCache = new Map<string, { at: number; status: 'active' | 'inactive' }>()
 const ALL_FEED_SOURCES = ['olx', 'telegram', 'facebook', 'threads'] as const
 const SOCIAL_FEED_SOURCES = new Set(['telegram', 'facebook', 'threads'])
 
@@ -144,19 +146,18 @@ async function filterPersistedInactiveOlx(response: any): Promise<any> {
 
   if (!unique.size) return response
 
-  try {
-    const verification = await $fetch<any>(`${FLAT_API_URL}/api/listings/verify`, {
-      method: 'POST',
-      body: { items: [...unique.values()] },
-      timeout: AVAILABILITY_TIMEOUT_MS,
-    })
-    const inactive = new Set<string>(
-      (Array.isArray(verification?.results) ? verification.results : [])
-        .filter((result: any) => result?.status === 'inactive')
-        .map(availabilityKey),
-    )
-    if (!inactive.size) return response
+  const now = Date.now()
+  const statuses = new Map<string, 'active' | 'inactive'>()
+  const pending: Array<{ source: string; country: string; id: string }> = []
+  for (const [key, item] of unique) {
+    const cached = availabilityCache.get(key)
+    if (cached && now - cached.at < AVAILABILITY_FRESH_MS) statuses.set(key, cached.status)
+    else pending.push(item)
+  }
 
+  const applyStatuses = () => {
+    const inactive = new Set([...statuses].filter(([, status]) => status === 'inactive').map(([key]) => key))
+    const availabilityChecked = [...statuses].filter(([, status]) => status === 'active').map(([key]) => key)
     const filtered = listings.filter((listing: any) => !inactive.has(availabilityKey(listing)))
     const removed = listings.length - filtered.length
     const count = Number(response?.count)
@@ -164,12 +165,32 @@ async function filterPersistedInactiveOlx(response: any): Promise<any> {
       ...response,
       listings: filtered,
       count: Number.isFinite(count) ? Math.max(0, count - removed) : filtered.length,
-      availabilityFiltered: removed,
+      ...(availabilityChecked.length ? { availabilityChecked } : {}),
+      ...(removed ? { availabilityFiltered: removed } : {}),
     }
+  }
+
+  try {
+    if (pending.length) {
+      const verification = await $fetch<any>(`${FLAT_API_URL}/api/listings/verify`, {
+        method: 'POST',
+        body: { items: pending },
+        timeout: AVAILABILITY_TIMEOUT_MS,
+      })
+      for (const result of Array.isArray(verification?.results) ? verification.results : []) {
+        if (result?.status !== 'active' && result?.status !== 'inactive') continue
+        const key = availabilityKey(result)
+        statuses.set(key, result.status)
+        availabilityCache.set(key, { at: now, status: result.status })
+      }
+    }
+
+    return applyStatuses()
   } catch {
     // Availability reads are a safety filter, not a reason to take the feed down.
-    // The direct OLX lookup below still performs a live check for shared links.
-    return response
+    // Still apply fresh cached answers; the direct lookup below remains the
+    // fallback for a shared OLX link that has not been checked yet.
+    return applyStatuses()
   }
 }
 
@@ -287,6 +308,7 @@ export default defineEventHandler(async (event) => {
           { timeout: EXACT_LOOKUP_TIMEOUT_MS },
         )
         if (exact?.listing && String(exact.listing.id ?? '') === listingId) {
+          availabilityCache.set(availabilityKey(exact.listing), { at: Date.now(), status: 'active' })
           return {
             ...response,
             count: 1,
@@ -297,6 +319,7 @@ export default defineEventHandler(async (event) => {
       } catch (error: any) {
         const status = Number(error?.statusCode || error?.response?.status || 0)
         if (status === 404) {
+          availabilityCache.set(`olx:${country}:${listingId}`, { at: Date.now(), status: 'inactive' })
           return {
             ...response,
             count: 0,

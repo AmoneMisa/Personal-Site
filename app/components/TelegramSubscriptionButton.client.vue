@@ -167,6 +167,13 @@ async function subscribe() {
   display: none !important;
 }
 
+/* Search shortcuts belong to the page layer. Keeping them visible above a
+   dialog covered its sticky action row on phones. */
+:global(body:has(.u-modal) .search-actions) {
+  visibility: hidden;
+  pointer-events: none;
+}
+
 /* ATS adds a score badge to the same row as four card actions. Keeping all of
    that beside the title squeezed long vacancy names into a very narrow column.
    Give ATS cards a full-width title row, then put score + actions underneath. */

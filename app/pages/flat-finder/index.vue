@@ -5,11 +5,10 @@ import FlatMap from "~/components/flats/FlatMap.client.vue";
 import FlatCard from "~/components/flats/FlatCard.vue";
 import FlatGrid from "~/components/flats/FlatGrid.vue";
 import FlatDetailsModal from "~/components/flats/FlatDetailsModal.vue";
-import FlatAdvancedFilters from "~/components/flats/FlatAdvancedFilters.vue";
 import SearchPageShell from "~/components/search/SearchPageShell.vue";
 import SearchSavedTabs from "~/components/search/SearchSavedTabs.vue";
+import SearchFilterBlocks from "~/components/search/SearchFilterBlocks.vue";
 import { queryBoolean, queryString } from "~/utils/queryParams";
-import { formatRelativeDate } from "~/utils/search/relativeDate";
 import { convertCurrency } from "~/utils/search/money";
 import { useFlatFilters } from "~/composables/flats/useFlatFilters";
 import { useFlatFeed } from "~/composables/flats/useFlatFeed";
@@ -17,17 +16,20 @@ import { useFlatPhotos } from "~/composables/flats/useFlatPhotos";
 import { useFlatMap } from "~/composables/flats/useFlatMap";
 import { useFlatRouteState } from "~/composables/flats/useFlatRouteState";
 import { useFlatTranslation } from "~/composables/flats/useFlatTranslation";
+import { useFlatPresentation } from "~/composables/flats/useFlatPresentation";
+import { useFlatMeta } from "~/composables/flats/useFlatMeta";
+import { useFlatAvailabilityCache } from "~/composables/flats/useFlatAvailabilityCache";
 import { useSavedCollections } from "~/composables/search/useSavedCollections";
 import { useLatestRequest } from "~/composables/search/useLatestRequest";
 import { useInfiniteFeed } from "~/composables/search/useInfiniteFeed";
 import { useSearchScroll } from "~/composables/search/useSearchScroll";
 import type {
-  FlatCountryMeta as CountryMeta,
   FlatFeedResult as FeedResult,
   FlatListing as Listing,
   FlatSort,
   FlatView,
 } from "~/types/flats";
+import type { SearchFilterBlock, SearchFilterValue } from "~/types/search";
 
 // Flat Finder. Auto-routed at /flat-finder. Reuses the flat-finder backend
 // (same one the desktop app uses) via the /flats-* proxy routes, so listings,
@@ -69,16 +71,35 @@ const {
   audience, metro, priceMin, priceMax, roomsMin, roomsMax, bedroomsMin, bedroomsMax,
   areaMin, areaMax, pricePerSqmMin, pricePerSqmMax, metroMaxM, nearbyKind, nearbyMaxM,
   floorMin, floorMax, totalFloorsMin, totalFloorsMax, yearMin, yearMax, maxAgeDays,
-  displayCurrency, query, source, showAdvanced, resetValues: resetFilterValues,
+  displayCurrency, query, source, showAdvanced, buildFeedParams, resetValues: resetFilterValues,
 } = useFlatFilters();
 const rates = ref<Record<string, number>>({ USD: 1 });
 
 const {
-  listings, total, loading, loadingMore, warming, failed, sourceErrors,
+  listings, total, loading, loadingMore, warming, failed, sourceErrors, statistics,
   nextCursor, loadMoreSentinel, fetchFeed,
 } = useFlatFeed();
 const { listingPhoto, visiblePhotos, markPhotoFailedFromEvent } = useFlatPhotos();
+const { isFresh: isAvailabilityFresh, markFresh: markAvailabilityFresh, forget: forgetAvailability } = useFlatAvailabilityCache();
 const view = ref<FlatView>("active");
+const {
+  presentCard,
+  displayListingTitle,
+  priceLabel,
+  convertedLabel,
+  nearbyItemLabel,
+  dealLabel,
+  ptLabel,
+} = useFlatPresentation({
+  t,
+  getLocale: () => String(locale.value),
+  getDisplayCurrency: () => displayCurrency.value,
+  getView: () => view.value,
+  getDealType: () => dealType.value,
+  getRoomOnly: () => roomOnlyFilter.value,
+  getAgency: () => agency.value,
+  convert,
+});
 const {
   favorites,
   hidden,
@@ -142,32 +163,21 @@ const viewTabs = computed(() => [
   { value: "hidden", label: t("hidden"), count: hidden.value.length },
 ]);
 
-const meta = ref<CountryMeta[]>([]);
-const cityOptions = computed(() => {
-  const picked = countries.value.length ? meta.value.filter((c) => countries.value.includes(c.code)) : meta.value;
-  return [...new Set(picked.flatMap((c) => c.cities ?? []))].sort();
-});
-const districtOptions = computed(() => {
-  const picked = countries.value.length ? meta.value.filter((c) => countries.value.includes(c.code)) : meta.value;
-  const set = new Set<string>();
-  for (const c of picked) {
-    for (const [cityName, loc] of Object.entries(c.locations ?? {})) {
-      if (city.value && cityName !== city.value) continue;
-      for (const d of loc?.districts ?? []) set.add(d);
-    }
-  }
-  return [...set].sort();
-});
-const metroOptions = computed(() => {
-  const picked = countries.value.length ? meta.value.filter((c) => countries.value.includes(c.code)) : meta.value;
-  const set = new Set<string>();
-  for (const c of picked) {
-    for (const [cityName, loc] of Object.entries(c.locations ?? {})) {
-      if (city.value && cityName !== city.value) continue;
-      for (const station of loc?.metro ?? []) set.add(station);
-    }
-  }
-  return [...set].sort();
+const locName = (value: string | null | undefined, kind: LocationKind = "any") => locationLabel(value, locale.value, kind);
+const {
+  districtOptions,
+  metroOptions,
+  countryItems,
+  cityItems,
+  districtItems,
+  metroItems,
+  loadMeta,
+} = useFlatMeta({
+  countries,
+  city,
+  t,
+  locationLabel: (value, kind) => locName(value, kind),
+  preferredCountry: () => defaultCountry.value,
 });
 
 const SOURCES = ["olx", "telegram"];
@@ -181,11 +191,7 @@ type Item = { label: string; value: string };
 const propertyTypeSel = computed<string>({ get: () => propertyType.value, set: (v) => (propertyType.value = v) });
 const dealTypeSel = computed<string>({ get: () => dealType.value, set: (v) => (dealType.value = v) });
 const agencySel = computed<string>({ get: () => agency.value, set: (v) => (agency.value = v) });
-const countryItems = computed<Item[]>(() => meta.value.map((c) => ({ value: c.code, label: c.name })));
-const locName = (v: string | null | undefined, kind: LocationKind = "any") => locationLabel(v, locale.value, kind);
-const cityItems = computed<Item[]>(() => [{ label: t("cityAny"), value: ANY }, ...cityOptions.value.map((c) => ({ label: locName(c, "city"), value: c }))]);
 const citySel = computed<string>({ get: () => city.value || ANY, set: (v) => (city.value = v === ANY ? "" : v) });
-const districtItems = computed<Item[]>(() => [{ label: t("districtAny"), value: ANY }, ...districtOptions.value.map((d) => ({ label: locName(d, "district"), value: d }))]);
 const nearbyKindItems = computed<Item[]>(() => [
   { label: t("nearbyKindAny"), value: ANY },
   ...NEARBY_KINDS.map((kind) => ({ value: kind, label: t(`nearbyKind_${kind}`) })),
@@ -194,7 +200,6 @@ const nearbyKindSel = computed<string>({
   get: () => nearbyKind.value || ANY,
   set: (v) => (nearbyKind.value = v === ANY ? "" : v),
 });
-const metroItems = computed<Item[]>(() => [{ label: t('metroAny'), value: ANY }, ...metroOptions.value.map((m) => ({ label: locName(m, "metro"), value: m }))]);
 const CURRENCY_PRIORITY = ["USD", "EUR", "UZS", "KZT", "UAH", "RON", "GBP", "KGS", "TJS", "TMT", "PLN"];
 const currencyItems = computed<Item[]>(() => {
   const keys = Object.keys(rates.value).filter((c) => /^[A-Z]{3}$/.test(c) && rates.value[c]! > 0);
@@ -238,6 +243,74 @@ const agencyItems = computed<Item[]>(() => [
   { label: t("agAny"), value: "any" }, { label: t("agOwner"), value: "owner" }, { label: t("agAgency"), value: "agency" },
 ]);
 
+function updateFilter<T>(target: { value: T }) {
+  return (value: SearchFilterValue) => {
+    target.value = value as T;
+  };
+}
+
+const flatAdvancedFilterBlocks = computed<SearchFilterBlock[]>(() => [
+  {
+    id: "quick",
+    title: t("quickOptions"),
+    icon: "i-lucide-sliders-horizontal",
+    gridClass: "flat-filter-grid_single",
+    fields: [{ id: "quick-options", control: "custom" }],
+  },
+  {
+    id: "location",
+    title: t("groupLocation"),
+    icon: "i-lucide-map-pin",
+    gridClass: "flat-filter-grid_single",
+    fields: [
+      { id: "district", control: "select", label: t("district"), value: districtSel.value, options: districtItems.value, hidden: !districtOptions.value.length, onUpdate: updateFilter(districtSel), onCommit: scheduleLoad },
+      { id: "metro", control: "select", label: t("metro"), value: metroSel.value, options: metroItems.value, hidden: !metroOptions.value.length, onUpdate: updateFilter(metroSel), onCommit: scheduleLoad },
+      { id: "metro-distance", control: "number", label: t("metroWithin"), value: metroMaxM.value, min: 0, step: 100, inputmode: "numeric", onUpdate: updateFilter(metroMaxM), onCommit: scheduleLoad },
+      { id: "nearby-kind", control: "select", label: t("nearbyKind"), value: nearbyKindSel.value, options: nearbyKindItems.value, onUpdate: updateFilter(nearbyKindSel), onCommit: scheduleLoad },
+      { id: "nearby-distance", control: "number", label: t("nearbyWithin"), value: nearbyMaxM.value, min: 0, step: 100, inputmode: "numeric", onUpdate: updateFilter(nearbyMaxM), onCommit: scheduleLoad },
+    ],
+  },
+  {
+    id: "apartment",
+    title: t("groupApartment"),
+    icon: "i-lucide-house",
+    fields: [
+      { id: "rooms-min", control: "number", label: `${t("rangeRooms")} · ${t("rangeFrom")}`, value: roomsMin.value, min: 0, onUpdate: updateFilter(roomsMin), onCommit: scheduleLoad },
+      { id: "rooms-max", control: "number", label: `${t("rangeRooms")} · ${t("rangeTo")}`, value: roomsMax.value, min: 0, onUpdate: updateFilter(roomsMax), onCommit: scheduleLoad },
+      { id: "bedrooms-min", control: "number", label: `${t("rangeBedrooms")} · ${t("rangeFrom")}`, value: bedroomsMin.value, min: 0, onUpdate: updateFilter(bedroomsMin), onCommit: scheduleLoad },
+      { id: "bedrooms-max", control: "number", label: `${t("rangeBedrooms")} · ${t("rangeTo")}`, value: bedroomsMax.value, min: 0, onUpdate: updateFilter(bedroomsMax), onCommit: scheduleLoad },
+      { id: "area-min", control: "number", label: `${t("rangeArea")} · ${t("rangeFrom")}`, value: areaMin.value, min: 0, onUpdate: updateFilter(areaMin), onCommit: scheduleLoad },
+      { id: "area-max", control: "number", label: `${t("rangeArea")} · ${t("rangeTo")}`, value: areaMax.value, min: 0, onUpdate: updateFilter(areaMax), onCommit: scheduleLoad },
+      { id: "sqm-min", control: "number", label: `${t("rangePricePerSqm")} · ${t("rangeFrom")}`, value: pricePerSqmMin.value, min: 0, inputmode: "numeric", onUpdate: updateFilter(pricePerSqmMin), onCommit: scheduleLoad },
+      { id: "sqm-max", control: "number", label: `${t("rangePricePerSqm")} · ${t("rangeTo")}`, value: pricePerSqmMax.value, min: 0, inputmode: "numeric", onUpdate: updateFilter(pricePerSqmMax), onCommit: scheduleLoad },
+    ],
+  },
+  {
+    id: "building",
+    title: t("groupBuilding"),
+    icon: "i-lucide-building-2",
+    fields: [
+      { id: "floor-min", control: "number", label: `${t("rangeFloor")} · ${t("rangeFrom")}`, value: floorMin.value, min: 0, onUpdate: updateFilter(floorMin), onCommit: scheduleLoad },
+      { id: "floor-max", control: "number", label: `${t("rangeFloor")} · ${t("rangeTo")}`, value: floorMax.value, min: 0, onUpdate: updateFilter(floorMax), onCommit: scheduleLoad },
+      { id: "total-floors-min", control: "number", label: `${t("rangeTotalFloors")} · ${t("rangeFrom")}`, value: totalFloorsMin.value, min: 1, onUpdate: updateFilter(totalFloorsMin), onCommit: scheduleLoad },
+      { id: "total-floors-max", control: "number", label: `${t("rangeTotalFloors")} · ${t("rangeTo")}`, value: totalFloorsMax.value, min: 1, onUpdate: updateFilter(totalFloorsMax), onCommit: scheduleLoad },
+      { id: "year-min", control: "number", label: `${t("rangeYear")} · ${t("rangeFrom")}`, value: yearMin.value, min: 1800, max: new Date().getFullYear() + 2, onUpdate: updateFilter(yearMin), onCommit: scheduleLoad },
+      { id: "year-max", control: "number", label: `${t("rangeYear")} · ${t("rangeTo")}`, value: yearMax.value, min: 1800, max: new Date().getFullYear() + 2, onUpdate: updateFilter(yearMax), onCommit: scheduleLoad },
+    ],
+  },
+  {
+    id: "listing",
+    title: t("groupListing"),
+    icon: "i-lucide-megaphone",
+    gridClass: "flat-filter-grid_single",
+    fields: [
+      { id: "audience", control: "select", label: t("audience"), value: audienceSel.value, options: audienceItems.value, searchable: false, onUpdate: updateFilter(audienceSel), onCommit: scheduleLoad },
+      { id: "property-type", control: "select", label: t("propertyType"), value: propertyTypeSel.value, options: propertyTypeItems.value, searchable: false, onUpdate: updateFilter(propertyTypeSel), onCommit: scheduleLoad },
+      { id: "fresh-days", control: "number", label: t("freshDays"), value: maxAgeDays.value, min: 1, max: 21, onUpdate: updateFilter(maxAgeDays), onCommit: scheduleLoad },
+    ],
+  },
+]);
+
 function loadPersonalState() {
   loadSavedCollections();
   loadPresets();
@@ -248,9 +321,7 @@ function toggleAdvanced() {
   try { localStorage.setItem("flats:showAdvanced", showAdvanced.value ? "1" : "0"); } catch { /* noop */ }
 }
 
-const activeListings = computed(() => applyDrawnArea(listings.value.filter((item) => (
-  !hiddenIds.value.has(item.id) && (!onlyWithPhotos.value || !!listingPhoto(item))
-))));
+const activeListings = computed(() => applyDrawnArea(listings.value.filter((item) => !hiddenIds.value.has(item.id))));
 const displayedListings = computed(() => {
   if (view.value === "favorites") return applyDrawnArea(favorites.value);
   if (view.value === "recent") return applyDrawnArea(recent.value);
@@ -386,15 +457,6 @@ async function copyShareLink() { await copyText(shareUrl.value); }
 function savePreset() {
   if (saveSearchPreset()) presetModalOpen.value = false;
 }
-async function loadMeta() {
-  const { data } = await safeFetch<CountryMeta[]>("/flats-meta");
-  if (!Array.isArray(data)) return;
-  meta.value = data;
-  if (!countries.value.length) {
-    const preferred = data.some((country) => country.code === defaultCountry.value) ? defaultCountry.value : "UA";
-    countries.value = [preferred];
-  }
-}
 async function loadRates() { const { data } = await safeFetch<{ rates?: Record<string, number> }>("/flats-rates"); if (data?.rates && data.rates.USD) rates.value = data.rates; }
 function scheduleWarmPoll() {
   if (warmTimer) clearTimeout(warmTimer);
@@ -404,61 +466,21 @@ function scheduleWarmPoll() {
 async function load(append = false, background = false) {
   const requestId = background ? currentLoadRequest() : nextLoadRequest();
   if (!background) { append ? loadingMore.value = true : loading.value = true; failed.value = false; }
-  const params: Record<string, string> = { limit: String(PAGE_SIZE) };
-  const cursorSort = sort.value === "newest" || sort.value === "oldest";
-  if (append && cursorSort && nextCursor.value) params.cursor = nextCursor.value;
-  else params.offset = String(append ? listings.value.length : 0);
-  if (countries.value.length) params.countries = countries.value.join(",");
-  if (city.value) params.city = city.value;
-  if (district.value) params.district = district.value;
-  if (propertyType.value !== "any") params.propertyType = propertyType.value;
-  if (dealType.value !== "any") params.dealType = dealType.value === "roomRent" ? "longRent" : dealType.value;
-  if (agency.value !== "any") params.agency = agency.value;
-  if (priceMin.value != null) params.priceMin = String(priceMin.value);
-  if (priceMax.value != null) params.priceMax = String(priceMax.value);
-  if (priceMin.value != null || priceMax.value != null) params.priceCurrency = displayCurrency.value;
-  if (roomsMin.value != null) params.roomsMin = String(roomsMin.value);
-  if (roomsMax.value != null) params.roomsMax = String(roomsMax.value);
-  if (bedroomsMin.value != null) params.bedroomsMin = String(bedroomsMin.value);
-  if (bedroomsMax.value != null) params.bedroomsMax = String(bedroomsMax.value);
-  if (areaMin.value != null) params.areaMin = String(areaMin.value);
-  if (areaMax.value != null) params.areaMax = String(areaMax.value);
-  if (pricePerSqmMin.value != null) params.pricePerSqmMin = String(pricePerSqmMin.value);
-  if (pricePerSqmMax.value != null) params.pricePerSqmMax = String(pricePerSqmMax.value);
-  if (metroMaxM.value != null) params.metroMaxM = String(metroMaxM.value);
-  if (nearbyKind.value) params.nearbyKind = nearbyKind.value;
-  if (nearbyMaxM.value != null) params.nearbyMaxM = String(nearbyMaxM.value);
-  if (floorMin.value != null) params.floorMin = String(floorMin.value);
-  if (floorMax.value != null) params.floorMax = String(floorMax.value);
-  if (totalFloorsMin.value != null) params.totalFloorsMin = String(totalFloorsMin.value);
-  if (totalFloorsMax.value != null) params.totalFloorsMax = String(totalFloorsMax.value);
-  if (yearMin.value != null) params.yearMin = String(yearMin.value);
-  if (yearMax.value != null) params.yearMax = String(yearMax.value);
-  if (maxAgeDays.value != null) params.maxAgeDays = String(maxAgeDays.value);
-  if (metro.value) params.metro = metro.value;
-  if (audience.value !== "any") params.audience = audience.value;
-  if (petFriendly.value) params.pets = "1";
-  if (roomOnlyFilter.value || dealType.value === "roomRent") params.roomOnly = "1";
-  if (childrenRequired.value) params.children = "1";
-  if (newBuildingOnly.value) params.newBuilding = "1";
-  if (dishwasherOnly.value) params.dishwasher = "1";
-  if (airConditionerOnly.value) params.airConditioner = "1";
-  if (parkingOnly.value) params.parking = "1";
-  if (internetOnly.value) params.internet = "1";
-  if (gasOnly.value) params.gas = "1";
-  if (balconyOnly.value) params.balcony = "1";
-  if (terraceOnly.value) params.terrace = "1";
-  if (privateYardOnly.value) params.privateYard = "1";
-  params.sort = sort.value;
-  if (query.value.trim()) params.query = query.value.trim();
-  params.sources = source.value || SOURCES.join(",");
+  const params = buildFeedParams({
+    limit: PAGE_SIZE,
+    append,
+    loadedCount: listings.value.length,
+    nextCursor: nextCursor.value,
+    sources: SOURCES,
+  });
   const { data, error } = await fetchFeed(params);
   if (!isLatestLoadRequest(requestId)) { if (!background) { loading.value = false; loadingMore.value = false; } return; }
   if (error || !data || data.error) {
-    if (!background) { failed.value = true; if (!append) { listings.value = []; total.value = 0; nextCursor.value = null; } sourceErrors.value = []; loading.value = false; loadingMore.value = false; }
+    if (!background) { failed.value = true; if (!append) { listings.value = []; total.value = 0; statistics.value = null; nextCursor.value = null; } sourceErrors.value = []; loading.value = false; loadingMore.value = false; }
     return;
   }
-  if (background) { total.value = data.count ?? total.value; sourceErrors.value = data.sourceErrors || []; warming.value = !!data.warming; scheduleWarmPoll(); return; }
+  if (data.availabilityChecked?.length) markAvailabilityFresh(data.availabilityChecked);
+  if (background) { total.value = data.count ?? total.value; sourceErrors.value = data.sourceErrors || []; if (data.statistics) statistics.value = data.statistics; warming.value = !!data.warming; scheduleWarmPoll(); return; }
   nextCursor.value = data.nextCursor || null;
   const next = Array.isArray(data.listings) ? data.listings : [];
   if (append) {
@@ -470,6 +492,7 @@ async function load(append = false, background = false) {
     if (import.meta.client) lastPaginationScrollY = window.scrollY;
   }
   total.value = data.count ?? listings.value.length;
+  if (!append) statistics.value = data.statistics || null;
   sourceErrors.value = data.sourceErrors || [];
   warming.value = !!data.warming;
   loading.value = false; loadingMore.value = false;
@@ -591,19 +614,23 @@ async function verifyOlxListing(l: Listing): Promise<Listing | null | undefined>
 async function openListing(l: Listing, olxAlreadyVerified = false) {
   let listing = l;
   const key = listingKey(l);
-  if (l.source === "olx" && !olxAlreadyVerified) {
+  if (l.source === "olx" && !olxAlreadyVerified && !isAvailabilityFresh(key)) {
     if (checkingListingKey.value) return;
     checkingListingKey.value = key;
     await nextTick();
     try {
       const verified = await verifyOlxListing(l);
       if (verified === null) {
+        forgetAvailability(key);
         removeUnavailableListing(l.id, l.source, l.country);
         showListingUnavailableToast();
         if (queryString(route.query.flat) === l.id) syncListingInUrl(null);
         return;
       }
-      if (verified) listing = verified;
+      if (verified) {
+        listing = verified;
+        markAvailabilityFresh(key);
+      }
     } finally {
       if (checkingListingKey.value === key) checkingListingKey.value = "";
     }
@@ -618,16 +645,6 @@ function modalTitle(listing: Listing | null): string {
   const normalized = displayListingTitle(listing).replace(/\s+/g, " ").trim();
   const humanTitle = normalized.split(/\s*[•·]\s*/)[0]?.trim() || normalized;
   return humanTitle.length > 140 ? `${humanTitle.slice(0, 137).trimEnd()}…` : humanTitle;
-}
-function hasMeaningfulTitle(value: string): boolean {
-  const content = value.replace(/[\p{Extended_Pictographic}\p{Emoji_Presentation}\p{Emoji_Modifier}\p{Variation_Selector}\p{Join_Control}]/gu, "").replace(/[^\p{L}\p{N}]+/gu, "");
-  return content.length >= 3;
-}
-function displayListingTitle(listing: Listing): string {
-  const title = listing.title.replace(/\s+/g, " ").trim();
-  if (hasMeaningfulTitle(title)) return title;
-  const parts = [dealLabel(listing.dealType), listing.rooms != null ? t("roomsN", { n: listing.rooms }) : "", ptLabel(listing.propertyType), listing.district || listing.city || ""].filter(Boolean);
-  return parts.join(" · ") || t("listingFallbackTitle");
 }
 function openLightbox(index: number) { if (!lightboxPhotos.value.length) return; lightboxIndex.value = Math.max(0, Math.min(index, lightboxPhotos.value.length - 1)); }
 function closeLightbox() { lightboxIndex.value = null; }
@@ -647,70 +664,20 @@ function releaseStuckScrollLock() {
 }
 function onLightboxKeydown(event: KeyboardEvent) { if (lightboxIndex.value == null) return; if (event.key === "Escape") closeLightbox(); else if (event.key === "ArrowLeft") moveLightbox(-1); else if (event.key === "ArrowRight") moveLightbox(1); else return; event.preventDefault(); }
 function openById(id: string) { const found = displayedListings.value.find((l) => l.id === id); if (found) void openListing(found); }
-function priceLabel(l: Listing): string { if (l.price == null) return t("priceNA"); return `${l.price.toLocaleString()} ${l.currency}`.trim(); }
 function updateLightboxZoom(event: MouseEvent) { const image = event.currentTarget as HTMLImageElement; const rect = image.getBoundingClientRect(); image.style.setProperty("--zoom-x", `${((event.clientX - rect.left) / rect.width) * 100}%`); image.style.setProperty("--zoom-y", `${((event.clientY - rect.top) / rect.height) * 100}%`); }
 function resetLightboxZoom(event: MouseEvent) { const image = event.currentTarget as HTMLImageElement; image.style.setProperty("--zoom-x", "50%"); image.style.setProperty("--zoom-y", "50%"); }
 function convert(amount: number, from: string, to: string): number | undefined {
   return convertCurrency(amount, from || "USD", to || "USD", rates.value);
 }
-function convertedLabel(l: Listing): string | null { if (l.price == null || !l.currency || l.currency.toUpperCase() === displayCurrency.value.toUpperCase()) return null; const v = convert(l.price, l.currency, displayCurrency.value); return v === undefined ? null : `≈ ${Math.round(v).toLocaleString()} ${displayCurrency.value}`; }
-const dealLabel = (d: Listing["dealType"]) => d === "sale" ? t("dtSale") : d === "longRent" ? t("dtLongRent") : d === "shortRent" ? t("dtShortRent") : "";
-function specLine(l: Listing): string { const parts: string[] = []; if (l.rooms != null) parts.push(t("roomsN", { n: l.rooms })); if (l.areaSqm != null) parts.push(`${l.areaSqm} ${t("sqm")}`); if (l.floor != null) parts.push(l.totalFloors != null ? `${l.floor}/${l.totalFloors} ${t("floorAbbr")}` : `${l.floor} ${t("floorAbbr")}`); return parts.join(" · "); }
-function locLine(l: Listing): string { return [locName(l.city, "city"), locName(l.district, "district"), locName(l.metro, "metro")].filter(Boolean).join(", "); }
 const fmtBool = (v?: boolean | null) => (v === true ? t("yes") : v === false ? t("no") : t("notSpecified"));
 const numOr = (v?: number | null, unit = "") => (v != null ? `${v}${unit ? " " + unit : ""}` : t("notSpecified"));
 const strOr = (v?: string | null) => (v ? v : t("notSpecified"));
 const listOr = (v?: string[] | null) => (v && v.length ? v.join(", ") : t("notSpecified"));
-const nearbyTranslationKeys: Record<string, string> = { "Bobur Park": "nearbyBoburPark", "Alay Bazaar": "nearbyAlayBazaar", Darkhan: "nearbyDarkhan", Novomoskovskaya: "nearbyNovomoskovskaya", "Farhod Bazaar": "nearbyFarhodBazaar", "Nizami Pedagogical University": "nearbyNizamiUniversity", "World Languages University": "nearbyWorldLanguagesUniversity", "Yangi Choshtepa": "nearbyYangiChoshtepa", "Sergeli Car Bazaar": "nearbySergeliCarBazaar", Park: "nearbyPark", "Bus stop": "nearbyBusStop", Clinic: "nearbyClinic", School: "nearbySchool", Kindergarten: "nearbyKindergarten", "Shopping center": "nearbyShoppingCenter", Mosque: "nearbyMosque", Dishwasher: "amenityDishwasher", dishwasher: "amenityDishwasher", "Separate rooms": "amenitySeparateRooms", "Washing machine": "amenityWashingMachine", Television: "amenityTelevision", "Bed linen": "amenityBedLinen", Towels: "amenityTowels" };
-const nearbyItemLabel = (value: string) => nearbyTranslationKeys[value] ? t(nearbyTranslationKeys[value]) : value;
 const nearbyListOr = (values?: string[] | null) => values?.length ? values.map(nearbyItemLabel).join(", ") : t("notSpecified");
 const amenitiesListOr = (values?: string[] | null) => values?.length ? values.map(nearbyItemLabel).join(", ") : t("notSpecified");
-const ptLabel = (p: Listing["propertyType"]) => (p === "house" ? t("ptHouse") : t("ptFlat"));
 const audienceLabel = (a?: Listing["audience"]) => a === "women" ? t("audWomen") : a === "men" ? t("audMen") : a === "family" ? t("audFamily") : t("audAny");
 const conditionLabel = (c?: Listing["condition"]) => c === "needs_renovation" ? t("condNeeds") : c === "basic" ? t("condBasic") : c === "good" ? t("condGood") : c === "modern" ? t("condModern") : c === "luxury" ? t("condLuxury") : t("notSpecified");
 const sourceLabel = (s?: string) => (s === "olx" ? "OLX" : s === "telegram" ? "Telegram" : strOr(s));
-function cardDealTone(l: Listing): "sale" | "rent" | "room" | "short" | "" {
-  if (l.dealType === "shortRent") return "short";
-  if (l.roomOnly) return "room";
-  if (l.dealType === "sale") return "sale";
-  if (l.dealType === "longRent") return "rent";
-  return "";
-}
-function cardDealLabel(l: Listing): string {
-  const filterApplies = view.value === "active";
-  if (l.dealType === "shortRent") return !filterApplies || dealType.value !== "shortRent" ? t("cardShortRent") : "";
-  if (l.roomOnly) return !filterApplies || (!roomOnlyFilter.value && dealType.value !== "roomRent") ? t("roomShare") : "";
-  if (!filterApplies || dealType.value === "any") {
-    if (l.dealType === "longRent") return t("cardRent");
-    return dealLabel(l.dealType);
-  }
-  return "";
-}
-function cardBadges(l: Listing): string[] {
-  const b: string[] = [];
-  if (view.value !== "active" || agency.value === "any") b.push(l.byAgency ? t("badgeAgency") : t("badgeOwner"));
-  if (l.commission === false) b.push(t("badgeNoCommission"));
-  if (l.newBuilding) b.push(t("badgeNew"));
-  if (l.furnished) b.push(t("badgeFurnished"));
-  if (l.airConditioner) b.push(t("badgeAC"));
-  if (l.balcony) b.push(t("badgeBalcony"));
-  if (l.parking) b.push(t("badgeParking"));
-  if (l.elevator) b.push(t("badgeElevator"));
-  if (l.internet) b.push(t("badgeInternet"));
-  if (l.negotiable) b.push(t("badgeNegotiable"));
-  if (l.petsAllowed) b.push(t("badgePet"));
-  if (l.childrenAllowed) b.push(t("badgeChildren"));
-  if (l.communalSeparated === false) b.push(t("badgeUtilIncl"));
-  if (l.deposit === true) b.push(t("badgeDeposit"));
-  if (l.audience === "family") b.push(t("badgeFamily"));
-  if (l.audience === "women") b.push(t("badgeWomen"));
-  if (l.audience === "men") b.push(t("badgeMen"));
-  for (const tag of l.tags || []) {
-    const label = nearbyItemLabel(tag)?.trim();
-    if (label) b.push(label);
-  }
-  return [...new Set(b)];
-}
 function floorLabel(l: Listing) { if (l.floor != null && l.totalFloors != null) return `${l.floor} / ${l.totalFloors}`; return l.floor != null || l.totalFloors != null ? String(l.floor ?? l.totalFloors) : t("nd"); }
 function depositLabel(l: Listing) { if (l.depositAmount != null) return `${l.depositAmount.toLocaleString()} ${l.depositCurrency || l.currency}`; return fmtBool(l.deposit); }
 function commissionLabel(l: Listing) { if (l.commissionPercent != null) return `${l.commissionPercent}%`; return fmtBool(l.commission); }
@@ -743,14 +710,6 @@ async function openSharedListing(id: string, sourceName = "", countryCode = "", 
     return;
   }
   if (data?.warming && attempt < 20) { if (sharedListingTimer) clearTimeout(sharedListingTimer); sharedListingTimer = setTimeout(() => { sharedListingTimer = undefined; void openSharedListing(id, sourceName, countryCode, attempt + 1); }, 1800); }
-}
-function timeAgo(iso: string | null): string {
-  return formatRelativeDate(iso, {
-    today: () => t("today"),
-    yesterday: () => t("yesterday"),
-    daysAgo: (n) => t("daysAgo", { n }),
-    monthsAgo: (n) => t("monthsAgo", { n }),
-  });
 }
 onMounted(async () => {
   window.addEventListener("keydown", onLightboxKeydown);
@@ -867,51 +826,30 @@ onBeforeUnmount(() => { modalOpen.value = false; lightboxIndex.value = null; rel
         </UiFilterFooter>
       </section>
 
-      <FlatAdvancedFilters v-if="showAdvanced" class="advanced-card">
+      <section v-if="showAdvanced" class="advanced-card">
         <div class="advanced-card__header"><div><u-icon name="i-lucide-filter" /><strong>{{ t("moreFilters") }}</strong></div><button type="button" @click="toggleAdvanced">{{ t("hideFilters") }} <u-icon name="i-lucide-chevron-up" /></button></div>
-        <div class="advanced-groups">
-          <div class="filter-group filter-group_quick"><h3><u-icon name="i-lucide-sliders-horizontal" /> {{ t('quickOptions') }}</h3><div class="quick-options">
-            <u-button type="button" :variant="petFriendly ? 'solid' : 'outline'" color="neutral" icon="i-lucide-paw-print" @click="petFriendly = !petFriendly; scheduleLoad()">{{ t('pets') }}</u-button>
-            <u-button type="button" :variant="childrenRequired ? 'solid' : 'outline'" color="neutral" icon="i-lucide-baby" @click="childrenRequired = !childrenRequired; scheduleLoad()">{{ t('children') }}</u-button>
-            <u-button type="button" :variant="roomOnlyFilter ? 'solid' : 'outline'" color="neutral" icon="i-lucide-bed-single" @click="roomOnlyFilter = !roomOnlyFilter; scheduleLoad()">{{ t('roomOnly') }}</u-button>
-            <u-button type="button" :variant="onlyWithPhotos ? 'solid' : 'outline'" color="neutral" icon="i-lucide-images" @click="onlyWithPhotos = !onlyWithPhotos; scheduleLoad()">{{ t('onlyWithPhotos') }}</u-button>
-            <u-button type="button" :variant="newBuildingOnly ? 'solid' : 'outline'" color="neutral" icon="i-lucide-building-2" @click="newBuildingOnly = !newBuildingOnly; scheduleLoad()">{{ t('newBuilding') }}</u-button>
-          </div></div>
-          <div class="filter-group"><h3><u-icon name="i-lucide-map-pin" /> {{ t('groupLocation') }}</h3>
-            <div v-if="districtOptions.length" class="flats__field"><u-select-menu :label="t('district')" v-model="districtSel" :items="districtItems" value-key="value" label-key="label" class="flats__select" @update:model-value="scheduleLoad()" /></div>
-            <div v-if="metroOptions.length" class="flats__field"><u-select-menu :label="t('metro')" v-model="metroSel" :items="metroItems" value-key="value" label-key="label" class="flats__select" @update:model-value="scheduleLoad()" /></div>
-            <div class="range-field"><span>{{ t('metroWithin') }}</span><u-input v-model.number="metroMaxM" :label="t('metres')" type="number" inputmode="numeric" min="0" step="100" @change="scheduleLoad()" /></div>
-            <div class="flats__field"><u-select-menu :label="t('nearbyKind')" v-model="nearbyKindSel" :items="nearbyKindItems" value-key="value" label-key="label" class="flats__select" @update:model-value="scheduleLoad()" /></div>
-            <div class="range-field"><span>{{ t('nearbyWithin') }}</span><u-input v-model.number="nearbyMaxM" :label="t('metres')" type="number" inputmode="numeric" min="0" step="100" @change="scheduleLoad()" /></div>
-          </div>
-          <div class="filter-group"><h3><u-icon name="i-lucide-house" /> {{ t('groupApartment') }}</h3>
-            <div class="range-field"><span>{{ t('rangeRooms') }}</span><u-input v-model.number="roomsMin" :label="t('rangeFrom')" type="number" min="0" @change="scheduleLoad()" /><span>—</span><u-input v-model.number="roomsMax" :label="t('rangeTo')" type="number" min="0" @change="scheduleLoad()" /></div>
-            <div class="range-field"><span>{{ t('rangeBedrooms') }}</span><u-input v-model.number="bedroomsMin" :label="t('rangeFrom')" type="number" min="0" @change="scheduleLoad()" /><span>—</span><u-input v-model.number="bedroomsMax" :label="t('rangeTo')" type="number" min="0" @change="scheduleLoad()" /></div>
-            <div class="range-field"><span>{{ t('rangeArea') }}</span><u-input v-model.number="areaMin" :label="t('rangeFrom')" type="number" min="0" @change="scheduleLoad()" /><span>—</span><u-input v-model.number="areaMax" :label="t('rangeTo')" type="number" min="0" @change="scheduleLoad()" /></div>
-            <div class="range-field"><span>{{ t('rangePricePerSqm') }}</span><u-input v-model.number="pricePerSqmMin" :label="t('rangeFrom')" type="number" inputmode="numeric" min="0" @change="scheduleLoad()" /><span>—</span><u-input v-model.number="pricePerSqmMax" :label="t('rangeTo')" type="number" inputmode="numeric" min="0" @change="scheduleLoad()" /></div>
-          </div>
-          <div class="filter-group"><h3><u-icon name="i-lucide-building-2" /> {{ t('groupBuilding') }}</h3>
-            <div class="range-field"><span>{{ t('rangeFloor') }}</span><u-input v-model.number="floorMin" :label="t('rangeFrom')" type="number" min="0" @change="scheduleLoad()" /><span>—</span><u-input v-model.number="floorMax" :label="t('rangeTo')" type="number" min="0" @change="scheduleLoad()" /></div>
-            <div class="range-field"><span>{{ t('rangeTotalFloors') }}</span><u-input v-model.number="totalFloorsMin" :label="t('rangeFrom')" type="number" min="1" @change="scheduleLoad()" /><span>—</span><u-input v-model.number="totalFloorsMax" :label="t('rangeTo')" type="number" min="1" @change="scheduleLoad()" /></div>
-            <div class="range-field"><span>{{ t('rangeYear') }}</span><u-input v-model.number="yearMin" :label="t('rangeFrom')" type="number" min="1800" :max="new Date().getFullYear() + 2" @change="scheduleLoad()" /><span>—</span><u-input v-model.number="yearMax" :label="t('rangeTo')" type="number" min="1800" :max="new Date().getFullYear() + 2" @change="scheduleLoad()" /></div>
-          </div>
-          <div class="filter-group"><h3><u-icon name="i-lucide-megaphone" /> {{ t('groupListing') }}</h3>
-            <div class="flats__field"><u-select-menu :label="t('audience')" v-model="audienceSel" :items="audienceItems" value-key="value" label-key="label" :search-input="false" class="flats__select" @update:model-value="scheduleLoad()" /></div>
-            <div class="flats__field"><u-select-menu :label="t('propertyType')" v-model="propertyTypeSel" :items="propertyTypeItems" value-key="value" label-key="label" :search-input="false" class="flats__select" @update:model-value="scheduleLoad()" /></div>
-            <div class="flats__field"><u-input v-model.number="maxAgeDays" type="number" min="1" max="21" :label="t('freshDays')" @change="scheduleLoad()" /></div>
-          </div>
-        </div>
-      </FlatAdvancedFilters>
+        <SearchFilterBlocks :blocks="flatAdvancedFilterBlocks" class="flats__filter-blocks">
+          <template #field-quick-options>
+            <div class="quick-options">
+              <u-button type="button" :variant="petFriendly ? 'solid' : 'outline'" color="neutral" icon="i-lucide-paw-print" @click="petFriendly = !petFriendly; scheduleLoad()">{{ t('pets') }}</u-button>
+              <u-button type="button" :variant="childrenRequired ? 'solid' : 'outline'" color="neutral" icon="i-lucide-baby" @click="childrenRequired = !childrenRequired; scheduleLoad()">{{ t('children') }}</u-button>
+              <u-button type="button" :variant="roomOnlyFilter ? 'solid' : 'outline'" color="neutral" icon="i-lucide-bed-single" @click="roomOnlyFilter = !roomOnlyFilter; scheduleLoad()">{{ t('roomOnly') }}</u-button>
+              <u-button type="button" :variant="onlyWithPhotos ? 'solid' : 'outline'" color="neutral" icon="i-lucide-images" @click="onlyWithPhotos = !onlyWithPhotos; scheduleLoad()">{{ t('onlyWithPhotos') }}</u-button>
+              <u-button type="button" :variant="newBuildingOnly ? 'solid' : 'outline'" color="neutral" icon="i-lucide-building-2" @click="newBuildingOnly = !newBuildingOnly; scheduleLoad()">{{ t('newBuilding') }}</u-button>
+            </div>
+          </template>
+        </SearchFilterBlocks>
+      </section>
       </div>
     </form>
 
     <p v-if="failed" class="flats__error">{{ t("error") }}</p>
     <p v-else-if="source === 'telegram' && !loading && !listings.length && sourceErrors?.some((item) => item.source === 'telegram')" class="flats__source-warning">{{ t("telegramUnavailable") }}</p>
     <div v-else class="flats__results-toolbar">
-      <p class="flats__count text-muted">{{ t("found", { n: view === 'active' && !onlyWithPhotos ? total : displayedListings.length }) }}</p>
+      <p class="flats__count text-muted">{{ t("found", { n: view === 'active' ? total : displayedListings.length }) }}</p>
       <UiSortSelect class="flats__sort" v-model="sort" :items="sortItems" :label="extraLabels.sort" @update:model-value="scheduleLoad(0)" />
     </div>
-    <FlatsStatsPanel v-if="displayedListings.length" :listings="displayedListings" :display-currency="displayCurrency" :convert="convert" />
+    <FlatsStatsPanel v-if="view === 'active' && statistics" :statistics="statistics" :display-currency="displayCurrency" :convert="convert" />
 <section v-if="listings.length" class="flats__map-wrap"><flat-map :points="mapPoints" :draw-label="t('drawArea')" :done-label="t('done')" :clear-label="t('clearArea')" :draw-hint="t('drawHint')" :expand-label="t('mapExpand')" :collapse-label="t('mapCollapse')" @select="openById" @area-change="drawnArea = $event" /></section>
 
     <FlatGrid :listings="displayedListings">
@@ -920,15 +858,7 @@ onBeforeUnmount(() => { modalOpen.value = false; lightboxIndex.value = null; rel
         :key="listingKey(l)"
         :listing="l"
         :photo="listingPhoto(l)"
-        :title="displayListingTitle(l)"
-        :price="priceLabel(l)"
-        :converted-price="convertedLabel(l)"
-        :specification="specLine(l)"
-        :location="locLine(l)"
-        :deal-label="cardDealLabel(l)"
-        :deal-tone="cardDealTone(l)"
-        :badges="cardBadges(l)"
-        :date-label="timeAgo(l.createdAt)"
+        :presentation="presentCard(l)"
         :favorite="isFavorite(l.id)"
         :hidden="isHidden(l.id)"
         :checking="checkingListingKey === listingKey(l)"
@@ -1102,7 +1032,7 @@ onBeforeUnmount(() => { modalOpen.value = false; lightboxIndex.value = null; rel
 /* Scoped to the value span (not every span, which included the chevron) and
    kept on one line. This rule sits after the one above and previously won with
    `white-space: normal`, which is what still let a multi-country value wrap. */
-.filter-primary-grid :deep(button > span:first-child), .advanced-groups :deep(button > span:first-child) { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; line-height: 1.25; text-align: left; }
+.filter-primary-grid :deep(button > span:first-child), .flats__filter-blocks :deep(button > span:first-child) { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; line-height: 1.25; text-align: left; }
 /* justify-content:start is what keeps this row sane: the first track is `auto`,
    so without it every pixel of leftover width inflated the label column and
    threw the label to the far left with the inputs stranded on the right.
@@ -1128,50 +1058,20 @@ onBeforeUnmount(() => { modalOpen.value = false; lightboxIndex.value = null; rel
 .advanced-card__header { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 14px 16px; border-bottom: 1px solid var(--line); }
 .advanced-card__header > div, .advanced-card__header button { display: inline-flex; align-items: center; gap: 8px; }
 .advanced-card__header button { color: var(--accent-pink); }
-.advanced-groups { display: grid; grid-template-columns: 1.15fr .95fr 1.1fr 1.1fr 1fr; padding: 16px; }
-.filter-group { min-width: 0; padding: 0 16px; border-left: 1px solid var(--line); }
-.filter-group:first-child { padding-left: 0; border-left: 0; }
-.filter-group:last-child { padding-right: 0; }
-.filter-group h3 { display: flex; align-items: center; gap: 7px; margin: 0 0 14px; color: var(--ui-text-muted); font-size: 11px; line-height: 1.3; text-transform: uppercase; letter-spacing: .04em; }
-.filter-group h3 svg { color: var(--accent-pink); flex: 0 0 auto; }
-/* One vertical rhythm for every stacked filter, whatever kind it is, so the
-   Location / Flat / House / Listing columns keep the same row spacing. */
-.filter-group .flats__field + .flats__field,
-.filter-group .flats__field + .range-field,
-.filter-group .range-field + .flats__field,
-.range-field + .range-field { margin-top: 12px; }
+.flats__filter-blocks { grid-template-columns: 1.15fr .95fr 1.1fr 1.1fr 1fr; gap: 0; padding: 16px; }
+.flats__filter-blocks :deep(.filter-section) { min-width: 0; padding: 0 16px; border: 0; border-left: 1px solid var(--line); border-radius: 0; background: transparent; }
+.flats__filter-blocks :deep(.filter-section:first-child) { padding-left: 0; border-left: 0; }
+.flats__filter-blocks :deep(.filter-section:last-child) { padding-right: 0; }
+.flats__filter-blocks :deep(.flat-filter-grid_single) { grid-template-columns: 1fr; }
 .quick-options { display: grid; gap: 8px; }
 .quick-options :deep(button) { width: 100%; min-height: var(--ui-control-h-md); justify-content: flex-start; height: auto; padding-block: 8px; white-space: normal; text-align: left; line-height: 1.25; }
-/* Every range row is the same height regardless of how many lines its label
-   needs: "Год постройки от" wrapped to three lines while "Этаж от" stayed on
-   one, so the Flat and House columns no longer lined up with each other. A
-   fixed row height plus a balanced label column keeps the two columns in step. */
-/* Range rows follow the same shape as every other filter: label ABOVE the
-   control, in the shared uppercase label style. They used to put the label
-   inline to the left, which both looked unlike the rest of the panel and made
-   the Flat and House columns drift apart whenever one label wrapped to more
-   lines than its neighbour. The label spans the full width, so the two inputs
-   and their separator flow onto the next row automatically. */
-/* No muted colour on the container: the label sets `opacity: .7` like every
-   other filter label, and inheriting a muted colour on top of that made these
-   labels visibly dimmer than "РАЙОН" and friends. The separator keeps it. */
-.range-field { display: grid; grid-template-columns: minmax(0,1fr) 10px minmax(0,1fr); align-items: center; column-gap: 8px; row-gap: 5px; font-size: 11px; }
-.range-field > span:first-child {
-  grid-column: 1 / -1;
-  font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em;
-  opacity: 0.7; line-height: 1.25; overflow-wrap: anywhere;
-}
-.range-field > span:not(:first-child) { color: var(--ui-text-muted); text-align: center; }
-/* Left-aligned now that each field carries its own from/to floating label
-   anchored to the left edge; a centred value belonged to neither of them. */
-.range-field :deep(input) { text-align: left; }
 .flats__controls_redesign :deep(input), .flats__controls_redesign :deep(button[role="combobox"]) { background-color: var(--bg-panel-2) !important; }
 
 @media (max-width: 1100px) {
-  .advanced-groups { grid-template-columns: repeat(2,minmax(0,1fr)); gap: 20px 0; }
-  .filter-group, .filter-group:first-child { padding: 0 16px; border-left: 1px solid var(--line); }
-  .filter-group:nth-child(odd) { border-left: 0; padding-left: 0; }
-  .filter-group:nth-child(even) { padding-right: 0; }
+  .flats__filter-blocks { grid-template-columns: repeat(2,minmax(0,1fr)); gap: 20px 0; }
+  .flats__filter-blocks :deep(.filter-section), .flats__filter-blocks :deep(.filter-section:first-child) { padding: 0 16px; border-left: 1px solid var(--line); }
+  .flats__filter-blocks :deep(.filter-section:nth-child(odd)) { border-left: 0; padding-left: 0; }
+  .flats__filter-blocks :deep(.filter-section:nth-child(even)) { padding-right: 0; }
 }
 @media (max-width: 760px) {
   .flats__controls_redesign { margin-inline: -4px; }
@@ -1191,11 +1091,10 @@ onBeforeUnmount(() => { modalOpen.value = false; lightboxIndex.value = null; rel
   .active-filter-chips { flex: 1 1 100%; }
   .advanced-card__header { padding: 13px 12px; }
   .advanced-card__header strong { line-height: 1.25; }
-  .advanced-groups { grid-template-columns: 1fr; padding: 14px 12px; gap: 0; }
-  .filter-group, .filter-group:first-child, .filter-group:nth-child(odd), .filter-group:nth-child(even) { padding: 16px 0; border-left: 0; border-top: 1px solid var(--line); }
-  .filter-group:first-child { padding-top: 0; border-top: 0; }
-  .filter-group:last-child { padding-bottom: 0; }
-  .range-field { grid-template-columns: minmax(0,1fr) 10px minmax(0,1fr); }
+  .flats__filter-blocks { grid-template-columns: 1fr; padding: 14px 12px; gap: 0; }
+  .flats__filter-blocks :deep(.filter-section), .flats__filter-blocks :deep(.filter-section:first-child), .flats__filter-blocks :deep(.filter-section:nth-child(odd)), .flats__filter-blocks :deep(.filter-section:nth-child(even)) { padding: 16px 0; border-left: 0; border-top: 1px solid var(--line); }
+  .flats__filter-blocks :deep(.filter-section:first-child) { padding-top: 0; border-top: 0; }
+  .flats__filter-blocks :deep(.filter-section:last-child) { padding-bottom: 0; }
   .flats__results-toolbar { align-items: stretch; flex-direction: column; }
   .flats__sort { width: 100%; }
   .flat-card__photo { aspect-ratio: 16 / 10; }
@@ -1208,6 +1107,5 @@ onBeforeUnmount(() => { modalOpen.value = false; lightboxIndex.value = null; rel
 @media (max-width: 390px) {
   .filter-price-row { column-gap: 3px; row-gap: 6px; }
   .price-input :deep(.price-number-input) { font-size: 11px; }
-  .range-field { grid-template-columns: minmax(0,1fr) 8px minmax(0,1fr); }
 }
 </style>

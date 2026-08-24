@@ -28,6 +28,43 @@ export function useJobFilters() {
   const skills = ref("");
   const showAdvanced = ref(true);
 
+  function buildFeedParams(options: {
+    page: number;
+    pageSize: number;
+    cvReady: boolean;
+    convertCurrency: (amount: number, from: string, to: string) => number | undefined;
+    convertPeriod: (amount: number, from: SalaryPeriod, to: SalaryPeriod) => number;
+  }): Record<string, string> {
+    const params: Record<string, string> = {
+      page: String(options.page),
+      pageSize: String(options.cvReady ? 50 : options.pageSize),
+      sort: sort.value === "ats" ? "date" : sort.value,
+    };
+    if (query.value) params.q = query.value;
+    if (source.value) params.source = source.value;
+    if (salaryMin.value) {
+      const inUsd = options.convertCurrency(salaryMin.value, displayCurrency.value, "USD");
+      if (inUsd) params.salaryMin = String(options.convertPeriod(inUsd, displayPeriod.value, "year"));
+    }
+    if (countries.value.length) params.country = countries.value.join(",");
+    if (cities.value.trim()) params.cities = cities.value.trim();
+    if (includeRu.value) params.includeRu = "true";
+    if (includeBy.value) params.includeBy = "true";
+    if (workMode.value) params.workMode = workMode.value;
+    if (relocation.value) params.relocation = relocation.value;
+    if (employmentKind.value) params.employmentKind = employmentKind.value;
+    if (hasSalary.value) params.hasSalary = "true";
+    if (maxExperience.value != null) params.maxExperienceYears = String(maxExperience.value);
+    if (foreignerOnly.value) params.foreignerFriendly = "true";
+    if (!hideRisky.value) params.hideRiskyIndustries = "false";
+    if (noExperience.value) params.noExperience = "true";
+    if (language.value) params.language = language.value;
+    if (languageLevel.value) params.languageLevel = languageLevel.value;
+    if (excludeLanguages.value.length) params.excludeLanguage = excludeLanguages.value.join(",");
+    if (skills.value.trim()) params.skills = skills.value.trim();
+    return params;
+  }
+
   function resetValues() {
     countries.value = [];
     cities.value = "";
@@ -51,6 +88,6 @@ export function useJobFilters() {
     query, source, salaryMin, displayCurrency, displayPeriod, sort, countries, cities,
     includeRu, includeBy, workMode, relocation, employmentKind, hasSalary, maxExperience,
     foreignerOnly, hideRisky, noExperience, language, languageLevel, excludeLanguages,
-    skills, showAdvanced, resetValues,
+    skills, showAdvanced, buildFeedParams, resetValues,
   };
 }

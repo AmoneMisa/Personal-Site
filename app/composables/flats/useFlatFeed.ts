@@ -1,5 +1,5 @@
 import { ref } from "vue";
-import type { FlatFeedResult, FlatListing } from "~/types/flats";
+import type { FlatFeedResult, FlatListing, FlatStatistics } from "~/types/flats";
 import { safeFetch } from "~/utils/safeFetch";
 
 export function useFlatFeed() {
@@ -10,8 +10,9 @@ export function useFlatFeed() {
   const warming = ref(false);
   const failed = ref(false);
   const sourceErrors = ref<FlatFeedResult["sourceErrors"]>([]);
+  const statistics = ref<FlatStatistics | null>(null);
   const nextCursor = ref<string | null>(null);
   const loadMoreSentinel = ref<HTMLElement | null>(null);
   const fetchFeed = (params: Record<string, string>) => safeFetch<FlatFeedResult>("/flats-feed", { params });
-  return { listings, total, loading, loadingMore, warming, failed, sourceErrors, nextCursor, loadMoreSentinel, fetchFeed };
+  return { listings, total, loading, loadingMore, warming, failed, sourceErrors, statistics, nextCursor, loadMoreSentinel, fetchFeed };
 }
