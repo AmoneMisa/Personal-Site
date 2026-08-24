@@ -161,6 +161,14 @@ export interface SalaryStat {
   maxUsd: number
 }
 
+export interface JobSalaryTrendPoint {
+  postedAt: string
+  salaryUsd: number
+  country?: string
+  city?: string
+  title: string
+}
+
 export interface JobStats {
   salary: SalaryStat
   bySource: Partial<Record<JobSource, { count: number; medianUsd: number }>>
@@ -169,6 +177,7 @@ export interface JobStats {
   foreignerFriendly: number
   byLanguage: Record<string, number>
   topSkills: { skill: string; count: number }[]
+  salaryTrend: JobSalaryTrendPoint[]
 }
 
 export interface JobResponse {
