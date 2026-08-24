@@ -28,18 +28,46 @@ function listingText(listing: any): string {
 export function normalizeFlatRoomOnly(listing: any): boolean {
   if (listing?.roomOnly === true) return true
   const text = listingText(listing)
-  return /(?:student\s+qizlarga|talaba\s+qizlarga|qiz\s+olinadi|подселени\p{L}*|койко\s+мест\p{L}*|шеринг)/u.test(text)
+  const explicitRoom = /(?:student\s+qizlarga|talaba\s+qizlarga|qiz\s+olinadi|opshijit\s+dom|obshijit\s+dom|общежити\p{L}*|yotoqxona|подселени\p{L}*|койко\s+мест\p{L}*|шеринг|room\s+only)/u.test(text)
+  if (explicitRoom) return true
+
+  // Price is only a fallback when the source gave us no deal information.
+  if (normalizedText(listing?.dealType) || explicitDealFromText(text)) return false
+  return priceBand(listing) === 'room'
+}
+
+function explicitDollarAmounts(value: unknown): number[] {
+  const text = String(value || '')
+  const amounts: number[] = []
+  // The negative lookbehind is important for floor notation such as
+  // "3/4/5 500$": matching must start at 500, never at the preceding floor 5.
+  for (const match of text.matchAll(/(?<![\d/])(\d{2,6}(?:[\s.,]\d{3})?)\s*(?:\$|usd|у\.?\s*е\.?)/giu)) {
+    const amount = Number(String(match[1]).replace(/\D/g, ''))
+    if (Number.isFinite(amount) && amount > 0) amounts.push(amount)
+  }
+  return amounts
 }
 
 export function normalizeFlatPrice(listing: any): { price: number | null; currency: string } {
   const existingPrice = normalizedPrice(listing?.price)
   const existingCurrency = String(listing?.currency || '').toUpperCase()
+  const source = normalizedText(listing?.source)
+  const title = String(listing?.title || '').trim()
+
+  if (SOCIAL_SOURCES.has(source)) {
+    const titleDollarAmount = explicitDollarAmounts(title).at(-1)
+    if (titleDollarAmount != null) return { price: titleDollarAmount, currency: 'USD' }
+
+    const descriptionDollarAmounts = explicitDollarAmounts(listing?.description || listing?.text || listing?.originalText)
+    if (existingPrice == null && descriptionDollarAmounts.length) {
+      return { price: descriptionDollarAmounts.at(-1)!, currency: 'USD' }
+    }
+  }
+
   if (existingPrice != null && existingPrice > 0) {
     return { price: existingPrice, currency: existingCurrency }
   }
 
-  const source = normalizedText(listing?.source)
-  const title = String(listing?.title || '').trim()
   if (!SOCIAL_SOURCES.has(source) || /(?:ming|минг|тыс|million|миллион|млн|sum|сум|uzs)/iu.test(title)) {
     return { price: null, currency: existingCurrency }
   }
@@ -57,29 +85,38 @@ export function normalizeFlatPrice(listing: any): { price: number | null; curren
 
 function normalizedPrice(value: unknown): number | null {
   if (typeof value === 'number') return Number.isFinite(value) ? value : null
-  const parsed = Number(String(value || '').replace(/[^\d.,-]/g, '').replace(',', '.'))
+  const raw = String(value ?? '').trim()
+  if (!raw) return null
+  const parsed = Number(raw.replace(/[^\d.,-]/g, '').replace(',', '.'))
   return Number.isFinite(parsed) ? parsed : null
 }
 
-function socialPriceLooksLikeMonthlyRent(listing: any): boolean {
-  const source = normalizedText(listing?.source)
-  if (!SOCIAL_SOURCES.has(source)) return false
-
+function priceBand(listing: any): 'room' | 'rent' | 'sale' | null {
   const price = normalizedPrice(listing?.price)
-  if (price == null || price <= 0) return false
+  if (price == null || price <= 0) return null
 
   const currency = String(listing?.currency || '').toUpperCase()
-  const monthlyUpperBounds: Record<string, number> = {
-    USD: 5_000,
-    EUR: 5_000,
-    UZS: 50_000_000,
-    UAH: 100_000,
-    KZT: 2_500_000,
-    KGS: 500_000,
-    RON: 25_000,
+  const thresholds: Record<string, { roomMax: number; saleMin: number }> = {
+    USD: { roomMax: 250, saleMin: 15_000 },
+    EUR: { roomMax: 250, saleMin: 15_000 },
+    UZS: { roomMax: 2_000_000, saleMin: 100_000_000 },
+    UAH: { roomMax: 8_000, saleMin: 300_000 },
+    KZT: { roomMax: 120_000, saleMin: 12_000_000 },
+    KGS: { roomMax: 20_000, saleMin: 4_000_000 },
+    RON: { roomMax: 1_000, saleMin: 100_000 },
   }
-  const upperBound = monthlyUpperBounds[currency]
-  return typeof upperBound === 'number' && price <= upperBound
+  const threshold = thresholds[currency]
+  if (!threshold) return null
+  if (price <= threshold.roomMax) return 'room'
+  if (price >= threshold.saleMin) return 'sale'
+  return 'rent'
+}
+
+function explicitDealFromText(text: string): FlatDealType | null {
+  if (/(?:посуточн\p{L}*|сутк\p{L}*|на сутки|кунлик|kunlik|sutkalik|суткалик)/u.test(text)) return 'shortRent'
+  if (/(?:продам|продается|продажа|sotiladi|sotaman|sotuv|for sale)/u.test(text)) return 'sale'
+  if (/(?:сдам|сдается|снять|аренд\p{L}*|ижара\p{L}*|ijara\p{L}*|ijaraga|берилади|beriladi|for rent|oyiga|в месяц|месяц|mingdan|мингдан|qiz\s+olinadi|student\s+qizlarga|talaba\s+qizlarga)/u.test(text)) return 'longRent'
+  return null
 }
 
 /**
@@ -93,14 +130,13 @@ export function normalizeFlatDealType(listing: any): FlatDealType | null {
   if (['shortrent', 'daily', 'dailyrent'].includes(raw)) return 'shortRent'
 
   const text = listingText(listing)
-  const isShortRent = /(?:посуточн\p{L}*|сутк\p{L}*|на сутки|кунлик|kunlik|sutkalik|суткалик)/u.test(text)
-  if (isShortRent) return 'shortRent'
+  const explicitDeal = explicitDealFromText(text)
+  if (explicitDeal) return explicitDeal
+  if (normalizeFlatRoomOnly(listing)) return 'longRent'
 
-  const isSale = /(?:продам|продается|продажа|продамиз|sotiladi|sotaman|sotuv|for sale)/u.test(text)
-  if (isSale) return 'sale'
-
-  const isLongRent = /(?:сдам|сдается|снять|аренд\p{L}*|ижара\p{L}*|ijara\p{L}*|ijaraga|берилади|beriladi|for rent|oyiga|в месяц|месяц|mingdan|мингдан|qiz\s+olinadi|student\s+qizlarga|talaba\s+qizlarga)/u.test(text)
-  if (isLongRent || normalizeFlatRoomOnly(listing) || socialPriceLooksLikeMonthlyRent(listing)) return 'longRent'
+  const inferredBand = priceBand(listing)
+  if (inferredBand === 'sale') return 'sale'
+  if (inferredBand === 'room' || inferredBand === 'rent') return 'longRent'
 
   return null
 }

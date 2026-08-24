@@ -35,10 +35,10 @@ function rewritePhoto(p: unknown): unknown {
 
 function shapeListing(listing: any): any {
   const normalizedPrice = normalizeFlatPrice(listing)
+  const listingWithPrice = { ...listing, ...normalizedPrice }
   const normalizedListing = {
-    ...listing,
-    ...normalizedPrice,
-    roomOnly: normalizeFlatRoomOnly(listing),
+    ...listingWithPrice,
+    roomOnly: normalizeFlatRoomOnly(listingWithPrice),
   }
   return {
     ...normalizedListing,
