@@ -84,6 +84,7 @@ interface FeedResult {
   nextCursor?: string | null;
   queryMs?: number;
   error?: string;
+  exactListingFallback?: "source" | "source-inactive" | string;
 }
 interface TranslationResult {
   status: "pending" | "completed" | "failed" | "disabled" | "not_found";
@@ -110,6 +111,7 @@ const { t: translate, locale } = useI18n();
 const t = (key: string, params: Record<string, unknown> = {}) => translate(`flats.${key}`, params);
 const route = useRoute();
 const router = useRouter();
+const toast = useToast();
 
 useSeoMeta({
   title: () => t("seoTitle"),
@@ -716,11 +718,65 @@ function syncListingInUrl(listing: Listing | null) {
   void router.replace({ query });
 }
 
-function openListing(l: Listing) {
-  stopTranslationPoll(); translationRequestId += 1; lightboxIndex.value = null; active.value = l;
-  translatedDescription.value = translationCache.get(translationCacheKey(l)) || ""; translatingDescription.value = false; translationFailed.value = false; modalOpen.value = true;
-  recent.value = [l, ...recent.value.filter((item) => item.id !== l.id)].slice(0, MAX_RECENT_FLATS); persistList(STORAGE.recent, recent.value, MAX_RECENT_FLATS);
-  syncListingInUrl(l);
+function listingIdentityMatches(item: Listing, id: string, sourceName = "", countryCode = ""): boolean {
+  if (item.id !== id) return false;
+  if (sourceName && item.source !== sourceName) return false;
+  if (countryCode && item.country !== countryCode.toUpperCase()) return false;
+  return true;
+}
+function removeUnavailableListing(id: string, sourceName = "olx", countryCode = "") {
+  const before = listings.value.length;
+  listings.value = listings.value.filter((item) => !listingIdentityMatches(item, id, sourceName, countryCode));
+  const removed = before - listings.value.length;
+  if (removed > 0) total.value = Math.max(0, total.value - removed);
+  favorites.value = favorites.value.filter((item) => !listingIdentityMatches(item, id, sourceName, countryCode));
+  hidden.value = hidden.value.filter((item) => !listingIdentityMatches(item, id, sourceName, countryCode));
+  recent.value = recent.value.filter((item) => !listingIdentityMatches(item, id, sourceName, countryCode));
+  if (import.meta.client) {
+    persistList(STORAGE.favorites, favorites.value);
+    persistList(STORAGE.hidden, hidden.value);
+    persistList(STORAGE.recent, recent.value, MAX_RECENT_FLATS);
+  }
+  if (active.value && listingIdentityMatches(active.value, id, sourceName, countryCode)) {
+    modalOpen.value = false;
+    active.value = null;
+  }
+}
+function showListingUnavailableToast() {
+  const english = locale.value.startsWith("en");
+  toast.add({
+    title: english ? "Listing no longer available" : "Объявление больше недоступно",
+    description: english ? "It was removed or taken down by the publisher." : "Оно было удалено или снято с публикации.",
+    color: "warning",
+    icon: "i-lucide-circle-alert",
+  });
+}
+async function verifyOlxListing(l: Listing): Promise<Listing | null | undefined> {
+  const params: Record<string, string> = { listingId: l.id, limit: "1", offset: "0", sources: "olx" };
+  if (/^[A-Za-z]{2}$/.test(l.country)) params.countries = l.country.toUpperCase();
+  const { data, error } = await safeFetch<FeedResult>("/flats-feed", { params });
+  if (error || !data) return undefined;
+  const exact = data.listings?.find((listing) => listing.id === l.id && listing.source === "olx");
+  if (exact) return exact;
+  if (data.exactListingFallback === "source-inactive") return null;
+  return undefined;
+}
+async function openListing(l: Listing, olxAlreadyVerified = false) {
+  let listing = l;
+  if (l.source === "olx" && !olxAlreadyVerified) {
+    const verified = await verifyOlxListing(l);
+    if (verified === null) {
+      removeUnavailableListing(l.id, l.source, l.country);
+      showListingUnavailableToast();
+      if (queryString(route.query.flat) === l.id) syncListingInUrl(null);
+      return;
+    }
+    if (verified) listing = verified;
+  }
+  stopTranslationPoll(); translationRequestId += 1; lightboxIndex.value = null; active.value = listing;
+  translatedDescription.value = translationCache.get(translationCacheKey(listing)) || ""; translatingDescription.value = false; translationFailed.value = false; modalOpen.value = true;
+  recent.value = [listing, ...recent.value.filter((item) => item.id !== listing.id)].slice(0, MAX_RECENT_FLATS); persistList(STORAGE.recent, recent.value, MAX_RECENT_FLATS);
+  syncListingInUrl(listing);
 }
 function modalTitle(listing: Listing | null): string {
   if (!listing) return "";
@@ -796,7 +852,7 @@ async function translateActiveDescription() {
   if (data.status === "pending" && data.key) { translationPollTimer = setTimeout(() => void pollTranslation(data.key!, listing, requestId, cacheKey), 1000); return; }
   translatingDescription.value = false; translationFailed.value = true;
 }
-function openById(id: string) { const found = displayedListings.value.find((l) => l.id === id); if (found) openListing(found); }
+function openById(id: string) { const found = displayedListings.value.find((l) => l.id === id); if (found) void openListing(found); }
 function priceLabel(l: Listing): string { if (l.price == null) return t("priceNA"); return `${l.price.toLocaleString()} ${l.currency}`.trim(); }
 function updateLightboxZoom(event: MouseEvent) { const image = event.currentTarget as HTMLImageElement; const rect = image.getBoundingClientRect(); image.style.setProperty("--zoom-x", `${((event.clientX - rect.left) / rect.width) * 100}%`); image.style.setProperty("--zoom-y", `${((event.clientY - rect.top) / rect.height) * 100}%`); }
 function resetLightboxZoom(event: MouseEvent) { const image = event.currentTarget as HTMLImageElement; image.style.setProperty("--zoom-x", "50%"); image.style.setProperty("--zoom-y", "50%"); }
@@ -840,9 +896,15 @@ async function shareFlat(l: Listing) {
 }
 async function copyListingShareLink() { listingShareCopied.value = await copyText(listingShareUrl.value); if (listingShareCopied.value) showShareSuccess(); }
 async function openSharedListing(id: string, sourceName = "", countryCode = "", attempt = 0) {
-  const local = listings.value.find((listing) => listing.id === id); if (local) { openListing(local); return; }
+  const local = listings.value.find((listing) => listing.id === id); if (local) { await openListing(local); return; }
   const params: Record<string, string> = { listingId: id, limit: "1", offset: "0" }; if (SOURCES.includes(sourceName)) params.sources = sourceName; if (/^[A-Za-z]{2}$/.test(countryCode)) params.countries = countryCode.toUpperCase();
-  const { data } = await safeFetch<FeedResult>("/flats-feed", { params }); const exact = data?.listings?.find((listing) => listing.id === id); if (exact) { openListing(exact); return; }
+  const { data, error } = await safeFetch<FeedResult>("/flats-feed", { params }); const exact = data?.listings?.find((listing) => listing.id === id); if (exact) { await openListing(exact, sourceName === "olx" && exact.source === "olx"); return; }
+  if (!error && sourceName === "olx" && data?.exactListingFallback === "source-inactive") {
+    removeUnavailableListing(id, sourceName, countryCode);
+    showListingUnavailableToast();
+    if (queryString(route.query.flat) === id) syncListingInUrl(null);
+    return;
+  }
   if (data?.warming && attempt < 20) { if (sharedListingTimer) clearTimeout(sharedListingTimer); sharedListingTimer = setTimeout(() => { sharedListingTimer = undefined; void openSharedListing(id, sourceName, countryCode, attempt + 1); }, 1800); }
 }
 function timeAgo(iso: string | null): string { if (!iso) return ""; const days = Math.floor((Date.now() - new Date(iso).getTime()) / 86_400_000); if (Number.isNaN(days)) return ""; if (days <= 0) return t("today"); if (days === 1) return t("yesterday"); if (days < 30) return t("daysAgo", { n: days }); return t("monthsAgo", { n: Math.floor(days / 30) }); }
