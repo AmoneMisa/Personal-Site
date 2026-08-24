@@ -1,4 +1,5 @@
 import { canonicalMetroValue } from '../utils/tashkentMetroLabels'
+import { normalizeFlatDealType } from '../utils/flatDealType'
 
 // GET /flats-feed — server-side proxy to the flat-finder backend's /api/listings.
 // The flat API is plain HTTP and the site is HTTPS, so a direct browser call is
@@ -35,6 +36,7 @@ function rewritePhoto(p: unknown): unknown {
 function shapeListing(listing: any): any {
   return {
     ...listing,
+    dealType: normalizeFlatDealType(listing),
     photo: rewritePhoto(listing?.photo),
     photos: Array.isArray(listing?.photos) ? listing.photos.map(rewritePhoto) : [],
   }
