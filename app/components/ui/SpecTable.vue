@@ -60,12 +60,14 @@ const flatVisionDerivedFields = computed(() => {
     const id = queryString(route.query.flat);
     const source = queryString(route.query.flatSource).toLowerCase();
     const country = queryString(route.query.flatCountry).toUpperCase();
-    const listing = recent.find((item) => {
-      if (id && String(item?.id || "") !== id) return false;
-      if (source && String(item?.source || "").toLowerCase() !== source) return false;
-      if (country && String(item?.country || "").toUpperCase() !== country) return false;
-      return true;
-    }) || recent[0];
+    const listing = id
+      ? recent.find((item) => {
+          if (String(item?.id || "") !== id) return false;
+          if (source && String(item?.source || "").toLowerCase() !== source) return false;
+          if (country && String(item?.country || "").toUpperCase() !== country) return false;
+          return true;
+        })
+      : recent[0];
 
     return new Set(
       Array.isArray(listing?.vision?.derivedFields)
