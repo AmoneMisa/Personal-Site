@@ -1,7 +1,7 @@
 // Candidate/resume sources from public Telegram channels.
 // Only public job-seeker/CV posts are accepted; employer vacancies are rejected.
 
-import type { CvProfile, HiringSource } from './hiringTypes'
+import type { CvProfile } from './hiringTypes'
 import { emptyCursor, loadCursors, saveCursor, type ChannelCursor } from './hiringCursors'
 import { isLikelyTelegramVacancy } from './sources'
 import { cityRe } from './hiringWebFields'
@@ -16,19 +16,11 @@ const DEFAULT_HISTORY_LIMIT = 600
 const MAX_HISTORY_LIMIT = 5_000
 const MIN_HISTORY_LIMIT = 50
 const TELEGRAM_WORKER_PAGE_LIMIT = 200
-// One page per request, in both directions. Bounded so a single fetch stays
-// well inside the worker timeout rather than the timeout being raised to fit
-// an unbounded scan.
 const TELEGRAM_PAGE_SIZE = Math.min(
   200,
   Math.max(50, Number(process.env.HIRING_TELEGRAM_PAGE_SIZE) || 150),
 )
 const TELEGRAM_WORKER_TIMEOUT_MS = 60_000
-// Channels are fetched four at a time over the public t.me preview, but one at
-// a time through the worker: its queue is single-lane by design (parallel calls
-// from one account trip FLOOD_WAIT), so fanning out only inflates the wait each
-// request has to survive.
-const TELEGRAM_PARALLEL_CHANNELS = 4
 const MAX_CANDIDATE_AGE_MONTHS = 3
 const FUTURE_DATE_TOLERANCE_MS = 48 * 60 * 60 * 1000
 
@@ -77,19 +69,12 @@ interface TelegramFetchResult {
 
 let telegramDiagnostics: HiringSourceDiagnostic[] = []
 
-// Strong job-seeker forms observed in the verified UZ sources. In particular,
-// `#ish #qidiryapman` is two separate hashtags and was not matched by the old
-// generic intent regex.
 const UZ_CANDIDATE_MARKER_RE =
   /(?:#(?:ish[_-]?kerak|menga[_-]?ish[_-]?kerak|ish[_-]?izlayapman)|#ish\s+#qidir(?:yapman|aman)|\b(?:menga\s+)?ish\s+(?:joyi\s+)?kerak\b|\bish\s+(?:qidiryapman|qidiraman|izlayapman)\b|\b(?:ish|ishga)\s+joylash(?:moqchiman|ish)\b|(?:^|\n)\s*so(?:['’‘])ralgan\s+ish\s+(?:joyi|turi)\s*[:—-]|(?<![\p{L}\p{N}])(?:я\s+)?ищу\s+(?:себе\s+)?(?:работу|подработку)(?![\p{L}\p{N}])|(?<![\p{L}\p{N}])работу\s+ищу(?![\p{L}\p{N}])|(?<![\p{L}\p{N}])нужна\s+(?:мне\s+)?работа(?![\p{L}\p{N}])|(?<![\p{L}\p{N}])могу\s+работать(?![\p{L}\p{N}])|#ищу\s+#работу|(?<![\p{L}\p{N}])(?:у\s+пошуку|шукаю)\s+(?:роботу|підробіток)(?![\p{L}\p{N}]))/iu
 
-// Employer language must always win over a positive hashtag. This matters for
-// UZ boards where a vacancy can be tagged `#ish_izlayapman #vakansiya`.
 const UZ_EMPLOYER_RE =
   /(?:#(?:ishchi[_-]?kerak|xodim[_-]?kerak|ishga[_-]?taklif[_-]?qilamiz|vakansiya)|\bvakansi(?:ya|я)\b|\bbo(?:'|’)sh\s+ish\s+o(?:'|’)rin(?:i|lari)\b|\bishga\s+(?:taklif\s+qilamiz|qabul\s+qilamiz|qabul\s+qilinadi|olamiz)\b|\b(?:xodim|hodim|ishchi)\s+kerak\b|\b(?:sotuvchi|kassir|operator|farrosh|afitsiant|ofitsiant|barmen|barista|oshpaz|haydovchi|qorovul|hamshira|o(?:'|’)qituvchi|administrator)\s+kerak\b|\btalab\s+(?:qilinadi|etiladi)\b|\bnomzod(?:ga|lar)?\s+.*?talab\b|\brezyume(?:ni)?\s+yubor(?:ing|ishingiz)\b)/iu
 
-// Structured fields commonly used by actual self-posted CV cards. These are
-// evidence of a candidate, but never override employer/vacancy signals.
 const CANDIDATE_FORM_RE =
   /(?:^|\n)\s*[^\p{L}\p{N}\n]{0,8}(?:ism(?:i|im)?(?:\s*[-–—]\s*(?:familya|familiya))?|familya|familiya|f\.?i\.?o\.?|фио|имя|yoshi|yoshim|tug(?:['’‘])ilgan\s+yili|возраст|qidirayotgan\s+kasb|so(?:['’‘])ralgan\s+ish\s+(?:joyi|turi)|yashash\s+manzili|ma(?:['’‘])lumoti|ожидаемая\s+работа|желаемая\s+(?:должность|работа)|tajribasi?|опыт\s+работы)\s*[:—-]/imu
 
@@ -178,9 +163,6 @@ function telegramChannels(): TelegramChannel[] {
 function telegramHistoryLimit(channel: TelegramChannel): number {
   const requested = Number(process.env.HIRING_TELEGRAM_HISTORY_LIMIT || DEFAULT_HISTORY_LIMIT)
   const envLimit = Number.isFinite(requested) ? requested : DEFAULT_HISTORY_LIMIT
-  // A stale production env value such as 200 must not silently undo the deep
-  // backfill required by a verified mixed board. Env can raise, not lower, a
-  // source-specific minimum.
   const wanted = Math.max(envLimit, channel.historyLimit || DEFAULT_HISTORY_LIMIT)
   return Math.min(MAX_HISTORY_LIMIT, Math.max(MIN_HISTORY_LIMIT, Math.round(wanted)))
 }
@@ -230,8 +212,6 @@ export function isLikelyCvPost(text: string, cvFeed = false): boolean {
 
   const explicitIntent = CANDIDATE_INTENT_RE.test(value)
   const candidateForm = CANDIDATE_FORM_RE.test(value)
-  // Strong employer structure has precedence even if the board used a sloppy
-  // candidate-looking hashtag in the same post.
   if (EMPLOYER_RE.test(value) || UZ_EMPLOYER_RE.test(value) || VACANCY_SECTION_RE.test(value)) return false
   if (!explicitIntent && !candidateForm && isLikelyTelegramVacancy(compact)) return false
 
@@ -242,8 +222,6 @@ export function isLikelyCvPost(text: string, cvFeed = false): boolean {
   const sections = cvSectionCount(value)
   const hasExperience = /(?:\d+\+?\s*(?:лет|рок(?:и|ів)?|years|yil|йил)|(?:опыт|досвід|experience|staj|tajriba)\s*[:—-]?\s*\d)/iu.test(value)
 
-  // The old `compact.length >= 60` branch admitted long but otherwise
-  // unstructured ads. A job-seeker intent now needs actual candidate evidence.
   if (explicitIntent && (firstPerson || candidateForm || hasRole || hasContact || sections >= 1)) return true
   if (hasCvMarker && (candidateForm || hasRole || sections >= 1 || hasContact)) return true
   if (cvFeed && (firstPerson || hasCvMarker || candidateForm) && (hasRole || sections >= 1 || hasExperience || hasContact)) return true
@@ -284,8 +262,6 @@ function parseExperience(text: string): number | undefined {
   const halfYears = text.match(/(?:ish\s+staji|staj|tajriba\p{L}*)\s*[:—-]?\s*(\d+)\s+yarim\s+yil/iu)
   if (halfYears?.[1]) return Number(halfYears[1]) + 0.5
   const match = text.match(/(?:опыт|досвід|experience|staj|tajriba\p{L}*)\s*[:—-]?\s*(\d+)\+?\s*(?:лет|рок(?:и|ів)?|years|yil|йил)?/iu)
-    // The keyword is required on this side: a bare "80 років" is somebody's
-    // age, not their career.
     || text.match(/(\d+)\+?\s*(?:лет|рок(?:и|ів)?|years|yil|йил)\s+(?:опыт\p{L}*|досвід\p{L}*|experience|tajriba\p{L}*|staj\p{L}*)/iu)
     || text.match(/(?:опыт|досвід|experience|staj|tajriba)\p{L}*\s+(?:работы|роботи|of\s+work)?\s*[:—-]?\s*(\d+)/iu)
   const years = match ? Number(match[1]) : undefined
@@ -381,13 +357,8 @@ function messageToProfile(
   const createdAt = recentCandidateDate(opts.dateIso)
   if (!createdAt) return null
   const lowerText = text.toLocaleLowerCase('ru')
-  // A CV feed that serves one country still carries candidates from elsewhere.
-  // Whether this post is about the channel's country decides what country the
-  // candidate gets — never whether the post is a candidate at all.
   const localToChannel = !channel.includeAny?.length
     || channel.includeAny.some((marker) => lowerText.includes(marker.toLocaleLowerCase('ru')))
-  // UZ mixed feeds must explicitly say that the person is looking for work.
-  // This source-level gate is intentionally stricter than the generic parser.
   if (channel.requireCandidateMarker && !UZ_CANDIDATE_MARKER_RE.test(text)) return null
   if (!isLikelyCvPost(text, channel.cvFeed)) return null
 
@@ -411,9 +382,6 @@ function messageToProfile(
   return {
     id: opts.id,
     source: 'telegram',
-    // The channel this came from, kept separately from where the candidate is:
-    // a remote candidate in Russia posting to a Kyrgyz CV feed is not a Kyrgyz
-    // candidate, and must not be filtered as one.
     sourceCountry: channel.country,
     country: localToChannel ? channel.country : '',
     name,
@@ -445,16 +413,11 @@ interface MessageOutcome {
   reason?: 'expired' | 'vacancy' | 'quality'
 }
 
-/** Employer language, checked separately so the funnel can attribute a drop. */
 function looksLikeVacancy(text: string): boolean {
   const value = text.replace(/\s+/g, ' ')
   return EMPLOYER_RE.test(text) || VACANCY_SECTION_RE.test(text) || isLikelyTelegramVacancy(value)
 }
 
-/**
- * messageToProfile plus the reason it said no, so a channel yielding nothing
- * can be told apart from a channel whose candidates we are rejecting.
- */
 function classifyMessage(
   text: string,
   opts: { id: string; url: string; dateIso: string | null | undefined },
@@ -470,9 +433,7 @@ function classifyMessage(
 }
 
 interface PageRequest {
-  /** Only messages newer than this are wanted (incremental polling). */
   afterId?: number
-  /** Only messages older than this are wanted (historical backfill). */
   beforeId?: number
   limit: number
 }
@@ -482,9 +443,7 @@ interface PageResult {
   funnel: ChannelFunnel
   newestId: number
   oldestId: number
-  /** Older messages remain beyond this page. */
   more: boolean
-  /** The page reached past the retention window; there is nothing worth backfilling. */
   reachedCutoff: boolean
 }
 
@@ -492,11 +451,6 @@ function emptyPage(): PageResult {
   return { profiles: [], funnel: emptyFunnel(), newestId: 0, oldestId: 0, more: false, reachedCutoff: false }
 }
 
-/**
- * Reads exactly one bounded page from the worker and classifies it, counting
- * every stage so a zero yield can be attributed to the source, the vacancy
- * gate or the quality gate rather than guessed at.
- */
 async function fetchWorkerPage(
   base: string,
   channel: TelegramChannel,
@@ -522,8 +476,6 @@ async function fetchWorkerPage(
   let oldestDate = Number.POSITIVE_INFINITY
 
   for (const message of data.messages) {
-    // Incremental mode: the worker returns newest-first, so anything at or
-    // below the cursor has been processed already and ends this page.
     if (request.afterId && Number(message.id) <= request.afterId) {
       page.more = false
       break
@@ -547,8 +499,6 @@ async function fetchWorkerPage(
 
     if (outcome.candidateMarker) page.funnel.candidateMarkerMatched += 1
     if (outcome.reason === 'vacancy') page.funnel.rejectedVacancy += 1
-    // "expired" is a retention fact, not a judgement on the post: counting it as
-    // a quality rejection would make an old channel look like a parser failure.
     else if (outcome.reason === 'quality') page.funnel.rejectedQuality += 1
     if (outcome.profile) {
       page.profiles.push(outcome.profile)
@@ -561,7 +511,6 @@ async function fetchWorkerPage(
     page.oldestId = Math.min(...ids)
   }
   page.reachedCutoff = Number.isFinite(oldestDate) && oldestDate < cutoff
-  // A full page means Telegram probably has more behind it.
   page.more = !page.reachedCutoff && data.messages.length >= request.limit
   return page
 }
@@ -596,10 +545,6 @@ async function fetchChannelViaWorker(base: string, channel: TelegramChannel, q: 
     }
 
     fetched += data.messages.length
-
-    // Telegram history is newest -> oldest. Once a page reaches beyond the
-    // three-month retention boundary, every later page is ineligible and the
-    // backfill is complete even when the numeric cap is much higher.
     const dates = data.messages
       .map((message) => message.date ? Date.parse(message.date) : Number.NaN)
       .filter(Number.isFinite)
@@ -649,19 +594,6 @@ interface ChannelOutcome {
   cursor: ChannelCursor
 }
 
-/**
- * One channel, one round: every message newer than the cursor, then at most one
- * bounded page of history.
- *
- * The backfill page is capped per round on purpose. A channel with 5,000
- * messages of history used to enqueue all twenty-five of its pages back to
- * back through a worker that serves one request at a time, and everything
- * behind it timed out. One page each per round keeps the queue fair; the
- * backfill still finishes, just without starving anyone.
- *
- * Incremental polling does not wait for the backfill to complete — a channel
- * still being backfilled reports its new posts on the normal cadence.
- */
 async function crawlChannel(
   base: string,
   channel: TelegramChannel,
@@ -673,7 +605,6 @@ async function crawlChannel(
   let next: ChannelCursor = { ...cursor }
   let mode: 'incremental' | 'backfill' | 'idle' = 'idle'
 
-  // 1. Everything posted since we last looked.
   const incremental = await fetchWorkerPage(base, channel, q, {
     afterId: cursor.newestMessageId || undefined,
     limit: TELEGRAM_PAGE_SIZE,
@@ -682,10 +613,8 @@ async function crawlChannel(
   profiles.push(...incremental.profiles)
   addFunnel(funnel, incremental.funnel)
   if (incremental.newestId) next.newestMessageId = Math.max(next.newestMessageId, incremental.newestId)
-  // First contact with a channel: its newest page is also the start of history.
   if (!next.oldestMessageId && incremental.oldestId) next.oldestMessageId = incremental.oldestId
 
-  // 2. One page further back, only while history is still owed.
   if (!next.bootstrapComplete && next.oldestMessageId) {
     const backfill = await fetchWorkerPage(base, channel, q, {
       beforeId: next.oldestMessageId,
@@ -695,8 +624,6 @@ async function crawlChannel(
     profiles.push(...backfill.profiles)
     addFunnel(funnel, backfill.funnel)
     if (backfill.oldestId) next.oldestMessageId = Math.min(next.oldestMessageId, backfill.oldestId)
-    // Retention decides where history ends: once a page predates the window,
-    // nothing older can ever become a candidate.
     if (backfill.reachedCutoff || !backfill.more || !backfill.oldestId) next.bootstrapComplete = true
   } else if (!next.oldestMessageId && !incremental.more) {
     next.bootstrapComplete = true
@@ -714,16 +641,12 @@ function addFunnel(total: ChannelFunnel, page: ChannelFunnel): void {
   total.candidates += page.candidates
 }
 
-// One channel, never throwing: a dead handle is a diagnostic, not a reason to
-// abandon the other channels in the batch.
 async function readChannel(channel: TelegramChannel, q: string, cursor: ChannelCursor): Promise<ChannelOutcome> {
   const checkedAt = new Date().toISOString()
   const startedAt = Date.now()
   const workerUrl = process.env.TELEGRAM_WORKER_URL
 
   try {
-    // Without a worker there is no cursor to keep: the public preview only ever
-    // returns the newest ~20 posts, so the crawl is incremental by nature.
     if (!workerUrl) {
       const result = await fetchTelegramChannel(channel, q)
       return {
@@ -797,18 +720,14 @@ async function readChannel(channel: TelegramChannel, q: string, cursor: ChannelC
   }
 }
 
-/** Configured handles, in fetch order — the queue dispatcher fans these out. */
+/** Configured handles, in fetch order — the queue scheduler fans these out. */
 export function hiringChannelHandles(): string[] {
   return telegramChannels()
     .filter((channel) => channel.enabled !== false)
     .map((channel) => channel.handle)
 }
 
-/**
- * Refreshes a single channel, for the per-channel queue tasks. The shared
- * diagnostics list is patched in place so /hiring-feed keeps reporting one row
- * per channel no matter which path last refreshed it.
- */
+/** Refresh one configured Telegram channel for the per-channel queue task. */
 export async function fetchHiringChannel(handle: string, q = ''): Promise<ChannelOutcome | null> {
   if (process.env.TELEGRAM_SOURCE === 'off') return null
   const wanted = handle.replace(/^@/, '').toLowerCase()
@@ -825,78 +744,6 @@ export async function fetchHiringChannel(handle: string, q = ''): Promise<Channe
   return outcome
 }
 
-const PRIORITY_ORDER: Record<string, number> = { high: 0, normal: 1, low: 2 }
-
-/** High-yield feeds are crawled first, so a slow tail cannot delay them. */
-function byPriority(channels: TelegramChannel[]): TelegramChannel[] {
-  return [...channels].sort(
-    (a, b) => (PRIORITY_ORDER[a.priority || 'normal'] ?? 1) - (PRIORITY_ORDER[b.priority || 'normal'] ?? 1),
-  )
-}
-
-export async function fetchHiringTelegram(q: string): Promise<CvProfile[]> {
-  if (process.env.TELEGRAM_SOURCE === 'off') return []
-  const configured = telegramChannels()
-  const active = byPriority(configured.filter((channel) => channel.enabled !== false))
-  const profiles: CvProfile[] = []
-  const diagnostics: HiringSourceDiagnostic[] = []
-  const cursors = await loadCursors()
-
-  const stride = process.env.TELEGRAM_WORKER_URL ? 1 : TELEGRAM_PARALLEL_CHANNELS
-  for (let start = 0; start < active.length; start += stride) {
-    const batch = active.slice(start, start + stride)
-    const results = await Promise.all(
-      batch.map((channel) => readChannel(channel, q, cursors.get(channel.handle) || emptyCursor(channel.handle))),
-    )
-    for (const item of results) {
-      profiles.push(...item.result.profiles)
-      diagnostics.push(item.diagnostic)
-      cursors.set(item.diagnostic.handle, item.cursor)
-    }
-  }
-
-  // Disabled sources stay visible in diagnostics: an audit needs to see that a
-  // channel is deliberately idle rather than silently missing.
-  for (const channel of configured.filter((item) => item.enabled === false)) {
-    const cursor = cursors.get(channel.handle) || emptyCursor(channel.handle)
-    diagnostics.push({
-      handle: channel.handle,
-      country: channel.country,
-      status: 'disabled',
-      fetched: 0,
-      candidateMarkerMatched: 0,
-      rejectedVacancy: 0,
-      rejectedQuality: 0,
-      candidates: 0,
-      mode: 'idle',
-      newestMessageId: cursor.newestMessageId,
-      oldestMessageId: cursor.oldestMessageId,
-      bootstrapComplete: cursor.bootstrapComplete,
-      fetchDurationMs: 0,
-      checkedAt: new Date().toISOString(),
-    })
-  }
-
-  telegramDiagnostics = diagnostics
-  const pending = diagnostics.filter((item) => item.status !== 'disabled' && !item.bootstrapComplete).length
-  console.log(
-    `[hiring] crawl round: ${active.length} channels, ` +
-    `${diagnostics.reduce((total, item) => total + item.fetched, 0)} messages, ` +
-    `${profiles.length} candidates, ${pending} still backfilling`,
-  )
-  return profiles
-}
-
 export function getHiringSourceDiagnostics(): HiringSourceDiagnostic[] {
   return telegramDiagnostics.map((item) => ({ ...item }))
-}
-
-const FETCHERS: Record<HiringSource, (q: string) => Promise<CvProfile[]>> = { telegram: fetchHiringTelegram }
-
-export function isHiringSourceConfigured(source: HiringSource): boolean {
-  return source === 'telegram' && process.env.TELEGRAM_SOURCE !== 'off'
-}
-
-export async function fetchHiringSource(source: HiringSource, q = ''): Promise<CvProfile[]> {
-  return FETCHERS[source](q)
 }
