@@ -220,7 +220,14 @@ onBeforeUnmount(() => {
     </template>
 
     <Teleport to="body">
-    <div v-if="open" ref="popupEl" class="u-select-menu__popup" role="listbox" :style="popupStyle">
+    <div
+      v-if="open"
+      ref="popupEl"
+      class="u-select-menu__popup"
+      role="listbox"
+      :aria-multiselectable="multiple ? 'true' : undefined"
+      :style="popupStyle"
+    >
       <input
           v-if="searchable"
           ref="searchEl"
@@ -242,8 +249,18 @@ onBeforeUnmount(() => {
             @mouseenter="activeIndex = index"
             @click="choose(item)"
         >
+          <span
+            class="u-select-menu__choice"
+            :class="[
+              multiple ? 'u-select-menu__choice_checkbox' : 'u-select-menu__choice_radio',
+              { 'u-select-menu__choice_selected': isSelected(item) },
+            ]"
+            aria-hidden="true"
+          >
+            <UIcon v-if="multiple && isSelected(item)" name="i-lucide-check" class="u-select-menu__check" />
+            <span v-else-if="!multiple && isSelected(item)" class="u-select-menu__radio-dot" />
+          </span>
           <span class="u-select-menu__option-label">{{ labelOf(item) }}</span>
-          <UIcon v-if="isSelected(item)" name="i-lucide-check" class="u-select-menu__check" />
         </li>
       </ul>
     </div>
@@ -387,7 +404,20 @@ onBeforeUnmount(() => {
 }
 .u-select-menu__option_active { background: rgba(255, 255, 255, 0.07); }
 .u-select-menu__option_selected { color: var(--accent-pink, #e0679a); }
+.u-select-menu__choice {
+  flex: none;
+  display: inline-grid;
+  place-items: center;
+  width: 15px;
+  height: 15px;
+  border: 1px solid var(--ui-control-border);
+  color: var(--accent-pink, #e0679a);
+}
+.u-select-menu__choice_radio { border-radius: 50%; }
+.u-select-menu__choice_checkbox { border-radius: 4px; }
+.u-select-menu__choice_selected { border-color: var(--accent-pink, #e0679a); }
+.u-select-menu__radio-dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
 .u-select-menu__option-label { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.u-select-menu__check { flex: none; font-size: 0.95em; }
+.u-select-menu__check { flex: none; font-size: 0.85em; }
 .u-select-menu__empty { padding: 8px; color: var(--ui-control-placeholder); font-size: 12.5px; text-align: center; }
 </style>
