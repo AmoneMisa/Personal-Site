@@ -989,7 +989,7 @@ onBeforeUnmount(() => { modalOpen.value = false; lightboxIndex.value = null; rel
 
 <template>
   <u-container class="flats">
-    <ocean-page-backdrop />
+    <ocean-page-backdrop variant="home" />
     <div class="flats__header text-center space-y-3">
       <h1 class="flats__title">{{ t("title") }}</h1>
       <p class="flats__subtitle text-muted mx-auto">{{ t("subtitle") }}</p>

@@ -42,7 +42,7 @@ const howSteps = [
 
 <template>
   <u-container class="services">
-    <ocean-page-backdrop />
+    <ocean-page-backdrop variant="treasure" />
     <div class="services__header text-center space-y-3">
       <page-header title="services.title" headline="services.headline" class="mb-6" />
       <p class="services__subtitle mx-auto">{{ t("services.subtitle") }}</p>

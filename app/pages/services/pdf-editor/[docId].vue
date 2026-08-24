@@ -2019,7 +2019,7 @@ onBeforeUnmount(() => {
 
 <template>
   <u-container class="pdf">
-    <ocean-page-backdrop />
+    <ocean-page-backdrop variant="treasure" />
     <div class="pdf__header background-hero text-center space-y-3">
       <page-header
           title="services.pdfEditor.title"
