@@ -1,20 +1,25 @@
-/* Shared refresh feedback for result grids that already expose a *_grid_loading state.
-   Keep the current results visible, dim the stale content and render the spinner
-   above every interactive result element. */
+/* Shared loading state for Flat Finder, Hiring and Jobs.
+   All three pages use the same visual treatment: stale results stay visible but
+   inert and dimmed, while one spinner is rendered above the result surface. */
 .flats__grid_loading,
-.hiring__grid_loading {
+.hiring__grid_loading,
+.jobs__grid_loading {
     position: relative;
     min-height: 180px;
     opacity: 1 !important;
     pointer-events: none;
+    isolation: isolate;
 }
 
 .flats__grid_loading > *,
-.hiring__grid_loading > * {
+.hiring__grid_loading > *,
+.jobs__grid_loading > * {
     opacity: 0.35;
     transition: opacity 140ms ease;
 }
 
+/* Flat Finder and Hiring expose the loading state directly on their result
+   grids, so the shared spinner is drawn by the grid itself. */
 .flats__grid_loading::after,
 .hiring__grid_loading::after {
     content: "";
@@ -28,30 +33,38 @@
     border-top-color: var(--accent-pink, #e0679a);
     border-radius: 50%;
     opacity: 1;
-    z-index: 20;
+    z-index: 50;
     animation: results-loader-spin 0.7s linear infinite;
 }
 
-/* Jobs has its own loader element. While it is present, the recently-viewed
-   strip is part of the stale result surface too: dim it and make it inert so a
-   user cannot open an old card while the filtered result set is being replaced. */
-.jobs:has(.jobs__loader) .recent {
-    opacity: 0.35;
-    pointer-events: none;
-    transition: opacity 140ms ease;
-}
-
-/* Keep the jobs spinner above cards and any local stacking contexts. The loader
-   text remains available to assistive technology but is not rendered visually. */
+/* Jobs already has a semantic loader node (role=status). Style that node to the
+   same geometry and stacking level instead of maintaining a second visual style. */
 .jobs__results {
+    position: relative;
     isolation: isolate;
 }
 
 .jobs__loader {
+    position: absolute !important;
+    inset: 0 !important;
+    display: flex !important;
+    align-items: flex-start !important;
+    justify-content: center !important;
+    padding-top: 72px !important;
     z-index: 50 !important;
     pointer-events: auto;
+    color: transparent !important;
 }
 
+.jobs__loader-icon {
+    width: 28px !important;
+    height: 28px !important;
+    color: var(--accent-pink, #e0679a);
+    animation: results-loader-spin 0.7s linear infinite !important;
+}
+
+/* Keep the status text for assistive technology without rendering the redundant
+   "Searching…" label beside the spinner. */
 .jobs__loader > span {
     position: absolute !important;
     width: 1px !important;
@@ -64,13 +77,22 @@
     border: 0 !important;
 }
 
+/* The recently-viewed strip belongs to the current jobs result surface even
+   though it sits immediately above the grid. It must be inert during refresh. */
+.jobs:has(.jobs__loader) .recent {
+    opacity: 0.35;
+    pointer-events: none;
+    transition: opacity 140ms ease;
+}
+
 @keyframes results-loader-spin {
     to { transform: rotate(360deg); }
 }
 
 @media (prefers-reduced-motion: reduce) {
     .flats__grid_loading::after,
-    .hiring__grid_loading::after {
-        animation-duration: 1.4s;
+    .hiring__grid_loading::after,
+    .jobs__loader-icon {
+        animation-duration: 1.4s !important;
     }
 }
