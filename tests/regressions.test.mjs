@@ -16,6 +16,12 @@ import {
   extractCandidateName,
 } from '../server/utils/hiringCandidateFields.ts'
 import { removeExistingSocialMeta } from '../server/utils/shareHead.ts'
+import { buildShareOgSvg, renderShareOgPng } from '../server/utils/shareOgImage.ts'
+import {
+  buildCandidateShareMeta,
+  buildFlatShareMeta,
+  buildJobShareMeta,
+} from '../server/utils/sharePreview.ts'
 import { looksSoftBlocked } from '../server/utils/browserSoftBlock.ts'
 import { dedupeCandidates, normalizeCandidate, normalizeProfessions, trimRabotaKzProfileText, trimThreadsProfileText } from '../server/utils/hiringNormalize.ts'
 import { repairCandidateProfile } from '../server/utils/hiringQuality.ts'
@@ -356,6 +362,40 @@ test('share metadata replacement preserves Nuxt assets in a combined head entry'
   assert.match(result, /<link rel="stylesheet" href="\/_nuxt\/app\.css">/)
   assert.match(result, /<script type="module" src="\/_nuxt\/app\.js"><\/script>/)
   assert.doesNotMatch(result, /og:title|twitter:card/)
+})
+
+test('site and listing previews use one stable 1200x630 OG image renderer', async () => {
+  const job = buildJobShareMeta({ title: 'Frontend Developer', company: 'WhitesLove' }, 'job-1')
+  const candidate = buildCandidateShareMeta({ name: 'Маргарита', role: 'Frontend Developer' }, 'cv-1', 'telegram', 'UA')
+  const flat = buildFlatShareMeta({ title: 'Квартира в центре', price: 900, currency: 'USD' }, 'flat-1', 'olx', 'UZ')
+
+  assert.match(job.image, /\/share-og\.png\?kind=job&id=job-1$/u)
+  assert.match(candidate.image, /\/share-og\.png\?kind=candidate&id=cv-1&source=telegram&country=UA$/u)
+  assert.match(flat.image, /\/share-og\.png\?kind=flat&id=flat-1&source=olx&country=UZ$/u)
+  assert.match(candidate.url, /\/hiring\?cv=cv-1&cvSource=telegram&cvCountry=UA$/u)
+
+  const svg = buildShareOgSvg({
+    kind: 'candidate',
+    title: 'Маргарита & Frontend > Lead',
+    description: 'Vue & Nuxt',
+  })
+  assert.match(svg, /width="1200" height="630"/u)
+  assert.match(svg, /Маргарита &amp; Frontend &gt; Lead/u)
+  assert.doesNotMatch(svg, /Маргарита & Frontend > Lead/u)
+
+  const png = await renderShareOgPng({ kind: 'site', title: 'WhitesLove' })
+  assert.deepEqual([...png.subarray(0, 8)], [137, 80, 78, 71, 13, 10, 26, 10])
+  assert.equal(png.readUInt32BE(16), 1200)
+  assert.equal(png.readUInt32BE(20), 630)
+
+  const plugin = readFileSync(new URL('../server/plugins/share-preview.ts', import.meta.url), 'utf8')
+  const route = readFileSync(new URL('../server/routes/share-og.png.get.ts', import.meta.url), 'utf8')
+  const app = readFileSync(new URL('../app/app.vue', import.meta.url), 'utf8')
+  assert.match(plugin, /pathname === '\/hiring' \|\| pathname === '\/en\/hiring'/u)
+  assert.match(plugin, /og:image:width" content="1200/u)
+  assert.match(plugin, /twitter:image:alt/u)
+  assert.match(route, /renderShareOgPng/u)
+  assert.match(app, /share-og\.png\?kind=site/u)
 })
 
 test('Cyrillic city, age and date patterns match at all', () => {

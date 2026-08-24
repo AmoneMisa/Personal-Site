@@ -1,36 +1,16 @@
 import {
-  SHARE_SITE_URL,
+  buildCandidateShareMeta,
   buildFlatShareMeta,
   buildJobShareMeta,
   escapeXml,
+  findSharedCandidate,
   findSharedFlat,
   findSharedJob,
-  flatPhotoUrl,
 } from '../utils/sharePreview'
 import { removeExistingSocialMeta } from '../utils/shareHead'
 
 function queryValue(value: unknown): string {
   return Array.isArray(value) ? String(value[0] ?? '') : String(value ?? '')
-}
-
-function isTelegramPhoto(value: string): boolean {
-  return /^\/api\/tg-photo\/[A-Za-z0-9_]{3,64}\/\d+$/.test(value)
-}
-
-function absoluteFlatImage(flat: any): string {
-  const photo = flatPhotoUrl(flat)
-  if (!photo) return `${SHARE_SITE_URL}/web-app-manifest-512x512.png`
-
-  // Public HTTPS listing photos can be consumed by Telegram directly.
-  if (/^https:\/\//i.test(photo)) return photo
-
-  // Telegram listing images live on the HTTP flat-finder backend. Proxy them
-  // through whiteslove.me so social crawlers can fetch them over HTTPS.
-  if (isTelegramPhoto(photo)) {
-    return `${SHARE_SITE_URL}/flats-photo?path=${encodeURIComponent(photo)}`
-  }
-
-  return `${SHARE_SITE_URL}/web-app-manifest-512x512.png`
 }
 
 export default defineNitroPlugin((nitroApp) => {
@@ -49,40 +29,27 @@ export default defineNitroPlugin((nitroApp) => {
       const country = queryValue(query.flatCountry).trim().toUpperCase()
       const flat = await findSharedFlat(id, source, country)
 
-      // A shared link must always produce a card. When the lookup misses (cold
-      // snapshot, expired listing, slow upstream) we still emit a generic
-      // preview instead of returning early — otherwise the crawler receives no
-      // usable tags and the chat shows an endless "generating preview".
-      meta = flat
-        ? buildFlatShareMeta(flat, id, source, country, pathname)
-        : {
-            title: 'Property listing · Flat Finder',
-            description: 'Apartment and house search across Uzbekistan, Kazakhstan, Ukraine and Romania.',
-            image: `${SHARE_SITE_URL}/web-app-manifest-512x512.png`,
-            imageType: 'image/png' as const,
-            url: `${SHARE_SITE_URL}${pathname}?flat=${encodeURIComponent(id)}`,
-            type: 'website' as const,
-          }
-      if (flat) meta.image = absoluteFlatImage(flat)
+      // Shared links must keep a valid card even after an item expires or while
+      // its source snapshot is warming. The builders provide the same 1200x630
+      // fallback renderer when item data is temporarily unavailable.
+      meta = buildFlatShareMeta(flat || {}, id, source, country, pathname)
     } else if (pathname === '/jobs' || pathname === '/en/jobs') {
       const id = queryValue(query.job).trim()
       if (!id) return
 
       const job = await findSharedJob(id)
-      if (!job) return
+      meta = buildJobShareMeta(job || {}, id, pathname)
+    } else if (pathname === '/hiring' || pathname === '/en/hiring') {
+      const id = queryValue(query.cv).trim()
+      if (!id) return
 
-      meta = buildJobShareMeta(job, id, pathname)
-      // Until a vacancy-specific renderer is introduced, use a guaranteed,
-      // same-origin image instead of the old /share/job-og.png URL (which did
-      // not have a Nitro route and therefore returned 404).
-      meta.image = `${SHARE_SITE_URL}/web-app-manifest-512x512.png`
+      const source = queryValue(query.cvSource).trim().toLowerCase()
+      const country = queryValue(query.cvCountry).trim().toUpperCase()
+      const candidate = await findSharedCandidate(id)
+      meta = buildCandidateShareMeta(candidate || {}, id, source, country, pathname)
     }
 
     if (!meta) return
-
-    // Keep the declared type honest: absoluteFlatImage may fall back to a PNG
-    // even though listing photos are normally JPEG.
-    meta.imageType = /\.png(?:$|\?)/i.test(meta.image) ? 'image/png' : 'image/jpeg'
 
     html.head = removeExistingSocialMeta(html.head)
     html.head.push(
@@ -92,16 +59,18 @@ export default defineNitroPlugin((nitroApp) => {
       `<meta property="og:description" content="${escapeXml(meta.description)}">`,
       `<meta property="og:url" content="${escapeXml(meta.url)}">`,
       `<meta property="og:image" content="${escapeXml(meta.image)}">`,
-      // secure_url + type help Telegram accept the image. Dimensions are
-      // deliberately NOT declared: the real photo size is unknown here, and a
-      // wrong width/height breaks card rendering worse than omitting it.
+      // Every share image comes from the same renderer, so format and dimensions
+      // are stable enough for Telegram, LinkedIn and Twitter/X to trust.
       `<meta property="og:image:secure_url" content="${escapeXml(meta.image)}">`,
       `<meta property="og:image:type" content="${escapeXml(meta.imageType)}">`,
+      '<meta property="og:image:width" content="1200">',
+      '<meta property="og:image:height" content="630">',
       `<meta property="og:image:alt" content="${escapeXml(meta.title)}">`,
       '<meta name="twitter:card" content="summary_large_image">',
       `<meta name="twitter:title" content="${escapeXml(meta.title)}">`,
       `<meta name="twitter:description" content="${escapeXml(meta.description)}">`,
       `<meta name="twitter:image" content="${escapeXml(meta.image)}">`,
+      `<meta name="twitter:image:alt" content="${escapeXml(meta.title)}">`,
     )
   })
 })

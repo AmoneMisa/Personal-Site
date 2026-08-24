@@ -18,6 +18,12 @@ FROM node:24-bookworm-slim AS runner
 
 WORKDIR /app
 
+# The OG renderer uses DejaVu Sans so Cyrillic and Latin card titles are both
+# rendered consistently in the small production image.
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends fonts-dejavu-core \
+  && rm -rf /var/lib/apt/lists/*
+
 ENV NODE_ENV=production
 ENV HOST=0.0.0.0
 ENV PORT=3000

@@ -100,6 +100,28 @@ export async function findSharedJob(id: string): Promise<any | null> {
   }
 }
 
+export async function findSharedCandidate(id: string): Promise<any | null> {
+  const wanted = String(id || '').trim()
+  if (!wanted) return null
+  const cached = cacheGet(`candidate:${wanted}`)
+  if (cached) return cached.value
+
+  try {
+    const [{ getStoredCvProfilesSnapshot }, { getStoredWebCvProfiles }] = await Promise.all([
+      import('./hiringSnapshot'),
+      import('./hiringWebStore'),
+    ])
+    const [stored, web] = await Promise.all([
+      getStoredCvProfilesSnapshot(),
+      getStoredWebCvProfiles(),
+    ])
+    const found = [...stored, ...web].find((profile) => profile.id === wanted || profile.url === wanted) || null
+    return cacheSet(`candidate:${wanted}`, found)
+  } catch {
+    return null
+  }
+}
+
 export async function findSharedFlat(id: string, source = '', country = ''): Promise<any | null> {
   const wanted = String(id || '').trim()
   if (!wanted) return null
@@ -133,22 +155,46 @@ export async function findSharedFlat(id: string, source = '', country = ''): Pro
   }
 }
 
+function finiteNumber(value: unknown): number | null {
+  if (value === null || value === undefined || value === '') return null
+  const parsed = Number(value)
+  return Number.isFinite(parsed) ? parsed : null
+}
+
 function salaryLabel(job: any): string {
-  const min = Number(job?.salaryMin)
-  const max = Number(job?.salaryMax)
-  if (!Number.isFinite(min) && !Number.isFinite(max)) return ''
+  const min = finiteNumber(job?.salaryMin)
+  const max = finiteNumber(job?.salaryMax)
+  if (min === null && max === null) return ''
   const currency = cleanShareText(job?.salaryCurrency || 'USD', 8)
   const period = job?.salaryPeriod ? `/${cleanShareText(job.salaryPeriod, 12)}` : ''
   const format = (value: number) => Math.round(value).toLocaleString('en-US')
-  if (Number.isFinite(min) && Number.isFinite(max)) return `${format(min)}–${format(max)} ${currency}${period}`
-  if (Number.isFinite(min)) return `from ${format(min)} ${currency}${period}`
-  return `up to ${format(max)} ${currency}${period}`
+  if (min !== null && max !== null) return `${format(min)}–${format(max)} ${currency}${period}`
+  if (min !== null) return `from ${format(min)} ${currency}${period}`
+  return `up to ${format(max!)} ${currency}${period}`
 }
 
 function flatPriceLabel(flat: any): string {
-  const price = Number(flat?.price)
-  if (!Number.isFinite(price)) return ''
+  const price = finiteNumber(flat?.price)
+  if (price === null) return ''
   return `${Math.round(price).toLocaleString('en-US')} ${cleanShareText(flat?.currency || '', 8)}`.trim()
+}
+
+function candidateSalaryLabel(profile: any): string {
+  const min = finiteNumber(profile?.salaryMin)
+  const max = finiteNumber(profile?.salaryMax)
+  if (min === null && max === null) return ''
+  const currency = cleanShareText(profile?.currency || '', 8)
+  const format = (value: number) => Math.round(value).toLocaleString('en-US')
+  if (min !== null && max !== null) return `${format(min)}–${format(max)} ${currency}`.trim()
+  if (min !== null) return `from ${format(min)} ${currency}`.trim()
+  return `up to ${format(max!)} ${currency}`.trim()
+}
+
+function shareImageUrl(kind: 'job' | 'candidate' | 'flat', id: string, source = '', country = ''): string {
+  const params = new URLSearchParams({ kind, id })
+  if (source) params.set('source', source)
+  if (country) params.set('country', country)
+  return `${SHARE_SITE_URL}/share-og.png?${params}`
 }
 
 export function buildJobShareMeta(job: any, id: string, pathname = '/jobs'): ShareMeta {
@@ -164,34 +210,71 @@ export function buildJobShareMeta(job: any, id: string, pathname = '/jobs'): Sha
   return {
     title,
     description,
-    image: `${SHARE_SITE_URL}/share/job-og.png?job=${encoded}`,
+    image: shareImageUrl('job', id),
     imageType: 'image/png',
     url: `${SHARE_SITE_URL}${pathname}?job=${encoded}`,
     type: 'article',
   }
 }
 
+export function buildCandidateShareMeta(
+  profile: any,
+  id: string,
+  source = '',
+  country = '',
+  pathname = '/hiring',
+): ShareMeta {
+  const title = cleanShareText(
+    [profile?.name, profile?.role].filter(Boolean).join(' — '),
+    120,
+  ) || 'Candidate · Hiring Board'
+  const experienceYears = finiteNumber(profile?.experienceYears)
+  const experience = experienceYears !== null
+    ? `${experienceYears} years experience`
+    : ''
+  const details = [
+    [profile?.city, profile?.country].filter(Boolean).join(', '),
+    profile?.remote ? 'Remote' : '',
+    experience,
+    candidateSalaryLabel(profile),
+    Array.isArray(profile?.skills) ? profile.skills.slice(0, 5).join(' · ') : '',
+  ].filter(Boolean)
+  const description = cleanShareText(
+    details.join(' · ') || profile?.description || 'Candidate profile from Hiring Board',
+    200,
+  )
+  const pageParams = new URLSearchParams({ cv: id })
+  if (source) pageParams.set('cvSource', source)
+  if (country) pageParams.set('cvCountry', country)
+
+  return {
+    title,
+    description,
+    image: shareImageUrl('candidate', id, source, country),
+    imageType: 'image/png',
+    url: `${SHARE_SITE_URL}${pathname}?${pageParams}`,
+    type: 'article',
+  }
+}
+
 export function buildFlatShareMeta(flat: any, id: string, source = '', country = '', pathname = '/flat-finder'): ShareMeta {
   const fallbackTitle = [
-    Number.isFinite(Number(flat?.rooms)) ? `${flat.rooms}-room` : '',
+    finiteNumber(flat?.rooms) !== null ? `${flat.rooms}-room` : '',
     flat?.propertyType === 'house' ? 'house' : 'apartment',
     cleanShareText(flat?.city, 50),
   ].filter(Boolean).join(' · ')
   const title = cleanShareText(flat?.title, 120) || fallbackTitle || 'Property listing · Flat Finder'
-  const floor = Number.isFinite(Number(flat?.floor))
-    ? Number.isFinite(Number(flat?.totalFloors)) ? `${flat.floor}/${flat.totalFloors} floor` : `${flat.floor} floor`
+  const floor = finiteNumber(flat?.floor) !== null
+    ? finiteNumber(flat?.totalFloors) !== null ? `${flat.floor}/${flat.totalFloors} floor` : `${flat.floor} floor`
     : ''
   const description = cleanShareText([
     flatPriceLabel(flat),
     [flat?.city, flat?.district, flat?.area || flat?.kvartal].filter(Boolean).join(', '),
-    Number.isFinite(Number(flat?.areaSqm)) ? `${flat.areaSqm} m²` : '',
+    finiteNumber(flat?.areaSqm) !== null ? `${flat.areaSqm} m²` : '',
     floor,
     flat?.petsAllowed === true ? 'Pet-friendly' : '',
   ].filter(Boolean).join(' · ') || flat?.description || 'Property listing from Flat Finder', 200)
 
-  const imageParams = new URLSearchParams({ flat: id })
-  if (source) imageParams.set('source', source)
-  if (country) imageParams.set('country', country)
   const pageParams = new URLSearchParams({ flat: id })
   if (source) pageParams.set('flatSource', source)
   if (country) pageParams.set('flatCountry', country)
@@ -199,20 +282,9 @@ export function buildFlatShareMeta(flat: any, id: string, source = '', country =
   return {
     title,
     description,
-    image: `${SHARE_SITE_URL}/share/flat-og.jpg?${imageParams}`,
-    imageType: 'image/jpeg',
+    image: shareImageUrl('flat', id, source, country),
+    imageType: 'image/png',
     url: `${SHARE_SITE_URL}${pathname}?${pageParams}`,
     type: 'website',
   }
-}
-
-export function flatPhotoUrl(flat: any): string | null {
-  const raw = flat?.photo || (Array.isArray(flat?.photos) ? flat.photos.find(Boolean) : null)
-  return typeof raw === 'string' && raw.trim() ? raw.trim() : null
-}
-
-export function upstreamFlatPhotoUrl(photo: string): string | null {
-  if (/^\/api\/tg-photo\/[A-Za-z0-9_]{3,64}\/\d+$/.test(photo)) return `${FLAT_API_URL}${photo}`
-  if (/^https?:\/\//i.test(photo)) return photo
-  return null
 }
