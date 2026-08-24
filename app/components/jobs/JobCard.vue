@@ -189,7 +189,7 @@ function openCard() { emit("open", props.job); }
 .job-card__badge_more { color: var(--ui-text-muted); background: rgba(148,163,184,.14); }
 .job-card__compensation { min-width: 0; margin-top: 12px; }
 .job-card__salary-values { display: flex; min-width: 0; align-items: baseline; gap: 5px; flex-wrap: nowrap; white-space: nowrap; overflow: hidden; }
-.job-card__salary { min-width: 0; flex: 0 1 auto; color: #f08ab8; font-size: 14px; line-height: 1.3; font-weight: 750; letter-spacing: .01em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.job-card__salary { color: #f08ab8; min-width: 0; flex: 0 1 auto; font-size: 14px; line-height: 1.3; font-weight: 750; letter-spacing: .01em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .job-card__salary-separator { flex: none; color: var(--ui-text-muted); opacity: .65; }
 .job-card__salary_conv { color: var(--ui-text-muted); font-size: 12.5px; font-weight: 600; opacity: .92; }
 .job-card__langs { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: 12px; margin-top: 6px; }
