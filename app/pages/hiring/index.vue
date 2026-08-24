@@ -896,7 +896,10 @@ onBeforeUnmount(() => {
           </div>
         </section>
 
-        <div class="hiring-filter-actions"><u-button type="button" variant="ghost" color="neutral" size="sm" icon="i-lucide-rotate-ccw" @click="resetFilters">{{ t("reset") }}</u-button></div>
+        <div class="hiring-filter-actions">
+          <span class="hiring__filter-count text-muted">{{ t("found", { n: view === 'active' ? total : displayedProfiles.length }) }}</span>
+          <u-button type="button" variant="ghost" color="neutral" size="sm" icon="i-lucide-rotate-ccw" @click="resetFilters">{{ t("reset") }}</u-button>
+        </div>
       </div>
     </form>
 
@@ -905,7 +908,6 @@ onBeforeUnmount(() => {
       {{ t(sourceWarningKey, { n: relevantSourceErrors.length }) }}
     </p>
     <p v-else-if="warming && !loading" class="hiring__warming text-muted">{{ t("warming") }}</p>
-    <p v-else class="hiring__count text-muted">{{ t("found", { n: view === 'active' ? total : displayedProfiles.length }) }}</p>
 <div class="hiring__grid" :class="{ 'hiring__grid_dense': denseGrid }">
       <article
           v-for="profile in displayedProfiles" :key="profile.id" class="hiring-card"
@@ -1048,7 +1050,7 @@ onBeforeUnmount(() => {
 .hiring-filter-group__title { display: flex; align-items: center; gap: 7px; margin-bottom: 12px; color: var(--ui-text-muted); font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: .04em; }
 .hiring-filter-group__title :deep(svg) { color: var(--accent-pink); }
 .hiring-filter-group__grid { display: grid; grid-template-columns: 1fr; gap: 12px; align-items: end; }
-.hiring-filter-actions { display: flex; justify-content: flex-end; }
+.hiring-filter-actions { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 @media (min-width: 700px) {
   .hiring__advanced { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .hiring-filter-group__grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -1069,7 +1071,7 @@ onBeforeUnmount(() => {
 .hiring__error { color: var(--ui-error, #f87171); }
 .hiring__source-warning { color: #f6c177; font-size: 13px; margin-bottom: 12px; }
 .hiring__warming { font-size: 13px; margin-bottom: 12px; }
-.hiring__count { font-size: 13px; margin-bottom: 12px; }
+.hiring__filter-count { font-size: 13px; }
 .hiring__grid { display: grid; gap: 14px; grid-template-columns: 1fr; align-items: stretch; }
 @media (min-width: 640px) { .hiring__grid { grid-template-columns: repeat(2, 1fr); } }
 @media (min-width: 1024px) { .hiring__grid { grid-template-columns: repeat(3, 1fr); } }
