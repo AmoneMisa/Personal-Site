@@ -18,6 +18,10 @@ const artworkSrc = computed(() =>
   is404.value ? "/images/errors/error-404.png" : "/images/errors/error-500.png",
 );
 
+const artStyle = computed(() => ({
+  "--error-art-url": `url("${artworkSrc.value}")`,
+}));
+
 const details = computed(
   () => props.error?.statusMessage || props.error?.message || "Server Error",
 );
@@ -52,8 +56,12 @@ function retry() {
     <div class="error-page__glow error-page__glow--one" aria-hidden="true" />
     <div class="error-page__glow error-page__glow--two" aria-hidden="true" />
 
-    <section class="error-card" :class="{ 'error-card--404': is404 }">
-      <div class="error-card__body">
+    <section class="error-card">
+      <div
+        class="error-card__body"
+        :class="{ 'error-card__body--404': is404 }"
+        :style="artStyle"
+      >
         <div class="error-copy">
           <span class="error-code">{{ code }}</span>
 
@@ -73,7 +81,10 @@ function retry() {
               class="error-button error-button--secondary"
               @click="is404 ? goBack() : retry()"
             >
-              <u-icon :name="is404 ? 'i-lucide-arrow-left' : 'i-lucide-refresh-cw'" aria-hidden="true" />
+              <u-icon
+                :name="is404 ? 'i-lucide-arrow-left' : 'i-lucide-refresh-cw'"
+                aria-hidden="true"
+              />
               <span>{{ is404 ? t("errors.actions.back") : t("errors.actions.retry") }}</span>
             </button>
           </div>
@@ -87,10 +98,7 @@ function retry() {
           </details>
         </div>
 
-        <div class="error-art" aria-hidden="true">
-          <span class="bubble bubble--one" />
-          <span class="bubble bubble--two" />
-          <span class="bubble bubble--three" />
+        <div class="error-art-mobile" aria-hidden="true">
           <img :src="artworkSrc" alt="" decoding="async" fetchpriority="high">
         </div>
       </div>
@@ -176,14 +184,34 @@ function retry() {
 
 .error-card__body {
   min-height: 570px;
-  display: grid;
-  grid-template-columns: minmax(0, 0.9fr) minmax(420px, 1.1fr);
+  position: relative;
+  display: flex;
   align-items: center;
-  gap: clamp(20px, 3vw, 54px);
   padding: clamp(34px, 5vw, 72px) clamp(30px, 5vw, 74px) clamp(28px, 4vw, 54px);
+  background-image:
+    linear-gradient(
+      90deg,
+      rgba(8, 12, 34, 0.98) 0%,
+      rgba(8, 12, 34, 0.94) 30%,
+      rgba(8, 12, 34, 0.72) 44%,
+      rgba(8, 12, 34, 0.18) 60%,
+      rgba(8, 12, 34, 0.02) 100%
+    ),
+    var(--error-art-url);
+  background-repeat: no-repeat, no-repeat;
+  background-size: 100% 100%, cover;
+  background-position: left top, center right;
 }
 
-.error-copy { position: relative; z-index: 2; max-width: 510px; }
+.error-card__body--404 {
+  background-position: left top, center right;
+}
+
+.error-copy {
+  position: relative;
+  z-index: 2;
+  width: min(510px, 100%);
+}
 
 .error-code {
   display: inline-flex;
@@ -278,6 +306,7 @@ function retry() {
   border-radius: 14px;
   background: rgba(12, 17, 44, 0.56);
   overflow: hidden;
+  backdrop-filter: blur(8px);
 }
 
 .error-details summary {
@@ -304,45 +333,15 @@ function retry() {
   font-size: 12px;
 }
 
-.error-art {
-  position: relative;
-  min-height: 440px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+.error-art-mobile {
+  display: none;
 }
 
-.error-art::before {
-  content: "";
-  position: absolute;
-  inset: 7% 1% 0;
-  border-radius: 50%;
-  background: radial-gradient(circle, rgba(32, 126, 220, 0.16), rgba(10, 16, 43, 0) 68%);
-  filter: blur(18px);
-}
-
-.error-art img {
-  position: relative;
-  z-index: 1;
+.error-art-mobile img {
   display: block;
-  width: min(100%, 560px);
+  width: 100%;
   height: auto;
-  object-fit: contain;
-  filter: drop-shadow(0 25px 30px rgba(0, 0, 0, 0.24));
 }
-
-.bubble {
-  position: absolute;
-  z-index: 2;
-  display: block;
-  border-radius: 50%;
-  border: 1px solid rgba(98, 181, 255, 0.5);
-  box-shadow: inset 2px 2px 3px rgba(255, 255, 255, 0.2), 0 0 12px rgba(54, 136, 255, 0.14);
-}
-
-.bubble--one { width: 15px; height: 15px; top: 14%; left: 18%; }
-.bubble--two { width: 9px; height: 9px; top: 28%; right: 9%; }
-.bubble--three { width: 20px; height: 20px; bottom: 20%; right: 18%; opacity: 0.55; }
 
 .error-nav {
   min-height: 78px;
@@ -371,14 +370,52 @@ function retry() {
 .error-nav__link--active { color: #f36ba8; border-color: rgba(243, 107, 168, 0.65); }
 .error-nav__divider { width: 1px; height: 20px; background: rgba(115, 125, 173, 0.38); }
 
+@media (max-width: 1100px) {
+  .error-card__body {
+    min-height: 540px;
+    background-position: left top, 68% center;
+  }
+
+  .error-copy {
+    width: min(480px, 100%);
+  }
+}
+
 @media (max-width: 900px) {
   .error-page { padding: 16px; }
   .error-card { border-radius: 24px; }
-  .error-card__body { grid-template-columns: 1fr; min-height: 0; padding: 34px 24px 20px; gap: 4px; }
-  .error-copy { max-width: none; }
+
+  .error-card__body {
+    min-height: 0;
+    display: block;
+    padding: 34px 24px 24px;
+    background-image: linear-gradient(
+      180deg,
+      rgba(8, 12, 34, 0.98) 0%,
+      rgba(8, 12, 34, 0.95) 52%,
+      rgba(8, 12, 34, 0.9) 100%
+    );
+    background-size: 100% 100%;
+    background-position: left top;
+  }
+
+  .error-copy {
+    width: 100%;
+    max-width: none;
+  }
+
   .error-title { max-width: 14ch; }
-  .error-art { min-height: 300px; margin-top: 8px; }
-  .error-art img { width: min(92vw, 500px); }
+
+  .error-art-mobile {
+    display: block;
+    margin-top: 22px;
+    border-radius: 20px;
+    overflow: hidden;
+    border: 1px solid rgba(72, 86, 139, 0.32);
+    background:
+      radial-gradient(circle at 70% 30%, rgba(45, 134, 255, 0.12), transparent 40%),
+      rgba(8, 12, 34, 0.72);
+  }
 }
 
 @media (max-width: 560px) {
@@ -386,8 +423,18 @@ function retry() {
   .error-title { font-size: clamp(36px, 11vw, 48px); }
   .error-actions { flex-direction: column; }
   .error-button { width: 100%; }
-  .error-art { min-height: 245px; }
-  .error-nav { min-height: 68px; gap: 14px; }
+
+  .error-art-mobile {
+    margin-top: 18px;
+    border-radius: 18px;
+  }
+
+  .error-nav {
+    min-height: 68px;
+    gap: 14px;
+    padding: 14px 18px;
+  }
+
   .error-nav__link { font-size: 14px; }
 }
 
