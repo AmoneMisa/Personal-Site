@@ -23,7 +23,9 @@ test('Telegram candidate parsing is owned by the domain module', async () => {
   assert.match(parser, /export function classifyTelegramMessage\(/u)
 })
 
-test('transport compatibility exports are explicit and temporary', async () => {
+test('Telegram transport is not a compatibility facade for domain parsing', async () => {
   const runtime = await read('server/utils/hiringSources.ts')
-  assert.match(runtime, /export \{ detectCity, detectDistrict, isLikelyCvPost \} from '\.\.\/hiring\/domain\/telegramCandidateParser'/u)
+  assert.doesNotMatch(runtime, /export \{[^}]*detectCity[^}]*\} from/u)
+  assert.doesNotMatch(runtime, /export \{[^}]*detectDistrict[^}]*\} from/u)
+  assert.doesNotMatch(runtime, /export \{[^}]*isLikelyCvPost[^}]*\} from/u)
 })

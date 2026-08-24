@@ -1,6 +1,6 @@
 import { recordWebDiagnostic, type WebSourceDiagnostic } from '../../utils/hiringDiagnostics'
 import { normalizeCandidate } from '../../utils/hiringNormalize'
-import { detectCity, isLikelyCvPost } from '../../utils/hiringSources'
+import { detectCity, isLikelyCvPost } from '../domain/telegramCandidateParser'
 import type { CvProfile } from '../../utils/hiringTypes'
 import { persistWebProfiles } from '../webProfilePersistence'
 
