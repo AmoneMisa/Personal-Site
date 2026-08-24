@@ -1,7 +1,39 @@
 <script setup lang="ts">
 import CustomButton from "~/components/common/CustomButton.vue";
+import PdfEditorControls from "~/components/pdfEditor/PdfEditorControls.vue";
 import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from "vue";
 import { BaseFabricObject, Canvas, Ellipse, FabricImage, FabricObject, PencilBrush, Rect, Textbox } from "fabric";
+import {usePdfDraft} from "~/composables/pdfEditor/usePdfDraft";
+import type {
+  PdfAlignGuide as AlignGuide,
+  PdfBrushShape as BrushShape,
+  PdfDeletedImage as DeletedImg,
+  PdfEditorMode as Mode,
+  PdfEditorState,
+  PdfImageEdit as ImageEdit,
+  PdfImageRegion as ImageRegion,
+  PdfLinkRegion as LinkRegion,
+  PdfOriginalBlock as OrigBlock,
+  PdfOriginalBlockMeta as OrigBlockMeta,
+  PdfPhotoFrame as PhotoFrame,
+  PdfSelectedObjectState,
+  PdfTextAlign as TextAlign,
+  PdfTextEditBlock as TextEditBlock,
+} from "~/types/pdfEditor";
+import {
+  PDF_FONT_FAMILIES as FONT_FAMILIES,
+  clampInt,
+  createPdfBlockId as genBlockId,
+  ensurePdfEditorFontsReady as ensureEditorFontsReady,
+  hexFromColor,
+  measurePdfTextWidth as measureMaxLineWidth,
+  pixelsToPdfPoints as pxToPt,
+  preloadImage,
+  resolvePdfFontFamily as resolveFontFamily,
+  rgbaFromHex,
+  setFabricObjectByTopLeft as setByTopLeft,
+  withPdfPointGeometry as withOrigPoints,
+} from "~/utils/pdfEditor/core";
 
 (BaseFabricObject as any).ownDefaults.originX = "center";
 (BaseFabricObject as any).ownDefaults.originY = "center";
@@ -50,7 +82,6 @@ const overlayCanvasRef = ref<HTMLCanvasElement | null>(null);
 const bgColor = ref<string | null>(null);
 
 // --- clickable links (auto-detected URLs / e-mails + source annotations)
-type LinkRegion = { x: number; y: number; w: number; h: number; uri: string };
 // per-page link regions in rendered-PNG pixel space at `dpi`
 const pageLinks = reactive<Record<number, LinkRegion[]>>({});
 // display px per PNG px (previewWidth / naturalWidth); kept in sync on resize
@@ -63,44 +94,25 @@ const autoLoaded = reactive<Record<number, boolean>>({});
 // --- Figma-style alignment guides (shown while dragging an object)
 // Each guide is a line in displayed-canvas CSS pixels: vertical guides use
 // `pos` as x and span [start,end] in y; horizontal guides are the transpose.
-type AlignGuide = { k: string; v: boolean; pos: number; start: number; end: number };
 const alignGuides = ref<AlignGuide[]>([]);
 // snap threshold in CSS px: how close an edge/center must be to lock on
 const SNAP_PX = 6;
 
 // --- original embedded images loaded as movable objects
 // raw extracted image as returned by the backend (PNG pixel space at `dpi`)
-type ImageClip = { cx: number; cy: number; rx: number; ry: number };
-type ImageRegion = { id?: string; name: string; url: string; x: number; y: number; w: number; h: number; clip?: ImageClip };
 // originals the user deleted (kept per page so the exporter can redact them
 // even though the canvas object is gone); px geometry at the given `dpi`
-type DeletedImg = { name: string; x: number; y: number; w: number; h: number; dpi: number };
 const deletedImages = reactive<Record<number, DeletedImg[]>>({});
 
 // Circular photo frame per page, in *canvas* pixels. A source PDF that rounds a
 // photo with a vector circle gives us this; any image whose centre sits inside
 // the frame is clipped to the circle, and it reveals the full rectangle (on top)
 // once dragged out. Lets you drop a different photo straight into the frame.
-type PhotoFrame = { cx: number; cy: number; rx: number; ry: number };
 const photoFrames = reactive<Record<number, PhotoFrame>>({});
 
 // --- editor tool state
-type Mode = "move" | "pen" | "highlighter" | "signature" | "rect" | "circle" | "text" | "image";
-type BrushShape = "round" | "square";
 
-function setByTopLeft(obj: any, left: number, top: number) {
-  // IMPORTANT: sizes must be known (after width/height/scale)
-  const w = obj.getScaledWidth?.() ?? obj.width ?? 0;
-  const h = obj.getScaledHeight?.() ?? obj.height ?? 0;
-
-  obj.set({
-    left: left + w / 2,
-    top: top + h / 2,
-  });
-  obj.setCoords?.();
-}
-
-const editor = reactive({
+const editor = reactive<PdfEditorState>({
   mode: "move" as Mode,
   color: "#7c3aed",
   opacity: 80, // 0..100
@@ -122,77 +134,8 @@ const editor = reactive({
   signatureSize: 2.0,
 });
 
-// Common fonts available for the full-editor inspector.
-const FONT_FAMILIES = [
-  "Helvetica",
-  "Arial",
-  "Times New Roman",
-  "Courier New",
-  "Georgia",
-  "Verdana",
-  "Trebuchet MS",
-  "Tahoma",
-  "Roboto",
-  "Open Sans",
-  "Lato",
-  "Montserrat",
-];
-
-// Webfonts the editor pulls in for extracted CV text (see useHead above). Fabric
-// measures text with the canvas, so these must finish downloading before blocks
-// are placed or the first render mis-measures against the fallback font.
-const EDITOR_WEBFONT_SPECS = [
-  '400 16px "Montserrat"',
-  '700 16px "Montserrat"',
-  '900 16px "Montserrat"',
-  '400 16px "Lato"',
-  '700 16px "Lato"',
-  'italic 400 16px "Lato"',
-];
-
-async function ensureEditorFontsReady(): Promise<void> {
-  const fonts = (typeof document !== "undefined" ? (document as any).fonts : null);
-  if (!fonts?.load) return;
-  const load = (async () => {
-    try {
-      await Promise.all(EDITOR_WEBFONT_SPECS.map((s) => fonts.load(s)));
-      await fonts.ready;
-    } catch {
-      // offline / blocked: fall back to the system stack, no hard failure
-    }
-  })();
-  // A slow or blocked font CDN (e.g. Google Fonts) must never stall the editor:
-  // cap the wait and let text render with the fallback, then repaint once the
-  // real glyphs arrive (see loadEditableText).
-  await Promise.race([load, new Promise<void>((r) => setTimeout(r, 1200))]);
-}
-
-// PDF font names (e.g. "Now-Black", "Aileron-Italic", "ABCDEF+Lato-Bold") are
-// almost never installed in the browser, so using them raw makes the canvas
-// fall back to its default serif. Resolve to a web-safe stack, guessing
-// serif vs sans from the name so the substitute at least matches the style.
-const SERIF_HINTS = ["times", "serif", "georgia", "garamond", "roman", "minion", "cambria", "antiqua"];
-function resolveFontFamily(raw?: string): string {
-  const name = (raw || "").trim();
-  if (!name) return "Arial, Helvetica, sans-serif";
-  const base = name.replace(/^[A-Z]{6}\+/, "").split(/[-,]/)[0]?.trim() ?? "";
-  const lower = base.toLowerCase();
-  // Real embedded CV families, loaded as webfonts (see useHead). "Now" is
-  // commercial, so the closest free geometric sans (Montserrat) stands in;
-  // Aileron is a Helvetica clone and matches the Arial stack closely.
-  if (lower.includes("now")) return '"Montserrat", Arial, sans-serif';
-  if (lower.includes("lato")) return '"Lato", Arial, sans-serif';
-  if (lower.includes("aileron")) return 'Arial, "Helvetica Neue", Helvetica, sans-serif';
-  const isSerif = SERIF_HINTS.some((h) => lower.includes(h));
-  const known = FONT_FAMILIES.find((f) => f.toLowerCase() === lower);
-  if (known) return `"${known}", ${isSerif ? "serif" : "sans-serif"}`;
-  return isSerif ? "Georgia, 'Times New Roman', serif" : "Arial, Helvetica, sans-serif";
-}
-
-type TextAlign = "left" | "center" | "right" | "justify";
-
 // --- inspector state (bound to the currently selected object)
-const selected = reactive({
+const selected = reactive<PdfSelectedObjectState>({
   exists: false,
   isText: false,
   fontFamily: "Helvetica",
@@ -211,14 +154,6 @@ const selected = reactive({
 });
 
 // --- draft (per-page json)
-type PdfDraft = {
-  v: 1;
-  updatedAt: number;
-  pages: Record<number, any>;
-  deletedImages?: Record<number, DeletedImg[]>;
-  ui?: { page?: number; zoom?: number };
-};
-
 const pageJson = reactive<Record<number, any>>({});
 
 // --- history (per current page)
@@ -241,11 +176,6 @@ const previewUrl = computed(() => {
   return `${config.public.apiBase}/pdf/${kind}/${docId.value}/${page.value}?dpi=${dpi.value}`;
 });
 
-function clampInt(n: number, min: number, max: number) {
-  const x = Number.isFinite(n) ? n : min;
-  return Math.max(min, Math.min(max, x));
-}
-
 watch(dpi, () => {
   dpi.value = clampInt(dpi.value, 72, 220);
 });
@@ -253,20 +183,6 @@ watch(dpi, () => {
 // --- API helpers
 function api(path: string) {
   return `${config.public.apiBase}${path}`;
-}
-
-// Preload an image URL, resolving once it is fully decoded (or on error, so we
-// never hang). Used to fetch the clean background BEFORE swapping the preview
-// raster, so the visible page doesn't flash/jump while the new PNG streams in.
-function preloadImage(url: string): Promise<void> {
-  return new Promise((resolve) => {
-    if (!url) return resolve();
-    const im = new Image();
-    im.crossOrigin = "anonymous";
-    im.onload = () => resolve();
-    im.onerror = () => resolve();
-    im.src = url;
-  });
 }
 
 // URL of the clean-background raster (originals removed) for a given page.
@@ -278,43 +194,19 @@ function backgroundUrl(pageNo: number): string {
 // =========================
 // Draft: load/save Redis
 // =========================
-let saveDraftTimer: any = null;
-
-function scheduleSaveDraft() {
-  clearTimeout(saveDraftTimer);
-  saveDraftTimer = setTimeout(saveDraftNow, 650);
-}
-
-async function saveDraftNow() {
-  if (!docId.value) return;
-  try {
-    if (c) pageJson[page.value] = c.toJSON(["id", "tool", "opacityPct", "orig", "name"]);
-    const draft: PdfDraft = {
-      v: 1,
-      updatedAt: Date.now(),
-      pages: { ...pageJson },
-      deletedImages: { ...deletedImages },
-      ui: { page: page.value },
-    };
-    await $fetch(api(`/pdf/draft/${docId.value}`), { method: "PUT", body: { draft } });
-  } catch {
-    // ignore
-  }
-}
-
-async function loadDraft() {
-  if (!docId.value) return;
-  try {
-    const res = await $fetch<{ draft: PdfDraft }>(api(`/pdf/draft/${docId.value}`));
-    if (res?.draft?.pages) {
-      Object.assign(pageJson, res.draft.pages);
-      if (res.draft.deletedImages) Object.assign(deletedImages, res.draft.deletedImages);
-      if (res.draft.ui?.page) page.value = clampInt(res.draft.ui.page, 1, 9999);
-    }
-  } catch {
-    // 404 ok
-  }
-}
+const {
+  scheduleSave: scheduleSaveDraft,
+  saveNow: saveDraftNow,
+  load: loadDraft,
+  dispose: disposeDraft,
+} = usePdfDraft({
+  docId,
+  page,
+  pageJson,
+  deletedImages,
+  api,
+  getCurrentPageJson: () => c?.toJSON(["id", "tool", "opacityPct", "orig", "name"]) ?? null,
+});
 
 // =========================
 // PDF info
@@ -334,17 +226,6 @@ async function refreshInfo() {
 // =========================
 // Fabric helpers
 // =========================
-function rgbaFromHex(hex: string, alpha01: number) {
-  const v = (hex || "").replace("#", "").trim();
-  const s = v.length === 3 ? v.split("").map((x) => x + x).join("") : v;
-  const n = parseInt(s || "ffffff", 16);
-  const r = (n >> 16) & 255;
-  const g = (n >> 8) & 255;
-  const b = n & 255;
-  const a = Math.max(0, Math.min(1, alpha01));
-  return `rgba(${r},${g},${b},${a})`;
-}
-
 function pushHistory() {
   if (!c || history.lock) return;
 
@@ -906,24 +787,6 @@ function isTextObject(o: any): boolean {
   return tp === "textbox" || tp === "text" || tp === "i-text";
 }
 
-function hexFromColor(input: any): string {
-  const val = String(input ?? "").trim();
-  if (!val) return "#000000";
-  if (val.startsWith("#")) {
-    const v = val.replace("#", "");
-    const s = v.length === 3 ? v.split("").map((x) => x + x).join("") : v.slice(0, 6);
-    return `#${(s || "000000").padEnd(6, "0")}`;
-  }
-  const m = val.match(/rgba?\(([^)]+)\)/i);
-  if (m && m[1]) {
-    const parts = m[1].split(",").map((x) => parseFloat(x.trim()));
-    const hx = (n: number | undefined) =>
-      Math.max(0, Math.min(255, Math.round(n || 0))).toString(16).padStart(2, "0");
-    return `#${hx(parts[0])}${hx(parts[1])}${hx(parts[2])}`;
-  }
-  return "#000000";
-}
-
 // Read the selected object's props into the inspector state.
 function syncSelectedFromObject(obj: any) {
   if (!obj || !c) {
@@ -1049,35 +912,6 @@ function applySelectedGeometry() {
   refreshImageClip(o);
   commitSelected(o);
   syncSelectedFromObject(o);
-}
-
-// Measure the widest hard-wrapped line of `text` as the browser will actually
-// render it. The PDF's embedded fonts are usually unavailable, so the browser
-// substitutes a wider face; feeding the raw PDF width to a Fabric Textbox then
-// soft-wraps lines that were single lines in the source (name splits, list
-// items grow taller and appear to drift down). Measuring with the same font the
-// canvas will use lets us size the box so hard lines never soft-wrap.
-let _measureCtx: CanvasRenderingContext2D | null = null;
-function measureMaxLineWidth(
-  text: string,
-  fontPx: number,
-  fontFamily: string,
-  bold: boolean,
-  italic: boolean,
-): number {
-  if (!_measureCtx) {
-    _measureCtx = document.createElement("canvas").getContext("2d");
-  }
-  if (!_measureCtx) return 0;
-  const style = italic ? "italic " : "";
-  const weight = bold ? "700 " : "400 ";
-  _measureCtx.font = `${style}${weight}${fontPx}px ${fontFamily || "Helvetica"}`;
-  let max = 0;
-  for (const line of (text || "").split("\n")) {
-    const w = _measureCtx.measureText(line).width;
-    if (w > max) max = w;
-  }
-  return max;
 }
 
 // Re-measure every extracted text box with its current font and grow its width
@@ -1479,116 +1313,6 @@ function calcMultiplier(): number {
   return Number.isFinite(m) && m > 0 ? m : 1;
 }
 
-// Raw text block as returned by the backend extraction endpoint.
-type OrigRun = {
-  n: number;
-  fontSize?: number;
-  fontName?: string;
-  bold?: boolean;
-  italic?: boolean;
-  color?: string;
-};
-
-type OrigBlock = {
-  id?: string;
-  x: number;
-  y: number;
-  w?: number;
-  h?: number;
-  text: string;
-  fontSize?: number;
-  fontName?: string;
-  bold?: boolean;
-  italic?: boolean;
-  color?: string;
-  lineHeight?: number;
-  lineRuns?: OrigRun[][];
-};
-
-// The original block kept verbatim on the object (plus the page/dpi it came from),
-// so the backend can locate the source region even if the user moved the text.
-// `*Pt` are DPI-independent PDF points (added at save time); `x/y/w/h` are the raw
-// extraction pixels at `dpi`.
-type OrigBlockMeta = {
-  id: string | null;
-  page: number;
-  dpi: number;
-  x: number;
-  y: number;
-  w: number;
-  h: number;
-  xPt?: number;
-  yPt?: number;
-  wPt?: number;
-  hPt?: number;
-  text: string;
-  fontSize: number | null;
-  fontSizePt?: number | null;
-  fontName: string | null;
-  bold: boolean;
-  italic: boolean;
-  color: string | null;
-};
-
-// Structured representation of an edited PDF text block, sent to the backend
-// so it can redact the original text and/or re-typeset the new content.
-// Geometry is provided in two coordinate spaces (both top-left origin):
-//   - `x/y/w/h/fontSize`     : pixels in the rendered PNG at the export DPI (`dpi`)
-//   - `xPt/yPt/wPt/hPt/...Pt` : DPI-independent PDF points (72 per inch) — preferred
-type TextEditBlock = {
-  id?: string;
-  text: string;
-  x: number;
-  y: number;
-  w: number;
-  h: number;
-  fontSize: number;
-  xPt: number;
-  yPt: number;
-  wPt: number;
-  hPt: number;
-  fontSizePt: number;
-  fontName: string;
-  bold: boolean;
-  italic: boolean;
-  underline: boolean;
-  align: string;
-  color: string;
-  opacity: number;
-  angle: number;
-  // original extracted block, untouched (null for text the user added manually)
-  orig: OrigBlockMeta | null;
-};
-
-// PDF points from PNG pixels rendered at `dpiVal` (72 points per inch).
-function pxToPt(px: number, dpiVal: number): number {
-  const d = dpiVal > 0 ? dpiVal : 72;
-  return Math.round(((px * 72) / d) * 100) / 100;
-}
-
-// Enrich a verbatim original block with DPI-independent point coordinates,
-// without mutating the copy stored on the canvas object.
-function withOrigPoints(orig: OrigBlockMeta | null): OrigBlockMeta | null {
-  if (!orig) return null;
-  const d = orig.dpi > 0 ? orig.dpi : 72;
-  return {
-    ...orig,
-    xPt: pxToPt(orig.x, d),
-    yPt: pxToPt(orig.y, d),
-    wPt: pxToPt(orig.w, d),
-    hPt: pxToPt(orig.h, d),
-    fontSizePt: orig.fontSize != null ? pxToPt(orig.fontSize, d) : null,
-  };
-}
-
-let blockIdSeq = 0;
-function genBlockId(pageNo: number, i: number): string {
-  const rnd = (globalThis.crypto as any)?.randomUUID?.();
-  if (rnd) return rnd;
-  blockIdSeq += 1;
-  return `blk_${pageNo}_${i}_${Date.now()}_${blockIdSeq}`;
-}
-
 // Collect editable PDF-text objects (tool === "pdftext") from the current canvas.
 // `mult` converts display coords -> natural PNG pixels; `dpiVal` is the DPI those
 // pixels were rendered at, used to also express geometry in DPI-independent points.
@@ -1636,19 +1360,6 @@ function collectTextEditsFromCanvas(mult: number, dpiVal: number): TextEditBlock
 
   return blocks;
 }
-
-// Structured edit for an original embedded image the user changed or deleted.
-// Geometry is DPI-independent PDF points (top-left origin, unrotated box).
-type ImageEdit = {
-  name: string;
-  xPt: number;
-  yPt: number;
-  wPt: number;
-  hPt: number;
-  angle: number;
-  deleted: boolean;
-  orig: { xPt: number; yPt: number; wPt: number; hPt: number };
-};
 
 // Collect moved/resized/rotated original images (tool === "pdfimg") from the
 // current canvas. Only images whose geometry differs from the extracted
@@ -1988,7 +1699,7 @@ watch(docId, async () => {
 onMounted(boot);
 
 onBeforeUnmount(() => {
-  clearTimeout(saveDraftTimer);
+  disposeDraft();
 
   window.removeEventListener("keydown", onKeyDown);
   window.removeEventListener("keydown", onModKey);
@@ -2101,275 +1812,35 @@ onBeforeUnmount(() => {
             </div>
           </div>
 
-          <div class="pdf__toolstrip">
-            <button
-                type="button"
-                class="services__pill"
-                :class="{ services__pill_active: editor.fullMode }"
-                @click="toggleFullMode"
-                :disabled="isBusy"
-            >
-              <u-icon name="i-lucide-square-pen" />
-              {{ t("services.pdfEditor.toolstrip.fullMode") }}
-            </button>
-
-            <div class="pdf__sep pdf__sep_small" />
-
-            <button
-                type="button"
-                class="services__pill"
-                :class="{ services__pill_active: editor.mode === 'move' }"
-                @click="editor.mode = 'move'"
-                :disabled="isBusy"
-            >
-              <u-icon name="i-lucide-move" />
-              {{ t("services.pdfEditor.toolstrip.move") }}
-            </button>
-
-            <button
-                type="button"
-                class="services__pill"
-                :class="{ services__pill_active: editor.mode === 'pen' }"
-                @click="editor.mode = 'pen'"
-                :disabled="isBusy"
-            >
-              <u-icon name="i-lucide-pencil" />
-              {{ t("services.pdfEditor.toolstrip.pen") }}
-            </button>
-
-            <button
-                type="button"
-                class="services__pill"
-                :class="{ services__pill_active: editor.mode === 'highlighter' }"
-                @click="editor.mode = 'highlighter'"
-                :disabled="isBusy"
-            >
-              <u-icon name="i-lucide-highlighter" />
-              {{ t("services.pdfEditor.toolstrip.highlighter") }}
-            </button>
-
-            <button
-                type="button"
-                class="services__pill"
-                :class="{ services__pill_active: editor.mode === 'signature' }"
-                @click="editor.mode = 'signature'"
-                :disabled="isBusy"
-            >
-              <u-icon name="i-lucide-signature" />
-              {{ t("services.pdfEditor.toolstrip.signature") }}
-            </button>
-
-            <button type="button" class="services__pill" @click="addRect" :disabled="isBusy">
-              <u-icon name="i-lucide-square" />
-              {{ t("services.pdfEditor.toolstrip.rect") }}
-            </button>
-
-            <button type="button" class="services__pill" @click="addCircle" :disabled="isBusy">
-              <u-icon name="i-lucide-circle" />
-              {{ t("services.pdfEditor.toolstrip.circle") }}
-            </button>
-
-            <button type="button" class="services__pill" @click="addTextBox" :disabled="isBusy">
-              <u-icon name="i-lucide-type" />
-              {{ t("services.pdfEditor.toolstrip.text") }}
-            </button>
-
-            <button type="button" class="services__pill" @click="openImagePicker" :disabled="isBusy">
-              <u-icon name="i-lucide-image" />
-              {{ t("services.pdfEditor.toolstrip.image") }}
-            </button>
-            <input ref="imageInput" type="file" accept="image/*" class="hidden" @change="onPickImage" />
-            <input ref="replaceInput" type="file" accept="image/*" class="hidden" @change="onPickReplaceImage" />
-
-            <div class="pdf__sep pdf__sep_small" />
-
-            <button type="button" class="services__pill" :disabled="isBusy || !canUndo" @click="undo">
-              <u-icon name="i-lucide-undo-2" />
-              {{ t("services.pdfEditor.toolstrip.undo") }}
-            </button>
-
-            <button type="button" class="services__pill" :disabled="isBusy || !canRedo" @click="redo">
-              <u-icon name="i-lucide-redo-2" />
-              {{ t("services.pdfEditor.toolstrip.redo") }}
-            </button>
-
-            <button type="button" class="services__pill" :disabled="isBusy" @click="removeSelected">
-              <u-icon name="i-lucide-trash-2" />
-              {{ t("services.pdfEditor.toolstrip.remove") }}
-            </button>
-
-            <button type="button" class="services__pill" :disabled="isBusy" @click="clearPage">
-              <u-icon name="i-lucide-eraser" />
-              {{ t("services.pdfEditor.toolstrip.clearPage") }}
-            </button>
-          </div>
-
-          <!-- PROPS -->
-          <div class="pdf__tool-section">
-            <div class="pdf__tool-title">{{ t("services.pdfEditor.editor.toolSettings") }}</div>
-
-            <div class="pdf__tool-grid4">
-              <div class="pdf__field">
-                <div class="pdf__label">{{ t("services.pdfEditor.fields.color") }}</div>
-                <u-input v-model="editor.color" type="color" class="pdf__color" />
-              </div>
-
-              <div class="pdf__field">
-                <div class="pdf__label">{{ t("services.pdfEditor.fields.opacity") }}</div>
-                <u-input v-model.number="editor.opacity" type="number" min="5" max="100" />
-              </div>
-
-              <div class="pdf__field">
-                <div class="pdf__label">{{ t("services.pdfEditor.fields.size") }}</div>
-                <u-input v-model.number="editor.size" type="number" min="1" max="40" />
-              </div>
-
-              <div class="pdf__field">
-                <div class="pdf__label" :title="t('services.pdfEditor.fields.shapeHelp')">
-                  {{ t("services.pdfEditor.fields.shape") }}
-                </div>
-                <u-select
-                    v-model="editor.brushShape"
-                    :title="t('services.pdfEditor.fields.shapeHelp')"
-                    :items="[
-                    { label: t('services.pdfEditor.fields.shapeRound'), value: 'round' },
-                    { label: t('services.pdfEditor.fields.shapeSquare'), value: 'square' }
-                  ]"
-                />
-              </div>
-
-              <div class="pdf__field pdf__field_row">
-                <div class="pdf__label">{{ t("services.pdfEditor.fields.textDefaults") }}</div>
-                <div class="pdf__style-row">
-                  <u-input v-model="editor.textValue" :placeholder="t('services.pdfEditor.fields.textPlaceholder')" style="min-width: 220px" />
-                  <u-input v-model.number="editor.textSize" type="number" min="8" max="120" style="width: 120px" />
-                  <u-input v-model="editor.textFont" :placeholder="t('services.pdfEditor.fields.fontPlaceholder')" style="min-width: 200px" />
-
-                  <button type="button" class="pdf__chip" :class="{ pdf__chip_active: editor.textBold }" @click="editor.textBold = !editor.textBold">B</button>
-                  <button type="button" class="pdf__chip" :class="{ pdf__chip_active: editor.textItalic }" @click="editor.textItalic = !editor.textItalic">I</button>
-                  <button type="button" class="pdf__chip" :class="{ pdf__chip_active: editor.textUnderline }" @click="editor.textUnderline = !editor.textUnderline">U</button>
-                </div>
-              </div>
-
-              <div class="pdf__field pdf__field_row">
-                <div class="pdf__label">{{ t("services.pdfEditor.fields.signatureThickness") }}</div>
-                <u-input v-model.number="editor.signatureSize" type="number" min="1" max="12" style="width: 140px" />
-              </div>
-            </div>
-
-            <div class="pdf__help text-muted">
-              {{ t("services.pdfEditor.editor.moveModeHelp") }}
-            </div>
-          </div>
-
-          <!-- FULL EDITOR: inspector for the selected object -->
-          <div v-if="editor.fullMode" class="pdf__tool-section pdf__inspector">
-            <div class="pdf__inspector-head">
-              <div class="pdf__tool-title">{{ t("services.pdfEditor.full.title") }}</div>
-              <button type="button" class="services__pill" :disabled="isBusy" @click="loadEditableText()">
-                <u-icon name="i-lucide-scan-text" />
-                {{ t("services.pdfEditor.full.loadText") }}
-              </button>
-            </div>
-
-            <div v-if="!selected.exists" class="pdf__help text-muted">
-              {{ t("services.pdfEditor.full.selectHint") }}
-            </div>
-
-            <div v-else class="pdf__inspector-body">
-              <div v-if="!selected.isText" class="pdf__field pdf__field_row">
-                <button type="button" class="services__pill" :disabled="isBusy" @click="replaceSelectedImage">
-                  <u-icon name="i-lucide-image-plus" />
-                  {{ t("services.pdfEditor.full.replaceImage") }}
-                </button>
-              </div>
-
-              <div class="pdf__tool-grid4">
-                <div v-if="selected.isText" class="pdf__field">
-                  <div class="pdf__label">{{ t("services.pdfEditor.full.font") }}</div>
-                  <u-select
-                      v-model="selected.fontFamily"
-                      :items="FONT_FAMILIES.map((f) => ({ label: f, value: f }))"
-                      @update:model-value="applySelectedFont"
-                  />
-                </div>
-
-                <div v-if="selected.isText" class="pdf__field">
-                  <div class="pdf__label">{{ t("services.pdfEditor.full.fontSize") }}</div>
-                  <u-input
-                      v-model.number="selected.fontSize"
-                      type="number"
-                      min="4"
-                      max="400"
-                      @change="applySelectedFontSize"
-                  />
-                </div>
-
-                <div class="pdf__field">
-                  <div class="pdf__label">{{ t("services.pdfEditor.full.color") }}</div>
-                  <u-input v-model="selected.color" type="color" @update:model-value="applySelectedColor" />
-                </div>
-
-                <div class="pdf__field">
-                  <div class="pdf__label">{{ t("services.pdfEditor.full.opacity") }}</div>
-                  <u-input
-                      v-model.number="selected.opacity"
-                      type="number"
-                      min="0"
-                      max="100"
-                      @change="applySelectedOpacity"
-                  />
-                </div>
-              </div>
-
-              <div v-if="selected.isText" class="pdf__field pdf__field_row">
-                <div class="pdf__label">{{ t("services.pdfEditor.full.style") }}</div>
-                <div class="pdf__style-row">
-                  <button type="button" class="pdf__chip" :class="{ pdf__chip_active: selected.bold }" @click="toggleSelectedStyle('bold')">B</button>
-                  <button type="button" class="pdf__chip" :class="{ pdf__chip_active: selected.italic }" @click="toggleSelectedStyle('italic')">I</button>
-                  <button type="button" class="pdf__chip" :class="{ pdf__chip_active: selected.underline }" @click="toggleSelectedStyle('underline')">U</button>
-
-                  <div class="pdf__sep pdf__sep_small" />
-
-                  <button type="button" class="pdf__chip" :class="{ pdf__chip_active: selected.align === 'left' }" @click="applySelectedAlign('left')"><u-icon name="i-lucide-align-left" /></button>
-                  <button type="button" class="pdf__chip" :class="{ pdf__chip_active: selected.align === 'center' }" @click="applySelectedAlign('center')"><u-icon name="i-lucide-align-center" /></button>
-                  <button type="button" class="pdf__chip" :class="{ pdf__chip_active: selected.align === 'right' }" @click="applySelectedAlign('right')"><u-icon name="i-lucide-align-right" /></button>
-                  <button type="button" class="pdf__chip" :class="{ pdf__chip_active: selected.align === 'justify' }" @click="applySelectedAlign('justify')"><u-icon name="i-lucide-align-justify" /></button>
-                </div>
-              </div>
-
-              <div class="pdf__tool-grid4">
-                <div class="pdf__field">
-                  <div class="pdf__label">{{ t("services.pdfEditor.full.posX") }}</div>
-                  <u-input v-model.number="selected.x" type="number" @change="applySelectedGeometry" />
-                </div>
-                <div class="pdf__field">
-                  <div class="pdf__label">{{ t("services.pdfEditor.full.posY") }}</div>
-                  <u-input v-model.number="selected.y" type="number" @change="applySelectedGeometry" />
-                </div>
-                <div class="pdf__field">
-                  <div class="pdf__label">{{ t("services.pdfEditor.full.width") }}</div>
-                  <u-input v-model.number="selected.w" type="number" min="1" @change="applySelectedGeometry" />
-                </div>
-                <div class="pdf__field">
-                  <div class="pdf__label">{{ selected.isText ? t("services.pdfEditor.full.rotation") : t("services.pdfEditor.full.height") }}</div>
-                  <u-input
-                      v-if="selected.isText"
-                      v-model.number="selected.angle"
-                      type="number"
-                      min="-180"
-                      max="180"
-                      @change="applySelectedGeometry"
-                  />
-                  <u-input v-else v-model.number="selected.h" type="number" min="1" @change="applySelectedGeometry" />
-                </div>
-              </div>
-
-              <div class="pdf__help text-muted">
-                {{ t("services.pdfEditor.full.help") }}
-              </div>
-            </div>
-          </div>
+          <pdf-editor-controls
+              :editor="editor"
+              :selected="selected"
+              :font-families="FONT_FAMILIES"
+              :busy="isBusy"
+              :can-undo="canUndo"
+              :can-redo="canRedo"
+              @toggle-full="toggleFullMode"
+              @set-mode="editor.mode = $event"
+              @add-rect="addRect"
+              @add-circle="addCircle"
+              @add-text="addTextBox"
+              @add-image="openImagePicker"
+              @undo="undo"
+              @redo="redo"
+              @remove="removeSelected"
+              @clear="clearPage"
+              @load-text="loadEditableText()"
+              @replace-image="replaceSelectedImage"
+              @apply-font="applySelectedFont"
+              @apply-font-size="applySelectedFontSize"
+              @apply-color="applySelectedColor"
+              @apply-opacity="applySelectedOpacity"
+              @toggle-style="toggleSelectedStyle"
+              @align="applySelectedAlign"
+              @apply-geometry="applySelectedGeometry"
+          />
+          <input ref="imageInput" type="file" accept="image/*" class="hidden" @change="onPickImage" />
+          <input ref="replaceInput" type="file" accept="image/*" class="hidden" @change="onPickReplaceImage" />
 
           <div v-if="errorMsg" class="pdf__error">{{ errorMsg }}</div>
 
@@ -2490,57 +1961,6 @@ onBeforeUnmount(() => {
   width: 120px;
 }
 
-.pdf__toolstrip {
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
-  margin-top: 10px;
-}
-
-/* Toolbar pill buttons (Move / Pen / Undo / …). Defined here because the shared
-   `services__pill` style lives in other pages' scoped blocks and wouldn't reach
-   this page — leaving these buttons unstyled/inconsistent otherwise. */
-.services__pill {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  height: 36px;
-  padding: 0 14px;
-  border-radius: 999px;
-  border: 1px solid var(--line);
-  background: rgba(255, 255, 255, 0.03);
-  color: var(--ui-text-muted);
-  font-weight: 700;
-  font-size: 13px;
-  cursor: pointer;
-  transition: filter 180ms ease, transform 140ms ease, color 180ms ease;
-}
-
-.services__pill:hover {
-  filter: brightness(1.06);
-  color: var(--text-white);
-}
-
-.services__pill:active {
-  transform: translateY(1px);
-}
-
-.services__pill:focus-visible {
-  outline: none;
-  box-shadow: 0 0 0 2px rgba(224, 103, 154, 0.3), 0 0 0 6px rgba(224, 103, 154, 0.14);
-}
-
-.services__pill:disabled {
-  opacity: 0.45;
-  cursor: not-allowed;
-}
-
-.services__pill_active {
-  color: var(--text-white);
-  border-color: rgba(224, 103, 154, 0.4);
-  background: rgba(224, 103, 154, 0.18);
-}
-
 /* Round icon buttons in the top actions row (page nav / download). Sized to
    match the pill/select/save controls beside them so the row aligns. */
 .pdf__icon-btn {
@@ -2568,104 +1988,6 @@ onBeforeUnmount(() => {
 .pdf__icon-btn:disabled {
   opacity: 0.45;
   cursor: not-allowed;
-}
-
-/* Keep the colour swatch compact instead of stretching the whole grid column. */
-.pdf__color {
-  max-width: 120px;
-}
-
-.pdf__tool-section {
-  margin-top: 12px;
-  padding: 12px;
-  border-radius: 10px;
-  background: var(--ocean-form-surface-soft);
-  border: 1px solid rgba(255, 255, 255, 0.06);
-}
-
-.pdf__tool-title {
-  font-weight: 600;
-  margin-bottom: 10px;
-  color: rgba(255, 255, 255, 0.9);
-}
-
-.pdf__inspector {
-  border-color: rgba(224, 103, 154, 0.28);
-  background: rgba(224, 103, 154, 0.06);
-}
-
-.pdf__inspector-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  flex-wrap: wrap;
-  margin-bottom: 10px;
-
-  .pdf__tool-title {
-    margin-bottom: 0;
-  }
-}
-
-.pdf__inspector-body {
-  display: grid;
-  gap: 10px;
-}
-
-.pdf__tool-grid4 {
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: 10px;
-  margin-bottom: 10px;
-  /* Top-align every field so the inputs share one baseline even when a cell
-     has extra content (labels/help). Keeps the row visually on one line. */
-  align-items: start;
-
-  @media (min-width: 860px) {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-  }
-}
-
-.pdf__field {
-  display: grid;
-  gap: 6px;
-}
-
-.pdf__field_row {
-  grid-column: 1 / -1;
-}
-
-.pdf__label {
-  font-weight: 600;
-  font-size: 12px;
-  color: rgba(255, 255, 255, 0.88);
-}
-
-.pdf__help {
-  font-size: 12px;
-  line-height: 1.35;
-}
-
-.pdf__style-row {
-  display: inline-flex;
-  gap: 8px;
-  flex-wrap: wrap;
-  align-items: center;
-}
-
-.pdf__chip {
-  width: 38px;
-  height: 34px;
-  border-radius: 12px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  background: rgba(255, 255, 255, 0.04);
-  color: rgba(255, 255, 255, 0.9);
-  font-weight: 600;
-}
-
-.pdf__chip_active {
-  border-color: rgba(224, 103, 154, 0.35);
-  background: rgba(224, 103, 154, 0.18);
 }
 
 .pdf__canvas-wrap {
