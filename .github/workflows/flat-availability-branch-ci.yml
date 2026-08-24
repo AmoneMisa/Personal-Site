@@ -7,6 +7,7 @@ on:
     branches: [ master ]
     paths:
       - 'server/routes/flats-feed.get.ts'
+      - 'tests/flats-shared-popup.test.mjs'
       - '.github/workflows/flat-availability-branch-ci.yml'
 
 permissions:
@@ -24,5 +25,7 @@ jobs:
           cache-dependency-path: package-lock.json
       - name: Install dependencies
         run: npm ci
+      - name: Test Flat Finder availability cache behavior
+        run: node --test tests/flats-shared-popup.test.mjs
       - name: Build Nuxt app
         run: npm run build
