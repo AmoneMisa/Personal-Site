@@ -15,6 +15,7 @@ export function useFlatFeed(options: { onAvailabilityChecked?: (keys: string[]) 
   const nextCursor = ref<string | null>(null);
   const loadMoreSentinel = ref<HTMLElement | null>(null);
   const requests = useLatestRequest();
+  let statisticsRequestId = 0;
   let warmTimer: ReturnType<typeof setTimeout> | undefined;
   let warmParams: Record<string, string> | null = null;
 
@@ -27,10 +28,27 @@ export function useFlatFeed(options: { onAvailabilityChecked?: (keys: string[]) 
     }, 1800);
   }
 
+  async function loadStatistics(params: Record<string, string>, requestId: number) {
+    const statsParams = {
+      ...params,
+      includeStats: "1",
+      statsOnly: "1",
+      limit: "1",
+      offset: "0",
+    };
+    delete statsParams.cursor;
+
+    const { data, error } = await safeFetch<FlatFeedResult>("/flats-feed", { params: statsParams });
+    if (requestId !== statisticsRequestId || error || !data || data.error) return;
+    if (data.statistics) statistics.value = data.statistics;
+  }
+
   async function loadFeed(params: Record<string, string>, options: { append?: boolean; background?: boolean } = {}): Promise<FlatFeedResult | undefined> {
     const append = !!options.append;
     const background = !!options.background;
     const requestId = requests.next();
+    const wantsStatistics = !append && params.includeStats === "1";
+    const currentStatisticsRequestId = !append ? ++statisticsRequestId : statisticsRequestId;
     if (!append) warmParams = { ...params };
     if (!background) {
       if (warmTimer) clearTimeout(warmTimer);
@@ -39,7 +57,14 @@ export function useFlatFeed(options: { onAvailabilityChecked?: (keys: string[]) 
       failed.value = false;
     }
 
-    const { data, error } = await safeFetch<FlatFeedResult>("/flats-feed", { params });
+    // Statistics are substantially more expensive than the first page because
+    // the backend has to deduplicate the complete result set and aggregate
+    // percentiles/geographies. Do not make the user wait for that work before
+    // the first cards can render; request it independently after the page is in.
+    const feedParams = { ...params };
+    if (wantsStatistics) delete feedParams.includeStats;
+
+    const { data, error } = await safeFetch<FlatFeedResult>("/flats-feed", { params: feedParams });
     if (!requests.isLatest(requestId)) return undefined;
     if (error || !data || data.error) {
       if (!background) {
@@ -54,10 +79,11 @@ export function useFlatFeed(options: { onAvailabilityChecked?: (keys: string[]) 
     }
     if (data.availabilityChecked?.length) options.onAvailabilityChecked?.(data.availabilityChecked);
     if (background) {
-      total.value = data.count ?? total.value;
+      if (!append) total.value = data.count ?? total.value;
       sourceErrors.value = data.sourceErrors || [];
       if (data.statistics) statistics.value = data.statistics;
       warming.value = !!data.warming;
+      if (wantsStatistics) void loadStatistics(params, currentStatisticsRequestId);
       scheduleWarmPoll();
       return data;
     }
@@ -76,18 +102,20 @@ export function useFlatFeed(options: { onAvailabilityChecked?: (keys: string[]) 
     } else {
       listings.value = nextListings;
     }
-    total.value = data.count ?? listings.value.length;
+    if (!append) total.value = data.count ?? listings.value.length;
     if (!append) statistics.value = data.statistics || null;
     sourceErrors.value = data.sourceErrors || [];
     warming.value = !!data.warming;
     loading.value = false;
     loadingMore.value = false;
+    if (wantsStatistics) void loadStatistics(params, currentStatisticsRequestId);
     scheduleWarmPoll();
     return data;
   }
 
   onBeforeUnmount(() => {
     if (warmTimer) clearTimeout(warmTimer);
+    statisticsRequestId++;
     requests.cancelPending();
   });
 
