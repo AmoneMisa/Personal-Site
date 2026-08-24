@@ -149,7 +149,7 @@ function suspicionHint(job: Job): string {
 </template>
 
 <style scoped>
-.job-card { position: relative; isolation: isolate; overflow: hidden; padding: 18px; border-radius: 14px; border: 1px solid var(--line); background: radial-gradient(circle at 100% 0, rgba(224,103,154,.07), transparent 38%), linear-gradient(145deg, rgba(255,255,255,.055), rgba(255,255,255,.025)); box-shadow: inset 0 1px 0 rgba(255,255,255,.06), 0 16px 36px rgba(2,6,23,.12); transition: transform 160ms ease, border-color 180ms ease, box-shadow 180ms ease; height: 100%; min-height: 340px; display: flex; flex-direction: column; }
+.job-card { position: relative; isolation: isolate; overflow: hidden; padding: 18px; border-radius: 14px; border: 1px solid var(--line); background: radial-gradient(circle at 100% 0, rgba(224,103,154,.07), transparent 38%), var(--bg-panel); box-shadow: inset 0 1px 0 rgba(255,255,255,.06), 0 16px 36px rgba(2,6,23,.12); transition: transform 160ms ease, border-color 180ms ease, box-shadow 180ms ease; height: 100%; min-height: 340px; display: flex; flex-direction: column; }
 .job-card_scored { box-shadow: inset 3px 0 0 var(--job-card-score), inset 0 1px 0 rgba(255,255,255,.06), 0 16px 36px rgba(2,6,23,.12); }
 .job-card:hover { transform: translateY(-3px); border-color: rgba(224,103,154,.42); box-shadow: inset 0 1px 0 rgba(255,255,255,.08), 0 20px 42px rgba(2,6,23,.22); }
 .job-card_scored:hover { box-shadow: inset 3px 0 0 var(--job-card-score), inset 0 1px 0 rgba(255,255,255,.08), 0 20px 42px rgba(2,6,23,.22); }
@@ -162,7 +162,8 @@ function suspicionHint(job: Job): string {
 .job-card__company { font-weight: 600; }
 .job-card__dot { opacity: .5; }
 .job-card__actions { flex: 0 0 auto; display: flex; justify-content: flex-end; align-items: center; gap: 4px; }
-.job-card__action { width: 27px; height: 27px; display: inline-grid; place-items: center; padding: 0; border: 1px solid var(--line); border-radius: 8px; background: rgba(255,255,255,.018); color: var(--ui-text-muted); cursor: pointer; transition: color 160ms ease, border-color 160ms ease, background 160ms ease; }
+.job-card__action { width: 27px; height: 27px; display: inline-grid; place-items: center; padding: 0; border: 1px solid var(--line); border-radius: 8px; background: var(--bg-panel-2); color: var(--ui-text-muted); cursor: pointer; transition: color 160ms ease, border-color 160ms ease, background 160ms ease; }
+.job-card__action :deep(svg) { display: block; margin: auto; }
 .job-card__action:hover { color: var(--accent-pink, #e0679a); border-color: rgba(224,103,154,.45); }
 .job-card__action_active { color: var(--accent-pink, #e0679a); background: rgba(224,103,154,.12); }
 .job-card__meta { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 12px; }

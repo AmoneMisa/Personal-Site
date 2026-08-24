@@ -2,6 +2,8 @@
 import { safeFetch } from "~/utils/safeFetch";
 import { metroLabelWithAlias, locationLabel, type LocationKind } from "~/utils/locationLabels";
 import FlatMap from "~/components/flats/FlatMap.client.vue";
+import { readStoredList, writeStoredList } from "~/utils/browserStorage";
+import { queryBoolean, queryString } from "~/utils/queryParams";
 
 // Flat Finder. Auto-routed at /flat-finder. Reuses the flat-finder backend
 // (same one the desktop app uses) via the /flats-* proxy routes, so listings,
@@ -95,8 +97,6 @@ interface TranslationResult {
 interface CountryMeta { code: string; name: string; currency: string; cities?: string[]; locations?: Record<string, { districts?: string[]; metro?: string[] }> }
 type FlatView = "active" | "favorites" | "recent" | "hidden";
 type FlatSort = "newest" | "oldest" | "priceAsc" | "priceDesc" | "titleAsc" | "titleDesc";
-type SearchPreset = { name: string; query: Record<string, string> };
-
 const PAGE_SIZE = 20;
 const MAX_SAVED_FLATS = 200;
 const MAX_RECENT_FLATS = 30;
@@ -125,7 +125,12 @@ useSeoMeta({
 // ---- filters ----
 // What "Reset filters" selects. An empty list means every country, so a cleared
 // form needs a real choice rather than the absence of one.
-const DEFAULT_COUNTRY = "UA";
+const defaultCountry = ref("UA");
+function regionalDefaultCountry(): "UA" | "UZ" {
+  if (!import.meta.client) return "UA";
+  const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone || "";
+  return timeZone.startsWith("Asia/") ? "UZ" : "UA";
+}
 const countries = ref<string[]>([]);
 const city = ref("");
 const district = ref("");
@@ -187,8 +192,6 @@ const view = ref<FlatView>("active");
 const favorites = ref<Listing[]>([]);
 const hidden = ref<Listing[]>([]);
 const recent = ref<Listing[]>([]);
-const presets = ref<SearchPreset[]>([]);
-const presetName = ref("");
 const presetModalOpen = ref(false);
 const shareModalOpen = ref(false);
 const sharedLinkOpened = ref(false);
@@ -205,6 +208,27 @@ let warmTimer: ReturnType<typeof setTimeout> | undefined;
 let sharedListingTimer: ReturnType<typeof setTimeout> | undefined;
 let infiniteObserver: IntersectionObserver | undefined;
 let lastPaginationScrollY = 0;
+
+const { copyText } = useClipboard();
+const {
+  presets,
+  presetName,
+  loadPresets,
+  savePreset: saveSearchPreset,
+  applyPreset,
+  removePreset,
+} = useSearchPresets({
+  storageKey: STORAGE.presets,
+  getQuery: currentFilterQuery,
+  applyQuery: applyQueryParams,
+  afterApply: () => scheduleLoad(0),
+});
+const viewTabs = computed(() => [
+  { value: "active", label: t("allListings") },
+  { value: "favorites", label: t("favorites"), count: favorites.value.length },
+  { value: "recent", label: t("recent"), count: recent.value.length },
+  { value: "hidden", label: t("hidden"), count: hidden.value.length },
+]);
 
 function photoCandidates(listing: Listing): string[] {
   return [...new Set([listing.photo, ...(listing.photos || [])].filter((value): value is string => !!value))];
@@ -283,41 +307,13 @@ const currencyItems = computed<Item[]>(() => {
   const rest = keys.filter((c) => !CURRENCY_PRIORITY.includes(c)).sort();
   return [...preferred, ...rest].map((c) => ({ label: c, value: c }));
 });
-const extraLabels = computed(() => locale.value.startsWith("en") ? {
-  amenities: "Amenities",
-  dishwasher: "Dishwasher",
-  ac: "A/C",
-  parking: "Parking",
-  internet: "Internet",
-  gas: "Gas",
-  balcony: "Balcony",
-  terrace: "Terrace",
-  yard: "Private yard",
-  sort: "Sort",
-  newest: "Newest first",
-  oldest: "Oldest first",
-  priceAsc: "Price: low to high",
-  priceDesc: "Price: high to low",
-  titleAsc: "A → Z",
-  titleDesc: "Z → A",
-} : {
-  amenities: "Удобства",
-  dishwasher: "Посудомойка",
-  ac: "Кондиционер",
-  parking: "Паркоместо",
-  internet: "Интернет",
-  gas: "Газ",
-  balcony: "Балкон",
-  terrace: "Терраса",
-  yard: "Личный дворик",
-  sort: "Сортировка",
-  newest: "Сначала новые",
-  oldest: "Сначала старые",
-  priceAsc: "Цена: дешевле",
-  priceDesc: "Цена: дороже",
-  titleAsc: "А → Я",
-  titleDesc: "Я → А",
-});
+const extraLabels = computed(() => ({
+  amenities: t("amenities"), dishwasher: t("dishwasher"), ac: t("airConditioner"),
+  parking: t("parking"), internet: t("internet"), gas: t("gas"), balcony: t("balcony"),
+  terrace: t("terrace"), yard: t("privateYard"), sort: t("sort"), newest: t("sortNewest"),
+  oldest: t("sortOldest"), priceAsc: t("sortPriceAsc"), priceDesc: t("sortPriceDesc"),
+  titleAsc: t("sortTitleAsc"), titleDesc: t("sortTitleDesc"),
+}));
 const sortItems = computed<Item[]>(() => [
   { value: "newest", label: extraLabels.value.newest },
   { value: "oldest", label: extraLabels.value.oldest },
@@ -346,23 +342,11 @@ const agencyItems = computed<Item[]>(() => [
   { label: t("agAny"), value: "any" }, { label: t("agOwner"), value: "owner" }, { label: t("agAgency"), value: "agency" },
 ]);
 
-function readSavedList(key: string, limit = MAX_SAVED_FLATS): Listing[] {
-  try {
-    const value = JSON.parse(localStorage.getItem(key) || "[]");
-    return Array.isArray(value) ? value.slice(0, limit) : [];
-  } catch { return []; }
-}
-function persistList(key: string, value: Listing[], limit = MAX_SAVED_FLATS) {
-  localStorage.setItem(key, JSON.stringify(value.slice(0, limit)));
-}
 function loadPersonalState() {
-  favorites.value = readSavedList(STORAGE.favorites);
-  hidden.value = readSavedList(STORAGE.hidden);
-  recent.value = readSavedList(STORAGE.recent, MAX_RECENT_FLATS);
-  try {
-    const value = JSON.parse(localStorage.getItem(STORAGE.presets) || "[]");
-    presets.value = Array.isArray(value) ? value : [];
-  } catch { presets.value = []; }
+  favorites.value = readStoredList<Listing>(STORAGE.favorites, MAX_SAVED_FLATS);
+  hidden.value = readStoredList<Listing>(STORAGE.hidden, MAX_SAVED_FLATS);
+  recent.value = readStoredList<Listing>(STORAGE.recent, MAX_RECENT_FLATS);
+  loadPresets();
   try { showAdvanced.value = localStorage.getItem("flats:showAdvanced") === "1"; } catch { /* noop */ }
 }
 function toggleAdvanced() {
@@ -447,8 +431,6 @@ function currentFilterQuery(): Record<string, string> {
   if (source.value) q.sources = source.value;
   return q;
 }
-function queryString(value: unknown): string { return Array.isArray(value) ? String(value[0] || "") : String(value || ""); }
-function queryBool(value: unknown): boolean { return ["1", "true"].includes(queryString(value).toLowerCase()); }
 function applyQueryParams(params: Record<string, unknown>) {
   const countryParam = queryString(params.countries);
   if (countryParam) countries.value = countryParam.split(",").filter(Boolean);
@@ -459,18 +441,18 @@ function applyQueryParams(params: Record<string, unknown>) {
   agency.value = ["owner", "agency"].includes(queryString(params.agency)) ? queryString(params.agency) : "any";
   audience.value = ["women", "men", "family"].includes(queryString(params.audience)) ? queryString(params.audience) : "any";
   metro.value = queryString(params.metro);
-  petFriendly.value = queryBool(params.pets);
-  roomOnlyFilter.value = queryBool(params.roomOnly);
-  childrenRequired.value = queryBool(params.children);
-  newBuildingOnly.value = queryBool(params.newBuilding);
-  dishwasherOnly.value = queryBool(params.dishwasher);
-  airConditionerOnly.value = queryBool(params.airConditioner);
-  parkingOnly.value = queryBool(params.parking);
-  internetOnly.value = queryBool(params.internet);
-  gasOnly.value = queryBool(params.gas);
-  balconyOnly.value = queryBool(params.balcony);
-  terraceOnly.value = queryBool(params.terrace);
-  privateYardOnly.value = queryBool(params.privateYard);
+  petFriendly.value = queryBoolean(params.pets);
+  roomOnlyFilter.value = queryBoolean(params.roomOnly);
+  childrenRequired.value = queryBoolean(params.children);
+  newBuildingOnly.value = queryBoolean(params.newBuilding);
+  dishwasherOnly.value = queryBoolean(params.dishwasher);
+  airConditionerOnly.value = queryBoolean(params.airConditioner);
+  parkingOnly.value = queryBoolean(params.parking);
+  internetOnly.value = queryBoolean(params.internet);
+  gasOnly.value = queryBoolean(params.gas);
+  balconyOnly.value = queryBoolean(params.balcony);
+  terraceOnly.value = queryBoolean(params.terrace);
+  privateYardOnly.value = queryBoolean(params.privateYard);
   const sortParam = queryString(params.sort);
   sort.value = (["newest", "oldest", "priceAsc", "priceDesc", "titleAsc", "titleDesc"].includes(sortParam) ? sortParam : "newest") as FlatSort;
   priceMin.value = Number(queryString(params.priceMin)) || undefined;
@@ -521,27 +503,19 @@ const shareUrl = computed(() => {
   const resolved = router.resolve({ path: route.path, query: { ...currentFilterQuery(), shared: "1" } });
   return import.meta.client ? new URL(resolved.href, window.location.origin).toString() : resolved.href;
 });
-async function copyText(value: string): Promise<boolean> {
-  if (navigator.clipboard?.writeText && window.isSecureContext) {
-    try { await navigator.clipboard.writeText(value); return true; } catch { /* fallback */ }
-  }
-  const field = document.createElement("textarea");
-  field.value = value; field.setAttribute("readonly", ""); field.style.position = "fixed"; field.style.opacity = "0";
-  document.body.appendChild(field); field.select();
-  let copied = false; try { copied = document.execCommand("copy"); } finally { field.remove(); }
-  return copied;
-}
 async function copyShareLink() { await copyText(shareUrl.value); }
 function savePreset() {
-  const name = presetName.value.trim();
-  if (!name) return;
-  presets.value = [...presets.value.filter((item) => item.name.toLowerCase() !== name.toLowerCase()), { name, query: currentFilterQuery() }];
-  localStorage.setItem(STORAGE.presets, JSON.stringify(presets.value));
-  presetName.value = ""; presetModalOpen.value = false;
+  if (saveSearchPreset()) presetModalOpen.value = false;
 }
-function applyPreset(preset: SearchPreset) { applyQueryParams(preset.query); scheduleLoad(0); }
-function removePreset(name: string) { presets.value = presets.value.filter((item) => item.name !== name); localStorage.setItem(STORAGE.presets, JSON.stringify(presets.value)); }
-async function loadMeta() { const { data } = await safeFetch<CountryMeta[]>("/flats-meta"); if (Array.isArray(data)) { meta.value = data; if (!countries.value.length) countries.value = data.map((c) => c.code); } }
+async function loadMeta() {
+  const { data } = await safeFetch<CountryMeta[]>("/flats-meta");
+  if (!Array.isArray(data)) return;
+  meta.value = data;
+  if (!countries.value.length) {
+    const preferred = data.some((country) => country.code === defaultCountry.value) ? defaultCountry.value : "UA";
+    countries.value = [preferred];
+  }
+}
 async function loadRates() { const { data } = await safeFetch<{ rates?: Record<string, number> }>("/flats-rates"); if (data?.rates && data.rates.USD) rates.value = data.rates; }
 function scheduleWarmPoll() {
   if (warmTimer) clearTimeout(warmTimer);
@@ -633,9 +607,8 @@ function scheduleLoad(delay = FILTER_DEBOUNCE_MS) { if (loadTimer) clearTimeout(
 function clearSearch() { query.value = ""; scheduleLoad(0); }
 function selectSource(v: string) { if (source.value === v) return; source.value = v; scheduleLoad(); }
 function resetFilters() {
-  // Ukraine rather than an empty list: empty means "every country", which is not
-  // what a cleared form should ask for.
-  countries.value = [DEFAULT_COUNTRY];
+  // Empty means "every country", so reset keeps the regional starting country.
+  countries.value = [defaultCountry.value];
   city.value = ""; district.value = ""; metro.value = ""; propertyType.value = "any"; dealType.value = "any"; agency.value = "any"; audience.value = "any";
   petFriendly.value = false; roomOnlyFilter.value = false; childrenRequired.value = false; newBuildingOnly.value = false;
   dishwasherOnly.value = false; airConditionerOnly.value = false; parkingOnly.value = false; internetOnly.value = false; gasOnly.value = false; balconyOnly.value = false; terraceOnly.value = false; privateYardOnly.value = false; sort.value = "newest";
@@ -648,16 +621,16 @@ function resetFilters() {
 }
 function updateBackToTop() { showBackToTop.value = window.scrollY > 600; }
 function scrollToFilters() { filtersEl.value?.scrollIntoView({ behavior: "smooth", block: "start" }); }
-function setView(next: FlatView) { view.value = next; }
+function setView(next: string) { view.value = next as FlatView; }
 function toggleFavorite(item: Listing) {
   favorites.value = isFavorite(item.id) ? favorites.value.filter((saved) => saved.id !== item.id) : [item, ...favorites.value.filter((saved) => saved.id !== item.id)].slice(0, MAX_SAVED_FLATS);
-  if (isHidden(item.id)) { hidden.value = hidden.value.filter((saved) => saved.id !== item.id); persistList(STORAGE.hidden, hidden.value); }
-  persistList(STORAGE.favorites, favorites.value);
+  if (isHidden(item.id)) { hidden.value = hidden.value.filter((saved) => saved.id !== item.id); writeStoredList(STORAGE.hidden, hidden.value, MAX_SAVED_FLATS); }
+  writeStoredList(STORAGE.favorites, favorites.value, MAX_SAVED_FLATS);
 }
 function toggleHidden(item: Listing) {
   hidden.value = isHidden(item.id) ? hidden.value.filter((saved) => saved.id !== item.id) : [item, ...hidden.value.filter((saved) => saved.id !== item.id)].slice(0, MAX_SAVED_FLATS);
-  if (isFavorite(item.id)) { favorites.value = favorites.value.filter((saved) => saved.id !== item.id); persistList(STORAGE.favorites, favorites.value); }
-  persistList(STORAGE.hidden, hidden.value);
+  if (isFavorite(item.id)) { favorites.value = favorites.value.filter((saved) => saved.id !== item.id); writeStoredList(STORAGE.favorites, favorites.value, MAX_SAVED_FLATS); }
+  writeStoredList(STORAGE.hidden, hidden.value, MAX_SAVED_FLATS);
 }
 
 function mapCoordinateLooksSane(listing: Listing): boolean {
@@ -675,6 +648,8 @@ const mapPoints = computed(() => displayedListings.value.filter(mapCoordinateLoo
 
 const active = ref<Listing | null>(null);
 const modalOpen = ref(false);
+const checkingListingKey = ref("");
+const listingKey = (listing: Listing) => `${listing.source}:${listing.country}:${listing.id}`;
 const lightboxIndex = ref<number | null>(null);
 const lightboxPhotos = computed(() => active.value ? visiblePhotos(active.value) : []);
 const lightboxPhoto = computed(() => lightboxIndex.value == null ? null : lightboxPhotos.value[lightboxIndex.value] || null);
@@ -733,9 +708,9 @@ function removeUnavailableListing(id: string, sourceName = "olx", countryCode = 
   hidden.value = hidden.value.filter((item) => !listingIdentityMatches(item, id, sourceName, countryCode));
   recent.value = recent.value.filter((item) => !listingIdentityMatches(item, id, sourceName, countryCode));
   if (import.meta.client) {
-    persistList(STORAGE.favorites, favorites.value);
-    persistList(STORAGE.hidden, hidden.value);
-    persistList(STORAGE.recent, recent.value, MAX_RECENT_FLATS);
+    writeStoredList(STORAGE.favorites, favorites.value, MAX_SAVED_FLATS);
+    writeStoredList(STORAGE.hidden, hidden.value, MAX_SAVED_FLATS);
+    writeStoredList(STORAGE.recent, recent.value, MAX_RECENT_FLATS);
   }
   if (active.value && listingIdentityMatches(active.value, id, sourceName, countryCode)) {
     modalOpen.value = false;
@@ -743,10 +718,9 @@ function removeUnavailableListing(id: string, sourceName = "olx", countryCode = 
   }
 }
 function showListingUnavailableToast() {
-  const english = locale.value.startsWith("en");
   toast.add({
-    title: english ? "Listing no longer available" : "Объявление больше недоступно",
-    description: english ? "It was removed or taken down by the publisher." : "Оно было удалено или снято с публикации.",
+    title: t("listingUnavailableTitle"),
+    description: t("listingUnavailableDescription"),
     color: "warning",
     icon: "i-lucide-circle-alert",
   });
@@ -763,19 +737,26 @@ async function verifyOlxListing(l: Listing): Promise<Listing | null | undefined>
 }
 async function openListing(l: Listing, olxAlreadyVerified = false) {
   let listing = l;
+  const key = listingKey(l);
   if (l.source === "olx" && !olxAlreadyVerified) {
-    const verified = await verifyOlxListing(l);
-    if (verified === null) {
-      removeUnavailableListing(l.id, l.source, l.country);
-      showListingUnavailableToast();
-      if (queryString(route.query.flat) === l.id) syncListingInUrl(null);
-      return;
+    if (checkingListingKey.value) return;
+    checkingListingKey.value = key;
+    try {
+      const verified = await verifyOlxListing(l);
+      if (verified === null) {
+        removeUnavailableListing(l.id, l.source, l.country);
+        showListingUnavailableToast();
+        if (queryString(route.query.flat) === l.id) syncListingInUrl(null);
+        return;
+      }
+      if (verified) listing = verified;
+    } finally {
+      if (checkingListingKey.value === key) checkingListingKey.value = "";
     }
-    if (verified) listing = verified;
   }
   stopTranslationPoll(); translationRequestId += 1; lightboxIndex.value = null; active.value = listing;
   translatedDescription.value = translationCache.get(translationCacheKey(listing)) || ""; translatingDescription.value = false; translationFailed.value = false; modalOpen.value = true;
-  recent.value = [listing, ...recent.value.filter((item) => item.id !== listing.id)].slice(0, MAX_RECENT_FLATS); persistList(STORAGE.recent, recent.value, MAX_RECENT_FLATS);
+  recent.value = [listing, ...recent.value.filter((item) => item.id !== listing.id)].slice(0, MAX_RECENT_FLATS); writeStoredList(STORAGE.recent, recent.value, MAX_RECENT_FLATS);
   syncListingInUrl(listing);
 }
 function modalTitle(listing: Listing | null): string {
@@ -882,11 +863,10 @@ function cardDealTone(l: Listing): "sale" | "rent" | "room" | "short" | "" {
 }
 function cardDealLabel(l: Listing): string {
   const filterApplies = view.value === "active";
-  const english = locale.value.startsWith("en");
-  if (l.dealType === "shortRent") return !filterApplies || dealType.value !== "shortRent" ? (english ? "Short-term rent" : "Посуточная аренда") : "";
+  if (l.dealType === "shortRent") return !filterApplies || dealType.value !== "shortRent" ? t("cardShortRent") : "";
   if (l.roomOnly) return !filterApplies || !roomOnlyFilter.value ? t("roomShare") : "";
   if (!filterApplies || dealType.value === "any") {
-    if (l.dealType === "longRent") return english ? "Rent" : "Аренда";
+    if (l.dealType === "longRent") return t("cardRent");
     return dealLabel(l.dealType);
   }
   return "";
@@ -959,6 +939,8 @@ function setupInfinitePagination() {
 onMounted(async () => {
   window.addEventListener("keydown", onLightboxKeydown); window.addEventListener("scroll", updateBackToTop, { passive: true }); updateBackToTop();
   const sharedFlatId = queryString(route.query.flat); const sharedFlatSource = queryString(route.query.flatSource); const sharedFlatCountry = queryString(route.query.flatCountry);
+  defaultCountry.value = regionalDefaultCountry();
+  if (!queryString(route.query.countries)) countries.value = [defaultCountry.value];
   loadPersonalState(); applyQueryParams(route.query); void loadRates(); await loadMeta(); await nextTick(); restoring.value = false;
   if (queryString(route.query.shared) === "1") { showAdvanced.value = true; sharedLinkOpened.value = true; shareModalOpen.value = true; }
   await load(false); if (sharedFlatId) await openSharedListing(sharedFlatId, sharedFlatSource, sharedFlatCountry); await nextTick(); lastPaginationScrollY = window.scrollY; setupInfinitePagination();
@@ -1006,24 +988,27 @@ onBeforeUnmount(() => { modalOpen.value = false; lightboxIndex.value = null; rel
         <div class="flats__filters">
           <button v-for="opt in sourceOptions" :key="opt.value" type="button" class="flats__pill" :class="{ 'flats__pill_active': source === opt.value }" @click="selectSource(opt.value)">{{ opt.label }}</button>
         </div>
-        <div class="flats__views" :aria-label="t('personalTabs')">
-          <button type="button" class="flats__pill" :class="{ 'flats__pill_active': view === 'active' }" @click="setView('active')">{{ t("allListings") }}</button>
-          <button type="button" class="flats__pill" :class="{ 'flats__pill_active': view === 'favorites' }" @click="setView('favorites')">{{ t("favorites") }} · {{ favorites.length }}</button>
-          <button type="button" class="flats__pill" :class="{ 'flats__pill_active': view === 'recent' }" @click="setView('recent')">{{ t("recent") }} · {{ recent.length }}</button>
-          <button type="button" class="flats__pill" :class="{ 'flats__pill_active': view === 'hidden' }" @click="setView('hidden')">{{ t("hidden") }} · {{ hidden.length }}</button>
-        </div>
+        <UiSearchViewTabs
+          :model-value="view"
+          :items="viewTabs"
+          :aria-label="t('personalTabs')"
+          @update:model-value="setView"
+        />
       </div>
 
       <div class="filter-surface">
       <section class="filter-card">
-        <div class="filter-presets">
-          <span class="flats__field-label filter-presets__label">{{ t("presets") }}</span>
-          <button v-for="preset in presets" :key="preset.name" type="button" class="flats__preset" @click="applyPreset(preset)">
-            <span>{{ preset.name }}</span><span class="flats__preset-remove" role="button" :aria-label="t('deletePreset')" @click.stop="removePreset(preset.name)">×</span>
-          </button>
-          <u-button type="button" variant="outline" color="neutral" size="sm" icon="i-lucide-bookmark-plus" @click="presetModalOpen = true">{{ t("savePreset") }}</u-button>
-          <u-button type="button" variant="outline" color="neutral" size="sm" icon="i-lucide-share-2" @click="sharedLinkOpened = false; shareModalOpen = true">{{ t("shareSearch") }}</u-button>
-        </div>
+        <UiSearchPresets
+          :presets="presets"
+          :label="t('presets')"
+          :delete-label="t('deletePreset')"
+          :save-label="t('savePreset')"
+          :share-label="t('shareSearch')"
+          @apply="applyPreset"
+          @remove="removePreset"
+          @save="presetModalOpen = true"
+          @share="sharedLinkOpened = false; shareModalOpen = true"
+        />
 
         <div class="filter-primary-grid">
           <div class="flats__field"><u-select-menu :label="t('country')" v-model="countries" :items="countryItems" value-key="value" label-key="label" multiple :placeholder="t('countryAny')" class="flats__select" @update:model-value="scheduleLoad()" /></div>
@@ -1052,15 +1037,14 @@ onBeforeUnmount(() => { modalOpen.value = false; lightboxIndex.value = null; rel
           <u-button type="button" size="xs" color="neutral" icon="i-lucide-tree-pine" :variant="privateYardOnly ? 'solid' : 'outline'" @click="privateYardOnly = !privateYardOnly; scheduleLoad()">{{ extraLabels.yard }}</u-button>
         </div>
 
-        <div class="filter-actions-row">
+        <UiFilterFooter class="filter-actions-row" :reset-label="t('reset')" @reset="resetFilters">
           <u-button type="button" variant="outline" color="neutral" icon="i-lucide-sliders-horizontal" :trailing-icon="showAdvanced ? 'i-lucide-chevron-up' : 'i-lucide-chevron-down'" :aria-expanded="showAdvanced" class="advanced-button" @click="toggleAdvanced">{{ showAdvanced ? t("hideFilters") : t("moreFilters") }}</u-button>
           <div class="active-filter-chips">
             <button v-if="district" type="button" class="filter-chip" @click="district = ''; scheduleLoad()">{{ t("district") }}: {{ locName(district, 'district') }} <span>×</span></button>
             <button v-if="roomsMin != null" type="button" class="filter-chip" @click="roomsMin = undefined; scheduleLoad()">{{ roomsMin }}+ {{ t('roomsChip') }} <span>×</span></button>
             <button v-if="petFriendly" type="button" class="filter-chip" @click="petFriendly = false; scheduleLoad()"><u-icon name="i-lucide-paw-print" /> {{ t('pets') }} <span>×</span></button>
           </div>
-          <u-button type="button" variant="ghost" color="neutral" size="sm" icon="i-lucide-rotate-ccw" class="filter-reset" @click="resetFilters">{{ t("reset") }}</u-button>
-        </div>
+        </UiFilterFooter>
       </section>
 
       <section v-if="showAdvanced" class="advanced-card">
@@ -1109,7 +1093,7 @@ onBeforeUnmount(() => { modalOpen.value = false; lightboxIndex.value = null; rel
 <section v-if="listings.length" class="flats__map-wrap"><flat-map :points="mapPoints" :draw-label="t('drawArea')" :done-label="t('done')" :clear-label="t('clearArea')" :draw-hint="t('drawHint')" :expand-label="t('mapExpand')" :collapse-label="t('mapCollapse')" @select="openById" @area-change="drawnArea = $event" /></section>
 
     <div class="flats__grid">
-      <article v-for="l in displayedListings" :key="`${l.source}:${l.country}:${l.id}`" class="flat-card" :class="{ 'flat-card_favorite': isFavorite(l.id), 'flat-card_hidden': isHidden(l.id) }" @click="openListing(l)">
+      <article v-for="l in displayedListings" :key="listingKey(l)" class="flat-card" :class="{ 'flat-card_favorite': isFavorite(l.id), 'flat-card_hidden': isHidden(l.id), 'flat-card_checking': checkingListingKey === listingKey(l) }" :aria-busy="checkingListingKey === listingKey(l)" @click="openListing(l)">
         <div class="flat-card__photo">
           <img v-if="listingPhoto(l)" :src="listingPhoto(l) || ''" :alt="displayListingTitle(l)" loading="lazy" decoding="async" referrerpolicy="no-referrer" @error="markPhotoFailedFromEvent" />
           <div v-else class="flat-card__no-photo"><u-icon name="i-lucide-image-off" class="flat-card__no-photo-icon" aria-hidden="true" /><span>{{ t("noPhoto") }}</span></div>
@@ -1130,6 +1114,7 @@ onBeforeUnmount(() => { modalOpen.value = false; lightboxIndex.value = null; rel
             <span class="flat-card__meta-tail"><span class="flat-card__src">{{ l.source }}</span><span v-if="timeAgo(l.createdAt)">· {{ timeAgo(l.createdAt) }}</span></span>
           </div>
         </div>
+        <div v-if="checkingListingKey === listingKey(l)" class="flat-card__checking" role="status" aria-live="polite"><u-icon name="i-lucide-loader-circle" class="flat-card__checking-icon" /><span>{{ t("checkingListing") }}</span></div>
       </article>
     </div>
 <div ref="loadMoreSentinel" v-if="hasMore" class="flats__sentinel"><span v-if="loadingMore" class="text-muted">{{ t("loadingMore") }}</span></div>
@@ -1160,13 +1145,9 @@ onBeforeUnmount(() => { modalOpen.value = false; lightboxIndex.value = null; rel
 .flats__controls { margin: 20px 0 20px; display: grid; gap: 12px; grid-template-columns: 1fr auto; align-items: start; }
 .flats__row { grid-column: 1 / -1; display: flex; flex-wrap: wrap; justify-content: space-between; gap: 12px; }
 .flats__filters { display: flex; flex-wrap: wrap; gap: 8px; }
-.flats__views { display: flex; flex-wrap: wrap; gap: 8px; padding-left: 12px; border-left: 1px solid var(--line); }
 .flats__pill { height: 34px; padding: 0 13px; border-radius: 8px; border: 1px solid var(--line); background: rgba(255,255,255,0.03); color: var(--ui-text-muted); font-weight: 700; font-size: 12px; text-transform: capitalize; cursor: pointer; transition: filter 180ms ease, color 180ms ease; }
 .flats__pill:hover { color: var(--text-white); }
 .flats__pill_active { color: var(--text-white); border-color: rgba(224,103,154,0.4); background: rgba(224,103,154,0.18); }
-.flats__preset { display: inline-flex; align-items: center; gap: 8px; min-height: 32px; padding: 0 8px 0 11px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg-panel); color: var(--text-primary); cursor: pointer; }
-.flats__preset-remove { color: var(--text-muted); font-size: 18px; line-height: 1; }
-.flats__preset-remove:hover { color: var(--accent-pink); }
 /* Control height is owned by .ui-control (assets/css/ui.css), which every input
    and select composes. Forcing a min-height on the NATIVE element inside them
    stacked a second height on top of the wrapper's, which is what made the range
@@ -1199,35 +1180,40 @@ onBeforeUnmount(() => { modalOpen.value = false; lightboxIndex.value = null; rel
 @media (min-width: 640px) { .flats__grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (min-width: 1024px) { .flats__grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
 @media (min-width: 1440px) { .flats__grid { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
-.flat-card { min-width: 0; border: 1px solid var(--line); border-radius: 12px; overflow: hidden; background: rgba(255,255,255,0.03); cursor: pointer; transition: transform 140ms ease, border-color 180ms ease, box-shadow 180ms ease; display: flex; flex-direction: column; }
+.flat-card { position: relative; min-width: 0; height: 100%; border: 1px solid var(--line); border-radius: 12px; overflow: hidden; background: var(--bg-panel); cursor: pointer; transition: transform 140ms ease, border-color 180ms ease, box-shadow 180ms ease; display: flex; flex-direction: column; }
 .flat-card:hover { transform: translateY(-2px); border-color: rgba(224,103,154,0.4); box-shadow: 0 12px 30px rgba(0,0,0,.16); }
+.flat-card_checking { pointer-events: none; }
+.flat-card__checking { position: absolute; z-index: 5; inset: 0; display: grid; place-content: center; justify-items: center; gap: 9px; padding: 18px; background: rgba(7,12,34,.92); color: var(--text-primary); font-size: 12.5px; font-weight: 700; text-align: center; }
+.flat-card__checking-icon { width: 26px; height: 26px; color: var(--accent-pink); animation: flat-card-spin .8s linear infinite; }
+@keyframes flat-card-spin { to { transform: rotate(360deg); } }
 .flat-card__photo { position: relative; width: 100%; aspect-ratio: 4 / 3; flex: 0 0 auto; overflow: hidden; background: var(--bg-panel); }
 .flat-card__photo::after { content: ""; position: absolute; inset: 0; pointer-events: none; background: linear-gradient(180deg, rgba(8,11,26,.16) 0%, transparent 28%, transparent 76%, rgba(8,11,26,.18) 100%); }
 .flat-card__photo > img { width: 100%; height: 100%; object-fit: cover; display: block; transition: transform 260ms ease; }
 .flat-card:hover .flat-card__photo > img { transform: scale(1.015); }
-.flat-card__no-photo { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 9px; height: 100%; color: var(--text-muted); font-size: 12px; background: rgba(255,255,255,0.025); }
+.flat-card__no-photo { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 9px; height: 100%; color: var(--text-muted); font-size: 12px; background: var(--bg-panel-2); }
 .flat-card__no-photo-icon { width: 34px; height: 34px; opacity: 0.48; }
-.flat-card__deal { position: absolute; z-index: 2; top: 9px; left: 9px; max-width: calc(100% - 92px); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; font-weight: 700; line-height: 1; padding: 6px 9px; border: 1px solid rgba(224,103,154,.42); border-radius: 7px; background: rgba(13,17,40,.86); color: var(--accent-pink); box-shadow: 0 3px 12px rgba(0,0,0,.2); backdrop-filter: blur(8px); }
+.flat-card__deal { position: absolute; z-index: 2; top: 9px; left: 9px; max-width: calc(100% - 92px); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; font-weight: 700; line-height: 1; padding: 6px 9px; border: 1px solid rgba(224,103,154,.42); border-radius: 7px; background: #0d1128; color: var(--accent-pink); box-shadow: 0 3px 12px rgba(0,0,0,.2); }
 .flat-card__deal_sale { color: #f58ab5; border-color: rgba(245,138,181,.45); }
 .flat-card__deal_rent { color: #b79cff; border-color: rgba(183,156,255,.42); }
 .flat-card__deal_room { color: #77d9e8; border-color: rgba(119,217,232,.42); }
 .flat-card__deal_short { color: #f4c86a; border-color: rgba(244,200,106,.45); }
 .flat-card__actions { position: absolute; z-index: 3; top: 8px; right: 8px; display: flex; gap: 5px; }
-.flat-card__action { width: 32px; height: 32px; display: inline-grid; place-items: center; padding: 0; border: 1px solid rgba(66,73,116,.86); border-radius: 7px; background: rgba(13,17,40,.84); color: #c8cbdb; cursor: pointer; box-shadow: 0 3px 12px rgba(0,0,0,.18); backdrop-filter: blur(8px); transition: color 150ms ease, border-color 150ms ease, background-color 150ms ease; }
+.flat-card__action { width: 32px; height: 32px; display: inline-grid; place-items: center; padding: 0; border: 1px solid rgba(66,73,116,.86); border-radius: 7px; background: #0d1128; color: #c8cbdb; cursor: pointer; box-shadow: 0 3px 12px rgba(0,0,0,.18); transition: color 150ms ease, border-color 150ms ease, background-color 150ms ease; }
+.flat-card__action :deep(svg) { display: block; margin: auto; }
 .flat-card__action:hover, .flat-card__action_active { color: var(--accent-pink); border-color: rgba(224,103,154,.58); background: rgba(26,29,57,.94); }
-.flat-card__body { padding: 13px 14px 14px; display: flex; flex-direction: column; gap: 5px; }
+.flat-card__body { min-height: 0; flex: 1 1 auto; padding: 13px 14px 14px; display: flex; flex-direction: column; gap: 5px; }
 .flat-card__price { font-weight: 750; font-size: 18px; line-height: 1.2; color: var(--text-white, inherit); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
 .flat-card__price-conv { font-size: 12px; font-weight: 500; line-height: 1.35; }
 .flat-card__title { margin-top: 2px; font-size: 14.5px; font-weight: 650; line-height: 1.38; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere; }
 .flat-card__spec { font-size: 12.5px; line-height: 1.4; }
-.flat-card__badges { display: flex; flex-wrap: wrap; align-content: flex-start; gap: 5px; margin-top: 5px; }
+.flat-card__badges { display: flex; flex-wrap: wrap; align-content: flex-start; gap: 5px; margin-top: 5px; max-height: 78px; overflow: hidden; }
 .flat-card__badge { max-width: 100%; font-size: 10.5px; font-weight: 600; line-height: 1.15; padding: 4px 7px; border-radius: 999px; border: 1px solid var(--line); background: rgba(255,255,255,0.05); color: var(--text-primary); white-space: normal; overflow-wrap: anywhere; }
-.flat-card__meta { display: flex; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; gap: 6px 10px; margin-top: 5px; padding-top: 8px; border-top: 1px solid rgba(255,255,255,.055); font-size: 11.5px; line-height: 1.35; }
+.flat-card__meta { display: flex; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; gap: 6px 10px; margin-top: auto; padding-top: 8px; border-top: 1px solid rgba(255,255,255,.055); font-size: 11.5px; line-height: 1.35; }
 .flat-card__location { min-width: 0; display: inline-flex; align-items: flex-start; gap: 5px; flex: 1 1 150px; }
 .flat-card__location svg { flex: 0 0 auto; margin-top: 1px; }
 .flat-card__meta-tail { display: inline-flex; gap: 5px; white-space: nowrap; margin-left: auto; }
 .flat-card__src { text-transform: capitalize; opacity: 0.72; }
-.flats__empty { margin-top: 18px; text-align: center; padding: 18px; border-radius: 10px; border: 1px solid var(--line); background: rgba(255,255,255,0.03); }
+.flats__empty { margin-top: 18px; text-align: center; padding: 18px; border-radius: 10px; border: 1px solid var(--line); background: var(--bg-panel); }
 .flats__sentinel { min-height: 44px; display: grid; place-items: center; }
 .flat-card_favorite { border-color: rgba(224,103,154,0.52); }
 .flat-card_hidden { opacity: 0.64; border-style: dashed; }
@@ -1283,8 +1269,6 @@ onBeforeUnmount(() => { modalOpen.value = false; lightboxIndex.value = null; rel
   box-shadow: none;
 }
 .filter-card { padding: 16px; }
-.filter-presets { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding-bottom: 14px; margin-bottom: 14px; border-bottom: 1px solid var(--line); }
-.filter-presets__label { margin-right: 4px; white-space: nowrap; }
 .filter-primary-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; }
 /* Scoped to the value span (not every span, which included the chevron) and
    kept on one line. This rule sits after the one above and previously won with
@@ -1311,7 +1295,6 @@ onBeforeUnmount(() => { modalOpen.value = false; lightboxIndex.value = null; rel
 .active-filter-chips { display: flex; flex: 1 1 300px; gap: 8px; flex-wrap: wrap; min-width: 0; }
 .filter-chip { display: inline-flex; align-items: center; gap: 7px; max-width: 100%; min-height: 34px; padding: 6px 11px; border: 1px solid var(--line); border-radius: 7px; background: var(--bg-panel-2); color: var(--text-primary); white-space: normal; text-align: left; line-height: 1.25; }
 .filter-chip span { color: var(--ui-text-muted); flex: 0 0 auto; }
-.filter-reset { margin-left: auto; }
 .advanced-card { margin-top: 0; overflow: hidden; border-top: 1px solid var(--line); }
 .advanced-card__header { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 14px 16px; border-bottom: 1px solid var(--line); }
 .advanced-card__header > div, .advanced-card__header button { display: inline-flex; align-items: center; gap: 8px; }
@@ -1365,11 +1348,7 @@ onBeforeUnmount(() => { modalOpen.value = false; lightboxIndex.value = null; rel
   .flats__controls_redesign { margin-inline: -4px; }
   .flats__searchbar { grid-template-columns: 1fr; }
   .flats__secondary-nav { gap: 8px; }
-  .flats__views { padding-left: 0; border-left: 0; }
   .filter-card { padding: 14px 12px; }
-  .filter-presets { align-items: stretch; }
-  .filter-presets__label { flex: 0 0 100%; }
-  .filter-presets :deep(button) { min-height: var(--ui-control-h-md); }
   .filter-primary-grid { grid-template-columns: 1fr; gap: 12px; }
   .filter-price-row { grid-template-columns: minmax(0,1fr) 10px minmax(0,1fr); column-gap: 4px; row-gap: 8px; }
   .filter-price-row__label { grid-column: 1 / -1; }
@@ -1381,7 +1360,6 @@ onBeforeUnmount(() => { modalOpen.value = false; lightboxIndex.value = null; rel
   .filter-actions-row { align-items: stretch; }
   .advanced-button { flex: 1 1 100%; justify-content: center; }
   .active-filter-chips { flex: 1 1 100%; }
-  .filter-reset { width: 100%; margin-left: 0; justify-content: center; }
   .advanced-card__header { padding: 13px 12px; }
   .advanced-card__header strong { line-height: 1.25; }
   .advanced-groups { grid-template-columns: 1fr; padding: 14px 12px; gap: 0; }
@@ -1401,7 +1379,6 @@ onBeforeUnmount(() => { modalOpen.value = false; lightboxIndex.value = null; rel
 @media (max-width: 390px) {
   .filter-price-row { column-gap: 3px; row-gap: 6px; }
   .price-input :deep(.price-number-input) { font-size: 11px; }
-  .filter-presets .flats__preset { max-width: 100%; }
   .range-field { grid-template-columns: minmax(0,1fr) 8px minmax(0,1fr); }
 }
 </style>

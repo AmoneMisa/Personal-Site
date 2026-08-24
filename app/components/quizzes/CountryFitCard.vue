@@ -232,7 +232,7 @@ const priceColumns = computed(() => {
 </script>
 
 <template>
-  <div class="p-4 rounded-xl border border-[var(--ui-border)] bg-[rgba(255,255,255,0.03)] result-card">
+  <div class="p-4 rounded-xl border border-[var(--ui-border)] result-card">
     <div class="flex items-start justify-between gap-3">
       <div class="font-black">
         {{ t(item.titleKey, item.fallbackName) || item.fallbackName }}
@@ -250,7 +250,7 @@ const priceColumns = computed(() => {
     </div>
 
     <div class="text-muted mt-2">
-      ~${{ Math.round(item.estimatedMonthlyUSD).toLocaleString("en-US") }} / month
+      {{ t("quizzes.countryFit.monthlyEstimate", { amount: Math.round(item.estimatedMonthlyUSD).toLocaleString("en-US") }) }}
     </div>
 
     <div v-if="showWhy && item.why?.length" class="text-muted mt-2">
@@ -309,7 +309,7 @@ const priceColumns = computed(() => {
 <style scoped>
 .result-card {
   position: relative;
-  background: rgba(8, 13, 35, 0.86);
+  background: var(--bg-panel);
   box-shadow: 0 12px 28px rgba(2, 5, 18, 0.2);
 }
 
@@ -350,7 +350,7 @@ const priceColumns = computed(() => {
   padding: 6px 10px;
   border-radius: 6px;
   border: 1px solid var(--ui-border);
-  background: rgba(255, 255, 255, 0.03);
+  background: var(--bg-panel-2);
   color: var(--ui-text-muted);
   line-height: 1;
   cursor: default;
@@ -366,13 +366,15 @@ const priceColumns = computed(() => {
   z-index: 70;
   left: 0;
   top: calc(100% + 10px);
-  width: 320px;
+  width: min(360px, calc(100vw - 32px));
+  max-height: min(520px, 70vh);
+  overflow-y: auto;
 
   padding: 12px;
-  border-radius: 14px;
-  border: 1px solid var(--ui-border);
-  background: rgba(15, 15, 18, 0.92);
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  background: var(--bg-panel);
+  box-shadow: 0 18px 44px rgba(2, 5, 18, 0.48);
 
   opacity: 0;
   transform: translateY(-6px);
@@ -408,6 +410,21 @@ const priceColumns = computed(() => {
   align-items: center;
   gap: 8px;
 }
+.indices__k :deep(svg) { flex: none; }
+
+.result-card {
+  min-width: 0;
+  height: 100%;
+  background: var(--bg-panel);
+}
+
+@media (min-width: 1180px) {
+  .result-card:nth-child(4n) .indices__panel { right: 0; left: auto; }
+}
+
+@media (min-width: 700px) and (max-width: 1179px) {
+  .result-card:nth-child(2n) .indices__panel { right: 0; left: auto; }
+}
 
 .indices__val {
   font-variant-numeric: tabular-nums;
@@ -428,7 +445,7 @@ const priceColumns = computed(() => {
   padding: 6px 10px;
   border-radius: 6px;
   border: 1px solid var(--ui-border);
-  background: rgba(255, 255, 255, 0.03);
+  background: var(--bg-panel-2);
   color: var(--ui-text-muted);
   line-height: 1;
 }

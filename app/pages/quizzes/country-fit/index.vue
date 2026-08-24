@@ -536,7 +536,7 @@ watch(user, (v) => lsSet(LS_KEYS.user, v), {deep: true});
             </u-button>
           </div>
 
-          <div v-if="selectedUSAStates.length" class="mt-4 grid grid-cols-1 md:grid-cols-3 gap-3">
+          <div v-if="selectedUSAStates.length" class="mt-4 country-results-grid">
             <country-fit-card
                 v-for="s in (usaGroup?.variants ?? []).filter(v => selectedUSAStates.includes(v.key))"
                 :key="s.key"
@@ -575,7 +575,7 @@ watch(user, (v) => lsSet(LS_KEYS.user, v), {deep: true});
             </u-button>
           </div>
 
-          <div v-if="selectedCountries.length" class="mt-4 grid grid-cols-1 md:grid-cols-3 gap-3">
+          <div v-if="selectedCountries.length" class="mt-4 country-results-grid">
             <country-fit-card
                 v-for="c in selectedCountries.map(k => resultsAll.find(g => g.base.key === k)?.base).filter(Boolean)"
                 :key="c!.key"
@@ -599,7 +599,7 @@ watch(user, (v) => lsSet(LS_KEYS.user, v), {deep: true});
           {{ t("quizzes.countryFit.usaCompareTitle") }}
         </div>
 
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+        <div class="country-results-grid">
           <country-fit-card
               v-for="s in usaStatesForCompare"
               :key="s.key"
@@ -617,7 +617,7 @@ watch(user, (v) => lsSet(LS_KEYS.user, v), {deep: true});
         <Icon name="i-lucide-flag" class="i-icon"/>
         {{ t("quizzes.countryFit.compareTitle") }}
       </div>
-      <div v-if="filteredResults.length && isShowCountries" class="grid grid-cols-1 md:grid-cols-3 gap-3">
+      <div v-if="filteredResults.length && isShowCountries" class="country-results-grid">
         <country-fit-card
             v-for="g in filteredResults"
             :key="g.base.key"
@@ -664,6 +664,19 @@ watch(user, (v) => lsSet(LS_KEYS.user, v), {deep: true});
   border-radius: 12px;
   background: var(--ocean-form-surface);
   box-shadow: 0 14px 34px rgba(2, 5, 18, 0.18);
+}
+
+.country-results-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 12px;
+  align-items: stretch;
+}
+@media (min-width: 700px) {
+  .country-results-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (min-width: 1180px) {
+  .country-results-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 }
 
 .quiz-form-surface::before,

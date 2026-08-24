@@ -7,6 +7,7 @@ import AtsPanel from "~/components/jobs/AtsPanel.vue";
 import RecentlyViewed from "~/components/jobs/RecentlyViewed.vue";
 import StatsPanel from "~/components/jobs/StatsPanel.vue";
 import type { Job, JobResult, JobStats, RecentJob } from "~/types/jobs";
+import { readStoredList, writeStoredList } from "~/utils/browserStorage";
 
 // Job Finder service. Auto-routed at /jobs. Aggregates many boards, enforces a
 // 14-day freshness cap server-side, offers full sort + advanced filters, shows
@@ -16,8 +17,8 @@ import type { Job, JobResult, JobStats, RecentJob } from "~/types/jobs";
 const { t: translate, locale } = useI18n();
 const t = (key: string, params: Record<string, unknown> = {}) =>
   translate(`jobs.${key}`, params);
-const label = (ru: string, en: string) => String(locale.value).toLowerCase().startsWith("ru") ? ru : en;
 const localePath = useLocalePath();
+const { copyText } = useClipboard();
 
 useSeoMeta({
   title: () => t("seoTitle"), description: () => t("seoDescription"),
@@ -204,23 +205,24 @@ const MAX_SAVED_JOBS = 200;
 const savedView = ref<SavedJobsView>("active");
 const hiddenJobs = ref<Job[]>([]);
 const favoriteJobs = ref<Job[]>([]);
+const savedViewTabs = computed(() => [
+  { value: "active", label: t("activeVacancies") },
+  { value: "favorites", label: t("favoriteVacancies"), count: favoriteJobs.value.length },
+  { value: "hidden", label: t("hiddenVacancies"), count: hiddenJobs.value.length },
+]);
 const hiddenIds = computed(() => new Set(hiddenJobs.value.map((job) => job.id)));
 const favoriteIds = computed(() => new Set(favoriteJobs.value.map((job) => job.id)));
 const isHidden = (id: string) => hiddenIds.value.has(id);
 const isFavorite = (id: string) => favoriteIds.value.has(id);
 
 function loadSavedJobs() {
-  if (!import.meta.client) return;
-  try { hiddenJobs.value = JSON.parse(localStorage.getItem(HIDDEN_JOBS_KEY) || "[]"); } catch { /* ignore */ }
-  try { favoriteJobs.value = JSON.parse(localStorage.getItem(FAVORITE_JOBS_KEY) || "[]"); } catch { /* ignore */ }
+  hiddenJobs.value = readStoredList<Job>(HIDDEN_JOBS_KEY, MAX_SAVED_JOBS);
+  favoriteJobs.value = readStoredList<Job>(FAVORITE_JOBS_KEY, MAX_SAVED_JOBS);
 }
 
 function persistSavedJobs() {
-  if (!import.meta.client) return;
-  try {
-    localStorage.setItem(HIDDEN_JOBS_KEY, JSON.stringify(hiddenJobs.value));
-    localStorage.setItem(FAVORITE_JOBS_KEY, JSON.stringify(favoriteJobs.value));
-  } catch { /* storage full/disabled */ }
+  writeStoredList(HIDDEN_JOBS_KEY, hiddenJobs.value, MAX_SAVED_JOBS);
+  writeStoredList(FAVORITE_JOBS_KEY, favoriteJobs.value, MAX_SAVED_JOBS);
 }
 
 function upsertSaved(list: Job[], job: Job): Job[] {
@@ -248,8 +250,8 @@ function toggleFavorite(job: Job) {
   persistSavedJobs();
 }
 
-function selectSavedView(view: SavedJobsView) {
-  savedView.value = view;
+function selectSavedView(view: string) {
+  savedView.value = view as SavedJobsView;
 }
 
 // ---- Seen / recently-viewed (localStorage) ----
@@ -303,16 +305,14 @@ function jobShareLink(job: Job | RecentJob): string {
 
 async function shareJob(job: Job | RecentJob): Promise<boolean> {
   const link = jobShareLink(job);
-  try {
-    await navigator.clipboard.writeText(link);
+  if (await copyText(link)) {
     shareCopiedJobId.value = job.id;
     setTimeout(() => {
       if (shareCopiedJobId.value === job.id) shareCopiedJobId.value = null;
     }, 2000);
     return true;
-  } catch {
-    return false;
   }
+  return false;
 }
 
 async function shareActiveJob() {
@@ -898,26 +898,12 @@ onBeforeUnmount(() => {
             {{ opt.label ?? t(opt.labelKey!) }}
           </button>
         </div>
-        <div class="jobs__saved-filters" :aria-label="t('savedFilters')">
-          <button
-              type="button"
-              class="jobs__pill"
-              :class="{ 'jobs__pill_active': savedView === 'active' }"
-              @click="selectSavedView('active')"
-          >{{ t("activeVacancies") }}</button>
-          <button
-              type="button"
-              class="jobs__pill"
-              :class="{ 'jobs__pill_active': savedView === 'favorites' }"
-              @click="selectSavedView('favorites')"
-          >{{ t("favoriteVacancies") }} · {{ favoriteJobs.length }}</button>
-          <button
-              type="button"
-              class="jobs__pill"
-              :class="{ 'jobs__pill_active': savedView === 'hidden' }"
-              @click="selectSavedView('hidden')"
-          >{{ t("hiddenVacancies") }} · {{ hiddenJobs.length }}</button>
-        </div>
+        <UiSearchViewTabs
+          :model-value="savedView"
+          :items="savedViewTabs"
+          :aria-label="t('savedFilters')"
+          @update:model-value="selectSavedView"
+        />
         <u-button type="submit" icon="i-lucide-search">
           {{ t("search") }}
         </u-button>
@@ -931,8 +917,7 @@ onBeforeUnmount(() => {
         </button>
       </div>
       <div v-if="showAdvanced" class="jobs__advanced">
-        <section class="jobs-filter-group">
-          <div class="jobs-filter-group__title"><u-icon name="i-lucide-map-pin" /> {{ label("Местоположение", "Location") }}</div>
+        <UiFilterSection class="jobs-filter-group" icon="i-lucide-map-pin" :title="t('filterLocation')">
           <div class="jobs-filter-group__grid jobs-filter-group__grid_location">
             <div class="jobs__field">
               <u-select-menu :label="t('country')" v-model="countries" :items="countryItems" value-key="value" label-key="label"
@@ -943,10 +928,9 @@ onBeforeUnmount(() => {
                   @keyup.enter="load(1)" @change="scheduleLoad()" />
             </div>
           </div>
-        </section>
+        </UiFilterSection>
 
-        <section class="jobs-filter-group jobs-filter-group_salary">
-          <div class="jobs-filter-group__title"><u-icon name="i-lucide-banknote" /> {{ label("Зарплата", "Salary") }}</div>
+        <UiFilterSection class="jobs-filter-group jobs-filter-group_salary" icon="i-lucide-banknote" :title="t('filterSalary')">
           <div class="jobs-filter-group__grid jobs-filter-group__grid_salary">
             <div class="jobs__field">
               <u-input v-model.number="salaryMin" type="number" min="0" icon="i-lucide-banknote"
@@ -965,10 +949,9 @@ onBeforeUnmount(() => {
               <span>{{ t("hasSalary") }}</span>
             </label>
           </div>
-        </section>
+        </UiFilterSection>
 
-        <section class="jobs-filter-group">
-          <div class="jobs-filter-group__title"><u-icon name="i-lucide-briefcase-business" /> {{ label("Условия работы", "Work conditions") }}</div>
+        <UiFilterSection class="jobs-filter-group" icon="i-lucide-briefcase-business" :title="t('filterWork')">
           <div class="jobs-filter-group__grid">
             <div class="jobs__field"><u-select-menu :label="t('workMode')" v-model="workModeSelect" :items="workModeItems" value-key="value" label-key="label" :search-input="false" class="jobs__select" @update:model-value="scheduleLoad()" /></div>
             <div class="jobs__field"><u-select-menu :label="t('relocation')" v-model="relocationSelect" :items="relocationItems" value-key="value" label-key="label" :search-input="false" class="jobs__select" @update:model-value="scheduleLoad()" /></div>
@@ -977,30 +960,26 @@ onBeforeUnmount(() => {
             <label class="jobs__remote jobs__field_inline"><u-switch v-model="noExperience" @update:model-value="scheduleLoad()" /><span>{{ t("noExperience") }}</span></label>
             <label class="jobs__remote jobs__field_inline"><u-switch v-model="foreignerOnly" @update:model-value="scheduleLoad()" /><span>{{ t("foreigner") }}</span></label>
           </div>
-        </section>
+        </UiFilterSection>
 
-        <section class="jobs-filter-group">
-          <div class="jobs-filter-group__title"><u-icon name="i-lucide-languages" /> {{ label("Навыки и языки", "Skills & languages") }}</div>
+        <UiFilterSection class="jobs-filter-group" icon="i-lucide-languages" :title="t('filterSkills')">
           <div class="jobs-filter-group__grid">
             <div class="jobs__field"><u-select-menu :label="t('language')" v-model="languageSelect" :items="languageItems" value-key="value" label-key="label" class="jobs__select" @update:model-value="scheduleLoad()" /></div>
             <div class="jobs__field"><u-select-menu :label="t('languageLevel')" v-model="languageLevelSelect" :items="levelItems" value-key="value" label-key="label" :search-input="false" :disabled="!language" class="jobs__select" @update:model-value="scheduleLoad()" /></div>
             <div class="jobs__field"><u-select-menu :label="t('excludeLanguage')" v-model="excludeLanguages" :items="excludeLanguageItems" value-key="value" label-key="label" multiple :placeholder="t('excludeLangPlaceholder')" class="jobs__select" @update:model-value="scheduleLoad()" /></div>
             <div class="jobs__field jobs__field_wide"><u-input v-model="skills" icon="i-lucide-wrench" :label="t('skills')" :placeholder="t('skillsPlaceholder')" @keyup.enter="load(1)" /></div>
           </div>
-        </section>
+        </UiFilterSection>
 
-        <section class="jobs-filter-group jobs-filter-group_flags">
-          <div class="jobs-filter-group__title"><u-icon name="i-lucide-shield-check" /> {{ label("Исключения и охват", "Exclusions & coverage") }}</div>
+        <UiFilterSection class="jobs-filter-group jobs-filter-group_flags" icon="i-lucide-shield-check" :title="t('filterCoverage')">
           <div class="jobs-filter-group__flags">
             <label class="jobs__remote" :title="t('hideRiskyHint')"><u-switch v-model="hideRisky" @update:model-value="scheduleLoad()" /><span>{{ t("hideRisky") }}</span></label>
             <label class="jobs__remote"><u-switch v-model="includeRu" @update:model-value="scheduleLoad()" /><span>{{ t("includeRu") }}</span></label>
             <label class="jobs__remote"><u-switch v-model="includeBy" @update:model-value="scheduleLoad()" /><span>{{ t("includeBy") }}</span></label>
           </div>
-        </section>
+        </UiFilterSection>
 
-        <div class="jobs-filter-actions">
-          <u-button type="button" variant="ghost" color="neutral" size="sm" icon="i-lucide-rotate-ccw" @click="resetFilters">{{ t("reset") }}</u-button>
-        </div>
+        <UiFilterFooter class="jobs-filter-actions" :reset-label="t('reset')" @reset="resetFilters" />
       </div>
     </form>
 
@@ -1167,10 +1146,6 @@ onBeforeUnmount(() => {
 .jobs__select :deep(button) { width: 100%; }
 .jobs__row { grid-column: 1 / -1; display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
 .jobs__filters { display: flex; flex-wrap: wrap; gap: 8px; }
-.jobs__saved-filters {
-  display: flex; flex-wrap: wrap; gap: 8px; padding-left: 12px;
-  border-left: 1px solid var(--line);
-}
 .jobs__pill {
   height: 34px; padding: 0 13px; border-radius: 8px; border: 1px solid var(--line);
   background: rgba(255,255,255,0.03); color: var(--ui-text-muted); font-weight: 700; font-size: 12px;
@@ -1202,12 +1177,8 @@ onBeforeUnmount(() => {
   padding: 14px; border-radius: 10px; border: 1px solid var(--line); background: var(--ocean-form-surface);
   box-shadow: 0 18px 42px rgba(2, 5, 18, 0.22);
 }
-.jobs-filter-group { min-width: 0; padding: 14px; border: 1px solid var(--line); border-radius: 9px; background: var(--ocean-form-surface-soft); }
-.jobs-filter-group__title { display: flex; align-items: center; gap: 7px; margin-bottom: 12px; color: var(--ui-text-muted); font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: .04em; }
-.jobs-filter-group__title :deep(svg) { color: var(--accent-pink); }
 .jobs-filter-group__grid { display: grid; grid-template-columns: 1fr; gap: 12px; align-items: end; }
 .jobs-filter-group__flags { display: flex; flex-wrap: wrap; gap: 14px 24px; align-items: center; }
-.jobs-filter-actions { display: flex; justify-content: flex-end; }
 .jobs__field { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
 .jobs__field-label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; opacity: 0.7; }
 .jobs__field_inline { align-self: center; min-height: var(--ui-control-h-md); }
@@ -1253,7 +1224,7 @@ onBeforeUnmount(() => {
 .job-card__tag { border-radius: 6px; padding: 3px 8px; font-size: 11px; line-height: 1.3; border: 1px solid var(--line); color: var(--ui-text-muted); }
 .job-card__tag_skill { border-color: rgba(224, 103, 154,0.3); color: #e79ec0; }
 .job-card__tag_plus { border-color: rgba(52,211,153,0.35); color: #6ee7b7; }
-.jobs__empty { margin-top: 18px; text-align: center; padding: 18px; border-radius: 10px; border: 1px solid var(--line); background: rgba(255,255,255,0.03); }
+.jobs__empty { margin-top: 18px; text-align: center; padding: 18px; border-radius: 10px; border: 1px solid var(--line); background: var(--bg-panel); }
 .jobs__load-more {
   min-height: 76px; display: flex; flex-direction: column; align-items: center;
   justify-content: center; gap: 8px; margin-top: 16px; font-size: 12px;

@@ -83,6 +83,36 @@ test('the search clear button clears and refreshes all three boards', () => {
   assert.match(input, /@click\.stop\.prevent="clear"/u)
 })
 
+test('board pages share filter primitives and flat finder starts from a regional country', () => {
+  const flat = readFileSync(new URL('../app/pages/flat-finder/index.vue', import.meta.url), 'utf8')
+  const hiring = readFileSync(new URL('../app/pages/hiring/index.vue', import.meta.url), 'utf8')
+  const jobs = readFileSync(new URL('../app/pages/jobs/index.vue', import.meta.url), 'utf8')
+  for (const source of [flat, hiring, jobs]) {
+    assert.match(source, /<UiFilterFooter/u)
+    assert.match(source, /<UiSearchViewTabs/u)
+  }
+  assert.match(hiring, /<UiFilterSection/u)
+  assert.match(jobs, /<UiFilterSection/u)
+  assert.match(flat, /timeZone\.startsWith\("Asia\/"\)\s*\?\s*"UZ"\s*:\s*"UA"/u)
+  assert.match(flat, /countries\.value\s*=\s*\[defaultCountry\.value\]/u)
+})
+
+test('OLX listing verification exposes a localized in-card loader', () => {
+  const flat = readFileSync(new URL('../app/pages/flat-finder/index.vue', import.meta.url), 'utf8')
+  const ru = JSON.parse(readFileSync(new URL('../i18n/locales/ru.json', import.meta.url), 'utf8'))
+  const en = JSON.parse(readFileSync(new URL('../i18n/locales/en.json', import.meta.url), 'utf8'))
+  assert.match(flat, /checkingListingKey\.value\s*=\s*key[\s\S]*?await verifyOlxListing/u)
+  assert.match(flat, /class="flat-card__checking"[\s\S]*?t\("checkingListing"\)/u)
+  assert.ok(ru.flats.checkingListing)
+  assert.ok(en.flats.checkingListing)
+})
+
+test('country quiz result cards use a responsive four-column grid', () => {
+  const quiz = readFileSync(new URL('../app/pages/quizzes/country-fit/index.vue', import.meta.url), 'utf8')
+  assert.match(quiz, /@media \(min-width: 1180px\)[\s\S]*?repeat\(4, minmax\(0, 1fr\)\)/u)
+  assert.doesNotMatch(quiz, /grid-cols-1 md:grid-cols-3 gap-3/u)
+})
+
 test('Uzbek education levels are localized without losing their subject details', () => {
   assert.equal(hiringEducationLabel("O'rta", 'ru'), 'Среднее')
   assert.equal(hiringEducationLabel('Oliy', 'ru'), 'Высшее')

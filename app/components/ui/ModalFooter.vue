@@ -39,6 +39,8 @@
 
 .modal-footer :deep(> button svg),
 .modal-footer :deep(> button [class*="icon"]) {
+  display: block;
+  margin: auto;
   width: 18px;
   height: 18px;
   min-width: 18px;

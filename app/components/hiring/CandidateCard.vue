@@ -29,7 +29,6 @@ const emit = defineEmits<{
 
 const { t: translate, locale } = useI18n()
 const t = (key: string, params: Record<string, unknown> = {}) => translate(`hiring.${key}`, params)
-const label = (ru: string, en: string) => String(locale.value).toLowerCase().startsWith('ru') ? ru : en
 
 const match = computed(() => scoreHiringCandidate(props.profile, props.matchFilters))
 const matchTier = computed(() => {
@@ -104,18 +103,18 @@ function experienceLabel(years: number): string {
 const metadata = computed(() => {
   const items: Array<{ key: string, icon: string, value: string, title: string }> = []
   if (props.profile.age != null) {
-    items.push({ key: 'age', icon: 'i-lucide-user-round', value: String(props.profile.age), title: `${label('Возраст', 'Age')}: ${props.profile.age}` })
+    items.push({ key: 'age', icon: 'i-lucide-user-round', value: String(props.profile.age), title: `${t('age')}: ${props.profile.age}` })
   }
   if (props.profile.experienceYears != null) {
     const value = experienceLabel(props.profile.experienceYears)
-    items.push({ key: 'experience', icon: 'i-lucide-briefcase-business', value, title: `${label('Опыт', 'Experience')}: ${value}` })
+    items.push({ key: 'experience', icon: 'i-lucide-briefcase-business', value, title: `${t('specExperience')}: ${value}` })
   }
   if (props.profile.city) {
     items.push({
       key: 'city',
       icon: 'i-lucide-map-pin',
       value: locationLabel(props.profile.city, String(locale.value), 'city'),
-      title: label('Локация', 'Location'),
+      title: t('filterLocation'),
     })
   }
   if (props.profile.remote) {
@@ -255,7 +254,7 @@ function openCard() {
   border: 1px solid var(--line);
   border-radius: 12px;
   overflow: hidden;
-  background: rgba(255, 255, 255, 0.035);
+  background: var(--bg-panel);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.025);
   cursor: pointer;
   transition: transform 140ms ease, border-color 180ms ease, box-shadow 180ms ease;
@@ -322,10 +321,11 @@ function openCard() {
   padding: 0;
   border: 1px solid var(--line);
   border-radius: 7px;
-  background: color-mix(in srgb, var(--bg-panel) 92%, transparent);
+  background: var(--bg-panel-2);
   color: var(--text-muted);
   cursor: pointer;
 }
+.hiring-card__action :deep(svg) { display: block; margin: auto; }
 .hiring-card__action:hover,
 .hiring-card__action_active {
   color: #7189d9;

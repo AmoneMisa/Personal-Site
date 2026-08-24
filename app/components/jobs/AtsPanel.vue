@@ -21,7 +21,7 @@ const pasteModel = computed({ get: () => props.paste, set: (value: string) => em
 </template>
 
 <style scoped>
-.ats { margin: 28px 0 8px; padding: 16px; border-radius: 10px; border: 1px solid var(--line); background: rgba(224,103,154,.06); }
+.ats { margin: 28px 0 8px; padding: 16px; border-radius: 10px; border: 1px solid var(--line); background: var(--bg-panel); }
 .ats__head { display: flex; gap: 12px; align-items: flex-start; }
 .ats__icon { font-size: 22px; color: var(--color-primary, #e0679a); margin-top: 2px; }
 .ats__title { font-weight: 600; }

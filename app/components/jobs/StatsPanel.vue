@@ -56,12 +56,12 @@ const t = (key: string, params: Record<string, unknown> = {}) => translate(`jobs
 </template>
 
 <style scoped>
-.stats { margin: 4px 0 26px; padding: 16px; border-radius: 10px; border: 1px solid var(--line); background: rgba(52,211,153,.05); }
+.stats { margin: 4px 0 26px; padding: 16px; border-radius: 10px; border: 1px solid var(--line); background: var(--bg-panel); }
 .stats__head { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
 .stats__icon { font-size: 20px; color: #34d399; }
 .stats__title { font-weight: 600; }
 .stats__grid { display: grid; gap: 12px; grid-template-columns: 1fr; }
-.stats__card { padding: 12px 14px; border-radius: 8px; border: 1px solid var(--line); background: rgba(255,255,255,.03); }
+.stats__card { padding: 12px 14px; border-radius: 8px; border: 1px solid var(--line); background: var(--bg-panel-2); }
 .stats__label { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; opacity: .7; margin-bottom: 8px; }
 .stats__big { font-size: 26px; font-weight: 600; color: #34d399; }
 .stats__sub { font-size: 12px; margin-top: 2px; }
