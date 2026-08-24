@@ -629,6 +629,7 @@ onBeforeUnmount(() => {
 
 <template>
   <u-container class="markdown-editor">
+    <ocean-page-backdrop variant="reef" />
     <div class="markdown-editor__header background-hero text-center space-y-3">
       <page-header
           title="services.markdownEditor.title"

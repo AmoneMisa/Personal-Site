@@ -262,6 +262,7 @@ function chooseAdvancedTag(tag: string) {
 
 <template>
   <u-container class="docker-search">
+    <ocean-page-backdrop variant="treasure" />
     <div class="docker-search__header background-hero text-center space-y-3">
       <page-header
           title="services.dockerSearch.title"

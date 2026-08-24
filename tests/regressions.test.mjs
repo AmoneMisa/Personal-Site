@@ -122,10 +122,54 @@ test('flat finder renders a collapsible localized statistics panel', () => {
   const flat = readFileSync(new URL('../app/pages/flat-finder/index.vue', import.meta.url), 'utf8')
   const stats = readFileSync(new URL('../app/components/flats/StatsPanel.vue', import.meta.url), 'utf8')
   assert.match(flat, /<FlatsStatsPanel/u)
-  assert.match(stats, /expanded = ref\(true\)/u)
+  assert.match(stats, /<UiAnalyticsPanel/u)
   assert.match(stats, /statsWithPhotos/u)
   const ru = JSON.parse(readFileSync(new URL('../i18n/locales/ru.json', import.meta.url), 'utf8'))
   assert.equal(ru.flats.statsTitle, 'Статистика объявлений')
+})
+
+test('all three listing boards use the shared Chart.js analytics components', () => {
+  const hiringPage = readFileSync(new URL('../app/pages/hiring/index.vue', import.meta.url), 'utf8')
+  const hiringStats = readFileSync(new URL('../app/components/hiring/StatsPanel.vue', import.meta.url), 'utf8')
+  const flatStats = readFileSync(new URL('../app/components/flats/StatsPanel.vue', import.meta.url), 'utf8')
+  const jobStats = readFileSync(new URL('../app/components/jobs/StatsPanel.vue', import.meta.url), 'utf8')
+  const line = readFileSync(new URL('../app/components/ui/AnalyticsLine.vue', import.meta.url), 'utf8')
+  const bars = readFileSync(new URL('../app/components/ui/AnalyticsBars.vue', import.meta.url), 'utf8')
+  const donut = readFileSync(new URL('../app/components/ui/AnalyticsDonut.vue', import.meta.url), 'utf8')
+  const shell = readFileSync(new URL('../app/components/ui/AnalyticsPanel.vue', import.meta.url), 'utf8')
+  const ru = JSON.parse(readFileSync(new URL('../i18n/locales/ru.json', import.meta.url), 'utf8'))
+  assert.match(hiringPage, /<HiringStatsPanel/u)
+  assert.match(hiringStats, /statsGender/u)
+  assert.match(hiringStats, /statsPlatforms/u)
+  assert.match(hiringStats, /statsLocations/u)
+  assert.match(hiringStats, /statsSalaryExperience/u)
+  assert.match(flatStats, /UiAnalyticsLine/u)
+  assert.match(flatStats, /UiAnalyticsDonut/u)
+  assert.match(flatStats, /UiAnalyticsBars/u)
+  assert.match(jobStats, /<UiAnalyticsLine/u)
+  assert.match(hiringStats, /<UiAnalyticsPanel/u)
+  assert.match(flatStats, /<UiAnalyticsPanel/u)
+  assert.match(jobStats, /<UiAnalyticsPanel/u)
+  assert.match(shell, /const expanded = ref\(props\.defaultExpanded\)/u)
+  assert.match(line, /from "vue-chartjs"/u)
+  assert.match(bars, /from "vue-chartjs"/u)
+  assert.match(donut, /from "vue-chartjs"/u)
+  assert.equal(ru.hiring.statsGender, 'Распределение по полу')
+  assert.equal(ru.flats.statsActivity, 'Новые объявления')
+})
+
+test('home uses the image-free error ambience while every service gets an illustrated backdrop', () => {
+  const hero = readFileSync(new URL('../app/components/redesign/HeroSection.vue', import.meta.url), 'utf8')
+  const backdrop = readFileSync(new URL('../app/components/OceanPageBackdrop.vue', import.meta.url), 'utf8')
+  assert.match(hero, /ocean-page-backdrop variant="ambient"/u)
+  assert.match(backdrop, /ocean-page-backdrop_ambient/u)
+  assert.doesNotMatch(backdrop, /ocean-page-backdrop_ambient[^}]*url\(/u)
+  for (const path of [
+    '../app/pages/services/index.vue', '../app/pages/services/pdf-editor/index.vue',
+    '../app/pages/services/merge-json/index.vue', '../app/pages/services/markdown-editor/index.vue',
+    '../app/pages/services/email-editor/index.vue', '../app/pages/services/dockerhub/index.vue',
+    '../app/pages/services/converter/index.vue', '../app/pages/services/svg-editor/index.vue',
+  ]) assert.match(readFileSync(new URL(path, import.meta.url), 'utf8'), /ocean-page-backdrop/u)
 })
 
 test('Rabota.kz and Threads profiles drop captured page controls and metadata', () => {
@@ -169,12 +213,14 @@ test('Rabota.kz education and employment history do not become skill badges', ()
 test('job statistics use the ocean design and expose localized salary trends', () => {
   const page = readFileSync(new URL('../app/pages/jobs/index.vue', import.meta.url), 'utf8')
   const panel = readFileSync(new URL('../app/components/jobs/StatsPanel.vue', import.meta.url), 'utf8')
+  const shell = readFileSync(new URL('../app/components/ui/AnalyticsPanel.vue', import.meta.url), 'utf8')
   const ru = JSON.parse(readFileSync(new URL('../i18n/locales/ru.json', import.meta.url), 'utf8'))
   assert.match(page, /:jobs="jobs"/u)
   assert.match(panel, /activeTab = ref<"overview" \| "trends">/u)
   assert.match(panel, /trendDays = ref<1 \| 3 \| 7 \| 60>/u)
   assert.match(panel, /"world" \| "country" \| "city" \| "position" \| "positions"/u)
-  assert.match(panel, /linear-gradient\(135deg/u)
+  assert.match(panel, /<UiAnalyticsLine/u)
+  assert.match(shell, /linear-gradient\(135deg/u)
   assert.equal(ru.jobs.statsTrends, 'Графики')
   assert.equal(ru.jobs.trendTwoMonths, '2 месяца')
 })
@@ -187,6 +233,31 @@ test('listing photos dissolve into cards and job salaries use a simple accent', 
   assert.match(jobs, /\.job-card__salary \{ color: #f08ab8/u)
   assert.doesNotMatch(jobs, /job-card__salary-icon/u)
   assert.doesNotMatch(jobs, /inset 3px 0 0 var\(--job-card-score\)/u)
+})
+
+test('job score frames share the same fading top-left accent and the app keeps its footer at the viewport bottom', () => {
+  const cards = readFileSync(new URL('../app/assets/css/jobs-card-redesign.css', import.meta.url), 'utf8')
+  const app = readFileSync(new URL('../app/app.vue', import.meta.url), 'utf8')
+  assert.match(cards, /job-card:has\(\.job-card__ats\)::before/u)
+  assert.match(cards, /linear-gradient\(135deg, var\(--job-match-accent\)/u)
+  assert.match(cards, /border: 1px solid rgba\(86, 96, 135, 0\.34\)/u)
+  assert.match(cards, /border-radius: 14px !important/u)
+  assert.match(app, /\.site-app \{[^}]*min-height: 100dvh[^}]*display: flex/u)
+  assert.match(app, /\.site-app__main \{[^}]*flex: 1 0 auto/u)
+  assert.match(app, /\.site-app__footer \{[^}]*margin-top: auto/u)
+})
+
+test('vacancy cards open from the card surface and compact overflowing pills', () => {
+  const card = readFileSync(new URL('../app/components/jobs/JobCard.vue', import.meta.url), 'utf8')
+  assert.match(card, /@click="openCard"/u)
+  assert.doesNotMatch(card, /viewVacancy/u)
+  assert.match(card, />\{\{ ats\.score \}\}%<\/span>/u)
+  assert.match(card, /const visibleBadges = computed\(\(\) => cardBadges\.value\.slice\(0, 6\)\)/u)
+  assert.match(card, /class="job-card__tag-scroll"/u)
+  assert.match(card, /@pointerdown\.stop="startDrag"/u)
+  assert.match(card, /class="job-card__tag-more">\+\{\{/u)
+  assert.match(card, /job-card__byline/u)
+  assert.match(card, /job-card__company/u)
 })
 
 test('country quiz result cards use a responsive four-column grid', () => {

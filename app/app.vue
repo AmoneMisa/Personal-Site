@@ -111,6 +111,23 @@ useHead({
 });
 </script>
 <style lang="scss">
+.site-app {
+  min-height: 100vh;
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+}
+
+.site-app__main {
+  min-width: 0;
+  flex: 1 0 auto;
+}
+
+.site-app__footer {
+  margin-top: auto;
+  flex: 0 0 auto;
+}
+
 /* The radial apartment cards are teleported to <body>. Their slots are rendered
    after the centre pager, so without an explicit stacking order they can paint
    over the pager and hide/cut off its arrows. Keep the pager above every card. */

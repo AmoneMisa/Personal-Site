@@ -16,7 +16,7 @@ const heroStats = computed(() =>
 
 <template>
   <section class="rd-section hero" id="hero-anchor">
-    <ocean-page-backdrop />
+    <ocean-page-backdrop variant="ambient" />
     <div class="rd-wrap">
       <div class="hero__grid">
         <div class="hero__content">

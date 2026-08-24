@@ -17,6 +17,7 @@ useSeoMeta({
 
 <template>
   <u-container class="email-editor">
+    <ocean-page-backdrop variant="home" />
     <div class="email-editor__header background-hero text-center space-y-3">
       <page-header
           title="services.emailEditor.title"

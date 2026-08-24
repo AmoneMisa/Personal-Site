@@ -17,6 +17,7 @@ useSeoMeta({
 
 <template>
   <u-container class="svg-editor">
+    <ocean-page-backdrop variant="home" />
     <div class="svg-editor__header background-hero text-center space-y-3">
       <page-header
           title="services.svgEditor.title"

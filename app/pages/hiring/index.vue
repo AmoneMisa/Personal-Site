@@ -838,6 +838,11 @@ onBeforeUnmount(() => {
       {{ t(sourceWarningKey, { n: relevantSourceErrors.length }) }}
     </p>
     <p v-else-if="warming && !loading" class="hiring__warming text-muted">{{ t("warming") }}</p>
+    <HiringStatsPanel
+      v-if="displayedProfiles.length"
+      :profiles="displayedProfiles"
+      :rates="usdRates"
+    />
     <div class="hiring__grid" :class="{ 'hiring__grid_dense': denseGrid }">
       <CandidateCard
         v-for="profile in displayedProfiles"

@@ -35,6 +35,7 @@ function onDownload() {
 
 <template>
   <u-container class="merge">
+    <ocean-page-backdrop variant="treasure" />
     <div class="merge__header background-hero text-center space-y-3">
       <page-header
           title="services.mergeJson.title"
