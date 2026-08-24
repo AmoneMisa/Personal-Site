@@ -1,4 +1,4 @@
-import { fetchHiringChannel } from '../../utils/hiringSources'
+import { fetchHiringChannel } from '../sources/telegramRuntime'
 import { persistTelegramCandidates } from './candidateSnapshotWriter'
 
 /**
