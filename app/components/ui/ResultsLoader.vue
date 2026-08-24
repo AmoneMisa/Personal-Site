@@ -31,6 +31,9 @@ withDefaults(defineProps<{
 .results-loader {
   position: relative;
   isolation: isolate;
+}
+
+.results-loader_loading {
   min-height: var(--results-loader-min-height);
 }
 
