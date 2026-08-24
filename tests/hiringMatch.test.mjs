@@ -31,7 +31,7 @@ test('candidate match scores selected roles and canonical skill aliases independ
 test('grouped profession filters match any canonical group member', () => {
   const match = scoreHiringCandidate(
     { professions: ['Cashier'] },
-    { professions: ['group:retail-service'], skills: [] },
+    { professions: ['group:sales-retail'], skills: [] },
   )
 
   assert.ok(match)

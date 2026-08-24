@@ -67,7 +67,7 @@ export function normalizeSkills(rawSkills: string[] | undefined, text: string): 
 interface ProfessionRule { name: string; re: RegExp }
 const PROFESSION_RULES: ProfessionRule[] = [
   // Management / office / sales.
-  { name: 'Sales Manager', re: /\b(?:sales\s+manager|account\s+manager)\b|менеджер\s+(?:по\s+)?(?:экспортн\p{L}*\s+)?продаж|менеджер\s+з\s+продаж|sotuv\s+menejer/iu },
+  { name: 'Sales Manager', re: /\b(?:sales\s+(?:manager|executive|director)|account\s+manager|head\s+of\s+sales)\b|менеджер\s+(?:по\s+)?(?:экспортн\p{L}*\s+)?продаж|менеджер\s+з\s+продаж|руководител\p{L}*\s+отдела\s+продаж|(?<!\p{L})роп(?!\p{L})|sotuv\s+menejer/iu },
   { name: 'Project Manager', re: /\bproject\s+manager\b|проектн(?:ый|ий)\s+менеджер|менеджер\s+проект|керівник\s+проєкт/iu },
   { name: 'Product Manager', re: /\bproduct\s+manager\b|продакт\s*менеджер|менеджер\s+продукт/iu },
   { name: 'Store Manager', re: /\bstore\s+manager\b|управляющ(?:ий|ая)\s+магазин|заведующ(?:ий|ая)\s+магазин|керуюч(?:ий|а)\s+магазин/iu },
@@ -96,6 +96,7 @@ const PROFESSION_RULES: ProfessionRule[] = [
   // Logistics / security / service.
   { name: 'Courier', re: /\bcourier\b|курьер|кур'єр|kuryer/iu },
   { name: 'Driver', re: /\bdriver\b|(?<!\p{L})водитель(?!\p{L})|(?<!\p{L})водій(?!\p{L})|\bhaydovchi\b|\bshafyor\b|(?<!\p{L})[СC][ЕE]\s+категори/iu },
+  { name: 'Logistics Specialist', re: /\b(?:logist|logistician|logistics\s+(?:specialist|coordinator|manager))\b|логист\p{L}*/iu },
   { name: 'Security Guard', re: /\bsecurity(?:\s+guard)?\b|охранник|охоронець|охорона|qorovul|qoriqlash|xavfsizlik/iu },
   { name: 'Cleaner', re: /\b(?:cleaner|cleaning|housekeeper)\b|уборщик|уборщица|уборка|прибиральник|прибиральниц|домработниц|farrosh/iu },
   { name: 'Caregiver', re: /\bcaregiver\b|сиделк|доглядальниц|parvarish/iu },
@@ -120,23 +121,28 @@ const PROFESSION_RULES: ProfessionRule[] = [
 
   // Education / childcare.
   { name: 'Tutor', re: /\btutor\b|репетитор|rep(?:e|i)titor(?:lik)?/iu },
+  { name: 'English Teacher', re: /\b(?:english\s+(?:teacher|tutor)|ingliz\s+tili(?:dan)?\s+(?:o['’ʻʼ‘`]?qituvchi|ustoz(?:iman)?))\b|преподавател\p{L}*\s+английск|учител\p{L}*\s+английск/iu },
   { name: 'Kindergarten Teacher', re: /\bkindergarten\s+teacher\b|воспитател|виховател|tarbiyachi|(?:xususiy\s+)?bog['’ʻʼ‘`]?cha/iu },
-  { name: 'Nanny', re: /\bnanny\b|няня|нянечк|enaga|bola\s+qarash/iu },
-  { name: 'Teacher', re: /\bteacher\b|учитель|вчитель|преподавател|викладач|тьютор|t(?:yutor|itur)(?:lik)?|o['’ʻʼ‘`]?qituvchi(?:lik)?/iu },
+  { name: 'Nanny', re: /\bnanny\b|няня|нянечк|enaga|bola(?:larga)?\s+qarash|bolaga\s+qarash/iu },
+  { name: 'Teacher', re: /\bteacher\b|учитель|вчитель|преподавател|викладач|тьютор|t(?:yutor|itur)(?:lik)?|o['’ʻʼ‘`]?qituvchi(?:lik)?|ustoz(?:iman)?/iu },
   { name: 'Psychologist', re: /\bpsychologist\b|психолог|psixolog/iu },
   { name: 'Speech Therapist', re: /\bspeech\s+therapist\b|логопед|logoped/iu },
 
   // IT / professional. Keep specializations before the generic developer rule.
   { name: 'Full-stack Developer', re: /\bfull[- ]?stack\s+(?:developer|engineer|dasturchi)\b|\bfullstack\s+dasturchi\b/iu },
   { name: 'Backend Developer', re: /\bback[- ]?end\s+(?:developer|engineer|dasturchi)\b|\bbackend\s+dasturchi\b/iu },
-  { name: 'Frontend Developer', re: /\bfront[- ]?end\s+(?:developer|engineer|dasturchi)\b|\bfrontend\s+dasturchi\b|фронтенд/iu },
+  { name: 'Frontend Developer', re: /\b(?:front[- ]?end|frontend|frontet|frontent|fronend)(?:\s+(?:developer|engineer|dasturchi))?\b|фронтенд/iu },
   { name: 'Mobile Developer', re: /\b(?:mobile|android|ios)\s+(?:developer|engineer|dasturchi)\b/iu },
   { name: 'System Administrator', re: /\b(?:system|network|windows\s+server)\s+administrator\b|систем(?:ный|ним)\s+администратор|сисадмин|сетевой\s+администратор|tarmoq\s+administrator|tizim\s+administrator/iu },
-  { name: 'IT Specialist', re: /\bit\s+specialist\b|it[-\s]?специалист|специалист\s+по\s+it|kompyuter\s+bo(?:['’ʻʼ‘`]?yicha|yicha)\s+ish/iu },
+  { name: 'IT Specialist', re: /\bit\s+specialist\b|it[-\s]?специалист|специалист\s+по\s+it|\bit(?:ishnik|[-\s]?shnik)\b|айтишник|kompyuter\s+bo(?:['’ʻʼ‘`]?yicha|yicha)\s+ish/iu },
   { name: 'Software Developer', re: /\b(?:software\s+)?(?:developer|programmer|frontend|front-end|backend|back-end|full[- ]?stack|android|ios)\b|разработчик|розробник|программист|програміст|dasturchi|dasturlash/iu },
   { name: 'QA Engineer', re: /\b(?:qa|quality\s+assurance|tester|test\s+engineer)\b|тестировщик|тестувальник/iu },
   { name: 'DevOps Engineer', re: /\bdevops\b/iu },
   { name: 'Cybersecurity Specialist', re: /\b(?:cybersecurity|cyber\s+security|ciso)\b|информационн\p{L}*\s+безопасност|axborot\s+xavfsizligi/iu },
+  { name: 'Penetration Tester', re: /\b(?:penetration\s+tester|pentester|ethical\s+hacker)\b|пентестер/iu },
+  { name: 'AI / ML Engineer', re: /\b(?:(?:ai|ml|machine\s+learning)\s+(?:engineer|developer)|machine\s+learning\s+specialist)\b|инженер\s+(?:машинного\s+обучения|ии)/iu },
+  { name: 'Data Scientist', re: /\bdata\s+scientist\b|\bdata\s+science\b|дата[-\s]?сайентист/iu },
+  { name: 'Data Engineer', re: /\bdata\s+engineer\b|инженер\s+данных/iu },
   { name: 'Engineering Manager', re: /\b(?:cto|vp\s+of\s+engineering|head\s+of\s+engineering|engineering\s+manager)\b|техническ\p{L}*\s+директор/iu },
   { name: 'Hardware Engineer', re: /\b(?:hardware|embedded|pcb)\s*(?:engineer|developer)?\b|друкован\p{L}*\s+плат|печатн\p{L}*\s+плат|мікроконтролер|микроконтроллер/iu },
   { name: 'Designer', re: /\b(?:designer|ui\/?ux)\b|дизайнер/iu },
@@ -151,6 +157,7 @@ const PROFESSION_RULES: ProfessionRule[] = [
   { name: 'Lawyer', re: /\b(?:lawyer|attorney|legal\s+specialist)\b|юрист|адвокат|правник|yurist/iu },
   { name: 'Notary', re: /\bnotar(?:y|ius)\b|нотариус/iu },
   { name: 'Metrology Specialist', re: /\bmetrolog(?:y|iya)\b|метролог|standartlashtirish/iu },
+  { name: 'Economist', re: /\beconomist\b|экономист|(?<!\p{L})iqt(?:i)?sod(?:chi|iy)(?!\p{L})/iu },
   { name: 'Finance / Banking Specialist', re: /\b(?:finance|banking)\s+specialist\b|специалист\s+по\s+(?:финанс|банков)|moliya|(?<!\p{L})bank(?!\p{L})|soliq/iu },
   { name: 'Oil & Gas Worker', re: /\boil\s*(?:&|and)?\s*gas\b|нефт\p{L}*\s*(?:и|&)?\s*газ\p{L}*|neft\s*(?:va\s*)?gaz(?:\s+soha\p{L}*)?/iu },
   { name: 'Biotechnologist', re: /\bbiotechnologist\b|биотехнолог|biotexnolog/iu },
@@ -173,16 +180,24 @@ const PROFESSION_RULES: ProfessionRule[] = [
 
 const SPECIFIC_MANAGER_ROLES = new Set([
   'Sales Manager', 'Project Manager', 'Product Manager', 'Store Manager', 'Restaurant Manager',
-  'General Manager', 'HR / Recruiter', 'Office Manager', 'Warehouse Manager',
+  'General Manager', 'HR / Recruiter', 'Office Manager', 'Warehouse Manager', 'Logistics Specialist',
 ])
 const SPECIFIC_DEVELOPER_ROLES = new Set([
   'Full-stack Developer', 'Backend Developer', 'Frontend Developer', 'Mobile Developer',
+])
+const SPECIFIC_TECH_ROLES = new Set([
+  'QA Engineer', 'DevOps Engineer', 'Cybersecurity Specialist', 'Penetration Tester',
+  'AI / ML Engineer', 'Data Scientist', 'Data Engineer', 'Hardware Engineer',
 ])
 const NON_TARGET_CONTEXT_RE = /(?:опыт\s+работы|досвід\s+роботи|work\s+experience|previous|раньше|ранее|прежде|работал|работала|працював|працювала|worked\s+(?:as|at)|oldin|avval|ishlagan|ishladim|tajriba|диплом|diplom|mutaxassisligim)/iu
 const TARGET_CONTEXT_RE = /(?:ищу\s+(?:работу|подработку)|шукаю\s+(?:роботу|підробіток)|желаемая\s+(?:должность|работа)|бажана\s+(?:посада|робота)|target\s+role|desired\s+(?:role|position)|looking\s+for\s+(?:a\s+)?(?:job|work)|open\s+to\s+work|menga\s+ish\s+kerak|ish\s+(?:kerak|qidiryapman|qidiraman|izlayapman)|ish\s+joyi\s+kerak|lavozim|kasb|soha|soxa|maqsad(?:im)?)/iu
 
 function cleanRole(raw: string | undefined): string {
   return (raw || '').trim().replace(/^[#\-–—•*\s]+/, '').replace(/[.;,]+$/, '').replace(/\s{2,}/g, ' ').slice(0, 180)
+}
+
+function comparableRoleText(raw: string | undefined): string {
+  return cleanRole(raw).toLocaleLowerCase('ru').replace(/[^\p{L}\p{N}]+/gu, '')
 }
 
 function collectProfessions(source: string): string[] {
@@ -202,8 +217,16 @@ function collectProfessions(source: string): string[] {
     if (generic >= 0) names.splice(generic, 1)
   }
   if (names.some((name) => SPECIFIC_DEVELOPER_ROLES.has(name))) {
-    const generic = names.indexOf('Software Developer')
-    if (generic >= 0) names.splice(generic, 1)
+    for (const genericName of ['Software Developer', 'IT Specialist']) {
+      const generic = names.indexOf(genericName)
+      if (generic >= 0) names.splice(generic, 1)
+    }
+  }
+  if (names.some((name) => SPECIFIC_TECH_ROLES.has(name))) {
+    for (const genericName of ['Engineer', 'IT Specialist']) {
+      const generic = names.indexOf(genericName)
+      if (generic >= 0) names.splice(generic, 1)
+    }
   }
   if (names.includes('System Administrator')) {
     const generic = names.indexOf('Administrator')
@@ -215,6 +238,10 @@ function collectProfessions(source: string): string[] {
   }
   if (names.includes('Dentist')) {
     const generic = names.indexOf('Doctor')
+    if (generic >= 0) names.splice(generic, 1)
+  }
+  if (names.includes('English Teacher')) {
+    const generic = names.indexOf('Teacher')
     if (generic >= 0) names.splice(generic, 1)
   }
   if (names.includes('Call Center Operator') || names.includes('Chat Operator')) {
@@ -275,6 +302,8 @@ export function normalizeProfessions(rawRole: string | undefined, text: string):
   // Desired-role text wins, except when a loose source parser handed us an
   // explicit work-history/education line instead of a target role.
   const target = cleanRole(rawRole)
+  if (FLEXIBLE_ROLE_RE.test(target)) return ['Any Role']
+  if (NON_ROLE_RE.test(target)) return []
   if (target && !NON_TARGET_CONTEXT_RE.test(target)) {
     const targetMatches = collectProfessions(target)
     if (targetMatches.length) return targetMatches
@@ -406,7 +435,7 @@ export function detectRelocationReady(text: string): boolean | null {
   return null
 }
 
-const REMOTE_POSITIVE_RE = /\bremote\b|удал[её]н\p{L}*|віддален|дистанцион|masofaviy|online\s+(?:work|job)|онлайн\s+работ/iu
+const REMOTE_POSITIVE_RE = /\bremote\b|удал[её]н\p{L}*|віддален|дистанцион|masofaviy|(?<!\p{L})onlayn(?!\p{L})|online\s+(?:work|job)|онлайн\s+работ/iu
 const REMOTE_NEGATIVE_RE = /только\s+офис|офисн(?:ый|ая)\s+формат|офлайн|удал[её]нк\p{L}*\s+не\s+рассматрива|remote\s+(?:not|no)|faqat\s+ofis|ofisda\s+ishlash/iu
 
 export function normalizeRemotePreference(
@@ -527,10 +556,10 @@ function normalizedCandidateSkills(profile: CvProfile, text: string): string[] {
   })
 }
 
-const HIDDEN_NAME_RE = /^(?:фио|піб|name)?\s*(?:скрыт\p{L}*|прихован\p{L}*|hidden|yashiril\p{L}*|ascuns)$/iu
+const HIDDEN_NAME_RE = /^(?:(?:фио|піб|name)?\s*(?:скрыт\p{L}*|прихован\p{L}*|hidden|yashiril\p{L}*|ascuns)|onlayn|online|resume|резюме|[?？�\uFFFD]{2,})$/iu
 const EMPLOYMENT_AS_EDUCATION_RE = /занятост|зайнятіст|удал[её]нн|дистанцион|remote|full[- ]?time|part[- ]?time|график\s+работ|bandlik/iu
-const FLEXIBLE_ROLE_RE = /^(?:нет|без)\s+разницы$|^не\s*важно$|^farqi\s+yo['’ʻʼ‘`]?q$|^любая\s+(?:работа|занятость)$/iu
-const NON_ROLE_RE = /^(?:удал[её]нно|работа\s+на\s+удал[её]н\p{L}*\s+основе|remote|farqi\s+yo['’ʻʼ‘`]?q|bilmaym\p{L}*|ish\s+ker(?:e|a)\s+onlayn|любая\s+(?:работа|занятость)|немає|нет|не\s+указано|not\s+specified)$/iu
+const FLEXIBLE_ROLE_RE = /^(?:нет|без)\s+разницы(?:\s+.*)?$|^не\s*важно(?:\s+.*)?$|^farqi\s+yo['’ʻʼ‘`]?q$|^любая\s+(?:работа|занятость)(?:\s+.*)?$/iu
+const NON_ROLE_RE = /^(?:удал[её]нно|работа\s+на\s+удал[её]н\p{L}*\s+основе|remote|onlayn|online|farqi\s+yo['’ʻʼ‘`]?q|bilmaym\p{L}*|ish\s+ker(?:e|a)\s+onlayn|любая\s+(?:работа|занятость)|немає|нет|не\s+указано|not\s+specified)$/iu
 
 function normalizeCandidateEducation(profile: CvProfile, text: string): string | null | undefined {
   const raw = profile.education?.trim() || ''
@@ -585,9 +614,12 @@ export function normalizeCandidate(profile: CvProfile): CvProfile {
         : rawSourceText
   const goalRole = extractGoalRole(originalText)
   const sourceRole = profile.sourceKey === 'careerist-uz' ? careeristRoleFromText(originalText) : null
-  const rawEffectiveRole = cleanRole(goalRole || sourceRole || profile.role)
+  const rawEffectiveRoleCandidate = cleanRole(goalRole || sourceRole || profile.role)
+  const roleDuplicatesName = Boolean(comparableRoleText(rawEffectiveRoleCandidate))
+    && comparableRoleText(rawEffectiveRoleCandidate) === comparableRoleText(profile.name)
+  const rawEffectiveRole = roleDuplicatesName ? '' : rawEffectiveRoleCandidate
   const flexibleRole = FLEXIBLE_ROLE_RE.test(rawEffectiveRole)
-  const effectiveRole = flexibleRole ? 'General Laborer' : NON_ROLE_RE.test(rawEffectiveRole) ? '' : rawEffectiveRole
+  const effectiveRole = flexibleRole ? 'Any Role' : NON_ROLE_RE.test(rawEffectiveRole) ? '' : rawEffectiveRole
   // Repair already-stored rows where a loose adapter saved the whole labelled
   // line ("familya: ...") as the name. New parses and old data then converge.
   const rawName = profile.name?.trim() || ''

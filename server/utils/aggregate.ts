@@ -4,6 +4,7 @@
 // structured filters and stats can operate on derived fields.
 
 import { enrichJob, resolveCountry } from './enrich'
+import { normalizeJobSeniority } from './jobSeniority'
 import { canonicalSkillName } from '~~/shared/jobSkills'
 import type {
   Job,
@@ -20,12 +21,12 @@ const ENRICHMENT_CACHE_MAX = 20_000
 const enrichmentCache = new Map<string, { fingerprint: string; job: Job }>()
 
 function cachedEnrichment(raw: Job): Job {
-  if (raw.workMode !== undefined && raw.skillDetails !== undefined) return raw
+  if (raw.workMode !== undefined && raw.skillDetails !== undefined) return normalizeJobSeniority(raw)
   const key = raw.url || raw.id
   const fingerprint = `${raw.postedAt}|${raw.title}|${raw.description?.length || 0}`
   const cached = enrichmentCache.get(key)
   if (cached?.fingerprint === fingerprint) return cached.job
-  const job = enrichJob(raw)
+  const job = normalizeJobSeniority(enrichJob(raw))
   enrichmentCache.set(key, { fingerprint, job })
   if (enrichmentCache.size > ENRICHMENT_CACHE_MAX) {
     const oldest = enrichmentCache.keys().next().value

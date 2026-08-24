@@ -69,9 +69,13 @@ function isExternal(href: string) {
 
 <style scoped lang="scss">
 .site-footer {
+  position: relative;
+  z-index: 1;
   border-top: 1px solid var(--line);
   padding: 44px 0 32px;
   margin-top: 16px;
+  background: #070c22;
+  box-shadow: 0 -18px 48px rgba(4, 8, 28, 0.36);
 }
 .site-footer__grid {
   display: flex;

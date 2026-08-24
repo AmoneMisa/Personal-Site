@@ -1,9 +1,10 @@
-import { useRedis } from '~~/server/utils/redis'
+import { useStateStore } from '~~/server/utils/stateStore'
 import { ALL_SOURCES, type Job, type JobSource } from './jobTypes'
 import { enrichJob } from './enrich'
 import { syncJobsSearchIndex } from './jobsElastic'
 import { fetchExtraTelegramJobs } from './extraTelegramJobSources'
 import { fetchLinkedInJobs } from './linkedinSource'
+import { fetchFacebookJobs, fetchThreadsJobs } from './socialJobSources'
 import { fetchExtraPublicJobs } from './extraPublicJobSources'
 import { fetchUsaVisaSponsorJobs } from './usaVisaSponsorSource'
 import { fetchSourceExpansionJobs } from './sourceExpansionJobs'
@@ -34,13 +35,62 @@ const STALE_DAYS = 4
 const SOURCE_TIMEOUT_MS = 30_000
 // `companies` is intentionally an umbrella source: official ATS feeds, career
 // pages, regional boards and aviation sources all run as isolated sub-loaders.
-// Give that fan-out room to finish, but stay below the Rabbit worker's 180s
-// frontend request timeout so retries remain controlled by RabbitMQ.
+// Give that fan-out room to finish while keeping one source refresh bounded.
 const COMPANIES_SOURCE_TIMEOUT_MS = 150_000
+// Regional LinkedIn pagination and serialized Threads searches intentionally do
+// more work than ordinary API/RSS sources. Keep them below the queue worker's
+// execution budget, but do not abort them at the generic 30-second ceiling.
+const LINKEDIN_SOURCE_TIMEOUT_MS = Math.max(
+  60_000,
+  Math.min(170_000, Number(process.env.LINKEDIN_SOURCE_TIMEOUT_MS) || 150_000),
+)
+const SOCIAL_SOURCE_TIMEOUT_MS = Math.max(
+  60_000,
+  Math.min(170_000, Number(process.env.SOCIAL_JOB_SOURCE_TIMEOUT_MS) || 150_000),
+)
 
 type StoredJob = Job & {
   lastSeen: string
   ai?: unknown
+}
+
+/**
+ * A few HTML boards hand the source adapter a whole detail page. If that
+ * adapter strips tags without first removing <script>, the script *contents*
+ * become ordinary text and reach enrichment. That is how Yandex RTB code was
+ * shown in the modal and words such as `JSON` became fake required skills.
+ *
+ * Keep this guard at the storage/enrichment boundary as defence in depth: a
+ * board-specific parser can still be fixed independently, while executable
+ * page plumbing never becomes vacancy content or ATS keywords again.
+ */
+export function sanitizeFetchedJob(job: Job): Job {
+  const raw = String(job.description || '').replace(/\s+/g, ' ').trim()
+  if (!raw) return job
+
+  const embeddedScript = raw.search(
+    /(?:window\.yaContextCb\b|Ya\.Context\.AdvManager\b|yandex_rtb_R-A-\d+|googletag\.cmd\b|dataLayer\.push\s*\()/i,
+  )
+  let description = embeddedScript >= 0 ? raw.slice(0, embeddedScript).trim() : raw
+
+  const isIshBor = (job.tags || []).some((tag) => /ish-bor\.uz/i.test(String(tag)))
+    || /ish-bor\.uz/i.test(job.company || '')
+    || /ish-bor\.uz/i.test(job.url || '')
+
+  if (isIshBor) {
+    // ish-bor appends SEO/navigation copy to the useful one-line summary.
+    description = description
+      .replace(/^Регистрация\s+\d{1,2}[./-]\d{1,2}[./-]20\d{2}(?:\s+\d+){0,3}\s*/iu, '')
+      .replace(/\s+\|?\s*Вакансии,\s*Вакансия,\s*работа(?:\s|,|$)[\s\S]*$/iu, '')
+      .replace(/\s+ish-bor\.uz\s+(?:Фильтр|Если вам нужна работа|Меню|О нас)[\s\S]*$/iu, '')
+      .trim()
+
+    // A detail layout with no textual summary is preferable as a concise card
+    // over exposing registration counters/navigation from the surrounding page.
+    if (!description || /^Регистрация(?:\s|$)/iu.test(description)) description = job.title.trim()
+  }
+
+  return description === raw ? job : { ...job, description: description || undefined }
 }
 
 async function fetchAllTelegram(q: string): Promise<Job[]> {
@@ -54,7 +104,6 @@ async function fetchAllTelegram(q: string): Promise<Job[]> {
 async function fetchAllCompanies(q: string): Promise<Job[]> {
   const loaders = [
     { label: 'companies', load: () => fetchCompanies(q) },
-    { label: 'linkedin', load: () => fetchLinkedInJobs(q) },
     { label: 'public-boards', load: () => fetchExtraPublicJobs(q) },
     { label: 'usa-visa-sponsors', load: () => fetchUsaVisaSponsorJobs(q) },
     { label: 'source-expansion', load: () => fetchSourceExpansionJobs(q) },
@@ -90,6 +139,9 @@ const FETCHERS: Record<JobSource, (q: string) => Promise<Job[]>> = {
   jooble: fetchJooble,
   rss: fetchRss,
   companies: fetchAllCompanies,
+  linkedin: fetchLinkedInJobs,
+  facebook: fetchFacebookJobs,
+  threads: fetchThreadsJobs,
   devkg: fetchDevKg,
   ishgo: fetchIshGo,
   itjobsuz: fetchItJobsUz,
@@ -113,6 +165,13 @@ function isConfigured(source: JobSource): boolean {
       return process.env.RSS_DEFAULTS !== 'off' || !!process.env.RSS_FEEDS
     case 'companies':
       return process.env.COMPANIES_SOURCE !== 'off'
+    case 'linkedin':
+      return process.env.LINKEDIN_SOURCE !== 'off'
+    case 'facebook':
+    case 'threads':
+      return String(process.env.SOCIAL_JOB_SOURCE || 'on').toLowerCase() !== 'off'
+        && !!process.env.HIRING_SOCIAL_API_URL
+        && String(process.env.QUEUE_INTERNAL_KEY || '').length >= 16
     case 'devkg':
       return process.env.DEVKG_SOURCE !== 'off'
     case 'ishgo':
@@ -154,9 +213,16 @@ function prune(list: StoredJob[], now: number): StoredJob[] {
   })
 }
 
+function sourceTimeoutMs(source: JobSource): number {
+  if (source === 'companies') return COMPANIES_SOURCE_TIMEOUT_MS
+  if (source === 'linkedin') return LINKEDIN_SOURCE_TIMEOUT_MS
+  if (source === 'facebook' || source === 'threads') return SOCIAL_SOURCE_TIMEOUT_MS
+  return SOURCE_TIMEOUT_MS
+}
+
 async function fetchSource(source: JobSource): Promise<Job[]> {
   let timer: ReturnType<typeof setTimeout> | undefined
-  const timeoutMs = source === 'companies' ? COMPANIES_SOURCE_TIMEOUT_MS : SOURCE_TIMEOUT_MS
+  const timeoutMs = sourceTimeoutMs(source)
 
   try {
     return await Promise.race([
@@ -176,9 +242,9 @@ async function fetchSource(source: JobSource): Promise<Job[]> {
 async function mergeFetchedSource(source: JobSource, jobs: Job[]) {
   const now = Date.now()
   const nowIso = new Date(now).toISOString()
-  const redis = useRedis()
+  const store = useStateStore()
 
-  const raw = await redis.get(STORE_KEY)
+  const raw = await store.get(STORE_KEY)
   const existing = raw ? JSON.parse(raw) as StoredJob[] : []
   const byKey = new Map<string, StoredJob>()
 
@@ -187,7 +253,7 @@ async function mergeFetchedSource(source: JobSource, jobs: Job[]) {
   }
 
   for (const job of jobs) {
-    const enriched = enrichJob(job)
+    const enriched = enrichJob(sanitizeFetchedJob(job))
     const key = dedupKey(enriched)
     const previous = byKey.get(key)
 
@@ -200,7 +266,7 @@ async function mergeFetchedSource(source: JobSource, jobs: Job[]) {
 
   const kept = prune([...byKey.values()], now)
 
-  await redis.set(
+  await store.set(
     STORE_KEY,
     JSON.stringify(kept),
     'EX',
@@ -265,7 +331,7 @@ export async function refreshJobSource(source: JobSource) {
 async function runJobSourceRefresh(source: JobSource) {
   const jobs = await fetchSource(source)
 
-  // Fetching is parallel; mutation of the shared Redis store is serialized.
+  // Fetching is parallel; mutation of the shared persistent store is serialized.
   const operation = mergeLock.then(
     () => mergeFetchedSource(source, jobs),
     () => mergeFetchedSource(source, jobs),

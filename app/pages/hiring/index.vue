@@ -29,7 +29,9 @@ interface FeedResult {
 }
 interface CountryMeta { code: string; name: string; currency: string; cities?: string[] }
 type HiringView = "active" | "favorites" | "recent" | "hidden";
+type HiringSort = "recent" | "name_asc" | "name_desc" | "experience_desc" | "experience_asc" | "age_asc" | "age_desc" | "salary_desc" | "salary_asc";
 type SearchPreset = { name: string; query: Record<string, string> };
+const HIRING_SORTS: HiringSort[] = ["recent", "name_asc", "name_desc", "experience_desc", "experience_asc", "age_asc", "age_desc", "salary_desc", "salary_asc"];
 
 const PAGE_SIZE = 20;
 const MAX_SAVED = 200;
@@ -63,6 +65,10 @@ const countries = ref<string[]>([]);
 const city = ref("");
 const remote = ref("any");
 const experienceMin = ref<number | undefined>(undefined);
+const salaryFrom = ref<number | undefined>(undefined);
+const salaryTo = ref<number | undefined>(undefined);
+const salaryCurrency = ref("USD");
+const sort = ref<HiringSort>("recent");
 const ageMin = ref<number | undefined>(undefined);
 const ageMax = ref<number | undefined>(undefined);
 const gender = ref("");
@@ -178,6 +184,21 @@ const senioritySel = computed<string>({
   get: () => seniority.value || SENIORITY_ANY,
   set: (v) => (seniority.value = v === SENIORITY_ANY ? "" : v),
 });
+const salaryCurrencyItems = computed<Item[]>(() => {
+  const currencies = [...new Set(["USD", "EUR", ...meta.value.map((item) => item.currency).filter(Boolean)])];
+  return currencies.map((value) => ({ value, label: value }));
+});
+const sortItems = computed<Item[]>(() => [
+  { value: "recent", label: label("Сначала новые", "Newest first") },
+  { value: "name_asc", label: label("Имя: А → Я", "Name: A → Z") },
+  { value: "name_desc", label: label("Имя: Я → А", "Name: Z → A") },
+  { value: "experience_desc", label: label("Опыт: больше → меньше", "Experience: high → low") },
+  { value: "experience_asc", label: label("Опыт: меньше → больше", "Experience: low → high") },
+  { value: "age_asc", label: label("Возраст: младше → старше", "Age: younger → older") },
+  { value: "age_desc", label: label("Возраст: старше → младше", "Age: older → younger") },
+  { value: "salary_desc", label: label("Желаемая ЗП: выше → ниже", "Desired salary: high → low") },
+  { value: "salary_asc", label: label("Желаемая ЗП: ниже → выше", "Desired salary: low → high") },
+]);
 
 function readSavedList(key: string, limit = MAX_SAVED): CvProfile[] {
   try {
@@ -286,6 +307,10 @@ function currentFilterQuery(): Record<string, string> {
   if (remote.value === "yes") queryParams.remote = "1";
   if (remote.value === "no") queryParams.remote = "0";
   if (experienceMin.value != null) queryParams.experienceMin = String(experienceMin.value);
+  if (salaryFrom.value != null) queryParams.salaryFrom = String(salaryFrom.value);
+  if (salaryTo.value != null) queryParams.salaryTo = String(salaryTo.value);
+  if (salaryCurrency.value !== "USD" || salaryFrom.value != null || salaryTo.value != null || sort.value.startsWith("salary")) queryParams.salaryCurrency = salaryCurrency.value;
+  if (sort.value !== "recent") queryParams.sort = sort.value;
   if (ageMin.value != null) queryParams.ageMin = String(ageMin.value);
   if (ageMax.value != null) queryParams.ageMax = String(ageMax.value);
   if (gender.value) queryParams.gender = gender.value;
@@ -308,6 +333,12 @@ function applyQueryParams(params: Record<string, unknown>) {
   city.value = queryString(params.city);
   remote.value = params.remote === "1" ? "yes" : params.remote === "0" ? "no" : "any";
   experienceMin.value = Number(queryString(params.experienceMin)) || undefined;
+  salaryFrom.value = Number(queryString(params.salaryFrom)) || undefined;
+  salaryTo.value = Number(queryString(params.salaryTo)) || undefined;
+  const requestedSalaryCurrency = queryString(params.salaryCurrency).toUpperCase();
+  salaryCurrency.value = /^[A-Z]{3}$/.test(requestedSalaryCurrency) ? requestedSalaryCurrency : "USD";
+  const requestedSort = queryString(params.sort) as HiringSort;
+  sort.value = HIRING_SORTS.includes(requestedSort) ? requestedSort : "recent";
   ageMin.value = Number(queryString(params.ageMin)) || undefined;
   ageMax.value = Number(queryString(params.ageMax)) || undefined;
   gender.value = ["male", "female", "unknown"].includes(queryString(params.gender)) ? queryString(params.gender) : "";
@@ -431,6 +462,10 @@ async function load(append = false, background = false) {
   if (remote.value === "yes") params.remote = "1";
   if (remote.value === "no") params.remote = "0";
   if (experienceMin.value != null) params.experienceMin = String(experienceMin.value);
+  if (salaryFrom.value != null) params.salaryFrom = String(salaryFrom.value);
+  if (salaryTo.value != null) params.salaryTo = String(salaryTo.value);
+  if (salaryFrom.value != null || salaryTo.value != null || sort.value.startsWith("salary")) params.salaryCurrency = salaryCurrency.value;
+  if (sort.value !== "recent") params.sort = sort.value;
   if (ageMin.value != null) params.ageMin = String(ageMin.value);
   if (ageMax.value != null) params.ageMax = String(ageMax.value);
   if (gender.value) params.gender = gender.value;
@@ -497,6 +532,10 @@ function resetFilters() {
   city.value = "";
   remote.value = "any";
   experienceMin.value = undefined;
+  salaryFrom.value = undefined;
+  salaryTo.value = undefined;
+  salaryCurrency.value = "USD";
+  sort.value = "recent";
   ageMin.value = undefined;
   ageMax.value = undefined;
   gender.value = "";
@@ -506,6 +545,11 @@ function resetFilters() {
   skills.value = "";
   source.value = "";
   scheduleLoad(80);
+}
+function clearProfessions() {
+  if (!professions.value.length) return;
+  professions.value = [];
+  scheduleLoad(0);
 }
 function setView(next: HiringView) { view.value = next; }
 
@@ -735,21 +779,21 @@ onBeforeUnmount(() => {
 
 <template>
   <u-container class="hiring">
-    <decorative-easter-egg
-      class="hiring__easter-egg"
-      src="/images/easter-eggs/hiring-resume.png"
-      :width="320"
-      :height="175"
-    />
+    <ocean-page-backdrop />
     <div class="hiring__header text-center space-y-3">
       <h1 class="hiring__title">{{ t("title") }}</h1>
       <p class="hiring__subtitle text-muted mx-auto">{{ t("subtitle") }}</p>
     </div>
 
+    <UiResultsLoader :loading="loading" :label="t('searching')" min-height="420px">
     <form class="hiring__controls" @submit.prevent="load()">
       <u-input v-model="query" clearable icon="i-lucide-search" :label="t('search')" :placeholder="t('searchPlaceholder')" @clear="clearSearch" />
-      <u-button type="submit" :loading="loading" icon="i-lucide-search">
-        {{ loading ? t("searching") : t("search") }}
+      <div class="hiring__sort">
+        <u-select-menu :label="label('Сортировка', 'Sort')" v-model="sort" :items="sortItems" value-key="value" label-key="label"
+            :search-input="false" class="hiring__select" @update:model-value="scheduleLoad(0)" />
+      </div>
+      <u-button type="submit" icon="i-lucide-search">
+        {{ t("search") }}
       </u-button>
 
       <div class="hiring__row">
@@ -780,54 +824,57 @@ onBeforeUnmount(() => {
         <div class="hiring__presets">
           <span class="hiring__field-label">{{ t("presets") }}</span>
           <button v-for="preset in presets" :key="preset.name" type="button" class="hiring__preset" @click="applyPreset(preset)">
-            <span>{{ preset.name }}</span>
-            <span class="hiring__preset-remove" role="button" :aria-label="t('deletePreset')" @click.stop="removePreset(preset.name)">×</span>
+            <span>{{ preset.name }}</span><span class="hiring__preset-remove" role="button" :aria-label="t('deletePreset')" @click.stop="removePreset(preset.name)">×</span>
           </button>
-          <u-button type="button" variant="outline" color="neutral" size="sm" icon="i-lucide-bookmark-plus" @click="presetModalOpen = true">
-            {{ t("savePreset") }}
-          </u-button>
-          <u-button type="button" variant="outline" color="neutral" size="sm" icon="i-lucide-share-2" @click="sharedLinkOpened = false; shareModalOpen = true">
-            {{ t("shareSearch") }}
-          </u-button>
+          <u-button type="button" variant="outline" color="neutral" size="sm" icon="i-lucide-bookmark-plus" @click="presetModalOpen = true">{{ t("savePreset") }}</u-button>
+          <u-button type="button" variant="outline" color="neutral" size="sm" icon="i-lucide-share-2" @click="sharedLinkOpened = false; shareModalOpen = true">{{ t("shareSearch") }}</u-button>
         </div>
-        <div class="hiring__field">
-          <u-select-menu :label="t('country')" v-model="countries" :items="countryItems" value-key="value" label-key="label"
-              multiple :placeholder="t('countryAny')" class="hiring__select" @update:model-value="scheduleLoad()" />
+
+        <section class="hiring-filter-group">
+          <div class="hiring-filter-group__title"><u-icon name="i-lucide-map-pin" /> {{ label("Местоположение", "Location") }}</div>
+          <div class="hiring-filter-group__grid">
+            <div class="hiring__field"><u-select-menu :label="t('country')" v-model="countries" :items="countryItems" value-key="value" label-key="label" multiple :placeholder="t('countryAny')" class="hiring__select" @update:model-value="scheduleLoad()" /></div>
+            <div class="hiring__field"><u-select-menu :label="t('city')" v-model="citySel" :items="cityItems" value-key="value" label-key="label" class="hiring__select" @update:model-value="scheduleLoad()" /></div>
+            <div class="hiring__field"><u-select-menu :label="t('remote')" v-model="remoteSel" :items="remoteItems" value-key="value" label-key="label" :search-input="false" class="hiring__select" @update:model-value="scheduleLoad()" /></div>
+          </div>
+        </section>
+
+        <section class="hiring-filter-group hiring-filter-group_salary">
+          <div class="hiring-filter-group__title"><u-icon name="i-lucide-banknote" /> {{ label("Желаемая зарплата", "Desired salary") }}</div>
+          <div class="hiring-filter-group__grid hiring-filter-group__grid_salary">
+            <div class="hiring__field hiring__salary-range">
+              <u-input v-model.number="salaryFrom" type="number" min="0" icon="i-lucide-banknote" :label="label('От', 'From')" @change="scheduleLoad()" />
+              <u-input v-model.number="salaryTo" type="number" min="0" icon="i-lucide-banknote" :label="label('До', 'To')" @change="scheduleLoad()" />
+            </div>
+            <div class="hiring__field"><u-select-menu :label="label('Валюта', 'Currency')" v-model="salaryCurrency" :items="salaryCurrencyItems" value-key="value" label-key="label" :search-input="false" class="hiring__select" @update:model-value="(salaryFrom != null || salaryTo != null || sort.startsWith('salary')) && scheduleLoad(0)" /></div>
+          </div>
+        </section>
+
+        <section class="hiring-filter-group">
+          <div class="hiring-filter-group__title"><u-icon name="i-lucide-user-round" /> {{ label("Профиль кандидата", "Candidate profile") }}</div>
+          <div class="hiring-filter-group__grid">
+            <div class="hiring__field"><u-input v-model.number="experienceMin" type="number" min="0" icon="i-lucide-briefcase" :label="t('experienceMin')" @change="scheduleLoad()" /></div>
+            <div class="hiring__field hiring__age-range"><u-input v-model.number="ageMin" type="number" min="14" max="99" icon="i-lucide-user-round" :label="label('Возраст от', 'Age from')" @change="scheduleLoad()" /><u-input v-model.number="ageMax" type="number" min="14" max="99" icon="i-lucide-user-round" :label="label('Возраст до', 'Age to')" @change="scheduleLoad()" /></div>
+            <div class="hiring__field"><u-select-menu :label="label('Пол', 'Gender')" v-model="genderSel" :items="genderItems" value-key="value" label-key="label" :search-input="false" class="hiring__select" @update:model-value="scheduleLoad()" /></div>
+            <div class="hiring__field"><u-select-menu :label="t('seniority')" v-model="senioritySel" :items="seniorityItems" value-key="value" label-key="label" :search-input="false" class="hiring__select" @update:model-value="scheduleLoad()" /></div>
+          </div>
+        </section>
+
+        <section class="hiring-filter-group hiring-filter-group_role">
+          <div class="hiring-filter-group__title"><u-icon name="i-lucide-briefcase-business" /> {{ label("Должность и навыки", "Role & skills") }}</div>
+          <div class="hiring-filter-group__grid">
+            <div class="hiring__field hiring__field_wide hiring__profession-field">
+              <u-select-menu :label="label('Желаемые должности', 'Desired positions')" v-model="professions" :items="professionItems" value-key="value" label-key="label" multiple searchable :placeholder="label('Любые должности', 'Any positions')" class="hiring__select" @update:model-value="scheduleLoad()" />
+              <button v-if="professions.length" type="button" class="hiring__profession-clear" @click="clearProfessions"><u-icon name="i-lucide-x" /> {{ label("Сбросить профессии", "Clear positions") }} · {{ professions.length }}</button>
+            </div>
+            <div class="hiring__field hiring__field_wide"><u-input v-model="skills" icon="i-lucide-code" :label="t('skills')" :placeholder="t('skillsPlaceholder')" @change="scheduleLoad()" /></div>
+          </div>
+        </section>
+
+        <div class="hiring-filter-actions">
+          <span class="hiring__filter-count text-muted">{{ t("found", { n: view === 'active' ? total : displayedProfiles.length }) }}</span>
+          <u-button type="button" variant="ghost" color="neutral" size="sm" icon="i-lucide-rotate-ccw" @click="resetFilters">{{ t("reset") }}</u-button>
         </div>
-        <div class="hiring__field">
-          <u-select-menu :label="t('city')" v-model="citySel" :items="cityItems" value-key="value" label-key="label"
-              class="hiring__select" @update:model-value="scheduleLoad()" />
-        </div>
-        <div class="hiring__field">
-          <u-select-menu :label="t('remote')" v-model="remoteSel" :items="remoteItems" value-key="value" label-key="label"
-              :search-input="false" class="hiring__select" @update:model-value="scheduleLoad()" />
-        </div>
-        <div class="hiring__field">
-          <u-input v-model.number="experienceMin" type="number" min="0" icon="i-lucide-briefcase" :label="t('experienceMin')" @change="scheduleLoad()" />
-        </div>
-        <div class="hiring__field hiring__age-range">
-          <u-input v-model.number="ageMin" type="number" min="14" max="99" icon="i-lucide-user-round" :label="label('Возраст от', 'Age from')" @change="scheduleLoad()" />
-          <u-input v-model.number="ageMax" type="number" min="14" max="99" icon="i-lucide-user-round" :label="label('Возраст до', 'Age to')" @change="scheduleLoad()" />
-        </div>
-        <div class="hiring__field">
-          <u-select-menu :label="label('Пол', 'Gender')" v-model="genderSel" :items="genderItems" value-key="value" label-key="label"
-              :search-input="false" class="hiring__select" @update:model-value="scheduleLoad()" />
-        </div>
-        <div class="hiring__field hiring__field_wide">
-          <u-select-menu :label="label('Желаемые должности', 'Desired positions')" v-model="professions" :items="professionItems"
-              value-key="value" label-key="label" multiple searchable :placeholder="label('Любые должности', 'Any positions')"
-              class="hiring__select" @update:model-value="scheduleLoad()" />
-        </div>
-        <div class="hiring__field">
-          <u-select-menu :label="t('seniority')" v-model="senioritySel" :items="seniorityItems" value-key="value" label-key="label"
-              :search-input="false" class="hiring__select" @update:model-value="scheduleLoad()" />
-        </div>
-        <div class="hiring__field">
-          <u-input v-model="skills" icon="i-lucide-code" :label="t('skills')" :placeholder="t('skillsPlaceholder')" @change="scheduleLoad()" />
-        </div>
-        <u-button type="button" variant="ghost" color="neutral" size="sm" icon="i-lucide-rotate-ccw" @click="resetFilters">
-          {{ t("reset") }}
-        </u-button>
       </div>
     </form>
 
@@ -836,9 +883,7 @@ onBeforeUnmount(() => {
       {{ t(sourceWarningKey, { n: relevantSourceErrors.length }) }}
     </p>
     <p v-else-if="warming && !loading" class="hiring__warming text-muted">{{ t("warming") }}</p>
-    <p v-else class="hiring__count text-muted">{{ t("found", { n: view === 'active' ? total : displayedProfiles.length }) }}</p>
-
-    <div class="hiring__grid" :class="{ 'hiring__grid_loading': loading, 'hiring__grid_dense': denseGrid }">
+    <div class="hiring__grid" :class="{ 'hiring__grid_dense': denseGrid }">
       <CandidateCard
         v-for="profile in displayedProfiles"
         :key="profile.id"
@@ -853,14 +898,15 @@ onBeforeUnmount(() => {
         @toggle-hidden="toggleHidden(profile)"
       />
     </div>
-
-    <div ref="loadMoreSentinel" v-if="hasMore" class="hiring__sentinel">
+<div ref="loadMoreSentinel" v-if="hasMore" class="hiring__sentinel">
       <span v-if="loadingMore" class="text-muted">{{ t("loadingMore") }}</span>
     </div>
 
     <div v-if="!loading && !displayedProfiles.length && !failed" class="hiring__empty">
       <div class="text-muted">{{ t("empty") }}</div>
     </div>
+
+    </UiResultsLoader>
 
     <u-modal v-model:open="modalOpen" :title="active?.name || active?.role || t('notSpecified')" :ui="{ content: 'max-w-3xl' }">
       <template #title>
@@ -930,15 +976,12 @@ onBeforeUnmount(() => {
 </template>
 
 <style scoped>
-.hiring { position: relative; isolation: isolate; overflow: hidden; padding-top: 24px; padding-bottom: 96px; }
+.hiring { position: relative; isolation: isolate; padding-top: 24px; padding-bottom: 96px; }
 .hiring__header { position: relative; z-index: 1; }
-.hiring__easter-egg {
-  position: absolute; top: 4px; right: -24px; z-index: 0;
-  width: 270px; opacity: 0.18;
-}
 .hiring__title { font-size: 32px; font-weight: 600; }
 .hiring__subtitle { max-width: 720px; font-size: 14px; }
-.hiring__controls { margin: 20px 0 20px; display: grid; gap: 12px; grid-template-columns: 1fr auto; align-items: start; }
+.hiring__controls { margin: 20px 0 20px; display: grid; gap: 12px; grid-template-columns: minmax(0, 1fr) minmax(220px, 280px) auto; align-items: start; }
+.hiring__sort { min-width: 0; }
 .hiring__row { grid-column: 1 / -1; display: flex; flex-wrap: wrap; justify-content: space-between; gap: 12px; }
 .hiring__filters, .hiring__views { display: flex; flex-wrap: wrap; gap: 8px; }
 .hiring__views { padding-left: 12px; border-left: 1px solid var(--line); }
@@ -950,9 +993,30 @@ onBeforeUnmount(() => {
 .hiring__pill:hover { color: var(--text-white); }
 .hiring__pill_active { color: var(--text-white); border-color: rgba(113,137,217,0.45); background: rgba(113,137,217,0.18); }
 .hiring__advanced {
-  grid-column: 1 / -1; display: grid; gap: 12px 14px; align-items: end; grid-template-columns: 1fr;
-  padding: 14px; border-radius: 8px; border: 1px solid var(--line); background: rgba(255,255,255,0.02);
+  position: relative; isolation: isolate; overflow: hidden;
+  grid-column: 1 / -1; display: grid; grid-template-columns: 1fr; gap: 12px;
+  padding: 14px; border-radius: 10px; border: 1px solid var(--line); background: var(--ocean-form-surface);
+  box-shadow: 0 18px 42px rgba(2, 5, 18, 0.22);
 }
+.hiring__advanced::before,
+.hiring__advanced::after {
+  content: "";
+  position: absolute;
+  z-index: 2;
+  border-radius: 999px;
+  border: 1px solid rgba(75, 145, 255, 0.12);
+  pointer-events: none;
+}
+.hiring__advanced::before {
+  width: 8px; height: 8px; left: calc(50% - 4px); top: 49%;
+  box-shadow: 0 -142px 0 -2px rgba(67, 119, 221, 0.08);
+}
+.hiring__advanced::after {
+  width: 6px; height: 6px; right: 1.4%; top: 24%;
+  border-color: rgba(207, 92, 220, 0.11);
+  box-shadow: 0 250px 0 -1px rgba(118, 83, 226, 0.07);
+}
+.hiring__advanced > * { position: relative; z-index: 1; }
 .hiring__presets {
   grid-column: 1 / -1; display: flex; flex-wrap: wrap; align-items: center; gap: 8px;
   padding-bottom: 12px; border-bottom: 1px solid var(--line);
@@ -963,23 +1027,37 @@ onBeforeUnmount(() => {
 }
 .hiring__preset-remove { color: var(--text-muted); font-size: 18px; line-height: 1; }
 .hiring__preset-remove:hover { color: var(--accent-pink); }
-@media (min-width: 700px) { .hiring__advanced { grid-template-columns: repeat(3, 1fr); } }
-@media (min-width: 1000px) { .hiring__advanced { grid-template-columns: repeat(4, 1fr); } .hiring__field_wide { grid-column: span 2; } }
+.hiring-filter-group { min-width: 0; padding: 14px; border: 1px solid var(--line); border-radius: 9px; background: rgba(8, 13, 35, 0.28); }
+.hiring-filter-group__title { display: flex; align-items: center; gap: 7px; margin-bottom: 12px; color: var(--ui-text-muted); font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: .04em; }
+.hiring-filter-group__title :deep(svg) { color: var(--accent-pink); }
+.hiring-filter-group__grid { display: grid; grid-template-columns: 1fr; gap: 12px; align-items: end; }
+.hiring-filter-actions { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+@media (min-width: 700px) {
+  .hiring__advanced { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .hiring-filter-group__grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .hiring-filter-group__grid_salary { grid-template-columns: minmax(0, 1.5fr) minmax(110px, .6fr); }
+  .hiring__field_wide { grid-column: span 2; }
+  .hiring-filter-actions { grid-column: 1 / -1; }
+}
 .hiring__field { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
-.hiring__age-range { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.hiring__age-range, .hiring__salary-range { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.hiring__profession-clear {
+  align-self: flex-start; display: inline-flex; align-items: center; gap: 5px; padding: 2px 0; border: 0;
+  background: transparent; color: var(--accent-pink); font-size: 11px; font-weight: 700; cursor: pointer;
+}
+.hiring__profession-clear:hover { text-decoration: underline; }
 .hiring__field-label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; opacity: 0.7; }
 .hiring__select { width: 100%; min-width: 0; }
 .hiring__select :deep(button) { width: 100%; min-width: 0; }
 .hiring__error { color: var(--ui-error, #f87171); }
 .hiring__source-warning { color: #f6c177; font-size: 13px; margin-bottom: 12px; }
 .hiring__warming { font-size: 13px; margin-bottom: 12px; }
-.hiring__count { font-size: 13px; margin-bottom: 12px; }
+.hiring__filter-count { font-size: 13px; }
 .hiring__grid { display: grid; gap: 14px; grid-template-columns: 1fr; grid-auto-rows: 1fr; align-items: stretch; }
 @media (min-width: 640px) { .hiring__grid { grid-template-columns: repeat(2, 1fr); } }
 @media (min-width: 1024px) { .hiring__grid { grid-template-columns: repeat(3, 1fr); } }
 @media (min-width: 1180px) { .hiring__grid.hiring__grid_dense { grid-template-columns: repeat(4, 1fr); } }
 @media (min-width: 1600px) { .hiring__grid { grid-template-columns: repeat(4, 1fr); } }
-.hiring__grid_loading { opacity: 0.4; pointer-events: none; }
 .hiring__empty { margin-top: 18px; text-align: center; padding: 18px; border-radius: 10px; border: 1px solid var(--line); background: rgba(255,255,255,0.03); }
 .hiring__sentinel { min-height: 44px; display: grid; place-items: center; }
 .hiring-modal { display: flex; flex-direction: column; gap: 12px; }
@@ -990,15 +1068,11 @@ onBeforeUnmount(() => {
 .hiring-modal__desc { font-size: 13.5px; line-height: 1.55; white-space: pre-wrap; color: var(--text-soft, inherit); margin-top: 8px; }
 .hiring-modal__tags { display: flex; flex-wrap: wrap; gap: 6px; }
 .hiring-modal__tag { font-size: 11px; padding: 2px 8px; border-radius: 6px; border: 1px solid var(--line); color: var(--ui-text-muted); }
-.hiring-modal-footer { --modal-footer-accent: #7189d9; --modal-footer-accent-text: #101428; }
 .hiring-share__hint { margin: 0 0 12px; color: var(--text-muted); font-size: 13px; line-height: 1.5; }
 @media (max-width: 700px) {
   .hiring__controls { grid-template-columns: 1fr; }
   .hiring__controls > :deep(button) { width: 100%; }
   .hiring__views { padding-left: 0; border-left: 0; }
-  .hiring__age-range { grid-template-columns: 1fr 1fr; }
-}
-@media (max-width: 1100px) {
-  .hiring__easter-egg { display: none; }
+  .hiring__age-range, .hiring__salary-range { grid-template-columns: 1fr 1fr; }
 }
 </style>

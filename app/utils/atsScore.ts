@@ -1,70 +1,51 @@
-import { canonicalSkillName, extractSkillNames } from '~~/shared/jobSkills'
+import {
+  buildCvProfile,
+  scoreJob as legacyScoreJob,
+  type CvProfile,
+} from '../../internal/legacy/atsScoreCore'
 
-// Client-side ATS (Applicant Tracking System) match scoring.
-// The CV never leaves the browser: text is extracted locally and matched against
-// each vacancy. Matching is done over a canonical *skill* dictionary (not raw word
-// frequency), so the score reflects real tech-skill overlap — e.g. Java, Spring,
-// Docker, Kubernetes, AWS — instead of noise words from the title/company.
-
-/** Canonical skills present in a block of free text. */
-function extractSkills(text: string): Set<string> {
-  return new Set(extractSkillNames(text))
-}
-
-/** Map a pre-normalized skill string (e.g. from the server) to a canonical label. */
-function canonical(skill: string): string | undefined {
-  return canonicalSkillName(skill)
-}
-
-export interface CvProfile {
-  skills: Set<string> // canonical skill labels found in the CV
-  raw: string
-}
-
-export function buildCvProfile(cvText: string): CvProfile {
-  return { skills: extractSkills(cvText), raw: cvText }
-}
-
-export interface AtsResult {
-  score: number // 0..100
-  matched: string[]
-  missing: string[]
-}
-
-/**
- * Score a vacancy against a CV profile by canonical skill coverage.
- * required = skills asked for by the vacancy (server-normalized skills/niceToHave
- * plus any recognised in the title/tags/description). score = share the CV covers.
- */
-export function scoreJob(profile: CvProfile, job: {
-  title: string
-  description?: string
-  tags?: string[]
-  skills?: string[]
-  niceToHave?: string[]
-}): AtsResult {
-  const required = new Set<string>()
-  for (const s of job.skills || []) { const c = canonical(s); if (c) required.add(c) }
-  for (const s of job.niceToHave || []) { const c = canonical(s); if (c) required.add(c) }
-  for (const s of extractSkills(`${job.title} ${(job.tags || []).join(' ')} ${job.description || ''}`)) {
-    required.add(s)
-  }
-
-  if (required.size === 0) return { score: 0, matched: [], missing: [] }
-
-  const matched: string[] = []
-  const missing: string[] = []
-  for (const skill of required) {
-    if (profile.skills.has(skill)) matched.push(skill)
-    else missing.push(skill)
-  }
-
-  const score = Math.round((matched.length / required.size) * 100)
-  return { score, matched: matched.slice(0, 12), missing: missing.slice(0, 10) }
-}
+export { buildCvProfile }
+export type { CvProfile }
 
 export function scoreColor(score: number): string {
-  if (score >= 70) return '#34d399' // green
-  if (score >= 45) return '#fbbf24' // amber
-  return '#f87171' // red
+  if (score >= 75) return '#34d399' // green: strong match
+  if (score >= 60) return '#fbbf24' // yellow: promising, but with noticeable gaps
+  if (score >= 45) return '#fb923c' // orange: weak-to-moderate match
+  return '#f87171' // red: poor match or eligibility blocker
+}
+
+type AtsJob = Parameters<typeof legacyScoreJob>[1]
+type AtsResult = ReturnType<typeof legacyScoreJob>
+
+const LONG_FORM_NO_SPONSORSHIP_RE = /(?:\bmay\s+not\s+be\s+able\s+to\b[^\n!?]{0,450}\b(?:sponsor|support|provide)\b[^\n!?]{0,180}\bsponsorship\b|\b(?:will|can|may)\s+not\b[^\n!?]{0,220}\b(?:sponsor|support|provide)\b[^\n!?]{0,160}\bsponsorship\b|\bnot\s+(?:currently\s+)?(?:able\s+to\s+)?(?:sponsor|support|provide)\b[^\n!?]{0,160}\bsponsorship\b)/i
+
+function isUsRole(job: AtsJob): boolean {
+  if (String(job.country || '').toUpperCase() === 'US') return true
+  return /(?:\bunited states\b|\busa\b|\bu\.s\.?\b|\bsan mateo\s*,?\s*ca\b)/i.test(
+    `${job.location || ''} ${job.title || ''} ${(job.description || '').slice(0, 1800)}`,
+  )
+}
+
+export function scoreJob(profile: CvProfile, job: AtsJob): AtsResult {
+  const result = legacyScoreJob(profile, job)
+  if (
+    !result.blockers.some((blocker) => blocker.code === 'visa_sponsorship')
+    && profile.requiresUsSponsorship === true
+    && isUsRole(job)
+    && LONG_FORM_NO_SPONSORSHIP_RE.test(`${job.description || ''} ${(job.tags || []).join(' ')}`)
+  ) {
+    const blocker = {
+      code: 'visa_sponsorship' as const,
+      label: 'Visa sponsorship unavailable',
+      critical: true as const,
+    }
+    return {
+      ...result,
+      score: Math.min(result.fitScore, 49),
+      eligible: false,
+      blockers: [...result.blockers, blocker],
+      missing: [blocker.label, ...result.missing.filter((item) => item !== blocker.label)].slice(0, 12),
+    }
+  }
+  return result
 }

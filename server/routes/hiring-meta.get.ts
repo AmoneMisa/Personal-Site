@@ -1,6 +1,6 @@
 // GET /hiring-meta — country/city metadata for the hiring page filters.
 
-import { HIRING_COUNTRIES } from '../utils/hiringSources'
+import { HIRING_COUNTRIES } from '../../shared/hiring/hiringMarkets'
 
 // The country selector represents markets the hiring board actually crawls.
 // A candidate from a supported source may currently live elsewhere, but that

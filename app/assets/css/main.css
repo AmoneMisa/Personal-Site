@@ -109,6 +109,15 @@ h1, h2, h3, h4, h5, h6 {
     --bg-deep: #0d1128;
     --bg-panel: #131730;
     --bg-panel-2: #171c3a;
+    /* The same layered navy surface used behind the 404/500 card: soft blue
+       and pink light pools. Decorative bubbles belong to the containing panel,
+       so this stays one continuous surface instead of restarting per field group. */
+    --ocean-form-surface:
+        radial-gradient(circle at 84% 16%, rgba(241, 73, 157, 0.15), transparent 27%),
+        radial-gradient(circle at 12% 86%, rgba(138, 68, 209, 0.14), transparent 30%),
+        radial-gradient(circle at 55% 0%, rgba(37, 117, 221, 0.10), transparent 34%),
+        linear-gradient(145deg, rgba(7, 12, 34, 0.97), rgba(8, 13, 36, 0.95));
+    --ocean-form-surface-soft: rgba(8, 13, 35, 0.52);
     --accent-pink: #e0679a;
     --accent-blue: #7189d9;
     --line: #252a4a;

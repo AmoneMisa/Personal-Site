@@ -39,10 +39,12 @@ test('hiring dispatcher skips disabled Telegram feeds and fast-tracks unfinished
   const source = readFileSync(new URL('../server/utils/hiringSources.ts', import.meta.url), 'utf8')
   assert.match(source, /hiringChannelHandles[\s\S]*?filter\(\(channel\)\s*=>\s*channel\.enabled\s*!==\s*false\)/u)
 
-  const worker = readFileSync(new URL('../jobs-queue-worker/worker.py', import.meta.url), 'utf8')
-  assert.match(worker, /HIRING_BACKFILL_SECONDS[\s\S]*?"300"/u)
-  assert.match(worker, /jobs_due_at\s*=\s*0\.0[\s\S]*?backfill_due_at\s*=\s*0\.0/u)
-  assert.match(worker, /queue_declare\(queue=HIRING_QUEUE, passive=True\)/u)
+  const queue = readFileSync(new URL('../shared/jobs/jobsPgQueue.ts', import.meta.url), 'utf8')
+  const dispatch = readFileSync(new URL('../server/routes/internal/jobs-queue-dispatch.post.ts', import.meta.url), 'utf8')
+  assert.match(dispatch, /HIRING_QUEUE_BACKFILL_SECONDS[\s\S]*?300/u)
+  assert.match(queue, /backfill_due_at/u)
+  assert.match(queue, /type = 'hiring\.refresh\.channel'[\s\S]*?status IN \('pending', 'running'\)/u)
+  assert.match(queue, /priority: 4/u)
 })
 
 test('UzJobs public anonymous resume rows become recent platform-contact candidates', () => {
@@ -158,9 +160,6 @@ test('share metadata replacement preserves Nuxt assets in a combined head entry'
 })
 
 test('Cyrillic city, age and date patterns match at all', () => {
-  // JavaScript's \b is ASCII-only, so every Cyrillic alternative in these
-  // patterns used to match nothing: cities, ages and freshness stamps were
-  // silently dropped from every board that writes in Russian or Ukrainian.
   assert.equal(cityFrom('Роман Киев (возможен переезд)', 'UA'), 'Kyiv')
   assert.equal(cityFrom('Александр Харьков', 'UA'), 'Kharkiv')
   assert.equal(cityFrom('г. Ташкент, Чиланзарский район', 'UZ'), 'Tashkent')
@@ -185,14 +184,10 @@ test('a day and month with no year resolve to the most recent past date', () => 
   assert.ok(Date.parse(august) <= Date.now() + 48 * 60 * 60 * 1000)
   assert.equal(new Date(august).getUTCMonth(), 7)
   assert.equal(new Date(august).getUTCDate(), 19)
-
-  // A work-history duration is not a date.
   assert.equal(dayMonthDate('5 лет'), null)
 })
 
 test('relative durations in a work history are not read as an activity date', () => {
-  // "опыт работы более 5 лет" and "5 месяцев" must not make a stale card look
-  // fresh; only an explicit "ago" marker counts.
   assert.equal(activityDate('Высшее образование, опыт работы более 5 лет.'), null)
   assert.equal(activityDate('Менеджер, 5 месяцев'), null)
   assert.match(activityDate('5 месяцев назад') ?? '', /^\d{4}-\d{2}-\d{2}T/)
@@ -256,32 +251,29 @@ test('source-specific role spellings and specialist roles use the shared taxonom
   assert.deepEqual(normalizeProfessions('Инспектор по качеству (пищевое производство)', ''), ['Quality Inspector'])
   assert.equal(hiringProfessionLabel('Network Administrator', 'ru'), 'Сетевой администратор')
   assert.equal(hiringProfessionLabel('System Administrator', 'ru'), 'Системный администратор')
-  assert.equal(hiringProfessionLabel('Penetration Tester', 'ru'), 'Специалист по тестированию на проникновение')
+  assert.equal(hiringProfessionLabel('Penetration Tester', 'ru'), 'Pentester')
 })
 
-test('related professions collapse into stable combined search facets', () => {
+test('legacy profession groups expand while explicit selections stay exact', () => {
   assert.deepEqual(normalizeProfessions('Главный бухгалтер', ''), ['Chief Accountant'])
   assert.deepEqual(normalizeProfessions('Казначей', ''), ['Treasurer'])
-  assert.deepEqual(expandHiringProfessionFilters(['group:accounting-treasury']), [
-    'Accountant',
-    'Chief Accountant',
-    'Treasurer',
-  ])
-  assert.deepEqual(expandHiringProfessionFilters(['group:retail-service']), [
-    'Manager',
-    'Consultant',
-    'Cashier',
-    'Salesperson',
-  ])
+
+  const accounting = expandHiringProfessionFilters(['group:accounting-finance'])
+  assert.ok(accounting.includes('Accountant'))
+  assert.ok(accounting.includes('Chief Accountant'))
+  assert.ok(accounting.includes('Treasurer'))
+
+  const sales = expandHiringProfessionFilters(['group:sales-retail'])
+  assert.ok(sales.includes('Consultant'))
+  assert.ok(sales.includes('Cashier'))
+  assert.ok(sales.includes('Salesperson'))
+
   assert.deepEqual(
     collapseHiringProfessionFilterValues(['Accountant', 'Chief Accountant', 'Cashier', 'Engineer']),
-    ['group:accounting-treasury', 'group:retail-service', 'Engineer'],
+    ['Accountant', 'Chief Accountant', 'Cashier', 'Engineer'],
   )
-  assert.deepEqual(normalizeHiringProfessionFilterSelections(['Treasurer']), ['group:accounting-treasury'])
-  assert.equal(
-    hiringProfessionFilterLabel('group:retail-service', 'ru'),
-    'Менеджер / Консультант / Кассир / Продавец',
-  )
+  assert.deepEqual(normalizeHiringProfessionFilterSelections(['Treasurer']), ['Treasurer'])
+  assert.equal(hiringProfessionFilterLabel('group:sales-retail', 'ru'), 'Продажи / Ритейл')
 })
 
 test('candidate detail table explicitly marks missing values for its hide toggle', () => {
@@ -578,13 +570,13 @@ test('IshBor keeps only the profile column and trusts its stated region', () => 
   assert.doesNotMatch(profileHtml, /работа в Ташкенте|Вакансии Ташкент|Регистрация/)
 
   const legacyText = [
-    'Електрик (Резюме) - Сурхандаря | работа в ташкенте',
+    'Електрик (Резюме) - Сурхандарья | работа в ташкенте',
     'ish bor.uz',
     'Фильтр',
     'Города и области',
     'Електрик',
     'Постоянный',
-    'Сурхандаря',
+    'Сурхандарья',
     'У меня нет опыта работы',
     'Dilshodbek (Мужчина)',
     '21.08.2026',
@@ -598,7 +590,7 @@ test('IshBor keeps only the profile column and trusts its stated region', () => 
   assert.equal(trimIshBorProfileText(legacyText), [
     'Електрик',
     'Постоянный',
-    'Сурхандаря',
+    'Сурхандарья',
     'У меня нет опыта работы',
     'Dilshodbek (Мужчина)',
     '21.08.2026',
@@ -725,7 +717,7 @@ test('web CV mirrors with reordered role text collapse to one candidate', () => 
   assert.equal(candidates.length, 1)
 })
 
-test('a candidate who accepts any work is classified as a general laborer', () => {
+test('a candidate who accepts any work keeps an explicit any-role preference', () => {
   for (const role of ["Farqi yo'q.", 'Нет разницы', 'Не важно']) {
     const profile = normalizeCandidate({
       id: `flexible-${role}`,
@@ -741,8 +733,8 @@ test('a candidate who accepts any work is classified as a general laborer', () =
       originalText: `${role}\nCandidate, 30 лет, Ташкент`,
       description: `${role}\nCandidate, 30 лет, Ташкент`,
     })
-    assert.equal(profile.role, 'General Laborer')
-    assert.deepEqual(profile.professions, ['General Laborer'])
+    assert.equal(profile.role, 'Any Role')
+    assert.deepEqual(profile.professions, ['Any Role'])
   }
 })
 
@@ -763,4 +755,47 @@ test('an obvious developer profile without a stated role becomes Software Develo
   }))
   assert.equal(profile.role, 'Software Developer')
   assert.deepEqual(profile.professions, ['Software Developer'])
+})
+
+test('hiring technical roles keep industry-standard English labels and Uzbek source roles normalize', () => {
+  assert.equal(hiringProfessionLabel('Data Scientist', 'ru'), 'Data Scientist')
+  assert.equal(hiringProfessionLabel('Penetration Tester', 'ru'), 'Pentester')
+  assert.equal(hiringProfessionLabel('Data Engineer', 'ru'), 'Data Engineer')
+  assert.equal(hiringProfessionLabel('QA Engineer', 'ru'), 'QA Engineer')
+  assert.equal(hiringProfessionLabel('DevOps Engineer', 'ru'), 'DevOps Engineer')
+
+  assert.deepEqual(normalizeProfessions('iqtisodchi', ''), ['Economist'])
+  assert.deepEqual(normalizeProfessions('iqtsodchi', ''), ['Economist'])
+  assert.deepEqual(normalizeProfessions('Iqtisodiy', ''), ['Economist'])
+  assert.deepEqual(normalizeProfessions('Logist', ''), ['Logistics Specialist'])
+  assert.deepEqual(normalizeProfessions('Ingliz tili ustoziman', ''), ['English Teacher'])
+  assert.deepEqual(normalizeProfessions('Mobilagraf ITishnik pdf faylla frontet', ''), ['Frontend Developer'])
+  assert.deepEqual(normalizeProfessions('Farqi yo qande ish bulsa hm, bolalarga qarash menga yoqadi', ''), ['Nanny'])
+  assert.deepEqual(normalizeProfessions('Sales Executive IND', ''), ['Sales Manager'])
+  assert.deepEqual(normalizeProfessions('РОП, Sales Executive', ''), ['Sales Manager'])
+  assert.deepEqual(normalizeProfessions('Data Scientist', ''), ['Data Scientist'])
+  assert.deepEqual(normalizeProfessions('Pentester', ''), ['Penetration Tester'])
+})
+
+test('hiring normalization drops source pseudo-roles and duplicate name-as-role values', () => {
+  const duplicateRole = normalizeCandidate({
+    id: 'ishbor-akbar', source: 'telegram', origin: 'web', sourceKey: 'ishbor-uz', country: 'UZ',
+    name: 'Akbar', role: 'Akbar', professions: ['Akbar'], url: 'https://example.test/akbar',
+    createdAt: '2026-08-22T12:00:00.000Z', originalText: 'Akbar\nToshkent', description: 'Akbar\nToshkent',
+  })
+  assert.equal(duplicateRole.role, '')
+  assert.deepEqual(duplicateRole.professions, [])
+
+  const onlineOnly = normalizeCandidate({
+    id: 'flagma-online', source: 'telegram', origin: 'web', sourceKey: 'flagma-uz', country: 'UZ',
+    name: 'Onlayn', role: 'Onlayn', professions: ['Onlayn'], url: 'https://example.test/online',
+    createdAt: '2026-08-22T12:00:00.000Z', originalText: 'Onlayn\n21 год\nСырдарья', description: 'Onlayn\n21 год\nСырдарья',
+  })
+  assert.equal(onlineOnly.name, '')
+  assert.equal(onlineOnly.role, '')
+  assert.deepEqual(onlineOnly.professions, [])
+  assert.equal(onlineOnly.remote, true)
+
+  assert.deepEqual(normalizeProfessions('Без разницы я быстро учусь', ''), ['Any Role'])
+  assert.equal(hiringProfessionLabel('Any Role', 'ru'), 'Любая работа')
 })

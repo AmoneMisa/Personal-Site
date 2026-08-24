@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { detectCity, detectDistrict } from '../server/utils/hiringSources.ts'
+import { detectCity, detectDistrict } from '../server/hiring/domain/telegramCandidateParser.ts'
 
 // The Telegram side kept its own city table, with the same dead \b as the web
 // parsers: a post that named its city in Cyrillic resolved to nothing.
@@ -18,7 +18,7 @@ test('Telegram posts written in Cyrillic resolve a city and a district', () => {
 })
 
 test('city names are matched through their case endings, but not into other words', async () => {
-  const { cityFrom } = await import('../server/utils/hiringWebFields.ts')
+  const { cityFrom } = await import('../shared/hiring/webFields.ts')
 
   // Place names are almost never written in the nominative in running text.
   assert.equal(cityFrom('живу в Ташкенте', 'UZ'), 'Tashkent')

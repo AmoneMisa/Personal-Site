@@ -1,5 +1,5 @@
-// Redis-backed vacancy store. A scheduled worker (server/tasks/jobs/refresh.ts)
-// pulls every configured board once, merges the result into a single Redis key,
+// Persistent vacancy store. A scheduled worker (server/tasks/jobs/refresh.ts)
+// pulls every configured board once, merges the result into one file-backed snapshot,
 // and prunes closed/old postings. The /jobs-feed request path then reads only
 // from this store, so it never blocks on (or is geo-blocked by) upstream boards.
 //
@@ -9,7 +9,7 @@
 import {
   syncJobsSearchIndex,
 } from './jobsElastic'
-import { useRedis } from '~~/server/utils/redis'
+import { useStateStore } from '~~/server/utils/stateStore'
 import { ALL_SOURCES, type Job, type JobSource } from './jobTypes'
 import { refreshRates } from './currency'
 import { getSkillMeta } from '~~/shared/jobSkills'
@@ -311,7 +311,7 @@ function vacancyNeedsAi(job: Job): boolean {
 async function persistMemoryStore() {
   memoryValidUntil = Date.now() + MEMORY_TTL_MS
   try {
-    await useRedis().set(STORE_KEY, JSON.stringify(memoryStore), 'EX', STORE_TTL_SECONDS)
+    await useStateStore().set(STORE_KEY, JSON.stringify(memoryStore), 'EX', STORE_TTL_SECONDS)
   } catch (error) {
     console.error('[jobs:ai] failed to persist enrichment:', (error as Error).message)
   }
@@ -394,13 +394,13 @@ async function fetchSource(source: JobSource): Promise<Job[]> {
   }
 }
 
-/** All stored vacancies (lastSeen stripped). Empty on a cold cache or Redis error. */
+/** All stored vacancies (lastSeen stripped). Empty on a cold cache or state-store error. */
 export async function getStoredJobs(): Promise<Job[]> {
   if (memoryStore.length && Date.now() < memoryValidUntil) {
     return publicJobs(memoryStore)
   }
   try {
-    const raw = await useRedis().get(STORE_KEY)
+    const raw = await useStateStore().get(STORE_KEY)
     if (!raw) {
       return publicJobs(memoryStore)
     }
@@ -417,7 +417,7 @@ async function loadStored(): Promise<StoredJob[]> {
   let timer: ReturnType<typeof setTimeout> | undefined
   try {
     const raw = await Promise.race([
-      useRedis().get(STORE_KEY),
+      useStateStore().get(STORE_KEY),
       new Promise<null>((resolve) => {
         timer = setTimeout(() => resolve(null), 750)
       }),
@@ -522,30 +522,21 @@ async function performJobStoreRefresh(): Promise<RefreshSummary> {
     }
   }))
 
-  const kept = publishMemoryStore(byKey, now);
+  const kept = publishMemoryStore(byKey, now)
 
-  /*
- * Redis остаётся source of truth.
- *
- * Elasticsearch — только производный
- * поисковый индекс.
- *
- * Ошибка ES никогда не должна ломать
- * обновление вакансий.
- */
+  // The persistent state snapshot is the source of truth. Elasticsearch is only
+  // a derived search index, so indexing errors never fail a vacancy refresh.
   try {
-    await syncJobsSearchIndex(
-        kept,
-    )
+    await syncJobsSearchIndex(kept)
   } catch (err) {
     console.error(
-        '[jobs:elasticsearch] sync failed:',
-        (err as Error).message,
+      '[jobs:elasticsearch] sync failed:',
+      (err as Error).message,
     )
   }
 
-  // The current in-memory result is complete now. Redis persistence below is
-  // best-effort and must not keep clients polling a finished vacancy refresh.
+  // The current in-memory result is complete now. Persistent snapshot writing
+  // below is best-effort and must not keep clients polling a finished refresh.
   refreshState = {
     ...refreshState,
     inProgress: false,
@@ -554,7 +545,7 @@ async function performJobStoreRefresh(): Promise<RefreshSummary> {
   }
 
   try {
-    await useRedis().set(STORE_KEY, JSON.stringify(kept), 'EX', STORE_TTL_SECONDS)
+    await useStateStore().set(STORE_KEY, JSON.stringify(kept), 'EX', STORE_TTL_SECONDS)
   } catch (err) {
     console.error('[jobs:refresh] failed to persist store:', (err as Error).message)
   }

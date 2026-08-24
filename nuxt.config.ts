@@ -8,11 +8,8 @@ export default defineNuxtConfig({
             },
             script: [
                 {
-                    // The site is dark-only. Lock the color-mode storage/cookie to
-                    // "dark" BEFORE @nuxtjs/color-mode's own inline script reads it,
-                    // so a stale "system"/"light" value from the old theme toggle can
-                    // never resolve to light (which would apply the .light class and
-                    // strip Nuxt UI's dark tokens). Runs pre-paint, so no flash.
+                    // The site is dark-only. Lock the persisted preference before paint
+                    // so stale values from the removed theme toggle cannot flash a light theme.
                     tagPriority: 'critical',
                     innerHTML:
                         "try{localStorage.setItem('nuxt-color-mode','dark');" +
@@ -42,13 +39,7 @@ export default defineNuxtConfig({
     compatibilityDate: '2025-07-15',
     devtools: {enabled: true},
     modules: ['@nuxtjs/i18n', '@nuxt/icon', '@nuxt/image'],
-    css: ['~/assets/css/main.css'],
-    // The redesign is a dark-only theme. Kept for @nuxtjs/color-mode if present;
-    // with Nuxt UI removed the palette is pinned by our own CSS variables.
-    colorMode: {
-        preference: 'dark',
-        fallback: 'dark',
-    },
+    css: ['~/assets/css/main.css', '~/assets/css/flat-placeholder.css', '~/assets/css/jobs-card-redesign.css'],
     sourcemap: {
         client: false,
         server: true
@@ -78,8 +69,8 @@ export default defineNuxtConfig({
             strictMessage: false,
         },
         locales: [
-            {code: 'en', language: 'en-US', name: 'English', file: 'en.json'},
-            {code: 'ru', language: 'ru-RU', name: 'Русский', file: 'ru.json'},
+            {code: 'en', language: 'en-US', name: 'English', files: ['en.json', 'errors.en.json']},
+            {code: 'ru', language: 'ru-RU', name: 'Русский', files: ['ru.json', 'errors.ru.json']},
         ],
         // Russian is the default and stays unprefixed at "/"; other locales get a
         // path prefix ("/en/..."). This gives every language a distinct, indexable
@@ -102,17 +93,10 @@ export default defineNuxtConfig({
         }
     },
     nitro: {
-        // Pre-compress public assets (brotli + gzip) at build time so fonts, CSS,
-        // JS and SVGs ship smaller without relying on the proxy to compress.
+        // Jobs/hiring read APIs live directly in Nitro server routes. No crawler,
+        // scheduler or queue execution is registered in this process; the separate
+        // Node jobs-worker owns every ingestion task.
         compressPublicAssets: {gzip: true, brotli: true},
-        experimental: {
-            tasks: true // enable Nitro tasks (jobs:refresh vacancy worker)
-        },
-        // Daily worker: refresh the Redis vacancy store + prune closed/old postings.
-        scheduledTasks: {
-            '0 3 * * *': ['jobs:refresh'],
-            '0 4 * * *': ['hiring:refresh'],
-        },
         routeRules: {
             '/api/**': {proxy: 'http://backend:8000/**'}, //http://backend:8000/** - prod
             '/fonts/**': {headers: {'cache-control': 'public, max-age=31536000, immutable'}},
@@ -122,6 +106,34 @@ export default defineNuxtConfig({
         }
     },
     icon: {
-        localApiEndpoint: "/_nuxt_icon"
+        // Never make SSR depend on Iconify/network availability. All literal
+        // icon usages are collected at build time; unresolved/dynamic icons fail
+        // visually instead of blocking the entire HTML response and causing 504s.
+        provider: 'none',
+        serverBundle: false,
+        fallbackToApi: false,
+        clientBundle: {
+            scan: true,
+            icons: [
+                'lucide:search',
+                'lucide:bookmark-plus',
+                'lucide:share-2',
+                'lucide:chevron-down',
+                'lucide:house',
+                'lucide:arrow-left',
+                'lucide:refresh-cw',
+                'lucide:layout-grid',
+                'lucide:sparkles',
+                'lucide:snowflake',
+                'lucide:square-parking',
+                'lucide:wifi',
+                'lucide:flame',
+                'lucide:panel-top',
+                'lucide:sun',
+                'lucide:tree-pine',
+                'lucide:sliders-horizontal',
+                'lucide:rotate-ccw',
+            ],
+        },
     }
 });

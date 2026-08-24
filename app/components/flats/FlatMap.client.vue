@@ -1,13 +1,5 @@
 <script setup lang="ts">
-// Client-only Leaflet map for flat listings (OpenStreetMap tiles). `.client`
-// suffix keeps it out of SSR. Leaflet is loaded from a CDN at runtime rather than
-// bundled, so the site's `npm ci` deploy needs no new dependency / lockfile change.
-//
-// Nearby listings are clustered by pixel proximity at the current zoom so they
-// don't stack into one unreadable blob. Clicking a cluster fans its listings out
-// as small "tablet" cards in a radial menu (Sims-style) instead of hiding them
-// behind each other; clicking a lone point selects it directly.
-import { nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
 
 interface FlatPoint {
   id: string;
@@ -18,6 +10,7 @@ interface FlatPoint {
   photo?: string;
   source?: string;
 }
+
 const props = defineProps<{
   points: FlatPoint[];
   drawLabel?: string;
@@ -27,6 +20,7 @@ const props = defineProps<{
   expandLabel?: string;
   collapseLabel?: string;
 }>();
+
 const emit = defineEmits<{
   (e: "select", id: string): void;
   (e: "area-change", points: Array<{ lat: number; lng: number }>): void;
@@ -34,34 +28,45 @@ const emit = defineEmits<{
 
 const LEAFLET_JS = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.js";
 const LEAFLET_CSS = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.css";
-
-// Listings within this many screen pixels of each other merge into one cluster.
 const CLUSTER_PX = 38;
-// Max tablets we'll fan out (across concentric rings). Beyond this a cluster
-// zooms in instead — but only if its points are actually spread out; a big
-// cluster stacked on one spot always fans, since zooming can't separate it.
-const MAX_RADIAL = 24;
-// Fan out (don't zoom) unless the cluster spans at least this many screen pixels.
+const ZOOM_CLUSTER_THRESHOLD = 24;
 const SPREAD_PX = 50;
-// Tablets per ring before starting the next, larger ring.
-const RING_SIZE = 9;
+const RADIAL_PAGE_SIZE = 9;
 
 const el = ref<HTMLElement | null>(null);
 const failed = ref(false);
 const drawing = ref(false);
 const area = ref<Array<{ lat: number; lng: number }>>([]);
-const radial = ref<{ x: number; y: number; items: FlatPoint[] } | null>(null);
-let map: any = null;
+const radial = ref<{ x: number; y: number; items: FlatPoint[]; page: number } | null>(null);
 const expanded = ref(false);
 
-// Leaflet caches the container size, so a map that grew to fill the screen
-// keeps rendering tiles for the old box until it is told to look again.
+const radialPageCount = computed(() => {
+  const count = radial.value?.items.length ?? 0;
+  return Math.max(1, Math.ceil(count / RADIAL_PAGE_SIZE));
+});
+
+const visibleRadialItems = computed(() => {
+  const current = radial.value;
+  if (!current) return [];
+  const start = current.page * RADIAL_PAGE_SIZE;
+  return current.items.slice(start, start + RADIAL_PAGE_SIZE);
+});
+
+const radialPageLabel = computed(() => {
+  const current = radial.value;
+  if (!current) return "";
+  return `${current.page + 1}/${radialPageCount.value}`;
+});
+
+let map: any = null;
+let layer: any = null;
+let areaLayer: any = null;
+let lastFitSig = "";
+
 async function setExpanded(value: boolean) {
   expanded.value = value;
   if (import.meta.client) document.body.style.overflow = value ? "hidden" : "";
   await nextTick();
-  // Once for the new box, once after the browser has settled: a single late
-  // call left a band of unloaded tiles across the map.
   requestAnimationFrame(() => map?.invalidateSize());
   setTimeout(() => map?.invalidateSize(), 260);
   setTimeout(() => map?.invalidateSize(), 600);
@@ -71,12 +76,32 @@ function toggleExpanded() {
   void setExpanded(!expanded.value);
 }
 
+function closeRadial() {
+  radial.value = null;
+}
+
+function changeRadialPage(direction: -1 | 1) {
+  const current = radial.value;
+  if (!current || radialPageCount.value <= 1) return;
+  const next = (current.page + direction + radialPageCount.value) % radialPageCount.value;
+  radial.value = { ...current, page: next };
+}
+
 function onKeydown(event: KeyboardEvent) {
+  if (radial.value) {
+    if (event.key === "Escape") {
+      closeRadial();
+      event.preventDefault();
+      return;
+    }
+    if (event.key === "ArrowLeft" || event.key === "ArrowRight") {
+      changeRadialPage(event.key === "ArrowRight" ? 1 : -1);
+      event.preventDefault();
+      return;
+    }
+  }
   if (event.key === "Escape" && expanded.value) void setExpanded(false);
 }
-let layer: any = null;
-let areaLayer: any = null;
-let lastFitSig = "";
 
 function loadLeaflet(): Promise<any> {
   const w = window as any;
@@ -104,15 +129,8 @@ function loadLeaflet(): Promise<any> {
   });
 }
 
-function escapeHtml(s: string) {
-  return s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c] || c));
-}
-
 interface Cluster { lat: number; lng: number; items: FlatPoint[] }
 
-// Group points whose current screen positions fall within CLUSTER_PX of an
-// existing group's anchor. Grouping depends on zoom, so it is recomputed whenever
-// the zoom changes (see zoomend below).
 function clusterPoints(): Cluster[] {
   const clusters: Array<{ x: number; y: number; latSum: number; lngSum: number; items: FlatPoint[] }> = [];
   for (const p of props.points) {
@@ -132,7 +150,11 @@ function clusterPoints(): Cluster[] {
     }
     if (!placed) clusters.push({ x: pt.x, y: pt.y, latSum: p.lat, lngSum: p.lng, items: [p] });
   }
-  return clusters.map((c) => ({ lat: c.latSum / c.items.length, lng: c.lngSum / c.items.length, items: c.items }));
+  return clusters.map((c) => ({
+    lat: c.latSum / c.items.length,
+    lng: c.lngSum / c.items.length,
+    items: c.items,
+  }));
 }
 
 function renderMarkers() {
@@ -156,14 +178,14 @@ function renderMarkers() {
   }
 }
 
-// Max pixel distance between any two items in the cluster at the current zoom.
-// ~0 means they're stacked on one spot (zooming won't separate them).
 function clusterSpreadPx(c: Cluster) {
   let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
   for (const p of c.items) {
     const pt = map.latLngToContainerPoint([p.lat, p.lng]);
-    minX = Math.min(minX, pt.x); maxX = Math.max(maxX, pt.x);
-    minY = Math.min(minY, pt.y); maxY = Math.max(maxY, pt.y);
+    minX = Math.min(minX, pt.x);
+    maxX = Math.max(maxX, pt.x);
+    minY = Math.min(minY, pt.y);
+    maxY = Math.max(maxY, pt.y);
   }
   return Math.hypot(maxX - minX, maxY - minY);
 }
@@ -174,20 +196,15 @@ function openCluster(c: Cluster) {
     emit("select", c.items[0].id);
     return;
   }
-  // Only zoom when there are a lot AND they're genuinely spread out enough that
-  // zooming will split them. Otherwise fan out (rings) — including big clusters
-  // stacked on a single point, which zooming could never separate.
-  if (c.items.length > MAX_RADIAL && clusterSpreadPx(c) > SPREAD_PX) {
+  if (c.items.length > ZOOM_CLUSTER_THRESHOLD && clusterSpreadPx(c) > SPREAD_PX) {
     const bounds = c.items.map((p) => [p.lat, p.lng]) as [number, number][];
     map.fitBounds(L.latLngBounds(bounds), { padding: [40, 40], maxZoom: 17 });
     return;
   }
   const pt = map.latLngToContainerPoint([c.lat, c.lng]);
-  radial.value = { x: pt.x, y: pt.y, items: c.items.slice(0, MAX_RADIAL) };
-}
-
-function closeRadial() {
-  radial.value = null;
+  const rect = el.value?.getBoundingClientRect();
+  if (!rect) return;
+  radial.value = { x: rect.left + pt.x, y: rect.top + pt.y, items: [...c.items], page: 0 };
 }
 
 function pick(id: string) {
@@ -195,14 +212,9 @@ function pick(id: string) {
   emit("select", id);
 }
 
-// Position each tablet on one of several concentric rings around the center, so
-// large clusters (e.g. 13) fan out readably instead of crowding one ring.
 function slotStyle(i: number, n: number) {
-  const ring = Math.floor(i / RING_SIZE);
-  const inRing = i % RING_SIZE;
-  const countThisRing = Math.min(RING_SIZE, n - ring * RING_SIZE);
-  const radius = 76 + ring * 74;
-  const angle = (-90 + (360 / countThisRing) * inRing) * (Math.PI / 180);
+  const radius = n <= 4 ? 112 : 142;
+  const angle = (-90 + (360 / Math.max(1, n)) * i) * (Math.PI / 180);
   const x = Math.cos(angle) * radius;
   const y = Math.sin(angle) * radius;
   return {
@@ -252,6 +264,7 @@ function clearArea() {
 
 onMounted(async () => {
   window.addEventListener("keydown", onKeydown);
+  window.addEventListener("scroll", closeRadial, { passive: true });
   if (!el.value) return;
   let L: any;
   try {
@@ -277,18 +290,18 @@ onMounted(async () => {
     renderArea();
     emit("area-change", area.value.length >= 3 ? area.value : []);
   });
-  // Zoom changes the pixel spacing, so clusters must be recomputed. Any pan/zoom
-  // also invalidates an open radial menu's screen position — close it.
   map.on("zoomend", renderMarkers);
   map.on("movestart", closeRadial);
   map.on("zoomstart", closeRadial);
   renderMarkers();
   fitToPoints();
 });
+
 watch(() => props.points, () => { renderMarkers(); fitToPoints(); }, { deep: true });
+
 onBeforeUnmount(() => {
   window.removeEventListener("keydown", onKeydown);
-  // Leaving the page while expanded would otherwise leave the body unscrollable.
+  window.removeEventListener("scroll", closeRadial);
   document.body.style.overflow = "";
   map?.remove?.();
   map = null;
@@ -299,18 +312,58 @@ onBeforeUnmount(() => {
 
 <template>
   <Teleport to="body" :disabled="!expanded">
-  <div v-show="!failed" class="flat-map-shell" :class="{ 'flat-map-shell_full': expanded }">
-    <div ref="el" class="flat-map" />
+    <div v-show="!failed" class="flat-map-shell" :class="{ 'flat-map-shell_full': expanded }">
+      <div ref="el" class="flat-map" />
 
-    <!-- Radial "Sims menu": tablets fanned around a clicked cluster -->
+      <div class="flat-map__tools">
+        <button
+          type="button"
+          class="flat-map__tool"
+          :class="{ 'flat-map__tool_active': expanded }"
+          :aria-label="expanded ? (props.collapseLabel || 'Close map') : (props.expandLabel || 'Full screen')"
+          @click="toggleExpanded"
+        >
+          {{ expanded ? "×" : "⤢" }}
+          <span>{{ expanded ? (props.collapseLabel || "Close") : (props.expandLabel || "Full screen") }}</span>
+        </button>
+        <button type="button" class="flat-map__tool" :class="{ 'flat-map__tool_active': drawing }" @click="toggleDrawing">
+          {{ drawing ? "✓" : "⌁" }}
+          <span>{{ drawing ? (props.doneLabel || "Done") : (props.drawLabel || "Draw area") }}</span>
+        </button>
+        <button v-if="area.length" type="button" class="flat-map__tool" @click="clearArea">
+          × <span>{{ props.clearLabel || "Clear" }}</span>
+        </button>
+      </div>
+      <div v-if="drawing" class="flat-map__hint">{{ props.drawHint || "Click points on the map to outline an area." }}</div>
+    </div>
+  </Teleport>
+
+  <Teleport to="body">
     <div v-if="radial" class="flat-radial" @click.self="closeRadial">
       <div class="flat-radial__anchor" :style="{ left: `${radial.x}px`, top: `${radial.y}px` }">
-        <span class="flat-radial__hub">{{ radial.items.length }}</span>
+        <div class="flat-radial__hub" role="group" aria-label="Browse apartment pages in this cluster">
+          <button
+            type="button"
+            class="flat-radial__hub-arrow"
+            :disabled="radialPageCount <= 1"
+            aria-label="Previous apartment page"
+            @click.stop="changeRadialPage(-1)"
+          >‹</button>
+          <span class="flat-radial__hub-count" :title="`${radial.items.length} apartments`">{{ radialPageLabel }}</span>
+          <button
+            type="button"
+            class="flat-radial__hub-arrow"
+            :disabled="radialPageCount <= 1"
+            aria-label="Next apartment page"
+            @click.stop="changeRadialPage(1)"
+          >›</button>
+        </div>
+
         <div
-            v-for="(item, i) in radial.items"
-            :key="item.id"
-            class="flat-radial__slot"
-            :style="slotStyle(i, radial.items.length)"
+          v-for="(item, i) in visibleRadialItems"
+          :key="`${radial.page}:${item.id}`"
+          class="flat-radial__slot"
+          :style="slotStyle(i, visibleRadialItems.length)"
         >
           <button type="button" class="flat-radial__tab" @click="pick(item.id)">
             <span class="flat-radial__thumb">
@@ -322,32 +375,11 @@ onBeforeUnmount(() => {
         </div>
       </div>
     </div>
-
-    <div class="flat-map__tools">
-      <button
-          type="button"
-          class="flat-map__tool"
-          :class="{ 'flat-map__tool_active': expanded }"
-          :aria-label="expanded ? (props.collapseLabel || 'Close map') : (props.expandLabel || 'Full screen')"
-          @click="toggleExpanded"
-      >
-        {{ expanded ? "×" : "⤢" }} <span>{{ expanded ? (props.collapseLabel || "Close") : (props.expandLabel || "Full screen") }}</span>
-      </button>
-      <button type="button" class="flat-map__tool" :class="{ 'flat-map__tool_active': drawing }" @click="toggleDrawing">
-        {{ drawing ? "✓" : "⌁" }} <span>{{ drawing ? (props.doneLabel || "Done") : (props.drawLabel || "Draw area") }}</span>
-      </button>
-      <button v-if="area.length" type="button" class="flat-map__tool" @click="clearArea">× <span>{{ props.clearLabel || "Clear" }}</span></button>
-    </div>
-    <div v-if="drawing" class="flat-map__hint">{{ props.drawHint || "Click points on the map to outline an area." }}</div>
-  </div>
   </Teleport>
 </template>
 
 <style scoped>
 .flat-map-shell { position: relative; z-index: 0; isolation: isolate; }
-/* Full screen is a fixed overlay rather than the Fullscreen API: the drawing
-   tools and the radial picker are ordinary DOM, and the API's stacking context
-   would leave them behind the map. */
 .flat-map-shell_full {
   position: fixed;
   inset: 0;
@@ -375,8 +407,6 @@ onBeforeUnmount(() => {
   background: rgba(13,17,40,0.94); color: var(--text-primary); font-size: 12px;
 }
 
-/* Cluster / point markers (divIcon HTML lives inside the map container, so :deep
-   reaches it through the scoped ancestor attribute). */
 :deep(.flat-cluster) {
   display: flex; align-items: center; justify-content: center;
   width: 16px; height: 16px; border-radius: 50%;
@@ -389,18 +419,26 @@ onBeforeUnmount(() => {
   background: rgba(224,103,154,0.92);
 }
 
-/* Radial menu */
-.flat-radial { position: absolute; inset: 0; z-index: 1000; }
+.flat-radial { position: fixed; inset: 0; z-index: 9000; }
 .flat-radial__anchor { position: absolute; width: 0; height: 0; }
 .flat-radial__hub {
-  position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
-  display: flex; align-items: center; justify-content: center;
-  width: 34px; height: 34px; border-radius: 50%;
-  background: var(--accent-pink, #e0679a); color: #fff; font-weight: 700; font-size: 13px;
-  border: 2px solid #fff; box-shadow: 0 2px 8px rgba(0,0,0,0.45);
+  position: absolute; top: 50%; left: 50%; z-index: 3; transform: translate(-50%, -50%);
+  display: grid; grid-template-columns: 19px 26px 19px; align-items: center; justify-content: center;
+  width: 64px; height: 64px; border-radius: 50%; overflow: hidden;
+  background: var(--accent-pink, #e0679a); color: #fff;
+  border: 2px solid #fff; box-shadow: 0 3px 12px rgba(0,0,0,0.5);
 }
+.flat-radial__hub-arrow {
+  display: grid; place-items: center; align-self: stretch; width: 100%; padding: 0;
+  border: 0; background: transparent; color: #fff; cursor: pointer;
+  font-size: 27px; line-height: 1; transition: background-color 120ms ease, transform 120ms ease;
+}
+.flat-radial__hub-arrow:hover, .flat-radial__hub-arrow:focus-visible { background: rgba(0,0,0,.16); outline: none; }
+.flat-radial__hub-arrow:active { transform: scale(.9); }
+.flat-radial__hub-arrow:disabled { opacity: .35; cursor: default; }
+.flat-radial__hub-count { text-align: center; font-size: 10px; font-weight: 800; line-height: 1; pointer-events: none; }
 .flat-radial__slot {
-  position: absolute; top: 0; left: 0;
+  position: absolute; top: 0; left: 0; z-index: 1;
   animation: flat-radial-in 0.24s cubic-bezier(0.34, 1.56, 0.64, 1) backwards;
 }
 @keyframes flat-radial-in {

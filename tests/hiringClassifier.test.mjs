@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { isLikelyCvPost } from '../server/utils/hiringSources.ts'
+import { isLikelyCvPost } from '../server/hiring/domain/telegramCandidateParser.ts'
 
 // Every one of these was rejected while the intent patterns were anchored
 // with \b next to Cyrillic, where a JavaScript word boundary never fires:

@@ -1,0 +1,115 @@
+name: Verify PostgreSQL jobs queue
+
+on:
+  push:
+    branches: [ perf/postgres-jobs-queue, chore/postgres-18-compat ]
+  pull_request:
+    branches: [ master ]
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:18-alpine
+        env:
+          POSTGRES_DB: sitequeue
+          POSTGRES_USER: sitequeue
+          POSTGRES_PASSWORD: sitequeue-test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U sitequeue -d sitequeue"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    env:
+      JOBS_QUEUE_DATABASE_URL: postgres://sitequeue:sitequeue-test@127.0.0.1:5432/sitequeue
+      HIRING_DATABASE_URL: postgres://sitequeue:sitequeue-test@127.0.0.1:5432/sitequeue
+      JOBS_QUEUE_DB_SCHEMA: site_queue_ci
+      QUEUE_INTERNAL_KEY: 0123456789abcdef0123456789abcdef
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Worker syntax and compose checks
+        run: |
+          node --experimental-transform-types --check jobs-worker/worker.ts
+          node --check jobs-worker/alias-loader.mjs
+          touch db.env
+          docker compose config >/dev/null
+          ! grep -q 'RABBITMQ_' docker-compose.yml
+          ! grep -q 'flat-finder-rabbitmq' docker-compose.yml
+          ! grep -q 'jobs-backend' docker-compose.yml
+          ! grep -q '^  jobs-api:' docker-compose.yml
+          ! grep -q 'jobs-queue-worker' docker-compose.yml
+          ! grep -q 'jobs-queue-dispatcher' docker-compose.yml
+          ! test -e jobs-queue-worker/worker.py
+          grep -q '^  frontend:' docker-compose.yml
+          grep -q '^  jobs-worker:' docker-compose.yml
+          test -e server/routes/jobs-feed.get.ts
+          test -e server/routes/hiring-feed.get.ts
+          test -e shared/jobs/jobsPgQueue.ts
+          test -e shared/http/browserSoftBlock.ts
+      - name: Run application tests
+        run: npm test
+      - name: Build Nuxt application
+        run: npm run build
+      - name: Exercise PostgreSQL queue transitions
+        run: |
+          node --experimental-strip-types --input-type=module <<'NODE'
+          import assert from 'node:assert/strict'
+          import { Pool } from 'pg'
+          const q = await import('./shared/jobs/jobsPgQueue.ts')
+          await q.initJobsPgQueue()
+          const dispatched = await q.dispatchDueJobsQueue({
+            sources: ['source-a', 'source-b'],
+            hiringHandles: ['candidate-a'],
+            backfillHandles: [],
+            jobsRefreshSeconds: 3600,
+            hiringRefreshSeconds: 3600,
+            backfillSeconds: 300,
+            hiringEnabled: true,
+          })
+          assert.equal(dispatched.jobsQueued, 2)
+          assert.equal(dispatched.hiringQueued, 1)
+
+          const first = await q.claimJobsQueueTask({ workerId: 'ci-1' })
+          assert.ok(first)
+          assert.equal(first.payload.type, 'jobs.refresh.source')
+          assert.equal(await q.completeJobsQueueTask({
+            id: first.id,
+            lockToken: first.lockToken,
+            result: { ok: true, stored: 1 },
+          }), true)
+
+          const second = await q.claimJobsQueueTask({ workerId: 'ci-2' })
+          assert.ok(second)
+          const failed = await q.failJobsQueueTask({
+            id: second.id,
+            lockToken: second.lockToken,
+            error: 'synthetic failure',
+          })
+          assert.equal(failed.failed, true)
+          assert.equal(failed.dead, false)
+
+          const admin = new Pool({ connectionString: process.env.JOBS_QUEUE_DATABASE_URL })
+          await admin.query('UPDATE site_queue_ci.tasks SET run_after = NOW() WHERE status = \'pending\'')
+          const retry = await q.claimJobsQueueTask({ workerId: 'ci-3' })
+          assert.ok(retry)
+          assert.ok(retry.attempts >= 1)
+          const stats = await q.jobsQueueStats()
+          assert.ok(Number(stats.done) >= 1)
+          assert.ok(Number(stats.running) >= 1)
+          await admin.query('DROP SCHEMA IF EXISTS site_queue_ci CASCADE')
+          await admin.end()
+          console.log('PostgreSQL queue integration passed')
+          process.exit(0)
+          NODE

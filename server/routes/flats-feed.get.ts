@@ -16,8 +16,15 @@ const EMPTY_STALE_MS = 60_000
 // The flat API answers an uncached query in ~6s and slower under load; 15s left
 // legitimate searches failing as if nothing matched.
 const UPSTREAM_TIMEOUT_MS = 25_000
+// A direct single-offer lookup should be faster than a country refresh. Keep it
+// below the main proxy budget so a broken OLX detail endpoint cannot hold the
+// share-link request open for the full feed timeout.
+const EXACT_LOOKUP_TIMEOUT_MS = 12_000
+const AVAILABILITY_TIMEOUT_MS = 5_000
 const feedCache = new Map<string, { at: number; data: any }>()
 const feedRefreshes = new Map<string, Promise<any>>()
+const ALL_FEED_SOURCES = ['olx', 'telegram', 'facebook', 'threads'] as const
+const SOCIAL_FEED_SOURCES = new Set(['telegram', 'facebook', 'threads'])
 
 function rewritePhoto(p: unknown): unknown {
   return typeof p === 'string' && p.startsWith('/api/tg-photo/')
@@ -25,23 +32,137 @@ function rewritePhoto(p: unknown): unknown {
     : p
 }
 
+function shapeListing(listing: any): any {
+  return {
+    ...listing,
+    photo: rewritePhoto(listing?.photo),
+    photos: Array.isArray(listing?.photos) ? listing.photos.map(rewritePhoto) : [],
+  }
+}
+
+function normalizeFeedDedupeText(value: unknown): string {
+  return String(value || '')
+    .toLowerCase()
+    .replace(/https?:\/\/\S+/giu, ' ')
+    .replace(/(?:^|\s)@[\p{L}\p{N}_]{3,}/gu, ' ')
+    .replace(/[\p{P}\p{S}]+/gu, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+function socialDedupeKey(listing: any): string | null {
+  const source = String(listing?.source || '').toLowerCase()
+  if (!SOCIAL_FEED_SOURCES.has(source)) return null
+
+  const text = normalizeFeedDedupeText(
+    `${listing?.title || ''}\n${listing?.description || listing?.text || listing?.originalText || ''}`,
+  )
+  // Short cards are too ambiguous to fingerprint safely. Keep their source IDs
+  // independent instead of risking two real apartments collapsing.
+  if (text.length < 80) return null
+
+  const areaSqm = Number(listing?.areaSqm)
+  const normalizedArea = Number.isFinite(areaSqm) ? Math.round(areaSqm * 2) / 2 : ''
+
+  // Source is deliberately omitted: exact Telegram/Facebook/Threads reposts of
+  // the same housing ad should produce one card, not one card per network.
+  return [
+    String(listing?.country || '').toUpperCase(),
+    String(listing?.city || '').toLowerCase(),
+    String(listing?.dealType || ''),
+    String(listing?.propertyType || ''),
+    String(listing?.price ?? ''),
+    String(listing?.currency || '').toUpperCase(),
+    String(listing?.rooms ?? ''),
+    String(normalizedArea),
+    text,
+  ].join('|')
+}
+
+function dedupeFeedListings(listings: any[]): any[] {
+  const seen = new Set<string>()
+  const out: any[] = []
+
+  for (const listing of listings) {
+    const key = socialDedupeKey(listing)
+    if (!key) {
+      out.push(listing)
+      continue
+    }
+    if (seen.has(key)) continue
+    seen.add(key)
+    out.push(listing)
+  }
+
+  return out
+}
+
 function shapeResponse(raw: any, requestedSources: string[]): any {
   const data = { ...raw }
-  const allowed = requestedSources.length ? requestedSources : ['olx', 'telegram']
-  data.listings = Array.isArray(raw?.listings)
-    ? raw.listings
-        .filter((listing: any) => allowed.includes(String(listing?.source || '').toLowerCase()))
-        .map((listing: any) => ({
-          ...listing,
-          photo: rewritePhoto(listing.photo),
-          photos: Array.isArray(listing.photos) ? listing.photos.map(rewritePhoto) : [],
-        }))
-    : []
+  const rawListings = Array.isArray(raw?.listings) ? raw.listings : []
+
+  // An empty requestedSources list means "all sources". Do not run that result
+  // through a second hardcoded allow-list: the upstream may add/rename a source
+  // before this proxy is updated, which previously produced the impossible UI
+  // state `count > 0` together with an empty listings array. Explicit source
+  // filters still get the defensive client-side check below.
+  const selectedListings = requestedSources.length
+    ? rawListings.filter((listing: any) => requestedSources.includes(String(listing?.source || '').toLowerCase()))
+    : rawListings
+
+  data.listings = dedupeFeedListings(selectedListings.map(shapeListing))
   const backendSources = Array.isArray(raw?.filters?.sources) ? raw.filters.sources : []
   data.count = requestedSources.length && backendSources.length === 0
     ? data.listings.length
     : typeof raw?.count === 'number' ? raw.count : data.listings.length
   return data
+}
+
+function availabilityKey(value: any): string {
+  return `${String(value?.source || '').toLowerCase()}:${String(value?.country || '').toUpperCase()}:${String(value?.id ?? '')}`
+}
+
+async function filterPersistedInactiveOlx(response: any): Promise<any> {
+  const listings = Array.isArray(response?.listings) ? response.listings : []
+  const unique = new Map<string, { source: string; country: string; id: string }>()
+
+  for (const listing of listings) {
+    const source = String(listing?.source || '').toLowerCase()
+    const country = String(listing?.country || '').toUpperCase()
+    const id = String(listing?.id ?? '').trim()
+    if (source !== 'olx' || !/^[A-Z]{2}$/.test(country) || !id) continue
+    unique.set(`${source}:${country}:${id}`, { source, country, id })
+  }
+
+  if (!unique.size) return response
+
+  try {
+    const verification = await $fetch<any>(`${FLAT_API_URL}/api/listings/verify`, {
+      method: 'POST',
+      body: { items: [...unique.values()] },
+      timeout: AVAILABILITY_TIMEOUT_MS,
+    })
+    const inactive = new Set<string>(
+      (Array.isArray(verification?.results) ? verification.results : [])
+        .filter((result: any) => result?.status === 'inactive')
+        .map(availabilityKey),
+    )
+    if (!inactive.size) return response
+
+    const filtered = listings.filter((listing: any) => !inactive.has(availabilityKey(listing)))
+    const removed = listings.length - filtered.length
+    const count = Number(response?.count)
+    return {
+      ...response,
+      listings: filtered,
+      count: Number.isFinite(count) ? Math.max(0, count - removed) : filtered.length,
+      availabilityFiltered: removed,
+    }
+  } catch {
+    // Availability reads are a safety filter, not a reason to take the feed down.
+    // The direct OLX lookup below still performs a live check for shared links.
+    return response
+  }
 }
 
 /** How long a cached answer may still be served: empty ones expire quickly. */
@@ -66,14 +187,50 @@ function refreshFeed(key: string, url: string): Promise<any> {
   return request
 }
 
+function exactCountry(params: URLSearchParams): string {
+  const countries = (params.get('countries') || '')
+    .split(',')
+    .map((country) => country.trim().toUpperCase())
+    .filter((country) => /^[A-Z]{2}$/.test(country))
+  return countries.length === 1 ? countries[0]! : ''
+}
+
+function findCachedExactListing(listingId: string, source: string, country: string): any | null {
+  const now = Date.now()
+  for (const entry of feedCache.values()) {
+    // A detail link may outlive the exact filtered cache key that produced it,
+    // but we should not resurrect an arbitrarily old/deleted advert from memory.
+    if (now - entry.at > FEED_STALE_MS) continue
+    const listings = Array.isArray(entry.data?.listings) ? entry.data.listings : []
+    const exact = listings.find((listing: any) => {
+      if (String(listing?.id ?? '') !== listingId) return false
+      if (source && String(listing?.source || '').toLowerCase() !== source) return false
+      if (country && String(listing?.country || '').toUpperCase() !== country) return false
+      return true
+    })
+    if (exact) return exact
+  }
+  return null
+}
+
 export default defineEventHandler(async (event) => {
   const incoming = getRequestURL(event)
-  const requestedSources = (incoming.searchParams.get('sources') || '')
+  const rawRequestedSources = (incoming.searchParams.get('sources') || '')
     .split(',')
     .map((source) => source.trim().toLowerCase())
-    .filter((source) => source === 'olx' || source === 'telegram')
+    .filter((source) => ALL_FEED_SOURCES.includes(source as typeof ALL_FEED_SOURCES[number]))
+
+  // The current web UI historically sent `olx,telegram` to mean "all" because
+  // those were the only sources when the page was built. Social housing is now
+  // persisted too, so preserve the UI contract while letting the default feed
+  // return every available source. A single explicit source remains a real filter.
+  const legacyAllSources = rawRequestedSources.length === 2
+    && rawRequestedSources.includes('olx')
+    && rawRequestedSources.includes('telegram')
+  const requestedSources = legacyAllSources ? [] : rawRequestedSources
 
   const upstreamParams = new URLSearchParams(incoming.searchParams)
+  if (legacyAllSources) upstreamParams.delete('sources')
   const metro = upstreamParams.get('metro')
   if (metro) upstreamParams.set('metro', canonicalMetroValue(metro))
 
@@ -104,26 +261,93 @@ export default defineEventHandler(async (event) => {
     const combined = shapeResponse(combinedRaw, requestedSources)
     return enforcePage(combined.listings.length ? { ...combined, compatibilityFallback: true } : shaped)
   }
+
+  const withExactListingFallback = async (response: any) => {
+    const listingId = String(upstreamParams.get('listingId') || '').trim()
+    if (!listingId) return response
+
+    const source = requestedSources.length === 1 ? requestedSources[0]! : ''
+    const country = exactCountry(upstreamParams)
+
+    // OLX exact links must never be resurrected from the site cache. The direct
+    // backend endpoint performs the forced live availability check and persists
+    // inactive state before returning 404.
+    if (source === 'olx' && country) {
+      try {
+        const exact = await $fetch<any>(
+          `${FLAT_API_URL}/api/listing/olx/${encodeURIComponent(listingId)}?country=${encodeURIComponent(country)}`,
+          { timeout: EXACT_LOOKUP_TIMEOUT_MS },
+        )
+        if (exact?.listing && String(exact.listing.id ?? '') === listingId) {
+          return {
+            ...response,
+            count: 1,
+            listings: [shapeListing(exact.listing)],
+            exactListingFallback: 'source',
+          }
+        }
+      } catch (error: any) {
+        const status = Number(error?.statusCode || error?.response?.status || 0)
+        if (status === 404) {
+          return {
+            ...response,
+            count: 0,
+            listings: [],
+            exactListingFallback: 'source-inactive',
+          }
+        }
+        // A transient source-check failure should not take the whole page down.
+        // Persisted inactive state is still filtered before the response leaves.
+        return response
+      }
+      return response
+    }
+
+    if (Array.isArray(response?.listings) && response.listings.length) return response
+
+    const cachedListing = findCachedExactListing(listingId, source, country)
+    if (cachedListing) {
+      return {
+        ...response,
+        count: 1,
+        listings: [shapeListing(cachedListing)],
+        exactListingFallback: 'cache',
+      }
+    }
+
+    return response
+  }
+
+  const finalize = async (raw: any) => filterPersistedInactiveOlx(
+    await withExactListingFallback(await shapeWithCombinedFallback(raw)),
+  )
+
   const cached = feedCache.get(key)
   if (cached && Date.now() - cached.at < FEED_FRESH_MS) {
     setResponseHeader(event, 'Cache-Control', 'no-store')
-    return await shapeWithCombinedFallback(cached.data)
+    return finalize(cached.data)
   }
   if (cached && Date.now() - cached.at < staleWindow(cached)) {
     refreshFeed(key, url).catch(() => {})
     setResponseHeader(event, 'Cache-Control', 'no-store')
-    return { ...await shapeWithCombinedFallback(cached.data), stale: true }
+    return {
+      ...await finalize(cached.data),
+      stale: true,
+    }
   }
   try {
     const data = await refreshFeed(key, url)
     setResponseHeader(event, 'Cache-Control', 'no-store')
-    return await shapeWithCombinedFallback(data)
+    return finalize(data)
   } catch (err) {
     // A stale answer, however old, beats reporting a failure — but only if it
     // actually has something in it.
     if (cached && Array.isArray(cached.data?.listings) && cached.data.listings.length) {
       setResponseHeader(event, 'Cache-Control', 'no-store')
-      return { ...await shapeWithCombinedFallback(cached.data), stale: true }
+      return {
+        ...await finalize(cached.data),
+        stale: true,
+      }
     }
     setResponseStatus(event, 502)
     return { error: (err as Error).message, listings: [], count: 0, upstreamFailed: true }

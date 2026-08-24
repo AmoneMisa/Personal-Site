@@ -37,6 +37,9 @@ interface Listing {
   bedrooms?: number | null;
   bathrooms?: number | null;
   balcony?: boolean | null;
+  terrace?: boolean | null;
+  privateYard?: boolean | null;
+  dishwasher?: boolean | null;
   airConditioner?: boolean | null;
   gas?: boolean | null;
   newBuilding?: boolean | null;
@@ -78,7 +81,10 @@ interface FeedResult {
   warming?: boolean;
   sourceCounts?: Record<string, number>;
   sourceErrors?: Array<{ source?: string; country?: string; error?: string }>;
+  nextCursor?: string | null;
+  queryMs?: number;
   error?: string;
+  exactListingFallback?: "source" | "source-inactive" | string;
 }
 interface TranslationResult {
   status: "pending" | "completed" | "failed" | "disabled" | "not_found";
@@ -88,6 +94,7 @@ interface TranslationResult {
 }
 interface CountryMeta { code: string; name: string; currency: string; cities?: string[]; locations?: Record<string, { districts?: string[]; metro?: string[] }> }
 type FlatView = "active" | "favorites" | "recent" | "hidden";
+type FlatSort = "newest" | "oldest" | "priceAsc" | "priceDesc" | "titleAsc" | "titleDesc";
 type SearchPreset = { name: string; query: Record<string, string> };
 
 const PAGE_SIZE = 20;
@@ -104,6 +111,7 @@ const { t: translate, locale } = useI18n();
 const t = (key: string, params: Record<string, unknown> = {}) => translate(`flats.${key}`, params);
 const route = useRoute();
 const router = useRouter();
+const toast = useToast();
 
 useSeoMeta({
   title: () => t("seoTitle"),
@@ -128,6 +136,15 @@ const petFriendly = ref(false);
 const roomOnlyFilter = ref(false);
 const childrenRequired = ref(false);
 const newBuildingOnly = ref(false);
+const dishwasherOnly = ref(false);
+const airConditionerOnly = ref(false);
+const parkingOnly = ref(false);
+const internetOnly = ref(false);
+const gasOnly = ref(false);
+const balconyOnly = ref(false);
+const terraceOnly = ref(false);
+const privateYardOnly = ref(false);
+const sort = ref<FlatSort>("newest");
 const audience = ref("any");
 const metro = ref("");
 const priceMin = ref<number | undefined>(undefined);
@@ -164,6 +181,7 @@ const loadingMore = ref(false);
 const warming = ref(false);
 const failed = ref(false);
 const sourceErrors = ref<FeedResult["sourceErrors"]>([]);
+const nextCursor = ref<string | null>(null);
 const failedPhotoUrls = ref<Set<string>>(new Set());
 const view = ref<FlatView>("active");
 const favorites = ref<Listing[]>([]);
@@ -265,6 +283,49 @@ const currencyItems = computed<Item[]>(() => {
   const rest = keys.filter((c) => !CURRENCY_PRIORITY.includes(c)).sort();
   return [...preferred, ...rest].map((c) => ({ label: c, value: c }));
 });
+const extraLabels = computed(() => locale.value.startsWith("en") ? {
+  amenities: "Amenities",
+  dishwasher: "Dishwasher",
+  ac: "A/C",
+  parking: "Parking",
+  internet: "Internet",
+  gas: "Gas",
+  balcony: "Balcony",
+  terrace: "Terrace",
+  yard: "Private yard",
+  sort: "Sort",
+  newest: "Newest first",
+  oldest: "Oldest first",
+  priceAsc: "Price: low to high",
+  priceDesc: "Price: high to low",
+  titleAsc: "A → Z",
+  titleDesc: "Z → A",
+} : {
+  amenities: "Удобства",
+  dishwasher: "Посудомойка",
+  ac: "Кондиционер",
+  parking: "Паркоместо",
+  internet: "Интернет",
+  gas: "Газ",
+  balcony: "Балкон",
+  terrace: "Терраса",
+  yard: "Личный дворик",
+  sort: "Сортировка",
+  newest: "Сначала новые",
+  oldest: "Сначала старые",
+  priceAsc: "Цена: дешевле",
+  priceDesc: "Цена: дороже",
+  titleAsc: "А → Я",
+  titleDesc: "Я → А",
+});
+const sortItems = computed<Item[]>(() => [
+  { value: "newest", label: extraLabels.value.newest },
+  { value: "oldest", label: extraLabels.value.oldest },
+  { value: "priceAsc", label: extraLabels.value.priceAsc },
+  { value: "priceDesc", label: extraLabels.value.priceDesc },
+  { value: "titleAsc", label: extraLabels.value.titleAsc },
+  { value: "titleDesc", label: extraLabels.value.titleDesc },
+]);
 const districtSel = computed<string>({ get: () => district.value || ANY, set: (v) => (district.value = v === ANY ? "" : v) });
 const metroSel = computed<string>({ get: () => metro.value || ANY, set: (v) => (metro.value = v === ANY ? "" : v) });
 const audienceItems = computed<Item[]>(() => [
@@ -284,7 +345,6 @@ const dealTypeItems = computed<Item[]>(() => [
 const agencyItems = computed<Item[]>(() => [
   { label: t("agAny"), value: "any" }, { label: t("agOwner"), value: "owner" }, { label: t("agAgency"), value: "agency" },
 ]);
-
 
 function readSavedList(key: string, limit = MAX_SAVED_FLATS): Listing[] {
   try {
@@ -353,6 +413,15 @@ function currentFilterQuery(): Record<string, string> {
   if (roomOnlyFilter.value) q.roomOnly = "1";
   if (childrenRequired.value) q.children = "1";
   if (newBuildingOnly.value) q.newBuilding = "1";
+  if (dishwasherOnly.value) q.dishwasher = "1";
+  if (airConditionerOnly.value) q.airConditioner = "1";
+  if (parkingOnly.value) q.parking = "1";
+  if (internetOnly.value) q.internet = "1";
+  if (gasOnly.value) q.gas = "1";
+  if (balconyOnly.value) q.balcony = "1";
+  if (terraceOnly.value) q.terrace = "1";
+  if (privateYardOnly.value) q.privateYard = "1";
+  if (sort.value !== "newest") q.sort = sort.value;
   if (priceMin.value != null) q.priceMin = String(priceMin.value);
   if (priceMax.value != null) q.priceMax = String(priceMax.value);
   if (displayCurrency.value !== "USD") q.currency = displayCurrency.value;
@@ -379,6 +448,7 @@ function currentFilterQuery(): Record<string, string> {
   return q;
 }
 function queryString(value: unknown): string { return Array.isArray(value) ? String(value[0] || "") : String(value || ""); }
+function queryBool(value: unknown): boolean { return ["1", "true"].includes(queryString(value).toLowerCase()); }
 function applyQueryParams(params: Record<string, unknown>) {
   const countryParam = queryString(params.countries);
   if (countryParam) countries.value = countryParam.split(",").filter(Boolean);
@@ -389,10 +459,20 @@ function applyQueryParams(params: Record<string, unknown>) {
   agency.value = ["owner", "agency"].includes(queryString(params.agency)) ? queryString(params.agency) : "any";
   audience.value = ["women", "men", "family"].includes(queryString(params.audience)) ? queryString(params.audience) : "any";
   metro.value = queryString(params.metro);
-  petFriendly.value = ["1", "true"].includes(queryString(params.pets).toLowerCase());
-  roomOnlyFilter.value = ["1", "true"].includes(queryString(params.roomOnly).toLowerCase());
-  childrenRequired.value = ["1", "true"].includes(queryString(params.children).toLowerCase());
-  newBuildingOnly.value = ["1", "true"].includes(queryString(params.newBuilding).toLowerCase());
+  petFriendly.value = queryBool(params.pets);
+  roomOnlyFilter.value = queryBool(params.roomOnly);
+  childrenRequired.value = queryBool(params.children);
+  newBuildingOnly.value = queryBool(params.newBuilding);
+  dishwasherOnly.value = queryBool(params.dishwasher);
+  airConditionerOnly.value = queryBool(params.airConditioner);
+  parkingOnly.value = queryBool(params.parking);
+  internetOnly.value = queryBool(params.internet);
+  gasOnly.value = queryBool(params.gas);
+  balconyOnly.value = queryBool(params.balcony);
+  terraceOnly.value = queryBool(params.terrace);
+  privateYardOnly.value = queryBool(params.privateYard);
+  const sortParam = queryString(params.sort);
+  sort.value = (["newest", "oldest", "priceAsc", "priceDesc", "titleAsc", "titleDesc"].includes(sortParam) ? sortParam : "newest") as FlatSort;
   priceMin.value = Number(queryString(params.priceMin)) || undefined;
   priceMax.value = Number(queryString(params.priceMax)) || undefined;
   if (queryString(params.currency)) displayCurrency.value = queryString(params.currency);
@@ -471,7 +551,10 @@ function scheduleWarmPoll() {
 async function load(append = false, background = false) {
   const seq = background ? loadSeq : ++loadSeq;
   if (!background) { append ? loadingMore.value = true : loading.value = true; failed.value = false; }
-  const params: Record<string, string> = { limit: String(PAGE_SIZE), offset: String(append ? listings.value.length : 0) };
+  const params: Record<string, string> = { limit: String(PAGE_SIZE) };
+  const cursorSort = sort.value === "newest" || sort.value === "oldest";
+  if (append && cursorSort && nextCursor.value) params.cursor = nextCursor.value;
+  else params.offset = String(append ? listings.value.length : 0);
   if (countries.value.length) params.countries = countries.value.join(",");
   if (city.value) params.city = city.value;
   if (district.value) params.district = district.value;
@@ -505,15 +588,25 @@ async function load(append = false, background = false) {
   if (roomOnlyFilter.value) params.roomOnly = "1";
   if (childrenRequired.value) params.children = "1";
   if (newBuildingOnly.value) params.newBuilding = "1";
+  if (dishwasherOnly.value) params.dishwasher = "1";
+  if (airConditionerOnly.value) params.airConditioner = "1";
+  if (parkingOnly.value) params.parking = "1";
+  if (internetOnly.value) params.internet = "1";
+  if (gasOnly.value) params.gas = "1";
+  if (balconyOnly.value) params.balcony = "1";
+  if (terraceOnly.value) params.terrace = "1";
+  if (privateYardOnly.value) params.privateYard = "1";
+  params.sort = sort.value;
   if (query.value.trim()) params.query = query.value.trim();
   params.sources = source.value || SOURCES.join(",");
   const { data, error } = await safeFetch<FeedResult>("/flats-feed", { params });
   if (seq !== loadSeq) { if (!background) { loading.value = false; loadingMore.value = false; } return; }
   if (error || !data || data.error) {
-    if (!background) { failed.value = true; if (!append) { listings.value = []; total.value = 0; } sourceErrors.value = []; loading.value = false; loadingMore.value = false; }
+    if (!background) { failed.value = true; if (!append) { listings.value = []; total.value = 0; nextCursor.value = null; } sourceErrors.value = []; loading.value = false; loadingMore.value = false; }
     return;
   }
   if (background) { total.value = data.count ?? total.value; sourceErrors.value = data.sourceErrors || []; warming.value = !!data.warming; scheduleWarmPoll(); return; }
+  nextCursor.value = data.nextCursor || null;
   const next = Array.isArray(data.listings) ? data.listings : [];
   if (append) {
     const existingKeys = new Set(listings.value.map((item) => `${item.source}:${item.country}:${item.id}`));
@@ -545,6 +638,7 @@ function resetFilters() {
   countries.value = [DEFAULT_COUNTRY];
   city.value = ""; district.value = ""; metro.value = ""; propertyType.value = "any"; dealType.value = "any"; agency.value = "any"; audience.value = "any";
   petFriendly.value = false; roomOnlyFilter.value = false; childrenRequired.value = false; newBuildingOnly.value = false;
+  dishwasherOnly.value = false; airConditionerOnly.value = false; parkingOnly.value = false; internetOnly.value = false; gasOnly.value = false; balconyOnly.value = false; terraceOnly.value = false; privateYardOnly.value = false; sort.value = "newest";
   priceMin.value = undefined; priceMax.value = undefined; displayCurrency.value = "USD";
   roomsMin.value = undefined; roomsMax.value = undefined; bedroomsMin.value = undefined; bedroomsMax.value = undefined; areaMin.value = undefined; areaMax.value = undefined; pricePerSqmMin.value = undefined; pricePerSqmMax.value = undefined;
   metroMaxM.value = undefined; nearbyKind.value = ""; nearbyMaxM.value = undefined;
@@ -566,7 +660,18 @@ function toggleHidden(item: Listing) {
   persistList(STORAGE.hidden, hidden.value);
 }
 
-const mapPoints = computed(() => displayedListings.value.filter((l) => l.lat != null && l.lng != null).map((l) => ({ id: l.id, lat: l.lat as number, lng: l.lng as number, title: displayListingTitle(l), priceLabel: priceLabel(l), photo: listingPhoto(l) || undefined, source: l.source })));
+function mapCoordinateLooksSane(listing: Listing): boolean {
+  const lat = Number(listing.lat);
+  const lng = Number(listing.lng);
+  if (!Number.isFinite(lat) || !Number.isFinite(lng) || Math.abs(lat) > 90 || Math.abs(lng) > 180) return false;
+  // Client-side guard for old cached Odesa rows while the backend repairs and
+  // re-geocodes them. Prevents one offshore point from stretching the whole map.
+  if (listing.country === "UA" && listing.city === "Odesa") {
+    return lat >= 46.25 && lat <= 46.65 && lng >= 30.45 && lng <= 30.88;
+  }
+  return true;
+}
+const mapPoints = computed(() => displayedListings.value.filter(mapCoordinateLooksSane).map((l) => ({ id: l.id, lat: l.lat as number, lng: l.lng as number, title: displayListingTitle(l), priceLabel: priceLabel(l), photo: listingPhoto(l) || undefined, source: l.source })));
 
 const active = ref<Listing | null>(null);
 const modalOpen = ref(false);
@@ -613,11 +718,65 @@ function syncListingInUrl(listing: Listing | null) {
   void router.replace({ query });
 }
 
-function openListing(l: Listing) {
-  stopTranslationPoll(); translationRequestId += 1; lightboxIndex.value = null; active.value = l;
-  translatedDescription.value = translationCache.get(translationCacheKey(l)) || ""; translatingDescription.value = false; translationFailed.value = false; modalOpen.value = true;
-  recent.value = [l, ...recent.value.filter((item) => item.id !== l.id)].slice(0, MAX_RECENT_FLATS); persistList(STORAGE.recent, recent.value, MAX_RECENT_FLATS);
-  syncListingInUrl(l);
+function listingIdentityMatches(item: Listing, id: string, sourceName = "", countryCode = ""): boolean {
+  if (item.id !== id) return false;
+  if (sourceName && item.source !== sourceName) return false;
+  if (countryCode && item.country !== countryCode.toUpperCase()) return false;
+  return true;
+}
+function removeUnavailableListing(id: string, sourceName = "olx", countryCode = "") {
+  const before = listings.value.length;
+  listings.value = listings.value.filter((item) => !listingIdentityMatches(item, id, sourceName, countryCode));
+  const removed = before - listings.value.length;
+  if (removed > 0) total.value = Math.max(0, total.value - removed);
+  favorites.value = favorites.value.filter((item) => !listingIdentityMatches(item, id, sourceName, countryCode));
+  hidden.value = hidden.value.filter((item) => !listingIdentityMatches(item, id, sourceName, countryCode));
+  recent.value = recent.value.filter((item) => !listingIdentityMatches(item, id, sourceName, countryCode));
+  if (import.meta.client) {
+    persistList(STORAGE.favorites, favorites.value);
+    persistList(STORAGE.hidden, hidden.value);
+    persistList(STORAGE.recent, recent.value, MAX_RECENT_FLATS);
+  }
+  if (active.value && listingIdentityMatches(active.value, id, sourceName, countryCode)) {
+    modalOpen.value = false;
+    active.value = null;
+  }
+}
+function showListingUnavailableToast() {
+  const english = locale.value.startsWith("en");
+  toast.add({
+    title: english ? "Listing no longer available" : "Объявление больше недоступно",
+    description: english ? "It was removed or taken down by the publisher." : "Оно было удалено или снято с публикации.",
+    color: "warning",
+    icon: "i-lucide-circle-alert",
+  });
+}
+async function verifyOlxListing(l: Listing): Promise<Listing | null | undefined> {
+  const params: Record<string, string> = { listingId: l.id, limit: "1", offset: "0", sources: "olx" };
+  if (/^[A-Za-z]{2}$/.test(l.country)) params.countries = l.country.toUpperCase();
+  const { data, error } = await safeFetch<FeedResult>("/flats-feed", { params });
+  if (error || !data) return undefined;
+  const exact = data.listings?.find((listing) => listing.id === l.id && listing.source === "olx");
+  if (exact) return exact;
+  if (data.exactListingFallback === "source-inactive") return null;
+  return undefined;
+}
+async function openListing(l: Listing, olxAlreadyVerified = false) {
+  let listing = l;
+  if (l.source === "olx" && !olxAlreadyVerified) {
+    const verified = await verifyOlxListing(l);
+    if (verified === null) {
+      removeUnavailableListing(l.id, l.source, l.country);
+      showListingUnavailableToast();
+      if (queryString(route.query.flat) === l.id) syncListingInUrl(null);
+      return;
+    }
+    if (verified) listing = verified;
+  }
+  stopTranslationPoll(); translationRequestId += 1; lightboxIndex.value = null; active.value = listing;
+  translatedDescription.value = translationCache.get(translationCacheKey(listing)) || ""; translatingDescription.value = false; translationFailed.value = false; modalOpen.value = true;
+  recent.value = [listing, ...recent.value.filter((item) => item.id !== listing.id)].slice(0, MAX_RECENT_FLATS); persistList(STORAGE.recent, recent.value, MAX_RECENT_FLATS);
+  syncListingInUrl(listing);
 }
 function modalTitle(listing: Listing | null): string {
   if (!listing) return "";
@@ -693,7 +852,7 @@ async function translateActiveDescription() {
   if (data.status === "pending" && data.key) { translationPollTimer = setTimeout(() => void pollTranslation(data.key!, listing, requestId, cacheKey), 1000); return; }
   translatingDescription.value = false; translationFailed.value = true;
 }
-function openById(id: string) { const found = displayedListings.value.find((l) => l.id === id); if (found) openListing(found); }
+function openById(id: string) { const found = displayedListings.value.find((l) => l.id === id); if (found) void openListing(found); }
 function priceLabel(l: Listing): string { if (l.price == null) return t("priceNA"); return `${l.price.toLocaleString()} ${l.currency}`.trim(); }
 function updateLightboxZoom(event: MouseEvent) { const image = event.currentTarget as HTMLImageElement; const rect = image.getBoundingClientRect(); image.style.setProperty("--zoom-x", `${((event.clientX - rect.left) / rect.width) * 100}%`); image.style.setProperty("--zoom-y", `${((event.clientY - rect.top) / rect.height) * 100}%`); }
 function resetLightboxZoom(event: MouseEvent) { const image = event.currentTarget as HTMLImageElement; image.style.setProperty("--zoom-x", "50%"); image.style.setProperty("--zoom-y", "50%"); }
@@ -714,7 +873,49 @@ const ptLabel = (p: Listing["propertyType"]) => (p === "house" ? t("ptHouse") : 
 const audienceLabel = (a?: Listing["audience"]) => a === "women" ? t("audWomen") : a === "men" ? t("audMen") : a === "family" ? t("audFamily") : t("audAny");
 const conditionLabel = (c?: Listing["condition"]) => c === "needs_renovation" ? t("condNeeds") : c === "basic" ? t("condBasic") : c === "good" ? t("condGood") : c === "modern" ? t("condModern") : c === "luxury" ? t("condLuxury") : t("notSpecified");
 const sourceLabel = (s?: string) => (s === "olx" ? "OLX" : s === "telegram" ? "Telegram" : strOr(s));
-function cardBadges(l: Listing): string[] { const b: string[] = []; b.push(l.byAgency ? t("badgeAgency") : t("badgeOwner")); if (l.newBuilding) b.push(t("badgeNew")); if (l.furnished) b.push(t("badgeFurnished")); if (l.airConditioner) b.push(t("badgeAC")); if (l.balcony) b.push(t("badgeBalcony")); if (l.parking) b.push(t("badgeParking")); if (l.elevator) b.push(t("badgeElevator")); if (l.internet) b.push(t("badgeInternet")); if (l.negotiable) b.push(t("badgeNegotiable")); if (l.petsAllowed) b.push(t("badgePet")); if (l.childrenAllowed) b.push(t("badgeChildren")); if (l.communalSeparated === false) b.push(t("badgeUtilIncl")); if (l.commission === false) b.push(t("badgeNoCommission")); if (l.deposit === true) b.push(t("badgeDeposit")); if (l.roomOnly) b.push(t("badgeRoomOnly")); if (l.audience === "family") b.push(t("badgeFamily")); if (l.audience === "women") b.push(t("badgeWomen")); if (l.audience === "men") b.push(t("badgeMen")); return b; }
+function cardDealTone(l: Listing): "sale" | "rent" | "room" | "short" | "" {
+  if (l.dealType === "shortRent") return "short";
+  if (l.roomOnly) return "room";
+  if (l.dealType === "sale") return "sale";
+  if (l.dealType === "longRent") return "rent";
+  return "";
+}
+function cardDealLabel(l: Listing): string {
+  const filterApplies = view.value === "active";
+  const english = locale.value.startsWith("en");
+  if (l.dealType === "shortRent") return !filterApplies || dealType.value !== "shortRent" ? (english ? "Short-term rent" : "Посуточная аренда") : "";
+  if (l.roomOnly) return !filterApplies || !roomOnlyFilter.value ? t("roomShare") : "";
+  if (!filterApplies || dealType.value === "any") {
+    if (l.dealType === "longRent") return english ? "Rent" : "Аренда";
+    return dealLabel(l.dealType);
+  }
+  return "";
+}
+function cardBadges(l: Listing): string[] {
+  const b: string[] = [];
+  if (view.value !== "active" || agency.value === "any") b.push(l.byAgency ? t("badgeAgency") : t("badgeOwner"));
+  if (l.commission === false) b.push(t("badgeNoCommission"));
+  if (l.newBuilding) b.push(t("badgeNew"));
+  if (l.furnished) b.push(t("badgeFurnished"));
+  if (l.airConditioner) b.push(t("badgeAC"));
+  if (l.balcony) b.push(t("badgeBalcony"));
+  if (l.parking) b.push(t("badgeParking"));
+  if (l.elevator) b.push(t("badgeElevator"));
+  if (l.internet) b.push(t("badgeInternet"));
+  if (l.negotiable) b.push(t("badgeNegotiable"));
+  if (l.petsAllowed) b.push(t("badgePet"));
+  if (l.childrenAllowed) b.push(t("badgeChildren"));
+  if (l.communalSeparated === false) b.push(t("badgeUtilIncl"));
+  if (l.deposit === true) b.push(t("badgeDeposit"));
+  if (l.audience === "family") b.push(t("badgeFamily"));
+  if (l.audience === "women") b.push(t("badgeWomen"));
+  if (l.audience === "men") b.push(t("badgeMen"));
+  for (const tag of l.tags || []) {
+    const label = nearbyItemLabel(tag)?.trim();
+    if (label) b.push(label);
+  }
+  return [...new Set(b)];
+}
 function floorLabel(l: Listing) { if (l.floor != null && l.totalFloors != null) return `${l.floor} / ${l.totalFloors}`; return l.floor != null || l.totalFloors != null ? String(l.floor ?? l.totalFloors) : t("nd"); }
 function depositLabel(l: Listing) { if (l.depositAmount != null) return `${l.depositAmount.toLocaleString()} ${l.depositCurrency || l.currency}`; return fmtBool(l.deposit); }
 function commissionLabel(l: Listing) { if (l.commissionPercent != null) return `${l.commissionPercent}%`; return fmtBool(l.commission); }
@@ -737,9 +938,15 @@ async function shareFlat(l: Listing) {
 }
 async function copyListingShareLink() { listingShareCopied.value = await copyText(listingShareUrl.value); if (listingShareCopied.value) showShareSuccess(); }
 async function openSharedListing(id: string, sourceName = "", countryCode = "", attempt = 0) {
-  const local = listings.value.find((listing) => listing.id === id); if (local) { openListing(local); return; }
+  const local = listings.value.find((listing) => listing.id === id); if (local) { await openListing(local); return; }
   const params: Record<string, string> = { listingId: id, limit: "1", offset: "0" }; if (SOURCES.includes(sourceName)) params.sources = sourceName; if (/^[A-Za-z]{2}$/.test(countryCode)) params.countries = countryCode.toUpperCase();
-  const { data } = await safeFetch<FeedResult>("/flats-feed", { params }); const exact = data?.listings?.find((listing) => listing.id === id); if (exact) { openListing(exact); return; }
+  const { data, error } = await safeFetch<FeedResult>("/flats-feed", { params }); const exact = data?.listings?.find((listing) => listing.id === id); if (exact) { await openListing(exact, sourceName === "olx" && exact.source === "olx"); return; }
+  if (!error && sourceName === "olx" && data?.exactListingFallback === "source-inactive") {
+    removeUnavailableListing(id, sourceName, countryCode);
+    showListingUnavailableToast();
+    if (queryString(route.query.flat) === id) syncListingInUrl(null);
+    return;
+  }
   if (data?.warming && attempt < 20) { if (sharedListingTimer) clearTimeout(sharedListingTimer); sharedListingTimer = setTimeout(() => { sharedListingTimer = undefined; void openSharedListing(id, sourceName, countryCode, attempt + 1); }, 1800); }
 }
 function timeAgo(iso: string | null): string { if (!iso) return ""; const days = Math.floor((Date.now() - new Date(iso).getTime()) / 86_400_000); if (Number.isNaN(days)) return ""; if (days <= 0) return t("today"); if (days === 1) return t("yesterday"); if (days < 30) return t("daysAgo", { n: days }); return t("monthsAgo", { n: Math.floor(days / 30) }); }
@@ -782,21 +989,17 @@ onBeforeUnmount(() => { modalOpen.value = false; lightboxIndex.value = null; rel
 
 <template>
   <u-container class="flats">
-    <decorative-easter-egg
-      class="flats__easter-egg"
-      src="/images/easter-eggs/flat-finder-key.png"
-      :width="320"
-      :height="180"
-    />
+    <ocean-page-backdrop />
     <div class="flats__header text-center space-y-3">
       <h1 class="flats__title">{{ t("title") }}</h1>
       <p class="flats__subtitle text-muted mx-auto">{{ t("subtitle") }}</p>
     </div>
 
+    <UiResultsLoader :loading="loading" :label="t('searching')" min-height="420px">
     <form ref="filtersEl" class="flats__controls flats__controls_redesign" @submit.prevent="load()">
       <div class="flats__searchbar">
         <u-input v-model="query" clearable icon="i-lucide-search" :label="t('search')" :placeholder="t('searchPlaceholder')" @clear="clearSearch" />
-        <u-button type="submit" :loading="loading" icon="i-lucide-search">{{ loading ? t("searching") : t("search") }}</u-button>
+        <u-button type="submit" icon="i-lucide-search">{{ t("search") }}</u-button>
       </div>
 
       <div class="flats__row flats__secondary-nav">
@@ -811,6 +1014,7 @@ onBeforeUnmount(() => { modalOpen.value = false; lightboxIndex.value = null; rel
         </div>
       </div>
 
+      <div class="filter-surface">
       <section class="filter-card">
         <div class="filter-presets">
           <span class="flats__field-label filter-presets__label">{{ t("presets") }}</span>
@@ -834,6 +1038,18 @@ onBeforeUnmount(() => { modalOpen.value = false; lightboxIndex.value = null; rel
           <span class="price-separator">—</span>
           <u-input v-model.number="priceMax" class="price-input" type="number" inputmode="numeric" min="1" max="1000000000" :label="t('rangeTo')" @change="scheduleLoad()" />
           <label class="currency-select"><span class="sr-only">{{ t("currency") }}</span><u-select-menu v-model="displayCurrency" :items="currencyItems" value-key="value" label-key="label" class="flats__select currency-select__control" @update:model-value="(priceMin != null || priceMax != null) && scheduleLoad()" /></label>
+        </div>
+
+        <div class="filter-amenities-row">
+          <span class="flats__field-label filter-amenities-row__label">{{ extraLabels.amenities }}</span>
+          <u-button type="button" size="xs" color="neutral" icon="i-lucide-sparkles" :variant="dishwasherOnly ? 'solid' : 'outline'" @click="dishwasherOnly = !dishwasherOnly; scheduleLoad()">{{ extraLabels.dishwasher }}</u-button>
+          <u-button type="button" size="xs" color="neutral" icon="i-lucide-snowflake" :variant="airConditionerOnly ? 'solid' : 'outline'" @click="airConditionerOnly = !airConditionerOnly; scheduleLoad()">{{ extraLabels.ac }}</u-button>
+          <u-button type="button" size="xs" color="neutral" icon="i-lucide-square-parking" :variant="parkingOnly ? 'solid' : 'outline'" @click="parkingOnly = !parkingOnly; scheduleLoad()">{{ extraLabels.parking }}</u-button>
+          <u-button type="button" size="xs" color="neutral" icon="i-lucide-wifi" :variant="internetOnly ? 'solid' : 'outline'" @click="internetOnly = !internetOnly; scheduleLoad()">{{ extraLabels.internet }}</u-button>
+          <u-button type="button" size="xs" color="neutral" icon="i-lucide-flame" :variant="gasOnly ? 'solid' : 'outline'" @click="gasOnly = !gasOnly; scheduleLoad()">{{ extraLabels.gas }}</u-button>
+          <u-button type="button" size="xs" color="neutral" icon="i-lucide-panel-top" :variant="balconyOnly ? 'solid' : 'outline'" @click="balconyOnly = !balconyOnly; scheduleLoad()">{{ extraLabels.balcony }}</u-button>
+          <u-button type="button" size="xs" color="neutral" icon="i-lucide-sun" :variant="terraceOnly ? 'solid' : 'outline'" @click="terraceOnly = !terraceOnly; scheduleLoad()">{{ extraLabels.terrace }}</u-button>
+          <u-button type="button" size="xs" color="neutral" icon="i-lucide-tree-pine" :variant="privateYardOnly ? 'solid' : 'outline'" @click="privateYardOnly = !privateYardOnly; scheduleLoad()">{{ extraLabels.yard }}</u-button>
         </div>
 
         <div class="filter-actions-row">
@@ -881,23 +1097,45 @@ onBeforeUnmount(() => { modalOpen.value = false; lightboxIndex.value = null; rel
           </div>
         </div>
       </section>
+      </div>
     </form>
 
     <p v-if="failed" class="flats__error">{{ t("error") }}</p>
     <p v-else-if="source === 'telegram' && !loading && !listings.length && sourceErrors?.some((item) => item.source === 'telegram')" class="flats__source-warning">{{ t("telegramUnavailable") }}</p>
-    <p v-else class="flats__count text-muted">{{ t("found", { n: view === 'active' ? total : displayedListings.length }) }}</p>
+    <div v-else class="flats__results-toolbar">
+      <p class="flats__count text-muted">{{ t("found", { n: view === 'active' ? total : displayedListings.length }) }}</p>
+      <label class="flats__sort"><span class="flats__field-label">{{ extraLabels.sort }}</span><u-select-menu v-model="sort" :items="sortItems" value-key="value" label-key="label" :search-input="false" class="flats__select" @update:model-value="scheduleLoad(0)" /></label>
+    </div>
+<section v-if="listings.length" class="flats__map-wrap"><flat-map :points="mapPoints" :draw-label="t('drawArea')" :done-label="t('done')" :clear-label="t('clearArea')" :draw-hint="t('drawHint')" :expand-label="t('mapExpand')" :collapse-label="t('mapCollapse')" @select="openById" @area-change="drawnArea = $event" /></section>
 
-    <section v-if="listings.length" class="flats__map-wrap"><flat-map :points="mapPoints" :draw-label="t('drawArea')" :done-label="t('done')" :clear-label="t('clearArea')" :draw-hint="t('drawHint')" :expand-label="t('mapExpand')" :collapse-label="t('mapCollapse')" @select="openById" @area-change="drawnArea = $event" /></section>
-
-    <div class="flats__grid" :class="{ 'flats__grid_loading': loading }">
+    <div class="flats__grid">
       <article v-for="l in displayedListings" :key="`${l.source}:${l.country}:${l.id}`" class="flat-card" :class="{ 'flat-card_favorite': isFavorite(l.id), 'flat-card_hidden': isHidden(l.id) }" @click="openListing(l)">
-        <div class="flat-card__photo"><img v-if="listingPhoto(l)" :src="listingPhoto(l) || ''" :alt="displayListingTitle(l)" loading="lazy" decoding="async" referrerpolicy="no-referrer" @error="markPhotoFailedFromEvent" /><div v-else class="flat-card__no-photo"><u-icon name="i-lucide-image-off" class="flat-card__no-photo-icon" aria-hidden="true" /><span>{{ t("noPhoto") }}</span></div><span v-if="dealLabel(l.dealType)" class="flat-card__deal">{{ dealLabel(l.dealType) }}</span><span v-if="l.roomOnly" class="flat-card__room">{{ t("roomShare") }}</span></div>
-        <div class="flat-card__body"><div class="flat-card__actions"><button type="button" class="flat-card__action" :class="{ 'flat-card__action_active': isFavorite(l.id) }" :aria-label="isFavorite(l.id) ? t('removeFavorite') : t('addFavorite')" @click.stop="toggleFavorite(l)"><u-icon name="i-lucide-heart" /></button><button type="button" class="flat-card__action" :class="{ 'flat-card__action_active': isHidden(l.id) }" :aria-label="isHidden(l.id) ? t('restoreListing') : t('hideListing')" @click.stop="toggleHidden(l)"><u-icon :name="isHidden(l.id) ? 'i-lucide-eye' : 'i-lucide-eye-off'" /></button></div><div class="flat-card__price">{{ priceLabel(l) }}</div><div v-if="convertedLabel(l)" class="flat-card__price-conv text-muted">{{ convertedLabel(l) }}</div><h3 class="flat-card__title">{{ displayListingTitle(l) }}</h3><div v-if="specLine(l)" class="flat-card__spec text-muted">{{ specLine(l) }}</div><div v-if="cardBadges(l).length" class="flat-card__badges"><span v-for="b in cardBadges(l)" :key="b" class="flat-card__badge">{{ b }}</span></div><div class="flat-card__meta text-muted"><span v-if="locLine(l)">{{ locLine(l) }}</span><span class="flat-card__src">{{ l.source }}</span><span v-if="timeAgo(l.createdAt)">· {{ timeAgo(l.createdAt) }}</span></div></div>
+        <div class="flat-card__photo">
+          <img v-if="listingPhoto(l)" :src="listingPhoto(l) || ''" :alt="displayListingTitle(l)" loading="lazy" decoding="async" referrerpolicy="no-referrer" @error="markPhotoFailedFromEvent" />
+          <div v-else class="flat-card__no-photo"><u-icon name="i-lucide-image-off" class="flat-card__no-photo-icon" aria-hidden="true" /><span>{{ t("noPhoto") }}</span></div>
+          <span v-if="cardDealLabel(l)" class="flat-card__deal" :class="`flat-card__deal_${cardDealTone(l)}`">{{ cardDealLabel(l) }}</span>
+          <div class="flat-card__actions">
+            <button type="button" class="flat-card__action" :class="{ 'flat-card__action_active': isFavorite(l.id) }" :aria-label="isFavorite(l.id) ? t('removeFavorite') : t('addFavorite')" @click.stop="toggleFavorite(l)"><u-icon name="i-lucide-heart" /></button>
+            <button type="button" class="flat-card__action" :class="{ 'flat-card__action_active': isHidden(l.id) }" :aria-label="isHidden(l.id) ? t('restoreListing') : t('hideListing')" @click.stop="toggleHidden(l)"><u-icon :name="isHidden(l.id) ? 'i-lucide-eye' : 'i-lucide-eye-off'" /></button>
+          </div>
+        </div>
+        <div class="flat-card__body">
+          <div class="flat-card__price">{{ priceLabel(l) }}</div>
+          <div v-if="convertedLabel(l)" class="flat-card__price-conv text-muted">{{ convertedLabel(l) }}</div>
+          <h3 class="flat-card__title">{{ displayListingTitle(l) }}</h3>
+          <div v-if="specLine(l)" class="flat-card__spec text-muted">{{ specLine(l) }}</div>
+          <div v-if="cardBadges(l).length" class="flat-card__badges"><span v-for="b in cardBadges(l)" :key="b" class="flat-card__badge">{{ b }}</span></div>
+          <div class="flat-card__meta text-muted">
+            <span v-if="locLine(l)" class="flat-card__location"><u-icon name="i-lucide-map-pin" />{{ locLine(l) }}</span>
+            <span class="flat-card__meta-tail"><span class="flat-card__src">{{ l.source }}</span><span v-if="timeAgo(l.createdAt)">· {{ timeAgo(l.createdAt) }}</span></span>
+          </div>
+        </div>
       </article>
     </div>
-
-    <div ref="loadMoreSentinel" v-if="hasMore" class="flats__sentinel"><span v-if="loadingMore" class="text-muted">{{ t("loadingMore") }}</span></div>
+<div ref="loadMoreSentinel" v-if="hasMore" class="flats__sentinel"><span v-if="loadingMore" class="text-muted">{{ t("loadingMore") }}</span></div>
     <div v-if="!loading && !displayedListings.length && !failed" class="flats__empty"><div class="text-muted">{{ t("empty") }}</div><div v-if="drawnArea.length >= 3 && listings.length" class="text-muted">{{ t("emptyArea") }}</div></div>
+
+    </UiResultsLoader>
 
     <u-modal v-model:open="modalOpen" :title="modalTitle(active)" :ui="{ content: 'max-w-4xl' }" :dismissible="lightboxIndex === null">
       <template #title><h2 class="flat-modal__title">{{ modalTitle(active) }}</h2></template>
@@ -915,12 +1153,8 @@ onBeforeUnmount(() => { modalOpen.value = false; lightboxIndex.value = null; rel
 </template>
 
 <style scoped>
-.flats { position: relative; isolation: isolate; overflow: hidden; padding-top: 24px; padding-bottom: 96px; }
+.flats { position: relative; isolation: isolate; padding-top: 24px; padding-bottom: 96px; }
 .flats__header { position: relative; z-index: 1; }
-.flats__easter-egg {
-  position: absolute; top: 2px; right: -22px; z-index: 0;
-  width: 265px; opacity: 0.19;
-}
 .flats__title { font-size: 32px; font-weight: 600; }
 .flats__subtitle { max-width: 720px; font-size: 14px; }
 .flats__controls { margin: 20px 0 20px; display: grid; gap: 12px; grid-template-columns: 1fr auto; align-items: start; }
@@ -955,35 +1189,47 @@ onBeforeUnmount(() => { modalOpen.value = false; lightboxIndex.value = null; rel
 .flats__back-top:hover { color: var(--accent-pink); border-color: rgba(224,103,154,.48); }
 .flats__error { color: var(--ui-error, #f87171); }
 .flats__source-warning { color: #f6c177; font-size: 13px; margin-bottom: 12px; }
-.flats__count { font-size: 13px; margin-bottom: 12px; }
+.flats__count { font-size: 13px; margin: 0; }
+.flats__results-toolbar { display: flex; align-items: end; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
+.flats__sort { display: flex; align-items: center; gap: 8px; width: min(310px, 100%); }
+.flats__sort > .flats__field-label { flex: 0 0 auto; }
+.flats__sort .flats__select { flex: 1 1 auto; }
 .flats__map-wrap { position: relative; z-index: 0; isolation: isolate; margin-bottom: 18px; scroll-margin-top: 90px; }
-.flats__grid { display: grid; gap: 14px; grid-template-columns: 1fr; align-items: stretch; grid-auto-rows: 1fr; }
-@media (min-width: 640px) { .flats__grid { grid-template-columns: repeat(2, 1fr); } }
-@media (min-width: 1024px) { .flats__grid { grid-template-columns: repeat(3, 1fr); } }
-.flats__grid_loading { opacity: 0.4; pointer-events: none; }
-.flat-card { height: 100%; border: 1px solid var(--line); border-radius: 12px; overflow: hidden; background: rgba(255,255,255,0.03); cursor: pointer; transition: transform 140ms ease, border-color 180ms ease; display: flex; flex-direction: column; }
-.flat-card__body { flex: 1 1 auto; position: relative; padding: 12px 14px; display: flex; flex-direction: column; gap: 4px; }
-.flat-card:hover { transform: translateY(-2px); border-color: rgba(224,103,154,0.4); }
-.flat-card__photo { position: relative; width: 100%; height: clamp(220px, 25vw, 310px); flex: 0 0 auto; overflow: hidden; background: var(--bg-panel); }
-.flat-card__photo > img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.flats__grid { display: grid; gap: 14px; grid-template-columns: 1fr; align-items: start; }
+@media (min-width: 640px) { .flats__grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (min-width: 1024px) { .flats__grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (min-width: 1440px) { .flats__grid { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+.flat-card { min-width: 0; border: 1px solid var(--line); border-radius: 12px; overflow: hidden; background: rgba(255,255,255,0.03); cursor: pointer; transition: transform 140ms ease, border-color 180ms ease, box-shadow 180ms ease; display: flex; flex-direction: column; }
+.flat-card:hover { transform: translateY(-2px); border-color: rgba(224,103,154,0.4); box-shadow: 0 12px 30px rgba(0,0,0,.16); }
+.flat-card__photo { position: relative; width: 100%; aspect-ratio: 4 / 3; flex: 0 0 auto; overflow: hidden; background: var(--bg-panel); }
+.flat-card__photo::after { content: ""; position: absolute; inset: 0; pointer-events: none; background: linear-gradient(180deg, rgba(8,11,26,.16) 0%, transparent 28%, transparent 76%, rgba(8,11,26,.18) 100%); }
+.flat-card__photo > img { width: 100%; height: 100%; object-fit: cover; display: block; transition: transform 260ms ease; }
+.flat-card:hover .flat-card__photo > img { transform: scale(1.015); }
 .flat-card__no-photo { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 9px; height: 100%; color: var(--text-muted); font-size: 12px; background: rgba(255,255,255,0.025); }
 .flat-card__no-photo-icon { width: 34px; height: 34px; opacity: 0.48; }
-.flat-card__deal { position: absolute; top: 8px; left: 8px; font-size: 11px; padding: 2px 8px; border-radius: 6px; background: rgba(13,17,40,0.8); color: #e0679a; }
-.flat-card__room { position: absolute; top: 8px; right: 8px; font-size: 11px; padding: 2px 8px; border-radius: 6px; background: rgba(13,17,40,0.8); color: #7189d9; }
-.flat-card__actions { position: absolute; top: 10px; right: 10px; display: flex; gap: 5px; }
-.flat-card__action { width: 29px; height: 29px; display: inline-grid; place-items: center; padding: 0; border: 1px solid var(--line); border-radius: 6px; background: var(--bg-panel); color: var(--text-muted); cursor: pointer; }
-.flat-card__action:hover, .flat-card__action_active { color: var(--accent-pink); border-color: rgba(224,103,154,0.48); }
-.flat-card__price { padding-right: 70px; font-weight: 700; font-size: 16px; color: var(--text-white, inherit); }
-.flat-card__price-conv { font-size: 12px; font-weight: 500; margin-top: 1px; }
-.flat-card__title { font-size: 13.5px; font-weight: 500; line-height: 1.35; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-.flat-card__spec { font-size: 12.5px; }
-.flat-card__badges { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 7px; }
-.flat-card__badge { font-size: 10.5px; font-weight: 600; line-height: 1; padding: 4px 7px; border-radius: 999px; border: 1px solid var(--line); background: rgba(255,255,255,0.05); color: var(--text-primary); white-space: nowrap; }
-.flat-card__meta { display: flex; flex-wrap: wrap; gap: 6px; font-size: 11.5px; margin-top: 2px; }
-.flat-card__src { text-transform: capitalize; opacity: 0.7; }
+.flat-card__deal { position: absolute; z-index: 2; top: 9px; left: 9px; max-width: calc(100% - 92px); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; font-weight: 700; line-height: 1; padding: 6px 9px; border: 1px solid rgba(224,103,154,.42); border-radius: 7px; background: rgba(13,17,40,.86); color: var(--accent-pink); box-shadow: 0 3px 12px rgba(0,0,0,.2); backdrop-filter: blur(8px); }
+.flat-card__deal_sale { color: #f58ab5; border-color: rgba(245,138,181,.45); }
+.flat-card__deal_rent { color: #b79cff; border-color: rgba(183,156,255,.42); }
+.flat-card__deal_room { color: #77d9e8; border-color: rgba(119,217,232,.42); }
+.flat-card__deal_short { color: #f4c86a; border-color: rgba(244,200,106,.45); }
+.flat-card__actions { position: absolute; z-index: 3; top: 8px; right: 8px; display: flex; gap: 5px; }
+.flat-card__action { width: 32px; height: 32px; display: inline-grid; place-items: center; padding: 0; border: 1px solid rgba(66,73,116,.86); border-radius: 7px; background: rgba(13,17,40,.84); color: #c8cbdb; cursor: pointer; box-shadow: 0 3px 12px rgba(0,0,0,.18); backdrop-filter: blur(8px); transition: color 150ms ease, border-color 150ms ease, background-color 150ms ease; }
+.flat-card__action:hover, .flat-card__action_active { color: var(--accent-pink); border-color: rgba(224,103,154,.58); background: rgba(26,29,57,.94); }
+.flat-card__body { padding: 13px 14px 14px; display: flex; flex-direction: column; gap: 5px; }
+.flat-card__price { font-weight: 750; font-size: 18px; line-height: 1.2; color: var(--text-white, inherit); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.flat-card__price-conv { font-size: 12px; font-weight: 500; line-height: 1.35; }
+.flat-card__title { margin-top: 2px; font-size: 14.5px; font-weight: 650; line-height: 1.38; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere; }
+.flat-card__spec { font-size: 12.5px; line-height: 1.4; }
+.flat-card__badges { display: flex; flex-wrap: wrap; align-content: flex-start; gap: 5px; margin-top: 5px; }
+.flat-card__badge { max-width: 100%; font-size: 10.5px; font-weight: 600; line-height: 1.15; padding: 4px 7px; border-radius: 999px; border: 1px solid var(--line); background: rgba(255,255,255,0.05); color: var(--text-primary); white-space: normal; overflow-wrap: anywhere; }
+.flat-card__meta { display: flex; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; gap: 6px 10px; margin-top: 5px; padding-top: 8px; border-top: 1px solid rgba(255,255,255,.055); font-size: 11.5px; line-height: 1.35; }
+.flat-card__location { min-width: 0; display: inline-flex; align-items: flex-start; gap: 5px; flex: 1 1 150px; }
+.flat-card__location svg { flex: 0 0 auto; margin-top: 1px; }
+.flat-card__meta-tail { display: inline-flex; gap: 5px; white-space: nowrap; margin-left: auto; }
+.flat-card__src { text-transform: capitalize; opacity: 0.72; }
 .flats__empty { margin-top: 18px; text-align: center; padding: 18px; border-radius: 10px; border: 1px solid var(--line); background: rgba(255,255,255,0.03); }
 .flats__sentinel { min-height: 44px; display: grid; place-items: center; }
-.flat-card_favorite { border-color: rgba(224,103,154,0.5); }
+.flat-card_favorite { border-color: rgba(224,103,154,0.52); }
 .flat-card_hidden { opacity: 0.64; border-style: dashed; }
 .flat-modal { display: flex; flex-direction: column; gap: 12px; }
 .flat-modal__title { display: -webkit-box; overflow: hidden; margin: 0; padding-right: 36px; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow-wrap: anywhere; font-size: 18px; font-weight: 700; line-height: 1.35; }
@@ -1019,7 +1265,23 @@ onBeforeUnmount(() => { modalOpen.value = false; lightboxIndex.value = null; rel
 .flats__controls_redesign { display: block; margin: 20px 0; }
 .flats__searchbar { display: grid; grid-template-columns: 1fr auto; gap: 10px; margin-bottom: 12px; }
 .flats__secondary-nav { margin-bottom: 12px; }
-.filter-card, .advanced-card { border: 1px solid var(--line); border-radius: 12px; background: var(--bg-panel); }
+.filter-surface {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--ocean-form-surface);
+  box-shadow: 0 18px 42px rgba(2, 5, 18, 0.22);
+}
+.filter-card, .advanced-card {
+  position: relative;
+  z-index: 1;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
 .filter-card { padding: 16px; }
 .filter-presets { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding-bottom: 14px; margin-bottom: 14px; border-bottom: 1px solid var(--line); }
 .filter-presets__label { margin-right: 4px; white-space: nowrap; }
@@ -1041,13 +1303,16 @@ onBeforeUnmount(() => { modalOpen.value = false; lightboxIndex.value = null; rel
 .price-separator { text-align: center; color: var(--ui-text-muted); }
 .currency-select { min-width: 0; }
 .currency-select__control :deep(button) { min-height: var(--ui-control-h-md); height: var(--ui-control-h-md); background: var(--bg-panel-2) !important; border-color: rgba(224,103,154,.78) !important; color: var(--text-white); font-weight: 800; letter-spacing: .04em; box-shadow: inset 0 0 0 1px rgba(224,103,154,.08); }
+.filter-amenities-row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--line); }
+.filter-amenities-row__label { margin-right: 4px; white-space: nowrap; }
+.filter-amenities-row :deep(button) { min-height: 30px; height: auto; padding-inline: 9px; white-space: nowrap; }
 .filter-actions-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--line); }
 .advanced-button { flex: 0 0 auto; }
 .active-filter-chips { display: flex; flex: 1 1 300px; gap: 8px; flex-wrap: wrap; min-width: 0; }
 .filter-chip { display: inline-flex; align-items: center; gap: 7px; max-width: 100%; min-height: 34px; padding: 6px 11px; border: 1px solid var(--line); border-radius: 7px; background: var(--bg-panel-2); color: var(--text-primary); white-space: normal; text-align: left; line-height: 1.25; }
 .filter-chip span { color: var(--ui-text-muted); flex: 0 0 auto; }
 .filter-reset { margin-left: auto; }
-.advanced-card { margin-top: 14px; overflow: hidden; }
+.advanced-card { margin-top: 0; overflow: hidden; border-top: 1px solid var(--line); }
 .advanced-card__header { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 14px 16px; border-bottom: 1px solid var(--line); }
 .advanced-card__header > div, .advanced-card__header button { display: inline-flex; align-items: center; gap: 8px; }
 .advanced-card__header button { color: var(--accent-pink); }
@@ -1091,7 +1356,6 @@ onBeforeUnmount(() => { modalOpen.value = false; lightboxIndex.value = null; rel
 .flats__controls_redesign :deep(input), .flats__controls_redesign :deep(button[role="combobox"]) { background-color: var(--bg-panel-2) !important; }
 
 @media (max-width: 1100px) {
-  .flats__easter-egg { display: none; }
   .advanced-groups { grid-template-columns: repeat(2,minmax(0,1fr)); gap: 20px 0; }
   .filter-group, .filter-group:first-child { padding: 0 16px; border-left: 1px solid var(--line); }
   .filter-group:nth-child(odd) { border-left: 0; padding-left: 0; }
@@ -1112,6 +1376,8 @@ onBeforeUnmount(() => { modalOpen.value = false; lightboxIndex.value = null; rel
   .currency-select { grid-column: 1 / -1; }
   .price-input { min-width: 0; padding-left: 7px; gap: 3px; }
   .price-input :deep(.price-number-input) { font-size: 12px; }
+  .filter-amenities-row__label { flex: 0 0 100%; }
+  .filter-amenities-row :deep(button) { flex: 1 1 auto; justify-content: center; }
   .filter-actions-row { align-items: stretch; }
   .advanced-button { flex: 1 1 100%; justify-content: center; }
   .active-filter-chips { flex: 1 1 100%; }
@@ -1123,7 +1389,9 @@ onBeforeUnmount(() => { modalOpen.value = false; lightboxIndex.value = null; rel
   .filter-group:first-child { padding-top: 0; border-top: 0; }
   .filter-group:last-child { padding-bottom: 0; }
   .range-field { grid-template-columns: minmax(0,1fr) 10px minmax(0,1fr); }
-  .flat-card__photo { height: 250px; }
+  .flats__results-toolbar { align-items: stretch; flex-direction: column; }
+  .flats__sort { width: 100%; }
+  .flat-card__photo { aspect-ratio: 16 / 10; }
   .flat-lightbox__stage { width: 92vw; height: 76vh; }
   .flat-lightbox__nav { width: 42px; height: 56px; font-size: 22px; }
   .flat-lightbox__nav_left { left: 8px; } .flat-lightbox__nav_right { right: 8px; } .flat-lightbox__close { top: 10px; right: 10px; }

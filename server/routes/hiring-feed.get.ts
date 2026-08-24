@@ -1,8 +1,10 @@
-// GET /hiring-feed — candidate CV/resume profiles (not employer vacancies).
-// Search runs through Elasticsearch when available and falls back to memory.
+// GET /hiring-feed — read-only candidate CV/resume feed.
+// Search uses the persisted snapshot and Elasticsearch only; crawling, targeted
+// web search, normalization writes and backfill belong exclusively to jobs-worker.
 
-import { getHiringSourceDiagnostics, HIRING_COUNTRIES } from '../utils/hiringSources'
-import { DERIVED_VERSION, getStoreFunnel, getStoredCvProfiles, isHiringStoreCold, refreshHiringStore } from '../utils/hiringStore'
+import { getHiringSourceDiagnostics } from '../utils/hiringSources'
+import { HIRING_COUNTRIES } from '../../shared/hiring/hiringMarkets'
+import { DERIVED_VERSION, getStoredCvProfilesSnapshot } from '../utils/hiringSnapshot'
 import { getStoredWebCvProfiles } from '../utils/hiringWebStore'
 import { candidateSearchAvailable, searchCandidates } from '../utils/hiringElastic'
 import { dedupeCandidates, detectMentionedProfessions, normalizeCandidate } from '../utils/hiringNormalize'
@@ -11,9 +13,16 @@ import { listWebSources } from '../utils/hiringWebSources'
 import { listUzJobsSources } from '../utils/hiringUzJobsSource'
 import { getHiringWebDiagnostics } from '../utils/hiringDiagnostics'
 import { loadDbSourceRuns } from '../utils/hiringDb'
-import { searchTargetedHiringProfiles } from '../utils/hiringTargetedSearch'
-import { getRates, loadRates } from '../utils/currency'
+import { convertCurrency, getRates, loadRates } from '../utils/currency'
 import type { CvProfile } from '../utils/hiringTypes'
+import {
+  publicCandidateGender,
+  publicCandidateLanguages,
+  publicCandidateName,
+  publicCandidateProfessionKeys,
+  publicCandidateRemote,
+  publicCandidateSalary,
+} from '../utils/hiringCandidatePresentation'
 import {
   HIRING_PROFESSION_LABELS,
   hiringProfessionLabel,
@@ -93,22 +102,20 @@ function profileSource(profile: CvProfile): string {
   return (profile.sourceKey || profile.source || 'unknown').toLowerCase()
 }
 
-/**
- * Where the profile actually came from. Legacy records carry source
- * 'telegram' regardless of origin — a compatibility shim, not a claim — so a
- * web candidate must be identified by origin and never by that field.
- */
 function profileOrigin(profile: CvProfile): string {
   return (profile.origin || 'telegram').toLowerCase()
 }
 
 const WEB_SOURCE_LABELS = new Map(listWebSources().map((source) => [source.key, source.label]))
 
-/** Human name of the provider, for cards and the filter list. */
 function profileProvider(profile: CvProfile): string {
+  if (profile.sourceLabel?.trim()) return profile.sourceLabel.trim()
   const key = profile.sourceKey?.toLowerCase()
   if (key && WEB_SOURCE_LABELS.has(key)) return WEB_SOURCE_LABELS.get(key)!
-  if (profileOrigin(profile) === 'web') return key || 'Web'
+  const origin = profileOrigin(profile)
+  if (origin === 'facebook') return 'Facebook'
+  if (origin === 'threads') return 'Threads'
+  if (origin === 'web') return key || 'Web'
   return 'Telegram'
 }
 
@@ -145,6 +152,19 @@ function profileSearchText(profile: CvProfile): string {
   ].join(' ').toLocaleLowerCase('ru')
 }
 
+function salaryBounds(profile: CvProfile, targetCurrency: string): { low: number; high: number } | null {
+  const sourceCurrency = profile.currency?.trim().toUpperCase()
+  if (!sourceCurrency) return null
+  const rawLow = profile.salaryMin ?? profile.salaryMax
+  const rawHigh = profile.salaryMax ?? profile.salaryMin
+  const low = convertCurrency(rawLow, sourceCurrency, targetCurrency)
+  const high = convertCurrency(rawHigh, sourceCurrency, targetCurrency)
+  if (low == null && high == null) return null
+  const first = low ?? high!
+  const second = high ?? low!
+  return { low: Math.min(first, second), high: Math.max(first, second) }
+}
+
 function matchesFilters(profile: CvProfile, params: URLSearchParams): boolean {
   const countries = list(params, 'countries').map((code) => code.toUpperCase())
   if (countries.length && !countries.includes((profile.country || '').toUpperCase())) return false
@@ -169,6 +189,19 @@ function matchesFilters(profile: CvProfile, params: URLSearchParams): boolean {
   const ageMax = Number(params.get('ageMax'))
   if (Number.isFinite(ageMax) && ageMax > 0) {
     if (profile.age == null || profile.age > ageMax) return false
+  }
+
+  const salaryFrom = Number(params.get('salaryFrom'))
+  const salaryTo = Number(params.get('salaryTo'))
+  if ((Number.isFinite(salaryFrom) && salaryFrom > 0) || (Number.isFinite(salaryTo) && salaryTo > 0)) {
+    const targetCurrency = (params.get('salaryCurrency') || 'USD').trim().toUpperCase()
+    const salary = salaryBounds(profile, targetCurrency)
+    if (!salary) return false
+    // Range-overlap semantics: a candidate is kept when their desired range has
+    // at least one value inside the selected range. This makes "до 1000" include
+    // e.g. a candidate asking for 800–1200, because 800 is still acceptable.
+    if (Number.isFinite(salaryFrom) && salaryFrom > 0 && salary.high < salaryFrom) return false
+    if (Number.isFinite(salaryTo) && salaryTo > 0 && salary.low > salaryTo) return false
   }
 
   const gender = (params.get('gender') || '').trim().toLowerCase()
@@ -210,11 +243,60 @@ function matchesFilters(profile: CvProfile, params: URLSearchParams): boolean {
   return true
 }
 
-// Normalizing one real CV costs about 7ms — profession detection, skills,
-// languages, contacts, the lot — so a store of a few hundred is seconds of
-// work, and it was being redone from scratch on every request. The result
-// depends only on the stored snapshot, so it is cached against a cheap
-// signature of it and recomputed when the snapshot moves.
+function activityTimestamp(profile: CvProfile): number {
+  const value = Date.parse(profile.activityAt || profile.updatedAt || profile.createdAt || '')
+  return Number.isFinite(value) ? value : 0
+}
+
+function compareOptionalNumber(a: number | null | undefined, b: number | null | undefined, descending: boolean): number {
+  const av = a == null || !Number.isFinite(a) ? null : a
+  const bv = b == null || !Number.isFinite(b) ? null : b
+  if (av == null && bv == null) return 0
+  if (av == null) return 1
+  if (bv == null) return -1
+  return descending ? bv - av : av - bv
+}
+
+function desiredSalary(profile: CvProfile, targetCurrency: string): number | null {
+  const bounds = salaryBounds(profile, targetCurrency)
+  return bounds ? Math.round((bounds.low + bounds.high) / 2) : null
+}
+
+function sortCandidateProfiles(profiles: CvProfile[], sort: string, salaryCurrency: string): void {
+  const recent = (a: CvProfile, b: CvProfile) => activityTimestamp(b) - activityTimestamp(a)
+  profiles.sort((a, b) => {
+    let primary = 0
+    switch (sort) {
+      case 'name_asc': {
+        const an = (a.name || '').trim()
+        const bn = (b.name || '').trim()
+        if (!an && !bn) primary = 0
+        else if (!an) primary = 1
+        else if (!bn) primary = -1
+        else primary = an.localeCompare(bn, undefined, { sensitivity: 'base' })
+        break
+      }
+      case 'name_desc': {
+        const an = (a.name || '').trim()
+        const bn = (b.name || '').trim()
+        if (!an && !bn) primary = 0
+        else if (!an) primary = 1
+        else if (!bn) primary = -1
+        else primary = bn.localeCompare(an, undefined, { sensitivity: 'base' })
+        break
+      }
+      case 'experience_desc': primary = compareOptionalNumber(a.experienceYears, b.experienceYears, true); break
+      case 'experience_asc': primary = compareOptionalNumber(a.experienceYears, b.experienceYears, false); break
+      case 'age_desc': primary = compareOptionalNumber(a.age, b.age, true); break
+      case 'age_asc': primary = compareOptionalNumber(a.age, b.age, false); break
+      case 'salary_desc': primary = compareOptionalNumber(desiredSalary(a, salaryCurrency), desiredSalary(b, salaryCurrency), true); break
+      case 'salary_asc': primary = compareOptionalNumber(desiredSalary(a, salaryCurrency), desiredSalary(b, salaryCurrency), false); break
+      default: primary = recent(a, b)
+    }
+    return primary || recent(a, b)
+  })
+}
+
 const SNAPSHOT_TTL_MS = 60_000
 let snapshotCache: CvProfile[] = []
 let snapshotKey = ''
@@ -228,14 +310,23 @@ function snapshotSignature(stored: CvProfile[]): string {
   return `${stored.length}:${newest}:${stored[0]?.id || ''}:${stored[stored.length - 1]?.id || ''}`
 }
 
+function repairPublicFacts(profile: CvProfile): CvProfile {
+  const professions = publicCandidateProfessionKeys(profile)
+  return {
+    ...profile,
+    ...publicCandidateSalary(profile),
+    role: professions[0] || profile.role,
+    professions: professions.length ? professions : profile.professions,
+    gender: publicCandidateGender(profile),
+    remote: publicCandidateRemote(profile),
+  }
+}
+
 function normalizedSnapshot(stored: CvProfile[]): CvProfile[] {
   const key = snapshotSignature(stored)
   if (key === snapshotKey && Date.now() - snapshotAt < SNAPSHOT_TTL_MS) return snapshotCache
-  // Profiles the store has already derived are used as they are; only rows
-  // written by another adapter, or from before the current parser version,
-  // pay for normalization here.
-  snapshotCache = dedupeCandidates(stored.map((profile) => (
-    profile.derived === DERIVED_VERSION ? profile : withProfessionExperience(normalizeCandidate(profile))
+  snapshotCache = dedupeCandidates(stored.map((profile) => repairPublicFacts(
+    profile.derived === DERIVED_VERSION ? profile : withProfessionExperience(normalizeCandidate(profile)),
   )))
   snapshotKey = key
   snapshotAt = Date.now()
@@ -251,36 +342,9 @@ function sourceCounts(profiles: CvProfile[]): Record<string, number> {
   return counts
 }
 
-// The selector is a taxonomy, not an index of arbitrary CV headlines. Raw
-// roles remain searchable in the full text, but only canonical values may be
-// submitted as a structured profession filter.
 function professionValues(): string[] {
   return collapseHiringProfessionFilterValues(Object.keys(HIRING_PROFESSION_LABELS))
     .sort((a, b) => a.localeCompare(b, 'en'))
-}
-
-function targetedSearchTerm(params: URLSearchParams): string {
-  const query = (params.get('query') || '').trim()
-  if (query) {
-    const mentioned = detectMentionedProfessions(query)
-    if (mentioned.length) return mentioned.map((profession) => hiringProfessionLabel(profession, 'ru')).join(' ')
-    return query
-  }
-  return list(params, 'professions')
-    // One representative term keeps the synchronous Flagma backfill bounded;
-    // all group members still participate in the authoritative stored filter.
-    .map((profession) => hiringProfessionLabel(expandHiringProfessionFilters([profession])[0] || profession, 'ru'))
-    .join(' ')
-    .trim()
-}
-
-function shouldSearchFlagma(params: URLSearchParams, term: string): boolean {
-  if (!term) return false
-  const countries = list(params, 'countries').map((value) => value.toUpperCase())
-  if (countries.length && !countries.includes('UZ')) return false
-  const sources = list(params, 'sources').map((value) => value.toLowerCase())
-  if (sources.length && !sources.includes('web') && !sources.includes('flagma-uz')) return false
-  return true
 }
 
 function requestLocale(event: Parameters<typeof getCookie>[0]): HiringProfessionLocale {
@@ -330,6 +394,41 @@ function previousExperienceSummary(profile: CvProfile, locale: HiringProfessionL
   })
 }
 
+function convertedSalaryRange(
+  profile: CvProfile,
+  targetCurrency: string,
+  locale: HiringProfessionLocale,
+): string | null {
+  const sourceCurrency = profile.currency?.trim().toUpperCase()
+  if (!sourceCurrency || (profile.salaryMin == null && profile.salaryMax == null)) return null
+  const min = convertCurrency(profile.salaryMin, sourceCurrency, targetCurrency)
+  const max = convertCurrency(profile.salaryMax, sourceCurrency, targetCurrency)
+  if (min == null && max == null) return null
+
+  const number = new Intl.NumberFormat(locale === 'en' ? 'en-US' : 'ru-RU', { maximumFractionDigits: 0 })
+  const low = min ?? max!
+  const high = max ?? min!
+  const range = low === high ? number.format(low) : `${number.format(Math.min(low, high))}–${number.format(Math.max(low, high))}`
+  return targetCurrency === 'USD' ? `$${range}` : `${range} ${targetCurrency}`
+}
+
+function salaryDisplayCurrency(profile: CvProfile, locale: HiringProfessionLocale): string | null | undefined {
+  const sourceCurrency = profile.currency?.trim().toUpperCase()
+  if (!sourceCurrency || (profile.salaryMin == null && profile.salaryMax == null)) return profile.currency
+
+  const localCurrency = HIRING_COUNTRIES.find((item) => item.code === profile.country?.toUpperCase())?.currency
+  const suffixes: string[] = []
+  if (localCurrency && localCurrency !== sourceCurrency) {
+    const local = convertedSalaryRange(profile, localCurrency, locale)
+    if (local) suffixes.push(`≈ ${local}`)
+  }
+  if (sourceCurrency !== 'USD') {
+    const usd = convertedSalaryRange(profile, 'USD', locale)
+    if (usd) suffixes.push(`≈ ${usd}`)
+  }
+  return suffixes.length ? `${sourceCurrency} · ${suffixes.join(' · ')}` : sourceCurrency
+}
+
 function publicProfile(profile: CvProfile, locale: HiringProfessionLocale): CvProfile {
   const localizeEmploymentType = (value: string): string => value === 'full_time'
     ? locale === 'en' ? 'Full-time' : 'Полная занятость'
@@ -354,21 +453,27 @@ function publicProfile(profile: CvProfile, locale: HiringProfessionLocale): CvPr
   if (profile.isAdult === false) details.push(localizeDetail('Minor'))
   if (profile.relocationReady === true) details.push(localizeDetail('Open to relocation'))
   if (profile.relocationReady === false) details.push(localizeDetail('Not open to relocation'))
-  if (profile.origin === 'web' && profile.contactType === 'platform') details.push(localizeDetail('Contact via source platform'))
+  if (profile.contactType === 'platform' && profileOrigin(profile) !== 'telegram') details.push(localizeDetail('Contact via source platform'))
 
-  const canonical = profile.professions?.length ? profile.professions : [profile.role].filter(Boolean)
+  const canonical = publicCandidateProfessionKeys(profile)
   return {
     ...profile,
+    name: publicCandidateName(profile.name, locale),
     role: canonical.map((profession) => hiringProfessionLabel(profession, locale)).join(', '),
+    professions: canonical,
     previousProfessions: (profile.previousProfessions || []).map((profession) => hiringProfessionLabel(profession, locale)),
     professionExperience: (profile.professionExperience || []).map((item) => ({
       ...item,
       profession: hiringProfessionLabel(item.profession, locale),
     })),
+    gender: publicCandidateGender(profile),
+    remote: publicCandidateRemote(profile),
+    languages: publicCandidateLanguages(profile, locale),
     employmentType: profile.employmentTypes?.length
       ? profile.employmentTypes.map(localizeEmploymentType).join(', ')
       : profile.employmentType ? localizeEmploymentType(profile.employmentType) : profile.employmentType,
     education: hiringEducationLabel(profile.education, locale),
+    currency: salaryDisplayCurrency(profile, locale),
     tags: [...new Set(details)].slice(0, 20),
     origin: profileOrigin(profile) as CvProfile['origin'],
     sourceKey: profileSource(profile),
@@ -380,43 +485,21 @@ export default defineEventHandler(async (event) => {
   const incoming = getRequestURL(event)
   const params = incoming.searchParams
   const locale = requestLocale(event)
-  loadRates().catch(() => {})
   const offset = Math.max(0, Number(params.get('offset')) || 0)
   const limit = Math.min(PAGE_MAX, Math.max(1, Number(params.get('limit')) || 20))
 
-  let warming = false
   const [telegramStored, webStored, persistedSourceRuns] = await Promise.all([
-    getStoredCvProfiles(),
+    getStoredCvProfilesSnapshot(),
     getStoredWebCvProfiles(),
     loadDbSourceRuns(),
+    loadRates(),
   ])
 
-  const term = targetedSearchTerm(params)
-  let targetedProfiles: CvProfile[] = []
-  let targetedError = ''
-  if (shouldSearchFlagma(params, term)) {
-    try {
-      targetedProfiles = await searchTargetedHiringProfiles(term)
-    } catch (error) {
-      targetedError = (error as Error).message
-      console.warn('[hiring-feed] targeted Flagma search failed:', targetedError)
-    }
-  }
-
   const storedByUrl = new Map<string, CvProfile>()
-  for (const profile of [...telegramStored, ...webStored, ...targetedProfiles]) {
+  for (const profile of [...telegramStored, ...webStored]) {
     storedByUrl.set(profile.url || profile.id, profile)
   }
-  const stored = [...storedByUrl.values()]
-
-  if (!stored.length && isHiringStoreCold()) {
-    warming = true
-    refreshHiringStore().catch((error) => {
-      console.error('[hiring-feed] background refresh failed:', (error as Error).message)
-    })
-  }
-
-  const profiles = normalizedSnapshot(stored)
+  const profiles = normalizedSnapshot([...storedByUrl.values()])
   const byId = new Map(profiles.map((profile) => [profile.id, profile]))
 
   const query = (params.get('query') || '').trim()
@@ -424,10 +507,13 @@ export default defineEventHandler(async (event) => {
     list(params, 'professions').length
     || params.get('ageMin')
     || params.get('ageMax')
-    || params.get('gender'),
+    || params.get('gender')
+    || params.get('salaryFrom')
+    || params.get('salaryTo')
+    || ((params.get('sort') || 'recent') !== 'recent'),
   )
   const professionQuery = query ? detectMentionedProfessions(query).length > 0 : false
-  const hasWebProfiles = webStored.length > 0 || targetedProfiles.length > 0
+  const hasWebProfiles = webStored.length > 0
   let page: CvProfile[] = []
   let count = 0
   let engine: 'elasticsearch' | 'memory' = 'memory'
@@ -460,18 +546,19 @@ export default defineEventHandler(async (event) => {
 
   if (engine === 'memory') {
     const filtered = profiles.filter((profile) => matchesFilters(profile, params))
-    filtered.sort((a, b) => Date.parse(b.activityAt || b.updatedAt || b.createdAt || '') - Date.parse(a.activityAt || a.updatedAt || a.createdAt || ''))
+    sortCandidateProfiles(
+      filtered,
+      (params.get('sort') || 'recent').trim().toLowerCase(),
+      (params.get('salaryCurrency') || 'USD').trim().toUpperCase(),
+    )
     count = filtered.length
     page = filtered.slice(offset, offset + limit)
   }
 
   const sourceStatuses = getHiringSourceDiagnostics()
-  // In-memory diagnostics disappear on every deploy. Merge the durable run
-  // history so a broken/empty web source remains visible instead of making a
-  // zero-result filter look like a legitimate empty market.
   const webStatusesByHandle = new Map(
     persistedSourceRuns
-      .filter((item) => /^web:/i.test(item.handle))
+      .filter((item) => /^(?:web|social):/i.test(item.handle))
       .map((item) => [item.handle.toLowerCase(), item]),
   )
   for (const item of getHiringWebDiagnostics()) webStatusesByHandle.set(item.handle.toLowerCase(), item)
@@ -484,12 +571,11 @@ export default defineEventHandler(async (event) => {
     ...webSourceStatuses
       .filter((item) => item.status === 'error')
       .map((item) => ({
-        source: 'key' in item ? item.key : item.handle.replace(/^web:/i, ''),
+        source: 'key' in item ? item.key : item.handle.replace(/^(?:web|social):/i, ''),
         country: item.country,
         handle: item.handle,
         error: item.error || 'source failed',
       })),
-    ...(targetedError ? [{ source: 'flagma-uz', country: 'UZ', handle: 'web:flagma-uz:search', error: targetedError }] : []),
   ]
 
   setResponseHeader(event, 'Cache-Control', 'no-store')
@@ -501,15 +587,12 @@ export default defineEventHandler(async (event) => {
     sourceStatuses,
     webSourceStatuses,
     sourceErrors,
-    // When crawling stops — a dead queue worker, a broker that refuses the
-    // login — the board keeps serving what it already had and looks healthy.
-    // This is the one field that gives that away.
     lastCrawlAt: [...persistedSourceRuns.map((run) => run.lastSuccessAt || ''), ...sourceStatuses.map((item) => item.checkedAt)]
       .filter(Boolean)
       .sort()
       .pop() || null,
-    funnel: getStoreFunnel(),
-    warming,
+    funnel: { parsed: 0, duplicate: 0, expired: 0, visibilityRejected: 0, shown: profiles.length },
+    warming: false,
     engine,
     filters: {
       countries: params.get('countries') || '',
@@ -517,6 +600,10 @@ export default defineEventHandler(async (event) => {
       query: params.get('query') || '',
       remote: params.get('remote') || '',
       experienceMin: params.get('experienceMin') || '',
+      salaryFrom: params.get('salaryFrom') || '',
+      salaryTo: params.get('salaryTo') || '',
+      salaryCurrency: params.get('salaryCurrency') || 'USD',
+      sort: params.get('sort') || 'recent',
       ageMin: params.get('ageMin') || '',
       ageMax: params.get('ageMax') || '',
       gender: params.get('gender') || '',
@@ -531,15 +618,18 @@ export default defineEventHandler(async (event) => {
     meta: {
       countries: HIRING_COUNTRIES,
       professions: professionValues(),
-      // Only origins that actually have candidates: offering "Web" while no
-      // board has stored anything hands the visitor a filter whose only
-      // possible result is an empty page.
       sources: [
         ...(profiles.some((profile) => profileOrigin(profile) === 'telegram')
           ? [{ value: 'telegram', label: 'Telegram', origin: 'telegram' }]
           : []),
         ...(profiles.some((profile) => profileOrigin(profile) === 'web')
           ? [{ value: 'web', label: 'Web', origin: 'web' }]
+          : []),
+        ...(profiles.some((profile) => profileOrigin(profile) === 'facebook')
+          ? [{ value: 'facebook', label: 'Facebook', origin: 'facebook' }]
+          : []),
+        ...(profiles.some((profile) => profileOrigin(profile) === 'threads')
+          ? [{ value: 'threads', label: 'Threads', origin: 'threads' }]
           : []),
         ...[...listWebSources(), ...listUzJobsSources()]
           .filter((source) => (sourceCounts(profiles)[source.key] || 0) > 0)

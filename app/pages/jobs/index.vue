@@ -1,89 +1,22 @@
 <script setup lang="ts">
 import { safeFetch } from "~/utils/safeFetch";
-import { buildCvProfile, scoreJob, scoreColor, type CvProfile } from "~/utils/atsScore";
+import { buildCvProfile, scoreJob, type CvProfile } from "~/utils/atsScore";
 import { extractCvText } from "~/utils/cvExtract";
+import JobCard from "~/components/jobs/JobCard.vue";
+import AtsPanel from "~/components/jobs/AtsPanel.vue";
+import RecentlyViewed from "~/components/jobs/RecentlyViewed.vue";
+import StatsPanel from "~/components/jobs/StatsPanel.vue";
+import type { Job, JobResult, JobStats, RecentJob } from "~/types/jobs";
 
 // Job Finder service. Auto-routed at /jobs. Aggregates many boards, enforces a
 // 14-day freshness cap server-side, offers full sort + advanced filters, shows
 // aggregate statistics (salary/countries/sources/languages/skills), and computes
 // an ATS match score for each vacancy from a CV that stays in the browser.
 
-interface LanguageReq { language: string; level?: string }
-interface JobSkillDetail { name: string; category: string; subcategory: string }
-interface Job {
-  id: string;
-  title: string;
-  company: string;
-  location: string;
-  url: string;
-  source: string;
-  remote: boolean;
-  tags: string[];
-  postedAt: string;
-  description?: string;
-  employmentType?: string;
-  salaryMin?: number;
-  salaryMax?: number;
-  salaryCurrency?: string;
-  applyUrl?: string;
-  // derived
-  country?: string;
-  city?: string;
-  workMode?: "remote" | "hybrid" | "office" | "unknown";
-  relocation?: "offered" | "none" | "unknown";
-  foreignerFriendly?: boolean;
-  suspicious?: boolean;
-  suspicionReasons?: string[];
-  riskCategory?: "gambling" | "adult" | "scam" | null;
-  noExperience?: boolean;
-  languages?: LanguageReq[];
-  skills?: string[];
-  niceToHave?: string[];
-  skillDetails?: JobSkillDetail[];
-  niceToHaveDetails?: JobSkillDetail[];
-  experienceMinYears?: number;
-  experienceMaxYears?: number;
-  salaryPeriod?: "hour" | "month" | "year";
-  salaryUsd?: number; // normalized ANNUAL midpoint in USD
-  salaryGross?: boolean;
-  salaryNegotiable?: boolean;
-  seniority?: "junior" | "middle" | "senior" | "lead" | null;
-  managementRole?: boolean;
-  education?: string;
-  schedule?: string;
-  contractType?: string;
-  deadline?: string;
-  tools?: string[];
-  applicationLanguage?: string;
-  employerType?: "direct" | "agency" | "board" | "telegram";
-}
-interface SalaryStat { count: number; medianUsd: number; avgUsd: number; minUsd: number; maxUsd: number }
-interface JobStats {
-  salary: SalaryStat;
-  bySource: Record<string, { count: number; medianUsd: number }>;
-  byCountry: Record<string, { count: number; medianUsd: number }>;
-  byWorkMode: Record<string, number>;
-  foreignerFriendly: number;
-  byLanguage: Record<string, number>;
-  topSkills: { skill: string; count: number }[];
-}
-interface JobResult {
-  jobs: Job[];
-  total: number;
-  page: number;
-  pageSize: number;
-  sources: Record<string, number>;
-  stats: JobStats;
-  rates?: Record<string, number>;
-  warming?: boolean;
-  loadedSources?: string[];
-  pendingSources?: string[];
-  failedSources?: string[];
-}
-
-const { t: translate } = useI18n();
+const { t: translate, locale } = useI18n();
 const t = (key: string, params: Record<string, unknown> = {}) =>
   translate(`jobs.${key}`, params);
+const label = (ru: string, en: string) => String(locale.value).toLowerCase().startsWith("ru") ? ru : en;
 const localePath = useLocalePath();
 
 useSeoMeta({
@@ -109,6 +42,9 @@ const sourceOptions = [
   { value: "ishgo", label: "ishGO.uz" },
   { value: "telegram", label: "Telegram" },
   { value: "olx", label: "OLX" },
+  { value: "linkedin", label: "LinkedIn" },
+  { value: "facebook", label: "Facebook" },
+  { value: "threads", label: "Threads" },
 ];
 
 // CIS-focused country list (RU/BY excluded by the backend). "Remote" is NOT a
@@ -317,7 +253,6 @@ function selectSavedView(view: SavedJobsView) {
 }
 
 // ---- Seen / recently-viewed (localStorage) ----
-type RecentJob = { id: string; title: string; company: string; url: string; source: string };
 const SEEN_KEY = "jobs:seen:v1";
 const RECENT_KEY = "jobs:recent:v1";
 const MAX_SEEN = 500;
@@ -915,54 +850,27 @@ onBeforeUnmount(() => {
 
 <template>
   <u-container class="jobs">
-    <decorative-easter-egg
-      class="jobs__easter-egg"
-      src="/images/easter-eggs/jobs-search.png"
-      :width="320"
-      :height="185"
-    />
+    <ocean-page-backdrop />
     <div class="jobs__header text-center space-y-3">
       <h1 class="jobs__title">{{ t("title") }}</h1>
       <p class="jobs__headline text-muted">{{ t("headline") }}</p>
       <p class="jobs__subtitle text-muted mx-auto">{{ t("subtitle") }}</p>
     </div>
 
-    <!-- ATS CV panel -->
-    <section class="ats">
-      <div class="ats__head">
-        <u-icon name="i-lucide-file-check-2" class="ats__icon" />
-        <div>
-          <div class="ats__title">{{ t("atsTitle") }}</div>
-          <div class="ats__intro text-muted">{{ t("atsIntro") }}</div>
-        </div>
-      </div>
-      <div class="ats__body">
-        <label class="ats__upload">
-          <input type="file" accept=".pdf,.docx,.txt,.md" class="hidden" @change="onCvFile" />
-          <u-icon name="i-lucide-upload" /> {{ t("atsUpload") }}
-        </label>
-        <u-textarea
-            v-model="cvPaste"
-            :rows="3"
-            :placeholder="t('atsPaste')"
-            class="ats__paste"
-            @blur="applyPastedCv"
-        />
-        <div class="ats__actions">
-          <u-button v-if="cvProfile" variant="soft" color="neutral" icon="i-lucide-x" @click="clearCv">
-            {{ t("atsClear") }}
-          </u-button>
-        </div>
-      </div>
-      <p v-if="cvError" class="jobs__error">{{ cvError }}</p>
-      <p v-else-if="cvLoading" class="text-muted ats__status">…</p>
-      <p v-else-if="cvProfile" class="ats__status" :style="{ color: '#34d399' }">{{ t("atsReady") }}</p>
-    </section>
+    <UiResultsLoader :loading="loading && savedView === 'active'" :label="t('searching')" min-height="420px">
+    <AtsPanel
+      v-model:paste="cvPaste"
+      :error="cvError"
+      :loading="cvLoading"
+      :ready="Boolean(cvProfile)"
+      @upload="onCvFile"
+      @apply="applyPastedCv"
+      @clear="clearCv"
+    />
 
     <!-- Filters + sort -->
     <form class="jobs__controls" @submit.prevent="load(1)">
       <u-input v-model="query" clearable icon="i-lucide-search" :label="t('search')" :placeholder="t('searchPlaceholder')" @clear="clearSearch" />
-      <u-input v-model.number="salaryMin" type="number" icon="i-lucide-banknote" :label="`${t('salaryMin')} (${displayCurrency}/${periodLabel(displayPeriod)})`" />
       <div class="jobs__sort">
         <u-icon name="i-lucide-arrow-down-wide-narrow" />
         <u-select-menu
@@ -1010,8 +918,8 @@ onBeforeUnmount(() => {
               @click="selectSavedView('hidden')"
           >{{ t("hiddenVacancies") }} · {{ hiddenJobs.length }}</button>
         </div>
-        <u-button type="submit" :loading="loading" icon="i-lucide-search">
-          {{ loading ? t("searching") : t("search") }}
+        <u-button type="submit" icon="i-lucide-search">
+          {{ t("search") }}
         </u-button>
       </div>
 
@@ -1023,105 +931,76 @@ onBeforeUnmount(() => {
         </button>
       </div>
       <div v-if="showAdvanced" class="jobs__advanced">
-        <div class="jobs__field">
-          <u-select-menu :label="t('country')"
-              v-model="countries" :items="countryItems" value-key="value" label-key="label"
-              multiple :placeholder="t('countryPlaceholder')"
-              class="jobs__select" @update:model-value="scheduleLoad()"
-          />
+        <section class="jobs-filter-group">
+          <div class="jobs-filter-group__title"><u-icon name="i-lucide-map-pin" /> {{ label("Местоположение", "Location") }}</div>
+          <div class="jobs-filter-group__grid jobs-filter-group__grid_location">
+            <div class="jobs__field">
+              <u-select-menu :label="t('country')" v-model="countries" :items="countryItems" value-key="value" label-key="label"
+                  multiple :placeholder="t('countryPlaceholder')" class="jobs__select" @update:model-value="scheduleLoad()" />
+            </div>
+            <div class="jobs__field jobs__field_wide">
+              <u-input v-model="cities" icon="i-lucide-map-pin" :label="t('cities')" :placeholder="t('citiesPlaceholder')"
+                  @keyup.enter="load(1)" @change="scheduleLoad()" />
+            </div>
+          </div>
+        </section>
+
+        <section class="jobs-filter-group jobs-filter-group_salary">
+          <div class="jobs-filter-group__title"><u-icon name="i-lucide-banknote" /> {{ label("Зарплата", "Salary") }}</div>
+          <div class="jobs-filter-group__grid jobs-filter-group__grid_salary">
+            <div class="jobs__field">
+              <u-input v-model.number="salaryMin" type="number" min="0" icon="i-lucide-banknote"
+                  :label="`${t('salaryMin')} (${displayCurrency}/${periodLabel(displayPeriod)})`" @change="scheduleLoad()" />
+            </div>
+            <div class="jobs__field">
+              <u-select-menu :label="t('currency')" v-model="displayCurrency" :items="currencyItems" value-key="value" label-key="label"
+                  class="jobs__select" @update:model-value="salaryMin && scheduleLoad()" />
+            </div>
+            <div class="jobs__field">
+              <u-select-menu :label="t('period')" v-model="displayPeriod" :items="periodItems" value-key="value" label-key="label"
+                  :search-input="false" class="jobs__select" @update:model-value="salaryMin && scheduleLoad()" />
+            </div>
+            <label class="jobs__remote jobs__field_inline">
+              <u-switch v-model="hasSalary" @update:model-value="scheduleLoad()" />
+              <span>{{ t("hasSalary") }}</span>
+            </label>
+          </div>
+        </section>
+
+        <section class="jobs-filter-group">
+          <div class="jobs-filter-group__title"><u-icon name="i-lucide-briefcase-business" /> {{ label("Условия работы", "Work conditions") }}</div>
+          <div class="jobs-filter-group__grid">
+            <div class="jobs__field"><u-select-menu :label="t('workMode')" v-model="workModeSelect" :items="workModeItems" value-key="value" label-key="label" :search-input="false" class="jobs__select" @update:model-value="scheduleLoad()" /></div>
+            <div class="jobs__field"><u-select-menu :label="t('relocation')" v-model="relocationSelect" :items="relocationItems" value-key="value" label-key="label" :search-input="false" class="jobs__select" @update:model-value="scheduleLoad()" /></div>
+            <div class="jobs__field"><u-select-menu :label="t('employment')" v-model="employmentKindSelect" :items="employmentKindItems" value-key="value" label-key="label" :search-input="false" class="jobs__select" @update:model-value="scheduleLoad()" /></div>
+            <div class="jobs__field"><u-input v-model.number="maxExperience" type="number" min="0" max="40" icon="i-lucide-briefcase" :label="t('experienceMax')" :placeholder="t('experienceMaxPlaceholder')" @keyup.enter="load(1)" @change="scheduleLoad()" /></div>
+            <label class="jobs__remote jobs__field_inline"><u-switch v-model="noExperience" @update:model-value="scheduleLoad()" /><span>{{ t("noExperience") }}</span></label>
+            <label class="jobs__remote jobs__field_inline"><u-switch v-model="foreignerOnly" @update:model-value="scheduleLoad()" /><span>{{ t("foreigner") }}</span></label>
+          </div>
+        </section>
+
+        <section class="jobs-filter-group">
+          <div class="jobs-filter-group__title"><u-icon name="i-lucide-languages" /> {{ label("Навыки и языки", "Skills & languages") }}</div>
+          <div class="jobs-filter-group__grid">
+            <div class="jobs__field"><u-select-menu :label="t('language')" v-model="languageSelect" :items="languageItems" value-key="value" label-key="label" class="jobs__select" @update:model-value="scheduleLoad()" /></div>
+            <div class="jobs__field"><u-select-menu :label="t('languageLevel')" v-model="languageLevelSelect" :items="levelItems" value-key="value" label-key="label" :search-input="false" :disabled="!language" class="jobs__select" @update:model-value="scheduleLoad()" /></div>
+            <div class="jobs__field"><u-select-menu :label="t('excludeLanguage')" v-model="excludeLanguages" :items="excludeLanguageItems" value-key="value" label-key="label" multiple :placeholder="t('excludeLangPlaceholder')" class="jobs__select" @update:model-value="scheduleLoad()" /></div>
+            <div class="jobs__field jobs__field_wide"><u-input v-model="skills" icon="i-lucide-wrench" :label="t('skills')" :placeholder="t('skillsPlaceholder')" @keyup.enter="load(1)" /></div>
+          </div>
+        </section>
+
+        <section class="jobs-filter-group jobs-filter-group_flags">
+          <div class="jobs-filter-group__title"><u-icon name="i-lucide-shield-check" /> {{ label("Исключения и охват", "Exclusions & coverage") }}</div>
+          <div class="jobs-filter-group__flags">
+            <label class="jobs__remote" :title="t('hideRiskyHint')"><u-switch v-model="hideRisky" @update:model-value="scheduleLoad()" /><span>{{ t("hideRisky") }}</span></label>
+            <label class="jobs__remote"><u-switch v-model="includeRu" @update:model-value="scheduleLoad()" /><span>{{ t("includeRu") }}</span></label>
+            <label class="jobs__remote"><u-switch v-model="includeBy" @update:model-value="scheduleLoad()" /><span>{{ t("includeBy") }}</span></label>
+          </div>
+        </section>
+
+        <div class="jobs-filter-actions">
+          <u-button type="button" variant="ghost" color="neutral" size="sm" icon="i-lucide-rotate-ccw" @click="resetFilters">{{ t("reset") }}</u-button>
         </div>
-        <div class="jobs__field jobs__field_wide">
-          <u-input
-              v-model="cities" icon="i-lucide-map-pin" :label="t('cities')" :placeholder="t('citiesPlaceholder')"
-              @keyup.enter="load(1)" @change="scheduleLoad()"
-          />
-        </div>
-        <div class="jobs__field">
-          <u-select-menu :label="t('currency')"
-              v-model="displayCurrency" :items="currencyItems" value-key="value" label-key="label"
-              class="jobs__select" @update:model-value="salaryMin && scheduleLoad()"
-          />
-        </div>
-        <div class="jobs__field">
-          <u-select-menu :label="t('period')"
-              v-model="displayPeriod" :items="periodItems" value-key="value" label-key="label"
-              :search-input="false" class="jobs__select" @update:model-value="salaryMin && scheduleLoad()"
-          />
-        </div>
-        <div class="jobs__field">
-          <u-select-menu :label="t('workMode')"
-              v-model="workModeSelect" :items="workModeItems" value-key="value" label-key="label"
-              :search-input="false" class="jobs__select" @update:model-value="scheduleLoad()"
-          />
-        </div>
-        <div class="jobs__field">
-          <u-select-menu :label="t('relocation')"
-              v-model="relocationSelect" :items="relocationItems" value-key="value" label-key="label"
-              :search-input="false" class="jobs__select" @update:model-value="scheduleLoad()"
-          />
-        </div>
-        <div class="jobs__field">
-          <u-select-menu :label="t('employment')"
-              v-model="employmentKindSelect" :items="employmentKindItems" value-key="value" label-key="label"
-              :search-input="false" class="jobs__select" @update:model-value="scheduleLoad()"
-          />
-        </div>
-        <div class="jobs__field">
-          <u-input
-              v-model.number="maxExperience" type="number" min="0" max="40"
-              icon="i-lucide-briefcase" :label="t('experienceMax')" :placeholder="t('experienceMaxPlaceholder')"
-              @keyup.enter="load(1)" @change="scheduleLoad()"
-          />
-        </div>
-        <div class="jobs__field">
-          <u-select-menu :label="t('language')"
-              v-model="languageSelect" :items="languageItems" value-key="value" label-key="label"
-              class="jobs__select" @update:model-value="scheduleLoad()"
-          />
-        </div>
-        <div class="jobs__field">
-          <u-select-menu :label="t('languageLevel')"
-              v-model="languageLevelSelect" :items="levelItems" value-key="value" label-key="label"
-              :search-input="false" :disabled="!language" class="jobs__select" @update:model-value="scheduleLoad()"
-          />
-        </div>
-        <div class="jobs__field">
-          <u-select-menu :label="t('excludeLanguage')"
-              v-model="excludeLanguages" :items="excludeLanguageItems" value-key="value" label-key="label"
-              multiple :placeholder="t('excludeLangPlaceholder')"
-              class="jobs__select" @update:model-value="scheduleLoad()"
-          />
-        </div>
-        <div class="jobs__field jobs__field_wide">
-          <u-input v-model="skills" icon="i-lucide-wrench" :label="t('skills')" :placeholder="t('skillsPlaceholder')" @keyup.enter="load(1)" />
-        </div>
-        <label class="jobs__remote jobs__field_inline">
-          <u-switch v-model="hasSalary" @update:model-value="scheduleLoad()" />
-          <span>{{ t("hasSalary") }}</span>
-        </label>
-        <label class="jobs__remote jobs__field_inline">
-          <u-switch v-model="foreignerOnly" @update:model-value="scheduleLoad()" />
-          <span>{{ t("foreigner") }}</span>
-        </label>
-        <label class="jobs__remote jobs__field_inline" :title="t('hideRiskyHint')">
-          <u-switch v-model="hideRisky" @update:model-value="scheduleLoad()" />
-          <span>{{ t("hideRisky") }}</span>
-        </label>
-        <label class="jobs__remote jobs__field_inline">
-          <u-switch v-model="noExperience" @update:model-value="scheduleLoad()" />
-          <span>{{ t("noExperience") }}</span>
-        </label>
-        <label class="jobs__remote jobs__field_inline">
-          <u-switch v-model="includeRu" @update:model-value="scheduleLoad()" />
-          <span>{{ t("includeRu") }}</span>
-        </label>
-        <label class="jobs__remote jobs__field_inline">
-          <u-switch v-model="includeBy" @update:model-value="scheduleLoad()" />
-          <span>{{ t("includeBy") }}</span>
-        </label>
-        <u-button type="button" variant="ghost" color="neutral" size="sm" icon="i-lucide-rotate-ccw" @click="resetFilters">
-          {{ t("reset") }}
-        </u-button>
       </div>
     </form>
 
@@ -1132,195 +1011,40 @@ onBeforeUnmount(() => {
     </p>
     <p v-else class="jobs__count text-muted">{{ t("jobsFound", { n: displayedTotal }) }}</p>
 
-    <!-- Statistics panel -->
-    <section v-if="savedView === 'active' && stats && total" class="stats">
-      <div class="stats__head">
-        <u-icon name="i-lucide-bar-chart-3" class="stats__icon" />
-        <span class="stats__title">{{ t("statsTitle") }}</span>
-      </div>
-      <div class="stats__grid">
-        <div class="stats__card">
-          <div class="stats__label">{{ t("statsSalary") }} ({{ displayCurrency }}/{{ periodLabel(displayPeriod) }})</div>
-          <template v-if="stats.salary.count">
-            <div class="stats__big">{{ money(stats.salary.medianUsd) }}</div>
-            <div class="stats__sub text-muted">
-              {{ t("statAvg") }} {{ money(stats.salary.avgUsd) }} ·
-              {{ t("statRange") }} {{ money(stats.salary.minUsd) }}–{{ money(stats.salary.maxUsd) }}
-            </div>
-            <div class="stats__sub text-muted">{{ t("statSamples", { n: stats.salary.count }) }}</div>
-          </template>
-          <div v-else class="stats__sub text-muted">{{ t("statNone") }}</div>
-        </div>
+    <StatsPanel
+      v-if="savedView === 'active' && stats && total"
+      :stats="stats"
+      :display-currency="displayCurrency"
+      :display-period-label="periodLabel(displayPeriod)"
+      :country-stats="countryStats"
+      :source-stats="sourceStats"
+      :work-mode-stats="workModeStats"
+      :language-stats="languageStats"
+      :money="money"
+      :country-label="countryLabel"
+    />
+    <RecentlyViewed :jobs="recentlyViewed" @open="openSharedJob" />
 
-        <div v-if="countryStats.length" class="stats__card">
-          <div class="stats__label">{{ t("statByCountry") }}</div>
-          <div v-for="[code, v] in countryStats.slice(0, 6)" :key="code" class="stats__row">
-            <span class="stats__row-key">{{ countryLabel(code) }}</span>
-            <span class="stats__row-val">{{ money(v.medianUsd) }} <em class="text-muted">({{ v.count }})</em></span>
-          </div>
-        </div>
-
-        <div v-if="sourceStats.length" class="stats__card">
-          <div class="stats__label">{{ t("statBySource") }}</div>
-          <div v-for="[src, v] in sourceStats.slice(0, 6)" :key="src" class="stats__row">
-            <span class="stats__row-key">{{ src }}</span>
-            <span class="stats__row-val">{{ money(v.medianUsd) }} <em class="text-muted">({{ v.count }})</em></span>
-          </div>
-        </div>
-
-        <div v-if="workModeStats.length" class="stats__card">
-          <div class="stats__label">{{ t("statByMode") }}</div>
-          <div v-for="wm in workModeStats" :key="wm.key" class="stats__row">
-            <span class="stats__row-key">{{ t("wm" + wm.key.charAt(0).toUpperCase() + wm.key.slice(1)) }}</span>
-            <span class="stats__row-val">{{ wm.n }}</span>
-          </div>
-          <div class="stats__row stats__row_hl">
-            <span class="stats__row-key">{{ t("foreigner") }}</span>
-            <span class="stats__row-val">{{ stats.foreignerFriendly }}</span>
-          </div>
-        </div>
-
-        <div v-if="languageStats.length" class="stats__card">
-          <div class="stats__label">{{ t("statLanguages") }}</div>
-          <div class="stats__chips">
-            <span v-for="[lang, n] in languageStats" :key="lang" class="stats__chip">{{ lang }} · {{ n }}</span>
-          </div>
-        </div>
-
-        <div v-if="stats.topSkills.length" class="stats__card stats__card_wide">
-          <div class="stats__label">{{ t("statTopSkills") }}</div>
-          <div class="stats__chips">
-            <span v-for="s in stats.topSkills" :key="s.skill" class="stats__chip stats__chip_skill">{{ s.skill }} · {{ s.count }}</span>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <!-- Recently viewed (last up to 4) -->
-    <section v-if="recentlyViewed.length" class="recent">
-      <div class="recent__title">{{ t("recentlyViewed") }}</div>
-      <div class="recent__row">
-        <button v-for="r in recentlyViewed" :key="r.id" type="button" class="recent__chip" @click="openSharedJob(r.id)">
-          <span class="recent__chip-title">{{ r.title }}</span>
-          <span class="recent__chip-company">{{ r.company }}</span>
-        </button>
-      </div>
-    </section>
-
-    <div class="jobs__results">
-     <div class="jobs__grid" :class="{ 'jobs__grid_loading': loading && savedView === 'active' }">
-      <div
+    <div class="jobs__grid">
+      <JobCard
           v-for="{ job, ats } in scored"
           :key="job.id"
-          class="job-card"
-          :class="{
-            'job-card_seen': isSeen(job.id),
-            'job-card_favorite': isFavorite(job.id),
-            'job-card_hidden': isHidden(job.id),
-          }"
-      >
-        <div class="job-card__head">
-          <button type="button" class="job-card__title" @click="openJob(job)">{{ job.title }}</button>
-          <div class="job-card__actions">
-            <span
-                v-if="ats"
-                class="job-card__ats"
-                :style="{ color: scoreColor(ats.score), borderColor: scoreColor(ats.score) }"
-                :title="ats.missing.length ? t('atsMissing') + ': ' + ats.missing.join(', ') : ''"
-            >{{ ats.score }}% {{ t("atsMatch") }}</span>
-            <button
-                type="button"
-                class="job-card__action"
-                :aria-label="t('share')"
-                :title="t('share')"
-                @click="shareJob(job)"
-            ><u-icon :name="shareCopiedJobId === job.id ? 'i-lucide-check' : 'i-lucide-share-2'" /></button>
-            <a
-                :href="job.url"
-                target="_blank"
-                rel="noopener noreferrer"
-                class="job-card__action"
-                :aria-label="t('openSource')"
-                :title="t('openSource')"
-                @click="markSeen(job)"
-            ><u-icon name="i-lucide-external-link" /></a>
-            <button
-                type="button"
-                class="job-card__action"
-                :class="{ 'job-card__action_active': isFavorite(job.id) }"
-                :aria-label="isFavorite(job.id) ? t('removeFavorite') : t('addFavorite')"
-                :title="isFavorite(job.id) ? t('removeFavorite') : t('addFavorite')"
-                @click="toggleFavorite(job)"
-            ><u-icon name="i-lucide-heart" /></button>
-            <button
-                type="button"
-                class="job-card__action"
-                :aria-label="isHidden(job.id) ? t('restoreVacancy') : t('hideVacancy')"
-                :title="isHidden(job.id) ? t('restoreVacancy') : t('hideVacancy')"
-                @click="toggleHidden(job)"
-            ><u-icon :name="isHidden(job.id) ? 'i-lucide-eye' : 'i-lucide-eye-off'" /></button>
-          </div>
-        </div>
-        <div class="job-card__meta text-muted">
-          <span class="job-card__company">{{ job.company }}</span>
-          <span class="job-card__dot">·</span>
-          <span>{{ job.location }}</span>
-          <span class="job-card__dot">·</span>
-          <span>{{ timeAgo(job.postedAt) }}</span>
-          <span v-if="employerTypeLabel(job.employerType)" class="job-card__badge job-card__badge_source">{{ employerTypeLabel(job.employerType) }}</span>
-          <span v-if="isToday(job.postedAt)" class="job-card__badge job-card__badge_new">{{ t("newToday") }}</span>
-          <span v-if="isSeen(job.id)" class="job-card__badge job-card__badge_seen">{{ t("seen") }}</span>
-          <span v-if="job.workMode && job.workMode !== 'unknown'" class="job-card__badge job-card__badge_mode">{{ t("wm" + job.workMode.charAt(0).toUpperCase() + job.workMode.slice(1)) }}</span>
-          <span v-else-if="job.remote" class="job-card__badge">{{ t("remote") }}</span>
-          <span v-if="empLabel(job.employmentKind)" class="job-card__badge job-card__badge_employment">{{ empLabel(job.employmentKind) }}</span>
-          <span v-if="seniorityLabel(job.seniority)" class="job-card__badge job-card__badge_seniority">{{ seniorityLabel(job.seniority) }}</span>
-          <span v-if="job.managementRole" class="job-card__badge job-card__badge_management">{{ t("management") }}</span>
-          <span v-if="job.experienceMinYears !== undefined && job.experienceMinYears > 0" class="job-card__badge job-card__badge_exp">{{ t("experienceYears", { n: job.experienceMinYears }) }}</span>
-          <span v-if="job.foreignerFriendly" class="job-card__badge job-card__badge_visa">{{ t("cardForeigner") }}</span>
-          <span v-if="job.suspicious" class="job-card__badge job-card__badge_suspicious" :title="suspicionHint(job)">⚠ {{ t("suspicious") }}</span>
-          <span v-if="job.relocation === 'offered'" class="job-card__badge job-card__badge_reloc">{{ t("cardReloc") }}</span>
-          <span v-if="formatSalary(job)" class="job-card__badge job-card__badge_salary">{{ t("salaryDisclosed") }}</span>
-          <span v-if="job.salaryNegotiable" class="job-card__badge job-card__badge_salary">{{ t("salaryNegotiable") }}</span>
-          <span v-if="formatSalary(job)" class="job-card__salary">{{ formatSalary(job) }}</span>
-          <span v-if="convertedSalary(job)" class="job-card__salary job-card__salary_conv">{{ convertedSalary(job) }}</span>
-        </div>
-        <div v-if="job.languages && job.languages.length" class="job-card__langs text-muted">
-          <u-icon name="i-lucide-languages" class="job-card__lang-icon" />
-          <span v-for="l in job.languages" :key="l.language" class="job-card__lang">
-            {{ l.language }}<template v-if="l.level"> ({{ l.level }})</template>
-          </span>
-        </div>
-        <p v-if="job.description" class="job-card__desc text-muted">{{ job.description }}</p>
-        <button type="button" class="job-card__details-btn" @click="openJob(job)">{{ t("viewVacancy") }}</button>
-        <template v-if="ats">
-          <div v-if="ats.matched.length" class="job-card__skills">
-            <span class="job-card__skills-label">{{ t("atsMatched") }}:</span>
-            <span v-for="kw in ats.matched" :key="kw" class="job-card__tag job-card__tag_match">{{ kw }}</span>
-          </div>
-          <div v-if="ats.missing.length" class="job-card__skills">
-            <span class="job-card__skills-label">{{ t("atsMissing") }}:</span>
-            <span v-for="kw in ats.missing" :key="kw" class="job-card__tag job-card__tag_miss">{{ kw }}</span>
-          </div>
-          <div v-if="!ats.matched.length && !ats.missing.length" class="job-card__skills">
-            <span class="job-card__skills-label">{{ t("atsNoSkills") }}</span>
-          </div>
-        </template>
-        <div v-else-if="job.skills && job.skills.length" class="job-card__tags">
-          <span v-for="s in job.skills.slice(0, 8)" :key="s" class="job-card__tag job-card__tag_skill">{{ s }}</span>
-          <span v-for="s in (job.niceToHave || []).slice(0, 4)" :key="'plus-' + s" class="job-card__tag job-card__tag_plus" :title="t('vNiceToHave')">+{{ s }}</span>
-        </div>
-        <div v-else-if="job.tags.length" class="job-card__tags">
-          <span v-for="tag in job.tags.slice(0, 6)" :key="tag" class="job-card__tag">{{ tag }}</span>
-        </div>
-      </div>
-     </div>
-     <div v-if="loading" class="jobs__loader" role="status" aria-live="polite">
-       <u-icon name="i-lucide-loader-circle" class="jobs__loader-icon" />
-       <span>{{ t("searching") }}</span>
-     </div>
+          :job="job"
+          :ats="ats"
+          :seen="isSeen(job.id)"
+          :favorite="isFavorite(job.id)"
+          :hidden="isHidden(job.id)"
+          :share-copied="shareCopiedJobId === job.id"
+          :salary="formatSalary(job)"
+          :converted-salary="convertedSalary(job)"
+          @open="openJob"
+          @share="shareJob"
+          @seen="markSeen"
+          @favorite="toggleFavorite"
+          @hidden="toggleHidden"
+      />
     </div>
-
-    <div v-if="!loading && !(warming && savedView === 'active') && !displayedJobs.length && !failed" class="jobs__empty">
+<div v-if="!loading && !(warming && savedView === 'active') && !displayedJobs.length && !failed" class="jobs__empty">
       <div class="text-muted">{{ t("empty") }}</div>
     </div>
 
@@ -1336,6 +1060,8 @@ onBeforeUnmount(() => {
       </u-button>
       <span class="text-muted">{{ t("shown", { shown: displayedJobs.length, total }) }}</span>
     </div>
+
+    </UiResultsLoader>
 
     <!-- Full vacancy popup -->
     <u-modal v-model:open="jobModalOpen" :title="activeJob?.title || ''" :ui="{ content: 'max-w-2xl' }">
@@ -1425,41 +1151,11 @@ onBeforeUnmount(() => {
 </template>
 
 <style scoped>
-.jobs { position: relative; isolation: isolate; overflow: hidden; padding-top: 24px; padding-bottom: 96px; }
+.jobs { position: relative; isolation: isolate; padding-top: 24px; padding-bottom: 96px; }
 .jobs__header { position: relative; z-index: 1; }
-.jobs__easter-egg {
-  position: absolute; top: 4px; left: -24px; z-index: 0;
-  width: 270px; opacity: 0.18;
-}
 .jobs__title { font-size: 32px; font-weight: 600; }
 .jobs__headline { font-size: 16px; }
 .jobs__subtitle { max-width: 760px; font-size: 14px; }
-
-.ats {
-  margin: 28px 0 8px;
-  padding: 16px;
-  border-radius: 10px;
-  border: 1px solid var(--line);
-  background: rgba(224, 103, 154, 0.06);
-}
-.ats__head { display: flex; gap: 12px; align-items: flex-start; }
-.ats__icon { font-size: 22px; color: var(--color-primary, #e0679a); margin-top: 2px; }
-.ats__title { font-weight: 600; }
-.ats__intro { font-size: 13px; }
-.ats__body {
-  display: grid; gap: 10px; margin-top: 12px; align-items: center;
-  grid-template-columns: 1fr;
-  @media (min-width: 800px) { grid-template-columns: auto 1fr auto; }
-}
-.ats__upload {
-  display: inline-flex; align-items: center; gap: 8px; white-space: nowrap;
-  height: 40px; padding: 0 14px; border-radius: 10px; cursor: pointer;
-  border: 1px dashed rgba(224, 103, 154, 0.5); color: var(--text-white, inherit); font-weight: 700; font-size: 13px;
-}
-.ats__paste { width: 100%; }
-.ats__actions { display: flex; justify-content: flex-end; }
-.ats__status { margin-top: 10px; font-size: 13px; }
-.hidden { display: none; }
 
 .jobs__controls {
   margin: 16px 0 28px; display: grid; gap: 12px; grid-template-columns: 1fr;
@@ -1502,100 +1198,42 @@ onBeforeUnmount(() => {
 }
 .jobs__advbtn:hover { color: var(--text-white); }
 .jobs__advanced {
-  grid-column: 1 / -1; display: grid; gap: 12px 14px; align-items: end;
-  grid-template-columns: 1fr;
-  padding: 14px; border-radius: 8px; border: 1px solid var(--line); background: rgba(255,255,255,0.02);
-  @media (min-width: 700px) { grid-template-columns: repeat(3, 1fr); }
-  @media (min-width: 1000px) { grid-template-columns: repeat(4, 1fr); }
+  grid-column: 1 / -1; display: grid; grid-template-columns: 1fr; gap: 12px;
+  padding: 14px; border-radius: 10px; border: 1px solid var(--line); background: var(--ocean-form-surface);
+  box-shadow: 0 18px 42px rgba(2, 5, 18, 0.22);
 }
-.jobs__field { display: flex; flex-direction: column; gap: 5px; }
+.jobs-filter-group { min-width: 0; padding: 14px; border: 1px solid var(--line); border-radius: 9px; background: var(--ocean-form-surface-soft); }
+.jobs-filter-group__title { display: flex; align-items: center; gap: 7px; margin-bottom: 12px; color: var(--ui-text-muted); font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: .04em; }
+.jobs-filter-group__title :deep(svg) { color: var(--accent-pink); }
+.jobs-filter-group__grid { display: grid; grid-template-columns: 1fr; gap: 12px; align-items: end; }
+.jobs-filter-group__flags { display: flex; flex-wrap: wrap; gap: 14px 24px; align-items: center; }
+.jobs-filter-actions { display: flex; justify-content: flex-end; }
+.jobs__field { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
 .jobs__field-label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; opacity: 0.7; }
-.jobs__field_wide { @media (min-width: 700px) { grid-column: span 2; } }
-.jobs__field_inline { align-self: center; margin-top: 14px; }
-
-.stats {
-  margin: 4px 0 26px; padding: 16px; border-radius: 10px;
-  border: 1px solid var(--line); background: rgba(52,211,153,0.05);
+.jobs__field_inline { align-self: center; min-height: var(--ui-control-h-md); }
+@media (min-width: 700px) {
+  .jobs__advanced { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .jobs-filter-group__grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .jobs-filter-group__grid_salary { grid-template-columns: minmax(0, 1.4fr) minmax(110px, .7fr) minmax(130px, .8fr); }
+  .jobs-filter-group__grid_salary .jobs__field_inline { grid-column: 1 / -1; }
+  .jobs__field_wide { grid-column: span 2; }
+  .jobs-filter-actions { grid-column: 1 / -1; }
 }
-.stats__head { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
-.stats__icon { font-size: 20px; color: #34d399; }
-.stats__title { font-weight: 600; }
-.stats__grid { display: grid; gap: 12px; grid-template-columns: 1fr; @media (min-width: 640px) { grid-template-columns: 1fr 1fr; } @media (min-width: 1000px) { grid-template-columns: repeat(3, 1fr); } }
-.stats__card { padding: 12px 14px; border-radius: 8px; border: 1px solid var(--line); background: rgba(255,255,255,0.03); }
-.stats__card_wide { @media (min-width: 640px) { grid-column: 1 / -1; } }
-.stats__label { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; opacity: 0.7; margin-bottom: 8px; }
-.stats__big { font-size: 26px; font-weight: 600; color: #34d399; }
-.stats__sub { font-size: 12px; margin-top: 2px; }
-.stats__row { display: flex; justify-content: space-between; gap: 10px; font-size: 13px; padding: 2px 0; }
-.stats__row_hl { border-top: 1px solid var(--line); margin-top: 4px; padding-top: 6px; }
-.stats__row-key { font-weight: 600; }
-.stats__row-val { font-weight: 600; white-space: nowrap; }
-.stats__row-val em { font-weight: 500; font-style: normal; font-size: 11px; }
-.stats__chips { display: flex; flex-wrap: wrap; gap: 6px; }
-.stats__chip { font-size: 12px; padding: 2px 9px; border-radius: 6px; border: 1px solid var(--line); color: var(--ui-text-muted); }
-.stats__chip_skill { border-color: rgba(224, 103, 154,0.35); color: #e79ec0; }
+@media (min-width: 1200px) {
+  .jobs__advanced { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .jobs-filter-group__grid_location { grid-template-columns: minmax(180px, .8fr) minmax(0, 1.6fr); }
+}
 
-.jobs__results { position: relative; }
 .jobs__grid {
-  display: grid; gap: 12px; grid-template-columns: 1fr; align-items: stretch;
+  display: grid; gap: 14px; grid-template-columns: 1fr; align-items: stretch;
   grid-auto-rows: 1fr; /* every card the same height across all rows */
-  @media (min-width: 640px) { grid-template-columns: repeat(2, 1fr); }
-  @media (min-width: 1024px) { grid-template-columns: repeat(3, 1fr); }
+  @media (min-width: 640px) { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  @media (min-width: 1024px) { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  @media (min-width: 1440px) { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 }
-/* Dim + lock the current results while a new page/filter is loading, and float a
-   spinner over them so it's clear the list is refreshing (not empty). */
-.jobs__grid_loading { opacity: 0.35; pointer-events: none; transition: opacity 140ms ease; }
-.jobs__loader {
-  position: absolute; inset: 0; display: flex; align-items: flex-start; justify-content: center;
-  gap: 10px; padding-top: 72px; color: var(--ui-text-muted); font-weight: 600; z-index: 2;
-}
-.jobs__loader-icon { width: 28px; height: 28px; animation: jobs-spin 0.7s linear infinite; }
-@keyframes jobs-spin { to { transform: rotate(360deg); } }
-.job-card {
-  padding: 16px; border-radius: 10px; border: 1px solid var(--line);
-  background: rgba(255,255,255,0.03); box-shadow: inset 0 1px 0 rgba(255,255,255,0.06);
-  transition: transform 140ms ease, border-color 180ms ease;
-  /* Uniform cards: fill the grid cell so every card in a row is the same height. */
-  height: 100%; min-height: 210px; display: flex; flex-direction: column;
-}
-/* Tags/skills sink to the bottom so cards line up regardless of body length. */
-/* Bottom group (details button + tags/skills) is pushed down via the
-   details button's margin-top:auto, so every card's footer sits at the bottom. */
-.job-card:hover { transform: translateY(-2px); border-color: rgba(224, 103, 154,0.40); }
-.job-card__head {
-  display: grid; grid-template-columns: minmax(0, 1fr) auto;
-  /* Centred, not start-aligned: the action buttons are taller than the title's
-     line box, so a shared top edge left the title text above the icon centres. */
-  align-items: center; column-gap: 10px; row-gap: 4px;
-}
-.job-card__actions {
-  justify-self: end; display: flex; flex-wrap: wrap; justify-content: flex-end;
-  align-items: center; gap: 5px; max-width: 100%;
-}
-.job-card__action {
-  width: 28px; height: 28px; display: inline-grid; place-items: center;
-  padding: 0; border: 1px solid var(--line); border-radius: 6px;
-  background: transparent; color: var(--ui-text-muted); cursor: pointer;
-}
-.job-card__action:hover { color: var(--accent-pink, #e0679a); border-color: rgba(224,103,154,0.45); }
-.job-card__action_active { color: var(--accent-pink, #e0679a); background: rgba(224,103,154,0.12); }
-.job-card__title {
-  min-width: 0; overflow-wrap: anywhere;
-  font-weight: 600; font-size: 16px; line-height: 1.35;
-  padding: 0; border: 0; background: transparent; cursor: pointer; text-align: left;
-  text-decoration: none; color: var(--text-white, inherit);
-}
-.job-card__title:hover { color: var(--color-primary, #e0679a); }
-.job-card__src { justify-self: end; font-size: 11px; text-transform: capitalize; opacity: 0.6; white-space: nowrap; }
-.job-card__ats {
-  justify-self: end; white-space: nowrap;
-  font-size: 12px; font-weight: 600; padding: 1px 8px;
-  border: 1px solid; border-radius: 6px;
-}
-.job-card__meta { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: 12px; margin-top: 4px; }
 .job-card__company { font-weight: 600; }
 .job-card__dot { opacity: 0.5; }
-.job-card__badge { flex: 0 0 auto; white-space: nowrap; border-radius: 6px; padding: 1px 7px; font-size: 11px; color: #34d399; background: rgba(52,211,153,0.14); }
+.job-card__badge { white-space: nowrap; border-radius: 6px; padding: 2px 8px; font-size: 11px; line-height: 1.35; color: #34d399; background: rgba(52,211,153,0.14); }
 .job-card__badge_mode { color: #38bdf8; background: rgba(56,189,248,0.14); }
 .job-card__badge_visa { color: #fbbf24; background: rgba(251,191,36,0.14); }
 .job-card__badge_suspicious { color: #f87171; background: rgba(248,113,113,0.14); border-color: rgba(248,113,113,0.35); cursor: help; }
@@ -1606,32 +1244,20 @@ onBeforeUnmount(() => {
 .job-card__badge_seniority { color: #f9a8d4; background: rgba(236,72,153,0.13); }
 .job-card__badge_management { color: #fcd34d; background: rgba(245,158,11,0.13); }
 .job-card__badge_salary { color: #f0abfc; background: rgba(217,70,239,0.12); }
-.job-card__salary { border-radius: 6px; padding: 1px 7px; font-size: 11px; color: #e0679a; background: rgba(224, 103, 154,0.14); }
-.job-card__salary_conv { color: #94a3b8; background: rgba(148,163,184,0.12); font-weight: 600; }
+.job-card__salary { color: #6ee7b7; font-size: 15px; line-height: 1.3; font-weight: 800; letter-spacing: 0.01em; }
+.job-card__salary_conv { color: #a7f3d0; font-size: 11px; font-weight: 600; opacity: 0.78; }
 .job-card__langs { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: 12px; margin-top: 6px; }
 .job-card__lang-icon { font-size: 14px; opacity: 0.7; }
 .job-card__lang:not(:last-child)::after { content: ","; }
-.job-card__desc {
-  margin-top: 8px; font-size: 13px; line-height: 1.45;
-  display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden;
-}
-.job-card__tags, .job-card__skills { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; align-items: center; }
-.job-card__skills-label { font-size: 11px; opacity: 0.7; }
-.job-card__tag { border-radius: 6px; padding: 2px 8px; font-size: 11px; border: 1px solid var(--line); color: var(--ui-text-muted); }
+.job-card__tags { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.job-card__tag { border-radius: 6px; padding: 3px 8px; font-size: 11px; line-height: 1.3; border: 1px solid var(--line); color: var(--ui-text-muted); }
 .job-card__tag_skill { border-color: rgba(224, 103, 154,0.3); color: #e79ec0; }
 .job-card__tag_plus { border-color: rgba(52,211,153,0.35); color: #6ee7b7; }
-.job-card__tag_match { border-color: rgba(52,211,153,0.45); color: #34d399; background: rgba(52,211,153,0.10); }
-.job-card__tag_miss { border-color: rgba(248,113,113,0.4); color: #f87171; }
 .jobs__empty { margin-top: 18px; text-align: center; padding: 18px; border-radius: 10px; border: 1px solid var(--line); background: rgba(255,255,255,0.03); }
 .jobs__load-more {
   min-height: 76px; display: flex; flex-direction: column; align-items: center;
   justify-content: center; gap: 8px; margin-top: 16px; font-size: 12px;
 }
-.job-card__details-btn {
-  align-self: flex-start; margin-top: auto; padding: 0; background: none; border: none;
-  color: var(--accent-pink, #e0679a); font-size: 12px; font-weight: 600; cursor: pointer;
-}
-.job-card__details-btn:hover { text-decoration: underline; }
 .job-modal { display: flex; flex-direction: column; gap: 12px; }
 .job-modal__meta { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: 12.5px; }
 .job-modal__badges { display: flex; flex-wrap: wrap; gap: 6px; }
@@ -1641,32 +1267,4 @@ onBeforeUnmount(() => {
   color: var(--text-soft, inherit); max-height: 52vh; overflow-y: auto;
 }
 .job-modal__tags { margin-top: 4px; }
-/* The apply and source links now use the shared footer classes from
-   components/ui/ModalFooter.vue. Their old fixed 36px height was what the
-   global override stylesheet existed to undo. */
-.job-card_seen { opacity: 0.72; }
-.job-card_seen:hover { opacity: 1; }
-.job-card_favorite { border-color: rgba(224,103,154,0.48); }
-.job-card_hidden { opacity: 0.62; border-style: dashed; }
-.job-card__badge_seen { color: #94a3b8; background: rgba(148,163,184,0.14); }
-.recent { margin: 4px 0 18px; }
-.recent__title {
-  font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em;
-  opacity: 0.7; margin-bottom: 8px;
-}
-.recent__row { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 8px; }
-.recent__chip {
-  display: flex; flex-direction: column; gap: 2px; text-align: left; min-width: 0;
-  padding: 8px 12px; border-radius: 8px; border: 1px solid var(--line);
-  background: rgba(255,255,255,0.03); cursor: pointer; transition: border-color 160ms ease;
-}
-.recent__chip:hover { border-color: rgba(224,103,154,0.4); }
-.recent__chip-title {
-  font-size: 12.5px; font-weight: 600; color: var(--text-white, inherit);
-  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-}
-.recent__chip-company { font-size: 11px; color: var(--ui-text-muted); }
-@media (max-width: 1100px) {
-  .jobs__easter-egg { display: none; }
-}
 </style>

@@ -45,7 +45,7 @@ const EXTRA_TELEGRAM_JOB_CHANNELS: TelegramChannel[] = [
 ]
 
 const UA = 'jobFinder/1.0 (job aggregator; contact: admin@whiteslove.me)'
-const DESC_MAX = 4000
+const DESC_MAX = Number.POSITIVE_INFINITY
 
 interface TelegramWorkerMessage {
   id: number
