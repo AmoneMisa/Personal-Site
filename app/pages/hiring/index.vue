@@ -22,6 +22,7 @@ import { useSavedCollections } from "~/composables/search/useSavedCollections";
 import { useInfiniteFeed } from "~/composables/search/useInfiniteFeed";
 import { ANY_SELECT_VALUE, useNullableSelect } from "~/composables/search/useNullableSelect";
 import { useShareLink } from "~/composables/search/useShareLink";
+import { regionalSearchCountry } from "~/utils/search/regionalCountry";
 import {
   type HiringCvProfile as CvProfile,
   type HiringFeedResult as FeedResult,
@@ -46,6 +47,7 @@ const { t: translate, locale } = useI18n();
 const t = (key: string, params: Record<string, unknown> = {}) => translate(`hiring.${key}`, params);
 const route = useRoute();
 const router = useRouter();
+const defaultCountry = ref("UA");
 const professionLocale = computed(() => hiringProfessionLocale(locale.value));
 const cityLabel = (value?: string | null) => locationLabel(value, String(locale.value), "city");
 
@@ -144,6 +146,7 @@ const { meta, countryItems, cityItems, salaryCurrencyItems, loadMeta } = useHiri
   locale,
   t,
   cityLabel,
+  preferredCountry: () => defaultCountry.value,
 });
 
 const availableSources = ref<SourceOption[]>([]);
@@ -244,7 +247,7 @@ useInfiniteFeed({
   rootMargin: "500px 0px",
 });
 
-const hiringRouteState = useHiringRouteState({ router, route, filters: hiringFilters, skillQuery: canonicalSkillQuery });
+const hiringRouteState = useHiringRouteState({ router, route, filters: hiringFilters, skillQuery: canonicalSkillQuery, defaultCountry: () => defaultCountry.value });
 function currentFilterQuery(): Record<string, string> { return hiringRouteState.serialize(); }
 function applyQueryParams(params: Record<string, unknown>) { hiringRouteState.deserialize(params); }
 
@@ -313,6 +316,7 @@ function selectSource(v: string) {
 }
 function resetFilters() {
   resetFilterValues();
+  countries.value = [defaultCountry.value];
   scheduleLoad(80);
 }
 function clearProfessions() {
@@ -469,6 +473,7 @@ onMounted(async () => {
   const sharedCvId = queryString(route.query.cv);
   const sharedCvSource = queryString(route.query.cvSource);
   const sharedCvCountry = queryString(route.query.cvCountry);
+  defaultCountry.value = regionalSearchCountry();
   loadPersonalState();
   applyQueryParams(route.query);
   await loadMeta();

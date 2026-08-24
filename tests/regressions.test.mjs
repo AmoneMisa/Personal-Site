@@ -93,6 +93,7 @@ test('board pages share filter primitives and flat finder starts from a regional
   const flat = readFileSync(new URL('../app/pages/flat-finder/index.vue', import.meta.url), 'utf8')
   const hiring = readFileSync(new URL('../app/pages/hiring/index.vue', import.meta.url), 'utf8')
   const jobs = readFileSync(new URL('../app/pages/jobs/index.vue', import.meta.url), 'utf8')
+  const regionalCountry = readFileSync(new URL('../app/utils/search/regionalCountry.ts', import.meta.url), 'utf8')
   const jobFilterBlocks = readFileSync(new URL('../app/composables/jobs/useJobFilterBlocks.ts', import.meta.url), 'utf8')
   const blocks = readFileSync(new URL('../app/components/search/SearchFilterBlocks.vue', import.meta.url), 'utf8')
   const control = readFileSync(new URL('../app/components/search/SearchFilterControl.vue', import.meta.url), 'utf8')
@@ -108,7 +109,9 @@ test('board pages share filter primitives and flat finder starts from a regional
   assert.match(jobFilterBlocks, /control:\s*"checkbox"/u)
   assert.match(checkbox, /const id = useId\(\)/u)
   assert.match(checkbox, /linear-gradient\(135deg, var\(--accent-pink/u)
-  assert.match(flat, /timeZone\.startsWith\("Asia\/"\)\s*\?\s*"UZ"\s*:\s*"UA"/u)
+  assert.match(flat, /regionalSearchCountry/u)
+  assert.match(hiring, /regionalSearchCountry/u)
+  assert.match(regionalCountry, /timeZone\.startsWith\("Asia\/"\)\s*\?\s*"UZ"\s*:\s*"UA"/u)
   assert.match(flat, /countries\.value\s*=\s*\[defaultCountry\.value\]/u)
 })
 

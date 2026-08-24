@@ -15,6 +15,7 @@ import SearchSourceTabs from "~/components/search/SearchSourceTabs.vue";
 import SearchEmptyState from "~/components/search/SearchEmptyState.vue";
 import { queryString } from "~/utils/queryParams";
 import { convertCurrency } from "~/utils/search/money";
+import { regionalSearchCountry } from "~/utils/search/regionalCountry";
 import { useFlatFilters } from "~/composables/flats/useFlatFilters";
 import { useFlatFilterBlocks } from "~/composables/flats/useFlatFilterBlocks";
 import { useFlatFeed } from "~/composables/flats/useFlatFeed";
@@ -64,11 +65,6 @@ useSeoMeta({
 // What "Reset filters" selects. An empty list means every country, so a cleared
 // form needs a real choice rather than the absence of one.
 const defaultCountry = ref("UA");
-function regionalDefaultCountry(): "UA" | "UZ" {
-  if (!import.meta.client) return "UA";
-  const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone || "";
-  return timeZone.startsWith("Asia/") ? "UZ" : "UA";
-}
 const flatFilters = useFlatFilters();
 const {
   countries, city, district, propertyType, dealType, agency, petFriendly, roomOnlyFilter,
@@ -515,7 +511,7 @@ async function openSharedListing(id: string, sourceName = "", countryCode = "", 
 }
 onMounted(async () => {
   const sharedFlatId = queryString(route.query.flat); const sharedFlatSource = queryString(route.query.flatSource); const sharedFlatCountry = queryString(route.query.flatCountry);
-  defaultCountry.value = regionalDefaultCountry();
+  defaultCountry.value = regionalSearchCountry();
   if (!queryString(route.query.countries)) countries.value = [defaultCountry.value];
   loadPersonalState(); applyQueryParams(route.query); void loadRates(); await loadMeta(); await nextTick(); restoring.value = false;
   if (queryString(route.query.shared) === "1") { showAdvanced.value = true; sharedLinkOpened.value = true; shareModalOpen.value = true; }

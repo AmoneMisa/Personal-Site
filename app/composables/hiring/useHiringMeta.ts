@@ -9,6 +9,7 @@ interface HiringMetaOptions {
   locale: Ref<string>;
   t: (key: string) => string;
   cityLabel: (value: string) => string;
+  preferredCountry: () => string;
 }
 
 export function useHiringMeta(options: HiringMetaOptions) {
@@ -36,7 +37,10 @@ export function useHiringMeta(options: HiringMetaOptions) {
     const { data } = await safeFetch<HiringCountryMeta[]>("/hiring-meta");
     if (!Array.isArray(data)) return;
     meta.value = data;
-    if (!options.countries.value.length) options.countries.value = data.map((country) => country.code);
+    if (!options.countries.value.length) {
+      const preferred = options.preferredCountry();
+      options.countries.value = [data.some((country) => country.code === preferred) ? preferred : "UA"];
+    }
   }
 
   return { meta, cityOptions, countryItems, cityItems, salaryCurrencyItems, loadMeta };

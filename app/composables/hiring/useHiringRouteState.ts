@@ -10,6 +10,7 @@ export function useHiringRouteState(options: {
   route: { query: LocationQuery };
   filters: ReturnType<typeof useHiringFilters>;
   skillQuery: () => string;
+  defaultCountry: () => string;
 }) {
   const {
     countries, city, remote, experienceMin, salaryFrom, salaryTo, salaryCurrency,
@@ -41,7 +42,7 @@ export function useHiringRouteState(options: {
 
   function deserialize(params: LocationQuery | Record<string, unknown>) {
     const countryParam = queryString(params.countries);
-    if (countryParam) countries.value = countryParam.split(",").filter(Boolean);
+    countries.value = countryParam ? countryParam.split(",").filter(Boolean) : [options.defaultCountry()];
     city.value = queryString(params.city);
     remote.value = params.remote === "1" ? "yes" : params.remote === "0" ? "no" : "any";
     experienceMin.value = Number(queryString(params.experienceMin)) || undefined;
