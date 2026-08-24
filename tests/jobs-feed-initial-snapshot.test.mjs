@@ -7,5 +7,5 @@ const route = readFileSync(new URL('../server/routes/jobs-feed.get.ts', import.m
 test('jobs feed waits for the persisted snapshot instead of returning a false empty result', () => {
   assert.match(route, /return getStoredJobsSnapshot\(\)/)
   assert.doesNotMatch(route, /Promise\.race\s*\(/)
-  assert.doesNotMatch(route, /setTimeout\([^\n]*resolve\(\[\]\)/)
+  assert.doesNotMatch(route, /resolve\(\[\]\)/)
 })
