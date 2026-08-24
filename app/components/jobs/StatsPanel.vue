@@ -195,7 +195,7 @@ function selectTrendScope(value: string) {
 
       <article v-if="experienceStats.length" class="stats__card">
         <div class="stats__label">{{ t("vExperience") }}</div>
-        <div v-if="stats.experience?.medianYears != null" class="stats__sub stats__sub_lead">{{ t("statAvg") }}: {{ t("experienceYears", { n: stats.experience.medianYears }) }}</div>
+        <div v-if="stats.experience?.medianYears != null" class="stats__sub stats__sub_lead">{{ t("vExperience") }}: {{ t("experienceYears", { n: stats.experience.medianYears }) }}</div>
         <div v-for="item in experienceStats" :key="item.key" class="stats__row"><span>{{ item.label }}</span><strong>{{ item.n }}</strong></div>
       </article>
 
