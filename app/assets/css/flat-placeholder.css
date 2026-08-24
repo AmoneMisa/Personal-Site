@@ -1,0 +1,10 @@
+.flat-card__no-photo {
+  background-image: url('/svg/shark.svg') !important;
+  background-repeat: no-repeat !important;
+  background-position: center !important;
+  background-size: min(46%, 180px) auto !important;
+}
+
+.flat-card__no-photo > * {
+  display: none !important;
+}
