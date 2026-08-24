@@ -69,8 +69,8 @@ export default defineNuxtConfig({
             strictMessage: false,
         },
         locales: [
-            {code: 'en', language: 'en-US', name: 'English', file: 'en.json'},
-            {code: 'ru', language: 'ru-RU', name: 'Русский', file: 'ru.json'},
+            {code: 'en', language: 'en-US', name: 'English', files: ['en.json', 'errors.en.json']},
+            {code: 'ru', language: 'ru-RU', name: 'Русский', files: ['ru.json', 'errors.ru.json']},
         ],
         // Russian is the default and stays unprefixed at "/"; other locales get a
         // path prefix ("/en/..."). This gives every language a distinct, indexable
