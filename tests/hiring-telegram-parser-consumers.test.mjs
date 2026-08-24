@@ -17,7 +17,7 @@ test('social candidate ingestion imports the domain parser directly', async () =
 })
 
 test('Telegram transport no longer acts as a parser facade', async () => {
-  const source = await read('server/utils/hiringSources.ts')
+  const source = await read('server/hiring/sources/telegramRuntime.ts')
   assert.doesNotMatch(source, /export \{[^}]*isLikelyCvPost[^}]*\} from/u)
   assert.doesNotMatch(source, /export \{[^}]*detectCity[^}]*\} from/u)
   assert.match(source, /classifyTelegramMessage/u)
