@@ -16,6 +16,12 @@ const heroStats = computed(() =>
 
 <template>
   <section class="rd-section hero" id="hero-anchor">
+    <decorative-easter-egg
+      class="hero__easter-egg"
+      src="/images/easter-eggs/home-high-five.png"
+      :width="280"
+      :height="234"
+    />
     <div class="rd-wrap">
       <div class="hero__grid">
         <div class="hero__content">
@@ -61,7 +67,22 @@ const heroStats = computed(() =>
 
 <style scoped lang="scss">
 .hero {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
   padding: 76px 0 68px;
+}
+.hero > .rd-wrap {
+  position: relative;
+  z-index: 1;
+}
+.hero__easter-egg {
+  position: absolute;
+  right: -34px;
+  bottom: 18px;
+  z-index: 0;
+  width: 230px;
+  opacity: 0.13;
 }
 .hero__grid {
   display: grid;
@@ -173,6 +194,12 @@ const heroStats = computed(() =>
   .hero__grid {
     grid-template-columns: 1fr;
     gap: 36px;
+  }
+}
+
+@media (max-width: 1279px) {
+  .hero__easter-egg {
+    display: none;
   }
 }
 </style>

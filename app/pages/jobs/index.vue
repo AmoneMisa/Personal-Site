@@ -915,6 +915,12 @@ onBeforeUnmount(() => {
 
 <template>
   <u-container class="jobs">
+    <decorative-easter-egg
+      class="jobs__easter-egg"
+      src="/images/easter-eggs/jobs-search.png"
+      :width="320"
+      :height="185"
+    />
     <div class="jobs__header text-center space-y-3">
       <h1 class="jobs__title">{{ t("title") }}</h1>
       <p class="jobs__headline text-muted">{{ t("headline") }}</p>
@@ -1419,7 +1425,12 @@ onBeforeUnmount(() => {
 </template>
 
 <style scoped>
-.jobs { padding-top: 24px; padding-bottom: 96px; }
+.jobs { position: relative; isolation: isolate; overflow: hidden; padding-top: 24px; padding-bottom: 96px; }
+.jobs__header { position: relative; z-index: 1; }
+.jobs__easter-egg {
+  position: absolute; top: 4px; left: -24px; z-index: 0;
+  width: 270px; opacity: 0.18;
+}
 .jobs__title { font-size: 32px; font-weight: 600; }
 .jobs__headline { font-size: 16px; }
 .jobs__subtitle { max-width: 760px; font-size: 14px; }
@@ -1655,4 +1666,7 @@ onBeforeUnmount(() => {
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 .recent__chip-company { font-size: 11px; color: var(--ui-text-muted); }
+@media (max-width: 1100px) {
+  .jobs__easter-egg { display: none; }
+}
 </style>

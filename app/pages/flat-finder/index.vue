@@ -782,6 +782,12 @@ onBeforeUnmount(() => { modalOpen.value = false; lightboxIndex.value = null; rel
 
 <template>
   <u-container class="flats">
+    <decorative-easter-egg
+      class="flats__easter-egg"
+      src="/images/easter-eggs/flat-finder-key.png"
+      :width="320"
+      :height="180"
+    />
     <div class="flats__header text-center space-y-3">
       <h1 class="flats__title">{{ t("title") }}</h1>
       <p class="flats__subtitle text-muted mx-auto">{{ t("subtitle") }}</p>
@@ -909,7 +915,12 @@ onBeforeUnmount(() => { modalOpen.value = false; lightboxIndex.value = null; rel
 </template>
 
 <style scoped>
-.flats { padding-top: 24px; padding-bottom: 96px; }
+.flats { position: relative; isolation: isolate; overflow: hidden; padding-top: 24px; padding-bottom: 96px; }
+.flats__header { position: relative; z-index: 1; }
+.flats__easter-egg {
+  position: absolute; top: 2px; right: -22px; z-index: 0;
+  width: 265px; opacity: 0.19;
+}
 .flats__title { font-size: 32px; font-weight: 600; }
 .flats__subtitle { max-width: 720px; font-size: 14px; }
 .flats__controls { margin: 20px 0 20px; display: grid; gap: 12px; grid-template-columns: 1fr auto; align-items: start; }
@@ -1080,6 +1091,7 @@ onBeforeUnmount(() => { modalOpen.value = false; lightboxIndex.value = null; rel
 .flats__controls_redesign :deep(input), .flats__controls_redesign :deep(button[role="combobox"]) { background-color: var(--bg-panel-2) !important; }
 
 @media (max-width: 1100px) {
+  .flats__easter-egg { display: none; }
   .advanced-groups { grid-template-columns: repeat(2,minmax(0,1fr)); gap: 20px 0; }
   .filter-group, .filter-group:first-child { padding: 0 16px; border-left: 1px solid var(--line); }
   .filter-group:nth-child(odd) { border-left: 0; padding-left: 0; }
