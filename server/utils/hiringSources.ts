@@ -12,10 +12,6 @@ import {
 } from '../../shared/hiring/sources/telegramChannels'
 
 const UA = 'hiringFinder/1.0 (CV board; contact: admin@whiteslove.me)'
-const DEFAULT_HISTORY_LIMIT = 600
-const MAX_HISTORY_LIMIT = 5_000
-const MIN_HISTORY_LIMIT = 50
-const TELEGRAM_WORKER_PAGE_LIMIT = 200
 const TELEGRAM_PAGE_SIZE = Math.min(
   200,
   Math.max(50, Number(process.env.HIRING_TELEGRAM_PAGE_SIZE) || 150),
@@ -30,15 +26,10 @@ export interface HiringSourceDiagnostic {
   handle: string
   country: string
   status: 'ok' | 'empty' | 'error' | 'disabled'
-  /** Messages read from Telegram in this round. */
   fetched: number
-  /** Posts carrying an explicit "I am looking for work" marker. */
   candidateMarkerMatched: number
-  /** Rejected because the post is an employer vacancy. */
   rejectedVacancy: number
-  /** Rejected by the CV/quality parser (not a profile, or unusable). */
   rejectedQuality: number
-  /** Profiles this round produced, before store-level dedup and retention. */
   candidates: number
   mode: 'incremental' | 'backfill' | 'idle'
   newestMessageId: number
@@ -49,7 +40,6 @@ export interface HiringSourceDiagnostic {
   error?: string
 }
 
-/** Per-channel counters a single crawl round produced. */
 export interface ChannelFunnel {
   fetched: number
   candidateMarkerMatched: number
@@ -158,13 +148,6 @@ function telegramChannels(): TelegramChannel[] {
       historyLimit: normalizedCountry === 'UZ' ? 2_000 : 1_500,
     }
   }).filter((channel) => channel.handle)
-}
-
-function telegramHistoryLimit(channel: TelegramChannel): number {
-  const requested = Number(process.env.HIRING_TELEGRAM_HISTORY_LIMIT || DEFAULT_HISTORY_LIMIT)
-  const envLimit = Number.isFinite(requested) ? requested : DEFAULT_HISTORY_LIMIT
-  const wanted = Math.max(envLimit, channel.historyLimit || DEFAULT_HISTORY_LIMIT)
-  return Math.min(MAX_HISTORY_LIMIT, Math.max(MIN_HISTORY_LIMIT, Math.round(wanted)))
 }
 
 function candidateCutoff(): number {
@@ -515,49 +498,6 @@ async function fetchWorkerPage(
   return page
 }
 
-async function fetchChannelViaWorker(base: string, channel: TelegramChannel, q: string): Promise<TelegramFetchResult> {
-  const target = telegramHistoryLimit(channel)
-  const cutoff = candidateCutoff()
-  const needle = q.trim().toLocaleLowerCase('ru')
-  const profiles: CvProfile[] = []
-  let fetched = 0
-  let beforeId = 0
-
-  while (fetched < target) {
-    const pageLimit = Math.min(TELEGRAM_WORKER_PAGE_LIMIT, target - fetched)
-    const params = new URLSearchParams({ channel: channel.handle, limit: String(pageLimit) })
-    if (beforeId > 0) params.set('beforeId', String(beforeId))
-    const res = await fetch(`${base.replace(/\/+$/, '')}/history?${params}`, { signal: AbortSignal.timeout(TELEGRAM_WORKER_TIMEOUT_MS) })
-    if (!res.ok) throw new Error(`tg-worker @${channel.handle} -> ${res.status}`)
-    const data = (await res.json()) as TelegramWorkerHistory
-    if (!data.ok || !Array.isArray(data.messages)) throw new Error(`tg-worker @${channel.handle} bad payload`)
-    if (!data.messages.length) break
-
-    for (const message of data.messages) {
-      const text = [(message.text || '').trim(), (message.preview || '').trim()].filter(Boolean).join('\n')
-      if (!text) continue
-      const profile = messageToProfile(text, {
-        id: `telegram-${channel.handle}-${message.id}`,
-        url: `https://t.me/${channel.handle}/${message.id}`,
-        dateIso: message.date,
-      }, channel, needle)
-      if (profile) profiles.push(profile)
-    }
-
-    fetched += data.messages.length
-    const dates = data.messages
-      .map((message) => message.date ? Date.parse(message.date) : Number.NaN)
-      .filter(Number.isFinite)
-    if (dates.length && Math.min(...dates) < cutoff) break
-
-    const ids = data.messages.map((message) => message.id).filter(Number.isFinite)
-    const nextBeforeId = Number(data.minId) || (ids.length ? Math.min(...ids) : 0)
-    if (!nextBeforeId || nextBeforeId === beforeId || data.messages.length < pageLimit) break
-    beforeId = nextBeforeId
-  }
-  return { profiles, fetched }
-}
-
 function parseChannelHtml(html: string, channel: TelegramChannel, q: string): TelegramFetchResult {
   const profiles: CvProfile[] = []
   const chunks = html.split(/<div class="tgme_widget_message_wrap\b[^>]*>/i).slice(1)
@@ -578,8 +518,6 @@ function parseChannelHtml(html: string, channel: TelegramChannel, q: string): Te
 }
 
 async function fetchTelegramChannel(channel: TelegramChannel, q: string): Promise<TelegramFetchResult> {
-  const workerUrl = process.env.TELEGRAM_WORKER_URL
-  if (workerUrl) return fetchChannelViaWorker(workerUrl, channel, q)
   const res = await fetch(`https://t.me/s/${encodeURIComponent(channel.handle)}`, {
     headers: { 'User-Agent': UA, Accept: 'text/html,application/xhtml+xml' },
     signal: AbortSignal.timeout(10_000),
