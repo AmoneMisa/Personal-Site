@@ -322,6 +322,8 @@
     "remoteYes": "Remote only",
     "remoteNo": "Not remote",
     "remoteBadge": "Remote",
+    "match": "match",
+    "matchHint": "Matched {matched} of {total} active criteria",
     "experienceMin": "Experience from (years)",
     "experienceN": "{n}+ yrs",
     "experienceNone": "Without experience",

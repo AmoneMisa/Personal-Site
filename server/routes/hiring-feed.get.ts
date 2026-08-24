@@ -12,6 +12,7 @@ import { listUzJobsSources } from '../utils/hiringUzJobsSource'
 import { getHiringWebDiagnostics } from '../utils/hiringDiagnostics'
 import { loadDbSourceRuns } from '../utils/hiringDb'
 import { searchTargetedHiringProfiles } from '../utils/hiringTargetedSearch'
+import { getRates, loadRates } from '../utils/currency'
 import type { CvProfile } from '../utils/hiringTypes'
 import {
   HIRING_PROFESSION_LABELS,
@@ -379,6 +380,7 @@ export default defineEventHandler(async (event) => {
   const incoming = getRequestURL(event)
   const params = incoming.searchParams
   const locale = requestLocale(event)
+  loadRates().catch(() => {})
   const offset = Math.max(0, Number(params.get('offset')) || 0)
   const limit = Math.min(PAGE_MAX, Math.max(1, Number(params.get('limit')) || 20))
 
@@ -494,6 +496,7 @@ export default defineEventHandler(async (event) => {
   return {
     count,
     profiles: page.map((profile) => publicProfile(profile, locale)),
+    rates: getRates(),
     sourceCounts: sourceCounts(profiles),
     sourceStatuses,
     webSourceStatuses,

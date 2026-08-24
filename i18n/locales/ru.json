@@ -322,6 +322,8 @@
     "remoteYes": "Только удалёнка",
     "remoteNo": "Не удалёнка",
     "remoteBadge": "Удалёнка",
+    "match": "match",
+    "matchHint": "Совпало {matched} из {total} активных критериев",
     "experienceMin": "Опыт от (лет)",
     "experienceN": "{n}+ лет",
     "experienceNone": "Без опыта",

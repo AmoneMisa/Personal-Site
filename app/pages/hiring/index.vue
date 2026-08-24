@@ -1,6 +1,9 @@
 <script setup lang="ts">
 import { safeFetch } from "~/utils/safeFetch";
 import { locationLabel } from "~/utils/locationLabels";
+import CandidateCard from "~/components/hiring/CandidateCard.vue";
+import type { HiringCvProfile as CvProfile } from "~/types/hiring";
+import { canonicalHiringSkill } from "~/utils/hiringMatch";
 import { hiringProfessionLocale } from "~~/shared/hiringProfessionLabels";
 import {
   expandHiringProfessionFilters,
@@ -11,38 +14,10 @@ import {
 // Hiring board — CV/resume profiles from candidates looking for work.
 // Auto-routed at /hiring. UI follows /flat-finder; data from /hiring-feed.
 
-interface CvProfile {
-  id: string;
-  source: string;
-  origin?: string;
-  sourceKey?: string;
-  sourceLabel?: string;
-  country: string;
-  name: string;
-  role: string;
-  professions?: string[];
-  age?: number | null;
-  gender?: "male" | "female" | "unknown";
-  experienceYears?: number | null;
-  salaryMin?: number | null;
-  salaryMax?: number | null;
-  currency?: string | null;
-  city?: string | null;
-  remote?: boolean | null;
-  url: string;
-  createdAt: string | null;
-  description: string;
-  skills?: string[];
-  languages?: string[];
-  education?: string | null;
-  tags?: string[];
-  contact?: string | null;
-  contactHours?: string | null;
-  employmentType?: string | null;
-}
 interface FeedResult {
   count: number;
   profiles: CvProfile[];
+  rates?: Record<string, number>;
   warming?: boolean;
   sourceCounts?: Record<string, number>;
   sourceErrors?: Array<{ source?: string; country?: string; handle?: string; error?: string }>;
@@ -108,6 +83,7 @@ const filtersPending = ref(false);
 const warming = ref(false);
 const failed = ref(false);
 const sourceErrors = ref<FeedResult["sourceErrors"]>([]);
+const usdRates = ref<Record<string, number>>({ USD: 1 });
 const view = ref<HiringView>("active");
 const favorites = ref<CvProfile[]>([]);
 const hidden = ref<CvProfile[]>([]);
@@ -286,9 +262,22 @@ const displayedProfiles = computed(() => {
 });
 const hasMore = computed(() => view.value === "active" && profiles.value.length < total.value);
 
-function canonicalSkillQuery(): string {
-  return skills.value.split(",").map((value) => value.trim()).filter(Boolean).join(",");
+function canonicalSkillValues(): string[] {
+  return [...new Set(skills.value
+    .split(",")
+    .map((value) => canonicalHiringSkill(value))
+    .map((value) => value.trim())
+    .filter(Boolean))];
 }
+
+function canonicalSkillQuery(): string {
+  return canonicalSkillValues().join(",");
+}
+
+const candidateMatchFilters = computed(() => ({
+  professions: professions.value,
+  skills: canonicalSkillValues(),
+}));
 
 function currentFilterQuery(): Record<string, string> {
   const queryParams: Record<string, string> = {};
@@ -472,6 +461,7 @@ async function load(append = false, background = false) {
       : next;
     total.value = data.count ?? profiles.value.length;
     sourceErrors.value = data.sourceErrors || [];
+    if (data.rates && typeof data.rates === "object") usdRates.value = data.rates;
     warming.value = !!data.warming;
     if (data.meta?.professions?.length) professionValues.value = data.meta.professions;
     if (data.meta?.sources?.length) availableSources.value = data.meta.sources;
@@ -675,15 +665,6 @@ async function openSharedCv(id: string, sourceName = "", countryCode = "", attem
   }
 }
 
-function cardBadges(profile: CvProfile): string[] {
-  const badges: string[] = [];
-  if (profile.remote) badges.push(t("remoteBadge"));
-  if (profile.age != null) badges.push(`${profile.age}`);
-  if (profile.experienceYears != null) badges.push(experienceLabel(profile.experienceYears));
-  for (const skill of (profile.skills || []).slice(0, 3)) badges.push(skill);
-  return badges.slice(0, 5);
-}
-
 /**
  * Cards from the CV boards are often only a role, a city and an age: at three
  * columns that leaves most of each card empty. When the page is mostly such
@@ -697,7 +678,7 @@ const denseGrid = computed(() => {
     if (profile.name && profile.role) filled += 1;
     if (salaryLabel(profile)) filled += 1;
     if (specLine(profile)) filled += 1;
-    if (cardBadges(profile).length >= 3) filled += 1;
+    if (new Set([...(profile.skills || []), ...(profile.tags || [])]).size >= 3) filled += 1;
     // All four, not most of them: a card without a salary line already leaves
     // a third of its height empty at three columns.
     return filled === 4;
@@ -705,14 +686,8 @@ const denseGrid = computed(() => {
   return rich / cards.length < 0.5;
 });
 
-function timeAgo(iso: string | null): string {
-  if (!iso) return "";
-  const days = Math.floor((Date.now() - new Date(iso).getTime()) / 86_400_000);
-  if (Number.isNaN(days)) return "";
-  if (days <= 0) return t("today");
-  if (days === 1) return t("yesterday");
-  if (days < 30) return t("daysAgo", { n: days });
-  return t("monthsAgo", { n: Math.floor(days / 30) });
+function profileCountryCurrency(profile: CvProfile): string {
+  return meta.value.find((country) => country.code === profile.country)?.currency || "";
 }
 
 onMounted(async () => {
@@ -864,33 +839,19 @@ onBeforeUnmount(() => {
     <p v-else class="hiring__count text-muted">{{ t("found", { n: view === 'active' ? total : displayedProfiles.length }) }}</p>
 
     <div class="hiring__grid" :class="{ 'hiring__grid_loading': loading, 'hiring__grid_dense': denseGrid }">
-      <article
-          v-for="profile in displayedProfiles" :key="profile.id" class="hiring-card"
-          :class="{ 'hiring-card_favorite': isFavorite(profile.id), 'hiring-card_hidden': isHidden(profile.id) }"
-          @click="openCv(profile)"
-      >
-        <div class="hiring-card__body">
-          <div class="hiring-card__actions">
-            <button type="button" class="hiring-card__action" :class="{ 'hiring-card__action_active': isFavorite(profile.id) }" :aria-label="isFavorite(profile.id) ? t('removeFavorite') : t('addFavorite')" @click.stop="toggleFavorite(profile)">
-              <u-icon name="i-lucide-heart" />
-            </button>
-            <button type="button" class="hiring-card__action" :class="{ 'hiring-card__action_active': isHidden(profile.id) }" :aria-label="isHidden(profile.id) ? t('restoreListing') : t('hideListing')" @click.stop="toggleHidden(profile)">
-              <u-icon :name="isHidden(profile.id) ? 'i-lucide-eye' : 'i-lucide-eye-off'" />
-            </button>
-          </div>
-          <h3 class="hiring-card__title">{{ profile.name || profile.role }}</h3>
-          <div v-if="profile.name && profile.role" class="hiring-card__role text-muted">{{ profile.role }}</div>
-          <div v-if="salaryLabel(profile)" class="hiring-card__salary">{{ salaryLabel(profile) }}</div>
-          <div v-if="specLine(profile)" class="hiring-card__spec text-muted">{{ specLine(profile) }}</div>
-          <div class="hiring-card__badges">
-            <span v-for="badge in cardBadges(profile)" :key="badge" class="hiring-card__badge">{{ badge }}</span>
-          </div>
-          <div class="hiring-card__meta text-muted">
-            <span>{{ profile.sourceLabel || profile.source }}</span>
-            <span v-if="timeAgo(profile.createdAt)">· {{ timeAgo(profile.createdAt) }}</span>
-          </div>
-        </div>
-      </article>
+      <CandidateCard
+        v-for="profile in displayedProfiles"
+        :key="profile.id"
+        :profile="profile"
+        :favorite="isFavorite(profile.id)"
+        :hidden="isHidden(profile.id)"
+        :rates="usdRates"
+        :country-currency="profileCountryCurrency(profile)"
+        :match-filters="candidateMatchFilters"
+        @open="openCv(profile)"
+        @toggle-favorite="toggleFavorite(profile)"
+        @toggle-hidden="toggleHidden(profile)"
+      />
     </div>
 
     <div ref="loadMoreSentinel" v-if="hasMore" class="hiring__sentinel">
@@ -1013,52 +974,14 @@ onBeforeUnmount(() => {
 .hiring__source-warning { color: #f6c177; font-size: 13px; margin-bottom: 12px; }
 .hiring__warming { font-size: 13px; margin-bottom: 12px; }
 .hiring__count { font-size: 13px; margin-bottom: 12px; }
-.hiring__grid { display: grid; gap: 14px; grid-template-columns: 1fr; align-items: stretch; }
+.hiring__grid { display: grid; gap: 14px; grid-template-columns: 1fr; grid-auto-rows: 1fr; align-items: stretch; }
 @media (min-width: 640px) { .hiring__grid { grid-template-columns: repeat(2, 1fr); } }
 @media (min-width: 1024px) { .hiring__grid { grid-template-columns: repeat(3, 1fr); } }
 @media (min-width: 1180px) { .hiring__grid.hiring__grid_dense { grid-template-columns: repeat(4, 1fr); } }
 @media (min-width: 1600px) { .hiring__grid { grid-template-columns: repeat(4, 1fr); } }
 .hiring__grid_loading { opacity: 0.4; pointer-events: none; }
-.hiring-card {
-  height: 190px; min-width: 0; border: 1px solid var(--line); border-radius: 12px; overflow: hidden;
-  background: rgba(255,255,255,0.03); cursor: pointer; transition: transform 140ms ease, border-color 180ms ease;
-  display: flex;
-}
-.hiring-card:hover { transform: translateY(-2px); border-color: rgba(113,137,217,0.45); }
-.hiring-card__body {
-  position: relative; width: 100%; min-width: 0; padding: 14px 16px; display: grid;
-  /* Rows size to their content and the badges absorb whatever is left, so a
-     sparse profile is a short card rather than a title above empty space. */
-  grid-template-rows: auto auto auto auto 1fr auto; gap: 3px;
-}
-.hiring-card__actions { position: absolute; top: 10px; right: 10px; display: flex; gap: 5px; z-index: 1; }
-.hiring-card__action {
-  width: 29px; height: 29px; display: inline-grid; place-items: center; padding: 0;
-  border: 1px solid var(--line); border-radius: 6px; background: var(--bg-panel); color: var(--text-muted); cursor: pointer;
-}
-.hiring-card__action:hover, .hiring-card__action_active { color: #7189d9; border-color: rgba(113,137,217,0.48); }
-.hiring-card__title {
-  min-width: 0; font-size: 14px; font-weight: 600; line-height: 1.35; padding-right: 70px;
-  white-space: nowrap; text-overflow: ellipsis; overflow: hidden;
-}
-.hiring-card__role {
-  min-width: 0; font-size: 12.5px; line-height: 1.35; padding-right: 70px;
-  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
-}
-.hiring-card__salary { font-weight: 700; font-size: 14px; color: var(--text-white, inherit); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.hiring-card__spec { font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.hiring-card__placeholder { visibility: hidden; }
-.hiring-card__badges { display: flex; align-content: flex-start; flex-wrap: wrap; gap: 5px; overflow: hidden; min-height: 0; padding-top: 3px; }
-.hiring-card__badge {
-  font-size: 10.5px; font-weight: 600; padding: 4px 7px; border-radius: 999px;
-  border: 1px solid var(--line); background: rgba(255,255,255,0.05); color: var(--text-primary); white-space: nowrap;
-  max-width: 100%; overflow: hidden; text-overflow: ellipsis;
-}
-.hiring-card__meta { display: flex; flex-wrap: wrap; gap: 6px; font-size: 11.5px; text-transform: capitalize; align-self: end; }
 .hiring__empty { margin-top: 18px; text-align: center; padding: 18px; border-radius: 10px; border: 1px solid var(--line); background: rgba(255,255,255,0.03); }
 .hiring__sentinel { min-height: 44px; display: grid; place-items: center; }
-.hiring-card_favorite { border-color: rgba(113,137,217,0.5); }
-.hiring-card_hidden { opacity: 0.64; border-style: dashed; }
 .hiring-modal { display: flex; flex-direction: column; gap: 12px; }
 .hiring-modal__title { margin: 0; font-size: 18px; font-weight: 700; line-height: 1.35; padding-right: 36px; }
 .hiring-modal__name { font-size: 14px; color: var(--text-muted); }
@@ -1074,7 +997,6 @@ onBeforeUnmount(() => {
   .hiring__controls > :deep(button) { width: 100%; }
   .hiring__views { padding-left: 0; border-left: 0; }
   .hiring__age-range { grid-template-columns: 1fr 1fr; }
-  .hiring-card { height: 184px; }
 }
 @media (max-width: 1100px) {
   .hiring__easter-egg { display: none; }
