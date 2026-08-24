@@ -19,8 +19,40 @@ function listingText(listing: any): string {
     listing?.text,
     listing?.originalText,
     listing?.priceText,
+    listing?.url,
+    listing?.id,
     tags,
   ].filter(Boolean).join(' '))
+}
+
+export function normalizeFlatRoomOnly(listing: any): boolean {
+  if (listing?.roomOnly === true) return true
+  const text = listingText(listing)
+  return /(?:student\s+qizlarga|talaba\s+qizlarga|qiz\s+olinadi|подселени\p{L}*|койко\s+мест\p{L}*|шеринг)/u.test(text)
+}
+
+export function normalizeFlatPrice(listing: any): { price: number | null; currency: string } {
+  const existingPrice = normalizedPrice(listing?.price)
+  const existingCurrency = String(listing?.currency || '').toUpperCase()
+  if (existingPrice != null && existingPrice > 0) {
+    return { price: existingPrice, currency: existingCurrency }
+  }
+
+  const source = normalizedText(listing?.source)
+  const title = String(listing?.title || '').trim()
+  if (!SOCIAL_SOURCES.has(source) || /(?:ming|минг|тыс|million|миллион|млн|sum|сум|uzs)/iu.test(title)) {
+    return { price: null, currency: existingCurrency }
+  }
+
+  // Compact Telegram posts often put a dollar rent directly after the district
+  // (for example, "Шайхонтохур 500") while leaving the structured price empty.
+  const trailingAmount = title.match(/(?:^|\s)(\d{2,4})(?:\s*(?:usd|у\.?\s*е\.?|\$))?\s*$/iu)
+  const inferredPrice = trailingAmount ? Number(trailingAmount[1]) : null
+  if (inferredPrice == null || inferredPrice < 100 || inferredPrice > 5_000) {
+    return { price: null, currency: existingCurrency }
+  }
+
+  return { price: inferredPrice, currency: 'USD' }
 }
 
 function normalizedPrice(value: unknown): number | null {
@@ -67,8 +99,8 @@ export function normalizeFlatDealType(listing: any): FlatDealType | null {
   const isSale = /(?:продам|продается|продажа|продамиз|sotiladi|sotaman|sotuv|for sale)/u.test(text)
   if (isSale) return 'sale'
 
-  const isLongRent = /(?:сдам|сдается|снять|аренд\p{L}*|ижара\p{L}*|ijara\p{L}*|ijaraga|берилади|beriladi|for rent|oyiga|в месяц|месяц)/u.test(text)
-  if (isLongRent || listing?.roomOnly === true || socialPriceLooksLikeMonthlyRent(listing)) return 'longRent'
+  const isLongRent = /(?:сдам|сдается|снять|аренд\p{L}*|ижара\p{L}*|ijara\p{L}*|ijaraga|берилади|beriladi|for rent|oyiga|в месяц|месяц|mingdan|мингдан|qiz\s+olinadi|student\s+qizlarga|talaba\s+qizlarga)/u.test(text)
+  if (isLongRent || normalizeFlatRoomOnly(listing) || socialPriceLooksLikeMonthlyRent(listing)) return 'longRent'
 
   return null
 }

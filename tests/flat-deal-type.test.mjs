@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { normalizeFlatDealType } from '../server/utils/flatDealType.ts'
+import { normalizeFlatDealType, normalizeFlatPrice, normalizeFlatRoomOnly } from '../server/utils/flatDealType.ts'
 
 test('keeps explicit deal types even when a low price resembles rent', () => {
   assert.equal(normalizeFlatDealType({ dealType: 'sale', source: 'telegram', price: 500, currency: 'USD' }), 'sale')
@@ -29,4 +29,35 @@ test('does not guess rent from high social prices or unknown OLX cards', () => {
 test('room-only offers are rentals unless upstream explicitly says otherwise', () => {
   assert.equal(normalizeFlatDealType({ roomOnly: true }), 'longRent')
   assert.equal(normalizeFlatDealType({ roomOnly: true, dealType: 'sale' }), 'sale')
+})
+
+test('restores the omitted dollar rent from a compact Telegram title', () => {
+  const listing = {
+    source: 'telegram',
+    title: 'Шайхонтохур 500',
+    price: null,
+    currency: 'UZS',
+    url: 'https://t.me/TOSHKENT_IJARAGA_UYLAR_SERGELI/2733012',
+  }
+  const normalizedPrice = normalizeFlatPrice(listing)
+  assert.deepEqual(normalizedPrice, { price: 500, currency: 'USD' })
+  assert.equal(normalizeFlatDealType({ ...listing, ...normalizedPrice }), 'longRent')
+})
+
+test('recognizes an OLX student room offered at a per-person Uzbek price', () => {
+  const listing = {
+    source: 'olx',
+    title: 'Student qizlarga GULZOR chorahada 900.mingdan',
+    price: 900_000,
+    currency: 'UZS',
+    roomOnly: false,
+    description: 'Gulzor chorrahani yonida 3ta o‘qiydigan qiz olinadi. 900 mingdan',
+  }
+  assert.equal(normalizeFlatRoomOnly(listing), true)
+  assert.equal(normalizeFlatDealType(listing), 'longRent')
+})
+
+test('does not invent a price from ordinary OLX titles or Uzbek thousand prices', () => {
+  assert.deepEqual(normalizeFlatPrice({ source: 'olx', title: 'Шайхонтохур 500', currency: 'UZS' }), { price: null, currency: 'UZS' })
+  assert.deepEqual(normalizeFlatPrice({ source: 'telegram', title: 'Kvartira 900 mingdan', currency: 'UZS' }), { price: null, currency: 'UZS' })
 })

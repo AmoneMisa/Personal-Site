@@ -1,5 +1,5 @@
 import { canonicalMetroValue } from '../utils/tashkentMetroLabels'
-import { normalizeFlatDealType } from '../utils/flatDealType'
+import { normalizeFlatDealType, normalizeFlatPrice, normalizeFlatRoomOnly } from '../utils/flatDealType'
 
 // GET /flats-feed — server-side proxy to the flat-finder backend's /api/listings.
 // The flat API is plain HTTP and the site is HTTPS, so a direct browser call is
@@ -34,9 +34,15 @@ function rewritePhoto(p: unknown): unknown {
 }
 
 function shapeListing(listing: any): any {
-  return {
+  const normalizedPrice = normalizeFlatPrice(listing)
+  const normalizedListing = {
     ...listing,
-    dealType: normalizeFlatDealType(listing),
+    ...normalizedPrice,
+    roomOnly: normalizeFlatRoomOnly(listing),
+  }
+  return {
+    ...normalizedListing,
+    dealType: normalizeFlatDealType(normalizedListing),
     photo: rewritePhoto(listing?.photo),
     photos: Array.isArray(listing?.photos) ? listing.photos.map(rewritePhoto) : [],
   }
