@@ -20,6 +20,7 @@ const UPSTREAM_TIMEOUT_MS = 25_000
 // below the main proxy budget so a broken OLX detail endpoint cannot hold the
 // share-link request open for the full feed timeout.
 const EXACT_LOOKUP_TIMEOUT_MS = 12_000
+const AVAILABILITY_TIMEOUT_MS = 5_000
 const feedCache = new Map<string, { at: number; data: any }>()
 const feedRefreshes = new Map<string, Promise<any>>()
 const ALL_FEED_SOURCES = ['olx', 'telegram', 'facebook', 'threads'] as const
@@ -115,6 +116,53 @@ function shapeResponse(raw: any, requestedSources: string[]): any {
     ? data.listings.length
     : typeof raw?.count === 'number' ? raw.count : data.listings.length
   return data
+}
+
+function availabilityKey(value: any): string {
+  return `${String(value?.source || '').toLowerCase()}:${String(value?.country || '').toUpperCase()}:${String(value?.id ?? '')}`
+}
+
+async function filterPersistedInactiveOlx(response: any): Promise<any> {
+  const listings = Array.isArray(response?.listings) ? response.listings : []
+  const unique = new Map<string, { source: string; country: string; id: string }>()
+
+  for (const listing of listings) {
+    const source = String(listing?.source || '').toLowerCase()
+    const country = String(listing?.country || '').toUpperCase()
+    const id = String(listing?.id ?? '').trim()
+    if (source !== 'olx' || !/^[A-Z]{2}$/.test(country) || !id) continue
+    unique.set(`${source}:${country}:${id}`, { source, country, id })
+  }
+
+  if (!unique.size) return response
+
+  try {
+    const verification = await $fetch<any>(`${FLAT_API_URL}/api/listings/verify`, {
+      method: 'POST',
+      body: { items: [...unique.values()] },
+      timeout: AVAILABILITY_TIMEOUT_MS,
+    })
+    const inactive = new Set<string>(
+      (Array.isArray(verification?.results) ? verification.results : [])
+        .filter((result: any) => result?.status === 'inactive')
+        .map(availabilityKey),
+    )
+    if (!inactive.size) return response
+
+    const filtered = listings.filter((listing: any) => !inactive.has(availabilityKey(listing)))
+    const removed = listings.length - filtered.length
+    const count = Number(response?.count)
+    return {
+      ...response,
+      listings: filtered,
+      count: Number.isFinite(count) ? Math.max(0, count - removed) : filtered.length,
+      availabilityFiltered: removed,
+    }
+  } catch {
+    // Availability reads are a safety filter, not a reason to take the feed down.
+    // The direct OLX lookup below still performs a live check for shared links.
+    return response
+  }
 }
 
 /** How long a cached answer may still be served: empty ones expire quickly. */
@@ -216,23 +264,14 @@ export default defineEventHandler(async (event) => {
 
   const withExactListingFallback = async (response: any) => {
     const listingId = String(upstreamParams.get('listingId') || '').trim()
-    if (!listingId || (Array.isArray(response?.listings) && response.listings.length)) return response
+    if (!listingId) return response
 
     const source = requestedSources.length === 1 ? requestedSources[0]! : ''
     const country = exactCountry(upstreamParams)
-    const cachedListing = findCachedExactListing(listingId, source, country)
-    if (cachedListing) {
-      return {
-        ...response,
-        count: 1,
-        listings: [shapeListing(cachedListing)],
-        exactListingFallback: 'cache',
-      }
-    }
 
-    // Shared OLX links should not depend on the current rotating country
-    // snapshot. The flat-finder backend already exposes a single-offer endpoint;
-    // use it as the last resort when listingId was not present in the snapshot.
+    // OLX exact links must never be resurrected from the site cache. The direct
+    // backend endpoint performs the forced live availability check and persists
+    // inactive state before returning 404.
     if (source === 'olx' && country) {
       try {
         const exact = await $fetch<any>(
@@ -247,39 +286,66 @@ export default defineEventHandler(async (event) => {
             exactListingFallback: 'source',
           }
         }
-      } catch {
-        // Keep the original empty response. The UI may retry while the country
-        // store is warming; a failed direct lookup must not turn the feed into 502.
+      } catch (error: any) {
+        const status = Number(error?.statusCode || error?.response?.status || 0)
+        if (status === 404) {
+          return {
+            ...response,
+            count: 0,
+            listings: [],
+            exactListingFallback: 'source-inactive',
+          }
+        }
+        // A transient source-check failure should not take the whole page down.
+        // Persisted inactive state is still filtered before the response leaves.
+        return response
+      }
+      return response
+    }
+
+    if (Array.isArray(response?.listings) && response.listings.length) return response
+
+    const cachedListing = findCachedExactListing(listingId, source, country)
+    if (cachedListing) {
+      return {
+        ...response,
+        count: 1,
+        listings: [shapeListing(cachedListing)],
+        exactListingFallback: 'cache',
       }
     }
 
     return response
   }
 
+  const finalize = async (raw: any) => filterPersistedInactiveOlx(
+    await withExactListingFallback(await shapeWithCombinedFallback(raw)),
+  )
+
   const cached = feedCache.get(key)
   if (cached && Date.now() - cached.at < FEED_FRESH_MS) {
     setResponseHeader(event, 'Cache-Control', 'no-store')
-    return withExactListingFallback(await shapeWithCombinedFallback(cached.data))
+    return finalize(cached.data)
   }
   if (cached && Date.now() - cached.at < staleWindow(cached)) {
     refreshFeed(key, url).catch(() => {})
     setResponseHeader(event, 'Cache-Control', 'no-store')
     return {
-      ...await withExactListingFallback(await shapeWithCombinedFallback(cached.data)),
+      ...await finalize(cached.data),
       stale: true,
     }
   }
   try {
     const data = await refreshFeed(key, url)
     setResponseHeader(event, 'Cache-Control', 'no-store')
-    return withExactListingFallback(await shapeWithCombinedFallback(data))
+    return finalize(data)
   } catch (err) {
     // A stale answer, however old, beats reporting a failure — but only if it
     // actually has something in it.
     if (cached && Array.isArray(cached.data?.listings) && cached.data.listings.length) {
       setResponseHeader(event, 'Cache-Control', 'no-store')
       return {
-        ...await withExactListingFallback(await shapeWithCombinedFallback(cached.data)),
+        ...await finalize(cached.data),
         stale: true,
       }
     }
