@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { detectCity, detectDistrict } from '../server/utils/hiringSources.ts'
+import { detectCity, detectDistrict } from '../server/hiring/domain/telegramCandidateParser.ts'
 
 // The Telegram side kept its own city table, with the same dead \b as the web
 // parsers: a post that named its city in Cyrillic resolved to nothing.
