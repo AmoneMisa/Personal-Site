@@ -3,9 +3,10 @@ import { readFile } from 'node:fs/promises'
 import test from 'node:test'
 
 const read = async (path) => readFile(new URL(`../${path}`, import.meta.url), 'utf8')
+const RUNTIME = 'server/hiring/sources/telegramRuntime.ts'
 
 test('Telegram candidate parsing is owned by the domain module', async () => {
-  const runtime = await read('server/utils/hiringSources.ts')
+  const runtime = await read(RUNTIME)
   const parser = await read('server/hiring/domain/telegramCandidateParser.ts')
 
   assert.match(runtime, /telegramCandidateParser/u)
@@ -24,7 +25,7 @@ test('Telegram candidate parsing is owned by the domain module', async () => {
 })
 
 test('Telegram transport is not a compatibility facade for domain parsing', async () => {
-  const runtime = await read('server/utils/hiringSources.ts')
+  const runtime = await read(RUNTIME)
   assert.doesNotMatch(runtime, /export \{[^}]*detectCity[^}]*\} from/u)
   assert.doesNotMatch(runtime, /export \{[^}]*detectDistrict[^}]*\} from/u)
   assert.doesNotMatch(runtime, /export \{[^}]*isLikelyCvPost[^}]*\} from/u)
