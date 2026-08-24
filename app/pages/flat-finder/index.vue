@@ -1014,6 +1014,7 @@ onBeforeUnmount(() => { modalOpen.value = false; lightboxIndex.value = null; rel
         </div>
       </div>
 
+      <div class="filter-surface">
       <section class="filter-card">
         <div class="filter-presets">
           <span class="flats__field-label filter-presets__label">{{ t("presets") }}</span>
@@ -1096,6 +1097,7 @@ onBeforeUnmount(() => { modalOpen.value = false; lightboxIndex.value = null; rel
           </div>
         </div>
       </section>
+      </div>
     </form>
 
     <p v-if="failed" class="flats__error">{{ t("error") }}</p>
@@ -1263,11 +1265,22 @@ onBeforeUnmount(() => { modalOpen.value = false; lightboxIndex.value = null; rel
 .flats__controls_redesign { display: block; margin: 20px 0; }
 .flats__searchbar { display: grid; grid-template-columns: 1fr auto; gap: 10px; margin-bottom: 12px; }
 .flats__secondary-nav { margin-bottom: 12px; }
-.filter-card, .advanced-card {
+.filter-surface {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
   border: 1px solid var(--line);
   border-radius: 12px;
   background: var(--ocean-form-surface);
   box-shadow: 0 18px 42px rgba(2, 5, 18, 0.22);
+}
+.filter-card, .advanced-card {
+  position: relative;
+  z-index: 1;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
 }
 .filter-card { padding: 16px; }
 .filter-presets { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding-bottom: 14px; margin-bottom: 14px; border-bottom: 1px solid var(--line); }
@@ -1299,7 +1312,7 @@ onBeforeUnmount(() => { modalOpen.value = false; lightboxIndex.value = null; rel
 .filter-chip { display: inline-flex; align-items: center; gap: 7px; max-width: 100%; min-height: 34px; padding: 6px 11px; border: 1px solid var(--line); border-radius: 7px; background: var(--bg-panel-2); color: var(--text-primary); white-space: normal; text-align: left; line-height: 1.25; }
 .filter-chip span { color: var(--ui-text-muted); flex: 0 0 auto; }
 .filter-reset { margin-left: auto; }
-.advanced-card { margin-top: 14px; overflow: hidden; }
+.advanced-card { margin-top: 0; overflow: hidden; border-top: 1px solid var(--line); }
 .advanced-card__header { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 14px 16px; border-bottom: 1px solid var(--line); }
 .advanced-card__header > div, .advanced-card__header button { display: inline-flex; align-items: center; gap: 8px; }
 .advanced-card__header button { color: var(--accent-pink); }

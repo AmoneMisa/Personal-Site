@@ -309,6 +309,8 @@ const priceColumns = computed(() => {
 <style scoped>
 .result-card {
   position: relative;
+  background: rgba(8, 13, 35, 0.86);
+  box-shadow: 0 12px 28px rgba(2, 5, 18, 0.2);
 }
 
 .ratings {

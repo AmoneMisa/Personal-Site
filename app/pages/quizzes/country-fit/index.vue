@@ -346,6 +346,7 @@ watch(user, (v) => lsSet(LS_KEYS.user, v), {deep: true});
       {{ t(countryFitQuiz.descriptionKey) }}
     </div>
 
+    <div class="quiz-form-surface">
     <div class="quiz-card quiz-card_situation">
       <div class="quiz-card__title">{{ t("quizzes.countryFit.constraintsTitle") }}</div>
       <div class="quiz-fields grid grid-cols-1 md:grid-cols-3">
@@ -495,6 +496,7 @@ watch(user, (v) => lsSet(LS_KEYS.user, v), {deep: true});
         </div>
       </div>
     </div>
+    </div>
 
     <!-- Results -->
     <div class="mt-10">
@@ -506,7 +508,7 @@ watch(user, (v) => lsSet(LS_KEYS.user, v), {deep: true});
       </div>
 
       <!-- Compare block -->
-      <div class="p-4 rounded-xl border border-[var(--line)] mb-8 bg-[rgba(255,255,255,0.03)]">
+      <div class="country-compare-panel p-4 rounded-xl border border-[var(--line)] mb-8">
         <div class="font-black mb-3">
           {{ t("quizzes.countryFit.compareTitle") }}
         </div>
@@ -651,14 +653,64 @@ watch(user, (v) => lsSet(LS_KEYS.user, v), {deep: true});
    The form and the question cards are one grid each, so every row lines up on
    its own without margins fighting the grid. */
 
-.quiz-card {
-  padding: 14px 16px;
+.quiz-form-surface {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  display: grid;
+  gap: 14px;
+  padding: 14px;
   border: 1px solid var(--line);
   border-radius: 12px;
   background: var(--ocean-form-surface);
   box-shadow: 0 14px 34px rgba(2, 5, 18, 0.18);
 }
-.quiz-card_situation { margin-bottom: 20px; }
+
+.quiz-form-surface::before,
+.quiz-form-surface::after {
+  content: "";
+  position: absolute;
+  z-index: 0;
+  border: 1px solid rgba(75, 145, 255, 0.1);
+  border-radius: 999px;
+  pointer-events: none;
+}
+
+.quiz-form-surface::before {
+  width: 8px;
+  height: 8px;
+  left: 32%;
+  top: 25%;
+}
+
+.quiz-form-surface::after {
+  width: 6px;
+  height: 6px;
+  right: 2%;
+  top: 58%;
+  border-color: rgba(207, 92, 220, 0.1);
+}
+
+.quiz-form-surface > * {
+  position: relative;
+  z-index: 1;
+}
+
+.quiz-card {
+  padding: 14px 16px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--ocean-form-surface-soft);
+}
+.quiz-card_situation { margin-bottom: 0; }
+
+.country-compare-panel {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  background: var(--ocean-form-surface);
+  box-shadow: 0 14px 34px rgba(2, 5, 18, 0.18);
+}
 
 .quiz-card__title {
   margin-bottom: 10px;
