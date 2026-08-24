@@ -97,6 +97,22 @@ test('board pages share filter primitives and flat finder starts from a regional
   assert.match(flat, /countries\.value\s*=\s*\[defaultCountry\.value\]/u)
 })
 
+test('all three listing boards share one accessible sort control', () => {
+  const control = readFileSync(new URL('../app/components/ui/SortSelect.vue', import.meta.url), 'utf8')
+  assert.match(control, /i-lucide-arrow-down-wide-narrow/u)
+  assert.match(control, /:aria-label="label"/u)
+  assert.match(control, /grid-template-columns:\s*32px minmax\(0, 1fr\)/u)
+
+  for (const page of [
+    '../app/pages/flat-finder/index.vue',
+    '../app/pages/jobs/index.vue',
+    '../app/pages/hiring/index.vue',
+  ]) {
+    const source = readFileSync(new URL(page, import.meta.url), 'utf8')
+    assert.match(source, /<UiSortSelect/u)
+  }
+})
+
 test('OLX listing verification exposes a localized in-card loader', () => {
   const flat = readFileSync(new URL('../app/pages/flat-finder/index.vue', import.meta.url), 'utf8')
   const ru = JSON.parse(readFileSync(new URL('../i18n/locales/ru.json', import.meta.url), 'utf8'))

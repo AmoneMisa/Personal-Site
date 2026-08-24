@@ -750,10 +750,7 @@ onBeforeUnmount(() => {
     <UiResultsLoader :loading="loading" :label="t('searching')" min-height="420px">
     <form class="hiring__controls" @submit.prevent="load()">
       <u-input v-model="query" clearable icon="i-lucide-search" :label="t('search')" :placeholder="t('searchPlaceholder')" @clear="clearSearch" />
-      <div class="hiring__sort">
-        <u-select-menu :label="t('sort')" v-model="sort" :items="sortItems" value-key="value" label-key="label"
-            :search-input="false" class="hiring__select" @update:model-value="scheduleLoad(0)" />
-      </div>
+      <UiSortSelect v-model="sort" :items="sortItems" :label="t('sort')" @update:model-value="scheduleLoad(0)" />
       <u-button type="submit" icon="i-lucide-search">
         {{ t("search") }}
       </u-button>
@@ -941,7 +938,6 @@ onBeforeUnmount(() => {
 .hiring__title { font-size: 32px; font-weight: 600; }
 .hiring__subtitle { max-width: 720px; font-size: 14px; }
 .hiring__controls { margin: 20px 0 20px; display: grid; gap: 12px; grid-template-columns: minmax(0, 1fr) minmax(220px, 280px) auto; align-items: start; }
-.hiring__sort { min-width: 0; }
 .hiring__row { grid-column: 1 / -1; display: flex; flex-wrap: wrap; justify-content: space-between; gap: 12px; }
 .hiring__filters { display: flex; flex-wrap: wrap; gap: 8px; }
 .hiring__pill {

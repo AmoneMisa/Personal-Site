@@ -1096,7 +1096,7 @@ onBeforeUnmount(() => { modalOpen.value = false; lightboxIndex.value = null; rel
     <p v-else-if="source === 'telegram' && !loading && !listings.length && sourceErrors?.some((item) => item.source === 'telegram')" class="flats__source-warning">{{ t("telegramUnavailable") }}</p>
     <div v-else class="flats__results-toolbar">
       <p class="flats__count text-muted">{{ t("found", { n: view === 'active' && !onlyWithPhotos ? total : displayedListings.length }) }}</p>
-      <label class="flats__sort"><span class="flats__field-label">{{ extraLabels.sort }}</span><u-select-menu v-model="sort" :items="sortItems" value-key="value" label-key="label" :search-input="false" class="flats__select" @update:model-value="scheduleLoad(0)" /></label>
+      <UiSortSelect class="flats__sort" v-model="sort" :items="sortItems" :label="extraLabels.sort" @update:model-value="scheduleLoad(0)" />
     </div>
     <FlatsStatsPanel v-if="displayedListings.length" :listings="displayedListings" :display-currency="displayCurrency" :convert="convert" />
 <section v-if="listings.length" class="flats__map-wrap"><flat-map :points="mapPoints" :draw-label="t('drawArea')" :done-label="t('done')" :clear-label="t('clearArea')" :draw-hint="t('drawHint')" :expand-label="t('mapExpand')" :collapse-label="t('mapCollapse')" @select="openById" @area-change="drawnArea = $event" /></section>
@@ -1183,9 +1183,7 @@ onBeforeUnmount(() => { modalOpen.value = false; lightboxIndex.value = null; rel
 .flats__source-warning { color: #f6c177; font-size: 13px; margin-bottom: 12px; }
 .flats__count { font-size: 13px; margin: 0; }
 .flats__results-toolbar { display: flex; align-items: end; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
-.flats__sort { display: flex; align-items: center; gap: 8px; width: min(310px, 100%); }
-.flats__sort > .flats__field-label { flex: 0 0 auto; }
-.flats__sort .flats__select { flex: 1 1 auto; }
+.flats__sort { width: min(310px, 100%); }
 .flats__map-wrap { position: relative; z-index: 0; isolation: isolate; margin-bottom: 18px; scroll-margin-top: 90px; }
 .flats__grid { display: grid; gap: 14px; grid-template-columns: 1fr; align-items: start; }
 @media (min-width: 640px) { .flats__grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }

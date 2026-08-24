@@ -871,19 +871,12 @@ onBeforeUnmount(() => {
     <!-- Filters + sort -->
     <form class="jobs__controls" @submit.prevent="load(1)">
       <u-input v-model="query" clearable icon="i-lucide-search" :label="t('search')" :placeholder="t('searchPlaceholder')" @clear="clearSearch" />
-      <div class="jobs__sort">
-        <u-icon name="i-lucide-arrow-down-wide-narrow" />
-        <u-select-menu
-            v-model="sort"
-            :items="sortItems"
-            value-key="value"
-            label-key="label"
-            :search-input="false"
-            class="jobs__select"
-            :aria-label="t('sortLabel')"
-            @update:model-value="(v: string) => v !== 'ats' && scheduleLoad()"
-        />
-      </div>
+      <UiSortSelect
+        v-model="sort"
+        :items="sortItems"
+        :label="t('sortLabel')"
+        @update:model-value="(value: string) => value !== 'ats' && scheduleLoad()"
+      />
 
       <div class="jobs__row">
         <div class="jobs__filters">
@@ -1141,10 +1134,6 @@ onBeforeUnmount(() => {
   margin: 16px 0 28px; display: grid; gap: 12px; grid-template-columns: 1fr;
   @media (min-width: 900px) { grid-template-columns: 1fr 200px 180px; }
 }
-.jobs__sort { display: flex; align-items: center; gap: 8px; }
-/* u-select-menu carries the site's own theme; we only own the width here. */
-.jobs__select { flex: 1; width: 100%; }
-.jobs__select :deep(button) { width: 100%; }
 .jobs__row { grid-column: 1 / -1; display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
 .jobs__filters { display: flex; flex-wrap: wrap; gap: 8px; }
 .jobs__pill {
