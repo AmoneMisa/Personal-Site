@@ -93,6 +93,7 @@ test('board pages share filter primitives and flat finder starts from a regional
   const flat = readFileSync(new URL('../app/pages/flat-finder/index.vue', import.meta.url), 'utf8')
   const hiring = readFileSync(new URL('../app/pages/hiring/index.vue', import.meta.url), 'utf8')
   const jobs = readFileSync(new URL('../app/pages/jobs/index.vue', import.meta.url), 'utf8')
+  const jobFilterBlocks = readFileSync(new URL('../app/composables/jobs/useJobFilterBlocks.ts', import.meta.url), 'utf8')
   const blocks = readFileSync(new URL('../app/components/search/SearchFilterBlocks.vue', import.meta.url), 'utf8')
   const control = readFileSync(new URL('../app/components/search/SearchFilterControl.vue', import.meta.url), 'utf8')
   const checkbox = readFileSync(new URL('../app/components/common/CustomCheckbox.vue', import.meta.url), 'utf8')
@@ -103,7 +104,8 @@ test('board pages share filter primitives and flat finder starts from a regional
   }
   assert.match(blocks, /<UiFilterSection/u)
   assert.match(control, /field\.control === 'checkbox'/u)
-  assert.match(jobs, /control:\s*"checkbox"/u)
+  assert.match(jobs, /useJobFilterBlocks/u)
+  assert.match(jobFilterBlocks, /control:\s*"checkbox"/u)
   assert.match(checkbox, /const id = useId\(\)/u)
   assert.match(checkbox, /linear-gradient\(135deg, var\(--accent-pink/u)
   assert.match(flat, /timeZone\.startsWith\("Asia\/"\)\s*\?\s*"UZ"\s*:\s*"UA"/u)
@@ -193,15 +195,18 @@ test('all three listing boards use the shared Chart.js analytics components', ()
 test('home uses the image-free error ambience while every service gets an illustrated backdrop', () => {
   const hero = readFileSync(new URL('../app/components/redesign/HeroSection.vue', import.meta.url), 'utf8')
   const backdrop = readFileSync(new URL('../app/components/OceanPageBackdrop.vue', import.meta.url), 'utf8')
+  const serviceHeader = readFileSync(new URL('../app/components/services/ServicePageHeader.vue', import.meta.url), 'utf8')
   assert.match(hero, /ocean-page-backdrop variant="ambient"/u)
   assert.match(backdrop, /ocean-page-backdrop_ambient/u)
   assert.doesNotMatch(backdrop, /ocean-page-backdrop_ambient[^}]*url\(/u)
+  assert.match(readFileSync(new URL('../app/pages/services/index.vue', import.meta.url), 'utf8'), /ocean-page-backdrop/u)
+  assert.match(serviceHeader, /<ocean-page-backdrop\s+:variant="backdrop"/u)
   for (const path of [
-    '../app/pages/services/index.vue', '../app/pages/services/pdf-editor/index.vue',
+    '../app/pages/services/pdf-editor/index.vue',
     '../app/pages/services/merge-json/index.vue', '../app/pages/services/markdown-editor/index.vue',
     '../app/pages/services/email-editor/index.vue', '../app/pages/services/dockerhub/index.vue',
     '../app/pages/services/converter/index.vue', '../app/pages/services/svg-editor/index.vue',
-  ]) assert.match(readFileSync(new URL(path, import.meta.url), 'utf8'), /ocean-page-backdrop/u)
+  ]) assert.match(readFileSync(new URL(path, import.meta.url), 'utf8'), /<service-page-header/u)
 })
 
 test('Rabota.kz and Threads profiles drop captured page controls and metadata', () => {
@@ -258,7 +263,7 @@ test('job statistics use the ocean design and expose localized salary trends', (
 })
 
 test('listing photos dissolve into cards and job salaries use a simple accent', () => {
-  const flats = readFileSync(new URL('../app/pages/flat-finder/index.vue', import.meta.url), 'utf8')
+  const flats = readFileSync(new URL('../app/components/flats/FlatCard.vue', import.meta.url), 'utf8')
   const jobs = readFileSync(new URL('../app/components/jobs/JobCard.vue', import.meta.url), 'utf8')
   assert.match(flats, /bottom: -28px; height: 48%[\s\S]*?linear-gradient\(180deg, transparent/u)
   assert.match(jobs, /\.job-card__compensation \{ min-width: 0; margin-top: 12px; \}/u)
