@@ -1,5 +1,5 @@
 import type { CvProfile } from '../../../../shared/contracts/hiring'
-import { emptyWebCursor, type WebCursor } from '../../../utils/hiringCursors'
+import { emptyWebCursor, type WebCursor } from '../../../../shared/hiring/hiringCursors'
 import { blockAnchors, mergeSameCandidate, type WebCvAdapter } from './common'
 
 const UA =
