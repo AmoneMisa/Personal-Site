@@ -22,6 +22,23 @@ if [ -d .git ]; then
   git pull --ff-only
 fi
 
+# Production only pulls prebuilt images, so unused image layers and builder cache
+# are safe to remove. This prevents containerd/overlayfs from filling the host
+# between deployments. Volumes and images referenced by existing containers are
+# deliberately left untouched.
+prune_unused_docker_data() {
+  echo "Docker storage before cleanup:"
+  docker system df || true
+  docker image prune -af
+  docker builder prune -af
+  echo "Docker storage after cleanup:"
+  docker system df || true
+}
+
+# Reclaim space before pulling the next image set. This is especially important
+# when the previous deploy already left the root filesystem close to full.
+prune_unused_docker_data
+
 docker network inspect ai-net >/dev/null 2>&1 || docker network create ai-net
 
 compose=(docker compose --env-file db.env)
@@ -65,3 +82,8 @@ if [ "$target" = "all" ] || [ "$target" = "frontend" ] || [ "$target" = "jobs" ]
     http://127.0.0.1:8080/hiring >/dev/null
   echo "Personal Site Nuxt runtime is healthy."
 fi
+
+# After a healthy rollout, the previous image generation is no longer referenced
+# by running containers. Remove it immediately instead of letting layers pile up
+# until the next deployment.
+prune_unused_docker_data
