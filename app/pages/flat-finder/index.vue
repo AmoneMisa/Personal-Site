@@ -1061,14 +1061,16 @@ onBeforeUnmount(() => { modalOpen.value = false; lightboxIndex.value = null; rel
       <label class="flats__sort"><span class="flats__field-label">{{ extraLabels.sort }}</span><u-select-menu v-model="sort" :items="sortItems" value-key="value" label-key="label" :search-input="false" class="flats__select" @update:model-value="scheduleLoad(0)" /></label>
     </div>
 
+    <UiResultsLoader :loading="loading" :label="t('searching')" min-height="220px">
     <section v-if="listings.length" class="flats__map-wrap"><flat-map :points="mapPoints" :draw-label="t('drawArea')" :done-label="t('done')" :clear-label="t('clearArea')" :draw-hint="t('drawHint')" :expand-label="t('mapExpand')" :collapse-label="t('mapCollapse')" @select="openById" @area-change="drawnArea = $event" /></section>
 
-    <div class="flats__grid" :class="{ 'flats__grid_loading': loading }">
+    <div class="flats__grid">
       <article v-for="l in displayedListings" :key="`${l.source}:${l.country}:${l.id}`" class="flat-card" :class="{ 'flat-card_favorite': isFavorite(l.id), 'flat-card_hidden': isHidden(l.id) }" @click="openListing(l)">
         <div class="flat-card__photo"><img v-if="listingPhoto(l)" :src="listingPhoto(l) || ''" :alt="displayListingTitle(l)" loading="lazy" decoding="async" referrerpolicy="no-referrer" @error="markPhotoFailedFromEvent" /><div v-else class="flat-card__no-photo"><u-icon name="i-lucide-image-off" class="flat-card__no-photo-icon" aria-hidden="true" /><span>{{ t("noPhoto") }}</span></div><span v-if="dealLabel(l.dealType)" class="flat-card__deal">{{ dealLabel(l.dealType) }}</span><span v-if="l.roomOnly" class="flat-card__room">{{ t("roomShare") }}</span></div>
         <div class="flat-card__body"><div class="flat-card__actions"><button type="button" class="flat-card__action" :class="{ 'flat-card__action_active': isFavorite(l.id) }" :aria-label="isFavorite(l.id) ? t('removeFavorite') : t('addFavorite')" @click.stop="toggleFavorite(l)"><u-icon name="i-lucide-heart" /></button><button type="button" class="flat-card__action" :class="{ 'flat-card__action_active': isHidden(l.id) }" :aria-label="isHidden(l.id) ? t('restoreListing') : t('hideListing')" @click.stop="toggleHidden(l)"><u-icon :name="isHidden(l.id) ? 'i-lucide-eye' : 'i-lucide-eye-off'" /></button></div><div class="flat-card__price">{{ priceLabel(l) }}</div><div v-if="convertedLabel(l)" class="flat-card__price-conv text-muted">{{ convertedLabel(l) }}</div><h3 class="flat-card__title">{{ displayListingTitle(l) }}</h3><div v-if="specLine(l)" class="flat-card__spec text-muted">{{ specLine(l) }}</div><div v-if="cardBadges(l).length" class="flat-card__badges"><span v-for="b in cardBadges(l)" :key="b" class="flat-card__badge">{{ b }}</span></div><div class="flat-card__meta text-muted"><span v-if="locLine(l)">{{ locLine(l) }}</span><span class="flat-card__src">{{ l.source }}</span><span v-if="timeAgo(l.createdAt)">· {{ timeAgo(l.createdAt) }}</span></div></div>
       </article>
     </div>
+    </UiResultsLoader>
 
     <div ref="loadMoreSentinel" v-if="hasMore" class="flats__sentinel"><span v-if="loadingMore" class="text-muted">{{ t("loadingMore") }}</span></div>
     <div v-if="!loading && !displayedListings.length && !failed" class="flats__empty"><div class="text-muted">{{ t("empty") }}</div><div v-if="drawnArea.length >= 3 && listings.length" class="text-muted">{{ t("emptyArea") }}</div></div>
@@ -1134,7 +1136,6 @@ onBeforeUnmount(() => { modalOpen.value = false; lightboxIndex.value = null; rel
 @media (min-width: 640px) { .flats__grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (min-width: 1024px) { .flats__grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
 @media (min-width: 1440px) { .flats__grid { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
-.flats__grid_loading { opacity: 0.4; pointer-events: none; }
 .flat-card { height: 100%; border: 1px solid var(--line); border-radius: 12px; overflow: hidden; background: rgba(255,255,255,0.03); cursor: pointer; transition: transform 140ms ease, border-color 180ms ease; display: flex; flex-direction: column; }
 .flat-card__body { flex: 1 1 auto; position: relative; padding: 12px 14px; display: flex; flex-direction: column; gap: 4px; }
 .flat-card:hover { transform: translateY(-2px); border-color: rgba(224,103,154,0.4); }

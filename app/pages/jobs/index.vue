@@ -1098,7 +1098,6 @@ onBeforeUnmount(() => {
       <span class="jobs__warming-dot" aria-hidden="true"></span>
       {{ t("warming", { loaded: loadedSourceCount, pending: pendingSourceCount }) }}
     </p>
-    <p v-else-if="loading && !stats && !jobs.length" class="jobs__count text-muted">{{ t("searching") }}…</p>
     <p v-else class="jobs__count text-muted">{{ t("jobsFound", { n: displayedTotal }) }}</p>
 
     <!-- Statistics panel -->
@@ -1165,6 +1164,7 @@ onBeforeUnmount(() => {
       </div>
     </section>
 
+    <UiResultsLoader :loading="loading && savedView === 'active'" :label="t('searching')" min-height="210px">
     <!-- Recently viewed (last up to 4) -->
     <section v-if="recentlyViewed.length" class="recent">
       <div class="recent__title">{{ t("recentlyViewed") }}</div>
@@ -1176,8 +1176,7 @@ onBeforeUnmount(() => {
       </div>
     </section>
 
-    <div class="jobs__results">
-     <div class="jobs__grid" :class="{ 'jobs__grid_loading': loading && savedView === 'active' }">
+    <div class="jobs__grid">
       <div
           v-for="{ job, ats } in scored"
           :key="job.id"
@@ -1283,11 +1282,7 @@ onBeforeUnmount(() => {
         </div>
       </div>
      </div>
-     <div v-if="loading" class="jobs__loader" role="status" aria-live="polite">
-       <u-icon name="i-lucide-loader-circle" class="jobs__loader-icon" />
-       <span>{{ t("searching") }}</span>
-     </div>
-    </div>
+    </UiResultsLoader>
 
     <div v-if="!loading && !(warming && savedView === 'active') && !displayedJobs.length && !failed" class="jobs__empty">
       <div class="text-muted">{{ t("empty") }}</div>
@@ -1513,7 +1508,6 @@ onBeforeUnmount(() => {
 .stats__chip { font-size: 12px; padding: 2px 9px; border-radius: 6px; border: 1px solid var(--line); color: var(--ui-text-muted); }
 .stats__chip_skill { border-color: rgba(224, 103, 154,0.35); color: #e79ec0; }
 
-.jobs__results { position: relative; }
 .jobs__grid {
   display: grid; gap: 12px; grid-template-columns: 1fr; align-items: stretch;
   grid-auto-rows: 1fr; /* every card the same height across all rows */
@@ -1521,15 +1515,6 @@ onBeforeUnmount(() => {
   @media (min-width: 1024px) { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   @media (min-width: 1440px) { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 }
-/* Dim + lock the current results while a new page/filter is loading, and float a
-   spinner over them so it's clear the list is refreshing (not empty). */
-.jobs__grid_loading { opacity: 0.35; pointer-events: none; transition: opacity 140ms ease; }
-.jobs__loader {
-  position: absolute; inset: 0; display: flex; align-items: flex-start; justify-content: center;
-  gap: 10px; padding-top: 72px; color: var(--ui-text-muted); font-weight: 600; z-index: 2;
-}
-.jobs__loader-icon { width: 28px; height: 28px; animation: jobs-spin 0.7s linear infinite; }
-@keyframes jobs-spin { to { transform: rotate(360deg); } }
 .job-card {
   padding: 16px; border-radius: 10px; border: 1px solid var(--line);
   background: rgba(255,255,255,0.03); box-shadow: inset 0 1px 0 rgba(255,255,255,0.06);

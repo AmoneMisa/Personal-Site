@@ -905,7 +905,8 @@ onBeforeUnmount(() => {
     <p v-else-if="warming && !loading" class="hiring__warming text-muted">{{ t("warming") }}</p>
     <p v-else class="hiring__count text-muted">{{ t("found", { n: view === 'active' ? total : displayedProfiles.length }) }}</p>
 
-    <div class="hiring__grid" :class="{ 'hiring__grid_loading': loading, 'hiring__grid_dense': denseGrid }">
+    <UiResultsLoader :loading="loading" :label="t('searching')" min-height="210px">
+    <div class="hiring__grid" :class="{ 'hiring__grid_dense': denseGrid }">
       <article
           v-for="profile in displayedProfiles" :key="profile.id" class="hiring-card"
           :class="{ 'hiring-card_favorite': isFavorite(profile.id), 'hiring-card_hidden': isHidden(profile.id) }"
@@ -934,6 +935,7 @@ onBeforeUnmount(() => {
         </div>
       </article>
     </div>
+    </UiResultsLoader>
 
     <div ref="loadMoreSentinel" v-if="hasMore" class="hiring__sentinel">
       <span v-if="loadingMore" class="text-muted">{{ t("loadingMore") }}</span>
@@ -1071,7 +1073,6 @@ onBeforeUnmount(() => {
 @media (min-width: 1024px) { .hiring__grid { grid-template-columns: repeat(3, 1fr); } }
 @media (min-width: 1180px) { .hiring__grid.hiring__grid_dense { grid-template-columns: repeat(4, 1fr); } }
 @media (min-width: 1600px) { .hiring__grid { grid-template-columns: repeat(4, 1fr); } }
-.hiring__grid_loading { opacity: 0.4; pointer-events: none; }
 .hiring-card {
   height: 190px; min-width: 0; border: 1px solid var(--line); border-radius: 12px; overflow: hidden;
   background: rgba(255,255,255,0.03); cursor: pointer; transition: transform 140ms ease, border-color 180ms ease;
