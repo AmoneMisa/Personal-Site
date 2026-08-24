@@ -292,6 +292,11 @@
   },
   "common": {
     "add": "Add",
+    "filePicker": {
+      "fileTooLarge": "File is too large.",
+      "noFile": "No file selected",
+      "pickFile": "Select file"
+    },
     "noData": "No Data",
     "pin": "Pin",
     "pinned": "Pinned",

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import CustomButton from "~/components/common/CustomButton.vue";
+import {downloadBlob, formatFileSize} from "~/utils/files";
 
 const { t } = useI18n();
 
@@ -55,17 +56,6 @@ function clearMessages() {
 function clearFiles() {
   files.value = [];
   clearMessages();
-}
-
-function humanSize(bytes: number) {
-  const units = ["B", "KB", "MB", "GB"];
-  let size = bytes;
-  let i = 0;
-  while (size >= 1024 && i < units.length - 1) {
-    size /= 1024;
-    i++;
-  }
-  return `${size.toFixed(size >= 10 || i === 0 ? 0 : 1)} ${units[i]}`;
 }
 
 function openPicker() {
@@ -171,17 +161,6 @@ function getFilenameFromContentDisposition(cd: string | null) {
   if (m?.[1]) return m[1].trim().replace(/(^"|"$)/g, "");
 
   return null;
-}
-
-function downloadBlob(blob: Blob, filename: string) {
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = filename;
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  URL.revokeObjectURL(url);
 }
 
 const endpoint = computed(() => {
@@ -435,7 +414,7 @@ const targetItems = computed(() =>
               <div v-for="(f, idx) in files" :key="`${f.name}-${idx}`" class="file">
                 <div class="file__meta">
                   <span class="file__name">{{ f.name }}</span>
-                  <span class="file__size">{{ humanSize(f.size) }}</span>
+                  <span class="file__size">{{ formatFileSize(f.size) }}</span>
                 </div>
 
                 <button class="file__remove" type="button" @click="removeFile(idx)" :disabled="isLoading">

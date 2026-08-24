@@ -4,6 +4,7 @@ import type {TabsItem} from "#ui/components/Tabs.vue";
 import {nextTick, onBeforeUnmount, onMounted} from "vue";
 import Modal from "~/components/common/Modal.vue";
 import {checkTextWithLanguageTool} from "~/composables/useLanguageTool";
+import {useScrollableTabs} from "~/composables/ui/useScrollableTabs";
 
 type PlatformId = "telegram" | "whatsapp" | "tiktok";
 type ViewMode = "md" | "preview";
@@ -577,33 +578,15 @@ function onKeydown(e: KeyboardEvent) {
   }
 }
 
-const platformTabsScroll = useTemplateRef<HTMLElement>("platformTabsScroll");
 const platformTabIndex = computed(() => {
   const idx = platformTabs.value.findIndex((x: any) => x.value === activePlatform.value);
   return Math.max(0, idx);
 });
-
-function ensurePlatformTabVisible(index: number) {
-  const wrap = platformTabsScroll.value;
-  if (!wrap) return;
-
-  const triggers = wrap.querySelectorAll<HTMLElement>(".tabs__trigger");
-  const active = triggers[index];
-  if (!active) return;
-
-  const left = active.offsetLeft;
-  const right = left + active.offsetWidth;
-  const viewLeft = wrap.scrollLeft;
-  const viewRight = wrap.scrollLeft + wrap.clientWidth;
-
-  if (left < viewLeft) wrap.scrollTo({left: left - 16, behavior: "smooth"});
-  else if (right > viewRight) wrap.scrollTo({left: right - wrap.clientWidth + 16, behavior: "smooth"});
-}
+const {scrollRef: platformTabsScroll, select: selectPlatformTab} = useScrollableTabs();
 
 async function onPlatformTabChange(value: PlatformId) {
   activePlatform.value = value;
-  await nextTick();
-  ensurePlatformTabVisible(platformTabIndex.value);
+  await selectPlatformTab(platformTabIndex.value);
 }
 
 onMounted(async () => {

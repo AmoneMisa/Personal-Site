@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import {nextTick, onBeforeUnmount, onMounted, ref} from "vue";
+import {ref} from "vue";
 import type {TabsItem} from "#ui/components/Tabs.vue";
+import {useScrollableTabs} from "~/composables/ui/useScrollableTabs";
 
 type SimpleSort = "len_asc" | "len_desc";
 
@@ -57,62 +58,15 @@ type VariantPreset = { labelKey: string; value: string | null };
 // -----------------------------
 // Tabs (your styling logic)
 // -----------------------------
-const tabsScroll = useTemplateRef<HTMLElement>("tabsScroll");
-const tabLine = useTemplateRef<HTMLElement>("tabLineElement");
-const currentIndex = ref(0);
-
-function moveTabLine(index: number) {
-  const wrap = tabsScroll.value;
-  const line = tabLine.value;
-  if (!wrap || !line) return;
-
-  const triggers = wrap.querySelectorAll<HTMLElement>(".tabs__trigger");
-  const active = triggers[index];
-  if (!active) return;
-
-  const center = active.offsetLeft + active.offsetWidth / 2;
-  const w = 12;
-  line.style.width = `${w}px`;
-  line.style.transform = `translateX(${Math.round(center - w / 2)}px)`;
-}
-
-function ensureTabVisible(index: number) {
-  const wrap = tabsScroll.value;
-  if (!wrap) return;
-
-  const triggers = wrap.querySelectorAll<HTMLElement>(".tabs__trigger");
-  const active = triggers[index];
-  if (!active) return;
-
-  const left = active.offsetLeft;
-  const right = left + active.offsetWidth;
-  const viewLeft = wrap.scrollLeft;
-  const viewRight = wrap.scrollLeft + wrap.clientWidth;
-
-  if (left < viewLeft) wrap.scrollTo({left: left - 16, behavior: "smooth"});
-  else if (right > viewRight) wrap.scrollTo({left: right - wrap.clientWidth + 16, behavior: "smooth"});
-}
+const {
+  scrollRef: tabsScroll,
+  indicatorRef: tabLine,
+  select: selectTab,
+} = useScrollableTabs();
 
 async function onTabChange(index: number) {
-  currentIndex.value = index;
-  await nextTick();
-  moveTabLine(index);
-  ensureTabVisible(index);
+  await selectTab(index);
 }
-
-function handleResize() {
-  nextTick(() => moveTabLine(currentIndex.value));
-}
-
-onMounted(async () => {
-  await nextTick();
-  moveTabLine(0);
-  window.addEventListener("resize", handleResize, {passive: true});
-});
-
-onBeforeUnmount(() => {
-  window.removeEventListener("resize", handleResize);
-});
 
 const tabs: TabsItem[] = [
   {label: "services.dockerSearch.tabs.simple"},

@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import {formatFileSize} from "~/utils/files";
+
 type Props = {
   labelKey: string
   accept?: string
@@ -7,6 +9,8 @@ type Props = {
   hintKey?: string
   maxBytes?: number
   maxBytesErrorKey?: string
+  pickFileKey?: string
+  noFileKey?: string
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -14,7 +18,9 @@ const props = withDefaults(defineProps<Props>(), {
   multiple: false,
   error: null,
   maxBytes: 50 * 1024 * 1024,
-  maxBytesErrorKey: "services.mergeJson.errors.fileTooLarge",
+  maxBytesErrorKey: "common.filePicker.fileTooLarge",
+  pickFileKey: "common.filePicker.pickFile",
+  noFileKey: "common.filePicker.noFile",
 })
 
 const emit = defineEmits<{
@@ -31,12 +37,6 @@ function openPicker() {
   inputRef.value?.click()
 }
 
-function formatBytes(bytes: number) {
-  const mb = bytes / (1024 * 1024)
-  if (mb >= 1024) return `${(mb / 1024).toFixed(1)} GB`
-  return `${mb.toFixed(1)} MB`
-}
-
 function validateFiles(files: File[]) {
   const tooLarge = files.find((f) => f.size > props.maxBytes)
   if (!tooLarge) return { ok: true as const }
@@ -44,7 +44,7 @@ function validateFiles(files: File[]) {
   return {
     ok: false as const,
     message: (key: string) =>
-        `${key} (${formatBytes(tooLarge.size)} > ${formatBytes(props.maxBytes)})`,
+        `${key} (${formatFileSize(tooLarge.size)} > ${formatFileSize(props.maxBytes)})`,
     file: tooLarge,
   }
 }
@@ -64,7 +64,7 @@ function onChange(e: Event) {
   const res = validateFiles(files)
   if (!res.ok) {
     fileNames.value = ""
-    localError.value = `${(useI18n().t as any)(props.maxBytesErrorKey)} (${formatBytes(res.file.size)} > ${formatBytes(props.maxBytes)})`
+    localError.value = `${(useI18n().t as any)(props.maxBytesErrorKey)} (${formatFileSize(res.file.size)} > ${formatFileSize(props.maxBytes)})`
     emit("files", [])
     return
   }
@@ -91,12 +91,12 @@ function onChange(e: Event) {
       <div class="fi__row">
         <button class="fi__btn" type="button" @click="openPicker">
           <u-icon name="i-lucide-upload" class="fi__icon" />
-          <span>{{ $t("services.mergeJson.inputs.pickFile") }}</span>
+          <span>{{ $t(pickFileKey) }}</span>
         </button>
 
-        <div class="fi__name" :title="fileNames || $t('services.mergeJson.inputs.noFile')">
+        <div class="fi__name" :title="fileNames || $t(noFileKey)">
           <span v-if="fileNames">{{ fileNames }}</span>
-          <span v-else class="fi__muted">{{ $t("services.mergeJson.inputs.noFile") }}</span>
+          <span v-else class="fi__muted">{{ $t(noFileKey) }}</span>
         </div>
       </div>
     </div>

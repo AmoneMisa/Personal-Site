@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import CustomButton from "~/components/common/CustomButton.vue";
 import { computed, ref } from "vue";
+import {formatFileSize} from "~/utils/files";
 
 const config = useRuntimeConfig();
 const { t } = useI18n();
@@ -19,7 +20,7 @@ const fileLabel = computed(() => selectedFile.value?.name ?? "");
 const fileSizeMb = computed(() => {
   const f = selectedFile.value;
   if (!f) return "";
-  return `${Math.max(0.1, Math.round((f.size / 1024 / 1024) * 10) / 10)} MB`;
+  return formatFileSize(f.size);
 });
 
 function openPicker() {

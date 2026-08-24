@@ -18,6 +18,7 @@ import {fixJsonText} from "~/utils/mergeJson/jsonFix";
 import {parseFlatTextToTree, toFlatText} from "~/utils/mergeJson/flat";
 import RenameModal from "~/components/mergeJson/RenameModal.vue";
 import DeleteBlockModal from "~/components/mergeJson/DeleteBlockModal.vue";
+import {downloadBlob} from "~/utils/files";
 
 export type SortMode = "asc" | "desc";
 export type ViewMode = "json" | "tree" | "flat";
@@ -510,12 +511,7 @@ export function useMergeJsonState() {
 
     function download(opts: { filename: string }) {
         const blob = new Blob([resultTextJson.value], {type: "application/json;charset=utf-8"});
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = opts.filename || "merged.json";
-        a.click();
-        URL.revokeObjectURL(url);
+        downloadBlob(blob, opts.filename || "merged.json");
     }
 
     const canFix = computed(() => (resultTextJson.value || "").trim().length > 0);
