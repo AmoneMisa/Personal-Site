@@ -572,15 +572,8 @@ onBeforeUnmount(() => {
       @clear="clearCv"
     />
 
-    <!-- Filters + sort -->
     <SearchFilterPanel tag="form" class="jobs__controls" @submit="load(1)">
       <u-input v-model="query" clearable icon="i-lucide-search" :label="t('search')" :placeholder="t('searchPlaceholder')" @clear="clearSearch" />
-      <UiSortSelect
-        v-model="sort"
-        :items="sortItems"
-        :label="t('sortLabel')"
-        @update:model-value="(value: string) => value !== 'ats' && scheduleLoad()"
-      />
 
       <div class="jobs__row">
         <SearchSourceTabs :model-value="source" :items="sourceOptions" @update:model-value="selectSource">
@@ -597,7 +590,6 @@ onBeforeUnmount(() => {
         </u-button>
       </div>
 
-      <!-- Advanced filters -->
       <div class="jobs__row jobs__adv-toggle">
         <button type="button" class="jobs__advbtn" @click="showAdvanced = !showAdvanced">
           <u-icon :name="showAdvanced ? 'i-lucide-chevron-down' : 'i-lucide-chevron-right'" />
@@ -606,21 +598,28 @@ onBeforeUnmount(() => {
       </div>
       <div v-if="showAdvanced" class="jobs__advanced">
         <SearchFilterBlocks :blocks="jobFilterBlocks" class="jobs__filter-blocks" />
-
         <UiFilterFooter class="jobs-filter-actions" :reset-label="t('reset')" @reset="resetFilters" />
       </div>
     </SearchFilterPanel>
 
-    <p v-if="failed" class="jobs__error">{{ t("error") }}</p>
-    <p v-else-if="warming && savedView === 'active'" class="jobs__warming" role="status" aria-live="polite">
-      <span class="jobs__warming-dot" aria-hidden="true"></span>
-      {{ t("warming", { loaded: loadedSourceCount, pending: pendingSourceCount }) }}
-    </p>
-    <p v-else class="jobs__count text-muted">{{ t("jobsFound", { n: displayedTotal }) }}</p>
+    <div class="jobs__results-toolbar">
+      <p v-if="failed" class="jobs__error">{{ t("error") }}</p>
+      <p v-else-if="warming && savedView === 'active'" class="jobs__warming" role="status" aria-live="polite">
+        <span class="jobs__warming-dot" aria-hidden="true"></span>
+        {{ t("warming", { loaded: loadedSourceCount, pending: pendingSourceCount }) }}
+      </p>
+      <p v-else class="jobs__count text-muted">{{ t("jobsFound", { n: displayedTotal }) }}</p>
+      <UiSortSelect
+        class="jobs__sort"
+        v-model="sort"
+        :items="sortItems"
+        :label="t('sortLabel')"
+        @update:model-value="(value: string) => value !== 'ats' && scheduleLoad()"
+      />
+    </div>
 
     <StatsPanel
       v-if="savedView === 'active' && stats && total"
-      :jobs="jobs"
       :stats="stats"
       :display-currency="displayCurrency"
       :display-period-label="periodLabel(displayPeriod)"
@@ -666,7 +665,6 @@ onBeforeUnmount(() => {
 
     </UiResultsLoader>
 
-    <!-- Full vacancy popup -->
     <SearchDetailsModal v-model:open="jobModalOpen" :title="activeJob?.title || ''" :ui="{ content: 'max-w-2xl' }">
       <template #body>
         <div v-if="activeJob" class="job-modal">
@@ -760,24 +758,22 @@ onBeforeUnmount(() => {
 .jobs__headline { font-size: 16px; }
 .jobs__subtitle { max-width: 760px; font-size: 14px; }
 
-.jobs__controls {
-  margin: 16px 0 28px; display: grid; gap: 12px; grid-template-columns: 1fr;
-  @media (min-width: 900px) { grid-template-columns: 1fr 200px 180px; }
-}
+.jobs__controls { margin: 16px 0 20px; display: grid; gap: 12px; grid-template-columns: 1fr; }
 .jobs__row { grid-column: 1 / -1; display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
 .jobs__remote { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 700; }
+.jobs__results-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
+.jobs__results-toolbar .jobs__error,
+.jobs__results-toolbar .jobs__count,
+.jobs__results-toolbar .jobs__warming { margin: 0; }
+.jobs__sort { flex: 0 0 min(280px, 42vw); min-width: 200px; }
 .jobs__error { color: var(--ui-error, #f87171); }
-.jobs__count { font-size: 13px; margin-bottom: 12px; }
-.jobs__warming {
-  display: flex; align-items: center; gap: 8px; margin-bottom: 12px;
-  color: var(--ui-text-muted); font-size: 13px;
-}
+.jobs__count { font-size: 13px; }
+.jobs__warming { display: flex; align-items: center; gap: 8px; color: var(--ui-text-muted); font-size: 13px; }
 .jobs__warming-dot {
   width: 8px; height: 8px; border-radius: 2px; background: var(--accent-pink, #e0679a);
   animation: jobs-warming 1s ease-in-out infinite alternate;
 }
 @keyframes jobs-warming { to { opacity: 0.35; } }
-
 .jobs__adv-toggle { margin-top: -2px; }
 .jobs__advbtn {
   display: inline-flex; align-items: center; gap: 6px; background: none; border: none;
@@ -807,6 +803,10 @@ onBeforeUnmount(() => {
 @media (min-width: 1200px) {
   .jobs__advanced { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .jobs-filter-group__grid_location { grid-template-columns: minmax(180px, .8fr) minmax(0, 1.6fr); }
+}
+@media (max-width: 620px) {
+  .jobs__results-toolbar { align-items: stretch; flex-direction: column; }
+  .jobs__sort { flex: 1 1 auto; width: 100%; min-width: 0; }
 }
 
 .jobs__load-more {
