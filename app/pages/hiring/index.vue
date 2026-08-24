@@ -9,6 +9,7 @@ import SearchSavedTabs from "~/components/search/SearchSavedTabs.vue";
 import SearchFilterPanel from "~/components/search/SearchFilterPanel.vue";
 import SearchFilterBlocks from "~/components/search/SearchFilterBlocks.vue";
 import { useHiringFilters } from "~/composables/hiring/useHiringFilters";
+import { useHiringFilterBlocks } from "~/composables/hiring/useHiringFilterBlocks";
 import { useHiringFeed } from "~/composables/hiring/useHiringFeed";
 import { useHiringMatch } from "~/composables/hiring/useHiringMatch";
 import { useHiringRouteState } from "~/composables/hiring/useHiringRouteState";
@@ -25,7 +26,6 @@ import {
   type HiringSourceOption as SourceOption,
   type HiringView,
 } from "~/types/hiring";
-import type { SearchFilterBlock, SearchFilterValue } from "~/types/search";
 import { queryString } from "~/utils/queryParams";
 import { hiringProfessionLocale } from "~~/shared/hiringProfessionLabels";
 import {
@@ -57,11 +57,12 @@ useSeoMeta({
   ogDescription: () => t("seoDescription"),
 });
 
+const hiringFilters = useHiringFilters();
 const {
   countries, city, remote, experienceMin, salaryFrom, salaryTo, salaryCurrency, sort,
   ageMin, ageMax, gender, professions, professionValues, query, seniority, skills, source,
   showAdvanced, buildFeedParams, resetValues: resetFilterValues,
-} = useHiringFilters();
+} = hiringFilters;
 
 const {
   profiles, total, loading, loadingMore, filtersPending, warming, failed,
@@ -192,55 +193,20 @@ const sortItems = computed<Item[]>(() => [
   { value: "salary_asc", label: t("sortSalaryAsc") },
 ]);
 
-function updateFilter<T>(target: { value: T }) {
-  return (value: SearchFilterValue) => {
-    target.value = value as T;
-  };
-}
-
-const hiringFilterBlocks = computed<SearchFilterBlock[]>(() => [
-  {
-    id: "location",
-    title: t("filterLocation"),
-    icon: "i-lucide-map-pin",
-    fields: [
-      { id: "countries", control: "multi-select", label: t("country"), value: countries.value, options: countryItems.value, placeholder: t("countryAny"), onUpdate: updateFilter(countries), onCommit: scheduleLoad },
-      { id: "city", control: "select", label: t("city"), value: citySel.value, options: cityItems.value, onUpdate: updateFilter(citySel), onCommit: scheduleLoad },
-      { id: "remote", control: "select", label: t("remote"), value: remote.value, options: remoteItems.value, searchable: false, onUpdate: updateFilter(remote), onCommit: scheduleLoad },
-    ],
-  },
-  {
-    id: "salary",
-    title: t("filterSalary"),
-    icon: "i-lucide-banknote",
-    fields: [
-      { id: "salary-from", control: "number", label: t("salaryFrom"), value: salaryFrom.value, min: 0, icon: "i-lucide-banknote", onUpdate: updateFilter(salaryFrom), onCommit: scheduleLoad },
-      { id: "salary-to", control: "number", label: t("salaryTo"), value: salaryTo.value, min: 0, icon: "i-lucide-banknote", onUpdate: updateFilter(salaryTo), onCommit: scheduleLoad },
-      { id: "salary-currency", control: "select", label: t("currency"), value: salaryCurrency.value, options: salaryCurrencyItems.value, searchable: false, onUpdate: updateFilter(salaryCurrency), onCommit: () => (salaryFrom.value != null || salaryTo.value != null || sort.value.startsWith("salary")) && scheduleLoad(0) },
-    ],
-  },
-  {
-    id: "candidate",
-    title: t("filterCandidate"),
-    icon: "i-lucide-user-round",
-    fields: [
-      { id: "experience-min", control: "number", label: t("experienceMin"), value: experienceMin.value, min: 0, icon: "i-lucide-briefcase", onUpdate: updateFilter(experienceMin), onCommit: scheduleLoad },
-      { id: "age-min", control: "number", label: t("ageFrom"), value: ageMin.value, min: 14, max: 99, icon: "i-lucide-user-round", onUpdate: updateFilter(ageMin), onCommit: scheduleLoad },
-      { id: "age-max", control: "number", label: t("ageTo"), value: ageMax.value, min: 14, max: 99, icon: "i-lucide-user-round", onUpdate: updateFilter(ageMax), onCommit: scheduleLoad },
-      { id: "gender", control: "select", label: t("gender"), value: genderSel.value, options: genderItems.value, searchable: false, onUpdate: updateFilter(genderSel), onCommit: scheduleLoad },
-      { id: "seniority", control: "select", label: t("seniority"), value: senioritySel.value, options: seniorityItems.value, searchable: false, onUpdate: updateFilter(senioritySel), onCommit: scheduleLoad },
-    ],
-  },
-  {
-    id: "role",
-    title: t("filterRoleSkills"),
-    icon: "i-lucide-briefcase-business",
-    fields: [
-      { id: "professions", control: "custom", class: "hiring__field_wide" },
-      { id: "skills", control: "text", class: "hiring__field_wide", label: t("skills"), value: skills.value, placeholder: t("skillsPlaceholder"), icon: "i-lucide-code", onUpdate: updateFilter(skills), onCommit: scheduleLoad },
-    ],
-  },
-]);
+const hiringFilterBlocks = useHiringFilterBlocks({
+  t,
+  filters: hiringFilters,
+  citySelect: citySel,
+  genderSelect: genderSel,
+  senioritySelect: senioritySel,
+  countryItems,
+  cityItems,
+  remoteItems,
+  salaryCurrencyItems,
+  genderItems,
+  seniorityItems,
+  scheduleLoad,
+});
 
 function loadPersonalState() {
   loadSavedCollections();

@@ -12,6 +12,7 @@ import SearchFilterBlocks from "~/components/search/SearchFilterBlocks.vue";
 import { queryBoolean, queryString } from "~/utils/queryParams";
 import { convertCurrency } from "~/utils/search/money";
 import { useFlatFilters } from "~/composables/flats/useFlatFilters";
+import { useFlatFilterBlocks } from "~/composables/flats/useFlatFilterBlocks";
 import { useFlatFeed } from "~/composables/flats/useFlatFeed";
 import { useFlatPhotos } from "~/composables/flats/useFlatPhotos";
 import { useFlatMap } from "~/composables/flats/useFlatMap";
@@ -31,7 +32,6 @@ import type {
   FlatSort,
   FlatView,
 } from "~/types/flats";
-import type { SearchFilterBlock, SearchFilterValue } from "~/types/search";
 
 // Flat Finder. Auto-routed at /flat-finder. Reuses the flat-finder backend
 // (same one the desktop app uses) via the /flats-* proxy routes, so listings,
@@ -66,6 +66,7 @@ function regionalDefaultCountry(): "UA" | "UZ" {
   const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone || "";
   return timeZone.startsWith("Asia/") ? "UZ" : "UA";
 }
+const flatFilters = useFlatFilters();
 const {
   countries, city, district, propertyType, dealType, agency, petFriendly, roomOnlyFilter,
   onlyWithPhotos, childrenRequired, newBuildingOnly, dishwasherOnly, airConditionerOnly,
@@ -74,7 +75,7 @@ const {
   areaMin, areaMax, pricePerSqmMin, pricePerSqmMax, metroMaxM, nearbyKind, nearbyMaxM,
   floorMin, floorMax, totalFloorsMin, totalFloorsMax, yearMin, yearMax, maxAgeDays,
   displayCurrency, query, source, showAdvanced, buildFeedParams, resetValues: resetFilterValues,
-} = useFlatFilters();
+} = flatFilters;
 const rates = ref<Record<string, number>>({ USD: 1 });
 
 const {
@@ -237,73 +238,21 @@ const agencyItems = computed<Item[]>(() => [
   { label: t("agAny"), value: "any" }, { label: t("agOwner"), value: "owner" }, { label: t("agAgency"), value: "agency" },
 ]);
 
-function updateFilter<T>(target: { value: T }) {
-  return (value: SearchFilterValue) => {
-    target.value = value as T;
-  };
-}
-
-const flatAdvancedFilterBlocks = computed<SearchFilterBlock[]>(() => [
-  {
-    id: "quick",
-    title: t("quickOptions"),
-    icon: "i-lucide-sliders-horizontal",
-    gridClass: "flat-filter-grid_single",
-    fields: [{ id: "quick-options", control: "custom" }],
-  },
-  {
-    id: "location",
-    title: t("groupLocation"),
-    icon: "i-lucide-map-pin",
-    gridClass: "flat-filter-grid_single",
-    fields: [
-      { id: "district", control: "select", label: t("district"), value: districtSel.value, options: districtItems.value, hidden: !districtOptions.value.length, onUpdate: updateFilter(districtSel), onCommit: scheduleLoad },
-      { id: "metro", control: "select", label: t("metro"), value: metroSel.value, options: metroItems.value, hidden: !metroOptions.value.length, onUpdate: updateFilter(metroSel), onCommit: scheduleLoad },
-      { id: "metro-distance", control: "number", label: t("metroWithin"), value: metroMaxM.value, min: 0, step: 100, inputmode: "numeric", onUpdate: updateFilter(metroMaxM), onCommit: scheduleLoad },
-      { id: "nearby-kind", control: "select", label: t("nearbyKind"), value: nearbyKindSel.value, options: nearbyKindItems.value, onUpdate: updateFilter(nearbyKindSel), onCommit: scheduleLoad },
-      { id: "nearby-distance", control: "number", label: t("nearbyWithin"), value: nearbyMaxM.value, min: 0, step: 100, inputmode: "numeric", onUpdate: updateFilter(nearbyMaxM), onCommit: scheduleLoad },
-    ],
-  },
-  {
-    id: "apartment",
-    title: t("groupApartment"),
-    icon: "i-lucide-house",
-    fields: [
-      { id: "rooms-min", control: "number", label: `${t("rangeRooms")} · ${t("rangeFrom")}`, value: roomsMin.value, min: 0, onUpdate: updateFilter(roomsMin), onCommit: scheduleLoad },
-      { id: "rooms-max", control: "number", label: `${t("rangeRooms")} · ${t("rangeTo")}`, value: roomsMax.value, min: 0, onUpdate: updateFilter(roomsMax), onCommit: scheduleLoad },
-      { id: "bedrooms-min", control: "number", label: `${t("rangeBedrooms")} · ${t("rangeFrom")}`, value: bedroomsMin.value, min: 0, onUpdate: updateFilter(bedroomsMin), onCommit: scheduleLoad },
-      { id: "bedrooms-max", control: "number", label: `${t("rangeBedrooms")} · ${t("rangeTo")}`, value: bedroomsMax.value, min: 0, onUpdate: updateFilter(bedroomsMax), onCommit: scheduleLoad },
-      { id: "area-min", control: "number", label: `${t("rangeArea")} · ${t("rangeFrom")}`, value: areaMin.value, min: 0, onUpdate: updateFilter(areaMin), onCommit: scheduleLoad },
-      { id: "area-max", control: "number", label: `${t("rangeArea")} · ${t("rangeTo")}`, value: areaMax.value, min: 0, onUpdate: updateFilter(areaMax), onCommit: scheduleLoad },
-      { id: "sqm-min", control: "number", label: `${t("rangePricePerSqm")} · ${t("rangeFrom")}`, value: pricePerSqmMin.value, min: 0, inputmode: "numeric", onUpdate: updateFilter(pricePerSqmMin), onCommit: scheduleLoad },
-      { id: "sqm-max", control: "number", label: `${t("rangePricePerSqm")} · ${t("rangeTo")}`, value: pricePerSqmMax.value, min: 0, inputmode: "numeric", onUpdate: updateFilter(pricePerSqmMax), onCommit: scheduleLoad },
-    ],
-  },
-  {
-    id: "building",
-    title: t("groupBuilding"),
-    icon: "i-lucide-building-2",
-    fields: [
-      { id: "floor-min", control: "number", label: `${t("rangeFloor")} · ${t("rangeFrom")}`, value: floorMin.value, min: 0, onUpdate: updateFilter(floorMin), onCommit: scheduleLoad },
-      { id: "floor-max", control: "number", label: `${t("rangeFloor")} · ${t("rangeTo")}`, value: floorMax.value, min: 0, onUpdate: updateFilter(floorMax), onCommit: scheduleLoad },
-      { id: "total-floors-min", control: "number", label: `${t("rangeTotalFloors")} · ${t("rangeFrom")}`, value: totalFloorsMin.value, min: 1, onUpdate: updateFilter(totalFloorsMin), onCommit: scheduleLoad },
-      { id: "total-floors-max", control: "number", label: `${t("rangeTotalFloors")} · ${t("rangeTo")}`, value: totalFloorsMax.value, min: 1, onUpdate: updateFilter(totalFloorsMax), onCommit: scheduleLoad },
-      { id: "year-min", control: "number", label: `${t("rangeYear")} · ${t("rangeFrom")}`, value: yearMin.value, min: 1800, max: new Date().getFullYear() + 2, onUpdate: updateFilter(yearMin), onCommit: scheduleLoad },
-      { id: "year-max", control: "number", label: `${t("rangeYear")} · ${t("rangeTo")}`, value: yearMax.value, min: 1800, max: new Date().getFullYear() + 2, onUpdate: updateFilter(yearMax), onCommit: scheduleLoad },
-    ],
-  },
-  {
-    id: "listing",
-    title: t("groupListing"),
-    icon: "i-lucide-megaphone",
-    gridClass: "flat-filter-grid_single",
-    fields: [
-      { id: "audience", control: "select", label: t("audience"), value: audience.value, options: audienceItems.value, searchable: false, onUpdate: updateFilter(audience), onCommit: scheduleLoad },
-      { id: "property-type", control: "select", label: t("propertyType"), value: propertyType.value, options: propertyTypeItems.value, searchable: false, onUpdate: updateFilter(propertyType), onCommit: scheduleLoad },
-      { id: "fresh-days", control: "number", label: t("freshDays"), value: maxAgeDays.value, min: 1, max: 21, onUpdate: updateFilter(maxAgeDays), onCommit: scheduleLoad },
-    ],
-  },
-]);
+const flatAdvancedFilterBlocks = useFlatFilterBlocks({
+  t,
+  filters: flatFilters,
+  districtSelect: districtSel,
+  metroSelect: metroSel,
+  nearbyKindSelect: nearbyKindSel,
+  districtItems,
+  metroItems,
+  nearbyKindItems,
+  audienceItems,
+  propertyTypeItems,
+  hasDistricts: () => districtOptions.value.length > 0,
+  hasMetro: () => metroOptions.value.length > 0,
+  scheduleLoad,
+});
 
 function loadPersonalState() {
   loadSavedCollections();

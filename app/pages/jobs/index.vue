@@ -13,6 +13,7 @@ import StatsPanel from "~/components/jobs/StatsPanel.vue";
 import type { Job, RecentJob } from "~/types/jobs";
 import { convertCurrency as convertCurrencyValue, convertSalaryPeriod, currencySymbol } from "~/utils/search/money";
 import { useJobFilters } from "~/composables/jobs/useJobFilters";
+import { useJobFilterBlocks } from "~/composables/jobs/useJobFilterBlocks";
 import { useJobFeed } from "~/composables/jobs/useJobFeed";
 import { useJobAts } from "~/composables/jobs/useJobAts";
 import { useJobMeta } from "~/composables/jobs/useJobMeta";
@@ -21,7 +22,6 @@ import { useSavedCollections } from "~/composables/search/useSavedCollections";
 import { useLatestRequest } from "~/composables/search/useLatestRequest";
 import { useInfiniteFeed } from "~/composables/search/useInfiniteFeed";
 import { ANY_SELECT_VALUE, useNullableSelect } from "~/composables/search/useNullableSelect";
-import type { SearchFilterBlock, SearchFilterValue } from "~/types/search";
 
 // Job Finder service. Auto-routed at /jobs. Aggregates many boards, enforces a
 // 14-day freshness cap server-side, offers full sort + advanced filters, shows
@@ -86,12 +86,13 @@ function convertPeriod(amount: number, from: Period, to: Period): number {
   return Math.round(convertSalaryPeriod(amount, from, to));
 }
 
+const jobFilters = useJobFilters();
 const {
   query, source, salaryMin, displayCurrency, displayPeriod, sort, countries, cities,
   includeRu, includeBy, workMode, relocation, employmentKind, hasSalary, maxExperience,
   foreignerOnly, hideRisky, noExperience, language, languageLevel, excludeLanguages,
   skills, showAdvanced, buildFeedParams, resetValues: resetFilterValues,
-} = useJobFilters();
+} = jobFilters;
 
 // Reka UI reserves an empty string for clearing a combobox and throws when an
 // item itself has value="". Keep the API-facing refs empty for "any", while
@@ -641,68 +642,27 @@ const levelItems = computed<Item[]>(() => [
   ...levelOptions.map((l) => ({ label: l, value: l })),
 ]);
 
-function updateFilter<T>(target: { value: T }) {
-  return (value: SearchFilterValue) => {
-    target.value = value as T;
-  };
-}
-
-const jobFilterBlocks = computed<SearchFilterBlock[]>(() => [
-  {
-    id: "location",
-    title: t("filterLocation"),
-    icon: "i-lucide-map-pin",
-    fields: [
-      { id: "countries", control: "multi-select", label: t("country"), value: countries.value, options: countryItems.value, placeholder: t("countryPlaceholder"), onUpdate: updateFilter(countries), onCommit: scheduleLoad },
-      { id: "cities", control: "text", class: "jobs__field_wide", label: t("cities"), value: cities.value, placeholder: t("citiesPlaceholder"), icon: "i-lucide-map-pin", onUpdate: updateFilter(cities), onCommit: scheduleLoad, onEnter: () => load(1) },
-    ],
-  },
-  {
-    id: "salary",
-    title: t("filterSalary"),
-    icon: "i-lucide-banknote",
-    fields: [
-      { id: "salary-min", control: "number", label: `${t("salaryMin")} (${displayCurrency.value}/${periodLabel(displayPeriod.value)})`, value: salaryMin.value, min: 0, icon: "i-lucide-banknote", onUpdate: updateFilter(salaryMin), onCommit: scheduleLoad },
-      { id: "currency", control: "select", label: t("currency"), value: displayCurrency.value, options: currencyItems.value, onUpdate: updateFilter(displayCurrency), onCommit: () => salaryMin.value && scheduleLoad() },
-      { id: "period", control: "select", label: t("period"), value: displayPeriod.value, options: periodItems.value, searchable: false, onUpdate: updateFilter(displayPeriod), onCommit: () => salaryMin.value && scheduleLoad() },
-      { id: "has-salary", control: "checkbox", label: t("hasSalary"), value: hasSalary.value, onUpdate: updateFilter(hasSalary), onCommit: scheduleLoad },
-    ],
-  },
-  {
-    id: "work",
-    title: t("filterWork"),
-    icon: "i-lucide-briefcase-business",
-    fields: [
-      { id: "work-mode", control: "select", label: t("workMode"), value: workModeSelect.value, options: workModeItems.value, searchable: false, onUpdate: updateFilter(workModeSelect), onCommit: scheduleLoad },
-      { id: "relocation", control: "select", label: t("relocation"), value: relocationSelect.value, options: relocationItems.value, searchable: false, onUpdate: updateFilter(relocationSelect), onCommit: scheduleLoad },
-      { id: "employment", control: "select", label: t("employment"), value: employmentKindSelect.value, options: employmentKindItems.value, searchable: false, onUpdate: updateFilter(employmentKindSelect), onCommit: scheduleLoad },
-      { id: "max-experience", control: "number", label: t("experienceMax"), value: maxExperience.value, placeholder: t("experienceMaxPlaceholder"), min: 0, max: 40, icon: "i-lucide-briefcase", onUpdate: updateFilter(maxExperience), onCommit: scheduleLoad, onEnter: () => load(1) },
-      { id: "no-experience", control: "checkbox", label: t("noExperience"), value: noExperience.value, onUpdate: updateFilter(noExperience), onCommit: scheduleLoad },
-      { id: "foreigner", control: "checkbox", label: t("foreigner"), value: foreignerOnly.value, onUpdate: updateFilter(foreignerOnly), onCommit: scheduleLoad },
-    ],
-  },
-  {
-    id: "skills",
-    title: t("filterSkills"),
-    icon: "i-lucide-languages",
-    fields: [
-      { id: "language", control: "select", label: t("language"), value: languageSelect.value, options: languageItems.value, onUpdate: updateFilter(languageSelect), onCommit: scheduleLoad },
-      { id: "language-level", control: "select", label: t("languageLevel"), value: languageLevelSelect.value, options: levelItems.value, searchable: false, disabled: !language.value, onUpdate: updateFilter(languageLevelSelect), onCommit: scheduleLoad },
-      { id: "exclude-language", control: "multi-select", label: t("excludeLanguage"), value: excludeLanguages.value, options: excludeLanguageItems.value, placeholder: t("excludeLangPlaceholder"), onUpdate: updateFilter(excludeLanguages), onCommit: scheduleLoad },
-      { id: "skills-query", control: "text", class: "jobs__field_wide", label: t("skills"), value: skills.value, placeholder: t("skillsPlaceholder"), icon: "i-lucide-wrench", onUpdate: updateFilter(skills), onEnter: () => load(1) },
-    ],
-  },
-  {
-    id: "coverage",
-    title: t("filterCoverage"),
-    icon: "i-lucide-shield-check",
-    fields: [
-      { id: "hide-risky", control: "checkbox", label: t("hideRisky"), title: t("hideRiskyHint"), value: hideRisky.value, onUpdate: updateFilter(hideRisky), onCommit: scheduleLoad },
-      { id: "include-ru", control: "checkbox", label: t("includeRu"), value: includeRu.value, onUpdate: updateFilter(includeRu), onCommit: scheduleLoad },
-      { id: "include-by", control: "checkbox", label: t("includeBy"), value: includeBy.value, onUpdate: updateFilter(includeBy), onCommit: scheduleLoad },
-    ],
-  },
-]);
+const jobFilterBlocks = useJobFilterBlocks({
+  t,
+  filters: jobFilters,
+  workModeSelect,
+  relocationSelect,
+  employmentKindSelect,
+  languageSelect,
+  languageLevelSelect,
+  countryItems,
+  currencyItems,
+  periodItems,
+  workModeItems,
+  relocationItems,
+  employmentKindItems,
+  languageItems,
+  levelItems,
+  excludeLanguageItems,
+  periodLabel,
+  scheduleLoad,
+  submit: () => load(1),
+});
 
 // Do not suspend SSR/hydration on the aggregated feed. A cold job store can
 // take several seconds while upstream boards time out; keeping that request at
