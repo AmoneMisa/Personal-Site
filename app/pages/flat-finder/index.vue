@@ -628,7 +628,6 @@ onBeforeUnmount(() => { modalOpen.value = false; lightboxOpen.value = false; rel
             <div class="quick-options">
               <u-button type="button" :variant="petFriendly ? 'solid' : 'outline'" color="neutral" icon="i-lucide-paw-print" @click="petFriendly = !petFriendly; scheduleLoad()">{{ t('pets') }}</u-button>
               <u-button type="button" :variant="childrenRequired ? 'solid' : 'outline'" color="neutral" icon="i-lucide-baby" @click="childrenRequired = !childrenRequired; scheduleLoad()">{{ t('children') }}</u-button>
-              <u-button type="button" :variant="roomOnlyFilter ? 'solid' : 'outline'" color="neutral" icon="i-lucide-bed-single" @click="roomOnlyFilter = !roomOnlyFilter; scheduleLoad()">{{ t('roomOnly') }}</u-button>
               <u-button type="button" :variant="onlyWithPhotos ? 'solid' : 'outline'" color="neutral" icon="i-lucide-images" @click="onlyWithPhotos = !onlyWithPhotos; scheduleLoad()">{{ t('onlyWithPhotos') }}</u-button>
               <u-button type="button" :variant="newBuildingOnly ? 'solid' : 'outline'" color="neutral" icon="i-lucide-building-2" @click="newBuildingOnly = !newBuildingOnly; scheduleLoad()">{{ t('newBuilding') }}</u-button>
             </div>
