@@ -1,5 +1,5 @@
 {
-  "errors": {
+  "errorPage": {
     "404": {
       "kicker": "Oops!",
       "title": "This page swam away",
