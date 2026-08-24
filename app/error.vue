@@ -12,7 +12,7 @@ const localePath = useLocalePath();
 
 const code = computed(() => props.error?.statusCode ?? 500);
 const is404 = computed(() => code.value === 404);
-const errorCopyKey = computed(() => `errors.${is404.value ? "404" : "500"}`);
+const errorCopyKey = computed(() => `errorPage.${is404.value ? "404" : "500"}`);
 
 const artworkSrc = computed(() =>
   is404.value ? "/images/errors/error-404.png" : "/images/errors/error-500.png",
@@ -73,7 +73,7 @@ function retry() {
           <div class="error-actions">
             <button type="button" class="error-button error-button--primary" @click="goHome">
               <u-icon name="i-lucide-house" aria-hidden="true" />
-              <span>{{ t("errors.actions.home") }}</span>
+              <span>{{ t("errorPage.actions.home") }}</span>
             </button>
 
             <button
@@ -85,14 +85,14 @@ function retry() {
                 :name="is404 ? 'i-lucide-arrow-left' : 'i-lucide-refresh-cw'"
                 aria-hidden="true"
               />
-              <span>{{ is404 ? t("errors.actions.back") : t("errors.actions.retry") }}</span>
+              <span>{{ is404 ? t("errorPage.actions.back") : t("errorPage.actions.retry") }}</span>
             </button>
           </div>
 
           <details v-if="!is404" class="error-details">
             <summary>
               <u-icon name="i-lucide-chevron-down" aria-hidden="true" />
-              <span>{{ t("errors.details") }}</span>
+              <span>{{ t("errorPage.details") }}</span>
             </summary>
             <pre>{{ details }}</pre>
           </details>
@@ -103,15 +103,15 @@ function retry() {
         </div>
       </div>
 
-      <nav class="error-nav" :aria-label="t('errors.navigationLabel')">
+      <nav class="error-nav" :aria-label="t('errorPage.navigationLabel')">
         <NuxtLink :to="localePath('/')" class="error-nav__link error-nav__link--active">
           <u-icon name="i-lucide-house" aria-hidden="true" />
-          <span>{{ t("errors.links.main") }}</span>
+          <span>{{ t("errorPage.links.main") }}</span>
         </NuxtLink>
         <span class="error-nav__divider" aria-hidden="true" />
         <NuxtLink :to="localePath('/services')" class="error-nav__link">
           <u-icon name="i-lucide-layout-grid" aria-hidden="true" />
-          <span>{{ t("errors.links.services") }}</span>
+          <span>{{ t("errorPage.links.services") }}</span>
         </NuxtLink>
       </nav>
     </section>
@@ -423,18 +423,8 @@ function retry() {
   .error-title { font-size: clamp(36px, 11vw, 48px); }
   .error-actions { flex-direction: column; }
   .error-button { width: 100%; }
-
-  .error-art-mobile {
-    margin-top: 18px;
-    border-radius: 18px;
-  }
-
-  .error-nav {
-    min-height: 68px;
-    gap: 14px;
-    padding: 14px 18px;
-  }
-
+  .error-art-mobile { margin-top: 18px; border-radius: 18px; }
+  .error-nav { min-height: 68px; gap: 14px; padding: 14px 18px; }
   .error-nav__link { font-size: 14px; }
 }
 
