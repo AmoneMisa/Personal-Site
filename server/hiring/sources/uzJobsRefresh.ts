@@ -4,7 +4,7 @@
 // visitors. We preserve that boundary: only the public id, desired categories,
 // region and last-visit date are stored, and contact remains "via platform".
 
-import { emptyWebCursor, loadWebCursors, saveWebCursor } from '../../utils/hiringCursors'
+import { emptyWebCursor, loadWebCursors, saveWebCursor } from '../../../shared/hiring/hiringCursors'
 import { recordWebDiagnostic, type SourceRun, type WebSourceDiagnostic } from '../../utils/hiringDiagnostics'
 import { normalizeCandidate } from '../../utils/hiringNormalize'
 import type { CvProfile } from '../../utils/hiringTypes'
