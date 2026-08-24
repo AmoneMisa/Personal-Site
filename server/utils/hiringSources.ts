@@ -13,8 +13,6 @@ import {
   type TelegramCandidateChannel,
 } from '../hiring/domain/telegramCandidateParser'
 
-export { detectCity, detectDistrict, isLikelyCvPost } from '../hiring/domain/telegramCandidateParser'
-
 const UA = 'hiringFinder/1.0 (CV board; contact: admin@whiteslove.me)'
 const TELEGRAM_PAGE_SIZE = Math.min(
   200,
