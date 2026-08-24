@@ -1032,10 +1032,30 @@ onBeforeUnmount(() => {
 .hiring__pill:hover { color: var(--text-white); }
 .hiring__pill_active { color: var(--text-white); border-color: rgba(113,137,217,0.45); background: rgba(113,137,217,0.18); }
 .hiring__advanced {
+  position: relative; isolation: isolate; overflow: hidden;
   grid-column: 1 / -1; display: grid; grid-template-columns: 1fr; gap: 12px;
   padding: 14px; border-radius: 10px; border: 1px solid var(--line); background: var(--ocean-form-surface);
   box-shadow: 0 18px 42px rgba(2, 5, 18, 0.22);
 }
+.hiring__advanced::before,
+.hiring__advanced::after {
+  content: "";
+  position: absolute;
+  z-index: 2;
+  border-radius: 999px;
+  border: 1px solid rgba(75, 145, 255, 0.12);
+  pointer-events: none;
+}
+.hiring__advanced::before {
+  width: 8px; height: 8px; left: calc(50% - 4px); top: 49%;
+  box-shadow: 0 -142px 0 -2px rgba(67, 119, 221, 0.08);
+}
+.hiring__advanced::after {
+  width: 6px; height: 6px; right: 1.4%; top: 24%;
+  border-color: rgba(207, 92, 220, 0.11);
+  box-shadow: 0 250px 0 -1px rgba(118, 83, 226, 0.07);
+}
+.hiring__advanced > * { position: relative; z-index: 1; }
 .hiring__presets {
   grid-column: 1 / -1; display: flex; flex-wrap: wrap; align-items: center; gap: 8px;
   padding-bottom: 12px; border-bottom: 1px solid var(--line);
@@ -1046,7 +1066,7 @@ onBeforeUnmount(() => {
 }
 .hiring__preset-remove { color: var(--text-muted); font-size: 18px; line-height: 1; }
 .hiring__preset-remove:hover { color: var(--accent-pink); }
-.hiring-filter-group { min-width: 0; padding: 14px; border: 1px solid var(--line); border-radius: 9px; background: var(--ocean-form-surface-soft); }
+.hiring-filter-group { min-width: 0; padding: 14px; border: 1px solid var(--line); border-radius: 9px; background: rgba(8, 13, 35, 0.28); }
 .hiring-filter-group__title { display: flex; align-items: center; gap: 7px; margin-bottom: 12px; color: var(--ui-text-muted); font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: .04em; }
 .hiring-filter-group__title :deep(svg) { color: var(--accent-pink); }
 .hiring-filter-group__grid { display: grid; grid-template-columns: 1fr; gap: 12px; align-items: end; }
