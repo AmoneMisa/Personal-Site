@@ -35,15 +35,9 @@ export function convertCurrency(
 
 export function formatMoney(amount: number, currency: string, locale?: string): string {
   const normalized = currency.toUpperCase();
-  try {
-    return new Intl.NumberFormat(locale, {
-      style: "currency",
-      currency: normalized,
-      maximumFractionDigits: 0,
-    }).format(amount);
-  } catch {
-    return `${Math.round(amount).toLocaleString(locale)} ${currencySymbol(normalized)}`;
-  }
+  const symbol = currencySymbol(normalized);
+  const value = Math.round(amount).toLocaleString(locale);
+  return symbol === normalized ? `${value} ${symbol}` : `${symbol}${value}`;
 }
 
 export function convertSalaryPeriod(amount: number, from: SalaryPeriod, to: SalaryPeriod): number {

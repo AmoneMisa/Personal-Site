@@ -9,6 +9,10 @@ import SearchDetailsModal from "~/components/search/SearchDetailsModal.vue";
 import SearchPageShell from "~/components/search/SearchPageShell.vue";
 import SearchSavedTabs from "~/components/search/SearchSavedTabs.vue";
 import SearchFilterBlocks from "~/components/search/SearchFilterBlocks.vue";
+import SearchPresetDialog from "~/components/search/SearchPresetDialog.vue";
+import SearchShareDialog from "~/components/search/SearchShareDialog.vue";
+import SearchSourceTabs from "~/components/search/SearchSourceTabs.vue";
+import SearchEmptyState from "~/components/search/SearchEmptyState.vue";
 import { queryString } from "~/utils/queryParams";
 import { convertCurrency } from "~/utils/search/money";
 import { useFlatFilters } from "~/composables/flats/useFlatFilters";
@@ -25,6 +29,7 @@ import { useSavedCollections } from "~/composables/search/useSavedCollections";
 import { useInfiniteFeed } from "~/composables/search/useInfiniteFeed";
 import { useSearchScroll } from "~/composables/search/useSearchScroll";
 import { ANY_SELECT_VALUE, useNullableSelect } from "~/composables/search/useNullableSelect";
+import { useShareLink } from "~/composables/search/useShareLink";
 import type {
   FlatFeedResult as FeedResult,
   FlatListing as Listing,
@@ -124,9 +129,6 @@ const {
 const presetModalOpen = ref(false);
 const shareModalOpen = ref(false);
 const sharedLinkOpened = ref(false);
-const listingShareModalOpen = ref(false);
-const listingShareUrl = ref("");
-const listingShareCopied = ref(false);
 const { drawnArea, applyDrawnArea } = useFlatMap(listings);
 const {
   filtersEl,
@@ -486,15 +488,19 @@ const specRows = computed<Array<{ label: string; value: string }>>(() => {
     { label: t("specParking"), value: fmtBool(l.parking) }, { label: t("specElevator"), value: fmtBool(l.elevator) }, { label: t("specFurnished"), value: fmtBool(l.furnished) }, { label: t("specBalcony"), value: fmtBool(l.balcony) }, { label: t("specAC"), value: fmtBool(l.airConditioner) }, { label: t("specGas"), value: fmtBool(l.gas) }, { label: t("specHeating"), value: fmtBool(l.heating) }, { label: t("specHotWater"), value: fmtBool(l.hotWater) }, { label: t("specInternet"), value: fmtBool(l.internet) }, { label: t("specPets"), value: fmtBool(l.petsAllowed) }, { label: t("specChildren"), value: fmtBool(l.childrenAllowed) }, { label: t("specSmoking"), value: fmtBool(l.smokingAllowed) }, { label: t("specAudience"), value: audienceLabel(l.audience) }, { label: t("specRoomShare"), value: fmtBool(l.roomOnly) }, { label: t("specNegotiable"), value: fmtBool(l.negotiable) }, { label: t("specDeposit"), value: depositLabel(l) }, { label: t("specCommission"), value: commissionLabel(l) }, { label: t("specCommunal"), value: communalLabel(l) }, { label: t("specUtilAmount"), value: l.utilitiesAmount != null ? `${l.utilitiesAmount.toLocaleString()} ${l.currency}` : t("notSpecified") }, { label: t("specMinLease"), value: strOr(l.minLeaseTerm) }, { label: t("specAvailable"), value: strOr(l.availableFrom) }, { label: t("specShops"), value: listOr(l.nearbyShops) }, { label: t("specNearby"), value: nearbyListOr(l.nearby) }, { label: t("specAmenities"), value: amenitiesListOr(l.amenities) },
   ];
 });
-const shareCopied = ref(false);
+const {
+  copied: shareCopied,
+  fallbackOpen: listingShareModalOpen,
+  fallbackUrl: listingShareUrl,
+  fallbackCopied: listingShareCopied,
+  share: shareLink,
+  copyFallback: copyListingShareLink,
+} = useShareLink();
 function makeListingShareLink(l: Listing): string { const resolved = router.resolve({ path: route.path, query: { flat: l.id, flatSource: l.source, flatCountry: l.country } }); return new URL(resolved.href, window.location.origin).toString(); }
-function showShareSuccess() { shareCopied.value = true; window.setTimeout(() => { shareCopied.value = false; }, 2000); }
 async function shareFlat(l: Listing) {
-  const link = makeListingShareLink(l); listingShareUrl.value = link; listingShareCopied.value = false; const title = displayListingTitle(l); const payload = { title, text: title, url: link };
-  if (navigator.share && (!navigator.canShare || navigator.canShare(payload))) { try { await navigator.share(payload); showShareSuccess(); return; } catch (error) { if (error instanceof DOMException && error.name === "AbortError") return; } }
-  listingShareCopied.value = await copyText(link); if (listingShareCopied.value) showShareSuccess(); else listingShareModalOpen.value = true;
+  const link = makeListingShareLink(l); const title = displayListingTitle(l);
+  await shareLink({ title, text: title, url: link, key: l.id });
 }
-async function copyListingShareLink() { listingShareCopied.value = await copyText(listingShareUrl.value); if (listingShareCopied.value) showShareSuccess(); }
 async function openSharedListing(id: string, sourceName = "", countryCode = "", attempt = 0) {
   const local = listings.value.find((listing) => listing.id === id); if (local) { await openListing(local); return; }
   const params: Record<string, string> = { listingId: id, limit: "1", offset: "0" }; if (SOURCES.includes(sourceName)) params.sources = sourceName; if (/^[A-Za-z]{2}$/.test(countryCode)) params.countries = countryCode.toUpperCase();
@@ -559,9 +565,7 @@ onBeforeUnmount(() => { modalOpen.value = false; lightboxOpen.value = false; rel
       </div>
 
       <div class="flats__row flats__secondary-nav">
-        <div class="flats__filters">
-          <button v-for="opt in sourceOptions" :key="opt.value" type="button" class="flats__pill" :class="{ 'flats__pill_active': source === opt.value }" @click="selectSource(opt.value)">{{ opt.label }}</button>
-        </div>
+        <SearchSourceTabs :model-value="source" :items="sourceOptions" @update:model-value="selectSource" />
         <SearchSavedTabs
           :model-value="view"
           :items="viewTabs"
@@ -669,7 +673,7 @@ onBeforeUnmount(() => { modalOpen.value = false; lightboxOpen.value = false; rel
       </template>
     </FlatGrid>
 <div ref="loadMoreSentinel" v-if="hasMore" class="flats__sentinel"><span v-if="loadingMore" class="text-muted">{{ t("loadingMore") }}</span></div>
-    <div v-if="!loading && !displayedListings.length && !failed" class="flats__empty"><div class="text-muted">{{ t("empty") }}</div><div v-if="drawnArea.length >= 3 && listings.length" class="text-muted">{{ t("emptyArea") }}</div></div>
+    <SearchEmptyState v-if="!loading && !displayedListings.length && !failed" :message="t('empty')"><div v-if="drawnArea.length >= 3 && listings.length" class="text-muted">{{ t("emptyArea") }}</div></SearchEmptyState>
 
     </UiResultsLoader>
 
@@ -681,10 +685,10 @@ onBeforeUnmount(() => { modalOpen.value = false; lightboxOpen.value = false; rel
 
     <teleport to="body"><div v-if="checkingListingKey" class="flat-verification" role="status" aria-live="assertive"><div class="flat-verification__card"><u-icon name="i-lucide-loader-circle" class="flat-verification__icon" /><span>{{ t("checkingListing") }}</span></div></div></teleport>
 
-    <u-modal v-model:open="presetModalOpen" :title="t('savePreset')"><template #body><u-input v-model="presetName" autofocus :label="t('presetName')" @keyup.enter="savePreset" /></template><template #footer><u-button color="neutral" variant="ghost" @click="presetModalOpen = false">{{ t("cancel") }}</u-button><u-button @click="savePreset">{{ t("save") }}</u-button></template></u-modal>
-    <u-modal v-model:open="shareModalOpen" :title="sharedLinkOpened ? t('sharedSearchApplied') : t('shareSearch')"><template #body><p class="flat-share__hint">{{ sharedLinkOpened ? t("sharedSearchHint") : t("shareSearchHint") }}</p><u-input :model-value="shareUrl" readonly /></template><template #footer><u-button icon="i-lucide-copy" @click="copyShareLink">{{ t("copyLink") }}</u-button></template></u-modal>
+    <SearchPresetDialog v-model:open="presetModalOpen" v-model:name="presetName" :title="t('savePreset')" :name-label="t('presetName')" :cancel-label="t('cancel')" :save-label="t('save')" @save="savePreset" />
+    <SearchShareDialog v-model:open="shareModalOpen" :title="sharedLinkOpened ? t('sharedSearchApplied') : t('shareSearch')" :hint="sharedLinkOpened ? t('sharedSearchHint') : t('shareSearchHint')" :url="shareUrl" :copy-label="t('copyLink')" @copy="copyShareLink" />
     <button v-if="showBackToTop" type="button" class="flats__back-top" :aria-label="t('backToTop')" @click="scrollToFilters"><u-icon name="i-lucide-arrow-up" /><span>{{ t('backToTop') }}</span></button>
-    <u-modal v-model:open="listingShareModalOpen" :title="t('shareListing')"><template #body><p class="flat-share__hint">{{ t("shareListingHint") }}</p><u-input :model-value="listingShareUrl" readonly /></template><template #footer><u-button :icon="listingShareCopied ? 'i-lucide-check' : 'i-lucide-copy'" @click="copyListingShareLink">{{ listingShareCopied ? t("shareCopied") : t("copyLink") }}</u-button></template></u-modal>
+    <SearchShareDialog v-model:open="listingShareModalOpen" :title="t('shareListing')" :hint="t('shareListingHint')" :url="listingShareUrl" :copy-label="t('copyLink')" :copied="listingShareCopied" :copied-label="t('shareCopied')" @copy="copyListingShareLink" />
   </SearchPageShell>
 </template>
 
@@ -695,10 +699,6 @@ onBeforeUnmount(() => { modalOpen.value = false; lightboxOpen.value = false; rel
 .flats__subtitle { max-width: 720px; font-size: 14px; }
 .flats__controls { margin: 20px 0 20px; display: grid; gap: 12px; grid-template-columns: 1fr auto; align-items: start; }
 .flats__row { grid-column: 1 / -1; display: flex; flex-wrap: wrap; justify-content: space-between; gap: 12px; }
-.flats__filters { display: flex; flex-wrap: wrap; gap: 8px; }
-.flats__pill { height: 34px; padding: 0 13px; border-radius: 8px; border: 1px solid var(--line); background: rgba(255,255,255,0.03); color: var(--ui-text-muted); font-weight: 700; font-size: 12px; text-transform: capitalize; cursor: pointer; transition: filter 180ms ease, color 180ms ease; }
-.flats__pill:hover { color: var(--text-white); }
-.flats__pill_active { color: var(--text-white); border-color: rgba(224,103,154,0.4); background: rgba(224,103,154,0.18); }
 /* Control height is owned by .ui-control (assets/css/ui.css), which every input
    and select composes. Forcing a min-height on the NATIVE element inside them
    stacked a second height on top of the wrapper's, which is what made the range
@@ -729,7 +729,6 @@ onBeforeUnmount(() => { modalOpen.value = false; lightboxOpen.value = false; rel
 .flat-verification__card { display: flex; align-items: center; gap: 12px; max-width: min(420px,100%); padding: 18px 22px; border: 1px solid rgba(224,103,154,.42); border-radius: 14px; background: #0b1129; box-shadow: 0 18px 60px rgba(0,0,0,.45); color: var(--text-primary); font-weight: 700; text-align: center; }
 .flat-verification__icon { flex: 0 0 auto; width: 28px; height: 28px; color: var(--accent-pink); animation: flat-card-spin .8s linear infinite; }
 @keyframes flat-card-spin { to { transform: rotate(360deg); } }
-.flats__empty { margin-top: 18px; text-align: center; padding: 18px; border-radius: 10px; border: 1px solid var(--line); background: var(--bg-panel); }
 .flats__sentinel { min-height: 44px; display: grid; place-items: center; }
 .flat-modal { display: flex; flex-direction: column; gap: 12px; }
 .flat-modal__title { display: -webkit-box; overflow: hidden; margin: 0; padding-right: 36px; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow-wrap: anywhere; font-size: 18px; font-weight: 700; line-height: 1.35; }
@@ -747,7 +746,6 @@ onBeforeUnmount(() => { modalOpen.value = false; lightboxOpen.value = false; rel
 /* auto-fit rather than a fixed four columns: at narrower widths four tracks squeezed the longest label onto two lines, so that one button stood taller and looked unlike the rest. They now reflow to two rows and every label stays on one line. */
 /* Footer action layout now lives in components/ui/ModalFooter.vue, shared with
    the vacancy and candidate popups. */
-.flat-share__hint { margin: 0 0 12px; color: var(--text-muted); font-size: 13px; line-height: 1.5; }
 
 /* Redesigned compact filters */
 .flats__controls_redesign { display: block; margin: 20px 0; }

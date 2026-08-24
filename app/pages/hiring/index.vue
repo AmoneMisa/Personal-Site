@@ -8,6 +8,10 @@ import SearchPageShell from "~/components/search/SearchPageShell.vue";
 import SearchSavedTabs from "~/components/search/SearchSavedTabs.vue";
 import SearchFilterPanel from "~/components/search/SearchFilterPanel.vue";
 import SearchFilterBlocks from "~/components/search/SearchFilterBlocks.vue";
+import SearchPresetDialog from "~/components/search/SearchPresetDialog.vue";
+import SearchShareDialog from "~/components/search/SearchShareDialog.vue";
+import SearchSourceTabs from "~/components/search/SearchSourceTabs.vue";
+import SearchEmptyState from "~/components/search/SearchEmptyState.vue";
 import { useHiringFilters } from "~/composables/hiring/useHiringFilters";
 import { useHiringFilterBlocks } from "~/composables/hiring/useHiringFilterBlocks";
 import { useHiringFeed } from "~/composables/hiring/useHiringFeed";
@@ -17,6 +21,7 @@ import { useHiringMeta } from "~/composables/hiring/useHiringMeta";
 import { useSavedCollections } from "~/composables/search/useSavedCollections";
 import { useInfiniteFeed } from "~/composables/search/useInfiniteFeed";
 import { ANY_SELECT_VALUE, useNullableSelect } from "~/composables/search/useNullableSelect";
+import { useShareLink } from "~/composables/search/useShareLink";
 import {
   type HiringCvProfile as CvProfile,
   type HiringFeedResult as FeedResult,
@@ -87,9 +92,6 @@ const {
 const presetModalOpen = ref(false);
 const shareModalOpen = ref(false);
 const sharedLinkOpened = ref(false);
-const listingShareModalOpen = ref(false);
-const listingShareUrl = ref("");
-const listingShareCopied = ref(false);
 const loadMoreSentinel = ref<HTMLElement | null>(null);
 let loadTimer: ReturnType<typeof setTimeout> | undefined;
 let sharedPostTimer: ReturnType<typeof setTimeout> | undefined;
@@ -399,7 +401,14 @@ const specRows = computed(() => {
   ];
 });
 
-const shareCopied = ref(false);
+const {
+  copied: shareCopied,
+  fallbackOpen: listingShareModalOpen,
+  fallbackUrl: listingShareUrl,
+  fallbackCopied: listingShareCopied,
+  share: shareLink,
+  copyFallback: copyListingShareLink,
+} = useShareLink();
 function makeCvShareLink(profile: CvProfile): string {
   const resolved = router.resolve({
     path: route.path,
@@ -407,32 +416,10 @@ function makeCvShareLink(profile: CvProfile): string {
   });
   return new URL(resolved.href, window.location.origin).toString();
 }
-function showShareSuccess() {
-  shareCopied.value = true;
-  window.setTimeout(() => { shareCopied.value = false; }, 2000);
-}
 async function shareCv(profile: CvProfile) {
   const link = makeCvShareLink(profile);
-  listingShareUrl.value = link;
-  listingShareCopied.value = false;
   const title = `${profile.name} — ${profile.role}`;
-  const payload = { title, text: title, url: link };
-  if (navigator.share && (!navigator.canShare || navigator.canShare(payload))) {
-    try {
-      await navigator.share(payload);
-      showShareSuccess();
-      return;
-    } catch (error) {
-      if (error instanceof DOMException && error.name === "AbortError") return;
-    }
-  }
-  listingShareCopied.value = await copyText(link);
-  if (listingShareCopied.value) showShareSuccess();
-  else listingShareModalOpen.value = true;
-}
-async function copyListingShareLink() {
-  listingShareCopied.value = await copyText(listingShareUrl.value);
-  if (listingShareCopied.value) showShareSuccess();
+  await shareLink({ title, text: title, url: link, key: profile.id });
 }
 
 async function openSharedCv(id: string, sourceName = "", countryCode = "", attempt = 0) {
@@ -527,13 +514,7 @@ onBeforeUnmount(() => {
       </u-button>
 
       <div class="hiring__row">
-        <div class="hiring__filters">
-          <button
-              v-for="opt in sourceOptions" :key="opt.value" type="button"
-              class="hiring__pill" :class="{ 'hiring__pill_active': source === opt.value }"
-              @click="selectSource(opt.value)"
-          >{{ opt.label }}</button>
-        </div>
+        <SearchSourceTabs :model-value="source" :items="sourceOptions" @update:model-value="selectSource" />
         <SearchSavedTabs
           :model-value="view"
           :items="viewTabs"
@@ -603,9 +584,7 @@ onBeforeUnmount(() => {
       <span v-if="loadingMore" class="text-muted">{{ t("loadingMore") }}</span>
     </div>
 
-    <div v-if="!loading && !displayedProfiles.length && !failed" class="hiring__empty">
-      <div class="text-muted">{{ t("empty") }}</div>
-    </div>
+    <SearchEmptyState v-if="!loading && !displayedProfiles.length && !failed" :message="t('empty')" />
 
     </UiResultsLoader>
 
@@ -642,37 +621,9 @@ onBeforeUnmount(() => {
       </template>
     </SearchDetailsModal>
 
-    <u-modal v-model:open="presetModalOpen" :title="t('savePreset')">
-      <template #body>
-        <u-input v-model="presetName" autofocus :placeholder="t('presetName')" @keyup.enter="savePreset" />
-      </template>
-      <template #footer>
-        <u-button color="neutral" variant="ghost" @click="presetModalOpen = false">{{ t("cancel") }}</u-button>
-        <u-button @click="savePreset">{{ t("save") }}</u-button>
-      </template>
-    </u-modal>
-
-    <u-modal v-model:open="shareModalOpen" :title="sharedLinkOpened ? t('sharedSearchApplied') : t('shareSearch')">
-      <template #body>
-        <p class="hiring-share__hint">{{ sharedLinkOpened ? t("sharedSearchHint") : t("shareSearchHint") }}</p>
-        <u-input :model-value="shareUrl" readonly />
-      </template>
-      <template #footer>
-        <u-button icon="i-lucide-copy" @click="copyShareLink">{{ t("copyLink") }}</u-button>
-      </template>
-    </u-modal>
-
-    <u-modal v-model:open="listingShareModalOpen" :title="t('shareListing')">
-      <template #body>
-        <p class="hiring-share__hint">{{ t("shareListingHint") }}</p>
-        <u-input :model-value="listingShareUrl" readonly />
-      </template>
-      <template #footer>
-        <u-button :icon="listingShareCopied ? 'i-lucide-check' : 'i-lucide-copy'" @click="copyListingShareLink">
-          {{ listingShareCopied ? t("shareCopied") : t("copyLink") }}
-        </u-button>
-      </template>
-    </u-modal>
+    <SearchPresetDialog v-model:open="presetModalOpen" v-model:name="presetName" :title="t('savePreset')" :name-label="t('presetName')" :cancel-label="t('cancel')" :save-label="t('save')" @save="savePreset" />
+    <SearchShareDialog v-model:open="shareModalOpen" :title="sharedLinkOpened ? t('sharedSearchApplied') : t('shareSearch')" :hint="sharedLinkOpened ? t('sharedSearchHint') : t('shareSearchHint')" :url="shareUrl" :copy-label="t('copyLink')" @copy="copyShareLink" />
+    <SearchShareDialog v-model:open="listingShareModalOpen" :title="t('shareListing')" :hint="t('shareListingHint')" :url="listingShareUrl" :copy-label="t('copyLink')" :copied="listingShareCopied" :copied-label="t('shareCopied')" @copy="copyListingShareLink" />
   </SearchPageShell>
 </template>
 
@@ -683,14 +634,6 @@ onBeforeUnmount(() => {
 .hiring__subtitle { max-width: 720px; font-size: 14px; }
 .hiring__controls { margin: 20px 0 20px; display: grid; gap: 12px; grid-template-columns: minmax(0, 1fr) minmax(220px, 280px) auto; align-items: start; }
 .hiring__row { grid-column: 1 / -1; display: flex; flex-wrap: wrap; justify-content: space-between; gap: 12px; }
-.hiring__filters { display: flex; flex-wrap: wrap; gap: 8px; }
-.hiring__pill {
-  height: 34px; padding: 0 13px; border-radius: 8px; border: 1px solid var(--line);
-  background: rgba(255,255,255,0.03); color: var(--ui-text-muted); font-weight: 700; font-size: 12px;
-  text-transform: capitalize; cursor: pointer; transition: filter 180ms ease, color 180ms ease;
-}
-.hiring__pill:hover { color: var(--text-white); }
-.hiring__pill_active { color: var(--text-white); border-color: rgba(113,137,217,0.45); background: rgba(113,137,217,0.18); }
 .hiring__advanced {
   position: relative; isolation: isolate; overflow: hidden;
   grid-column: 1 / -1; display: grid; grid-template-columns: 1fr; gap: 12px;
@@ -739,7 +682,6 @@ onBeforeUnmount(() => {
 .hiring__error { color: var(--ui-error, #f87171); }
 .hiring__source-warning { color: #f6c177; font-size: 13px; margin-bottom: 12px; }
 .hiring__warming { font-size: 13px; margin-bottom: 12px; }
-.hiring__empty { margin-top: 18px; text-align: center; padding: 18px; border-radius: 10px; border: 1px solid var(--line); background: var(--bg-panel); }
 .hiring__sentinel { min-height: 44px; display: grid; place-items: center; }
 .hiring-modal { display: flex; flex-direction: column; gap: 12px; }
 .hiring-modal__title { margin: 0; font-size: 18px; font-weight: 700; line-height: 1.35; padding-right: 36px; }
@@ -749,7 +691,6 @@ onBeforeUnmount(() => {
 .hiring-modal__desc { font-size: 13.5px; line-height: 1.55; white-space: pre-wrap; color: var(--text-soft, inherit); margin-top: 8px; }
 .hiring-modal__tags { display: flex; flex-wrap: wrap; gap: 6px; }
 .hiring-modal__tag { font-size: 11px; padding: 2px 8px; border-radius: 6px; border: 1px solid var(--line); color: var(--ui-text-muted); }
-.hiring-share__hint { margin: 0 0 12px; color: var(--text-muted); font-size: 13px; line-height: 1.5; }
 @media (max-width: 700px) {
   .hiring__controls { grid-template-columns: 1fr; }
   .hiring__controls > :deep(button) { width: 100%; }

@@ -1,15 +1,11 @@
 <script setup lang="ts">
-import type { Job, JobStatEntry, JobStats, WorkModeStat } from "~/types/jobs";
+import type { Job, JobStats } from "~/types/jobs";
 
 const props = defineProps<{
   jobs: Job[];
   stats: JobStats;
   displayCurrency: string;
   displayPeriodLabel: string;
-  countryStats: JobStatEntry[];
-  sourceStats: JobStatEntry[];
-  workModeStats: WorkModeStat[];
-  languageStats: [string, number][];
   money: (annualUsd: number) => string;
   countryLabel: (code: string) => string;
 }>();
@@ -20,6 +16,14 @@ const activeTab = ref<"overview" | "trends">("overview");
 const trendDays = ref<1 | 3 | 7 | 60>(7);
 const trendScope = ref<"world" | "country" | "city" | "position" | "positions">("world");
 const colors = ["#e0679a", "#45c8ff", "#a78bfa", "#34d399"];
+const countryStats = computed(() => Object.entries(props.stats.byCountry ?? {}).filter(([, value]) => value.medianUsd > 0).sort((a, b) => b[1].medianUsd - a[1].medianUsd));
+const sourceStats = computed(() => Object.entries(props.stats.bySource ?? {}).filter(([, value]) => value.medianUsd > 0).sort((a, b) => b[1].medianUsd - a[1].medianUsd));
+const languageStats = computed(() => Object.entries(props.stats.byLanguage ?? {}).sort((a, b) => b[1] - a[1]).slice(0, 8));
+const workModeStats = computed(() => [
+  { key: "remote", n: props.stats.byWorkMode?.remote ?? 0 },
+  { key: "hybrid", n: props.stats.byWorkMode?.hybrid ?? 0 },
+  { key: "office", n: props.stats.byWorkMode?.office ?? 0 },
+].filter((item) => item.n > 0));
 
 type SalaryPoint = { at: number; salary: number; group: string };
 

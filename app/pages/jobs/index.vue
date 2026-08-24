@@ -7,11 +7,13 @@ import SearchPageShell from "~/components/search/SearchPageShell.vue";
 import SearchSavedTabs from "~/components/search/SearchSavedTabs.vue";
 import SearchFilterPanel from "~/components/search/SearchFilterPanel.vue";
 import SearchFilterBlocks from "~/components/search/SearchFilterBlocks.vue";
+import SearchSourceTabs from "~/components/search/SearchSourceTabs.vue";
+import SearchEmptyState from "~/components/search/SearchEmptyState.vue";
 import AtsPanel from "~/components/jobs/AtsPanel.vue";
 import RecentlyViewed from "~/components/jobs/RecentlyViewed.vue";
 import StatsPanel from "~/components/jobs/StatsPanel.vue";
 import type { Job, RecentJob } from "~/types/jobs";
-import { convertCurrency as convertCurrencyValue, convertSalaryPeriod, currencySymbol } from "~/utils/search/money";
+import { convertCurrency as convertCurrencyValue, convertSalaryPeriod, currencySymbol, formatMoney } from "~/utils/search/money";
 import { JOB_SALARY_PERIODS, useJobFilters } from "~/composables/jobs/useJobFilters";
 import { useJobFilterBlocks } from "~/composables/jobs/useJobFilterBlocks";
 import { useJobFeed } from "~/composables/jobs/useJobFeed";
@@ -21,6 +23,7 @@ import { useJobRouteState } from "~/composables/jobs/useJobRouteState";
 import { useSavedCollections } from "~/composables/search/useSavedCollections";
 import { useInfiniteFeed } from "~/composables/search/useInfiniteFeed";
 import { ANY_SELECT_VALUE, useNullableSelect } from "~/composables/search/useNullableSelect";
+import { useShareLink } from "~/composables/search/useShareLink";
 
 // Job Finder service. Auto-routed at /jobs. Aggregates many boards, enforces a
 // 14-day freshness cap server-side, offers full sort + advanced filters, shows
@@ -31,7 +34,6 @@ const { t: translate, locale } = useI18n();
 const t = (key: string, params: Record<string, unknown> = {}) =>
   translate(`jobs.${key}`, params);
 const localePath = useLocalePath();
-const { copyText } = useClipboard();
 
 useSeoMeta({
   title: () => t("seoTitle"), description: () => t("seoDescription"),
@@ -70,11 +72,6 @@ function convertCurrency(amount: number, from: string, to: string): number | und
   return converted == null ? undefined : Math.round(converted);
 }
 
-function formatAmount(n: number, cur: string): string {
-  const symbol = currencySymbol(cur);
-  return symbol === cur.toUpperCase() ? `${n.toLocaleString()} ${symbol}` : `${symbol}${n.toLocaleString()}`;
-}
-
 // Pay-period conversion. PER_YEAR turns an amount at a period into a yearly amount
 // (must match server enrich.ts: 160 work hours/month). To convert an amount from
 // period A to B: multiply by PER_YEAR[A] / PER_YEAR[B].
@@ -107,8 +104,12 @@ const {
 } = useJobFeed(usdRates);
 const activeJob = ref<Job | null>(null);
 const jobModalOpen = ref(false);
-const shareCopied = ref(false);
-const shareCopiedJobId = ref<string | null>(null);
+const {
+  copied: shareCopied,
+  copiedKey: shareCopiedJobId,
+  share: shareLink,
+  resetFeedback: resetShareFeedback,
+} = useShareLink();
 
 // ---- Personal vacancy lists (localStorage; no account or backend required) ----
 type SavedJobsView = "active" | "favorites" | "hidden";
@@ -179,7 +180,7 @@ function markSeen(job: Job | RecentJob) {
 function openJob(job: Job) {
   activeJob.value = job;
   jobModalOpen.value = true;
-  shareCopied.value = false;
+  resetShareFeedback();
   markSeen(job);
   persistState();
 }
@@ -199,22 +200,12 @@ function jobShareLink(job: Job | RecentJob): string {
 
 async function shareJob(job: Job | RecentJob): Promise<boolean> {
   const link = jobShareLink(job);
-  if (await copyText(link)) {
-    shareCopiedJobId.value = job.id;
-    setTimeout(() => {
-      if (shareCopiedJobId.value === job.id) shareCopiedJobId.value = null;
-    }, 2000);
-    return true;
-  }
-  return false;
+  return shareLink({ url: link, title: `${job.title} — ${job.company}`, key: job.id }, { fallback: false });
 }
 
 async function shareActiveJob() {
   if (!activeJob.value) return;
-  if (await shareJob(activeJob.value)) {
-    shareCopied.value = true;
-    setTimeout(() => (shareCopied.value = false), 2000);
-  }
+  await shareJob(activeJob.value);
 }
 
 const empLabel = (kind?: string) =>
@@ -385,7 +376,7 @@ function money(annualUsd: number): string {
   const converted = convertCurrency(annualUsd, "USD", displayCurrency.value);
   const cur = converted === undefined ? "USD" : displayCurrency.value;
   const v = convertPeriod(converted ?? annualUsd, "year", displayPeriod.value);
-  return formatAmount(v, cur);
+  return formatMoney(v, cur);
 }
 
 // Tooltip for the Suspicious badge: spell out WHY, so the warning is auditable
@@ -464,29 +455,6 @@ const vacRows = computed<Array<{ label: string; value: string }>>(() => {
     rows.push({ label: t("vMissing"), value: ats.missing.length ? ats.missing.join(", ") : t("notSpecified") });
   }
   return rows;
-});
-
-// sorted views over the stats maps for stable rendering
-const countryStats = computed(() =>
-  Object.entries(stats.value?.byCountry ?? {})
-    .filter(([, v]) => v.medianUsd > 0)
-    .sort((a, b) => b[1].medianUsd - a[1].medianUsd),
-);
-const sourceStats = computed(() =>
-  Object.entries(stats.value?.bySource ?? {})
-    .filter(([, v]) => v.medianUsd > 0)
-    .sort((a, b) => b[1].medianUsd - a[1].medianUsd),
-);
-const languageStats = computed(() =>
-  Object.entries(stats.value?.byLanguage ?? {}).sort((a, b) => b[1] - a[1]).slice(0, 8),
-);
-const workModeStats = computed(() => {
-  const m = stats.value?.byWorkMode ?? {};
-  return [
-    { key: "remote", n: m.remote ?? 0 },
-    { key: "hybrid", n: m.hybrid ?? 0 },
-    { key: "office", n: m.office ?? 0 },
-  ].filter((x) => x.n > 0);
 });
 
 // { label, value } item lists for the u-select-menu controls (site convention).
@@ -615,18 +583,9 @@ onBeforeUnmount(() => {
       />
 
       <div class="jobs__row">
-        <div class="jobs__filters">
-          <button
-              v-for="opt in sourceOptions"
-              :key="opt.value"
-              type="button"
-              class="jobs__pill"
-              :class="{ 'jobs__pill_active': source === opt.value }"
-              @click="selectSource(opt.value)"
-          >
-            {{ opt.label ?? t(opt.labelKey!) }}
-          </button>
-        </div>
+        <SearchSourceTabs :model-value="source" :items="sourceOptions" @update:model-value="selectSource">
+          <template #label="{ item }">{{ item.label ?? t(item.labelKey!) }}</template>
+        </SearchSourceTabs>
         <SearchSavedTabs
           :model-value="savedView"
           :items="savedViewTabs"
@@ -665,10 +624,6 @@ onBeforeUnmount(() => {
       :stats="stats"
       :display-currency="displayCurrency"
       :display-period-label="periodLabel(displayPeriod)"
-      :country-stats="countryStats"
-      :source-stats="sourceStats"
-      :work-mode-stats="workModeStats"
-      :language-stats="languageStats"
       :money="money"
       :country-label="countryLabel"
     />
@@ -694,9 +649,7 @@ onBeforeUnmount(() => {
       />
       </template>
     </JobGrid>
-<div v-if="!loading && !(warming && savedView === 'active') && !displayedJobs.length && !failed" class="jobs__empty">
-      <div class="text-muted">{{ t("empty") }}</div>
-    </div>
+    <SearchEmptyState v-if="!loading && !(warming && savedView === 'active') && !displayedJobs.length && !failed" :message="t('empty')" />
 
     <div v-if="savedView === 'active' && sort !== 'ats' && displayedJobs.length" ref="loadMoreSentinel" class="jobs__load-more">
       <u-button
@@ -812,14 +765,6 @@ onBeforeUnmount(() => {
   @media (min-width: 900px) { grid-template-columns: 1fr 200px 180px; }
 }
 .jobs__row { grid-column: 1 / -1; display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
-.jobs__filters { display: flex; flex-wrap: wrap; gap: 8px; }
-.jobs__pill {
-  height: 34px; padding: 0 13px; border-radius: 8px; border: 1px solid var(--line);
-  background: rgba(255,255,255,0.03); color: var(--ui-text-muted); font-weight: 700; font-size: 12px;
-  cursor: pointer; transition: filter 180ms ease, color 180ms ease;
-}
-.jobs__pill:hover { filter: brightness(1.06); color: var(--text-white); }
-.jobs__pill_active { color: var(--text-white); border-color: rgba(224, 103, 154,0.40); background: rgba(224, 103, 154,0.18); }
 .jobs__remote { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 700; }
 .jobs__error { color: var(--ui-error, #f87171); }
 .jobs__count { font-size: 13px; margin-bottom: 12px; }
@@ -864,7 +809,6 @@ onBeforeUnmount(() => {
   .jobs-filter-group__grid_location { grid-template-columns: minmax(180px, .8fr) minmax(0, 1.6fr); }
 }
 
-.jobs__empty { margin-top: 18px; text-align: center; padding: 18px; border-radius: 10px; border: 1px solid var(--line); background: var(--bg-panel); }
 .jobs__load-more {
   min-height: 76px; display: flex; flex-direction: column; align-items: center;
   justify-content: center; gap: 8px; margin-top: 16px; font-size: 12px;
