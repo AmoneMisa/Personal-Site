@@ -201,6 +201,7 @@ function computeStats(jobs: Job[]): JobStats {
   const byWorkMode: Record<WorkMode, number> = { remote: 0, hybrid: 0, office: 0, unknown: 0 }
   const byLanguage: Record<string, number> = {}
   const skillCount: Record<string, number> = {}
+  const salaryTrend: JobStats['salaryTrend'] = []
   let foreignerFriendly = 0
 
   for (const job of jobs) {
@@ -210,6 +211,13 @@ function computeStats(jobs: Job[]): JobStats {
       ;(bySourceSal[job.source] ||= []).push(pay)
       const c = job.country || 'OTHER'
       ;(byCountrySal[c] ||= []).push(pay)
+      salaryTrend.push({
+        postedAt: job.postedAt,
+        salaryUsd: pay,
+        ...(job.country ? { country: job.country } : {}),
+        ...(job.city ? { city: job.city } : {}),
+        title: job.title,
+      })
     }
     byWorkMode[job.workMode || 'unknown']++
     if (job.foreignerFriendly) foreignerFriendly++
@@ -246,6 +254,7 @@ function computeStats(jobs: Job[]): JobStats {
     foreignerFriendly,
     byLanguage,
     topSkills,
+    salaryTrend,
   }
 }
 
