@@ -22,7 +22,7 @@ const AI_CANDIDATE_PARSER_VERSION = 'candidate-semantic-v2'
 const AI_FAILED_RETRY_MS = 15 * 60_000
 const AI_PENDING_STALE_MS = 30 * 60_000
 const DB_HYDRATE_COOLDOWN_MS = 60_000
-const DERIVED_VERSION = 'd18'
+const DERIVED_VERSION = 'd19'
 
 type CandidateAiData = {
   name?: string | null

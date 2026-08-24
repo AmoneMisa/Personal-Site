@@ -1,5 +1,6 @@
 import type { CandidateGender, HiringStatistics, HiringStatisticsItem } from './contracts/hiring'
 import { canonicalCityValue } from './locationCatalog'
+import { hiringStatisticGroupsForProfessions } from './hiringStatisticGroups'
 
 export interface HiringStatisticsProfile {
   gender?: CandidateGender
@@ -12,6 +13,9 @@ export interface HiringStatisticsProfile {
   salaryMax?: number | null
   currency?: string | null
   experienceYears?: number | null
+  age?: number | null
+  role?: string
+  professions?: string[]
 }
 
 const DAY_MS = 86_400_000
@@ -50,7 +54,10 @@ export function buildHiringStatistics<T extends HiringStatisticsProfile>(
   },
 ): HiringStatistics {
   const genders = { female: 0, male: 0, unknown: 0 }
+  const ages = new Map<string, number>()
   const activity = new Map<string, number>()
+  const professionValues: string[] = []
+  const sectorValues: string[] = []
   const now = options.now ?? Date.now()
   const start = now - 60 * DAY_MS
   let salarySamples = 0
@@ -58,6 +65,17 @@ export function buildHiringStatistics<T extends HiringStatisticsProfile>(
 
   for (const profile of profiles) {
     genders[profile.gender === 'female' || profile.gender === 'male' ? profile.gender : 'unknown'] += 1
+    const age = profile.age
+    const ageKey = age == null || !Number.isFinite(age) ? '__unknown__'
+      : age < 18 ? '<18' : age < 25 ? '18–24' : age < 35 ? '25–34'
+        : age < 45 ? '35–44' : age < 55 ? '45–54' : '55+'
+    ages.set(ageKey, (ages.get(ageKey) || 0) + 1)
+
+    const professions = [...new Set([...(profile.professions || []), profile.role || ''])]
+      .map((value) => value.trim())
+      .filter((value) => value && value !== 'Any Role')
+    professionValues.push(...professions)
+    sectorValues.push(...hiringStatisticGroupsForProfessions(professions))
 
     const timestamp = Date.parse(profile.activityAt || profile.updatedAt || profile.createdAt || '')
     if (Number.isFinite(timestamp) && timestamp >= start && timestamp <= now) {
@@ -82,11 +100,15 @@ export function buildHiringStatistics<T extends HiringStatisticsProfile>(
 
   return {
     genders,
+    ages: ['<18', '18–24', '25–34', '35–44', '45–54', '55+', '__unknown__']
+      .map((label) => ({ label, value: ages.get(label) || 0 })),
     platforms: rankedItems(profiles.map(options.provider)),
     locations: rankedItems(profiles.map((profile) => {
       const location = profile.city?.trim()
       return location ? canonicalCityValue(location) : profile.country || '__unknown__'
     })),
+    sectors: rankedItems(sectorValues),
+    professions: rankedItems(professionValues),
     activity: [...activity.entries()].sort((a, b) => a[0].localeCompare(b[0])).map(([date, value]) => ({ date, value })),
     salaryByExperience: salaryByExperience.map(median),
     salarySamples,

@@ -11,6 +11,8 @@ interface ProfessionLabels {
  */
 export const HIRING_PROFESSION_LABELS: Record<string, ProfessionLabels> = {
   'Any Role': { en: 'Any role', ru: 'Любая работа' },
+  'Chief Executive Officer': { en: 'CEO', ru: 'CEO / Генеральный директор' },
+  'Chief Technology Officer': { en: 'CTO', ru: 'CTO / Технический директор' },
   'Sales Manager': { en: 'Sales Manager', ru: 'Менеджер по продажам' },
   'Project Manager': { en: 'Project Manager', ru: 'Менеджер проектов' },
   'Product Manager': { en: 'Product Manager', ru: 'Продакт-менеджер' },

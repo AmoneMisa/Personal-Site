@@ -2,6 +2,8 @@
 import type { HiringCvProfile, HiringStatistics } from "~/types/hiring";
 import { locationLabel } from "~/utils/locationLabels";
 import { buildHiringStatistics } from "~~/shared/hiringStatistics";
+import { hiringStatisticGroupLabel } from "~~/shared/hiringStatisticGroups";
+import { hiringProfessionLabel, hiringProfessionLocale } from "~~/shared/hiringProfessionLabels";
 
 const props = defineProps<{ profiles: HiringCvProfile[]; rates: Record<string, number>; statistics?: HiringStatistics | null }>();
 const { t: translate, locale } = useI18n();
@@ -19,12 +21,16 @@ const localStatistics = computed(() => buildHiringStatistics(props.profiles, {
   },
 }));
 const currentStatistics = computed(() => props.statistics || localStatistics.value);
+const professionLocale = computed(() => hiringProfessionLocale(locale.value));
 
 const genderItems = computed(() => {
   return (["female", "male", "unknown"] as const).map((key, index) => ({ label: t(`gender${key.charAt(0).toUpperCase()}${key.slice(1)}`), value: currentStatistics.value.genders[key], color: palette[index] }));
 });
 const locationBars = computed(() => currentStatistics.value.locations.slice(0, 6).map((item, index) => ({ label: item.label === "__unknown__" ? t("statsUnknown") : locationLabel(item.label, locale.value, "city"), value: item.value, color: palette[index % palette.length] })));
 const platformBars = computed(() => currentStatistics.value.platforms.slice(0, 6).map((item, index) => ({ label: item.label === "__unknown__" ? t("statsUnknown") : item.label, value: item.value, color: palette[index % palette.length] })));
+const ageBars = computed(() => currentStatistics.value.ages.filter((item) => item.value > 0).map((item, index) => ({ label: item.label === "__unknown__" ? t("statsUnknown") : item.label, value: item.value, color: palette[index % palette.length] })));
+const sectorBars = computed(() => currentStatistics.value.sectors.slice(0, 8).map((item, index) => ({ label: hiringStatisticGroupLabel(item.label, professionLocale.value), value: item.value, color: palette[index % palette.length] })));
+const professionBars = computed(() => currentStatistics.value.professions.slice(0, 8).map((item, index) => ({ label: hiringProfessionLabel(item.label, professionLocale.value), value: item.value, color: palette[index % palette.length] })));
 
 const experienceSalary = computed(() => {
   const labels = ["0–1", "2–3", "4–6", "7–10", "10+"];
@@ -49,6 +55,9 @@ const salarySamples = computed(() => currentStatistics.value.salarySamples);
       <article class="analytics-card"><h3>{{ t("statsGender") }}</h3><UiAnalyticsDonut :items="genderItems" :center-label="t('statsCandidates')" /></article>
       <article class="analytics-card"><h3>{{ t("statsPlatforms") }}</h3><UiAnalyticsBars :items="platformBars" /></article>
       <article class="analytics-card"><h3>{{ t("statsLocations") }}</h3><UiAnalyticsBars :items="locationBars" /></article>
+      <article class="analytics-card"><h3>{{ t("statsAge") }}</h3><UiAnalyticsBars :items="ageBars" /></article>
+      <article class="analytics-card"><h3>{{ t("statsSectors") }}</h3><UiAnalyticsBars :items="sectorBars" /></article>
+      <article class="analytics-card"><h3>{{ t("statsProfessions") }}</h3><UiAnalyticsBars :items="professionBars" /></article>
       <article class="analytics-card analytics-card_salary"><div class="analytics-card__head"><h3>{{ t("statsSalaryExperience") }}</h3><small>{{ t("statsSalarySamples",{n:salarySamples}) }}</small></div><UiAnalyticsLine v-if="salarySamples" :series="experienceSalary.series" :labels="experienceSalary.labels" :format="(value)=>`$${Math.round(value).toLocaleString()}`" /><p v-else class="analytics-card__empty">{{ t("statsNoSalaryData") }}</p></article>
     </div>
   </UiAnalyticsPanel>

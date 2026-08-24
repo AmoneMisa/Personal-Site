@@ -13,8 +13,11 @@ export interface HiringStatisticsItem {
 
 export interface HiringStatistics {
   genders: Record<CandidateGender, number>
+  ages: HiringStatisticsItem[]
   platforms: HiringStatisticsItem[]
   locations: HiringStatisticsItem[]
+  sectors: HiringStatisticsItem[]
+  professions: HiringStatisticsItem[]
   activity: Array<{ date: string; value: number }>
   salaryByExperience: Array<number | null>
   salarySamples: number

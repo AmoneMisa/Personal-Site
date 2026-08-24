@@ -67,6 +67,8 @@ export function normalizeSkills(rawSkills: string[] | undefined, text: string): 
 interface ProfessionRule { name: string; re: RegExp }
 const PROFESSION_RULES: ProfessionRule[] = [
   // Management / office / sales.
+  { name: 'Chief Executive Officer', re: /\b(?:ceo|chief\s+executive\s+officer)\b|генеральн\p{L}*\s+директор|гендиректор|виконавч\p{L}*\s+директор/iu },
+  { name: 'Chief Technology Officer', re: /\b(?:cto|chief\s+technology\s+officer)\b|техническ\p{L}*\s+директор|технічн\p{L}*\s+директор/iu },
   { name: 'Sales Manager', re: /\b(?:sales\s+(?:manager|executive|director)|account\s+manager|head\s+of\s+sales)\b|менеджер\s+(?:по\s+)?(?:экспортн\p{L}*\s+)?продаж|менеджер\s+з\s+продаж|руководител\p{L}*\s+отдела\s+продаж|(?<!\p{L})роп(?!\p{L})|sotuv\s+menejer/iu },
   { name: 'Project Manager', re: /\bproject\s+manager\b|проектн(?:ый|ий)\s+менеджер|менеджер\s+проект|керівник\s+проєкт/iu },
   { name: 'Product Manager', re: /\bproduct\s+manager\b|продакт\s*менеджер|менеджер\s+продукт/iu },
@@ -143,7 +145,7 @@ const PROFESSION_RULES: ProfessionRule[] = [
   { name: 'AI / ML Engineer', re: /\b(?:(?:ai|ml|machine\s+learning)\s+(?:engineer|developer)|machine\s+learning\s+specialist)\b|инженер\s+(?:машинного\s+обучения|ии)/iu },
   { name: 'Data Scientist', re: /\bdata\s+scientist\b|\bdata\s+science\b|дата[-\s]?сайентист/iu },
   { name: 'Data Engineer', re: /\bdata\s+engineer\b|инженер\s+данных/iu },
-  { name: 'Engineering Manager', re: /\b(?:cto|vp\s+of\s+engineering|head\s+of\s+engineering|engineering\s+manager)\b|техническ\p{L}*\s+директор/iu },
+  { name: 'Engineering Manager', re: /\b(?:vp\s+of\s+engineering|head\s+of\s+engineering|engineering\s+manager)\b/iu },
   { name: 'Hardware Engineer', re: /\b(?:hardware|embedded|pcb)\s*(?:engineer|developer)?\b|друкован\p{L}*\s+плат|печатн\p{L}*\s+плат|мікроконтролер|микроконтроллер/iu },
   { name: 'Designer', re: /\b(?:designer|ui\/?ux)\b|дизайнер/iu },
   { name: 'Architect', re: /\barchitect\b|архитектор|архітектор|arxitektor(?:\s+loyihachi)?/iu },
@@ -152,7 +154,7 @@ const PROFESSION_RULES: ProfessionRule[] = [
   { name: 'Marketer', re: /\b(?:marketer|marketing(?:\s+specialist)?|smm)\b|маркетинг|маркетолог|smm[-\s]?специалист/iu },
   { name: 'Media Specialist', re: /\bmedia\s+specialist\b|специалист\s+по\s+сми|matbuot/iu },
   { name: 'Quality Inspector', re: /\bquality\s+inspector\b|инспектор\s+по\s+качеств|інспектор\s+з\s+якост/iu },
-  { name: 'Production Manager', re: /\bproduction\s+(?:manager|director)\b|директор\s+по\s+производств|техническ\p{L}*\s+директор/iu },
+  { name: 'Production Manager', re: /\bproduction\s+(?:manager|director)\b|директор\s+по\s+производств/iu },
   { name: 'Translator', re: /\b(?:translator|interpreter)\b|переводчик|перекладач|таржимон|tarjimon/iu },
   { name: 'Lawyer', re: /\b(?:lawyer|attorney|legal\s+specialist)\b|юрист|адвокат|правник|yurist/iu },
   { name: 'Notary', re: /\bnotar(?:y|ius)\b|нотариус/iu },
@@ -179,6 +181,7 @@ const PROFESSION_RULES: ProfessionRule[] = [
 ]
 
 const SPECIFIC_MANAGER_ROLES = new Set([
+  'Chief Executive Officer', 'Chief Technology Officer',
   'Sales Manager', 'Project Manager', 'Product Manager', 'Store Manager', 'Restaurant Manager',
   'General Manager', 'HR / Recruiter', 'Office Manager', 'Warehouse Manager', 'Logistics Specialist',
 ])
@@ -212,7 +215,7 @@ function collectProfessions(source: string): string[] {
     const generic = names.indexOf('Manager')
     if (generic >= 0) names.splice(generic, 1)
   }
-  if (names.includes('Production Manager') || names.includes('Engineering Manager')) {
+  if (names.includes('Production Manager') || names.includes('Engineering Manager') || names.includes('Chief Executive Officer') || names.includes('Chief Technology Officer')) {
     const generic = names.indexOf('General Manager')
     if (generic >= 0) names.splice(generic, 1)
   }

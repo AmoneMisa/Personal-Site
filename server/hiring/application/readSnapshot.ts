@@ -7,7 +7,7 @@ const MEMORY_TTL_MS = 60_000
 
 // Keep in sync with the derivation version stamped by hiringStore. The API only
 // reads this marker; jobs-worker owns normalization/repair and writes it.
-export const DERIVED_VERSION = 'd18'
+export const DERIVED_VERSION = 'd19'
 
 type StoredProfile = CvProfile & {
   lastSeen?: string
