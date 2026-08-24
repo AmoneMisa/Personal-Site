@@ -105,7 +105,6 @@ function suspicionHint(job: Job): string {
     </div>
 
     <div v-if="salary || convertedSalary" class="job-card__compensation">
-      <u-icon name="i-lucide-banknote" class="job-card__salary-icon" />
       <div class="job-card__salary-values">
         <span v-if="salary" class="job-card__salary">{{ salary }}</span>
         <span v-if="convertedSalary" class="job-card__salary job-card__salary_conv">{{ convertedSalary }}</span>
@@ -149,10 +148,10 @@ function suspicionHint(job: Job): string {
 </template>
 
 <style scoped>
-.job-card { position: relative; isolation: isolate; overflow: hidden; padding: 18px; border-radius: 14px; border: 1px solid var(--line); background: radial-gradient(circle at 100% 0, rgba(224,103,154,.07), transparent 38%), var(--bg-panel); box-shadow: inset 0 1px 0 rgba(255,255,255,.06), 0 16px 36px rgba(2,6,23,.12); transition: transform 160ms ease, border-color 180ms ease, box-shadow 180ms ease; height: 100%; min-height: 340px; display: flex; flex-direction: column; }
-.job-card_scored { box-shadow: inset 3px 0 0 var(--job-card-score), inset 0 1px 0 rgba(255,255,255,.06), 0 16px 36px rgba(2,6,23,.12); }
+.job-card { position: relative; isolation: isolate; overflow: hidden; padding: 18px; border-radius: 14px; border: 1px solid var(--line); background: var(--bg-panel); box-shadow: inset 0 1px 0 rgba(255,255,255,.04), 0 16px 36px rgba(2,6,23,.12); transition: transform 160ms ease, border-color 180ms ease, box-shadow 180ms ease; height: 100%; min-height: 340px; display: flex; flex-direction: column; }
+.job-card_scored { border-color: var(--line); box-shadow: inset 0 1px 0 rgba(255,255,255,.04), 0 16px 36px rgba(2,6,23,.12); }
 .job-card:hover { transform: translateY(-3px); border-color: rgba(224,103,154,.42); box-shadow: inset 0 1px 0 rgba(255,255,255,.08), 0 20px 42px rgba(2,6,23,.22); }
-.job-card_scored:hover { box-shadow: inset 3px 0 0 var(--job-card-score), inset 0 1px 0 rgba(255,255,255,.08), 0 20px 42px rgba(2,6,23,.22); }
+.job-card_scored:hover { box-shadow: inset 0 1px 0 rgba(255,255,255,.08), 0 20px 42px rgba(2,6,23,.22); }
 .job-card__head { display: grid; grid-template-columns: minmax(0,1fr) auto; align-items: start; gap: 12px; }
 .job-card__title { width: 100%; min-width: 0; overflow-wrap: break-word; font-weight: 700; font-size: 15px; line-height: 1.4; padding: 0; border: 0; background: transparent; cursor: pointer; text-align: left; color: var(--text-white, inherit); }
 .job-card__title:hover { color: var(--color-primary, #e0679a); }
@@ -179,11 +178,10 @@ function suspicionHint(job: Job): string {
 .job-card__badge_seniority { color: #f9a8d4; background: rgba(236,72,153,.13); }
 .job-card__badge_management { color: #fcd34d; background: rgba(245,158,11,.13); }
 .job-card__badge_salary { color: #f0abfc; background: rgba(217,70,239,.12); }
-.job-card__compensation { display: flex; align-items: center; gap: 10px; margin-top: 12px; padding: 10px 12px; border: 1px solid rgba(52,211,153,.34); border-radius: 10px; background: linear-gradient(110deg, rgba(16,185,129,.18), rgba(52,211,153,.07)); box-shadow: inset 0 1px 0 rgba(167,243,208,.08); }
-.job-card__salary-icon { flex: 0 0 auto; color: #6ee7b7; font-size: 20px; }
+.job-card__compensation { min-width: 0; margin-top: 12px; }
 .job-card__salary-values { display: flex; min-width: 0; flex-direction: column; gap: 1px; }
-.job-card__salary { color: #6ee7b7; font-size: 15px; line-height: 1.3; font-weight: 800; letter-spacing: .01em; }
-.job-card__salary_conv { color: #a7f3d0; font-size: 11px; font-weight: 600; opacity: .78; }
+.job-card__salary { color: #f08ab8; font-size: 15px; line-height: 1.3; font-weight: 750; letter-spacing: .01em; overflow-wrap: anywhere; }
+.job-card__salary_conv { color: var(--ui-text-muted); font-size: 12px; font-weight: 550; opacity: .9; }
 .job-card__langs { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: 12px; margin-top: 6px; }
 .job-card__lang-icon { font-size: 14px; opacity: .7; }
 .job-card__lang:not(:last-child)::after { content: ","; }

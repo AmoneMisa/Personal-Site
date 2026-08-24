@@ -179,6 +179,16 @@ test('job statistics use the ocean design and expose localized salary trends', (
   assert.equal(ru.jobs.trendTwoMonths, '2 месяца')
 })
 
+test('listing photos dissolve into cards and job salaries use a simple accent', () => {
+  const flats = readFileSync(new URL('../app/pages/flat-finder/index.vue', import.meta.url), 'utf8')
+  const jobs = readFileSync(new URL('../app/components/jobs/JobCard.vue', import.meta.url), 'utf8')
+  assert.match(flats, /bottom: -28px; height: 48%[\s\S]*?linear-gradient\(180deg, transparent/u)
+  assert.match(jobs, /\.job-card__compensation \{ min-width: 0; margin-top: 12px; \}/u)
+  assert.match(jobs, /\.job-card__salary \{ color: #f08ab8/u)
+  assert.doesNotMatch(jobs, /job-card__salary-icon/u)
+  assert.doesNotMatch(jobs, /inset 3px 0 0 var\(--job-card-score\)/u)
+})
+
 test('country quiz result cards use a responsive four-column grid', () => {
   const quiz = readFileSync(new URL('../app/pages/quizzes/country-fit/index.vue', import.meta.url), 'utf8')
   assert.match(quiz, /@media \(min-width: 1180px\)[\s\S]*?repeat\(4, minmax\(0, 1fr\)\)/u)
