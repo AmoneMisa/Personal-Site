@@ -1,21 +1,29 @@
-export function readStoredList<T>(key: string, limit = Number.POSITIVE_INFINITY): T[] {
-  if (typeof localStorage === "undefined") return [];
+export function readStoredValue<T>(key: string): T | null {
+  if (typeof localStorage === "undefined") return null;
 
   try {
-    const stored = JSON.parse(localStorage.getItem(key) || "[]");
-    return Array.isArray(stored) ? stored.slice(0, limit) : [];
+    return JSON.parse(localStorage.getItem(key) || "null") as T | null;
   } catch {
-    return [];
+    return null;
   }
 }
 
-export function writeStoredList<T>(key: string, value: T[], limit = Number.POSITIVE_INFINITY): boolean {
+export function writeStoredValue<T>(key: string, value: T): boolean {
   if (typeof localStorage === "undefined") return false;
 
   try {
-    localStorage.setItem(key, JSON.stringify(value.slice(0, limit)));
+    localStorage.setItem(key, JSON.stringify(value));
     return true;
   } catch {
     return false;
   }
+}
+
+export function readStoredList<T>(key: string, limit = Number.POSITIVE_INFINITY): T[] {
+  const stored = readStoredValue<unknown>(key);
+  return Array.isArray(stored) ? stored.slice(0, limit) as T[] : [];
+}
+
+export function writeStoredList<T>(key: string, value: T[], limit = Number.POSITIVE_INFINITY): boolean {
+  return writeStoredValue(key, value.slice(0, limit));
 }

@@ -1,13 +1,21 @@
 <script setup lang="ts">
 import CustomButton from "~/components/common/CustomButton.vue";
 import type {TabsItem} from "#ui/components/Tabs.vue";
-import {nextTick, onBeforeUnmount, onMounted} from "vue";
+import {nextTick, onMounted} from "vue";
 import Modal from "~/components/common/Modal.vue";
 import {checkTextWithLanguageTool} from "~/composables/useLanguageTool";
 import {useScrollableTabs} from "~/composables/ui/useScrollableTabs";
+import {
+  formatPlatformText,
+  highlightLanguageMatches,
+  renderPlatformPreview,
+  type MarkdownPlatform,
+} from "~/utils/markdownEditor/platformFormatters";
+import {useMarkdownDraft, type MarkdownViewMode} from "~/composables/markdownEditor/useMarkdownDraft";
+import {useMarkdownEditing} from "~/composables/markdownEditor/useMarkdownEditing";
 
-type PlatformId = "telegram" | "whatsapp" | "tiktok";
-type ViewMode = "md" | "preview";
+type PlatformId = MarkdownPlatform;
+type ViewMode = MarkdownViewMode;
 
 const {t, locale} = useI18n();
 
@@ -23,14 +31,31 @@ const viewMode = ref<ViewMode>("md");
 const activePlatform = ref<PlatformId>("telegram");
 
 const showEmoji = ref(false);
-
-const linkOpen = ref(false);
-const linkText = ref("");
-const linkUrl = ref("https://");
-const linkSelStart = ref<number>(0);
-const linkSelEnd = ref<number>(0);
+const {
+  linkOpen,
+  linkText,
+  linkUrl,
+  focusEditor,
+  wrapSelection,
+  toggleQuote,
+  toggleCodeBlock,
+  applyList,
+  formatList,
+  openLinkModal,
+  insertLinkConfirmed,
+  onEmoji,
+} = useMarkdownEditing(input, inputRef, showEmoji);
 const copied = ref(false);
 const spellcheckEnabled = ref(true);
+const {copyText} = useClipboard();
+const {load: loadDraft} = useMarkdownDraft({
+  storageKey: STORAGE_KEY,
+  maxLength: MAX,
+  input,
+  platform: activePlatform,
+  viewMode,
+  spellcheckEnabled,
+});
 
 const plainLen = computed(() => input.value.length);
 const isTooLong = computed(() => plainLen.value > MAX);
@@ -43,388 +68,19 @@ const platformTabs = computed<TabsItem[]>(() => ([
 
 const canCopy = computed(() => !!outputText.value && !isTooLong.value);
 
-// --------------------
-// Editor helpers
-// --------------------
-function clampToMax() {
-  if (input.value.length > MAX) input.value = input.value.slice(0, MAX);
-}
-
-function focusEditor() {
-  requestAnimationFrame(() => inputRef.value?.focus());
-}
-
-function insertAtCursor(text: string) {
-  const el = inputRef.value;
-  if (!el) return;
-
-  const start = el.selectionStart ?? 0;
-  const end = el.selectionEnd ?? 0;
-
-  input.value = input.value.slice(0, start) + text + input.value.slice(end);
-
-  requestAnimationFrame(() => {
-    el.focus();
-    const pos = start + text.length;
-    el.setSelectionRange(pos, pos);
-  });
-}
-
-function wrapSelection(left: string, right = left) {
-  const el = inputRef.value;
-  if (!el) return;
-
-  const start = el.selectionStart ?? 0;
-  const end = el.selectionEnd ?? 0;
-
-  const before = input.value.slice(0, start);
-  const selected = input.value.slice(start, end);
-  const after = input.value.slice(end);
-
-  const hasWrap = before.endsWith(left) && after.startsWith(right);
-  if (hasWrap) {
-    input.value = before.slice(0, -left.length) + selected + after.slice(right.length);
-    requestAnimationFrame(() => {
-      el.focus();
-      el.setSelectionRange(start - left.length, end - left.length);
-    });
-    return;
-  }
-
-  input.value = before + left + selected + right + after;
-
-  requestAnimationFrame(() => {
-    el.focus();
-    if (selected.length) el.setSelectionRange(start + left.length, end + left.length);
-    else {
-      const pos = start + left.length;
-      el.setSelectionRange(pos, pos);
-    }
-  });
-}
-
-function toggleQuote() {
-  const el = inputRef.value;
-  if (!el) return;
-
-  const start = el.selectionStart ?? 0;
-  const end = el.selectionEnd ?? 0;
-
-  const full = input.value;
-  const lineStart = full.lastIndexOf("\n", start - 1) + 1;
-  const lineEnd = full.indexOf("\n", end);
-  const realEnd = lineEnd === -1 ? full.length : lineEnd;
-
-  const before = full.slice(0, lineStart);
-  const block = full.slice(lineStart, realEnd);
-  const after = full.slice(realEnd);
-
-  const lines = block.split("\n");
-  const allQuoted = lines.every((l) => l.startsWith("> "));
-  const nextLines = allQuoted
-      ? lines.map((l) => l.replace(/^>\s/, ""))
-      : lines.map((l) => (l.trim().length ? `> ${l}` : l));
-
-  const nextBlock = nextLines.join("\n");
-  input.value = before + nextBlock + after;
-
-  requestAnimationFrame(() => {
-    el.focus();
-    el.setSelectionRange(lineStart, lineStart + nextBlock.length);
-  });
-}
-
-function toggleCodeBlock() {
-  const el = inputRef.value;
-  if (!el) return;
-
-  const start = el.selectionStart ?? 0;
-  const end = el.selectionEnd ?? 0;
-
-  const selected = input.value.slice(start, end);
-  const fence = "```";
-
-  const before = input.value.slice(0, start);
-  const after = input.value.slice(end);
-
-  const hasWrap = before.endsWith(fence + "\n") && after.startsWith("\n" + fence);
-  if (hasWrap) {
-    input.value = before.slice(0, -(fence.length + 1)) + selected + after.slice(fence.length + 1);
-    requestAnimationFrame(() => {
-      el.focus();
-      el.setSelectionRange(start - (fence.length + 1), end - (fence.length + 1));
-    });
-    return;
-  }
-
-  const block = `${fence}\n${selected || "text"}\n${fence}`;
-  input.value = input.value.slice(0, start) + block + input.value.slice(end);
-
-  requestAnimationFrame(() => {
-    el.focus();
-    const innerStart = start + fence.length + 1;
-    const innerEnd = innerStart + (selected ? selected.length : 4);
-    el.setSelectionRange(innerStart, innerEnd);
-  });
-}
-
-// --------------------
-// Lists
-// --------------------
-function applyList(kind: "ul" | "ol") {
-  const el = inputRef.value;
-  if (!el) return;
-
-  const start = el.selectionStart ?? 0;
-  const end = el.selectionEnd ?? 0;
-
-  const full = input.value;
-
-  const lineStart = full.lastIndexOf("\n", start - 1) + 1;
-  const lineEnd = full.indexOf("\n", end);
-  const realEnd = lineEnd === -1 ? full.length : lineEnd;
-
-  const before = full.slice(0, lineStart);
-  const block = full.slice(lineStart, realEnd);
-  const after = full.slice(realEnd);
-
-  const lines = block.split("\n");
-  let n = 1;
-
-  const mapped = lines.map((l) => {
-    const raw = l.trimEnd();
-    if (!raw.trim()) return raw;
-
-    const cleaned = raw.replace(/^(\s*)([-*•]|\d+\.)\s+/, "$1");
-    if (kind === "ul") return `- ${cleaned.trimStart()}`;
-    return `${n++}. ${cleaned.trimStart()}`;
-  });
-
-  const nextBlock = mapped.join("\n");
-  input.value = before + nextBlock + after;
-
-  requestAnimationFrame(() => {
-    el.focus();
-    el.setSelectionRange(lineStart, lineStart + nextBlock.length);
-  });
-}
-
-function formatList() {
-  const el = inputRef.value;
-  if (!el) return;
-
-  const start = el.selectionStart ?? 0;
-  const end = el.selectionEnd ?? 0;
-  const full = input.value;
-
-  const lineStart = full.lastIndexOf("\n", start - 1) + 1;
-  const lineEnd = full.indexOf("\n", end);
-  const realEnd = lineEnd === -1 ? full.length : lineEnd;
-
-  const before = full.slice(0, lineStart);
-  const block = full.slice(lineStart, realEnd);
-  const after = full.slice(realEnd);
-
-  const lines = block.split("\n");
-
-  const numbered = lines.filter((l) => /^\s*\d+\.\s+/.test(l)).length;
-  const bulleted = lines.filter((l) => /^\s*[-*•]\s+/.test(l)).length;
-  const kind: "ul" | "ol" = numbered > bulleted ? "ol" : "ul";
-
-  let n = 1;
-  const mapped = lines.map((l) => {
-    const raw = l.trimEnd();
-    if (!raw.trim()) return raw;
-
-    const m = raw.match(/^(\s*)(.*)$/);
-    const indent = m?.[1] ?? "";
-    const rest = (m?.[2] ?? "").replace(/^(\s*)([-*•]|\d+\.)\s+/, "$1").trimStart();
-
-    if (kind === "ul") return `${indent}- ${rest}`;
-    return `${indent}${n++}. ${rest}`;
-  });
-
-  const nextBlock = mapped.join("\n");
-  input.value = before + nextBlock + after;
-
-  requestAnimationFrame(() => {
-    el.focus();
-    el.setSelectionRange(lineStart, lineStart + nextBlock.length);
-  });
-}
-
-// --------------------
-// Link modal
-// --------------------
-function openLinkModal() {
-  const el = inputRef.value;
-  if (!el) return;
-
-  linkSelStart.value = el.selectionStart ?? 0;
-  linkSelEnd.value = el.selectionEnd ?? 0;
-
-  const selected = input.value.slice(linkSelStart.value, linkSelEnd.value);
-
-  linkText.value = selected || "";
-  linkUrl.value = "https://";
-  linkOpen.value = true;
-}
-
-async function insertLinkConfirmed() {
-  const el = inputRef.value;
-  if (!el) return;
-
-  const start = linkSelStart.value ?? (el.selectionStart ?? 0);
-  const end = linkSelEnd.value ?? (el.selectionEnd ?? 0);
-
-  const txt = (linkText.value || input.value.slice(start, end) || "link").trim();
-  const url = (linkUrl.value || "").trim();
-  if (!url) return;
-
-  const snippet = `[${txt}](${url})`;
-
-  input.value = input.value.slice(0, start) + snippet + input.value.slice(end);
-
-  linkOpen.value = false;
-
-  await nextTick();
-
-  requestAnimationFrame(() => {
-    el.focus();
-    el.setSelectionRange(start, start + snippet.length);
-  });
-}
-
-// --------------------
-// Emoji
-// --------------------
-function onEmoji(e: any) {
-  const emoji = e?.detail?.unicode;
-  if (emoji) insertAtCursor(emoji);
-}
-
-// --------------------
-// Output transforms
-// --------------------
-function stripAllMarkdown(raw: string) {
-  let s = raw;
-  s = s.replace(/```([\s\S]*?)```/g, "$1");
-  s = s.replace(/`([^`]+)`/g, "$1");
-  s = s.replace(/\[([^\]]+)\]\(([^)]+)\)/g, "$1 ($2)");
-  s = s.replace(/^\s*>\s?/gm, "");
-  s = s.replace(/\|\|([\s\S]*?)\|\|/g, "$1");
-  s = s.replace(/\*\*([\s\S]*?)\*\*/g, "$1");
-  s = s.replace(/__([\s\S]*?)__/g, "$1");
-  s = s.replace(/~~([\s\S]*?)~~/g, "$1");
-  s = s.replace(/\*([\s\S]*?)\*/g, "$1");
-  return s;
-}
-
-function toWhatsAppStable(raw: string) {
-  let s = raw;
-  s = s.replace(/\[([^\]]+)\]\(([^)]+)\)/g, "$1 ($2)");
-  s = s.replace(/\|\|([\s\S]*?)\|\|/g, "$1");
-  s = s.replace(/__([\s\S]*?)__/g, "$1");
-  s = s.replace(/`([^`]+)`/g, "```$1```");
-  s = s.replace(/(?<!\*)\*([^*\n]+)\*(?!\*)/g, "_$1_");
-  s = s.replace(/\*\*([\s\S]*?)\*\*/g, "*$1*");
-  s = s.replace(/~~([\s\S]*?)~~/g, "~$1~");
-  return s;
-}
-
 const outputText = computed(() => {
-  const raw = input.value;
-  if (activePlatform.value === "telegram") return raw;
-  if (activePlatform.value === "whatsapp") return toWhatsAppStable(raw);
-  return stripAllMarkdown(raw);
+  return formatPlatformText(input.value, activePlatform.value);
 });
 const checking = ref(false);
 const checkResult = ref(null);
 
-function highlightErrorsInPreview(html: string, matches: any[]) {
-  // Преобразуем HTML в plain-text индексы
-  // Нам нужно сопоставить offset/length с HTML-строкой
-  // Поэтому сначала убираем теги, чтобы получить карту позиций
-
-  const textOnly = html.replace(/<[^>]+>/g, "");
-  let result = "";
-  let lastIndex = 0;
-
-  matches.forEach((m) => {
-    const start = m.offset;
-    const end = m.offset + m.length;
-
-    // Определяем цвет по типу ошибки
-    const cat = m.rule?.category?.id || "";
-    let cls = "lt-error-generic";
-
-    if (cat.includes("TYPOS")) cls = "lt-error-typo";
-    else if (cat.includes("GRAMMAR")) cls = "lt-error-grammar";
-    else if (cat.includes("PUNCTUATION")) cls = "lt-error-punct";
-    else if (cat.includes("STYLE")) cls = "lt-error-style";
-
-    result += textOnly.slice(lastIndex, start);
-    result += `<mark class="${cls}">${textOnly.slice(start, end)}</mark>`;
-    lastIndex = end;
-  });
-
-  result += textOnly.slice(lastIndex);
-  return result.replace(/\n/g, "<br/>");
-}
-
 const highlightedPreview = computed(() => {
   if (!checkResult.value || !checkResult.value.matches?.length) return null;
-  const html = previewHtml.value;
-
-  return highlightErrorsInPreview(html, checkResult.value.matches);
+  return highlightLanguageMatches(previewHtml.value, checkResult.value.matches);
 });
 
-// --------------------
-// Preview (simple)
-/// -------------------
-function escapeHtml(s: string) {
-  return s
-      .replace(/&/g, "&amp;")
-      .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;")
-      .replace(/"/g, "&quot;")
-      .replace(/'/g, "&#39;");
-}
-
-function renderPreviewTelegram(md: string) {
-  let s = escapeHtml(md);
-  s = s.replace(/```([\s\S]*?)```/g, (_m, c) => `<pre class="pv-pre"><code>${escapeHtml(c)}</code></pre>`);
-  s = s.replace(/`([^`]+)`/g, `<code class="pv-code">$1</code>`);
-  s = s.replace(/\[([^\]]+)\]\(([^)]+)\)/g, `<a class="pv-link" href="$2" target="_blank" rel="noreferrer noopener">$1</a>`);
-  s = s.replace(/\|\|([\s\S]*?)\|\|/g, `<span class="pv-spoiler">$1</span>`);
-  s = s.replace(/\*\*([\s\S]*?)\*\*/g, "<b>$1</b>");
-  s = s.replace(/__([\s\S]*?)__/g, "<u>$1</u>");
-  s = s.replace(/~~([\s\S]*?)~~/g, "<s>$1</s>");
-  s = s.replace(/(?<!\*)\*([^*\n]+)\*(?!\*)/g, "<i>$1</i>");
-  s = s.replace(/^\s*&gt;\s?(.*)$/gm, `<blockquote class="pv-quote">$1</blockquote>`);
-  s = s.replace(/\n/g, "<br/>");
-  return s;
-}
-
-function renderPreviewWhatsApp(md: string) {
-  let s = escapeHtml(md);
-  s = s.replace(/```([\s\S]*?)```/g, (_m, c) => `<pre class="pv-pre"><code>${escapeHtml(c)}</code></pre>`);
-  s = s.replace(/\*([^*\n]+)\*/g, "<b>$1</b>");
-  s = s.replace(/_([^_\n]+)_/g, "<i>$1</i>");
-  s = s.replace(/~([^~\n]+)~/g, "<s>$1</s>");
-  s = s.replace(/\n/g, "<br/>");
-  return s;
-}
-
-function renderPreviewTikTok(md: string) {
-  return escapeHtml(stripAllMarkdown(md)).replace(/\n/g, "<br/>");
-}
-
 const previewHtml = computed(() => {
-  const md = outputText.value;
-  if (activePlatform.value === "telegram") return renderPreviewTelegram(md);
-  if (activePlatform.value === "whatsapp") return renderPreviewWhatsApp(md);
-  return renderPreviewTikTok(md);
+  return renderPlatformPreview(outputText.value, activePlatform.value);
 });
 
 // --------------------
@@ -432,12 +88,9 @@ const previewHtml = computed(() => {
 // --------------------
 async function copyOutput() {
   if (isTooLong.value) return;
-  try {
-    await navigator.clipboard.writeText(outputText.value);
+  if (await copyText(outputText.value)) {
     copied.value = true;
     setTimeout(() => (copied.value = false), 900);
-  } catch {
-    // ignore
   }
 }
 
@@ -463,121 +116,6 @@ function clearAll() {
   focusEditor();
 }
 
-function loadState() {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return;
-    const p = JSON.parse(raw);
-
-    if (typeof p?.input === "string") input.value = p.input.slice(0, MAX);
-    if (p?.platform === "telegram" || p?.platform === "whatsapp" || p?.platform === "tiktok") activePlatform.value = p.platform;
-    if (p?.viewMode === "md" || p?.viewMode === "preview") viewMode.value = p.viewMode;
-    if (typeof p?.spellcheckEnabled === "boolean") spellcheckEnabled.value = p.spellcheckEnabled;
-  } catch {
-  }
-}
-
-function saveState() {
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify({
-      input: input.value,
-      platform: activePlatform.value,
-      viewMode: viewMode.value,
-      spellcheckEnabled: spellcheckEnabled.value
-    }));
-  } catch {
-  }
-}
-
-watch(input, () => {
-  clampToMax();
-  saveState();
-});
-watch([activePlatform, viewMode, spellcheckEnabled], saveState);
-
-// --------------------
-// Hotkeys
-// --------------------
-function isMac() {
-  if (process.server) return false;
-  return /Mac|iPhone|iPad|iPod/i.test(navigator.platform);
-}
-
-function toggleEmojiHotkey() {
-  showEmoji.value = !showEmoji.value;
-}
-
-function onKeydown(e: KeyboardEvent) {
-  const el = inputRef.value;
-  if (!el) return;
-  if (document.activeElement !== el) return;
-
-  const mod = isMac() ? e.metaKey : e.ctrlKey;
-
-  if (mod && !e.shiftKey && !e.altKey) {
-    const k = e.key.toLowerCase();
-    if (k === "b") {
-      e.preventDefault();
-      wrapSelection("**");
-      return;
-    }
-    if (k === "i") {
-      e.preventDefault();
-      wrapSelection("*");
-      return;
-    }
-    if (k === "u") {
-      e.preventDefault();
-      wrapSelection("__");
-      return;
-    }
-    if (k === "k") {
-      e.preventDefault();
-      openLinkModal();
-      return;
-    }
-  }
-
-  if (mod && e.shiftKey && !e.altKey) {
-    const k = e.key.toLowerCase();
-    if (k === "s") {
-      e.preventDefault();
-      wrapSelection("||");
-      return;
-    }
-    if (k === "c") {
-      e.preventDefault();
-      toggleCodeBlock();
-      return;
-    }
-    if (k === "q") {
-      e.preventDefault();
-      toggleQuote();
-      return;
-    }
-    if (k === "8") {
-      e.preventDefault();
-      applyList("ul");
-      return;
-    }
-    if (k === "7") {
-      e.preventDefault();
-      applyList("ol");
-      return;
-    }
-    if (k === "l") {
-      e.preventDefault();
-      formatList();
-      return;
-    }
-    if (k === "e") {
-      e.preventDefault();
-      toggleEmojiHotkey();
-      return;
-    }
-  }
-}
-
 const platformTabIndex = computed(() => {
   const idx = platformTabs.value.findIndex((x: any) => x.value === activePlatform.value);
   return Math.max(0, idx);
@@ -590,14 +128,9 @@ async function onPlatformTabChange(value: PlatformId) {
 }
 
 onMounted(async () => {
-  loadState();
+  loadDraft();
   await import("emoji-picker-element");
   await nextTick();
-  window.addEventListener("keydown", onKeydown, {passive: false});
-});
-
-onBeforeUnmount(() => {
-  window.removeEventListener("keydown", onKeydown as any);
 });
 </script>
 
