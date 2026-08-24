@@ -919,6 +919,7 @@ onBeforeUnmount(() => {
 
 <template>
   <u-container class="jobs">
+    <ocean-page-backdrop />
     <decorative-easter-egg
       class="jobs__easter-egg"
       src="/images/easter-eggs/jobs-search.png"
@@ -1409,11 +1410,12 @@ onBeforeUnmount(() => {
 </template>
 
 <style scoped>
-.jobs { position: relative; isolation: isolate; overflow: hidden; padding-top: 24px; padding-bottom: 96px; }
+.jobs { position: relative; isolation: isolate; padding-top: 24px; padding-bottom: 96px; }
 .jobs__header { position: relative; z-index: 1; }
 .jobs__easter-egg {
-  position: absolute; top: 4px; left: -24px; z-index: 0;
-  width: 270px; opacity: 0.18;
+  position: absolute; top: 2px; left: -48px; z-index: 0;
+  width: 340px; opacity: 0.4;
+  filter: drop-shadow(0 0 26px rgba(36, 184, 255, 0.2));
 }
 .jobs__title { font-size: 32px; font-weight: 600; }
 .jobs__headline { font-size: 16px; }

@@ -989,6 +989,7 @@ onBeforeUnmount(() => { modalOpen.value = false; lightboxIndex.value = null; rel
 
 <template>
   <u-container class="flats">
+    <ocean-page-backdrop />
     <decorative-easter-egg
       class="flats__easter-egg"
       src="/images/easter-eggs/flat-finder-key.png"
@@ -1156,11 +1157,12 @@ onBeforeUnmount(() => { modalOpen.value = false; lightboxIndex.value = null; rel
 </template>
 
 <style scoped>
-.flats { position: relative; isolation: isolate; overflow: hidden; padding-top: 24px; padding-bottom: 96px; }
+.flats { position: relative; isolation: isolate; padding-top: 24px; padding-bottom: 96px; }
 .flats__header { position: relative; z-index: 1; }
 .flats__easter-egg {
-  position: absolute; top: 2px; right: -22px; z-index: 0;
-  width: 265px; opacity: 0.19;
+  position: absolute; top: -30px; right: -44px; z-index: 0;
+  width: 290px; opacity: 0.46;
+  filter: drop-shadow(0 0 26px rgba(36, 184, 255, 0.2));
 }
 .flats__title { font-size: 32px; font-weight: 600; }
 .flats__subtitle { max-width: 720px; font-size: 14px; }

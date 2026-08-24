@@ -804,6 +804,7 @@ onBeforeUnmount(() => {
 
 <template>
   <u-container class="hiring">
+    <ocean-page-backdrop />
     <decorative-easter-egg
       class="hiring__easter-egg"
       src="/images/easter-eggs/hiring-resume.png"
@@ -1018,11 +1019,12 @@ onBeforeUnmount(() => {
 </template>
 
 <style scoped>
-.hiring { position: relative; isolation: isolate; overflow: hidden; padding-top: 24px; padding-bottom: 96px; }
+.hiring { position: relative; isolation: isolate; padding-top: 24px; padding-bottom: 96px; }
 .hiring__header { position: relative; z-index: 1; }
 .hiring__easter-egg {
-  position: absolute; top: 4px; right: -24px; z-index: 0;
-  width: 270px; opacity: 0.18;
+  position: absolute; top: -30px; right: -44px; z-index: 0;
+  width: 290px; opacity: 0.46;
+  filter: drop-shadow(0 0 26px rgba(36, 184, 255, 0.2));
 }
 .hiring__title { font-size: 32px; font-weight: 600; }
 .hiring__subtitle { max-width: 720px; font-size: 14px; }

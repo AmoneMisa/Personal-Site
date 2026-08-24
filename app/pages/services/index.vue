@@ -42,6 +42,7 @@ const howSteps = [
 
 <template>
   <u-container class="services">
+    <ocean-page-backdrop />
     <decorative-easter-egg
       class="services__easter-egg"
       src="/images/easter-eggs/services-tools.png"
@@ -87,7 +88,6 @@ const howSteps = [
 .services {
   position: relative;
   isolation: isolate;
-  overflow: hidden;
   padding: 40px 0 96px;
 }
 .services__header {
@@ -96,11 +96,12 @@ const howSteps = [
 }
 .services__easter-egg {
   position: absolute;
-  top: 8px;
-  left: -24px;
+  top: -22px;
+  right: -42px;
   z-index: 0;
-  width: 260px;
-  opacity: 0.18;
+  width: 300px;
+  opacity: 0.44;
+  filter: drop-shadow(0 0 26px rgba(36, 184, 255, 0.2));
 }
 .services__subtitle {
   max-width: 720px;
