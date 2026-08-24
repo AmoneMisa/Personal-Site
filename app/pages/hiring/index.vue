@@ -16,6 +16,7 @@ import { useHiringMeta } from "~/composables/hiring/useHiringMeta";
 import { useSavedCollections } from "~/composables/search/useSavedCollections";
 import { useLatestRequest } from "~/composables/search/useLatestRequest";
 import { useInfiniteFeed } from "~/composables/search/useInfiniteFeed";
+import { ANY_SELECT_VALUE, useNullableSelect } from "~/composables/search/useNullableSelect";
 import {
   HIRING_SORTS,
   type HiringCvProfile as CvProfile,
@@ -154,40 +155,31 @@ const sourceOptions = computed<SourceOption[]>(() => [
   ...availableSources.value,
 ]);
 
-const ANY = "__any__";
 type Item = { label: string; value: string };
-const citySel = computed<string>({ get: () => city.value || ANY, set: (v) => (city.value = v === ANY ? "" : v) });
+const citySel = useNullableSelect(city);
 const remoteItems = computed<Item[]>(() => [
   { label: t("remoteAny"), value: "any" },
   { label: t("remoteYes"), value: "yes" },
   { label: t("remoteNo"), value: "no" },
 ]);
-const remoteSel = computed<string>({ get: () => remote.value, set: (v) => (remote.value = v) });
 const genderItems = computed<Item[]>(() => [
-  { label: t("genderAny"), value: ANY },
+  { label: t("genderAny"), value: ANY_SELECT_VALUE },
   { label: t("genderMale"), value: "male" },
   { label: t("genderFemale"), value: "female" },
   { label: t("genderUnknown"), value: "unknown" },
 ]);
-const genderSel = computed<string>({
-  get: () => gender.value || ANY,
-  set: (v) => (gender.value = v === ANY ? "" : v),
-});
+const genderSel = useNullableSelect(gender);
 const professionItems = computed<Item[]>(() => professionValues.value
   .map((value) => ({ value, label: hiringProfessionFilterLabel(value, professionLocale.value) }))
   .sort((a, b) => a.label.localeCompare(b.label, professionLocale.value)));
-const SENIORITY_ANY = "__any__";
 const seniorityItems = computed<Item[]>(() => [
-  { label: t("seniorityAny"), value: SENIORITY_ANY },
+  { label: t("seniorityAny"), value: ANY_SELECT_VALUE },
   { label: t("seniorityJunior"), value: "junior" },
   { label: t("seniorityMiddle"), value: "middle" },
   { label: t("senioritySenior"), value: "senior" },
   { label: t("seniorityLead"), value: "lead" },
 ]);
-const senioritySel = computed<string>({
-  get: () => seniority.value || SENIORITY_ANY,
-  set: (v) => (seniority.value = v === SENIORITY_ANY ? "" : v),
-});
+const senioritySel = useNullableSelect(seniority);
 const sortItems = computed<Item[]>(() => [
   { value: "recent", label: t("sortRecent") },
   { value: "name_asc", label: t("sortNameAsc") },
@@ -214,7 +206,7 @@ const hiringFilterBlocks = computed<SearchFilterBlock[]>(() => [
     fields: [
       { id: "countries", control: "multi-select", label: t("country"), value: countries.value, options: countryItems.value, placeholder: t("countryAny"), onUpdate: updateFilter(countries), onCommit: scheduleLoad },
       { id: "city", control: "select", label: t("city"), value: citySel.value, options: cityItems.value, onUpdate: updateFilter(citySel), onCommit: scheduleLoad },
-      { id: "remote", control: "select", label: t("remote"), value: remoteSel.value, options: remoteItems.value, searchable: false, onUpdate: updateFilter(remoteSel), onCommit: scheduleLoad },
+      { id: "remote", control: "select", label: t("remote"), value: remote.value, options: remoteItems.value, searchable: false, onUpdate: updateFilter(remote), onCommit: scheduleLoad },
     ],
   },
   {

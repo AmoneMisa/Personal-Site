@@ -2,8 +2,6 @@
 defineProps<{
   title: string;
   description?: string;
-  loading?: boolean;
-  loadingLabel?: string;
   className?: string;
   headerClass?: string;
   titleClass?: string;
@@ -20,12 +18,6 @@ defineProps<{
         <p v-if="description" :class="['search-page__description text-muted mx-auto', descriptionClass]">{{ description }}</p>
       </header>
     </slot>
-    <slot name="toolbar" />
-    <UiResultsLoader v-if="loading !== undefined" :loading="loading" :label="loadingLabel" min-height="420px">
-      <slot />
-    </UiResultsLoader>
-    <slot v-else />
-    <slot name="floating" />
-    <slot name="dialogs" />
+    <slot />
   </u-container>
 </template>

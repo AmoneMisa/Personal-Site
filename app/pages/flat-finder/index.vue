@@ -24,6 +24,7 @@ import { useSavedCollections } from "~/composables/search/useSavedCollections";
 import { useLatestRequest } from "~/composables/search/useLatestRequest";
 import { useInfiniteFeed } from "~/composables/search/useInfiniteFeed";
 import { useSearchScroll } from "~/composables/search/useSearchScroll";
+import { ANY_SELECT_VALUE, useNullableSelect } from "~/composables/search/useNullableSelect";
 import type {
   FlatFeedResult as FeedResult,
   FlatListing as Listing,
@@ -187,20 +188,13 @@ const NEARBY_KINDS = [
   "school", "kindergarten", "park", "transport", "historic", "cinema", "landmark",
 ] as const;
 const sourceOptions = computed(() => [{ value: "", label: t("all") }, ...SOURCES.map((s) => ({ value: s, label: s }))]);
-const ANY = "__any__";
 type Item = { label: string; value: string };
-const propertyTypeSel = computed<string>({ get: () => propertyType.value, set: (v) => (propertyType.value = v) });
-const dealTypeSel = computed<string>({ get: () => dealType.value, set: (v) => (dealType.value = v) });
-const agencySel = computed<string>({ get: () => agency.value, set: (v) => (agency.value = v) });
-const citySel = computed<string>({ get: () => city.value || ANY, set: (v) => (city.value = v === ANY ? "" : v) });
+const citySel = useNullableSelect(city);
 const nearbyKindItems = computed<Item[]>(() => [
-  { label: t("nearbyKindAny"), value: ANY },
+  { label: t("nearbyKindAny"), value: ANY_SELECT_VALUE },
   ...NEARBY_KINDS.map((kind) => ({ value: kind, label: t(`nearbyKind_${kind}`) })),
 ]);
-const nearbyKindSel = computed<string>({
-  get: () => nearbyKind.value || ANY,
-  set: (v) => (nearbyKind.value = v === ANY ? "" : v),
-});
+const nearbyKindSel = useNullableSelect(nearbyKind);
 const CURRENCY_PRIORITY = ["USD", "EUR", "UZS", "KZT", "UAH", "RON", "GBP", "KGS", "TJS", "TMT", "PLN"];
 const currencyItems = computed<Item[]>(() => {
   const keys = Object.keys(rates.value).filter((c) => /^[A-Z]{3}$/.test(c) && rates.value[c]! > 0);
@@ -223,15 +217,14 @@ const sortItems = computed<Item[]>(() => [
   { value: "titleAsc", label: extraLabels.value.titleAsc },
   { value: "titleDesc", label: extraLabels.value.titleDesc },
 ]);
-const districtSel = computed<string>({ get: () => district.value || ANY, set: (v) => (district.value = v === ANY ? "" : v) });
-const metroSel = computed<string>({ get: () => metro.value || ANY, set: (v) => (metro.value = v === ANY ? "" : v) });
+const districtSel = useNullableSelect(district);
+const metroSel = useNullableSelect(metro);
 const audienceItems = computed<Item[]>(() => [
   { label: t('audienceAny'), value: "any" },
   { label: t('audienceWomen'), value: "women" },
   { label: t('audienceMen'), value: "men" },
   { label: t('audienceFamily'), value: "family" },
 ]);
-const audienceSel = computed<string>({ get: () => audience.value, set: (v) => (audience.value = v) });
 const propertyTypeItems = computed<Item[]>(() => [
   { label: t("ptAny"), value: "any" }, { label: t("ptFlat"), value: "flat" }, { label: t("ptHouse"), value: "house" },
 ]);
@@ -305,8 +298,8 @@ const flatAdvancedFilterBlocks = computed<SearchFilterBlock[]>(() => [
     icon: "i-lucide-megaphone",
     gridClass: "flat-filter-grid_single",
     fields: [
-      { id: "audience", control: "select", label: t("audience"), value: audienceSel.value, options: audienceItems.value, searchable: false, onUpdate: updateFilter(audienceSel), onCommit: scheduleLoad },
-      { id: "property-type", control: "select", label: t("propertyType"), value: propertyTypeSel.value, options: propertyTypeItems.value, searchable: false, onUpdate: updateFilter(propertyTypeSel), onCommit: scheduleLoad },
+      { id: "audience", control: "select", label: t("audience"), value: audience.value, options: audienceItems.value, searchable: false, onUpdate: updateFilter(audience), onCommit: scheduleLoad },
+      { id: "property-type", control: "select", label: t("propertyType"), value: propertyType.value, options: propertyTypeItems.value, searchable: false, onUpdate: updateFilter(propertyType), onCommit: scheduleLoad },
       { id: "fresh-days", control: "number", label: t("freshDays"), value: maxAgeDays.value, min: 1, max: 21, onUpdate: updateFilter(maxAgeDays), onCommit: scheduleLoad },
     ],
   },
@@ -777,8 +770,8 @@ onBeforeUnmount(() => { modalOpen.value = false; lightboxOpen.value = false; rel
         <div class="filter-primary-grid">
           <div class="flats__field"><u-select-menu :label="t('country')" v-model="countries" :items="countryItems" value-key="value" label-key="label" multiple :placeholder="t('countryAny')" class="flats__select" @update:model-value="scheduleLoad()" /></div>
           <div class="flats__field"><u-select-menu :label="t('city')" v-model="citySel" :items="cityItems" value-key="value" label-key="label" class="flats__select" @update:model-value="scheduleLoad()" /></div>
-          <div class="flats__field"><u-select-menu :label="t('dealType')" v-model="dealTypeSel" :items="dealTypeItems" value-key="value" label-key="label" :search-input="false" class="flats__select" @update:model-value="scheduleLoad()" /></div>
-          <div class="flats__field"><u-select-menu :label="t('agency')" v-model="agencySel" :items="agencyItems" value-key="value" label-key="label" :search-input="false" class="flats__select" @update:model-value="scheduleLoad()" /></div>
+          <div class="flats__field"><u-select-menu :label="t('dealType')" v-model="dealType" :items="dealTypeItems" value-key="value" label-key="label" :search-input="false" class="flats__select" @update:model-value="scheduleLoad()" /></div>
+          <div class="flats__field"><u-select-menu :label="t('agency')" v-model="agency" :items="agencyItems" value-key="value" label-key="label" :search-input="false" class="flats__select" @update:model-value="scheduleLoad()" /></div>
         </div>
 
         <div class="filter-price-row">

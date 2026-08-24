@@ -20,6 +20,7 @@ import { useJobRouteState } from "~/composables/jobs/useJobRouteState";
 import { useSavedCollections } from "~/composables/search/useSavedCollections";
 import { useLatestRequest } from "~/composables/search/useLatestRequest";
 import { useInfiniteFeed } from "~/composables/search/useInfiniteFeed";
+import { ANY_SELECT_VALUE, useNullableSelect } from "~/composables/search/useNullableSelect";
 import type { SearchFilterBlock, SearchFilterValue } from "~/types/search";
 
 // Job Finder service. Auto-routed at /jobs. Aggregates many boards, enforces a
@@ -95,26 +96,11 @@ const {
 // Reka UI reserves an empty string for clearing a combobox and throws when an
 // item itself has value="". Keep the API-facing refs empty for "any", while
 // exposing a non-empty sentinel to USelectMenu.
-const ANY_SELECT_VALUE = "__any__";
-function withAnyOption(model: { value: string }) {
-  return computed<string>({
-    get: () => model.value || ANY_SELECT_VALUE,
-    set: (value) => {
-      model.value = value === ANY_SELECT_VALUE ? "" : value;
-    },
-  });
-}
-const workModeSelect = withAnyOption(workMode);
-const relocationSelect = withAnyOption(relocation);
-const employmentKindSelect = withAnyOption(employmentKind);
-const languageSelect = computed<string>({
-  get: () => language.value || ANY_SELECT_VALUE,
-  set: (value) => {
-    language.value = value === ANY_SELECT_VALUE ? "" : value;
-    if (!language.value) languageLevel.value = "";
-  },
-});
-const languageLevelSelect = withAnyOption(languageLevel);
+const workModeSelect = useNullableSelect(workMode);
+const relocationSelect = useNullableSelect(relocation);
+const employmentKindSelect = useNullableSelect(employmentKind);
+const languageSelect = useNullableSelect(language, { onClear: () => { languageLevel.value = ""; } });
+const languageLevelSelect = useNullableSelect(languageLevel);
 
 const {
   jobs, total, page, pageSize, stats, loading, loadingMore, failed, warming,
