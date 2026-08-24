@@ -513,7 +513,6 @@ onBeforeUnmount(() => {
     <UiResultsLoader :loading="loading" :label="t('searching')" min-height="420px">
     <SearchFilterPanel tag="form" class="hiring__controls" @submit="load()">
       <u-input v-model="query" clearable icon="i-lucide-search" :label="t('search')" :placeholder="t('searchPlaceholder')" @clear="clearSearch" />
-      <UiSortSelect v-model="sort" :items="sortItems" :label="t('sort')" @update:model-value="scheduleLoad(0)" />
       <u-button type="submit" icon="i-lucide-search">
         {{ t("search") }}
       </u-button>
@@ -559,11 +558,16 @@ onBeforeUnmount(() => {
       </div>
     </SearchFilterPanel>
 
-    <p v-if="failed" class="hiring__error">{{ t("error") }}</p>
-    <p v-else-if="hasSourceWarning" class="hiring__source-warning">
-      {{ t(sourceWarningKey, { n: relevantSourceErrors.length }) }}
-    </p>
-    <p v-else-if="warming && !loading" class="hiring__warming text-muted">{{ t("warming") }}</p>
+    <div class="hiring__results-toolbar">
+      <p v-if="failed" class="hiring__error">{{ t("error") }}</p>
+      <p v-else-if="hasSourceWarning" class="hiring__source-warning">
+        {{ t(sourceWarningKey, { n: relevantSourceErrors.length }) }}
+      </p>
+      <p v-else-if="warming && !loading" class="hiring__warming text-muted">{{ t("warming") }}</p>
+      <p v-else class="hiring__count text-muted">{{ t("found", { n: view === 'active' ? total : displayedProfiles.length }) }}</p>
+      <UiSortSelect class="hiring__sort" v-model="sort" :items="sortItems" :label="t('sort')" @update:model-value="scheduleLoad(0)" />
+    </div>
+
     <HiringStatsPanel
       v-if="displayedProfiles.length"
       :profiles="displayedProfiles"
@@ -586,7 +590,7 @@ onBeforeUnmount(() => {
       />
       </template>
     </CandidateGrid>
-<div ref="loadMoreSentinel" v-if="hasMore" class="hiring__sentinel">
+    <div ref="loadMoreSentinel" v-if="hasMore" class="hiring__sentinel">
       <span v-if="loadingMore" class="text-muted">{{ t("loadingMore") }}</span>
     </div>
 
@@ -638,8 +642,15 @@ onBeforeUnmount(() => {
 .hiring__header { position: relative; z-index: 1; }
 .hiring__title { font-size: 32px; font-weight: 600; }
 .hiring__subtitle { max-width: 720px; font-size: 14px; }
-.hiring__controls { margin: 20px 0 20px; display: grid; gap: 12px; grid-template-columns: minmax(0, 1fr) minmax(220px, 280px) auto; align-items: start; }
+.hiring__controls { margin: 20px 0 20px; display: grid; gap: 12px; grid-template-columns: minmax(0, 1fr) auto; align-items: start; }
 .hiring__row { grid-column: 1 / -1; display: flex; flex-wrap: wrap; justify-content: space-between; gap: 12px; }
+.hiring__results-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
+.hiring__results-toolbar .hiring__error,
+.hiring__results-toolbar .hiring__source-warning,
+.hiring__results-toolbar .hiring__warming,
+.hiring__results-toolbar .hiring__count { margin: 0; }
+.hiring__sort { flex: 0 0 min(280px, 42vw); min-width: 200px; }
+.hiring__count { font-size: 13px; }
 .hiring__advanced {
   position: relative; isolation: isolate; overflow: hidden;
   grid-column: 1 / -1; display: grid; grid-template-columns: 1fr; gap: 12px;
@@ -686,8 +697,8 @@ onBeforeUnmount(() => {
 .hiring__select { width: 100%; min-width: 0; }
 .hiring__select :deep(button) { width: 100%; min-width: 0; }
 .hiring__error { color: var(--ui-error, #f87171); }
-.hiring__source-warning { color: #f6c177; font-size: 13px; margin-bottom: 12px; }
-.hiring__warming { font-size: 13px; margin-bottom: 12px; }
+.hiring__source-warning { color: #f6c177; font-size: 13px; }
+.hiring__warming { font-size: 13px; }
 .hiring__sentinel { min-height: 44px; display: grid; place-items: center; }
 .hiring-modal { display: flex; flex-direction: column; gap: 12px; }
 .hiring-modal__title { margin: 0; font-size: 18px; font-weight: 700; line-height: 1.35; padding-right: 36px; }
@@ -700,6 +711,8 @@ onBeforeUnmount(() => {
 @media (max-width: 700px) {
   .hiring__controls { grid-template-columns: 1fr; }
   .hiring__controls > :deep(button) { width: 100%; }
+  .hiring__results-toolbar { align-items: stretch; flex-direction: column; }
+  .hiring__sort { flex: 1 1 auto; width: 100%; min-width: 0; }
   .hiring__age-range, .hiring__salary-range { grid-template-columns: 1fr 1fr; }
 }
 </style>
