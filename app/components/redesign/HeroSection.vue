@@ -183,5 +183,4 @@ const heroStats = computed(() =>
     gap: 36px;
   }
 }
-
 </style>
