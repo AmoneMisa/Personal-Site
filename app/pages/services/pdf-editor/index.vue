@@ -2,6 +2,7 @@
 import CustomButton from "~/components/common/CustomButton.vue";
 import { computed, ref } from "vue";
 import {formatFileSize} from "~/utils/files";
+import {useFileCollection} from "~/composables/ui/useFileCollection";
 
 const config = useRuntimeConfig();
 const { t } = useI18n();
@@ -10,11 +11,23 @@ useServiceSeo("pdfEditor");
 const router = useRouter();
 const localePath = useLocalePath();
 
-const fileInput = ref<HTMLInputElement | null>(null);
-const selectedFile = ref<File | null>(null);
-
 const isBusy = ref(false);
 const errorMsg = ref<string | null>(null);
+
+const {
+  files,
+  inputRef: fileInput,
+  pickFromInput,
+  openPicker,
+  clearFiles,
+} = useFileCollection({
+  validate: (file) => file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf"),
+  onRejected: () => {
+    errorMsg.value = t("services.pdfEditor.upload.onlyPdf") || "Only PDF files are allowed";
+  },
+});
+
+const selectedFile = computed(() => files.value[0] ?? null);
 
 const fileLabel = computed(() => selectedFile.value?.name ?? "");
 const fileSizeMb = computed(() => {
@@ -23,30 +36,13 @@ const fileSizeMb = computed(() => {
   return formatFileSize(f.size);
 });
 
-function openPicker() {
-  fileInput.value?.click();
-}
-
 function onPick(e: Event) {
-  const input = e.target as HTMLInputElement;
-  const f = input.files?.[0] ?? null;
-  if (!f) return;
-
-  // accept only pdf
-  const isPdf = f.type === "application/pdf" || f.name.toLowerCase().endsWith(".pdf");
-  if (!isPdf) {
-    errorMsg.value = t("services.pdfEditor.upload.onlyPdf") || "Only PDF files are allowed";
-    input.value = "";
-    return;
-  }
-
-  selectedFile.value = f;
   errorMsg.value = null;
-  input.value = "";
+  pickFromInput(e);
 }
 
 function clear() {
-  selectedFile.value = null;
+  clearFiles();
   errorMsg.value = null;
 }
 

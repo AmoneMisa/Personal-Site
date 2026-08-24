@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import CustomButton from "~/components/common/CustomButton.vue";
 import {downloadBlob, formatFileSize} from "~/utils/files";
+import {useFileCollection} from "~/composables/ui/useFileCollection";
 
 const { t } = useI18n();
 
@@ -39,14 +40,29 @@ const accept = computed(() => {
 const maxFiles = computed(() => (mode.value === "media" ? 20 : 1));
 const isMultiple = computed(() => mode.value === "media");
 
-const files = ref<File[]>([]);
-const isDragging = ref(false);
 const isLoading = ref(false);
 
 const errorMessage = ref<string | null>(null);
 const successMessage = ref<string | null>(null);
 
-const fileInputRef = ref<HTMLInputElement | null>(null);
+const {
+  files,
+  inputRef: fileInputRef,
+  isDragging,
+  pickFromInput,
+  openPicker: openFilePicker,
+  clearFiles: clearSelectedFiles,
+  removeFile,
+  onDrop: addDroppedFiles,
+  onDragOver,
+  onDragLeave,
+} = useFileCollection({
+  multiple: isMultiple,
+  maxFiles,
+  onLimit: (limit) => {
+    successMessage.value = t("services.converter.messages.tookFirst", {count: limit});
+  },
+});
 
 function clearMessages() {
   errorMessage.value = null;
@@ -54,58 +70,23 @@ function clearMessages() {
 }
 
 function clearFiles() {
-  files.value = [];
+  clearSelectedFiles();
   clearMessages();
 }
 
 function openPicker() {
   clearMessages();
-  fileInputRef.value?.click();
+  openFilePicker();
 }
 
 function pickFilesFromInput(e: Event) {
-  const input = e.target as HTMLInputElement;
-  const list = Array.from(input.files || []);
-  addFiles(list);
-  input.value = "";
-}
-
-function addFiles(list: File[]) {
   clearMessages();
-  if (!list.length) return;
-
-  if (!isMultiple.value) {
-    files.value = [list[0]];
-    return;
-  }
-
-  const combined = [...files.value, ...list].slice(0, maxFiles.value);
-  files.value = combined;
-
-  if (combined.length >= maxFiles.value && (files.value.length + list.length) > maxFiles.value) {
-    successMessage.value = t("services.converter.messages.tookFirst", { count: maxFiles.value });
-  }
+  pickFromInput(e);
 }
 
 function onDrop(e: DragEvent) {
-  e.preventDefault();
-  isDragging.value = false;
-  const list = Array.from(e.dataTransfer?.files || []);
-  addFiles(list);
-}
-
-function onDragOver(e: DragEvent) {
-  e.preventDefault();
-  isDragging.value = true;
-}
-
-function onDragLeave(e: DragEvent) {
-  e.preventDefault();
-  isDragging.value = false;
-}
-
-function removeFile(idx: number) {
-  files.value = files.value.filter((_, i) => i !== idx);
+  clearMessages();
+  addDroppedFiles(e);
 }
 
 function fileExt(name: string) {
