@@ -1,0 +1,44 @@
+/* Shared refresh feedback for result grids that already expose a *_grid_loading state.
+   Keep the current results visible (like the jobs page), dim only the cards and
+   render the spinner itself at full opacity above them. */
+.flats__grid_loading,
+.hiring__grid_loading {
+    position: relative;
+    min-height: 180px;
+    opacity: 1 !important;
+    pointer-events: none;
+}
+
+.flats__grid_loading > *,
+.hiring__grid_loading > * {
+    opacity: 0.35;
+    transition: opacity 140ms ease;
+}
+
+.flats__grid_loading::after,
+.hiring__grid_loading::after {
+    content: "";
+    position: absolute;
+    top: 72px;
+    left: 50%;
+    width: 28px;
+    height: 28px;
+    margin-left: -14px;
+    border: 3px solid rgba(158, 164, 193, 0.35);
+    border-top-color: var(--accent-pink, #e0679a);
+    border-radius: 50%;
+    opacity: 1;
+    z-index: 20;
+    animation: results-loader-spin 0.7s linear infinite;
+}
+
+@keyframes results-loader-spin {
+    to { transform: rotate(360deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .flats__grid_loading::after,
+    .hiring__grid_loading::after {
+        animation-duration: 1.4s;
+    }
+}
