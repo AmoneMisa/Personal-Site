@@ -1,6 +1,6 @@
 /* Shared refresh feedback for result grids that already expose a *_grid_loading state.
-   Keep the current results visible (like the jobs page), dim only the cards and
-   render the spinner itself at full opacity above them. */
+   Keep the current results visible, dim the stale content and render the spinner
+   above every interactive result element. */
 .flats__grid_loading,
 .hiring__grid_loading {
     position: relative;
@@ -30,6 +30,38 @@
     opacity: 1;
     z-index: 20;
     animation: results-loader-spin 0.7s linear infinite;
+}
+
+/* Jobs has its own loader element. While it is present, the recently-viewed
+   strip is part of the stale result surface too: dim it and make it inert so a
+   user cannot open an old card while the filtered result set is being replaced. */
+.jobs:has(.jobs__loader) .recent {
+    opacity: 0.35;
+    pointer-events: none;
+    transition: opacity 140ms ease;
+}
+
+/* Keep the jobs spinner above cards and any local stacking contexts. The loader
+   text remains available to assistive technology but is not rendered visually. */
+.jobs__results {
+    isolation: isolate;
+}
+
+.jobs__loader {
+    z-index: 50 !important;
+    pointer-events: auto;
+}
+
+.jobs__loader > span {
+    position: absolute !important;
+    width: 1px !important;
+    height: 1px !important;
+    padding: 0 !important;
+    margin: -1px !important;
+    overflow: hidden !important;
+    clip: rect(0, 0, 0, 0) !important;
+    white-space: nowrap !important;
+    border: 0 !important;
 }
 
 @keyframes results-loader-spin {
