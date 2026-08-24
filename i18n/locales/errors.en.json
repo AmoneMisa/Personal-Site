@@ -1,0 +1,27 @@
+{
+  "errors": {
+    "404": {
+      "kicker": "Oops!",
+      "title": "This page swam away",
+      "text": "Looks like the little shark carried this page off, and the cat is already on the trail.",
+      "hint": "Head back home or try opening the section you need again."
+    },
+    "500": {
+      "kicker": "Server error",
+      "title": "Something went wrong",
+      "text": "Looks like the little shark caused some chaos on the server, and the cat is already fixing it.",
+      "hint": "Try refreshing the page or come back a little later — everything should be purring again soon."
+    },
+    "actions": {
+      "home": "Home",
+      "back": "Back",
+      "retry": "Retry"
+    },
+    "details": "Technical details",
+    "links": {
+      "main": "Home",
+      "services": "Services"
+    },
+    "navigationLabel": "Navigation"
+  }
+}
