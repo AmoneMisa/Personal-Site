@@ -16,7 +16,7 @@ withDefaults(defineProps<{
     :style="{ '--results-loader-min-height': minHeight }"
     :aria-busy="loading"
   >
-    <div class="results-loader__content" :inert="loading || undefined">
+    <div class="results-loader__content" :inert="loading || undefined" :aria-disabled="loading || undefined">
       <slot />
     </div>
 
@@ -50,12 +50,13 @@ withDefaults(defineProps<{
 .results-loader__overlay {
   position: absolute;
   inset: 0;
-  z-index: 50;
+  z-index: 1000;
   display: flex;
   align-items: flex-start;
   justify-content: center;
   padding-top: 72px;
   pointer-events: auto;
+  cursor: wait;
 }
 
 .results-loader__spinner {

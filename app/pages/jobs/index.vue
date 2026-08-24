@@ -925,6 +925,7 @@ onBeforeUnmount(() => {
       <p class="jobs__subtitle text-muted mx-auto">{{ t("subtitle") }}</p>
     </div>
 
+    <UiResultsLoader :loading="loading && savedView === 'active'" :label="t('searching')" min-height="420px">
     <!-- ATS CV panel -->
     <section class="ats">
       <div class="ats__head">
@@ -1007,8 +1008,8 @@ onBeforeUnmount(() => {
               @click="selectSavedView('hidden')"
           >{{ t("hiddenVacancies") }} · {{ hiddenJobs.length }}</button>
         </div>
-        <u-button type="submit" :loading="loading" icon="i-lucide-search">
-          {{ loading ? t("searching") : t("search") }}
+        <u-button type="submit" icon="i-lucide-search">
+          {{ t("search") }}
         </u-button>
       </div>
 
@@ -1163,9 +1164,7 @@ onBeforeUnmount(() => {
         </div>
       </div>
     </section>
-
-    <UiResultsLoader :loading="loading && savedView === 'active'" :label="t('searching')" min-height="210px">
-    <!-- Recently viewed (last up to 4) -->
+<!-- Recently viewed (last up to 4) -->
     <section v-if="recentlyViewed.length" class="recent">
       <div class="recent__title">{{ t("recentlyViewed") }}</div>
       <div class="recent__row">
@@ -1282,9 +1281,7 @@ onBeforeUnmount(() => {
         </div>
       </div>
      </div>
-    </UiResultsLoader>
-
-    <div v-if="!loading && !(warming && savedView === 'active') && !displayedJobs.length && !failed" class="jobs__empty">
+<div v-if="!loading && !(warming && savedView === 'active') && !displayedJobs.length && !failed" class="jobs__empty">
       <div class="text-muted">{{ t("empty") }}</div>
     </div>
 
@@ -1300,6 +1297,8 @@ onBeforeUnmount(() => {
       </u-button>
       <span class="text-muted">{{ t("shown", { shown: displayedJobs.length, total }) }}</span>
     </div>
+
+    </UiResultsLoader>
 
     <!-- Full vacancy popup -->
     <u-modal v-model:open="jobModalOpen" :title="activeJob?.title || ''" :ui="{ content: 'max-w-2xl' }">

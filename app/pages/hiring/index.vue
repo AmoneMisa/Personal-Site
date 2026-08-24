@@ -809,14 +809,15 @@ onBeforeUnmount(() => {
       <p class="hiring__subtitle text-muted mx-auto">{{ t("subtitle") }}</p>
     </div>
 
+    <UiResultsLoader :loading="loading" :label="t('searching')" min-height="420px">
     <form class="hiring__controls" @submit.prevent="load()">
       <u-input v-model="query" clearable icon="i-lucide-search" :label="t('search')" :placeholder="t('searchPlaceholder')" @clear="clearSearch" />
       <div class="hiring__sort">
         <u-select-menu :label="label('Сортировка', 'Sort')" v-model="sort" :items="sortItems" value-key="value" label-key="label"
             :search-input="false" class="hiring__select" @update:model-value="scheduleLoad(0)" />
       </div>
-      <u-button type="submit" :loading="loading" icon="i-lucide-search">
-        {{ loading ? t("searching") : t("search") }}
+      <u-button type="submit" icon="i-lucide-search">
+        {{ t("search") }}
       </u-button>
 
       <div class="hiring__row">
@@ -904,9 +905,7 @@ onBeforeUnmount(() => {
     </p>
     <p v-else-if="warming && !loading" class="hiring__warming text-muted">{{ t("warming") }}</p>
     <p v-else class="hiring__count text-muted">{{ t("found", { n: view === 'active' ? total : displayedProfiles.length }) }}</p>
-
-    <UiResultsLoader :loading="loading" :label="t('searching')" min-height="210px">
-    <div class="hiring__grid" :class="{ 'hiring__grid_dense': denseGrid }">
+<div class="hiring__grid" :class="{ 'hiring__grid_dense': denseGrid }">
       <article
           v-for="profile in displayedProfiles" :key="profile.id" class="hiring-card"
           :class="{ 'hiring-card_favorite': isFavorite(profile.id), 'hiring-card_hidden': isHidden(profile.id) }"
@@ -935,15 +934,15 @@ onBeforeUnmount(() => {
         </div>
       </article>
     </div>
-    </UiResultsLoader>
-
-    <div ref="loadMoreSentinel" v-if="hasMore" class="hiring__sentinel">
+<div ref="loadMoreSentinel" v-if="hasMore" class="hiring__sentinel">
       <span v-if="loadingMore" class="text-muted">{{ t("loadingMore") }}</span>
     </div>
 
     <div v-if="!loading && !displayedProfiles.length && !failed" class="hiring__empty">
       <div class="text-muted">{{ t("empty") }}</div>
     </div>
+
+    </UiResultsLoader>
 
     <u-modal v-model:open="modalOpen" :title="active?.name || active?.role || t('notSpecified')" :ui="{ content: 'max-w-3xl' }">
       <template #title>
