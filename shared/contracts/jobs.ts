@@ -161,19 +161,52 @@ export interface SalaryStat {
   maxUsd: number
 }
 
+export interface JobGroupedSalaryStat {
+  count: number
+  salaryCount: number
+  medianUsd: number
+}
+
+export interface JobExperienceStats {
+  knownCount: number
+  medianYears: number | null
+  noExperience: number
+  upToOne: number
+  oneToThree: number
+  threeToFive: number
+  fivePlus: number
+  unknown: number
+}
+
+export interface JobProfessionGeographyStat extends JobGroupedSalaryStat {
+  kind: 'country' | 'city'
+  key: string
+}
+
+export interface JobProfessionStat extends JobGroupedSalaryStat {
+  profession: string
+  medianExperienceYears: number | null
+  geographies: JobProfessionGeographyStat[]
+}
+
 export interface JobSalaryTrendPoint {
   postedAt: string
   salaryUsd: number
   country?: string
   city?: string
   title: string
+  profession?: string
 }
 
 export interface JobStats {
   salary: SalaryStat
-  bySource: Partial<Record<JobSource, { count: number; medianUsd: number }>>
-  byCountry: Record<string, { count: number; medianUsd: number }>
+  bySource: Partial<Record<JobSource, JobGroupedSalaryStat>>
+  byCountry: Record<string, JobGroupedSalaryStat>
   byWorkMode: Record<WorkMode, number>
+  byRelocation: Record<Relocation, number>
+  byEmploymentKind: Record<EmploymentKind | 'unknown', number>
+  experience: JobExperienceStats
+  byProfession: JobProfessionStat[]
   foreignerFriendly: number
   byLanguage: Record<string, number>
   topSkills: { skill: string; count: number }[]

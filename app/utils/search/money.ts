@@ -40,6 +40,32 @@ export function formatMoney(amount: number, currency: string, locale?: string): 
   return symbol === normalized ? `${value} ${symbol}` : `${symbol}${value}`;
 }
 
+export function formatCompactNumber(amount: number): string {
+  const abs = Math.abs(amount);
+  if (abs < 1_000) return Math.round(amount).toLocaleString("en-US");
+  const [divisor, suffix] = abs >= 1_000_000_000
+    ? [1_000_000_000, "B"] as const
+    : abs >= 1_000_000
+      ? [1_000_000, "M"] as const
+      : [1_000, "K"] as const;
+  const scaled = amount / divisor;
+  const rounded = Number(scaled.toFixed(Math.abs(scaled) >= 100 ? 1 : 1));
+  return `${rounded.toLocaleString("en-US", { maximumFractionDigits: 1 })}${suffix}`;
+}
+
+/**
+ * Compact only numeric salary fragments, preserving currency symbols, ranges and
+ * localized period labels. The unabridged string remains available for tooltips
+ * and detail views, so card density never costs information.
+ */
+export function compactSalaryText(value: string): string {
+  return value.replace(/\d(?:[\d\s\u00a0\u202f,.]*\d)?/g, (token) => {
+    const normalized = token.replace(/[\s\u00a0\u202f,]/g, "");
+    const amount = Number(normalized);
+    return Number.isFinite(amount) && amount >= 1_000 ? formatCompactNumber(amount) : token;
+  });
+}
+
 export function convertSalaryPeriod(amount: number, from: SalaryPeriod, to: SalaryPeriod): number {
   return amount * PERIODS_PER_YEAR[from] / PERIODS_PER_YEAR[to];
 }

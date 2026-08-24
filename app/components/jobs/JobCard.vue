@@ -2,6 +2,7 @@
 import { scoreColor } from "~/utils/atsScore";
 import type { Job, JobAtsResult } from "~/types/jobs";
 import { formatRelativeDate } from "~/utils/search/relativeDate";
+import { compactSalaryText } from "~/utils/search/money";
 import SearchMatchBadge from "~/components/search/SearchMatchBadge.vue";
 import type { DraggablePillItem } from "~/components/ui/DraggablePills.vue";
 
@@ -61,6 +62,8 @@ const visibleBadges = computed(() => cardBadges.value.slice(0, 6));
 const hiddenBadgeCount = computed(() => Math.max(0, cardBadges.value.length - visibleBadges.value.length));
 const countryLabel = computed(() => props.job.country || props.job.location.split(",").at(-1)?.trim() || "");
 const bylineTitle = computed(() => [props.job.company, props.job.location].filter(Boolean).join(" · "));
+const compactSalary = computed(() => props.salary ? compactSalaryText(props.salary) : null);
+const compactConvertedSalary = computed(() => props.convertedSalary ? compactSalaryText(props.convertedSalary) : null);
 
 const pills = (items: string[] | undefined, className: string, prefix = ""): DraggablePillItem[] =>
   (items || []).map((label, index) => ({ key: `${prefix}${label}:${index}`, label: prefix ? `${prefix}${label}` : label, className }));
@@ -90,31 +93,16 @@ function openCard() { emit("open", props.job); }
   >
     <div class="job-card__head">
       <h3 class="job-card__title">{{ job.title }}</h3>
-      <SearchMatchBadge
-        v-if="ats"
-        class="job-card__ats"
-        :value="ats.score"
-        :tier="ats.score >= 75 ? 'good' : ats.score >= 50 ? 'warning' : 'bad'"
-        :style="{ color: scoreColor(ats.score), borderColor: scoreColor(ats.score) }"
-        :title="ats.missing.length ? t('atsMissing') + ': ' + ats.missing.join(', ') : ''"
-      />
-    </div>
-
-    <div class="job-card__meta-row">
-      <span class="job-card__date text-muted">{{ timeAgo(job.postedAt) }}</span>
-      <div class="job-card__actions">
-        <button type="button" class="job-card__action" :aria-label="t('share')" :title="t('share')" @click.stop="emit('share', job)">
-          <u-icon :name="shareCopied ? 'i-lucide-check' : 'i-lucide-share-2'" />
-        </button>
-        <a :href="job.url" target="_blank" rel="noopener noreferrer" class="job-card__action" :aria-label="t('openSource')" :title="t('openSource')" @click.stop="emit('seen', job)">
-          <u-icon name="i-lucide-external-link" />
-        </a>
-        <button type="button" class="job-card__action" :class="{ 'job-card__action_active': favorite }" :aria-label="favorite ? t('removeFavorite') : t('addFavorite')" :title="favorite ? t('removeFavorite') : t('addFavorite')" @click.stop="emit('favorite', job)">
-          <u-icon name="i-lucide-heart" />
-        </button>
-        <button type="button" class="job-card__action" :aria-label="hidden ? t('restoreVacancy') : t('hideVacancy')" :title="hidden ? t('restoreVacancy') : t('hideVacancy')" @click.stop="emit('hidden', job)">
-          <u-icon :name="hidden ? 'i-lucide-eye' : 'i-lucide-eye-off'" />
-        </button>
+      <div class="job-card__head-side">
+        <SearchMatchBadge
+          v-if="ats"
+          class="job-card__ats"
+          :value="ats.score"
+          :tier="ats.score >= 75 ? 'good' : ats.score >= 50 ? 'warning' : 'bad'"
+          :style="{ color: scoreColor(ats.score), borderColor: scoreColor(ats.score) }"
+          :title="ats.missing.length ? t('atsMissing') + ': ' + ats.missing.join(', ') : ''"
+        />
+        <span class="job-card__date text-muted">{{ timeAgo(job.postedAt) }}</span>
       </div>
     </div>
 
@@ -125,8 +113,9 @@ function openCard() { emit("open", props.job); }
 
     <div v-if="salary || convertedSalary" class="job-card__compensation">
       <div class="job-card__salary-values">
-        <span v-if="salary" class="job-card__salary">{{ salary }}</span>
-        <span v-if="convertedSalary" class="job-card__salary job-card__salary_conv">{{ convertedSalary }}</span>
+        <span v-if="salary" class="job-card__salary" :title="salary">{{ compactSalary }}</span>
+        <span v-if="salary && convertedSalary" class="job-card__salary-separator" aria-hidden="true">·</span>
+        <span v-if="convertedSalary" class="job-card__salary job-card__salary_conv" :title="convertedSalary">{{ compactConvertedSalary }}</span>
       </div>
     </div>
 
@@ -158,31 +147,32 @@ function openCard() { emit("open", props.job); }
       <div v-else-if="job.tags.length" class="job-card__tags">
         <UiDraggablePills :items="tagPills" :visible-hint-count="3" />
       </div>
-      <div class="job-card__byline text-muted" :title="bylineTitle"><span class="job-card__company">{{ job.company }}</span><span v-if="countryLabel" class="job-card__dot">·</span><span v-if="countryLabel">{{ countryLabel }}</span></div>
+      <div class="job-card__bottom">
+        <div class="job-card__byline text-muted" :title="bylineTitle"><span class="job-card__company">{{ job.company }}</span><span v-if="countryLabel" class="job-card__dot">·</span><span v-if="countryLabel">{{ countryLabel }}</span></div>
+        <div class="job-card__actions">
+          <button type="button" class="job-card__action" :class="{ 'job-card__action_active': favorite }" :aria-label="favorite ? t('removeFavorite') : t('addFavorite')" :title="favorite ? t('removeFavorite') : t('addFavorite')" @click.stop="emit('favorite', job)">
+            <u-icon name="i-lucide-heart" />
+          </button>
+          <button type="button" class="job-card__action" :aria-label="hidden ? t('restoreVacancy') : t('hideVacancy')" :title="hidden ? t('restoreVacancy') : t('hideVacancy')" @click.stop="emit('hidden', job)">
+            <u-icon :name="hidden ? 'i-lucide-eye' : 'i-lucide-eye-off'" />
+          </button>
+        </div>
+      </div>
     </div>
   </article>
 </template>
 
 <style scoped>
-.job-card { position: relative; isolation: isolate; overflow: hidden; padding: 18px; border-radius: 14px; border: 1px solid var(--line); background: var(--bg-panel); box-shadow: inset 0 1px 0 rgba(255,255,255,.04), 0 16px 36px rgba(2,6,23,.12); transition: transform 160ms ease, border-color 180ms ease, box-shadow 180ms ease; height: 100%; min-height: 300px; display: flex; flex-direction: column; cursor: pointer; }
+.job-card { position: relative; isolation: isolate; overflow: hidden; padding: 18px; border-radius: 14px; border: 1px solid var(--line); background: var(--bg-panel); box-shadow: inset 0 1px 0 rgba(255,255,255,.04), 0 16px 36px rgba(2,6,23,.12); transition: transform 160ms ease, border-color 180ms ease, box-shadow 180ms ease; height: auto; min-height: 0; display: flex; flex-direction: column; cursor: pointer; }
 .job-card:focus-visible { outline: 2px solid var(--accent-pink, #e0679a); outline-offset: 3px; }
 .job-card_scored { border-color: var(--line); box-shadow: inset 0 1px 0 rgba(255,255,255,.04), 0 16px 36px rgba(2,6,23,.12); }
 .job-card:hover { transform: translateY(-3px); border-color: rgba(224,103,154,.42); box-shadow: inset 0 1px 0 rgba(255,255,255,.08), 0 20px 42px rgba(2,6,23,.22); }
 .job-card_scored:hover { box-shadow: inset 0 1px 0 rgba(255,255,255,.08), 0 20px 42px rgba(2,6,23,.22); }
 .job-card__head { display: grid; grid-template-columns: minmax(0,1fr) auto; align-items: start; gap: 12px; }
+.job-card__head-side { display: flex; flex-direction: column; align-items: flex-end; gap: 5px; min-width: 48px; }
 .job-card__title { width: 100%; min-width: 0; margin: 0; overflow-wrap: break-word; font-weight: 700; font-size: 15px; line-height: 1.4; color: var(--text-white, inherit); }
 .job-card__ats { justify-self: end; white-space: nowrap; font-size: 11px; font-weight: 700; padding: 2px 8px; border: 1px solid; border-radius: 7px; background: rgba(2,6,23,.18); }
-.job-card__meta-row { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-top: 8px; }
-.job-card__date { min-width: 0; font-size: 11.5px; white-space: nowrap; }
-.job-card__byline { display: flex; min-width: 0; align-items: center; gap: 5px; padding-top: 4px; font-size: 12px; line-height: 1.35; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.job-card__byline > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
-.job-card__company { font-weight: 600; flex: 0 1 auto; }
-.job-card__dot { opacity: .5; }
-.job-card__actions { flex: 0 0 auto; display: flex; justify-content: flex-end; align-items: center; gap: 4px; }
-.job-card__action { width: 27px; height: 27px; display: inline-grid; place-items: center; padding: 0; border: 1px solid var(--line); border-radius: 8px; background: var(--bg-panel-2); color: var(--ui-text-muted); cursor: pointer; transition: color 160ms ease, border-color 160ms ease, background 160ms ease; }
-.job-card__action :deep(svg) { display: block; margin: auto; }
-.job-card__action:hover { color: var(--accent-pink, #e0679a); border-color: rgba(224,103,154,.45); }
-.job-card__action_active { color: var(--accent-pink, #e0679a); background: rgba(224,103,154,.12); }
+.job-card__date { min-width: 0; font-size: 11px; line-height: 1.2; white-space: nowrap; }
 .job-card__meta { display: flex; flex-wrap: wrap; align-content: flex-start; align-items: center; gap: 5px; max-height: 48px; overflow: hidden; margin-top: 9px; }
 .job-card__badge { flex: 0 0 auto; white-space: nowrap; border-radius: 6px; padding: 2px 8px; font-size: 11px; line-height: 1.35; color: #34d399; background: rgba(52,211,153,.14); }
 .job-card__badge_mode { color: #38bdf8; background: rgba(56,189,248,.14); }
@@ -197,15 +187,16 @@ function openCard() { emit("open", props.job); }
 .job-card__badge_management { color: #fcd34d; background: rgba(245,158,11,.13); }
 .job-card__badge_salary { color: #f0abfc; background: rgba(217,70,239,.12); }
 .job-card__badge_more { color: var(--ui-text-muted); background: rgba(148,163,184,.14); }
-.job-card__compensation { min-width: 0; margin-top: 12px; }
-.job-card__salary-values { display: flex; min-width: 0; flex-direction: column; gap: 1px; }
-.job-card__salary { color: #f08ab8; font-size: 15px; line-height: 1.3; font-weight: 750; letter-spacing: .01em; overflow-wrap: anywhere; }
-.job-card__salary_conv { color: var(--ui-text-muted); font-size: 12px; font-weight: 550; opacity: .9; }
+.job-card__compensation { min-width: 0; margin-top: 12px; overflow: hidden; }
+.job-card__salary-values { display: flex; min-width: 0; align-items: baseline; gap: 5px; flex-wrap: nowrap; white-space: nowrap; overflow: hidden; }
+.job-card__salary { min-width: 0; flex: 0 1 auto; color: #f08ab8; font-size: 14px; line-height: 1.3; font-weight: 750; letter-spacing: .01em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.job-card__salary-separator { flex: none; color: var(--ui-text-muted); opacity: .65; }
+.job-card__salary_conv { color: var(--ui-text-muted); font-size: 12.5px; font-weight: 600; opacity: .92; }
 .job-card__langs { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: 12px; margin-top: 6px; }
 .job-card__lang-icon { font-size: 14px; opacity: .7; }
 .job-card__lang:not(:last-child)::after { content: ","; }
 .job-card__desc { margin-top: 10px; font-size: 13px; line-height: 1.5; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
-.job-card__footer { display: flex; flex-direction: column; margin-top: auto; padding-top: 10px; }
+.job-card__footer { display: flex; flex-direction: column; margin-top: 12px; padding-top: 0; }
 .job-card__tags, .job-card__skills { position: relative; min-width: 0; display: flex; gap: 6px; align-items: center; }
 .job-card__skills { flex-wrap: wrap; }
 .job-card__skills + .job-card__skills { margin-top: 9px; }
@@ -215,17 +206,25 @@ function openCard() { emit("open", props.job); }
 .job-card :deep(.job-card__tag_plus) { border-color: rgba(52,211,153,.35); color: #6ee7b7; }
 .job-card :deep(.job-card__tag_match) { border-color: rgba(52,211,153,.45); color: #34d399; background: rgba(52,211,153,.1); }
 .job-card :deep(.job-card__tag_miss) { border-color: rgba(248,113,113,.4); color: #f87171; }
-.job-card__byline { margin-top: 10px; padding-top: 8px; border-top: 1px solid rgba(86,96,135,.22); }
+.job-card__bottom { display: flex; min-width: 0; align-items: center; gap: 10px; margin-top: 10px; padding-top: 8px; border-top: 1px solid rgba(86,96,135,.22); }
+.job-card__byline { display: flex; min-width: 0; flex: 1 1 auto; align-items: center; gap: 5px; font-size: 12px; line-height: 1.35; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.job-card__byline > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.job-card__company { font-weight: 600; flex: 0 1 auto; }
+.job-card__dot { opacity: .5; }
+.job-card__actions { flex: 0 0 auto; margin-left: auto; display: flex; justify-content: flex-end; align-items: center; gap: 4px; }
+.job-card__action { width: 27px; height: 27px; display: inline-grid; place-items: center; padding: 0; border: 1px solid var(--line); border-radius: 8px; background: var(--bg-panel-2); color: var(--ui-text-muted); cursor: pointer; transition: color 160ms ease, border-color 160ms ease, background 160ms ease; }
+.job-card__action :deep(svg) { display: block; margin: auto; }
+.job-card__action:hover { color: var(--accent-pink, #e0679a); border-color: rgba(224,103,154,.45); }
+.job-card__action_active { color: var(--accent-pink, #e0679a); background: rgba(224,103,154,.12); }
 .job-card_seen { opacity: .72; }
 .job-card_seen:hover { opacity: 1; }
 .job-card_favorite { border-color: rgba(224,103,154,.48); }
 .job-card_hidden { opacity: .62; border-style: dashed; }
 @media (max-width: 480px) {
-  .job-card { min-height: 0; padding: 15px; }
-  .job-card__head { grid-template-columns: 1fr; gap: 8px; }
-  .job-card__ats { justify-self: start; }
-  .job-card__meta-row { flex-direction: row; align-items: center; margin-top: 7px; }
-  .job-card__actions { margin: 0; }
-  .job-card__byline { padding-right: 0; }
+  .job-card { padding: 15px; }
+  .job-card__head { gap: 8px; }
+  .job-card__salary { font-size: 13px; }
+  .job-card__salary_conv { font-size: 11.5px; }
+  .job-card__bottom { gap: 6px; }
 }
 </style>
