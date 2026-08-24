@@ -1,6 +1,6 @@
 import type { SourceRun } from '../../utils/hiringDiagnostics'
 import { hiringDbEnabled, saveDbCandidates } from '../infrastructure/database'
-import { emptyWebCursor, loadWebCursors, saveWebCursor } from '../../utils/hiringCursors'
+import { emptyWebCursor, loadWebCursors, saveWebCursor } from '../../../shared/hiring/hiringCursors'
 import { normalizeCandidate } from '../../utils/hiringNormalize'
 import { persistWebProfiles } from '../webProfilePersistence'
 import { parseIshBorProfile } from '../../../shared/hiring/ishBorProfile'
