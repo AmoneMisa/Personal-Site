@@ -2,58 +2,14 @@
 import {ref} from "vue";
 import type {TabsItem} from "#ui/components/Tabs.vue";
 import {useScrollableTabs} from "~/composables/ui/useScrollableTabs";
-
-type SimpleSort = "len_asc" | "len_desc";
-
-const simpleSort = ref<SimpleSort>("len_asc");
-const simpleSortOptions = computed(() => ([
-  {label: t("services.dockerSearch.simple.sort.lenAsc"), value: "len_asc"},
-  {label: t("services.dockerSearch.simple.sort.lenDesc"), value: "len_desc"}
-]));
-
-const simpleResultsSorted = computed(() => {
-  const list = [...(simpleResults.value || [])];
-
-  list.sort((a, b) => {
-    const la = (a.tag || "").length;
-    const lb = (b.tag || "").length;
-
-    if (la !== lb) return simpleSort.value === "len_asc" ? la - lb : lb - la;
-    return (a.tag || "").localeCompare(b.tag || "");
-  });
-
-  return list;
-});
+import {useDockerAliases} from "~/composables/dockerHub/useDockerAliases";
+import {useDockerSimpleSearch} from "~/composables/dockerHub/useDockerSimpleSearch";
+import {useDockerResolve} from "~/composables/dockerHub/useDockerResolve";
+import type {DockerVariantPreset} from "~/types/dockerHub";
 
 const {t} = useI18n();
 
 useServiceSeo("dockerSearch");
-
-type ResolveResponse = {
-  repo: string;
-  major: number;
-  variant?: string | null;
-  best_tag: string | null;
-  fallbacks: string[];
-  reason: string;
-  total_matched: number;
-};
-
-type AliasesResponse = {
-  repo: string;
-  tag: string;
-  digest: string | null;
-  aliases: string[];
-  reason: string;
-};
-
-type SimpleSearchItem = {
-  base: string;
-  tag: string;
-  examples: string[];
-};
-
-type VariantPreset = { labelKey: string; value: string | null };
 
 // -----------------------------
 // Tabs (your styling logic)
@@ -78,77 +34,40 @@ const tabs: TabsItem[] = [
 // -----------------------------
 const repo = ref("library/amazoncorretto");
 
-// Aliases (shared)
-const loadingAliases = ref(false);
-const aliasesError = ref<string | null>(null);
-const aliasesResult = ref<AliasesResponse | null>(null);
 const selectedTag = ref<string | null>(null);
-
-function resetAliases() {
-  aliasesResult.value = null;
-  aliasesError.value = null;
-}
-
-async function loadAliases(tag: string) {
-  loadingAliases.value = true;
-  aliasesError.value = null;
-
-  try {
-    aliasesResult.value = await $fetch<AliasesResponse>("/api/dockerhub/tags/aliases", {
-      params: {repo: repo.value.trim(), tag},
-    });
-  } catch (e: any) {
-    aliasesError.value = e?.data?.message || e?.message || "Fetch failed";
-  } finally {
-    loadingAliases.value = false;
-  }
-}
+const {
+  loading: loadingAliases,
+  error: aliasesError,
+  result: aliasesResult,
+  reset: resetAliases,
+  load: loadAliases,
+} = useDockerAliases(repo);
 
 // -----------------------------
 // Tab 1: Simple search
 // -----------------------------
-const simpleQuery = ref("");
-const simpleLoading = ref(false);
-const simpleError = ref<string | null>(null);
-const simpleResults = ref<SimpleSearchItem[]>([]);
+const {
+  query: simpleQuery,
+  sort: simpleSort,
+  loading: simpleLoading,
+  error: simpleError,
+  results: simpleResults,
+  sortedResults: simpleResultsSorted,
+  canSearch: canSimpleSearch,
+  reset: resetSimpleSearch,
+  run: runSimpleSearch,
+  choose: chooseSimpleTag,
+} = useDockerSimpleSearch(repo, selectedTag, resetAliases);
 
-const canSimpleSearch = computed(() => repo.value.trim().length > 3 && simpleQuery.value.trim().length > 1);
-
-async function runSimpleSearch() {
-  if (!canSimpleSearch.value) return;
-
-  simpleLoading.value = true;
-  simpleError.value = null;
-  resetAliases();
-
-  try {
-    const data = await $fetch<SimpleSearchItem[]>("/api/dockerhub/tags/search", {
-      params: {repo: repo.value.trim(), q: simpleQuery.value.trim()},
-    });
-
-    simpleResults.value = Array.isArray(data) ? data : [];
-    selectedTag.value = simpleResults.value[0]?.tag ?? null;
-  } catch (e: any) {
-    simpleError.value = e?.data?.message || e?.message || "Fetch failed";
-    simpleResults.value = [];
-    selectedTag.value = null;
-  } finally {
-    simpleLoading.value = false;
-  }
-}
-
-function chooseSimpleTag(tag: string) {
-  selectedTag.value = tag;
-  resetAliases();
-}
+const simpleSortOptions = computed(() => ([
+  {label: t("services.dockerSearch.simple.sort.lenAsc"), value: "len_asc"},
+  {label: t("services.dockerSearch.simple.sort.lenDesc"), value: "len_desc"},
+]));
 
 // -----------------------------
 // Tab 2: Advanced search (your current)
 // -----------------------------
-const major = ref<number | null>(17);
-const variant = ref<string | null>("alpine");
-
-const variantPresets: VariantPreset[] = [
+const variantPresets: DockerVariantPreset[] = [
   {labelKey: "services.dockerSearch.variant.any", value: null},
   {labelKey: "services.dockerSearch.variant.alpine", value: "alpine"},
   {labelKey: "services.dockerSearch.variant.al2", value: "al2"},
@@ -156,53 +75,18 @@ const variantPresets: VariantPreset[] = [
   {labelKey: "services.dockerSearch.variant.ubuntu", value: "ubuntu"},
 ];
 
-const loading = ref(false);
-const error = ref<string | null>(null);
-const resolveResult = ref<ResolveResponse | null>(null);
-
-const canAdvancedSearch = computed(() => {
-  const r = repo.value.trim();
-  return r.length > 3 && !!major.value && major.value > 0;
-});
-
-function resetAdvanced() {
-  resolveResult.value = null;
-  error.value = null;
-  selectedTag.value = null;
-  resetAliases();
-}
-
-async function runAdvancedSearch() {
-  if (!canAdvancedSearch.value) return;
-
-  loading.value = true;
-  error.value = null;
-  resetAliases();
-
-  try {
-    const data = await $fetch<ResolveResponse>("/api/dockerhub/tags/resolve", {
-      params: {
-        repo: repo.value.trim(),
-        major: major.value,
-        ...(variant.value ? {variant: variant.value} : {}),
-      },
-    });
-
-    resolveResult.value = data;
-    selectedTag.value = data.best_tag ?? null;
-  } catch (e: any) {
-    error.value = e?.data?.message || e?.message || "Fetch failed";
-  } finally {
-    loading.value = false;
-  }
-}
-
-const tagsToShow = computed(() => resolveResult.value?.fallbacks ?? []);
-
-function chooseAdvancedTag(tag: string) {
-  selectedTag.value = tag;
-  resetAliases();
-}
+const {
+  major,
+  variant,
+  loading,
+  error,
+  result: resolveResult,
+  canSearch: canAdvancedSearch,
+  tags: tagsToShow,
+  reset: resetAdvanced,
+  run: runAdvancedSearch,
+  choose: chooseAdvancedTag,
+} = useDockerResolve(repo, selectedTag, resetAliases);
 </script>
 
 <template>
@@ -286,7 +170,7 @@ function chooseAdvancedTag(tag: string) {
                         type="button"
                         class="docker-search__btn docker-search__btn_ghost"
                         :disabled="simpleLoading"
-                        @click="() => { simpleQuery=''; simpleResults=[]; simpleError=null; selectedTag=null; resetAliases(); }"
+                        @click="resetSimpleSearch"
                     >
                       <u-icon name="i-lucide-eraser" class="docker-search__btn-icon"/>
                       {{ t("services.dockerSearch.actions.reset") }}
