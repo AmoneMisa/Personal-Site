@@ -2,7 +2,7 @@
 // Parsing/classification lives in the hiring domain layer.
 
 import type { CvProfile } from '../../../shared/contracts/hiring'
-import { emptyCursor, loadCursors, saveCursor, type ChannelCursor } from '../../utils/hiringCursors'
+import { emptyCursor, loadCursors, saveCursor, type ChannelCursor } from '../../../shared/hiring/hiringCursors'
 import {
   HIRING_TELEGRAM_CHANNELS,
   type HiringTelegramChannelDescriptor,
