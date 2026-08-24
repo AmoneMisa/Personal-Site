@@ -17,7 +17,7 @@ import {
 } from '../server/utils/hiringCandidateFields.ts'
 import { removeExistingSocialMeta } from '../server/utils/shareHead.ts'
 import { looksSoftBlocked } from '../server/utils/browserSoftBlock.ts'
-import { dedupeCandidates, normalizeCandidate, normalizeProfessions } from '../server/utils/hiringNormalize.ts'
+import { dedupeCandidates, normalizeCandidate, normalizeProfessions, trimRabotaKzProfileText, trimThreadsProfileText } from '../server/utils/hiringNormalize.ts'
 import { repairCandidateProfile } from '../server/utils/hiringQuality.ts'
 import { withProfessionExperience } from '../server/utils/hiringExperience.ts'
 import { trimCareeristProfileText } from '../server/utils/hiringCareeristFields.ts'
@@ -126,6 +126,44 @@ test('flat finder renders a collapsible localized statistics panel', () => {
   assert.match(stats, /statsWithPhotos/u)
   const ru = JSON.parse(readFileSync(new URL('../i18n/locales/ru.json', import.meta.url), 'utf8'))
   assert.equal(ru.flats.statsTitle, 'Статистика объявлений')
+})
+
+test('Rabota.kz and Threads profiles drop captured page controls and metadata', () => {
+  const rabota = trimRabotaKzProfileText([
+    'Найдено 87 916 резюме в Казахстане',
+    '87916 резюме людей, ищущих работу в Казахстане. Быстрый поиск и подбор сотрудников на вакантные рабочие места',
+    'Айнур',
+    'Преподаватель музыки',
+    'обновлено сегодня',
+    'В избранное',
+    'Скачать',
+    'Скрыть',
+    'Пожаловаться',
+    'обновлено сегодня',
+    'Развернуть',
+  ].join('\n'))
+  assert.equal(rabota, 'Айнур\nПреподаватель музыки\nобновлено сегодня')
+
+  const threads = trimThreadsProfileText([
+    'nataliiaurzhumtseva',
+    '35m',
+    'Я ищу работу в Бишкеке',
+    'Translate',
+    '12',
+    '6',
+  ].join('\n'), 'Nataliaurzhumtseva')
+  assert.equal(threads, 'Я ищу работу в Бишкеке')
+})
+
+test('Rabota.kz education and employment history do not become skill badges', () => {
+  const profile = normalizeCandidate({
+    id: 'rabota-kz-skills', source: 'Rabota.kz', sourceKey: 'rabotakz', origin: 'web', country: 'KZ',
+    name: 'Айнур', role: 'Преподаватель музыки', url: 'https://rabota.kz/cv/list/example',
+    createdAt: '2026-08-24T10:00:00.000Z',
+    skills: ['Высший музыкальный колледж им.Казангапа', 'сентября 2002 г. — по настоящее время', 'Responsibility'],
+    originalText: 'Айнур\n48 лет, Кызылорда\nПреподаватель музыки\n36 000 KZT\nВысший музыкальный колледж им.Казангапа\nсентября 2002 г. — по настоящее время\nResponsibility',
+  })
+  assert.deepEqual(profile.skills, ['Responsibility'])
 })
 
 test('country quiz result cards use a responsive four-column grid', () => {

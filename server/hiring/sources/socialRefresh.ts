@@ -1,5 +1,5 @@
 import { recordWebDiagnostic, type WebSourceDiagnostic } from '../../utils/hiringDiagnostics'
-import { normalizeCandidate } from '../../utils/hiringNormalize'
+import { normalizeCandidate, trimThreadsProfileText } from '../../utils/hiringNormalize'
 import { detectCity, isLikelyCvPost } from '../domain/telegramCandidateParser'
 import type { CvProfile } from '../../utils/hiringTypes'
 import { persistWebProfiles } from '../webProfilePersistence'
@@ -114,7 +114,8 @@ function nameFrom(item: SocialItem, text: string): string {
 }
 
 function itemToProfile(item: SocialItem, target: SocialTarget): CvProfile | null {
-  const text = String(item.text || '').trim()
+  const rawText = String(item.text || '').trim()
+  const text = target.platform === 'threads' ? trimThreadsProfileText(rawText, String(item.author || '')) : rawText
   const createdAt = recentIso(item.createdAt)
   const candidateIntent = isLikelyCvPost(text, true) || LOCAL_CANDIDATE_INTENT_RE.test(text)
   if (!createdAt || !item.url || !text || !candidateIntent) return null

@@ -515,6 +515,51 @@ function stripUiArtifacts(value: string): string {
     .trim()
 }
 
+const RABOTA_UI_LINE_RE = /^(?:в избранное|скачать|скрыть|пожаловаться|развернуть)$/iu
+const RABOTA_HEADER_RE = /^(?:найдено\s+[\d\s]+\s+резюме\s+в\s+казахстане|[\d\s]+\s+резюме\s+людей,\s+ищущих\s+работу\s+в\s+казахстане\.)/iu
+
+/** Removes search-page chrome duplicated inside Rabota.kz resume cards. */
+export function trimRabotaKzProfileText(value: string): string {
+  const seen = new Set<string>()
+  return stripUiArtifacts(value)
+    .split('\n')
+    .filter((line) => {
+      const key = line.toLocaleLowerCase('ru').replace(/\s+/g, ' ').trim()
+      if (!key || RABOTA_UI_LINE_RE.test(key) || RABOTA_HEADER_RE.test(key) || seen.has(key)) return false
+      seen.add(key)
+      return true
+    })
+    .join('\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim()
+}
+
+/** Removes author/time/translation controls and engagement counters from Threads captures. */
+export function trimThreadsProfileText(value: string, candidateName = ''): string {
+  const normalizedName = candidateName.toLocaleLowerCase('ru').replace(/\s+/g, ' ').trim()
+  const lines = stripUiArtifacts(value).split('\n')
+  const translateAt = lines.findIndex((line) => /^translate$/iu.test(line.trim()))
+  const content = (translateAt >= 0 ? lines.slice(0, translateAt) : lines)
+    .filter((line, index) => {
+      const key = line.toLocaleLowerCase('ru').replace(/\s+/g, ' ').trim()
+      if (!key || /^\d+[smhdw]$/iu.test(key) || /^translate$/iu.test(key)) return false
+      if (index === 0 && ((normalizedName && key === normalizedName) || (/^@?[a-z0-9._]{4,40}$/iu.test(key) && /^\d+[smhdw]$/iu.test(lines[1]?.trim() || '')))) return false
+      return true
+    })
+  while (content.length && /^\d{1,5}$/.test(content.at(-1)!.trim())) content.pop()
+  return content.join('\n').replace(/\n{3,}/g, '\n\n').trim()
+}
+
+function sourceProfileText(profile: CvProfile, value: string): string {
+  const clean = stripUiArtifacts(value)
+  if (profile.sourceKey === 'rabotakz') return trimRabotaKzProfileText(clean)
+  if (profile.origin === 'threads' || profile.sourceKey?.startsWith('threads-')) return trimThreadsProfileText(clean, profile.name)
+  if (profile.sourceKey === 'ishbor-uz') return trimIshBorProfileText(clean)
+  if (profile.sourceKey === 'careerist-uz') return trimCareeristProfileText(clean)
+  if (profile.sourceKey?.startsWith('flagma')) return trimFlagmaProfileText(clean)
+  return clean
+}
+
 /** Removes ad-loader JavaScript leaked by incomplete Flagma card fragments. */
 function trimFlagmaProfileText(value: string): string {
   return stripUiArtifacts(value)
@@ -530,9 +575,15 @@ function trimFlagmaProfileText(value: string): string {
 }
 
 function normalizedCandidateSkills(profile: CvProfile, text: string): string[] {
-  const skipTextExtraction = profile.sourceKey === 'careerist-uz' || profile.sourceKey === 'ishbor-uz'
+  const rabotaKz = profile.sourceKey === 'rabotakz'
+  const skipTextExtraction = profile.sourceKey === 'careerist-uz' || profile.sourceKey === 'ishbor-uz' || rabotaKz
   const rawSkills = skipTextExtraction
-    ? []
+    ? rabotaKz
+      ? (profile.skills || []).filter((skill) => (
+          skill.length <= 60
+          && !/(?:19|20)\d{2}|по\s+настоящее\s+время|колледж|университет|институт|училище|сентябр|октябр|ноябр|декабр|январ|феврал|март|апрел|ма[йя]|июн|июл|август/iu.test(skill)
+        ))
+      : []
     : profile.sourceKey?.startsWith('flagma')
       ? (profile.skills || []).filter((skill) => canonicalSkillName(skill) != null)
       : profile.skills
@@ -605,13 +656,7 @@ export function normalizeCandidate(profile: CvProfile): CvProfile {
   // Repair rows parsed before Material Icon ligatures were removed from the
   // source HTML. Underscored glyph names are presentation markup, not CV text.
   const rawSourceText = stripUiArtifacts(profile.originalText || profile.description || '')
-  const originalText = profile.sourceKey === 'ishbor-uz'
-    ? trimIshBorProfileText(rawSourceText)
-    : profile.sourceKey === 'careerist-uz'
-      ? trimCareeristProfileText(rawSourceText)
-      : profile.sourceKey?.startsWith('flagma')
-        ? trimFlagmaProfileText(rawSourceText)
-        : rawSourceText
+  const originalText = sourceProfileText(profile, rawSourceText)
   const goalRole = extractGoalRole(originalText)
   const sourceRole = profile.sourceKey === 'careerist-uz' ? careeristRoleFromText(originalText) : null
   const rawEffectiveRoleCandidate = cleanRole(goalRole || sourceRole || profile.role)
@@ -681,13 +726,7 @@ export function normalizeCandidate(profile: CvProfile): CvProfile {
     ...profile,
     name,
     originalText,
-    description: profile.sourceKey === 'ishbor-uz'
-      ? trimIshBorProfileText(stripUiArtifacts(profile.description || originalText))
-      : profile.sourceKey === 'careerist-uz'
-        ? trimCareeristProfileText(stripUiArtifacts(profile.description || originalText))
-        : profile.sourceKey?.startsWith('flagma')
-          ? trimFlagmaProfileText(profile.description || originalText)
-          : stripUiArtifacts(profile.description || originalText),
+    description: sourceProfileText(profile, profile.description || originalText),
     role: professions[0] || (effectiveRole ? normalizeRole(effectiveRole, originalText) : ''),
     professions,
     previousProfessions: profile.previousProfessions?.length

@@ -357,6 +357,7 @@ function openCard() {
   -webkit-box-orient: vertical;
 }
 .hiring-card__salary {
+  min-width: 0;
   display: flex;
   flex-wrap: wrap;
   align-items: baseline;
@@ -368,7 +369,9 @@ function openCard() {
   line-height: 1.35;
 }
 .hiring-card__salary-item {
-  white-space: nowrap;
+  min-width: 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
 }
 .hiring-card__salary-item + .hiring-card__salary-item::before {
   content: '·';
