@@ -79,4 +79,5 @@ const emit = defineEmits<{
 .flat-card__badges { margin-top: 5px; }.flat-card__badges :deep(.flat-card__badge) { border-radius: 999px; padding: 4px 7px; font-size: 10.5px; font-weight: 600; line-height: 1.15; background: rgba(255,255,255,0.05); color: var(--text-primary); }
 .flat-card__meta { display: flex; align-items: center; justify-content: space-between; gap: 6px 10px; margin-top: 8px; padding-top: 8px; border-top: 1px solid rgba(255,255,255,.055); font-size: 11.5px; line-height: 1.35; }.flat-card__location { min-width: 0; display: inline-flex; align-items: center; gap: 5px; flex: 1 1 auto; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }.flat-card__meta-tail { display: inline-flex; flex: 0 0 auto; gap: 5px; white-space: nowrap; margin-left: auto; }.flat-card__src { text-transform: capitalize; opacity: 0.72; }
 .flat-card_favorite { border-color: rgba(224,103,154,0.52); }.flat-card_hidden { opacity: 0.64; border-style: dashed; }
+@media (max-width: 760px) { .flat-card__photo { aspect-ratio: 16 / 10; } }
 </style>

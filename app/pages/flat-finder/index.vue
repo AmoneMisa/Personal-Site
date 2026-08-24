@@ -4,6 +4,7 @@ import { metroLabelWithAlias, locationLabel, type LocationKind } from "~/utils/l
 import FlatMap from "~/components/flats/FlatMap.client.vue";
 import FlatCard from "~/components/flats/FlatCard.vue";
 import FlatGrid from "~/components/flats/FlatGrid.vue";
+import FlatGallery from "~/components/flats/FlatGallery.vue";
 import SearchDetailsModal from "~/components/search/SearchDetailsModal.vue";
 import SearchPageShell from "~/components/search/SearchPageShell.vue";
 import SearchSavedTabs from "~/components/search/SearchSavedTabs.vue";
@@ -533,10 +534,7 @@ const active = ref<Listing | null>(null);
 const modalOpen = ref(false);
 const checkingListingKey = ref("");
 const listingKey = (listing: Listing) => `${listing.source}:${listing.country}:${listing.id}`;
-const lightboxIndex = ref<number | null>(null);
-const lightboxPhotos = computed(() => active.value ? visiblePhotos(active.value) : []);
-const lightboxPhoto = computed(() => lightboxIndex.value == null ? null : lightboxPhotos.value[lightboxIndex.value] || null);
-const lightboxPosition = computed(() => (lightboxIndex.value ?? 0) + 1);
+const lightboxOpen = ref(false);
 const {
   translatedDescription,
   translatingDescription,
@@ -635,7 +633,7 @@ async function openListing(l: Listing, olxAlreadyVerified = false) {
       if (checkingListingKey.value === key) checkingListingKey.value = "";
     }
   }
-  lightboxIndex.value = null; active.value = listing;
+  lightboxOpen.value = false; active.value = listing;
   prepareTranslation(listing); modalOpen.value = true;
   addRecent(listing);
   syncListingInUrl(listing);
@@ -646,26 +644,14 @@ function modalTitle(listing: Listing | null): string {
   const humanTitle = normalized.split(/\s*[•·]\s*/)[0]?.trim() || normalized;
   return humanTitle.length > 140 ? `${humanTitle.slice(0, 137).trimEnd()}…` : humanTitle;
 }
-function openLightbox(index: number) { if (!lightboxPhotos.value.length) return; lightboxIndex.value = Math.max(0, Math.min(index, lightboxPhotos.value.length - 1)); }
-function closeLightbox() { lightboxIndex.value = null; }
-function moveLightbox(direction: -1 | 1) { const total = lightboxPhotos.value.length; if (!total || lightboxIndex.value == null) return; lightboxIndex.value = (lightboxIndex.value + direction + total) % total; }
-function lightboxPhotoFailed(event: Event) { markPhotoFailedFromEvent(event); nextTick(() => { if (!lightboxPhotos.value.length) closeLightbox(); else if (lightboxIndex.value != null) lightboxIndex.value = Math.min(lightboxIndex.value, lightboxPhotos.value.length - 1); }); }
-const SWIPE_MIN_PX = 50;
-let swipeStart: { x: number; y: number; id: number } | null = null;
-function onLightboxPointerDown(event: PointerEvent) { if (lightboxPhotos.value.length < 2) return; swipeStart = { x: event.clientX, y: event.clientY, id: event.pointerId }; }
-function onLightboxPointerUp(event: PointerEvent) { if (!swipeStart || event.pointerId !== swipeStart.id) return; const dx = event.clientX - swipeStart.x; const dy = event.clientY - swipeStart.y; swipeStart = null; if (Math.abs(dx) < SWIPE_MIN_PX || Math.abs(dx) <= Math.abs(dy)) return; moveLightbox(dx < 0 ? 1 : -1); }
-function onLightboxPointerCancel() { swipeStart = null; }
 function releaseStuckScrollLock() {
-  if (import.meta.server || modalOpen.value || lightboxIndex.value !== null) return;
+  if (import.meta.server || modalOpen.value || lightboxOpen.value) return;
   const body = document.body;
   if (body.style.overflow === "hidden") body.style.removeProperty("overflow");
   if (body.style.position === "fixed") { const top = body.style.top; body.style.removeProperty("position"); body.style.removeProperty("top"); body.style.removeProperty("width"); const offset = Math.abs(parseInt(top || "0", 10)) || 0; if (offset) window.scrollTo(0, offset); }
   body.style.removeProperty("padding-right"); document.documentElement.style.removeProperty("overflow");
 }
-function onLightboxKeydown(event: KeyboardEvent) { if (lightboxIndex.value == null) return; if (event.key === "Escape") closeLightbox(); else if (event.key === "ArrowLeft") moveLightbox(-1); else if (event.key === "ArrowRight") moveLightbox(1); else return; event.preventDefault(); }
 function openById(id: string) { const found = displayedListings.value.find((l) => l.id === id); if (found) void openListing(found); }
-function updateLightboxZoom(event: MouseEvent) { const image = event.currentTarget as HTMLImageElement; const rect = image.getBoundingClientRect(); image.style.setProperty("--zoom-x", `${((event.clientX - rect.left) / rect.width) * 100}%`); image.style.setProperty("--zoom-y", `${((event.clientY - rect.top) / rect.height) * 100}%`); }
-function resetLightboxZoom(event: MouseEvent) { const image = event.currentTarget as HTMLImageElement; image.style.setProperty("--zoom-x", "50%"); image.style.setProperty("--zoom-y", "50%"); }
 function convert(amount: number, from: string, to: string): number | undefined {
   return convertCurrency(amount, from || "USD", to || "USD", rates.value);
 }
@@ -712,7 +698,6 @@ async function openSharedListing(id: string, sourceName = "", countryCode = "", 
   if (data?.warming && attempt < 20) { if (sharedListingTimer) clearTimeout(sharedListingTimer); sharedListingTimer = setTimeout(() => { sharedListingTimer = undefined; void openSharedListing(id, sourceName, countryCode, attempt + 1); }, 1800); }
 }
 onMounted(async () => {
-  window.addEventListener("keydown", onLightboxKeydown);
   const sharedFlatId = queryString(route.query.flat); const sharedFlatSource = queryString(route.query.flatSource); const sharedFlatCountry = queryString(route.query.flatCountry);
   defaultCountry.value = regionalDefaultCountry();
   if (!queryString(route.query.countries)) countries.value = [defaultCountry.value];
@@ -720,8 +705,8 @@ onMounted(async () => {
   if (queryString(route.query.shared) === "1") { showAdvanced.value = true; sharedLinkOpened.value = true; shareModalOpen.value = true; }
   await load(false); if (sharedFlatId) await openSharedListing(sharedFlatId, sharedFlatSource, sharedFlatCountry); await nextTick(); lastPaginationScrollY = window.scrollY;
 });
-watch(modalOpen, (open) => { if (open) return; syncListingInUrl(null); closeLightbox(); cancelTranslation(); nextTick(() => setTimeout(releaseStuckScrollLock, 350)); });
-watch(lightboxIndex, (index) => { if (index === null) nextTick(() => setTimeout(releaseStuckScrollLock, 350)); });
+watch(modalOpen, (open) => { if (open) return; syncListingInUrl(null); lightboxOpen.value = false; cancelTranslation(); nextTick(() => setTimeout(releaseStuckScrollLock, 350)); });
+watch(lightboxOpen, (open) => { if (!open) nextTick(() => setTimeout(releaseStuckScrollLock, 350)); });
 // A link that names a listing should open it, whether the page is mounting for
 // the first time or the query changed underneath one that is already up. The
 // mount-time read covers only the first case; this covers both, and cannot
@@ -740,7 +725,7 @@ watch(
 );
 watch(city, () => { if (restoring.value) return; district.value = ""; metro.value = ""; query.value = ""; });
 watch(countries, () => { if (restoring.value) return; district.value = ""; metro.value = ""; city.value = ""; query.value = ""; });
-onBeforeUnmount(() => { modalOpen.value = false; lightboxIndex.value = null; releaseStuckScrollLock(); window.removeEventListener("keydown", onLightboxKeydown); if (loadTimer) clearTimeout(loadTimer); if (warmTimer) clearTimeout(warmTimer); if (sharedListingTimer) clearTimeout(sharedListingTimer); cancelTranslation(); });
+onBeforeUnmount(() => { modalOpen.value = false; lightboxOpen.value = false; releaseStuckScrollLock(); if (loadTimer) clearTimeout(loadTimer); if (warmTimer) clearTimeout(warmTimer); if (sharedListingTimer) clearTimeout(sharedListingTimer); cancelTranslation(); });
 </script>
 
 <template>
@@ -878,15 +863,13 @@ onBeforeUnmount(() => { modalOpen.value = false; lightboxIndex.value = null; rel
 
     </UiResultsLoader>
 
-    <SearchDetailsModal v-model:open="modalOpen" :title="modalTitle(active)" :ui="{ content: 'max-w-4xl' }" :dismissible="lightboxIndex === null">
+    <SearchDetailsModal v-model:open="modalOpen" :title="modalTitle(active)" :ui="{ content: 'max-w-4xl' }" :dismissible="!lightboxOpen">
       <template #title><h2 class="flat-modal__title">{{ modalTitle(active) }}</h2></template>
-      <template #body><div v-if="active" class="flat-modal"><div v-if="visiblePhotos(active).length" class="flat-modal__gallery"><img v-for="(p, i) in visiblePhotos(active)" :key="p" :src="p" :alt="`${modalTitle(active)} (${i + 1})`" class="flat-modal__thumb" loading="lazy" decoding="async" referrerpolicy="no-referrer" @error="markPhotoFailedFromEvent" @click="openLightbox(i)" /></div><div class="flat-modal__price">{{ priceLabel(active) }}<span v-if="convertedLabel(active)" class="flat-modal__price-conv"> ({{ convertedLabel(active) }})</span><span v-if="dealLabel(active.dealType)" class="flat-modal__deal"> · {{ dealLabel(active.dealType) }}</span><span v-if="active.roomOnly" class="flat-modal__deal"> · {{ t("roomShare") }}</span></div><UiSpecTable :rows="specRows" :hide-empty-label="t('hideEmpty')" :empty-value="t('notSpecified')" /><div v-if="active.description && descriptionNeedsTranslation" class="flat-modal__translation"><u-button type="button" variant="outline" color="neutral" size="sm" icon="i-lucide-languages" :loading="translatingDescription" @click="translateActiveDescription">{{ translatingDescription ? t("translatingDescription") : t("translateDescription") }}</u-button><span v-if="translationFailed" class="flat-modal__translation-error">{{ t("translationFailed") }}</span></div><section v-if="translatedDescription" class="flat-modal__translated"><h4 class="flat-modal__translated-title">{{ t("translatedDescription") }}</h4><p class="flat-modal__desc">{{ translatedDescription }}</p></section><details v-if="active.description" class="flat-modal__descbox"><summary>{{ t("origDescription") }}</summary><p class="flat-modal__desc">{{ active.description }}</p></details><div v-if="active.tags && active.tags.length" class="flat-modal__tags"><span v-for="tag in active.tags" :key="tag" class="flat-modal__tag">{{ nearbyItemLabel(tag) }}</span></div></div></template>
+      <template #body><div v-if="active" class="flat-modal"><FlatGallery v-model:lightbox-open="lightboxOpen" :photos="visiblePhotos(active)" :title="modalTitle(active)" :viewer-label="t('photoViewer')" :previous-label="t('previousPhoto')" :next-label="t('nextPhoto')" :close-label="t('closePhoto')" @photo-error="markPhotoFailedFromEvent" /><div class="flat-modal__price">{{ priceLabel(active) }}<span v-if="convertedLabel(active)" class="flat-modal__price-conv"> ({{ convertedLabel(active) }})</span><span v-if="dealLabel(active.dealType)" class="flat-modal__deal"> · {{ dealLabel(active.dealType) }}</span><span v-if="active.roomOnly" class="flat-modal__deal"> · {{ t("roomShare") }}</span></div><UiSpecTable :rows="specRows" :hide-empty-label="t('hideEmpty')" :empty-value="t('notSpecified')" /><div v-if="active.description && descriptionNeedsTranslation" class="flat-modal__translation"><u-button type="button" variant="outline" color="neutral" size="sm" icon="i-lucide-languages" :loading="translatingDescription" @click="translateActiveDescription">{{ translatingDescription ? t("translatingDescription") : t("translateDescription") }}</u-button><span v-if="translationFailed" class="flat-modal__translation-error">{{ t("translationFailed") }}</span></div><section v-if="translatedDescription" class="flat-modal__translated"><h4 class="flat-modal__translated-title">{{ t("translatedDescription") }}</h4><p class="flat-modal__desc">{{ translatedDescription }}</p></section><details v-if="active.description" class="flat-modal__descbox"><summary>{{ t("origDescription") }}</summary><p class="flat-modal__desc">{{ active.description }}</p></details><div v-if="active.tags && active.tags.length" class="flat-modal__tags"><span v-for="tag in active.tags" :key="tag" class="flat-modal__tag">{{ nearbyItemLabel(tag) }}</span></div></div></template>
       <template #footer><UiModalFooter v-if="active"><u-button variant="outline" color="neutral" icon="i-lucide-heart" @click="toggleFavorite(active)">{{ isFavorite(active.id) ? t("removeFavorite") : t("addFavorite") }}</u-button><u-button variant="outline" color="neutral" :icon="isHidden(active.id) ? 'i-lucide-eye' : 'i-lucide-eye-off'" @click="toggleHidden(active)">{{ isHidden(active.id) ? t("restoreListing") : t("hideListing") }}</u-button><u-button variant="outline" color="neutral" :icon="shareCopied ? 'i-lucide-check' : 'i-lucide-share-2'" @click="shareFlat(active)">{{ shareCopied ? t("shareCopied") : t("share") }}</u-button><a class="modal-footer__primary" :href="active.url" target="_blank" rel="noopener noreferrer">{{ t("open") }} →</a></UiModalFooter></template>
     </SearchDetailsModal>
 
     <teleport to="body"><div v-if="checkingListingKey" class="flat-verification" role="status" aria-live="assertive"><div class="flat-verification__card"><u-icon name="i-lucide-loader-circle" class="flat-verification__icon" /><span>{{ t("checkingListing") }}</span></div></div></teleport>
-
-    <teleport to="body"><div v-if="lightboxPhoto" class="flat-lightbox" role="dialog" aria-modal="true" :aria-label="t('photoViewer')" @click="closeLightbox"><div class="flat-lightbox__stage" @click.stop @pointerdown="onLightboxPointerDown" @pointerup="onLightboxPointerUp" @pointercancel="onLightboxPointerCancel"><img :src="lightboxPhoto" :alt="`${modalTitle(active)} (${lightboxPosition}/${lightboxPhotos.length})`" referrerpolicy="no-referrer" draggable="false" @error="lightboxPhotoFailed" @mousemove="updateLightboxZoom" @mouseleave="resetLightboxZoom" /></div><button v-if="lightboxPhotos.length > 1" type="button" class="flat-lightbox__nav flat-lightbox__nav_left" :aria-label="t('previousPhoto')" @click.stop="moveLightbox(-1)"><u-icon name="i-lucide-chevron-left" /></button><button v-if="lightboxPhotos.length > 1" type="button" class="flat-lightbox__nav flat-lightbox__nav_right" :aria-label="t('nextPhoto')" @click.stop="moveLightbox(1)"><u-icon name="i-lucide-chevron-right" /></button><span v-if="lightboxPhotos.length > 1" class="flat-lightbox__counter">{{ lightboxPosition }} / {{ lightboxPhotos.length }}</span><button type="button" class="flat-lightbox__close" :aria-label="t('closePhoto')" @click.stop="closeLightbox"><u-icon name="i-lucide-x" /></button></div></teleport>
 
     <u-modal v-model:open="presetModalOpen" :title="t('savePreset')"><template #body><u-input v-model="presetName" autofocus :label="t('presetName')" @keyup.enter="savePreset" /></template><template #footer><u-button color="neutral" variant="ghost" @click="presetModalOpen = false">{{ t("cancel") }}</u-button><u-button @click="savePreset">{{ t("save") }}</u-button></template></u-modal>
     <u-modal v-model:open="shareModalOpen" :title="sharedLinkOpened ? t('sharedSearchApplied') : t('shareSearch')"><template #body><p class="flat-share__hint">{{ sharedLinkOpened ? t("sharedSearchHint") : t("shareSearchHint") }}</p><u-input :model-value="shareUrl" readonly /></template><template #footer><u-button icon="i-lucide-copy" @click="copyShareLink">{{ t("copyLink") }}</u-button></template></u-modal>
@@ -932,64 +915,14 @@ onBeforeUnmount(() => { modalOpen.value = false; lightboxIndex.value = null; rel
 .flats__results-toolbar { display: flex; align-items: end; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
 .flats__sort { width: min(310px, 100%); }
 .flats__map-wrap { position: relative; z-index: 0; isolation: isolate; margin-bottom: 18px; scroll-margin-top: 90px; }
-.flats__grid { display: grid; gap: 14px; grid-template-columns: 1fr; align-items: start; }
-@media (min-width: 640px) { .flats__grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-@media (min-width: 1024px) { .flats__grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
-@media (min-width: 1440px) { .flats__grid { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
-.flat-card { position: relative; min-width: 0; height: 100%; border: 1px solid var(--line); border-radius: 12px; overflow: hidden; background: var(--bg-panel); cursor: pointer; transition: transform 140ms ease, border-color 180ms ease, box-shadow 180ms ease; display: flex; flex-direction: column; }
-.flat-card:hover { transform: translateY(-2px); border-color: rgba(224,103,154,0.4); box-shadow: 0 12px 30px rgba(0,0,0,.16); }
-.flat-card_checking { pointer-events: none; }
-.flat-card__checking { position: absolute; z-index: 5; inset: 0; display: grid; place-content: center; justify-items: center; gap: 9px; padding: 18px; background: rgba(7,12,34,.92); color: var(--text-primary); font-size: 12.5px; font-weight: 700; text-align: center; }
-.flat-card__checking-icon { width: 26px; height: 26px; color: var(--accent-pink); animation: flat-card-spin .8s linear infinite; }
 .flat-verification { position: fixed; z-index: 10050; inset: 0; display: grid; place-items: center; padding: 20px; background: rgba(3,7,24,.64); backdrop-filter: blur(4px); }
 .flat-verification__card { display: flex; align-items: center; gap: 12px; max-width: min(420px,100%); padding: 18px 22px; border: 1px solid rgba(224,103,154,.42); border-radius: 14px; background: #0b1129; box-shadow: 0 18px 60px rgba(0,0,0,.45); color: var(--text-primary); font-weight: 700; text-align: center; }
 .flat-verification__icon { flex: 0 0 auto; width: 28px; height: 28px; color: var(--accent-pink); animation: flat-card-spin .8s linear infinite; }
 @keyframes flat-card-spin { to { transform: rotate(360deg); } }
-.flat-card__photo { position: relative; width: 100%; aspect-ratio: 4 / 3; flex: 0 0 auto; overflow: visible; background: var(--bg-panel); }
-.flat-card__photo::after { content: ""; position: absolute; z-index: 1; left: 0; right: 0; bottom: -28px; height: 48%; pointer-events: none; background: linear-gradient(180deg, transparent 0%, rgba(11,16,42,.38) 42%, var(--bg-panel) 92%); }
-.flat-card__photo > img { width: 100%; height: 100%; object-fit: cover; display: block; transition: transform 260ms ease; }
-.flat-card:hover .flat-card__photo > img { transform: scale(1.015); }
-.flat-card__no-photo { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 9px; height: 100%; color: var(--text-muted); font-size: 12px; background: var(--bg-panel-2); }
-.flat-card__no-photo-icon { width: 34px; height: 34px; opacity: 0.48; }
-.flat-card__deal { position: absolute; z-index: 2; top: 9px; left: 9px; max-width: calc(100% - 92px); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; font-weight: 700; line-height: 1; padding: 6px 9px; border: 1px solid rgba(224,103,154,.42); border-radius: 7px; background: #0d1128; color: var(--accent-pink); box-shadow: 0 3px 12px rgba(0,0,0,.2); }
-.flat-card__deal_sale { color: #f58ab5; border-color: rgba(245,138,181,.45); }
-.flat-card__deal_rent { color: #b79cff; border-color: rgba(183,156,255,.42); }
-.flat-card__deal_room { color: #77d9e8; border-color: rgba(119,217,232,.42); }
-.flat-card__deal_short { color: #f4c86a; border-color: rgba(244,200,106,.45); }
-.flat-card__actions { position: absolute; z-index: 3; top: 8px; right: 8px; display: flex; gap: 5px; }
-.flat-card__action { width: 32px; height: 32px; display: inline-grid; place-items: center; padding: 0; border: 1px solid rgba(66,73,116,.86); border-radius: 7px; background: #0d1128; color: #c8cbdb; cursor: pointer; box-shadow: 0 3px 12px rgba(0,0,0,.18); transition: color 150ms ease, border-color 150ms ease, background-color 150ms ease; }
-.flat-card__action :deep(svg) { display: block; margin: auto; }
-.flat-card__action:hover, .flat-card__action_active { color: var(--accent-pink); border-color: rgba(224,103,154,.58); background: rgba(26,29,57,.94); }
-.flat-card__body { position: relative; z-index: 2; min-height: 0; flex: 1 1 auto; padding: 13px 14px 14px; display: flex; flex-direction: column; gap: 5px; }
-.flat-card__price { font-weight: 750; font-size: 18px; line-height: 1.2; color: var(--text-white, inherit); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
-.flat-card__price-conv { font-size: 12px; font-weight: 500; line-height: 1.35; }
-.flat-card__title { margin-top: 2px; font-size: 14.5px; font-weight: 650; line-height: 1.38; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere; }
-.flat-card__spec { font-size: 12.5px; line-height: 1.4; }
-.flat-card__badges { display: flex; flex-wrap: wrap; align-content: flex-start; gap: 5px; margin-top: 5px; max-height: 78px; overflow: hidden; }
-.flat-card__badge { max-width: 100%; font-size: 10.5px; font-weight: 600; line-height: 1.15; padding: 4px 7px; border-radius: 999px; border: 1px solid var(--line); background: rgba(255,255,255,0.05); color: var(--text-primary); white-space: normal; overflow-wrap: anywhere; }
-.flat-card__meta { display: flex; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; gap: 6px 10px; margin-top: auto; padding-top: 8px; border-top: 1px solid rgba(255,255,255,.055); font-size: 11.5px; line-height: 1.35; }
-.flat-card__location { min-width: 0; display: inline-flex; align-items: flex-start; gap: 5px; flex: 1 1 150px; }
-.flat-card__location svg { flex: 0 0 auto; margin-top: 1px; }
-.flat-card__meta-tail { display: inline-flex; gap: 5px; white-space: nowrap; margin-left: auto; }
-.flat-card__src { text-transform: capitalize; opacity: 0.72; }
 .flats__empty { margin-top: 18px; text-align: center; padding: 18px; border-radius: 10px; border: 1px solid var(--line); background: var(--bg-panel); }
 .flats__sentinel { min-height: 44px; display: grid; place-items: center; }
-.flat-card_favorite { border-color: rgba(224,103,154,0.52); }
-.flat-card_hidden { opacity: 0.64; border-style: dashed; }
 .flat-modal { display: flex; flex-direction: column; gap: 12px; }
 .flat-modal__title { display: -webkit-box; overflow: hidden; margin: 0; padding-right: 36px; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow-wrap: anywhere; font-size: 18px; font-weight: 700; line-height: 1.35; }
-.flat-modal__gallery { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 6px; max-height: 46vh; overflow-y: auto; }
-.flat-modal__thumb { width: 100%; aspect-ratio: 4 / 3; object-fit: cover; border-radius: 8px; cursor: zoom-in; border: 1px solid var(--line); transition: border-color 140ms ease; }
-.flat-modal__thumb:hover { border-color: var(--accent-pink); }
-.flat-lightbox { position: fixed; inset: 0; z-index: 5000; display: grid; place-items: center; isolation: isolate; background: #080b1a; padding: clamp(12px, 2vw, 28px); cursor: zoom-out; pointer-events: auto; }
-.flat-lightbox__stage { width: min(82vw, 1200px); height: min(76dvh, 720px); display: flex; align-items: center; justify-content: center; cursor: default; pointer-events: auto; touch-action: pan-y pinch-zoom; user-select: none; -webkit-user-select: none; }
-.flat-lightbox__stage img { -webkit-user-drag: none; display: block; width: auto; height: auto; max-width: 100%; max-height: 100%; object-fit: contain; border-radius: 8px; transform-origin: var(--zoom-x, 50%) var(--zoom-y, 50%); transition: transform 180ms ease; }
-@media (hover: hover) and (pointer: fine) { .flat-lightbox__stage img { cursor: zoom-in; } .flat-lightbox__stage img:hover { transform: scale(1.7); cursor: zoom-out; } }
-.flat-lightbox__nav, .flat-lightbox__close { position: fixed; z-index: 1; display: grid; place-items: center; border: 1px solid #343a62; border-radius: 8px; background: #131730; color: #fff; cursor: pointer; pointer-events: auto; }
-.flat-lightbox__nav { top: 50%; width: 52px; height: 72px; transform: translateY(-50%); font-size: 28px; }
-.flat-lightbox__nav:hover, .flat-lightbox__nav:focus-visible, .flat-lightbox__close:hover, .flat-lightbox__close:focus-visible { border-color: var(--accent-pink); color: var(--accent-pink); }
-.flat-lightbox__nav_left { left: 16px; } .flat-lightbox__nav_right { right: 16px; } .flat-lightbox__close { top: 16px; right: 20px; width: 44px; height: 44px; font-size: 24px; }
-.flat-lightbox__counter { position: fixed; bottom: 18px; left: 50%; z-index: 1; transform: translateX(-50%); padding: 6px 10px; border: 1px solid #343a62; border-radius: 6px; background: #131730; color: var(--text-primary); font: 500 12px/1.2 "JetBrains Mono", monospace; pointer-events: auto; }
 .flat-modal__price { font-weight: 700; font-size: 20px; } .flat-modal__price-conv { font-weight: 500; font-size: 14px; color: var(--text-muted); } .flat-modal__deal { color: #e0679a; font-weight: 500; }
 /* The modal body is a flex column with its own gap, so this table must not add
    margins of its own — stacked margins were what made the spacing between blocks
@@ -1097,10 +1030,6 @@ onBeforeUnmount(() => { modalOpen.value = false; lightboxIndex.value = null; rel
   .flats__filter-blocks :deep(.filter-section:last-child) { padding-bottom: 0; }
   .flats__results-toolbar { align-items: stretch; flex-direction: column; }
   .flats__sort { width: 100%; }
-  .flat-card__photo { aspect-ratio: 16 / 10; }
-  .flat-lightbox__stage { width: 92vw; height: 76vh; }
-  .flat-lightbox__nav { width: 42px; height: 56px; font-size: 22px; }
-  .flat-lightbox__nav_left { left: 8px; } .flat-lightbox__nav_right { right: 8px; } .flat-lightbox__close { top: 10px; right: 10px; }
   .flats__back-top span { display: none; }
   .flats__back-top { right: 14px; bottom: 18px; width: 44px; padding: 0; justify-content: center; }
 }

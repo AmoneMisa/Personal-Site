@@ -1021,35 +1021,6 @@ onBeforeUnmount(() => {
   .jobs-filter-group__grid_location { grid-template-columns: minmax(180px, .8fr) minmax(0, 1.6fr); }
 }
 
-.jobs__grid {
-  display: grid; gap: 14px; grid-template-columns: 1fr; align-items: stretch;
-  grid-auto-rows: 1fr; /* every card the same height across all rows */
-  @media (min-width: 640px) { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  @media (min-width: 1024px) { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-  @media (min-width: 1440px) { grid-template-columns: repeat(4, minmax(0, 1fr)); }
-}
-.job-card__company { font-weight: 600; }
-.job-card__dot { opacity: 0.5; }
-.job-card__badge { white-space: nowrap; border-radius: 6px; padding: 2px 8px; font-size: 11px; line-height: 1.35; color: #34d399; background: rgba(52,211,153,0.14); }
-.job-card__badge_mode { color: #38bdf8; background: rgba(56,189,248,0.14); }
-.job-card__badge_visa { color: #fbbf24; background: rgba(251,191,36,0.14); }
-.job-card__badge_suspicious { color: #f87171; background: rgba(248,113,113,0.14); border-color: rgba(248,113,113,0.35); cursor: help; }
-.job-card__badge_reloc { color: #f472b6; background: rgba(244,114,182,0.14); }
-.job-card__badge_source { color: #c4b5fd; background: rgba(167,139,250,0.14); }
-.job-card__badge_new { color: #6ee7b7; background: rgba(52,211,153,0.14); }
-.job-card__badge_employment { color: #93c5fd; background: rgba(59,130,246,0.13); }
-.job-card__badge_seniority { color: #f9a8d4; background: rgba(236,72,153,0.13); }
-.job-card__badge_management { color: #fcd34d; background: rgba(245,158,11,0.13); }
-.job-card__badge_salary { color: #f0abfc; background: rgba(217,70,239,0.12); }
-.job-card__salary { color: #6ee7b7; font-size: 15px; line-height: 1.3; font-weight: 800; letter-spacing: 0.01em; }
-.job-card__salary_conv { color: #a7f3d0; font-size: 11px; font-weight: 600; opacity: 0.78; }
-.job-card__langs { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: 12px; margin-top: 6px; }
-.job-card__lang-icon { font-size: 14px; opacity: 0.7; }
-.job-card__lang:not(:last-child)::after { content: ","; }
-.job-card__tags { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
-.job-card__tag { border-radius: 6px; padding: 3px 8px; font-size: 11px; line-height: 1.3; border: 1px solid var(--line); color: var(--ui-text-muted); }
-.job-card__tag_skill { border-color: rgba(224, 103, 154,0.3); color: #e79ec0; }
-.job-card__tag_plus { border-color: rgba(52,211,153,0.35); color: #6ee7b7; }
 .jobs__empty { margin-top: 18px; text-align: center; padding: 18px; border-radius: 10px; border: 1px solid var(--line); background: var(--bg-panel); }
 .jobs__load-more {
   min-height: 76px; display: flex; flex-direction: column; align-items: center;

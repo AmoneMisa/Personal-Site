@@ -873,11 +873,6 @@ onBeforeUnmount(() => {
 .hiring__error { color: var(--ui-error, #f87171); }
 .hiring__source-warning { color: #f6c177; font-size: 13px; margin-bottom: 12px; }
 .hiring__warming { font-size: 13px; margin-bottom: 12px; }
-.hiring__grid { display: grid; gap: 14px; grid-template-columns: 1fr; grid-auto-rows: 1fr; align-items: stretch; }
-@media (min-width: 640px) { .hiring__grid { grid-template-columns: repeat(2, 1fr); } }
-@media (min-width: 1024px) { .hiring__grid { grid-template-columns: repeat(3, 1fr); } }
-@media (min-width: 1180px) { .hiring__grid.hiring__grid_dense { grid-template-columns: repeat(4, 1fr); } }
-@media (min-width: 1600px) { .hiring__grid { grid-template-columns: repeat(4, 1fr); } }
 .hiring__empty { margin-top: 18px; text-align: center; padding: 18px; border-radius: 10px; border: 1px solid var(--line); background: var(--bg-panel); }
 .hiring__sentinel { min-height: 44px; display: grid; place-items: center; }
 .hiring-modal { display: flex; flex-direction: column; gap: 12px; }
