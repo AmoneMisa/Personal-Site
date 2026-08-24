@@ -804,6 +804,12 @@ onBeforeUnmount(() => {
 
 <template>
   <u-container class="hiring">
+    <decorative-easter-egg
+      class="hiring__easter-egg"
+      src="/images/easter-eggs/hiring-resume.png"
+      :width="320"
+      :height="175"
+    />
     <div class="hiring__header text-center space-y-3">
       <h1 class="hiring__title">{{ t("title") }}</h1>
       <p class="hiring__subtitle text-muted mx-auto">{{ t("subtitle") }}</p>
@@ -1012,7 +1018,12 @@ onBeforeUnmount(() => {
 </template>
 
 <style scoped>
-.hiring { padding-top: 24px; padding-bottom: 96px; }
+.hiring { position: relative; isolation: isolate; overflow: hidden; padding-top: 24px; padding-bottom: 96px; }
+.hiring__header { position: relative; z-index: 1; }
+.hiring__easter-egg {
+  position: absolute; top: 4px; right: -24px; z-index: 0;
+  width: 270px; opacity: 0.18;
+}
 .hiring__title { font-size: 32px; font-weight: 600; }
 .hiring__subtitle { max-width: 720px; font-size: 14px; }
 .hiring__controls { margin: 20px 0 20px; display: grid; gap: 12px; grid-template-columns: minmax(0, 1fr) minmax(220px, 280px) auto; align-items: start; }
@@ -1127,5 +1138,8 @@ onBeforeUnmount(() => {
   .hiring__views { padding-left: 0; border-left: 0; }
   .hiring__age-range, .hiring__salary-range { grid-template-columns: 1fr 1fr; }
   .hiring-card { height: 184px; }
+}
+@media (max-width: 1100px) {
+  .hiring__easter-egg { display: none; }
 }
 </style>
