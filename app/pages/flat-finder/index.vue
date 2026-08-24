@@ -139,6 +139,7 @@ const dealType = ref("any");
 const agency = ref("any");
 const petFriendly = ref(false);
 const roomOnlyFilter = ref(false);
+const onlyWithPhotos = ref(false);
 const childrenRequired = ref(false);
 const newBuildingOnly = ref(false);
 const dishwasherOnly = ref(false);
@@ -336,7 +337,8 @@ const propertyTypeItems = computed<Item[]>(() => [
 ]);
 const dealTypeItems = computed<Item[]>(() => [
   { label: t("dtAny"), value: "any" }, { label: t("dtSale"), value: "sale" },
-  { label: t("dtLongRent"), value: "longRent" }, { label: t("dtShortRent"), value: "shortRent" },
+  { label: t("dtLongRent"), value: "longRent" }, { label: t("dtRoomRent"), value: "roomRent" },
+  { label: t("dtShortRent"), value: "shortRent" },
 ]);
 const agencyItems = computed<Item[]>(() => [
   { label: t("agAny"), value: "any" }, { label: t("agOwner"), value: "owner" }, { label: t("agAgency"), value: "agency" },
@@ -374,7 +376,9 @@ function applyDrawnArea(items: Listing[]) {
   if (!items.some((item) => item.lat != null && item.lng != null)) return items;
   return items.filter((item) => item.lat != null && item.lng != null && pointInPolygon({ lat: item.lat, lng: item.lng }, drawnArea.value));
 }
-const activeListings = computed(() => applyDrawnArea(listings.value.filter((item) => !hiddenIds.value.has(item.id))));
+const activeListings = computed(() => applyDrawnArea(listings.value.filter((item) => (
+  !hiddenIds.value.has(item.id) && (!onlyWithPhotos.value || !!listingPhoto(item))
+))));
 const displayedListings = computed(() => {
   if (view.value === "favorites") return applyDrawnArea(favorites.value);
   if (view.value === "recent") return applyDrawnArea(recent.value);
@@ -395,6 +399,7 @@ function currentFilterQuery(): Record<string, string> {
   if (audience.value !== "any") q.audience = audience.value;
   if (petFriendly.value) q.pets = "1";
   if (roomOnlyFilter.value) q.roomOnly = "1";
+  if (onlyWithPhotos.value) q.withPhotos = "1";
   if (childrenRequired.value) q.children = "1";
   if (newBuildingOnly.value) q.newBuilding = "1";
   if (dishwasherOnly.value) q.dishwasher = "1";
@@ -437,12 +442,13 @@ function applyQueryParams(params: Record<string, unknown>) {
   city.value = queryString(params.city);
   district.value = queryString(params.district);
   propertyType.value = ["flat", "house"].includes(queryString(params.propertyType)) ? queryString(params.propertyType) : "any";
-  dealType.value = ["sale", "longRent", "shortRent"].includes(queryString(params.dealType)) ? queryString(params.dealType) : "any";
+  dealType.value = ["sale", "longRent", "roomRent", "shortRent"].includes(queryString(params.dealType)) ? queryString(params.dealType) : "any";
   agency.value = ["owner", "agency"].includes(queryString(params.agency)) ? queryString(params.agency) : "any";
   audience.value = ["women", "men", "family"].includes(queryString(params.audience)) ? queryString(params.audience) : "any";
   metro.value = queryString(params.metro);
   petFriendly.value = queryBoolean(params.pets);
   roomOnlyFilter.value = queryBoolean(params.roomOnly);
+  onlyWithPhotos.value = queryBoolean(params.withPhotos);
   childrenRequired.value = queryBoolean(params.children);
   newBuildingOnly.value = queryBoolean(params.newBuilding);
   dishwasherOnly.value = queryBoolean(params.dishwasher);
@@ -533,7 +539,7 @@ async function load(append = false, background = false) {
   if (city.value) params.city = city.value;
   if (district.value) params.district = district.value;
   if (propertyType.value !== "any") params.propertyType = propertyType.value;
-  if (dealType.value !== "any") params.dealType = dealType.value;
+  if (dealType.value !== "any") params.dealType = dealType.value === "roomRent" ? "longRent" : dealType.value;
   if (agency.value !== "any") params.agency = agency.value;
   if (priceMin.value != null) params.priceMin = String(priceMin.value);
   if (priceMax.value != null) params.priceMax = String(priceMax.value);
@@ -559,7 +565,7 @@ async function load(append = false, background = false) {
   if (metro.value) params.metro = metro.value;
   if (audience.value !== "any") params.audience = audience.value;
   if (petFriendly.value) params.pets = "1";
-  if (roomOnlyFilter.value) params.roomOnly = "1";
+  if (roomOnlyFilter.value || dealType.value === "roomRent") params.roomOnly = "1";
   if (childrenRequired.value) params.children = "1";
   if (newBuildingOnly.value) params.newBuilding = "1";
   if (dishwasherOnly.value) params.dishwasher = "1";
@@ -610,7 +616,7 @@ function resetFilters() {
   // Empty means "every country", so reset keeps the regional starting country.
   countries.value = [defaultCountry.value];
   city.value = ""; district.value = ""; metro.value = ""; propertyType.value = "any"; dealType.value = "any"; agency.value = "any"; audience.value = "any";
-  petFriendly.value = false; roomOnlyFilter.value = false; childrenRequired.value = false; newBuildingOnly.value = false;
+  petFriendly.value = false; roomOnlyFilter.value = false; onlyWithPhotos.value = false; childrenRequired.value = false; newBuildingOnly.value = false;
   dishwasherOnly.value = false; airConditionerOnly.value = false; parkingOnly.value = false; internetOnly.value = false; gasOnly.value = false; balconyOnly.value = false; terraceOnly.value = false; privateYardOnly.value = false; sort.value = "newest";
   priceMin.value = undefined; priceMax.value = undefined; displayCurrency.value = "USD";
   roomsMin.value = undefined; roomsMax.value = undefined; bedroomsMin.value = undefined; bedroomsMax.value = undefined; areaMin.value = undefined; areaMax.value = undefined; pricePerSqmMin.value = undefined; pricePerSqmMax.value = undefined;
@@ -741,6 +747,7 @@ async function openListing(l: Listing, olxAlreadyVerified = false) {
   if (l.source === "olx" && !olxAlreadyVerified) {
     if (checkingListingKey.value) return;
     checkingListingKey.value = key;
+    await nextTick();
     try {
       const verified = await verifyOlxListing(l);
       if (verified === null) {
@@ -864,7 +871,7 @@ function cardDealTone(l: Listing): "sale" | "rent" | "room" | "short" | "" {
 function cardDealLabel(l: Listing): string {
   const filterApplies = view.value === "active";
   if (l.dealType === "shortRent") return !filterApplies || dealType.value !== "shortRent" ? t("cardShortRent") : "";
-  if (l.roomOnly) return !filterApplies || !roomOnlyFilter.value ? t("roomShare") : "";
+  if (l.roomOnly) return !filterApplies || (!roomOnlyFilter.value && dealType.value !== "roomRent") ? t("roomShare") : "";
   if (!filterApplies || dealType.value === "any") {
     if (l.dealType === "longRent") return t("cardRent");
     return dealLabel(l.dealType);
@@ -1054,6 +1061,7 @@ onBeforeUnmount(() => { modalOpen.value = false; lightboxIndex.value = null; rel
             <u-button type="button" :variant="petFriendly ? 'solid' : 'outline'" color="neutral" icon="i-lucide-paw-print" @click="petFriendly = !petFriendly; scheduleLoad()">{{ t('pets') }}</u-button>
             <u-button type="button" :variant="childrenRequired ? 'solid' : 'outline'" color="neutral" icon="i-lucide-baby" @click="childrenRequired = !childrenRequired; scheduleLoad()">{{ t('children') }}</u-button>
             <u-button type="button" :variant="roomOnlyFilter ? 'solid' : 'outline'" color="neutral" icon="i-lucide-bed-single" @click="roomOnlyFilter = !roomOnlyFilter; scheduleLoad()">{{ t('roomOnly') }}</u-button>
+            <u-button type="button" :variant="onlyWithPhotos ? 'solid' : 'outline'" color="neutral" icon="i-lucide-images" @click="onlyWithPhotos = !onlyWithPhotos; scheduleLoad()">{{ t('onlyWithPhotos') }}</u-button>
             <u-button type="button" :variant="newBuildingOnly ? 'solid' : 'outline'" color="neutral" icon="i-lucide-building-2" @click="newBuildingOnly = !newBuildingOnly; scheduleLoad()">{{ t('newBuilding') }}</u-button>
           </div></div>
           <div class="filter-group"><h3><u-icon name="i-lucide-map-pin" /> {{ t('groupLocation') }}</h3>
@@ -1087,7 +1095,7 @@ onBeforeUnmount(() => { modalOpen.value = false; lightboxIndex.value = null; rel
     <p v-if="failed" class="flats__error">{{ t("error") }}</p>
     <p v-else-if="source === 'telegram' && !loading && !listings.length && sourceErrors?.some((item) => item.source === 'telegram')" class="flats__source-warning">{{ t("telegramUnavailable") }}</p>
     <div v-else class="flats__results-toolbar">
-      <p class="flats__count text-muted">{{ t("found", { n: view === 'active' ? total : displayedListings.length }) }}</p>
+      <p class="flats__count text-muted">{{ t("found", { n: view === 'active' && !onlyWithPhotos ? total : displayedListings.length }) }}</p>
       <label class="flats__sort"><span class="flats__field-label">{{ extraLabels.sort }}</span><u-select-menu v-model="sort" :items="sortItems" value-key="value" label-key="label" :search-input="false" class="flats__select" @update:model-value="scheduleLoad(0)" /></label>
     </div>
 <section v-if="listings.length" class="flats__map-wrap"><flat-map :points="mapPoints" :draw-label="t('drawArea')" :done-label="t('done')" :clear-label="t('clearArea')" :draw-hint="t('drawHint')" :expand-label="t('mapExpand')" :collapse-label="t('mapCollapse')" @select="openById" @area-change="drawnArea = $event" /></section>
@@ -1127,6 +1135,8 @@ onBeforeUnmount(() => { modalOpen.value = false; lightboxIndex.value = null; rel
       <template #body><div v-if="active" class="flat-modal"><div v-if="visiblePhotos(active).length" class="flat-modal__gallery"><img v-for="(p, i) in visiblePhotos(active)" :key="p" :src="p" :alt="`${modalTitle(active)} (${i + 1})`" class="flat-modal__thumb" loading="lazy" decoding="async" referrerpolicy="no-referrer" @error="markPhotoFailedFromEvent" @click="openLightbox(i)" /></div><div class="flat-modal__price">{{ priceLabel(active) }}<span v-if="convertedLabel(active)" class="flat-modal__price-conv"> ({{ convertedLabel(active) }})</span><span v-if="dealLabel(active.dealType)" class="flat-modal__deal"> · {{ dealLabel(active.dealType) }}</span><span v-if="active.roomOnly" class="flat-modal__deal"> · {{ t("roomShare") }}</span></div><UiSpecTable :rows="specRows" :hide-empty-label="t('hideEmpty')" :empty-value="t('notSpecified')" /><div v-if="active.description && descriptionNeedsTranslation" class="flat-modal__translation"><u-button type="button" variant="outline" color="neutral" size="sm" icon="i-lucide-languages" :loading="translatingDescription" @click="translateActiveDescription">{{ translatingDescription ? t("translatingDescription") : t("translateDescription") }}</u-button><span v-if="translationFailed" class="flat-modal__translation-error">{{ t("translationFailed") }}</span></div><section v-if="translatedDescription" class="flat-modal__translated"><h4 class="flat-modal__translated-title">{{ t("translatedDescription") }}</h4><p class="flat-modal__desc">{{ translatedDescription }}</p></section><details v-if="active.description" class="flat-modal__descbox"><summary>{{ t("origDescription") }}</summary><p class="flat-modal__desc">{{ active.description }}</p></details><div v-if="active.tags && active.tags.length" class="flat-modal__tags"><span v-for="tag in active.tags" :key="tag" class="flat-modal__tag">{{ nearbyItemLabel(tag) }}</span></div></div></template>
       <template #footer><UiModalFooter v-if="active"><u-button variant="outline" color="neutral" icon="i-lucide-heart" @click="toggleFavorite(active)">{{ isFavorite(active.id) ? t("removeFavorite") : t("addFavorite") }}</u-button><u-button variant="outline" color="neutral" :icon="isHidden(active.id) ? 'i-lucide-eye' : 'i-lucide-eye-off'" @click="toggleHidden(active)">{{ isHidden(active.id) ? t("restoreListing") : t("hideListing") }}</u-button><u-button variant="outline" color="neutral" :icon="shareCopied ? 'i-lucide-check' : 'i-lucide-share-2'" @click="shareFlat(active)">{{ shareCopied ? t("shareCopied") : t("share") }}</u-button><a class="modal-footer__primary" :href="active.url" target="_blank" rel="noopener noreferrer">{{ t("open") }} →</a></UiModalFooter></template>
     </u-modal>
+
+    <teleport to="body"><div v-if="checkingListingKey" class="flat-verification" role="status" aria-live="assertive"><div class="flat-verification__card"><u-icon name="i-lucide-loader-circle" class="flat-verification__icon" /><span>{{ t("checkingListing") }}</span></div></div></teleport>
 
     <teleport to="body"><div v-if="lightboxPhoto" class="flat-lightbox" role="dialog" aria-modal="true" :aria-label="t('photoViewer')" @click="closeLightbox"><div class="flat-lightbox__stage" @click.stop @pointerdown="onLightboxPointerDown" @pointerup="onLightboxPointerUp" @pointercancel="onLightboxPointerCancel"><img :src="lightboxPhoto" :alt="`${modalTitle(active)} (${lightboxPosition}/${lightboxPhotos.length})`" referrerpolicy="no-referrer" draggable="false" @error="lightboxPhotoFailed" @mousemove="updateLightboxZoom" @mouseleave="resetLightboxZoom" /></div><button v-if="lightboxPhotos.length > 1" type="button" class="flat-lightbox__nav flat-lightbox__nav_left" :aria-label="t('previousPhoto')" @click.stop="moveLightbox(-1)"><u-icon name="i-lucide-chevron-left" /></button><button v-if="lightboxPhotos.length > 1" type="button" class="flat-lightbox__nav flat-lightbox__nav_right" :aria-label="t('nextPhoto')" @click.stop="moveLightbox(1)"><u-icon name="i-lucide-chevron-right" /></button><span v-if="lightboxPhotos.length > 1" class="flat-lightbox__counter">{{ lightboxPosition }} / {{ lightboxPhotos.length }}</span><button type="button" class="flat-lightbox__close" :aria-label="t('closePhoto')" @click.stop="closeLightbox"><u-icon name="i-lucide-x" /></button></div></teleport>
 
@@ -1185,6 +1195,9 @@ onBeforeUnmount(() => { modalOpen.value = false; lightboxIndex.value = null; rel
 .flat-card_checking { pointer-events: none; }
 .flat-card__checking { position: absolute; z-index: 5; inset: 0; display: grid; place-content: center; justify-items: center; gap: 9px; padding: 18px; background: rgba(7,12,34,.92); color: var(--text-primary); font-size: 12.5px; font-weight: 700; text-align: center; }
 .flat-card__checking-icon { width: 26px; height: 26px; color: var(--accent-pink); animation: flat-card-spin .8s linear infinite; }
+.flat-verification { position: fixed; z-index: 10050; inset: 0; display: grid; place-items: center; padding: 20px; background: rgba(3,7,24,.64); backdrop-filter: blur(4px); }
+.flat-verification__card { display: flex; align-items: center; gap: 12px; max-width: min(420px,100%); padding: 18px 22px; border: 1px solid rgba(224,103,154,.42); border-radius: 14px; background: #0b1129; box-shadow: 0 18px 60px rgba(0,0,0,.45); color: var(--text-primary); font-weight: 700; text-align: center; }
+.flat-verification__icon { flex: 0 0 auto; width: 28px; height: 28px; color: var(--accent-pink); animation: flat-card-spin .8s linear infinite; }
 @keyframes flat-card-spin { to { transform: rotate(360deg); } }
 .flat-card__photo { position: relative; width: 100%; aspect-ratio: 4 / 3; flex: 0 0 auto; overflow: hidden; background: var(--bg-panel); }
 .flat-card__photo::after { content: ""; position: absolute; inset: 0; pointer-events: none; background: linear-gradient(180deg, rgba(8,11,26,.16) 0%, transparent 28%, transparent 76%, rgba(8,11,26,.18) 100%); }

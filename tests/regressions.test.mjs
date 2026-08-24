@@ -107,6 +107,17 @@ test('OLX listing verification exposes a localized in-card loader', () => {
   assert.ok(en.flats.checkingListing)
 })
 
+test('flat finder exposes photo-only and room-rent filters', () => {
+  const flat = readFileSync(new URL('../app/pages/flat-finder/index.vue', import.meta.url), 'utf8')
+  const ru = JSON.parse(readFileSync(new URL('../i18n/locales/ru.json', import.meta.url), 'utf8'))
+  const en = JSON.parse(readFileSync(new URL('../i18n/locales/en.json', import.meta.url), 'utf8'))
+  assert.match(flat, /const onlyWithPhotos = ref\(false\)/u)
+  assert.match(flat, /value: "roomRent"/u)
+  assert.match(flat, /class="flat-verification"/u)
+  assert.ok(ru.flats.onlyWithPhotos && ru.flats.dtRoomRent)
+  assert.ok(en.flats.onlyWithPhotos && en.flats.dtRoomRent)
+})
+
 test('country quiz result cards use a responsive four-column grid', () => {
   const quiz = readFileSync(new URL('../app/pages/quizzes/country-fit/index.vue', import.meta.url), 'utf8')
   assert.match(quiz, /@media \(min-width: 1180px\)[\s\S]*?repeat\(4, minmax\(0, 1fr\)\)/u)
