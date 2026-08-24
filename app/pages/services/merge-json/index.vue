@@ -4,7 +4,7 @@ import FileInput from "~/components/common/FileInput.vue";
 import CustomCheckbox from "~/components/common/CustomCheckbox.vue";
 import CustomInput from "~/components/common/CustomInput.vue";
 import AddKeyModal from "~/components/mergeJson/AddKeyModal.vue";
-import MonacoJsonView from "~/components/mergeJson/MonacoJsonView.client.vue";
+import MergeJsonPane from "~/components/mergeJson/MergeJsonPane.vue";
 import {useMergeJsonState} from "~/composables/mergeJson/useMergeJsonState";
 
 const {t} = useI18n();
@@ -227,85 +227,45 @@ function onDownload() {
       </div>
 
       <div class="merge__triple">
-        <div class="merge__pane">
-          <div class="merge__pane-head">
-            <div class="merge__pane-title">{{ t("services.mergeJson.table.colA") }}</div>
-            <div class="merge__pane-sub" v-if="ui.selectedKey">
-              <span class="merge__sel">{{ ui.selectedKey }}</span>
-            </div>
-          </div>
+        <merge-json-pane
+            :title="t('services.mergeJson.table.colA')"
+            :mode="monacoMode"
+            :text="ui.viewTextA"
+            :selected-key="ui.selectedKey"
+            :hidden-keys="ui.hiddenKeysA"
+            :decorations="ui.decorationsA"
+            :reveal-path="ui.revealKey"
+            @nav="ui.jumpToMatch"
+            @select="ui.selectKey"
+        />
 
-          <div class="merge__pane-body">
-            <ClientOnly>
-              <monaco-json-view
-                  :mode="monacoMode"
-                  :text="ui.viewTextA"
-                  :selected-key="ui.selectedKey"
-                  :hidden-keys="ui.hiddenKeysA"
-                  :decorations="ui.decorationsA"
-                  :reveal-path="ui.revealKey"
-                  @nav="ui.jumpToMatch"
-                  readonly
-                  @select="ui.selectKey"
-              />
-            </ClientOnly>
-          </div>
-        </div>
+        <merge-json-pane
+            center
+            :title="t('services.mergeJson.table.colResult')"
+            :mode="monacoMode"
+            :model-value="ui.viewMode === 'flat' ? ui.resultTextFlat : ui.resultTextJson"
+            :selected-key="ui.selectedKey"
+            :hidden-keys="ui.hiddenKeysR"
+            :decorations="ui.decorationsR"
+            :reveal-path="ui.revealKey"
+            :readonly="false"
+            :error="ui.errorR"
+            @nav="ui.jumpToMatch"
+            @update:modelValue="ui.viewMode === 'flat' ? ui.onResultFlatChange($event) : ui.onResultJsonChange($event)"
+            @select="ui.selectKey"
+        />
 
-        <div class="merge__pane merge__pane_center">
-          <div class="merge__pane-head">
-            <div class="merge__pane-title">{{ t("services.mergeJson.table.colResult") }}</div>
-            <div class="merge__pane-sub" v-if="ui.selectedKey">
-              <span class="merge__sel">{{ ui.selectedKey }}</span>
-            </div>
-          </div>
-
-          <div class="merge__pane-body">
-            <ClientOnly>
-              <monaco-json-view
-                  :mode="monacoMode"
-                  :model-value="ui.viewMode === 'flat' ? ui.resultTextFlat : ui.resultTextJson"
-                  :selected-key="ui.selectedKey"
-                  :hidden-keys="ui.hiddenKeysR"
-                  :decorations="ui.decorationsR"
-                  :reveal-path="ui.revealKey"
-                  @nav="ui.jumpToMatch"
-                  :readonly="false"
-                  @update:modelValue="
-                  (v) => (ui.viewMode === 'flat' ? ui.onResultFlatChange(v) : ui.onResultJsonChange(v))
-                "
-                  @select="ui.selectKey"
-              />
-            </ClientOnly>
-
-            <div v-if="ui.errorR" class="merge__err">{{ ui.errorR }}</div>
-          </div>
-        </div>
-
-        <div class="merge__pane">
-          <div class="merge__pane-head">
-            <div class="merge__pane-title">{{ t("services.mergeJson.table.colB") }}</div>
-            <div class="merge__pane-sub" v-if="ui.selectedKey">
-              <span class="merge__sel">{{ ui.selectedKey }}</span>
-            </div>
-          </div>
-
-          <div class="merge__pane-body">
-            <ClientOnly>
-              <monaco-json-view
-                  :mode="monacoMode"
-                  :text="ui.viewTextB"
-                  :selected-key="ui.selectedKey"
-                  :hidden-keys="ui.hiddenKeysB"
-                  :decorations="ui.decorationsB"
-                  :reveal-path="ui.revealKey"
-                  @nav="ui.jumpToMatch"
-                  readonly
-                  @select="ui.selectKey"
-              />
-            </ClientOnly>
-          </div>
-        </div>
+        <merge-json-pane
+            :title="t('services.mergeJson.table.colB')"
+            :mode="monacoMode"
+            :text="ui.viewTextB"
+            :selected-key="ui.selectedKey"
+            :hidden-keys="ui.hiddenKeysB"
+            :decorations="ui.decorationsB"
+            :reveal-path="ui.revealKey"
+            @nav="ui.jumpToMatch"
+            @select="ui.selectKey"
+        />
       </div>
     </section>
 
@@ -414,70 +374,9 @@ function onDownload() {
   min-width: 0;
 }
 
-.merge__pane {
-  border-radius: 10px;
-  border: 1px solid var(--line);
-  background: rgba(0, 0, 0, 0.12);
-  padding: 10px;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-}
-
-.merge__pane_center {
-  box-shadow: 0 0 0 1px rgba(224, 103, 154, 0.18) inset;
-}
-
-.merge__pane-head {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 10px;
-  margin-bottom: 8px;
-}
-
-.merge__pane-title {
-  font-weight: 600;
-  font-size: 12px;
-  color: var(--ui-text-muted);
-}
-
-.merge__pane-sub {
-  font-size: 12px;
-  font-weight: 600;
-  opacity: 0.75;
-  min-width: 0;
-}
-
-.merge__sel {
-  display: inline-block;
-  max-width: 100%;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.merge__pane-body {
-  min-height: 420px;
-  height: 420px;
-}
-
-.merge__err {
-  margin-top: 10px;
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--color-error);
-  opacity: 0.95;
-}
-
 @media (max-width: 1100px) {
   .merge__triple {
     grid-template-columns: 1fr;
-  }
-
-  .merge__pane-body {
-    min-height: 360px;
-    height: 360px;
   }
 
   .merge__search {

@@ -19,14 +19,12 @@ import {parseFlatTextToTree, toFlatText} from "~/utils/mergeJson/flat";
 import RenameModal from "~/components/mergeJson/RenameModal.vue";
 import DeleteBlockModal from "~/components/mergeJson/DeleteBlockModal.vue";
 import {downloadBlob} from "~/utils/files";
+import type {MergeJsonDecoration} from "~/types/mergeJson";
 
 export type SortMode = "asc" | "desc";
 export type ViewMode = "json" | "tree" | "flat";
 export type Pane = "A" | "B" | "R";
 export type Pick = "AUTO" | "A" | "B" | "EDITED" | "ADDED";
-
-type DecoKind = "new" | "conflict" | "added" | "edited" | "find";
-type Deco = { path: string; kind: DecoKind };
 
 export function useMergeJsonState() {
     const viewMode = ref<ViewMode>("json");
@@ -375,8 +373,8 @@ export function useMergeJsonState() {
         return JSON.stringify(a) !== JSON.stringify(b);
     }
 
-    function decoForPane(pane: Pane): Deco[] {
-        const out: Deco[] = [];
+    function decoForPane(pane: Pane): MergeJsonDecoration[] {
+        const out: MergeJsonDecoration[] = [];
         const keys = allLeafKeys.value;
 
         const q = query.value.trim();

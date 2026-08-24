@@ -2,18 +2,15 @@
 import type {editor as E} from "monaco-editor";
 import {parseTree} from "jsonc-parser";
 import {buildJsonIndex} from "~/utils/mergeJson/monacoIndex";
-
-type ViewMode = "json" | "flat";
-type DecoKind = "new" | "conflict" | "added" | "edited" | "find";
-type Deco = { path: string; kind: DecoKind };
+import type {MergeJsonDecoration, MergeJsonDecorationKind, MergeJsonEditorMode} from "~/types/mergeJson";
 
 type Props = {
   modelValue?: string;
   text?: string;
-  mode: ViewMode;
+  mode: MergeJsonEditorMode;
   selectedKey?: string;
   hiddenKeys?: string[];
-  decorations?: Deco[];
+  decorations?: MergeJsonDecoration[];
   revealPath?: string | null;
   readonly?: boolean;
 };
@@ -29,7 +26,7 @@ const props = withDefaults(defineProps<Props>(), {
 });
 let index = buildJsonIndex(currentText() || "{}");
 
-function classFor(k: DecoKind) {
+function classFor(k: MergeJsonDecorationKind) {
   if (k === "new") return "jm__hl_new";
   if (k === "conflict") return "jm__hl_conflict";
   if (k === "added") return "jm__hl_added";
