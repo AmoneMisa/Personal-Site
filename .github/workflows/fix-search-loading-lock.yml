@@ -21,15 +21,11 @@ jobs:
         shell: bash
         run: |
           python3 <<'PY'
+          import re
           from pathlib import Path
 
-          def replace_once(text: str, old: str, new: str, label: str) -> str:
-              count = text.count(old)
-              if count != 1:
-                  raise SystemExit(f"{label}: expected exactly one match, got {count}")
-              return text.replace(old, new, 1)
-
-          # Shared component: one overlay owns the whole interactive surface.
+          # Shared component: inert is the real interaction lock; aria-disabled
+          # exposes the state; the overlay must also sit above all local controls.
           path = Path('app/components/ui/ResultsLoader.vue')
           text = path.read_text()
           text = text.replace(
@@ -37,110 +33,70 @@ jobs:
               '<div class="results-loader__content" :inert="loading || undefined" :aria-disabled="loading || undefined">',
           )
           text = text.replace('  z-index: 50;\n', '  z-index: 1000;\n')
-          text = text.replace('  pointer-events: auto;\n}\n\n.results-loader__spinner', '  pointer-events: auto;\n  cursor: wait;\n}\n\n.results-loader__spinner')
+          if '  cursor: wait;\n' not in text:
+              text = text.replace('  pointer-events: auto;\n}\n\n.results-loader__spinner', '  pointer-events: auto;\n  cursor: wait;\n}\n\n.results-loader__spinner')
           path.write_text(text)
 
-          # Jobs: loader starts before ATS and ends after pagination. This makes ATS,
-          # all filters, stats, recently viewed and cards inert as one unit.
+          def strip_loader(text: str) -> str:
+              text = re.sub(r'\n?\s*<UiResultsLoader\b[^>]*>\s*\n?', '\n', text)
+              text = re.sub(r'\n?\s*</UiResultsLoader>\s*\n?', '\n', text)
+              return text
+
+          def remove_button_loading(text: str) -> str:
+              text = text.replace(' :loading="loading" icon="i-lucide-search"', ' icon="i-lucide-search"')
+              text = text.replace('{{ loading ? t("searching") : t("search") }}', '{{ t("search") }}')
+              return text
+
+          # Jobs: ATS + all filters + stats + recently viewed + cards + pagination.
           path = Path('app/pages/jobs/index.vue')
-          text = path.read_text()
-          text = replace_once(
-              text,
-              '    <!-- ATS CV panel -->\n',
-              '    <UiResultsLoader :loading="loading && savedView === \'active\'" :label="t(\'searching\')" min-height="420px">\n    <!-- ATS CV panel -->\n',
-              'jobs loader start',
-          )
-          text = replace_once(
-              text,
-              '    <UiResultsLoader :loading="loading && savedView === \'active\'" :label="t(\'searching\')" min-height="210px">\n    <!-- Recently viewed (last up to 4) -->\n',
-              '    <!-- Recently viewed (last up to 4) -->\n',
-              'jobs nested loader start',
-          )
-          text = replace_once(
-              text,
-              '     </div>\n    </UiResultsLoader>\n\n    <div v-if="!loading && !(warming && savedView === \'active\') && !displayedJobs.length && !failed" class="jobs__empty">',
-              '     </div>\n\n    <div v-if="!loading && !(warming && savedView === \'active\') && !displayedJobs.length && !failed" class="jobs__empty">',
-              'jobs nested loader end',
-          )
-          text = replace_once(
-              text,
-              '      </span>\n    </div>\n\n    <!-- Full vacancy popup -->',
-              '      </span>\n    </div>\n    </UiResultsLoader>\n\n    <!-- Full vacancy popup -->',
-              'jobs loader end',
-          )
-          text = text.replace('        <u-button type="submit" :loading="loading" icon="i-lucide-search">\n          {{ loading ? t("searching") : t("search") }}\n        </u-button>',
-                              '        <u-button type="submit" icon="i-lucide-search">\n          {{ t("search") }}\n        </u-button>')
+          text = strip_loader(path.read_text())
+          marker = '    <!-- ATS CV panel -->'
+          if text.count(marker) != 1:
+              raise SystemExit('jobs: ATS marker mismatch')
+          text = text.replace(marker, '    <UiResultsLoader :loading="loading && savedView === \'active\'" :label="t(\'searching\')" min-height="420px">\n' + marker, 1)
+          marker = '    <!-- Full vacancy popup -->'
+          if text.count(marker) != 1:
+              raise SystemExit('jobs: modal marker mismatch')
+          text = text.replace(marker, '    </UiResultsLoader>\n\n' + marker, 1)
+          text = remove_button_loading(text)
           path.write_text(text)
 
-          # Flat Finder: wrap filters, toolbar, map, cards, pagination and empty state.
+          # Flat Finder: filters through empty state. Modal/lightbox stay outside.
           path = Path('app/pages/flat-finder/index.vue')
-          text = path.read_text()
-          text = replace_once(
-              text,
-              '    <form ref="filtersEl" class="flats__controls flats__controls_redesign" @submit.prevent="load()">\n',
-              '    <UiResultsLoader :loading="loading" :label="t(\'searching\')" min-height="420px">\n    <form ref="filtersEl" class="flats__controls flats__controls_redesign" @submit.prevent="load()">\n',
-              'flat loader start',
-          )
-          text = replace_once(
-              text,
-              '    <UiResultsLoader :loading="loading" :label="t(\'searching\')" min-height="220px">\n    <section v-if="listings.length" class="flats__map-wrap">',
-              '    <section v-if="listings.length" class="flats__map-wrap">',
-              'flat nested loader start',
-          )
-          text = replace_once(
-              text,
-              '    </div>\n    </UiResultsLoader>\n\n    <div ref="loadMoreSentinel" v-if="hasMore" class="flats__sentinel">',
-              '    </div>\n\n    <div ref="loadMoreSentinel" v-if="hasMore" class="flats__sentinel">',
-              'flat nested loader end',
-          )
-          text = replace_once(
-              text,
-              '    <div v-if="!loading && !displayedListings.length && !failed" class="flats__empty"><div class="text-muted">{{ t("empty") }}</div><div v-if="drawnArea.length >= 3 && listings.length" class="text-muted">{{ t("emptyArea") }}</div></div>\n\n    <u-modal v-model:open="modalOpen"',
-              '    <div v-if="!loading && !displayedListings.length && !failed" class="flats__empty"><div class="text-muted">{{ t("empty") }}</div><div v-if="drawnArea.length >= 3 && listings.length" class="text-muted">{{ t("emptyArea") }}</div></div>\n    </UiResultsLoader>\n\n    <u-modal v-model:open="modalOpen"',
-              'flat loader end',
-          )
-          text = text.replace('<u-button type="submit" :loading="loading" icon="i-lucide-search">{{ loading ? t("searching") : t("search") }}</u-button>',
-                              '<u-button type="submit" icon="i-lucide-search">{{ t("search") }}</u-button>')
+          text = strip_loader(path.read_text())
+          marker = '    <form ref="filtersEl" class="flats__controls flats__controls_redesign" @submit.prevent="load()">'
+          if text.count(marker) != 1:
+              raise SystemExit('flat: form marker mismatch')
+          text = text.replace(marker, '    <UiResultsLoader :loading="loading" :label="t(\'searching\')" min-height="420px">\n' + marker, 1)
+          marker = '    <u-modal v-model:open="modalOpen"'
+          if text.count(marker) != 1:
+              raise SystemExit('flat: modal marker mismatch')
+          text = text.replace(marker, '    </UiResultsLoader>\n\n' + marker, 1)
+          text = remove_button_loading(text)
           path.write_text(text)
 
-          # Hiring: same contract as Flat Finder.
+          # Hiring: same single-wrapper contract.
           path = Path('app/pages/hiring/index.vue')
-          text = path.read_text()
-          text = replace_once(
-              text,
-              '    <form class="hiring__controls" @submit.prevent="load()">\n',
-              '    <UiResultsLoader :loading="loading" :label="t(\'searching\')" min-height="420px">\n    <form class="hiring__controls" @submit.prevent="load()">\n',
-              'hiring loader start',
-          )
-          text = replace_once(
-              text,
-              '    <UiResultsLoader :loading="loading" :label="t(\'searching\')" min-height="210px">\n    <div class="hiring__grid"',
-              '    <div class="hiring__grid"',
-              'hiring nested loader start',
-          )
-          text = replace_once(
-              text,
-              '    </div>\n    </UiResultsLoader>\n\n    <div ref="loadMoreSentinel" v-if="hasMore" class="hiring__sentinel">',
-              '    </div>\n\n    <div ref="loadMoreSentinel" v-if="hasMore" class="hiring__sentinel">',
-              'hiring nested loader end',
-          )
-          text = replace_once(
-              text,
-              '    <div v-if="!loading && !displayedProfiles.length && !failed" class="hiring__empty">\n      <div class="text-muted">{{ t("empty") }}</div>\n    </div>\n\n    <u-modal v-model:open="modalOpen"',
-              '    <div v-if="!loading && !displayedProfiles.length && !failed" class="hiring__empty">\n      <div class="text-muted">{{ t("empty") }}</div>\n    </div>\n    </UiResultsLoader>\n\n    <u-modal v-model:open="modalOpen"',
-              'hiring loader end',
-          )
-          text = text.replace('      <u-button type="submit" :loading="loading" icon="i-lucide-search">\n        {{ loading ? t("searching") : t("search") }}\n      </u-button>',
-                              '      <u-button type="submit" icon="i-lucide-search">\n        {{ t("search") }}\n      </u-button>')
+          text = strip_loader(path.read_text())
+          marker = '    <form class="hiring__controls" @submit.prevent="load()">'
+          if text.count(marker) != 1:
+              raise SystemExit('hiring: form marker mismatch')
+          text = text.replace(marker, '    <UiResultsLoader :loading="loading" :label="t(\'searching\')" min-height="420px">\n' + marker, 1)
+          marker = '    <u-modal v-model:open="modalOpen"'
+          if text.count(marker) != 1:
+              raise SystemExit('hiring: modal marker mismatch')
+          text = text.replace(marker, '    </UiResultsLoader>\n\n' + marker, 1)
+          text = remove_button_loading(text)
           path.write_text(text)
 
-          # Sanity: exactly one shared loader per search page and no button spinner copy.
           for p in [Path('app/pages/jobs/index.vue'), Path('app/pages/flat-finder/index.vue'), Path('app/pages/hiring/index.vue')]:
               body = p.read_text()
-              if body.count('<UiResultsLoader') != 1:
-                  raise SystemExit(f'{p}: expected one UiResultsLoader, got {body.count("<UiResultsLoader")}')
+              if body.count('<UiResultsLoader') != 1 or body.count('</UiResultsLoader>') != 1:
+                  raise SystemExit(f'{p}: expected exactly one shared loader')
               if ':loading="loading" icon="i-lucide-search"' in body:
-                  raise SystemExit(f'{p}: search button still has its own loading spinner')
+                  raise SystemExit(f'{p}: duplicate search-button spinner remains')
+              if '{{ loading ? t("searching") : t("search") }}' in body:
+                  raise SystemExit(f'{p}: loading text remains on search button')
           PY
 
       - name: Validate application
@@ -154,10 +110,6 @@ jobs:
         run: |
           git rm .github/workflows/fix-search-loading-lock.yml
           git add app/components/ui/ResultsLoader.vue app/pages/jobs/index.vue app/pages/flat-finder/index.vue app/pages/hiring/index.vue
-          if git diff --cached --quiet; then
-            echo "No changes to commit"
-            exit 0
-          fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git commit -m "fix: lock all search UI behind shared loader"
