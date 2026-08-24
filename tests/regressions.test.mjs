@@ -166,6 +166,19 @@ test('Rabota.kz education and employment history do not become skill badges', ()
   assert.deepEqual(profile.skills, ['Responsibility'])
 })
 
+test('job statistics use the ocean design and expose localized salary trends', () => {
+  const page = readFileSync(new URL('../app/pages/jobs/index.vue', import.meta.url), 'utf8')
+  const panel = readFileSync(new URL('../app/components/jobs/StatsPanel.vue', import.meta.url), 'utf8')
+  const ru = JSON.parse(readFileSync(new URL('../i18n/locales/ru.json', import.meta.url), 'utf8'))
+  assert.match(page, /:jobs="jobs"/u)
+  assert.match(panel, /activeTab = ref<"overview" \| "trends">/u)
+  assert.match(panel, /trendDays = ref<1 \| 3 \| 7 \| 60>/u)
+  assert.match(panel, /"world" \| "country" \| "city" \| "position" \| "positions"/u)
+  assert.match(panel, /linear-gradient\(135deg/u)
+  assert.equal(ru.jobs.statsTrends, 'Графики')
+  assert.equal(ru.jobs.trendTwoMonths, '2 месяца')
+})
+
 test('country quiz result cards use a responsive four-column grid', () => {
   const quiz = readFileSync(new URL('../app/pages/quizzes/country-fit/index.vue', import.meta.url), 'utf8')
   assert.match(quiz, /@media \(min-width: 1180px\)[\s\S]*?repeat\(4, minmax\(0, 1fr\)\)/u)

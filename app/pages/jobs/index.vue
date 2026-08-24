@@ -992,6 +992,7 @@ onBeforeUnmount(() => {
 
     <StatsPanel
       v-if="savedView === 'active' && stats && total"
+      :jobs="jobs"
       :stats="stats"
       :display-currency="displayCurrency"
       :display-period-label="periodLabel(displayPeriod)"
