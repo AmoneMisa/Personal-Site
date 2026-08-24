@@ -805,12 +805,6 @@ onBeforeUnmount(() => {
 <template>
   <u-container class="hiring">
     <ocean-page-backdrop />
-    <decorative-easter-egg
-      class="hiring__easter-egg"
-      src="/images/easter-eggs/hiring-resume.png"
-      :width="320"
-      :height="175"
-    />
     <div class="hiring__header text-center space-y-3">
       <h1 class="hiring__title">{{ t("title") }}</h1>
       <p class="hiring__subtitle text-muted mx-auto">{{ t("subtitle") }}</p>
@@ -1021,11 +1015,6 @@ onBeforeUnmount(() => {
 <style scoped>
 .hiring { position: relative; isolation: isolate; padding-top: 24px; padding-bottom: 96px; }
 .hiring__header { position: relative; z-index: 1; }
-.hiring__easter-egg {
-  position: absolute; top: -30px; right: -44px; z-index: 0;
-  width: 290px; opacity: 0.46;
-  filter: drop-shadow(0 0 26px rgba(36, 184, 255, 0.2));
-}
 .hiring__title { font-size: 32px; font-weight: 600; }
 .hiring__subtitle { max-width: 720px; font-size: 14px; }
 .hiring__controls { margin: 20px 0 20px; display: grid; gap: 12px; grid-template-columns: minmax(0, 1fr) minmax(220px, 280px) auto; align-items: start; }
@@ -1042,7 +1031,8 @@ onBeforeUnmount(() => {
 .hiring__pill_active { color: var(--text-white); border-color: rgba(113,137,217,0.45); background: rgba(113,137,217,0.18); }
 .hiring__advanced {
   grid-column: 1 / -1; display: grid; grid-template-columns: 1fr; gap: 12px;
-  padding: 14px; border-radius: 10px; border: 1px solid var(--line); background: rgba(255,255,255,0.02);
+  padding: 14px; border-radius: 10px; border: 1px solid var(--line); background: var(--ocean-form-surface);
+  box-shadow: 0 18px 42px rgba(2, 5, 18, 0.22);
 }
 .hiring__presets {
   grid-column: 1 / -1; display: flex; flex-wrap: wrap; align-items: center; gap: 8px;
@@ -1054,7 +1044,7 @@ onBeforeUnmount(() => {
 }
 .hiring__preset-remove { color: var(--text-muted); font-size: 18px; line-height: 1; }
 .hiring__preset-remove:hover { color: var(--accent-pink); }
-.hiring-filter-group { min-width: 0; padding: 14px; border: 1px solid var(--line); border-radius: 9px; background: rgba(255,255,255,0.025); }
+.hiring-filter-group { min-width: 0; padding: 14px; border: 1px solid var(--line); border-radius: 9px; background: var(--ocean-form-surface-soft); }
 .hiring-filter-group__title { display: flex; align-items: center; gap: 7px; margin-bottom: 12px; color: var(--ui-text-muted); font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: .04em; }
 .hiring-filter-group__title :deep(svg) { color: var(--accent-pink); }
 .hiring-filter-group__grid { display: grid; grid-template-columns: 1fr; gap: 12px; align-items: end; }
@@ -1140,8 +1130,5 @@ onBeforeUnmount(() => {
   .hiring__views { padding-left: 0; border-left: 0; }
   .hiring__age-range, .hiring__salary-range { grid-template-columns: 1fr 1fr; }
   .hiring-card { height: 184px; }
-}
-@media (max-width: 1100px) {
-  .hiring__easter-egg { display: none; }
 }
 </style>

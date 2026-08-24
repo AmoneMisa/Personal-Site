@@ -71,6 +71,7 @@ const howSteps = [
 
 <template>
   <u-container class="quizzes">
+    <ocean-page-backdrop />
     <div class="quizzes__header text-center space-y-3">
       <page-header
           title="quizzes.title"
@@ -147,6 +148,8 @@ const howSteps = [
 
 <style scoped>
 .quizzes {
+  position: relative;
+  isolation: isolate;
   padding-top: 24px;
   padding-bottom: 96px;
 }
@@ -219,7 +222,7 @@ const howSteps = [
   padding: 18px;
   border-radius: 10px;
   border: 1px solid var(--line);
-  background: rgba(255, 255, 255, 0.03);
+  background: var(--ocean-form-surface);
 }
 
 .quizzes__empty-title {
@@ -252,7 +255,7 @@ const howSteps = [
   padding: 18px;
   border-radius: 10px;
   border: 1px solid var(--line);
-  background: rgba(255, 255, 255, 0.03);
+  background: var(--ocean-form-surface);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
 }
 

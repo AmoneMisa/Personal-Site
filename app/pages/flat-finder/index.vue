@@ -990,12 +990,6 @@ onBeforeUnmount(() => { modalOpen.value = false; lightboxIndex.value = null; rel
 <template>
   <u-container class="flats">
     <ocean-page-backdrop />
-    <decorative-easter-egg
-      class="flats__easter-egg"
-      src="/images/easter-eggs/flat-finder-key.png"
-      :width="320"
-      :height="180"
-    />
     <div class="flats__header text-center space-y-3">
       <h1 class="flats__title">{{ t("title") }}</h1>
       <p class="flats__subtitle text-muted mx-auto">{{ t("subtitle") }}</p>
@@ -1159,11 +1153,6 @@ onBeforeUnmount(() => { modalOpen.value = false; lightboxIndex.value = null; rel
 <style scoped>
 .flats { position: relative; isolation: isolate; padding-top: 24px; padding-bottom: 96px; }
 .flats__header { position: relative; z-index: 1; }
-.flats__easter-egg {
-  position: absolute; top: -30px; right: -44px; z-index: 0;
-  width: 290px; opacity: 0.46;
-  filter: drop-shadow(0 0 26px rgba(36, 184, 255, 0.2));
-}
 .flats__title { font-size: 32px; font-weight: 600; }
 .flats__subtitle { max-width: 720px; font-size: 14px; }
 .flats__controls { margin: 20px 0 20px; display: grid; gap: 12px; grid-template-columns: 1fr auto; align-items: start; }
@@ -1274,7 +1263,12 @@ onBeforeUnmount(() => { modalOpen.value = false; lightboxIndex.value = null; rel
 .flats__controls_redesign { display: block; margin: 20px 0; }
 .flats__searchbar { display: grid; grid-template-columns: 1fr auto; gap: 10px; margin-bottom: 12px; }
 .flats__secondary-nav { margin-bottom: 12px; }
-.filter-card, .advanced-card { border: 1px solid var(--line); border-radius: 12px; background: var(--bg-panel); }
+.filter-card, .advanced-card {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--ocean-form-surface);
+  box-shadow: 0 18px 42px rgba(2, 5, 18, 0.22);
+}
 .filter-card { padding: 16px; }
 .filter-presets { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding-bottom: 14px; margin-bottom: 14px; border-bottom: 1px solid var(--line); }
 .filter-presets__label { margin-right: 4px; white-space: nowrap; }
@@ -1349,7 +1343,6 @@ onBeforeUnmount(() => { modalOpen.value = false; lightboxIndex.value = null; rel
 .flats__controls_redesign :deep(input), .flats__controls_redesign :deep(button[role="combobox"]) { background-color: var(--bg-panel-2) !important; }
 
 @media (max-width: 1100px) {
-  .flats__easter-egg { display: none; }
   .advanced-groups { grid-template-columns: repeat(2,minmax(0,1fr)); gap: 20px 0; }
   .filter-group, .filter-group:first-child { padding: 0 16px; border-left: 1px solid var(--line); }
   .filter-group:nth-child(odd) { border-left: 0; padding-left: 0; }

@@ -334,7 +334,8 @@ watch(user, (v) => lsSet(LS_KEYS.user, v), {deep: true});
 </script>
 
 <template>
-  <u-container class="py-8">
+  <u-container class="country-fit py-8">
+    <ocean-page-backdrop />
     <page-header
         title="quizzes.countryFit.title"
         headline="quizzes.countryFit.headline"
@@ -634,6 +635,12 @@ watch(user, (v) => lsSet(LS_KEYS.user, v), {deep: true});
 </template>
 
 <style scoped>
+.country-fit {
+  position: relative;
+  isolation: isolate;
+  padding-bottom: 96px;
+}
+
 .field {
   display: grid;
   gap: 5px;
@@ -648,7 +655,8 @@ watch(user, (v) => lsSet(LS_KEYS.user, v), {deep: true});
   padding: 14px 16px;
   border: 1px solid var(--line);
   border-radius: 12px;
-  background: rgba(255, 255, 255, 0.03);
+  background: var(--ocean-form-surface);
+  box-shadow: 0 14px 34px rgba(2, 5, 18, 0.18);
 }
 .quiz-card_situation { margin-bottom: 20px; }
 
@@ -684,7 +692,7 @@ watch(user, (v) => lsSet(LS_KEYS.user, v), {deep: true});
   padding: 7px 10px;
   border: 1px solid var(--line);
   border-radius: 9px;
-  background: rgba(255, 255, 255, 0.02);
+  background: var(--ocean-form-surface-soft);
   font-size: 12.5px;
   line-height: 1.3;
   text-align: left;

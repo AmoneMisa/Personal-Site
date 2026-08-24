@@ -43,12 +43,6 @@ const howSteps = [
 <template>
   <u-container class="services">
     <ocean-page-backdrop />
-    <decorative-easter-egg
-      class="services__easter-egg"
-      src="/images/easter-eggs/services-tools.png"
-      :width="320"
-      :height="225"
-    />
     <div class="services__header text-center space-y-3">
       <page-header title="services.title" headline="services.headline" class="mb-6" />
       <p class="services__subtitle mx-auto">{{ t("services.subtitle") }}</p>
@@ -93,15 +87,6 @@ const howSteps = [
 .services__header {
   position: relative;
   z-index: 1;
-}
-.services__easter-egg {
-  position: absolute;
-  top: -22px;
-  right: -42px;
-  z-index: 0;
-  width: 300px;
-  opacity: 0.44;
-  filter: drop-shadow(0 0 26px rgba(36, 184, 255, 0.2));
 }
 .services__subtitle {
   max-width: 720px;
@@ -203,11 +188,6 @@ const howSteps = [
 @media (max-width: 800px) {
   .services__grid {
     grid-template-columns: 1fr;
-  }
-}
-@media (max-width: 1100px) {
-  .services__easter-egg {
-    display: none;
   }
 }
 </style>

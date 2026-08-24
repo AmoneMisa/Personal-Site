@@ -2019,6 +2019,7 @@ onBeforeUnmount(() => {
 
 <template>
   <u-container class="pdf">
+    <ocean-page-backdrop />
     <div class="pdf__header background-hero text-center space-y-3">
       <page-header
           title="services.pdfEditor.title"
@@ -2440,8 +2441,17 @@ onBeforeUnmount(() => {
 <style scoped lang="scss">
 /* Breathing room below the editor so it never butts up against the footer. */
 .pdf {
+  position: relative;
+  isolation: isolate;
   padding-top: 24px;
   padding-bottom: 96px;
+}
+
+.pdf__panel-inner {
+  border-radius: 10px;
+  padding: 16px;
+  background: var(--ocean-form-surface);
+  box-shadow: 0 18px 42px rgba(2, 5, 18, 0.22);
 }
 
 .pdf__page-chip {
@@ -2582,7 +2592,7 @@ onBeforeUnmount(() => {
   margin-top: 12px;
   padding: 12px;
   border-radius: 10px;
-  background: rgba(255, 255, 255, 0.03);
+  background: var(--ocean-form-surface-soft);
   border: 1px solid rgba(255, 255, 255, 0.06);
 }
 

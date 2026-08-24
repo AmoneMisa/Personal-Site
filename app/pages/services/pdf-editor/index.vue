@@ -84,6 +84,7 @@ async function createDoc() {
 
 <template>
   <u-container class="pdf">
+    <ocean-page-backdrop />
     <div class="pdf__header background-hero text-center space-y-3">
       <page-header
           title="services.pdfEditor.title"
@@ -103,12 +104,9 @@ async function createDoc() {
               <span>{{ t("services.pdfEditor.upload.title") }}</span>
             </div>
 
-            <button type="button" class="ui-pill-btn ui-pill-btn_animated" @click="openPicker" :disabled="isBusy">
-              <span class="ui-pill-btn__inner">
-                <u-icon name="i-lucide-plus" />
-                {{ t("services.pdfEditor.upload.add") }}
-              </span>
-            </button>
+            <u-button type="button" size="lg" icon="i-lucide-plus" @click="openPicker" :disabled="isBusy">
+              {{ t("services.pdfEditor.upload.add") }}
+            </u-button>
             <input
                 ref="fileInput"
                 type="file"
@@ -151,12 +149,9 @@ async function createDoc() {
                 {{ t("services.pdfEditor.upload.start") }}
               </custom-button>
 
-              <button type="button" class="ui-pill-btn" @click="clear" :disabled="isBusy">
-                <span class="ui-pill-btn__inner">
-                  <u-icon name="i-lucide-trash-2" />
-                  {{ t("services.pdfEditor.upload.clear") }}
-                </span>
-              </button>
+              <u-button type="button" variant="outline" color="neutral" size="lg" icon="i-lucide-trash-2" @click="clear" :disabled="isBusy">
+                {{ t("services.pdfEditor.upload.clear") }}
+              </u-button>
             </div>
 
             <div class="pdf__help text-muted">
@@ -177,6 +172,8 @@ async function createDoc() {
 
 <style lang="scss">
 .pdf {
+  position: relative;
+  isolation: isolate;
   padding-top: 24px;
   padding-bottom: 96px;
 }
@@ -200,6 +197,8 @@ async function createDoc() {
 .pdf__panel-inner {
   border-radius: 10px;
   padding: 16px;
+  background: var(--ocean-form-surface);
+  box-shadow: 0 18px 42px rgba(2, 5, 18, 0.22);
 }
 
 .pdf__panel-head {
@@ -235,7 +234,7 @@ async function createDoc() {
   gap: 10px;
   padding: 10px;
   border-radius: 8px;
-  background: rgba(255, 255, 255, 0.03);
+  background: var(--ocean-form-surface-soft);
   border: 1px solid rgba(255, 255, 255, 0.06);
 }
 
@@ -333,7 +332,7 @@ async function createDoc() {
 .pdf__hint {
   padding: 12px;
   border-radius: 10px;
-  background: rgba(255, 255, 255, 0.03);
+  background: var(--ocean-form-surface-soft);
   border: 1px solid rgba(255, 255, 255, 0.06);
 }
 

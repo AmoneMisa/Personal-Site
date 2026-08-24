@@ -920,12 +920,6 @@ onBeforeUnmount(() => {
 <template>
   <u-container class="jobs">
     <ocean-page-backdrop />
-    <decorative-easter-egg
-      class="jobs__easter-egg"
-      src="/images/easter-eggs/jobs-search.png"
-      :width="320"
-      :height="185"
-    />
     <div class="jobs__header text-center space-y-3">
       <h1 class="jobs__title">{{ t("title") }}</h1>
       <p class="jobs__headline text-muted">{{ t("headline") }}</p>
@@ -1412,11 +1406,6 @@ onBeforeUnmount(() => {
 <style scoped>
 .jobs { position: relative; isolation: isolate; padding-top: 24px; padding-bottom: 96px; }
 .jobs__header { position: relative; z-index: 1; }
-.jobs__easter-egg {
-  position: absolute; top: 2px; left: -48px; z-index: 0;
-  width: 340px; opacity: 0.4;
-  filter: drop-shadow(0 0 26px rgba(36, 184, 255, 0.2));
-}
 .jobs__title { font-size: 32px; font-weight: 600; }
 .jobs__headline { font-size: 16px; }
 .jobs__subtitle { max-width: 760px; font-size: 14px; }
@@ -1489,9 +1478,10 @@ onBeforeUnmount(() => {
 .jobs__advbtn:hover { color: var(--text-white); }
 .jobs__advanced {
   grid-column: 1 / -1; display: grid; grid-template-columns: 1fr; gap: 12px;
-  padding: 14px; border-radius: 10px; border: 1px solid var(--line); background: rgba(255,255,255,0.02);
+  padding: 14px; border-radius: 10px; border: 1px solid var(--line); background: var(--ocean-form-surface);
+  box-shadow: 0 18px 42px rgba(2, 5, 18, 0.22);
 }
-.jobs-filter-group { min-width: 0; padding: 14px; border: 1px solid var(--line); border-radius: 9px; background: rgba(255,255,255,0.025); }
+.jobs-filter-group { min-width: 0; padding: 14px; border: 1px solid var(--line); border-radius: 9px; background: var(--ocean-form-surface-soft); }
 .jobs-filter-group__title { display: flex; align-items: center; gap: 7px; margin-bottom: 12px; color: var(--ui-text-muted); font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: .04em; }
 .jobs-filter-group__title :deep(svg) { color: var(--accent-pink); }
 .jobs-filter-group__grid { display: grid; grid-template-columns: 1fr; gap: 12px; align-items: end; }
@@ -1679,9 +1669,6 @@ onBeforeUnmount(() => {
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 .recent__chip-company { font-size: 11px; color: var(--ui-text-muted); }
-@media (max-width: 1100px) {
-  .jobs__easter-egg { display: none; }
-}
 @media (max-width: 480px) {
   .job-card { min-height: 0; padding: 15px; }
   .job-card__head { grid-template-columns: 1fr; gap: 8px; }
