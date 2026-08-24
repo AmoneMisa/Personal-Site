@@ -39,7 +39,7 @@ export default defineNuxtConfig({
     compatibilityDate: '2025-07-15',
     devtools: {enabled: true},
     modules: ['@nuxtjs/i18n', '@nuxt/icon', '@nuxt/image'],
-    css: ['~/assets/css/main.css'],
+    css: ['~/assets/css/main.css', '~/assets/css/results-loader.css'],
     sourcemap: {
         client: false,
         server: true
