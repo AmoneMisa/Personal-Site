@@ -15,7 +15,6 @@ import { useHiringMatch } from "~/composables/hiring/useHiringMatch";
 import { useHiringRouteState } from "~/composables/hiring/useHiringRouteState";
 import { useHiringMeta } from "~/composables/hiring/useHiringMeta";
 import { useSavedCollections } from "~/composables/search/useSavedCollections";
-import { useLatestRequest } from "~/composables/search/useLatestRequest";
 import { useInfiniteFeed } from "~/composables/search/useInfiniteFeed";
 import { ANY_SELECT_VALUE, useNullableSelect } from "~/composables/search/useNullableSelect";
 import {
@@ -63,7 +62,7 @@ const {
 
 const {
   profiles, total, loading, loadingMore, filtersPending, warming, failed,
-  sourceErrors, usdRates, fetchFeed,
+  sourceErrors, usdRates, loadFeed,
 } = useHiringFeed();
 const view = ref<HiringView>("active");
 const {
@@ -92,9 +91,7 @@ const listingShareModalOpen = ref(false);
 const listingShareUrl = ref("");
 const listingShareCopied = ref(false);
 const loadMoreSentinel = ref<HTMLElement | null>(null);
-const { next: nextLoadRequest, isLatest: isLatestLoadRequest } = useLatestRequest();
 let loadTimer: ReturnType<typeof setTimeout> | undefined;
-let warmTimer: ReturnType<typeof setTimeout> | undefined;
 let sharedPostTimer: ReturnType<typeof setTimeout> | undefined;
 
 const { copyText } = useClipboard();
@@ -282,59 +279,17 @@ function savePreset() {
   if (saveSearchPreset()) presetModalOpen.value = false;
 }
 
-function scheduleWarmPoll() {
-  if (warmTimer) clearTimeout(warmTimer);
-  if (!warming.value) return;
-  warmTimer = setTimeout(() => { warmTimer = undefined; void load(false, true); }, 1800);
-}
-
 async function load(append = false, background = false) {
-  const requestId = nextLoadRequest();
-  if (!background) {
-    if (append) loadingMore.value = true;
-    // A filter change already has something to show; dimming the grid for it
-    // is what made filtering feel slow even when the answer was quick.
-    else loading.value = !profiles.value.length;
-    failed.value = false;
-  }
   const params = buildFeedParams({
     limit: PAGE_SIZE,
     offset: append ? profiles.value.length : 0,
     skillQuery: canonicalSkillQuery(),
   });
-
-  const { data, error } = await fetchFeed(params);
-  if (!isLatestLoadRequest(requestId)) {
-    if (append) loadingMore.value = false;
-    return;
-  }
-  if (error || !data || data.error) {
-    if (!background) {
-      // A failed request is usually a redeploy restarting the server. Throwing
-      // away the board for it turns a blip into an empty page; keep what is on
-      // screen and only admit failure when there is nothing to keep.
-      failed.value = !profiles.value.length;
-      sourceErrors.value = [];
-    }
-  } else {
-    const next = data.profiles || [];
-    profiles.value = append
-      ? [...new Map([...profiles.value, ...next].map((item) => [item.id, item])).values()]
-      : next;
-    total.value = data.count ?? profiles.value.length;
-    sourceErrors.value = data.sourceErrors || [];
-    if (data.rates && typeof data.rates === "object") usdRates.value = data.rates;
-    warming.value = !!data.warming;
-    if (data.meta?.professions?.length) professionValues.value = data.meta.professions;
-    if (data.meta?.sources?.length) availableSources.value = data.meta.sources;
-  }
-  if (!background) {
-    loading.value = false;
-    loadingMore.value = false;
-    filtersPending.value = false;
-  }
+  const data = await loadFeed(params, { append, background });
+  if (!data) return;
+  if (data.meta?.professions?.length) professionValues.value = data.meta.professions;
+  if (data.meta?.sources?.length) availableSources.value = data.meta.sources;
   if (!append && !background) void syncQueryParams();
-  scheduleWarmPoll();
 }
 
 function scheduleLoad(delay = 250) {
@@ -547,7 +502,6 @@ watch(modalOpen, (isOpen) => {
 
 onBeforeUnmount(() => {
   if (loadTimer) clearTimeout(loadTimer);
-  if (warmTimer) clearTimeout(warmTimer);
   if (sharedPostTimer) clearTimeout(sharedPostTimer);
 });
 </script>

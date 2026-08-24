@@ -19,7 +19,6 @@ import { useJobAts } from "~/composables/jobs/useJobAts";
 import { useJobMeta } from "~/composables/jobs/useJobMeta";
 import { useJobRouteState } from "~/composables/jobs/useJobRouteState";
 import { useSavedCollections } from "~/composables/search/useSavedCollections";
-import { useLatestRequest } from "~/composables/search/useLatestRequest";
 import { useInfiniteFeed } from "~/composables/search/useInfiniteFeed";
 import { ANY_SELECT_VALUE, useNullableSelect } from "~/composables/search/useNullableSelect";
 
@@ -104,8 +103,8 @@ const languageLevelSelect = useNullableSelect(languageLevel);
 
 const {
   jobs, total, page, pageSize, stats, loading, loadingMore, failed, warming,
-  loadedSourceCount, pendingSourceCount, loadMoreSentinel, fetchFeed,
-} = useJobFeed();
+  loadedSourceCount, pendingSourceCount, loadMoreSentinel, loadFeed,
+} = useJobFeed(usdRates);
 const activeJob = ref<Job | null>(null);
 const jobModalOpen = ref(false);
 const shareCopied = ref(false);
@@ -227,9 +226,7 @@ const seniorityLabel = (value?: Job["seniority"]) =>
 const employerTypeLabel = (value?: Job["employerType"]) =>
   value ? t("employer" + value.charAt(0).toUpperCase() + value.slice(1)) : "";
 const isToday = (iso: string) => new Date(iso).toDateString() === new Date().toDateString();
-const { next: nextLoadRequest, isLatest: isLatestLoadRequest } = useLatestRequest();
 let loadTimer: ReturnType<typeof setTimeout> | undefined;
-let warmTimer: ReturnType<typeof setTimeout> | undefined;
 
 const totalPages = computed(() => Math.max(1, Math.ceil(total.value / pageSize.value)));
 const hasMore = computed(() => savedView.value === "active" && sort.value !== "ats" && page.value < totalPages.value);
@@ -248,15 +245,6 @@ useInfiniteFeed({
   loadMore,
   rootMargin: "300px 0px",
 });
-
-function scheduleWarmPoll() {
-  if (warmTimer) clearTimeout(warmTimer);
-  if (!warming.value) return;
-  warmTimer = setTimeout(() => {
-    warmTimer = undefined;
-    void load(1, { background: true });
-  }, 1800);
-}
 
 function scheduleLoad(delay = 250) {
   if (loadTimer) clearTimeout(loadTimer);
@@ -315,13 +303,6 @@ async function load(
   toPage = 1,
   options: { append?: boolean; background?: boolean } = {},
 ) {
-  const requestId = nextLoadRequest();
-  if (!options.background) {
-    if (warmTimer) clearTimeout(warmTimer);
-    if (options.append) loadingMore.value = true;
-    else loading.value = true;
-    failed.value = false;
-  }
   const params = buildFeedParams({
     page: toPage,
     pageSize: pageSize.value,
@@ -330,37 +311,11 @@ async function load(
     convertPeriod,
   });
 
-  // Served by Nitro at /jobs-feed (NOT under /api, which the host site proxies to FastAPI).
-  const { data, error } = await fetchFeed(params);
-  // A slower previous request must never overwrite a newer filter selection.
-  if (!isLatestLoadRequest(requestId)) return;
-  if (error || !data) {
-    if (!options.background) {
-      failed.value = true;
-      if (!options.append) {
-        jobs.value = []; total.value = 0; stats.value = null;
-      }
-    }
-  } else {
-    if (data.rates && data.rates.USD) usdRates.value = data.rates;
-    if (options.append) {
-      const known = new Set(jobs.value.map((job) => job.url || job.id));
-      jobs.value = [...jobs.value, ...data.jobs.filter((job) => !known.has(job.url || job.id))];
-    } else {
-      jobs.value = data.jobs;
-    }
-    total.value = data.total; page.value = data.page;
-    pageSize.value = data.pageSize; stats.value = data.stats;
-    warming.value = !!data.warming;
-    loadedSourceCount.value = data.loadedSources?.length ?? 0;
-    pendingSourceCount.value = data.pendingSources?.length ?? 0;
-  }
-  loading.value = false;
-  loadingMore.value = false;
+  const data = await loadFeed(params, options);
+  if (!data) return;
   // Persist the filters that produced this result (foreground loads only, so a
   // background warm-poll or a "load more" page doesn't rewrite the URL).
   if (!options.append && !options.background) persistState();
-  scheduleWarmPoll();
 }
 
 function loadMore() {
@@ -625,7 +580,6 @@ watch(jobModalOpen, (isOpen) => {
 });
 onBeforeUnmount(() => {
   if (loadTimer) clearTimeout(loadTimer);
-  if (warmTimer) clearTimeout(warmTimer);
 });
 </script>
 

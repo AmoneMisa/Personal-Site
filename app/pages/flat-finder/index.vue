@@ -22,7 +22,6 @@ import { useFlatPresentation } from "~/composables/flats/useFlatPresentation";
 import { useFlatMeta } from "~/composables/flats/useFlatMeta";
 import { useFlatAvailabilityCache } from "~/composables/flats/useFlatAvailabilityCache";
 import { useSavedCollections } from "~/composables/search/useSavedCollections";
-import { useLatestRequest } from "~/composables/search/useLatestRequest";
 import { useInfiniteFeed } from "~/composables/search/useInfiniteFeed";
 import { useSearchScroll } from "~/composables/search/useSearchScroll";
 import { ANY_SELECT_VALUE, useNullableSelect } from "~/composables/search/useNullableSelect";
@@ -76,13 +75,13 @@ const {
   displayCurrency, query, source, showAdvanced, buildFeedParams, resetValues: resetFilterValues,
 } = flatFilters;
 const rates = ref<Record<string, number>>({ USD: 1 });
+const { isFresh: isAvailabilityFresh, markFresh: markAvailabilityFresh, forget: forgetAvailability } = useFlatAvailabilityCache();
 
 const {
   listings, total, loading, loadingMore, warming, failed, sourceErrors, statistics,
-  nextCursor, loadMoreSentinel, fetchFeed,
-} = useFlatFeed();
+  nextCursor, loadMoreSentinel, loadFeed,
+} = useFlatFeed({ onAvailabilityChecked: markAvailabilityFresh });
 const { listingPhoto, visiblePhotos, markPhotoFailedFromEvent } = useFlatPhotos();
-const { isFresh: isAvailabilityFresh, markFresh: markAvailabilityFresh, forget: forgetAvailability } = useFlatAvailabilityCache();
 const view = ref<FlatView>("active");
 const {
   presentCard,
@@ -134,13 +133,7 @@ const {
   showBackToFilters: showBackToTop,
   scrollToFilters,
 } = useSearchScroll(600);
-const {
-  next: nextLoadRequest,
-  current: currentLoadRequest,
-  isLatest: isLatestLoadRequest,
-} = useLatestRequest();
 let loadTimer: ReturnType<typeof setTimeout> | undefined;
-let warmTimer: ReturnType<typeof setTimeout> | undefined;
 let sharedListingTimer: ReturnType<typeof setTimeout> | undefined;
 let lastPaginationScrollY = 0;
 
@@ -304,14 +297,7 @@ function savePreset() {
   if (saveSearchPreset()) presetModalOpen.value = false;
 }
 async function loadRates() { const { data } = await safeFetch<{ rates?: Record<string, number> }>("/flats-rates"); if (data?.rates && data.rates.USD) rates.value = data.rates; }
-function scheduleWarmPoll() {
-  if (warmTimer) clearTimeout(warmTimer);
-  if (!warming.value) return;
-  warmTimer = setTimeout(() => { warmTimer = undefined; void load(false, true); }, 1800);
-}
 async function load(append = false, background = false) {
-  const requestId = background ? currentLoadRequest() : nextLoadRequest();
-  if (!background) { append ? loadingMore.value = true : loading.value = true; failed.value = false; }
   const params = buildFeedParams({
     limit: PAGE_SIZE,
     append,
@@ -319,31 +305,10 @@ async function load(append = false, background = false) {
     nextCursor: nextCursor.value,
     sources: SOURCES,
   });
-  const { data, error } = await fetchFeed(params);
-  if (!isLatestLoadRequest(requestId)) { if (!background) { loading.value = false; loadingMore.value = false; } return; }
-  if (error || !data || data.error) {
-    if (!background) { failed.value = true; if (!append) { listings.value = []; total.value = 0; statistics.value = null; nextCursor.value = null; } sourceErrors.value = []; loading.value = false; loadingMore.value = false; }
-    return;
-  }
-  if (data.availabilityChecked?.length) markAvailabilityFresh(data.availabilityChecked);
-  if (background) { total.value = data.count ?? total.value; sourceErrors.value = data.sourceErrors || []; if (data.statistics) statistics.value = data.statistics; warming.value = !!data.warming; scheduleWarmPoll(); return; }
-  nextCursor.value = data.nextCursor || null;
-  const next = Array.isArray(data.listings) ? data.listings : [];
-  if (append) {
-    const existingKeys = new Set(listings.value.map((item) => `${item.source}:${item.country}:${item.id}`));
-    const newListings = next.filter((item) => { const key = `${item.source}:${item.country}:${item.id}`; if (existingKeys.has(key)) return false; existingKeys.add(key); return true; });
-    listings.value = [...listings.value, ...newListings];
-  } else {
-    listings.value = next;
-    if (import.meta.client) lastPaginationScrollY = window.scrollY;
-  }
-  total.value = data.count ?? listings.value.length;
-  if (!append) statistics.value = data.statistics || null;
-  sourceErrors.value = data.sourceErrors || [];
-  warming.value = !!data.warming;
-  loading.value = false; loadingMore.value = false;
+  const data = await loadFeed(params, { append, background });
+  if (!data || background) return;
+  if (!append && import.meta.client) lastPaginationScrollY = window.scrollY;
   if (!append) void syncQueryParams();
-  scheduleWarmPoll();
 }
 // One debounce for every filter interaction. Picking a country, then a city,
 // then a district used to fire a request per click at 80ms apart, and each
@@ -570,7 +535,7 @@ watch(
 );
 watch(city, () => { if (restoring.value) return; district.value = ""; metro.value = ""; query.value = ""; });
 watch(countries, () => { if (restoring.value) return; district.value = ""; metro.value = ""; city.value = ""; query.value = ""; });
-onBeforeUnmount(() => { modalOpen.value = false; lightboxOpen.value = false; releaseStuckScrollLock(); if (loadTimer) clearTimeout(loadTimer); if (warmTimer) clearTimeout(warmTimer); if (sharedListingTimer) clearTimeout(sharedListingTimer); cancelTranslation(); });
+onBeforeUnmount(() => { modalOpen.value = false; lightboxOpen.value = false; releaseStuckScrollLock(); if (loadTimer) clearTimeout(loadTimer); if (sharedListingTimer) clearTimeout(sharedListingTimer); cancelTranslation(); });
 </script>
 
 <template>
