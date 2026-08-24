@@ -1,13 +1,25 @@
 <script setup lang="ts">
 import { safeFetch } from "~/utils/safeFetch";
-import { buildCvProfile, scoreJob, type CvProfile } from "~/utils/atsScore";
-import { extractCvText } from "~/utils/cvExtract";
 import JobCard from "~/components/jobs/JobCard.vue";
+import JobGrid from "~/components/jobs/JobGrid.vue";
+import JobDetailsModal from "~/components/jobs/JobDetailsModal.vue";
+import JobFilters from "~/components/jobs/JobFilters.vue";
+import JobAdvancedFilters from "~/components/jobs/JobAdvancedFilters.vue";
+import SearchPageShell from "~/components/search/SearchPageShell.vue";
+import SearchSavedTabs from "~/components/search/SearchSavedTabs.vue";
 import AtsPanel from "~/components/jobs/AtsPanel.vue";
 import RecentlyViewed from "~/components/jobs/RecentlyViewed.vue";
 import StatsPanel from "~/components/jobs/StatsPanel.vue";
-import type { Job, JobResult, JobStats, RecentJob } from "~/types/jobs";
-import { readStoredList, writeStoredList } from "~/utils/browserStorage";
+import type { Job, RecentJob } from "~/types/jobs";
+import { convertCurrency as convertCurrencyValue, convertSalaryPeriod, currencySymbol } from "~/utils/search/money";
+import { useJobFilters } from "~/composables/jobs/useJobFilters";
+import { useJobFeed } from "~/composables/jobs/useJobFeed";
+import { useJobAts } from "~/composables/jobs/useJobAts";
+import { useJobMeta } from "~/composables/jobs/useJobMeta";
+import { useJobRouteState } from "~/composables/jobs/useJobRouteState";
+import { useSavedCollections } from "~/composables/search/useSavedCollections";
+import { useLatestRequest } from "~/composables/search/useLatestRequest";
+import { useInfiniteFeed } from "~/composables/search/useInfiniteFeed";
 
 // Job Finder service. Auto-routed at /jobs. Aggregates many boards, enforces a
 // 14-day freshness cap server-side, offers full sort + advanced filters, shows
@@ -27,55 +39,7 @@ useSeoMeta({
   twitterTitle: () => t("seoTitle"), twitterDescription: () => t("seoDescription"),
 });
 
-const sourceOptions = [
-  { value: "", labelKey: "all" },
-  { value: "rss", label: "DOU.ua" },
-  { value: "jooble", label: "Jooble" },
-  { value: "themuse", label: "The Muse" },
-  { value: "jobicy", label: "Jobicy" },
-  { value: "remotive", label: "Remotive" },
-  { value: "remoteok", label: "RemoteOK" },
-  { value: "arbeitnow", label: "Arbeitnow" },
-  { value: "adzuna", label: "Adzuna" },
-  { value: "companies", label: "Companies" },
-  { value: "devkg", label: "DevKG (Kyrgyzstan)" },
-  { value: "itjobsuz", label: "IT-Jobs.uz" },
-  { value: "ishgo", label: "ishGO.uz" },
-  { value: "telegram", label: "Telegram" },
-  { value: "olx", label: "OLX" },
-  { value: "linkedin", label: "LinkedIn" },
-  { value: "facebook", label: "Facebook" },
-  { value: "threads", label: "Threads" },
-];
-
-// CIS-focused country list (RU/BY excluded by the backend). "Remote" is NOT a
-// country — remote/worldwide postings are filtered via the Work mode selector.
-// No flag emojis: Windows renders them as raw region letters ("uz Uzbekistan").
-const countryOptions = [
-  { value: "", labelKey: "any" },
-  { value: "UZ", label: "Uzbekistan" },
-  { value: "UA", label: "Ukraine" },
-  { value: "KZ", label: "Kazakhstan" },
-  { value: "GE", label: "Georgia" },
-  { value: "AZ", label: "Azerbaijan" },
-  { value: "AM", label: "Armenia" },
-  { value: "KG", label: "Kyrgyzstan" },
-  { value: "MD", label: "Moldova" },
-  { value: "RO", label: "Romania" },
-  { value: "TJ", label: "Tajikistan" },
-  { value: "TM", label: "Turkmenistan" },
-  { value: "PL", label: "Poland" },
-  { value: "DE", label: "Germany" },
-  { value: "GB", label: "UK" },
-  { value: "US", label: "USA" },
-  { value: "CN", label: "China" },
-  { value: "JP", label: "Japan" },
-  { value: "KR", label: "South Korea" },
-  { value: "TW", label: "Taiwan" },
-];
-
-const languageOptions = ["English", "German", "Russian", "Ukrainian", "Uzbek", "Kazakh", "French", "Spanish", "Polish", "Turkish", "Japanese"];
-const levelOptions = ["A1", "A2", "B1", "B2", "C1", "C2", "Intermediate", "Upper-Intermediate", "Advanced", "Fluent", "Native"];
+const { sourceOptions, countryOptions, languageOptions, levelOptions } = useJobMeta();
 
 // Rates are supplied by /jobs-feed from the shared server FX cache. Keep USD as
 // the cold/error fallback; the first successful response expands this to every
@@ -99,62 +63,33 @@ const currencyOptions = computed(() => {
   const rest = available.filter((code) => !preferred.includes(code)).sort();
   return [...preferred, ...rest];
 });
-const CURRENCY_SYMBOL: Record<string, string> = { USD: "$", EUR: "€", GBP: "£" };
-
 // Convert between two currencies via USD. Returns undefined if a rate is unknown.
 function convertCurrency(amount: number, from: string, to: string): number | undefined {
-  const rf = usdRates.value[(from || "USD").toUpperCase()];
-  const rt = usdRates.value[(to || "USD").toUpperCase()];
-  if (!rf || !rt) return undefined;
-  return Math.round((amount * rf) / rt);
+  const converted = convertCurrencyValue(amount, from || "USD", to || "USD", usdRates.value, "usdPerCurrency");
+  return converted == null ? undefined : Math.round(converted);
 }
 
 function formatAmount(n: number, cur: string): string {
-  const sym = CURRENCY_SYMBOL[cur.toUpperCase()];
-  return sym ? `${sym}${n.toLocaleString()}` : `${n.toLocaleString()} ${cur.toUpperCase()}`;
+  const symbol = currencySymbol(cur);
+  return symbol === cur.toUpperCase() ? `${n.toLocaleString()} ${symbol}` : `${symbol}${n.toLocaleString()}`;
 }
 
 // Pay-period conversion. PER_YEAR turns an amount at a period into a yearly amount
 // (must match server enrich.ts: 160 work hours/month). To convert an amount from
 // period A to B: multiply by PER_YEAR[A] / PER_YEAR[B].
-const HOURS_PER_MONTH = 160;
-const PER_YEAR: Record<string, number> = { hour: 12 * HOURS_PER_MONTH, month: 12, year: 1 };
 const periodOptions = ["hour", "month", "year"] as const;
 type Period = (typeof periodOptions)[number];
 
 function convertPeriod(amount: number, from: Period, to: Period): number {
-  return Math.round((amount * (PER_YEAR[from] ?? 1)) / (PER_YEAR[to] ?? 1));
+  return Math.round(convertSalaryPeriod(amount, from, to));
 }
 
-const query = ref("");
-const source = ref("");
-const salaryMin = ref<number | undefined>(undefined);
-const displayCurrency = ref("USD"); // currency the user wants amounts shown in
-const displayPeriod = ref<Period>("month"); // hour | month | year for converted salaries
-const sort = ref("date"); // date | oldest | title | company | salary | ats
-
-// advanced filters — default to no country selected (= any). Country is a
-// heuristic guess from job text, so pinning it to a single CIS country hides
-// almost every vacancy; users can multi-select the countries they care about.
-const countries = ref<string[]>([]);
-const cities = ref(""); // free-text, comma-separated cities (any-of), may span countries
-const includeRu = ref(false); // Russia is excluded by the backend unless opted-in
-const includeBy = ref(false); // Belarus is excluded by the backend unless opted-in
-const workMode = ref("");
-const relocation = ref("");
-const employmentKind = ref("");
-const hasSalary = ref(false);
-const maxExperience = ref<number | undefined>(undefined);
-const foreignerOnly = ref(false);
-// Hide gambling / adult / earnings-bait postings. Default ON; unchecking sends
-// hideRiskyIndustries=false so the backend stops filtering them out.
-const hideRisky = ref(true);
-const noExperience = ref(false);
-const language = ref("");
-const languageLevel = ref("");
-const excludeLanguages = ref<string[]>([]);
-const skills = ref("");
-const showAdvanced = ref(true);
+const {
+  query, source, salaryMin, displayCurrency, displayPeriod, sort, countries, cities,
+  includeRu, includeBy, workMode, relocation, employmentKind, hasSalary, maxExperience,
+  foreignerOnly, hideRisky, noExperience, language, languageLevel, excludeLanguages,
+  skills, showAdvanced, resetValues: resetFilterValues,
+} = useJobFilters();
 
 // Reka UI reserves an empty string for clearing a combobox and throws when an
 // item itself has value="". Keep the API-facing refs empty for "any", while
@@ -180,18 +115,10 @@ const languageSelect = computed<string>({
 });
 const languageLevelSelect = withAnyOption(languageLevel);
 
-const jobs = ref<Job[]>([]);
-const total = ref(0);
-const page = ref(1);
-const pageSize = ref(20);
-const stats = ref<JobStats | null>(null);
-const loading = ref(false);
-const loadingMore = ref(false);
-const failed = ref(false);
-const warming = ref(false);
-const loadedSourceCount = ref(0);
-const pendingSourceCount = ref(0);
-const loadMoreSentinel = ref<HTMLElement | null>(null);
+const {
+  jobs, total, page, pageSize, stats, loading, loadingMore, failed, warming,
+  loadedSourceCount, pendingSourceCount, loadMoreSentinel, fetchFeed,
+} = useJobFeed();
 const activeJob = ref<Job | null>(null);
 const jobModalOpen = ref(false);
 const shareCopied = ref(false);
@@ -199,55 +126,36 @@ const shareCopiedJobId = ref<string | null>(null);
 
 // ---- Personal vacancy lists (localStorage; no account or backend required) ----
 type SavedJobsView = "active" | "favorites" | "hidden";
-const HIDDEN_JOBS_KEY = "jobs:hidden:v1";
-const FAVORITE_JOBS_KEY = "jobs:favorites:v1";
-const MAX_SAVED_JOBS = 200;
 const savedView = ref<SavedJobsView>("active");
-const hiddenJobs = ref<Job[]>([]);
-const favoriteJobs = ref<Job[]>([]);
+const {
+  favorites: favoriteJobs,
+  hidden: hiddenJobs,
+  hiddenIds,
+  favoriteIds,
+  isHidden,
+  isFavorite,
+  toggleFavorite: toggleSavedFavorite,
+  toggleHidden: toggleSavedHidden,
+  load: loadSavedJobs,
+} = useSavedCollections<Job>({
+  namespace: "jobs",
+  getId: (job) => job.id,
+  favoritesLimit: 200,
+  hiddenLimit: 200,
+});
 const savedViewTabs = computed(() => [
   { value: "active", label: t("activeVacancies") },
   { value: "favorites", label: t("favoriteVacancies"), count: favoriteJobs.value.length },
   { value: "hidden", label: t("hiddenVacancies"), count: hiddenJobs.value.length },
 ]);
-const hiddenIds = computed(() => new Set(hiddenJobs.value.map((job) => job.id)));
-const favoriteIds = computed(() => new Set(favoriteJobs.value.map((job) => job.id)));
-const isHidden = (id: string) => hiddenIds.value.has(id);
-const isFavorite = (id: string) => favoriteIds.value.has(id);
-
-function loadSavedJobs() {
-  hiddenJobs.value = readStoredList<Job>(HIDDEN_JOBS_KEY, MAX_SAVED_JOBS);
-  favoriteJobs.value = readStoredList<Job>(FAVORITE_JOBS_KEY, MAX_SAVED_JOBS);
-}
-
-function persistSavedJobs() {
-  writeStoredList(HIDDEN_JOBS_KEY, hiddenJobs.value, MAX_SAVED_JOBS);
-  writeStoredList(FAVORITE_JOBS_KEY, favoriteJobs.value, MAX_SAVED_JOBS);
-}
-
-function upsertSaved(list: Job[], job: Job): Job[] {
-  return [job, ...list.filter((item) => item.id !== job.id)].slice(0, MAX_SAVED_JOBS);
-}
-
 function toggleHidden(job: Job) {
-  if (isHidden(job.id)) {
-    hiddenJobs.value = hiddenJobs.value.filter((item) => item.id !== job.id);
-  } else {
-    hiddenJobs.value = upsertSaved(hiddenJobs.value, job);
-    favoriteJobs.value = favoriteJobs.value.filter((item) => item.id !== job.id);
-    if (activeJob.value?.id === job.id) jobModalOpen.value = false;
-  }
-  persistSavedJobs();
+  const willHide = !isHidden(job.id);
+  toggleSavedHidden(job);
+  if (willHide && activeJob.value?.id === job.id) jobModalOpen.value = false;
 }
 
 function toggleFavorite(job: Job) {
-  if (isFavorite(job.id)) {
-    favoriteJobs.value = favoriteJobs.value.filter((item) => item.id !== job.id);
-  } else {
-    favoriteJobs.value = upsertSaved(favoriteJobs.value, job);
-    hiddenJobs.value = hiddenJobs.value.filter((item) => item.id !== job.id);
-  }
-  persistSavedJobs();
+  toggleSavedFavorite(job);
 }
 
 function selectSavedView(view: string) {
@@ -332,10 +240,9 @@ const seniorityLabel = (value?: Job["seniority"]) =>
 const employerTypeLabel = (value?: Job["employerType"]) =>
   value ? t("employer" + value.charAt(0).toUpperCase() + value.slice(1)) : "";
 const isToday = (iso: string) => new Date(iso).toDateString() === new Date().toDateString();
-let loadSequence = 0;
+const { next: nextLoadRequest, isLatest: isLatestLoadRequest } = useLatestRequest();
 let loadTimer: ReturnType<typeof setTimeout> | undefined;
 let warmTimer: ReturnType<typeof setTimeout> | undefined;
-let loadMoreObserver: IntersectionObserver | undefined;
 
 const totalPages = computed(() => Math.max(1, Math.ceil(total.value / pageSize.value)));
 const hasMore = computed(() => savedView.value === "active" && sort.value !== "ats" && page.value < totalPages.value);
@@ -346,6 +253,14 @@ const canLoadMore = computed(() =>
   && !loadingMore.value
   && page.value < totalPages.value,
 );
+useInfiniteFeed({
+  sentinel: loadMoreSentinel,
+  hasMore,
+  loading: computed(() => loading.value || loadingMore.value),
+  canLoad: canLoadMore,
+  loadMore,
+  rootMargin: "300px 0px",
+});
 
 function scheduleWarmPoll() {
   if (warmTimer) clearTimeout(warmTimer);
@@ -378,11 +293,6 @@ function selectSource(value: string) {
 }
 
 // ---- ATS ----
-const cvProfile = ref<CvProfile | null>(null);
-const cvPaste = ref("");
-const cvError = ref<string | null>(null);
-const cvLoading = ref(false);
-
 const displayedJobs = computed(() => {
   if (savedView.value === "favorites") return favoriteJobs.value;
   if (savedView.value === "hidden") return hiddenJobs.value;
@@ -390,16 +300,25 @@ const displayedJobs = computed(() => {
 });
 const displayedTotal = computed(() => savedView.value === "active" ? total.value : displayedJobs.value.length);
 
-const scored = computed(() => {
-  const profile = cvProfile.value;
-  const list = displayedJobs.value.map((job) => ({
-    job,
-    ats: profile ? scoreJob(profile, job) : null,
-  }));
-  if (profile && sort.value === "ats") {
-    list.sort((a, b) => (b.ats?.score ?? 0) - (a.ats?.score ?? 0));
-  }
-  return list;
+const {
+  cvProfile,
+  cvPaste,
+  cvError,
+  cvLoading,
+  scored,
+  activeAts,
+  onCvFile,
+  applyPastedCv,
+  clearCv,
+} = useJobAts({
+  jobs,
+  displayedJobs,
+  activeJob,
+  total,
+  pageSize,
+  sort,
+  reload: () => load(1),
+  translate: (key) => t(key),
 });
 
 const countryLabel = (code: string) =>
@@ -409,7 +328,7 @@ async function load(
   toPage = 1,
   options: { append?: boolean; background?: boolean } = {},
 ) {
-  const requestId = ++loadSequence;
+  const requestId = nextLoadRequest();
   if (!options.background) {
     if (warmTimer) clearTimeout(warmTimer);
     if (options.append) loadingMore.value = true;
@@ -446,9 +365,9 @@ async function load(
   if (skills.value.trim()) params.skills = skills.value.trim();
 
   // Served by Nitro at /jobs-feed (NOT under /api, which the host site proxies to FastAPI).
-  const { data, error } = await safeFetch<JobResult>("/jobs-feed", { params });
+  const { data, error } = await fetchFeed(params);
   // A slower previous request must never overwrite a newer filter selection.
-  if (requestId !== loadSequence) return;
+  if (!isLatestLoadRequest(requestId)) return;
   if (error || !data) {
     if (!options.background) {
       failed.value = true;
@@ -484,11 +403,7 @@ function loadMore() {
 
 function resetFilters() {
   savedView.value = "active";
-  countries.value = []; cities.value = ""; includeRu.value = false; includeBy.value = false;
-  workMode.value = ""; relocation.value = "";
-  employmentKind.value = ""; hasSalary.value = false; maxExperience.value = undefined;
-  foreignerOnly.value = false; hideRisky.value = true; noExperience.value = false; language.value = ""; languageLevel.value = "";
-  excludeLanguages.value = []; skills.value = "";
+  resetFilterValues();
   scheduleLoad(100);
 }
 
@@ -552,67 +467,13 @@ function applyState(s: Record<string, string>) {
   if (sort.value === "ats") sort.value = "date";
 }
 
-function persistState() {
-  if (!import.meta.client) return;
-  const s = currentState();
-  try {
-    localStorage.setItem(SEARCH_STATE_KEY, JSON.stringify(s));
-  } catch { /* storage full / disabled */ }
-  const urlState = jobModalOpen.value && activeJob.value
-    ? { ...s, job: activeJob.value.id }
-    : s;
-  const qs = new URLSearchParams(urlState).toString();
-  // replaceState (not push) so the back button isn't spammed on every filter change.
-  window.history.replaceState(window.history.state, "", qs ? `?${qs}` : window.location.pathname);
-}
-
-function restoreState() {
-  if (!import.meta.client) return;
-  const fromUrl = new URLSearchParams(window.location.search);
-  // `job` is a share target, not a filter — it must not count as "URL has filters"
-  // (otherwise a bare ?job=… link would wipe the visitor's saved search).
-  if ([...fromUrl.keys()].some((k) => k !== "job")) {
-    applyState(Object.fromEntries(fromUrl.entries()));
-    return;
-  }
-  try {
-    const raw = localStorage.getItem(SEARCH_STATE_KEY);
-    if (raw) applyState(JSON.parse(raw));
-  } catch { /* ignore corrupt state */ }
-}
-
-async function onCvFile(e: Event) {
-  const file = (e.target as HTMLInputElement).files?.[0];
-  if (!file) return;
-  cvError.value = null;
-  cvLoading.value = true;
-  try {
-    const text = await extractCvText(file);
-    cvPaste.value = text;
-    cvProfile.value = buildCvProfile(text);
-    if (!jobs.value.length || total.value > pageSize.value) await load(1);
-  } catch (err: any) {
-    cvError.value = err?.message || t("atsReadError");
-  } finally {
-    cvLoading.value = false;
-  }
-}
-
-function applyPastedCv() {
-  if (cvPaste.value.trim().length < 30) {
-    cvError.value = t("atsPasteTooShort");
-    return;
-  }
-  cvError.value = null;
-  cvProfile.value = buildCvProfile(cvPaste.value);
-}
-
-function clearCv() {
-  cvProfile.value = null;
-  cvPaste.value = "";
-  cvError.value = null;
-  if (sort.value === "ats") sort.value = "date";
-}
+const { persist: persistState, restore: restoreState } = useJobRouteState({
+  storageKey: SEARCH_STATE_KEY,
+  serialize: currentState,
+  deserialize: applyState,
+  ignoredUrlKeys: ["job"],
+  extraQuery: () => jobModalOpen.value && activeJob.value ? { job: activeJob.value.id } : {},
+});
 
 // Salary in the vacancy's own currency (as provided by the source).
 function formatSalary(job: Job): string | null {
@@ -648,8 +509,8 @@ function convertedSalary(job: Job): string | null {
   const body = lo !== undefined && hi !== undefined
     ? `${lo.toLocaleString()}–${hi.toLocaleString()}`
     : (lo ?? hi)!.toLocaleString();
-  const sym = CURRENCY_SYMBOL[displayCurrency.value.toUpperCase()];
-  const money = sym ? `${sym}${body}` : `${body} ${displayCurrency.value.toUpperCase()}`;
+  const sym = currencySymbol(displayCurrency.value);
+  const money = sym === displayCurrency.value.toUpperCase() ? `${body} ${sym}` : `${sym}${body}`;
   return `≈ ${money}/${periodLabel(displayPeriod.value)}`;
 }
 
@@ -678,7 +539,6 @@ function timeAgo(iso: string): string {
 
 // ---- normalized vacancy spec table (details modal) ----
 // ATS match for the open vacancy (only when a CV profile is loaded).
-const activeAts = computed(() => (cvProfile.value && activeJob.value ? scoreJob(cvProfile.value, activeJob.value) : null));
 const vBool = (v?: boolean) => (v === true ? t("yes") : v === false ? t("no") : t("notSpecified"));
 const vStr = (v?: string | null) => (v ? v : t("notSpecified"));
 function experienceValue(j: Job): string {
@@ -819,12 +679,6 @@ const levelItems = computed<Item[]>(() => [
 // take several seconds while upstream boards time out; keeping that request at
 // top level leaves all filters rendered but inert until it finishes.
 onMounted(() => {
-  loadMoreObserver = new IntersectionObserver(
-    ([entry]) => {
-      if (entry?.isIntersecting) loadMore();
-    },
-    { rootMargin: "300px 0px" },
-  );
   loadSeen(); // restore "seen"/recently-viewed marks
   loadSavedJobs();
   const sharedJobId = new URLSearchParams(window.location.search).get("job");
@@ -837,25 +691,21 @@ watch(jobModalOpen, (isOpen) => {
   activeJob.value = null;
   persistState();
 });
-watch(loadMoreSentinel, (element, previous) => {
-  if (previous) loadMoreObserver?.unobserve(previous);
-  if (element) loadMoreObserver?.observe(element);
-});
 onBeforeUnmount(() => {
   if (loadTimer) clearTimeout(loadTimer);
   if (warmTimer) clearTimeout(warmTimer);
-  loadMoreObserver?.disconnect();
 });
 </script>
 
 <template>
-  <u-container class="jobs">
-    <ocean-page-backdrop />
-    <div class="jobs__header text-center space-y-3">
-      <h1 class="jobs__title">{{ t("title") }}</h1>
-      <p class="jobs__headline text-muted">{{ t("headline") }}</p>
-      <p class="jobs__subtitle text-muted mx-auto">{{ t("subtitle") }}</p>
-    </div>
+  <SearchPageShell class-name="jobs" :title="t('title')">
+    <template #header>
+      <div class="jobs__header text-center space-y-3">
+        <h1 class="jobs__title">{{ t("title") }}</h1>
+        <p class="jobs__headline text-muted">{{ t("headline") }}</p>
+        <p class="jobs__subtitle text-muted mx-auto">{{ t("subtitle") }}</p>
+      </div>
+    </template>
 
     <UiResultsLoader :loading="loading && savedView === 'active'" :label="t('searching')" min-height="420px">
     <AtsPanel
@@ -869,7 +719,7 @@ onBeforeUnmount(() => {
     />
 
     <!-- Filters + sort -->
-    <form class="jobs__controls" @submit.prevent="load(1)">
+    <JobFilters class="jobs__controls" @submit="load(1)">
       <u-input v-model="query" clearable icon="i-lucide-search" :label="t('search')" :placeholder="t('searchPlaceholder')" @clear="clearSearch" />
       <UiSortSelect
         v-model="sort"
@@ -891,7 +741,7 @@ onBeforeUnmount(() => {
             {{ opt.label ?? t(opt.labelKey!) }}
           </button>
         </div>
-        <UiSearchViewTabs
+        <SearchSavedTabs
           :model-value="savedView"
           :items="savedViewTabs"
           :aria-label="t('savedFilters')"
@@ -909,7 +759,7 @@ onBeforeUnmount(() => {
           {{ t("advanced") }}
         </button>
       </div>
-      <div v-if="showAdvanced" class="jobs__advanced">
+      <JobAdvancedFilters v-if="showAdvanced" class="jobs__advanced">
         <UiFilterSection class="jobs-filter-group" icon="i-lucide-map-pin" :title="t('filterLocation')">
           <div class="jobs-filter-group__grid jobs-filter-group__grid_location">
             <div class="jobs__field">
@@ -973,8 +823,8 @@ onBeforeUnmount(() => {
         </UiFilterSection>
 
         <UiFilterFooter class="jobs-filter-actions" :reset-label="t('reset')" @reset="resetFilters" />
-      </div>
-    </form>
+      </JobAdvancedFilters>
+    </JobFilters>
 
     <p v-if="failed" class="jobs__error">{{ t("error") }}</p>
     <p v-else-if="warming && savedView === 'active'" class="jobs__warming" role="status" aria-live="polite">
@@ -998,9 +848,9 @@ onBeforeUnmount(() => {
     />
     <RecentlyViewed :jobs="recentlyViewed" @open="openSharedJob" />
 
-    <div class="jobs__grid">
+    <JobGrid :items="scored">
+      <template #default="{ job, ats }">
       <JobCard
-          v-for="{ job, ats } in scored"
           :key="job.id"
           :job="job"
           :ats="ats"
@@ -1016,7 +866,8 @@ onBeforeUnmount(() => {
           @favorite="toggleFavorite"
           @hidden="toggleHidden"
       />
-    </div>
+      </template>
+    </JobGrid>
 <div v-if="!loading && !(warming && savedView === 'active') && !displayedJobs.length && !failed" class="jobs__empty">
       <div class="text-muted">{{ t("empty") }}</div>
     </div>
@@ -1037,7 +888,7 @@ onBeforeUnmount(() => {
     </UiResultsLoader>
 
     <!-- Full vacancy popup -->
-    <u-modal v-model:open="jobModalOpen" :title="activeJob?.title || ''" :ui="{ content: 'max-w-2xl' }">
+    <JobDetailsModal v-model:open="jobModalOpen" :title="activeJob?.title || ''" :ui="{ content: 'max-w-2xl' }">
       <template #body>
         <div v-if="activeJob" class="job-modal">
           <div class="job-modal__meta text-muted">
@@ -1119,8 +970,8 @@ onBeforeUnmount(() => {
         >{{ shareCopied ? t("shareCopied") : t("share") }}</u-button>
         </UiModalFooter>
       </template>
-    </u-modal>
-  </u-container>
+    </JobDetailsModal>
+  </SearchPageShell>
 </template>
 
 <style scoped>

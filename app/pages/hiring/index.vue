@@ -2,13 +2,31 @@
 import { safeFetch } from "~/utils/safeFetch";
 import { locationLabel } from "~/utils/locationLabels";
 import CandidateCard from "~/components/hiring/CandidateCard.vue";
-import type { HiringCvProfile as CvProfile } from "~/types/hiring";
-import { canonicalHiringSkill } from "~/utils/hiringMatch";
-import { readStoredList, writeStoredList } from "~/utils/browserStorage";
+import CandidateGrid from "~/components/hiring/CandidateGrid.vue";
+import CandidateDetailsModal from "~/components/hiring/CandidateDetailsModal.vue";
+import HiringFilters from "~/components/hiring/HiringFilters.vue";
+import HiringAdvancedFilters from "~/components/hiring/HiringAdvancedFilters.vue";
+import SearchPageShell from "~/components/search/SearchPageShell.vue";
+import SearchSavedTabs from "~/components/search/SearchSavedTabs.vue";
+import { useHiringFilters } from "~/composables/hiring/useHiringFilters";
+import { useHiringFeed } from "~/composables/hiring/useHiringFeed";
+import { useHiringMatch } from "~/composables/hiring/useHiringMatch";
+import { useHiringRouteState } from "~/composables/hiring/useHiringRouteState";
+import { useSavedCollections } from "~/composables/search/useSavedCollections";
+import { useLatestRequest } from "~/composables/search/useLatestRequest";
+import { useInfiniteFeed } from "~/composables/search/useInfiniteFeed";
+import {
+  HIRING_SORTS,
+  type HiringCountryMeta as CountryMeta,
+  type HiringCvProfile as CvProfile,
+  type HiringFeedResult as FeedResult,
+  type HiringSort,
+  type HiringSourceOption as SourceOption,
+  type HiringView,
+} from "~/types/hiring";
 import { queryString } from "~/utils/queryParams";
 import { hiringProfessionLocale } from "~~/shared/hiringProfessionLabels";
 import {
-  expandHiringProfessionFilters,
   hiringProfessionFilterLabel,
   normalizeHiringProfessionFilterSelections,
 } from "~~/shared/hiringProfessionGroups";
@@ -16,31 +34,8 @@ import {
 // Hiring board — CV/resume profiles from candidates looking for work.
 // Auto-routed at /hiring. UI follows /flat-finder; data from /hiring-feed.
 
-interface FeedResult {
-  count: number;
-  profiles: CvProfile[];
-  rates?: Record<string, number>;
-  warming?: boolean;
-  sourceCounts?: Record<string, number>;
-  sourceErrors?: Array<{ source?: string; country?: string; handle?: string; error?: string }>;
-  meta?: {
-    professions?: string[];
-    sources?: Array<{ value: string; label: string; origin?: string }>;
-  };
-  error?: string;
-}
-interface CountryMeta { code: string; name: string; currency: string; cities?: string[] }
-type HiringView = "active" | "favorites" | "recent" | "hidden";
-type HiringSort = "recent" | "name_asc" | "name_desc" | "experience_desc" | "experience_asc" | "age_asc" | "age_desc" | "salary_desc" | "salary_asc";
-const HIRING_SORTS: HiringSort[] = ["recent", "name_asc", "name_desc", "experience_desc", "experience_asc", "age_asc", "age_desc", "salary_desc", "salary_asc"];
-
 const PAGE_SIZE = 20;
-const MAX_SAVED = 200;
-const MAX_RECENT = 30;
 const STORAGE = {
-  favorites: "hiring:favorites:v1",
-  hidden: "hiring:hidden:v1",
-  recent: "hiring:recent:v1",
   presets: "hiring:presets:v1",
 };
 
@@ -60,39 +55,36 @@ useSeoMeta({
   ogDescription: () => t("seoDescription"),
 });
 
-const countries = ref<string[]>([]);
-const city = ref("");
-const remote = ref("any");
-const experienceMin = ref<number | undefined>(undefined);
-const salaryFrom = ref<number | undefined>(undefined);
-const salaryTo = ref<number | undefined>(undefined);
-const salaryCurrency = ref("USD");
-const sort = ref<HiringSort>("recent");
-const ageMin = ref<number | undefined>(undefined);
-const ageMax = ref<number | undefined>(undefined);
-const gender = ref("");
-const professions = ref<string[]>([]);
-const professionValues = ref<string[]>([]);
-const query = ref("");
-const seniority = ref("");
-const skills = ref("");
-const source = ref("");
-const showAdvanced = ref(true);
+const {
+  countries, city, remote, experienceMin, salaryFrom, salaryTo, salaryCurrency, sort,
+  ageMin, ageMax, gender, professions, professionValues, query, seniority, skills, source,
+  showAdvanced, resetValues: resetFilterValues,
+} = useHiringFilters();
 
-const profiles = ref<CvProfile[]>([]);
-const total = ref(0);
-const loading = ref(false);
-const loadingMore = ref(false);
-/** A filter changed and the confirming request has not answered yet. */
-const filtersPending = ref(false);
-const warming = ref(false);
-const failed = ref(false);
-const sourceErrors = ref<FeedResult["sourceErrors"]>([]);
-const usdRates = ref<Record<string, number>>({ USD: 1 });
+const {
+  profiles, total, loading, loadingMore, filtersPending, warming, failed,
+  sourceErrors, usdRates, fetchFeed,
+} = useHiringFeed();
 const view = ref<HiringView>("active");
-const favorites = ref<CvProfile[]>([]);
-const hidden = ref<CvProfile[]>([]);
-const recent = ref<CvProfile[]>([]);
+const {
+  favorites,
+  hidden,
+  recent,
+  hiddenIds,
+  favoriteIds,
+  isHidden,
+  isFavorite,
+  toggleFavorite,
+  toggleHidden,
+  addRecent,
+  load: loadSavedCollections,
+} = useSavedCollections<CvProfile>({
+  namespace: "hiring",
+  getId: (item) => item.id,
+  favoritesLimit: 200,
+  hiddenLimit: 200,
+  recentLimit: 30,
+});
 const presetModalOpen = ref(false);
 const shareModalOpen = ref(false);
 const sharedLinkOpened = ref(false);
@@ -100,12 +92,10 @@ const listingShareModalOpen = ref(false);
 const listingShareUrl = ref("");
 const listingShareCopied = ref(false);
 const loadMoreSentinel = ref<HTMLElement | null>(null);
-let loadSeq = 0;
+const { next: nextLoadRequest, isLatest: isLatestLoadRequest } = useLatestRequest();
 let loadTimer: ReturnType<typeof setTimeout> | undefined;
-let querySyncTimer: ReturnType<typeof setTimeout> | undefined;
 let warmTimer: ReturnType<typeof setTimeout> | undefined;
 let sharedPostTimer: ReturnType<typeof setTimeout> | undefined;
-let infiniteObserver: IntersectionObserver | undefined;
 
 const { copyText } = useClipboard();
 const {
@@ -156,7 +146,6 @@ const cityOptions = computed(() => {
     .sort((a, b) => cityLabel(a).localeCompare(cityLabel(b), String(locale.value)));
 });
 
-interface SourceOption { value: string; label: string; origin?: string }
 const availableSources = ref<SourceOption[]>([]);
 const sourceOptions = computed<SourceOption[]>(() => [
   { value: "", label: t("all") },
@@ -219,18 +208,19 @@ const sortItems = computed<Item[]>(() => [
 ]);
 
 function loadPersonalState() {
-  favorites.value = readStoredList<CvProfile>(STORAGE.favorites, MAX_SAVED);
-  hidden.value = readStoredList<CvProfile>(STORAGE.hidden, MAX_SAVED);
-  recent.value = readStoredList<CvProfile>(STORAGE.recent, MAX_RECENT);
+  loadSavedCollections();
   loadPresets();
 }
 
-const hiddenIds = computed(() => new Set(hidden.value.map((item) => item.id)));
-const favoriteIds = computed(() => new Set(favorites.value.map((item) => item.id)));
-const isHidden = (id: string) => hiddenIds.value.has(id);
-const isFavorite = (id: string) => favoriteIds.value.has(id);
-
 const activeProfiles = computed(() => profiles.value.filter((item) => !hiddenIds.value.has(item.id)));
+const {
+  canonicalSkillValues,
+  canonicalSkillQuery,
+  candidateMatchFilters,
+  matchesLocally,
+} = useHiringMatch({
+  countries, city, remote, experienceMin, ageMin, ageMax, gender, professions, seniority, skills, source,
+});
 
 /**
  * The same filters the server applies, over what is already on screen.
@@ -240,39 +230,6 @@ const activeProfiles = computed(() => profiles.value.filter((item) => !hiddenIds
  * text search, which stays the server's job — so the visible list narrows on
  * the keystroke and is replaced by the authoritative result when it lands.
  */
-function matchesLocally(profile: CvProfile): boolean {
-  if (countries.value.length && !countries.value.includes((profile.country || "").toUpperCase())) return false;
-  if (remote.value === "yes" && !profile.remote) return false;
-  if (remote.value === "no" && profile.remote) return false;
-  if (gender.value && (profile.gender || "unknown") !== gender.value) return false;
-  if (seniority.value && (profile.seniority || "") !== seniority.value) return false;
-
-  if (experienceMin.value != null) {
-    if (profile.experienceYears == null || profile.experienceYears < experienceMin.value) return false;
-  }
-  if (ageMin.value != null && (profile.age == null || profile.age < ageMin.value)) return false;
-  if (ageMax.value != null && (profile.age == null || profile.age > ageMax.value)) return false;
-
-  if (city.value) {
-    const needle = city.value.trim().toLocaleLowerCase("ru");
-    const hay = `${profile.city || ""} ${profile.district || ""}`.toLocaleLowerCase("ru");
-    if (!hay.includes(needle)) return false;
-  }
-
-  if (professions.value.length) {
-    const owned = new Set([...(profile.professions || []), profile.role].filter(Boolean));
-    if (!expandHiringProfessionFilters(professions.value).some((profession) => owned.has(profession))) return false;
-  }
-
-  if (source.value) {
-    const origin = (profile.origin || "telegram").toLowerCase();
-    const key = (profile.sourceKey || profile.source || "").toLowerCase();
-    if (source.value !== origin && source.value !== key) return false;
-  }
-
-  return true;
-}
-
 const displayedProfiles = computed(() => {
   if (view.value === "favorites") return favorites.value;
   if (view.value === "recent") return recent.value;
@@ -282,23 +239,13 @@ const displayedProfiles = computed(() => {
   return filtersPending.value ? activeProfiles.value.filter(matchesLocally) : activeProfiles.value;
 });
 const hasMore = computed(() => view.value === "active" && profiles.value.length < total.value);
-
-function canonicalSkillValues(): string[] {
-  return [...new Set(skills.value
-    .split(",")
-    .map((value) => canonicalHiringSkill(value))
-    .map((value) => value.trim())
-    .filter(Boolean))];
-}
-
-function canonicalSkillQuery(): string {
-  return canonicalSkillValues().join(",");
-}
-
-const candidateMatchFilters = computed(() => ({
-  professions: professions.value,
-  skills: canonicalSkillValues(),
-}));
+useInfiniteFeed({
+  sentinel: loadMoreSentinel,
+  hasMore,
+  loading: computed(() => loading.value || loadingMore.value),
+  loadMore: () => load(true),
+  rootMargin: "500px 0px",
+});
 
 function currentFilterQuery(): Record<string, string> {
   const queryParams: Record<string, string> = {};
@@ -359,22 +306,7 @@ function activeCvQuery(profile: CvProfile): Record<string, string> {
   };
 }
 
-async function syncQueryParams() {
-  const preserved: Record<string, string> = {};
-  for (const key of ["cv", "cvSource", "cvCountry"] as const) {
-    const value = queryString(route.query[key]);
-    if (value) preserved[key] = value;
-  }
-  await router.replace({ query: { ...currentFilterQuery(), ...preserved } });
-}
-
-function scheduleQuerySync(delay = 160) {
-  if (querySyncTimer) clearTimeout(querySyncTimer);
-  querySyncTimer = setTimeout(() => {
-    querySyncTimer = undefined;
-    void syncQueryParams();
-  }, delay);
-}
+const { schedule: scheduleQuerySync } = useHiringRouteState(router, route, currentFilterQuery, applyQueryParams);
 
 async function syncActiveCvQuery(profile: CvProfile | null) {
   await router.replace({
@@ -410,7 +342,7 @@ function scheduleWarmPoll() {
 }
 
 async function load(append = false, background = false) {
-  const seq = ++loadSeq;
+  const requestId = nextLoadRequest();
   if (!background) {
     if (append) loadingMore.value = true;
     // A filter change already has something to show; dimming the grid for it
@@ -438,8 +370,8 @@ async function load(append = false, background = false) {
   if (skillQuery) params.skills = skillQuery;
   if (source.value) params.sources = source.value;
 
-  const { data, error } = await safeFetch<FeedResult>("/hiring-feed", { params });
-  if (seq !== loadSeq) {
+  const { data, error } = await fetchFeed(params);
+  if (!isLatestLoadRequest(requestId)) {
     if (append) loadingMore.value = false;
     return;
   }
@@ -490,22 +422,7 @@ function selectSource(v: string) {
   scheduleLoad(80);
 }
 function resetFilters() {
-  countries.value = [];
-  city.value = "";
-  remote.value = "any";
-  experienceMin.value = undefined;
-  salaryFrom.value = undefined;
-  salaryTo.value = undefined;
-  salaryCurrency.value = "USD";
-  sort.value = "recent";
-  ageMin.value = undefined;
-  ageMax.value = undefined;
-  gender.value = "";
-  professions.value = [];
-  query.value = "";
-  seniority.value = "";
-  skills.value = "";
-  source.value = "";
+  resetFilterValues();
   scheduleLoad(80);
 }
 function clearProfessions() {
@@ -515,36 +432,13 @@ function clearProfessions() {
 }
 function setView(next: string) { view.value = next as HiringView; }
 
-function toggleFavorite(item: CvProfile) {
-  favorites.value = isFavorite(item.id)
-    ? favorites.value.filter((saved) => saved.id !== item.id)
-    : [item, ...favorites.value.filter((saved) => saved.id !== item.id)].slice(0, MAX_SAVED);
-  if (isHidden(item.id)) {
-    hidden.value = hidden.value.filter((saved) => saved.id !== item.id);
-    writeStoredList(STORAGE.hidden, hidden.value, MAX_SAVED);
-  }
-  writeStoredList(STORAGE.favorites, favorites.value, MAX_SAVED);
-}
-
-function toggleHidden(item: CvProfile) {
-  hidden.value = isHidden(item.id)
-    ? hidden.value.filter((saved) => saved.id !== item.id)
-    : [item, ...hidden.value.filter((saved) => saved.id !== item.id)].slice(0, MAX_SAVED);
-  if (isFavorite(item.id)) {
-    favorites.value = favorites.value.filter((saved) => saved.id !== item.id);
-    writeStoredList(STORAGE.favorites, favorites.value, MAX_SAVED);
-  }
-  writeStoredList(STORAGE.hidden, hidden.value, MAX_SAVED);
-}
-
 const active = ref<CvProfile | null>(null);
 const modalOpen = ref(false);
 
 function openCv(profile: CvProfile) {
   active.value = profile;
   modalOpen.value = true;
-  recent.value = [profile, ...recent.value.filter((item) => item.id !== profile.id)].slice(0, MAX_RECENT);
-  writeStoredList(STORAGE.recent, recent.value, MAX_RECENT);
+  addRecent(profile);
   void syncActiveCvQuery(profile);
 }
 
@@ -710,13 +604,6 @@ onMounted(async () => {
   }
   await load(false);
   if (sharedCvId) await openSharedCv(sharedCvId, sharedCvSource, sharedCvCountry);
-  await nextTick();
-  infiniteObserver = new IntersectionObserver((entries) => {
-    if (entries.some((entry) => entry.isIntersecting) && hasMore.value && !loading.value && !loadingMore.value) {
-      void load(true);
-    }
-  }, { rootMargin: "500px 0px" });
-  if (loadMoreSentinel.value) infiniteObserver.observe(loadMoreSentinel.value);
 });
 
 watch(modalOpen, (isOpen) => {
@@ -725,30 +612,27 @@ watch(modalOpen, (isOpen) => {
   void syncActiveCvQuery(null);
 });
 
-watch(loadMoreSentinel, (current, previous) => {
-  if (previous) infiniteObserver?.unobserve(previous);
-  if (current) infiniteObserver?.observe(current);
-});
-
 onBeforeUnmount(() => {
   if (loadTimer) clearTimeout(loadTimer);
-  if (querySyncTimer) clearTimeout(querySyncTimer);
   if (warmTimer) clearTimeout(warmTimer);
   if (sharedPostTimer) clearTimeout(sharedPostTimer);
-  infiniteObserver?.disconnect();
 });
 </script>
 
 <template>
-  <u-container class="hiring">
-    <ocean-page-backdrop />
-    <div class="hiring__header text-center space-y-3">
-      <h1 class="hiring__title">{{ t("title") }}</h1>
-      <p class="hiring__subtitle text-muted mx-auto">{{ t("subtitle") }}</p>
-    </div>
+  <SearchPageShell
+    class-name="hiring"
+    :title="t('title')"
+  >
+    <template #header>
+      <div class="hiring__header text-center space-y-3">
+        <h1 class="hiring__title">{{ t("title") }}</h1>
+        <p class="hiring__subtitle text-muted mx-auto">{{ t("subtitle") }}</p>
+      </div>
+    </template>
 
     <UiResultsLoader :loading="loading" :label="t('searching')" min-height="420px">
-    <form class="hiring__controls" @submit.prevent="load()">
+    <HiringFilters class="hiring__controls" @submit="load()">
       <u-input v-model="query" clearable icon="i-lucide-search" :label="t('search')" :placeholder="t('searchPlaceholder')" @clear="clearSearch" />
       <UiSortSelect v-model="sort" :items="sortItems" :label="t('sort')" @update:model-value="scheduleLoad(0)" />
       <u-button type="submit" icon="i-lucide-search">
@@ -763,7 +647,7 @@ onBeforeUnmount(() => {
               @click="selectSource(opt.value)"
           >{{ opt.label }}</button>
         </div>
-        <UiSearchViewTabs
+        <SearchSavedTabs
           :model-value="view"
           :items="viewTabs"
           :aria-label="t('personalTabs')"
@@ -771,7 +655,7 @@ onBeforeUnmount(() => {
         />
       </div>
 
-      <div v-if="showAdvanced" class="hiring__advanced">
+      <HiringAdvancedFilters v-if="showAdvanced" class="hiring__advanced">
         <UiSearchPresets
           :presets="presets"
           :label="t('presets')"
@@ -827,8 +711,8 @@ onBeforeUnmount(() => {
           :reset-label="t('reset')"
           @reset="resetFilters"
         />
-      </div>
-    </form>
+      </HiringAdvancedFilters>
+    </HiringFilters>
 
     <p v-if="failed" class="hiring__error">{{ t("error") }}</p>
     <p v-else-if="hasSourceWarning" class="hiring__source-warning">
@@ -840,9 +724,9 @@ onBeforeUnmount(() => {
       :profiles="displayedProfiles"
       :rates="usdRates"
     />
-    <div class="hiring__grid" :class="{ 'hiring__grid_dense': denseGrid }">
+    <CandidateGrid :profiles="displayedProfiles" :dense="denseGrid">
+      <template #default="{ profile }">
       <CandidateCard
-        v-for="profile in displayedProfiles"
         :key="profile.id"
         :profile="profile"
         :favorite="isFavorite(profile.id)"
@@ -854,7 +738,8 @@ onBeforeUnmount(() => {
         @toggle-favorite="toggleFavorite(profile)"
         @toggle-hidden="toggleHidden(profile)"
       />
-    </div>
+      </template>
+    </CandidateGrid>
 <div ref="loadMoreSentinel" v-if="hasMore" class="hiring__sentinel">
       <span v-if="loadingMore" class="text-muted">{{ t("loadingMore") }}</span>
     </div>
@@ -865,7 +750,7 @@ onBeforeUnmount(() => {
 
     </UiResultsLoader>
 
-    <u-modal v-model:open="modalOpen" :title="active?.name || active?.role || t('notSpecified')" :ui="{ content: 'max-w-3xl' }">
+    <CandidateDetailsModal v-model:open="modalOpen" :title="active?.name || active?.role || t('notSpecified')" :ui="{ content: 'max-w-3xl' }">
       <template #title>
         <h2 class="hiring-modal__title">{{ active?.name || active?.role || t("notSpecified") }}</h2>
         <p v-if="active?.name && active?.role" class="hiring-modal__role">{{ active.role }}</p>
@@ -896,7 +781,7 @@ onBeforeUnmount(() => {
           <a class="modal-footer__primary" :href="active.url" target="_blank" rel="noopener noreferrer">{{ t("open") }} →</a>
         </UiModalFooter>
       </template>
-    </u-modal>
+    </CandidateDetailsModal>
 
     <u-modal v-model:open="presetModalOpen" :title="t('savePreset')">
       <template #body>
@@ -929,7 +814,7 @@ onBeforeUnmount(() => {
         </u-button>
       </template>
     </u-modal>
-  </u-container>
+  </SearchPageShell>
 </template>
 
 <style scoped>

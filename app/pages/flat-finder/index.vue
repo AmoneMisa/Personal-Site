@@ -2,108 +2,39 @@
 import { safeFetch } from "~/utils/safeFetch";
 import { metroLabelWithAlias, locationLabel, type LocationKind } from "~/utils/locationLabels";
 import FlatMap from "~/components/flats/FlatMap.client.vue";
-import { readStoredList, writeStoredList } from "~/utils/browserStorage";
+import FlatCard from "~/components/flats/FlatCard.vue";
+import FlatGrid from "~/components/flats/FlatGrid.vue";
+import FlatDetailsModal from "~/components/flats/FlatDetailsModal.vue";
+import FlatAdvancedFilters from "~/components/flats/FlatAdvancedFilters.vue";
+import SearchPageShell from "~/components/search/SearchPageShell.vue";
+import SearchSavedTabs from "~/components/search/SearchSavedTabs.vue";
 import { queryBoolean, queryString } from "~/utils/queryParams";
+import { formatRelativeDate } from "~/utils/search/relativeDate";
+import { convertCurrency } from "~/utils/search/money";
+import { useFlatFilters } from "~/composables/flats/useFlatFilters";
+import { useFlatFeed } from "~/composables/flats/useFlatFeed";
+import { useFlatPhotos } from "~/composables/flats/useFlatPhotos";
+import { useFlatMap } from "~/composables/flats/useFlatMap";
+import { useFlatRouteState } from "~/composables/flats/useFlatRouteState";
+import { useFlatTranslation } from "~/composables/flats/useFlatTranslation";
+import { useSavedCollections } from "~/composables/search/useSavedCollections";
+import { useLatestRequest } from "~/composables/search/useLatestRequest";
+import { useInfiniteFeed } from "~/composables/search/useInfiniteFeed";
+import { useSearchScroll } from "~/composables/search/useSearchScroll";
+import type {
+  FlatCountryMeta as CountryMeta,
+  FlatFeedResult as FeedResult,
+  FlatListing as Listing,
+  FlatSort,
+  FlatView,
+} from "~/types/flats";
 
 // Flat Finder. Auto-routed at /flat-finder. Reuses the flat-finder backend
 // (same one the desktop app uses) via the /flats-* proxy routes, so listings,
 // filters and the map all work over HTTPS same-origin.
 
-interface Listing {
-  id: string;
-  source: string;
-  country: string;
-  title: string;
-  propertyType: "flat" | "house";
-  byAgency: boolean;
-  price: number | null;
-  currency: string;
-  rooms: number | null;
-  areaSqm: number | null;
-  city: string;
-  district?: string | null;
-  metro?: string | null;
-  address?: string | null;
-  roomOnly?: boolean;
-  lat: number | null;
-  lng: number | null;
-  photo: string | null;
-  photos: string[];
-  url: string;
-  createdAt: string | null;
-  description: string;
-  dealType: "sale" | "longRent" | "shortRent" | null;
-  floor?: number | null;
-  totalFloors?: number | null;
-  buildingYear?: number | null;
-  bedrooms?: number | null;
-  bathrooms?: number | null;
-  balcony?: boolean | null;
-  terrace?: boolean | null;
-  privateYard?: boolean | null;
-  dishwasher?: boolean | null;
-  airConditioner?: boolean | null;
-  gas?: boolean | null;
-  newBuilding?: boolean | null;
-  communalSeparated?: boolean | null;
-  kvartal?: string | null;
-  area?: string | null;
-  areaAmbiguous?: boolean;
-  locationConfidence?: number | null;
-  requireExactAddress?: boolean;
-  nearbyShops?: string[];
-  nearby?: string[];
-  residenceComplex?: string | null;
-  petsAllowed?: boolean | null;
-  childrenAllowed?: boolean | null;
-  audience?: "women" | "men" | "family" | null;
-  deposit?: boolean | null;
-  depositAmount?: number | null;
-  depositCurrency?: string | null;
-  commission?: boolean | null;
-  commissionPercent?: number | null;
-  furnished?: boolean | null;
-  condition?: "needs_renovation" | "basic" | "good" | "modern" | "luxury" | null;
-  amenities?: string[];
-  parking?: boolean | null;
-  elevator?: boolean | null;
-  heating?: boolean | null;
-  hotWater?: boolean | null;
-  internet?: boolean | null;
-  smokingAllowed?: boolean | null;
-  negotiable?: boolean | null;
-  utilitiesAmount?: number | null;
-  minLeaseTerm?: string | null;
-  availableFrom?: string | null;
-  tags?: string[];
-}
-interface FeedResult {
-  count: number;
-  listings: Listing[];
-  warming?: boolean;
-  sourceCounts?: Record<string, number>;
-  sourceErrors?: Array<{ source?: string; country?: string; error?: string }>;
-  nextCursor?: string | null;
-  queryMs?: number;
-  error?: string;
-  exactListingFallback?: "source" | "source-inactive" | string;
-}
-interface TranslationResult {
-  status: "pending" | "completed" | "failed" | "disabled" | "not_found";
-  key?: string;
-  data?: { translatedText?: string; sourceLanguage?: string | null };
-  confidence?: number;
-}
-interface CountryMeta { code: string; name: string; currency: string; cities?: string[]; locations?: Record<string, { districts?: string[]; metro?: string[] }> }
-type FlatView = "active" | "favorites" | "recent" | "hidden";
-type FlatSort = "newest" | "oldest" | "priceAsc" | "priceDesc" | "titleAsc" | "titleDesc";
 const PAGE_SIZE = 20;
-const MAX_SAVED_FLATS = 200;
-const MAX_RECENT_FLATS = 30;
 const STORAGE = {
-  favorites: "flats:favorites:v1",
-  hidden: "flats:hidden:v1",
-  recent: "flats:recent:v1",
   presets: "flats:presets:v1",
 };
 
@@ -131,83 +62,63 @@ function regionalDefaultCountry(): "UA" | "UZ" {
   const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone || "";
   return timeZone.startsWith("Asia/") ? "UZ" : "UA";
 }
-const countries = ref<string[]>([]);
-const city = ref("");
-const district = ref("");
-const propertyType = ref("any");
-const dealType = ref("any");
-const agency = ref("any");
-const petFriendly = ref(false);
-const roomOnlyFilter = ref(false);
-const onlyWithPhotos = ref(false);
-const childrenRequired = ref(false);
-const newBuildingOnly = ref(false);
-const dishwasherOnly = ref(false);
-const airConditionerOnly = ref(false);
-const parkingOnly = ref(false);
-const internetOnly = ref(false);
-const gasOnly = ref(false);
-const balconyOnly = ref(false);
-const terraceOnly = ref(false);
-const privateYardOnly = ref(false);
-const sort = ref<FlatSort>("newest");
-const audience = ref("any");
-const metro = ref("");
-const priceMin = ref<number | undefined>(undefined);
-const priceMax = ref<number | undefined>(undefined);
-const roomsMin = ref<number | undefined>(undefined);
-const roomsMax = ref<number | undefined>(undefined);
-const bedroomsMin = ref<number | undefined>(undefined);
-const bedroomsMax = ref<number | undefined>(undefined);
-const areaMin = ref<number | undefined>(undefined);
-const areaMax = ref<number | undefined>(undefined);
-const pricePerSqmMin = ref<number | undefined>(undefined);
-const pricePerSqmMax = ref<number | undefined>(undefined);
-// Walking distance, in metres, from the coordinate-derived places data.
-const metroMaxM = ref<number | undefined>(undefined);
-const nearbyKind = ref("");
-const nearbyMaxM = ref<number | undefined>(undefined);
-const floorMin = ref<number | undefined>(undefined);
-const floorMax = ref<number | undefined>(undefined);
-const totalFloorsMin = ref<number | undefined>(undefined);
-const totalFloorsMax = ref<number | undefined>(undefined);
-const yearMin = ref<number | undefined>(undefined);
-const yearMax = ref<number | undefined>(undefined);
-const maxAgeDays = ref<number | undefined>(undefined);
-const displayCurrency = ref("USD");
+const {
+  countries, city, district, propertyType, dealType, agency, petFriendly, roomOnlyFilter,
+  onlyWithPhotos, childrenRequired, newBuildingOnly, dishwasherOnly, airConditionerOnly,
+  parkingOnly, internetOnly, gasOnly, balconyOnly, terraceOnly, privateYardOnly, sort,
+  audience, metro, priceMin, priceMax, roomsMin, roomsMax, bedroomsMin, bedroomsMax,
+  areaMin, areaMax, pricePerSqmMin, pricePerSqmMax, metroMaxM, nearbyKind, nearbyMaxM,
+  floorMin, floorMax, totalFloorsMin, totalFloorsMax, yearMin, yearMax, maxAgeDays,
+  displayCurrency, query, source, showAdvanced, resetValues: resetFilterValues,
+} = useFlatFilters();
 const rates = ref<Record<string, number>>({ USD: 1 });
-const query = ref("");
-const source = ref("");
-const showAdvanced = ref(false);
 
-const listings = ref<Listing[]>([]);
-const total = ref(0);
-const loading = ref(false);
-const loadingMore = ref(false);
-const warming = ref(false);
-const failed = ref(false);
-const sourceErrors = ref<FeedResult["sourceErrors"]>([]);
-const nextCursor = ref<string | null>(null);
-const failedPhotoUrls = ref<Set<string>>(new Set());
+const {
+  listings, total, loading, loadingMore, warming, failed, sourceErrors,
+  nextCursor, loadMoreSentinel, fetchFeed,
+} = useFlatFeed();
+const { listingPhoto, visiblePhotos, markPhotoFailedFromEvent } = useFlatPhotos();
 const view = ref<FlatView>("active");
-const favorites = ref<Listing[]>([]);
-const hidden = ref<Listing[]>([]);
-const recent = ref<Listing[]>([]);
+const {
+  favorites,
+  hidden,
+  recent,
+  hiddenIds,
+  favoriteIds,
+  isHidden,
+  isFavorite,
+  toggleFavorite,
+  toggleHidden,
+  addRecent,
+  removeWhere: removeSavedWhere,
+  load: loadSavedCollections,
+} = useSavedCollections<Listing>({
+  namespace: "flats",
+  getId: (item) => item.id,
+  favoritesLimit: 200,
+  hiddenLimit: 200,
+  recentLimit: 30,
+});
 const presetModalOpen = ref(false);
 const shareModalOpen = ref(false);
 const sharedLinkOpened = ref(false);
 const listingShareModalOpen = ref(false);
 const listingShareUrl = ref("");
 const listingShareCopied = ref(false);
-const loadMoreSentinel = ref<HTMLElement | null>(null);
-const drawnArea = ref<Array<{ lat: number; lng: number }>>([]);
-const filtersEl = ref<HTMLElement | null>(null);
-const showBackToTop = ref(false);
-let loadSeq = 0;
+const { drawnArea, applyDrawnArea } = useFlatMap(listings);
+const {
+  filtersEl,
+  showBackToFilters: showBackToTop,
+  scrollToFilters,
+} = useSearchScroll(600);
+const {
+  next: nextLoadRequest,
+  current: currentLoadRequest,
+  isLatest: isLatestLoadRequest,
+} = useLatestRequest();
 let loadTimer: ReturnType<typeof setTimeout> | undefined;
 let warmTimer: ReturnType<typeof setTimeout> | undefined;
 let sharedListingTimer: ReturnType<typeof setTimeout> | undefined;
-let infiniteObserver: IntersectionObserver | undefined;
 let lastPaginationScrollY = 0;
 
 const { copyText } = useClipboard();
@@ -230,23 +141,6 @@ const viewTabs = computed(() => [
   { value: "recent", label: t("recent"), count: recent.value.length },
   { value: "hidden", label: t("hidden"), count: hidden.value.length },
 ]);
-
-function photoCandidates(listing: Listing): string[] {
-  return [...new Set([listing.photo, ...(listing.photos || [])].filter((value): value is string => !!value))];
-}
-function listingPhoto(listing: Listing): string | null {
-  return photoCandidates(listing).find((url) => !failedPhotoUrls.value.has(url)) || null;
-}
-function visiblePhotos(listing: Listing): string[] {
-  return photoCandidates(listing).filter((url) => !failedPhotoUrls.value.has(url));
-}
-function markPhotoFailed(url: string | null) {
-  if (!url) return;
-  failedPhotoUrls.value = new Set([...failedPhotoUrls.value, url]);
-}
-function markPhotoFailedFromEvent(event: Event) {
-  markPhotoFailed((event.currentTarget as HTMLImageElement | null)?.getAttribute("src") || null);
-}
 
 const meta = ref<CountryMeta[]>([]);
 const cityOptions = computed(() => {
@@ -345,9 +239,7 @@ const agencyItems = computed<Item[]>(() => [
 ]);
 
 function loadPersonalState() {
-  favorites.value = readStoredList<Listing>(STORAGE.favorites, MAX_SAVED_FLATS);
-  hidden.value = readStoredList<Listing>(STORAGE.hidden, MAX_SAVED_FLATS);
-  recent.value = readStoredList<Listing>(STORAGE.recent, MAX_RECENT_FLATS);
+  loadSavedCollections();
   loadPresets();
   try { showAdvanced.value = localStorage.getItem("flats:showAdvanced") === "1"; } catch { /* noop */ }
 }
@@ -356,26 +248,6 @@ function toggleAdvanced() {
   try { localStorage.setItem("flats:showAdvanced", showAdvanced.value ? "1" : "0"); } catch { /* noop */ }
 }
 
-const hiddenIds = computed(() => new Set(hidden.value.map((item) => item.id)));
-const favoriteIds = computed(() => new Set(favorites.value.map((item) => item.id)));
-const isHidden = (id: string) => hiddenIds.value.has(id);
-const isFavorite = (id: string) => favoriteIds.value.has(id);
-
-function pointInPolygon(point: { lat: number; lng: number }, polygon: Array<{ lat: number; lng: number }>) {
-  let inside = false;
-  for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
-    const xi = polygon[i]!.lng, yi = polygon[i]!.lat;
-    const xj = polygon[j]!.lng, yj = polygon[j]!.lat;
-    const intersects = ((yi > point.lat) !== (yj > point.lat)) && point.lng < ((xj - xi) * (point.lat - yi)) / (yj - yi) + xi;
-    if (intersects) inside = !inside;
-  }
-  return inside;
-}
-function applyDrawnArea(items: Listing[]) {
-  if (drawnArea.value.length < 3) return items;
-  if (!items.some((item) => item.lat != null && item.lng != null)) return items;
-  return items.filter((item) => item.lat != null && item.lng != null && pointInPolygon({ lat: item.lat, lng: item.lng }, drawnArea.value));
-}
 const activeListings = computed(() => applyDrawnArea(listings.value.filter((item) => (
   !hiddenIds.value.has(item.id) && (!onlyWithPhotos.value || !!listingPhoto(item))
 ))));
@@ -386,6 +258,20 @@ const displayedListings = computed(() => {
   return activeListings.value;
 });
 const hasMore = computed(() => view.value === "active" && listings.value.length < total.value);
+function loadMoreListings() {
+  const currentScrollY = window.scrollY;
+  if (currentScrollY <= lastPaginationScrollY + 40) return;
+  lastPaginationScrollY = currentScrollY;
+  void load(true, false);
+}
+useInfiniteFeed({
+  sentinel: loadMoreSentinel,
+  hasMore,
+  loading: computed(() => loading.value || loadingMore.value),
+  loadMore: loadMoreListings,
+  rootMargin: "0px",
+  threshold: 0.01,
+});
 
 function currentFilterQuery(): Record<string, string> {
   const q: Record<string, string> = {};
@@ -491,20 +377,7 @@ function applyQueryParams(params: Record<string, unknown>) {
 // a failed or still-running request left the URL describing filters that were no
 // longer applied: resetting did not clear it, and removing one of the chips
 // above the results did not take that filter out of the query string either.
-let querySyncTimer: ReturnType<typeof setTimeout> | undefined;
-function scheduleQuerySync(delay = 200) {
-  if (querySyncTimer) clearTimeout(querySyncTimer);
-  querySyncTimer = setTimeout(() => { querySyncTimer = undefined; void syncQueryParams(); }, delay);
-}
-
-async function syncQueryParams() {
-  const preserved: Record<string, string> = {};
-  for (const key of ["flat", "flatSource", "flatCountry"] as const) {
-    const value = queryString(route.query[key]);
-    if (value) preserved[key] = value;
-  }
-  await router.replace({ query: { ...currentFilterQuery(), ...preserved } });
-}
+const { schedule: scheduleQuerySync } = useFlatRouteState(router, route, currentFilterQuery, applyQueryParams);
 const shareUrl = computed(() => {
   const resolved = router.resolve({ path: route.path, query: { ...currentFilterQuery(), shared: "1" } });
   return import.meta.client ? new URL(resolved.href, window.location.origin).toString() : resolved.href;
@@ -529,7 +402,7 @@ function scheduleWarmPoll() {
   warmTimer = setTimeout(() => { warmTimer = undefined; void load(false, true); }, 1800);
 }
 async function load(append = false, background = false) {
-  const seq = background ? loadSeq : ++loadSeq;
+  const requestId = background ? currentLoadRequest() : nextLoadRequest();
   if (!background) { append ? loadingMore.value = true : loading.value = true; failed.value = false; }
   const params: Record<string, string> = { limit: String(PAGE_SIZE) };
   const cursorSort = sort.value === "newest" || sort.value === "oldest";
@@ -579,8 +452,8 @@ async function load(append = false, background = false) {
   params.sort = sort.value;
   if (query.value.trim()) params.query = query.value.trim();
   params.sources = source.value || SOURCES.join(",");
-  const { data, error } = await safeFetch<FeedResult>("/flats-feed", { params });
-  if (seq !== loadSeq) { if (!background) { loading.value = false; loadingMore.value = false; } return; }
+  const { data, error } = await fetchFeed(params);
+  if (!isLatestLoadRequest(requestId)) { if (!background) { loading.value = false; loadingMore.value = false; } return; }
   if (error || !data || data.error) {
     if (!background) { failed.value = true; if (!append) { listings.value = []; total.value = 0; nextCursor.value = null; } sourceErrors.value = []; loading.value = false; loadingMore.value = false; }
     return;
@@ -614,31 +487,12 @@ function clearSearch() { query.value = ""; scheduleLoad(0); }
 function selectSource(v: string) { if (source.value === v) return; source.value = v; scheduleLoad(); }
 function resetFilters() {
   // Empty means "every country", so reset keeps the regional starting country.
-  countries.value = [defaultCountry.value];
-  city.value = ""; district.value = ""; metro.value = ""; propertyType.value = "any"; dealType.value = "any"; agency.value = "any"; audience.value = "any";
-  petFriendly.value = false; roomOnlyFilter.value = false; onlyWithPhotos.value = false; childrenRequired.value = false; newBuildingOnly.value = false;
-  dishwasherOnly.value = false; airConditionerOnly.value = false; parkingOnly.value = false; internetOnly.value = false; gasOnly.value = false; balconyOnly.value = false; terraceOnly.value = false; privateYardOnly.value = false; sort.value = "newest";
-  priceMin.value = undefined; priceMax.value = undefined; displayCurrency.value = "USD";
-  roomsMin.value = undefined; roomsMax.value = undefined; bedroomsMin.value = undefined; bedroomsMax.value = undefined; areaMin.value = undefined; areaMax.value = undefined; pricePerSqmMin.value = undefined; pricePerSqmMax.value = undefined;
-  metroMaxM.value = undefined; nearbyKind.value = ""; nearbyMaxM.value = undefined;
-  floorMin.value = undefined; floorMax.value = undefined; totalFloorsMin.value = undefined; totalFloorsMax.value = undefined; yearMin.value = undefined; yearMax.value = undefined; maxAgeDays.value = undefined;
-  query.value = ""; source.value = ""; drawnArea.value = []; view.value = "active";
+  resetFilterValues(defaultCountry.value);
+  drawnArea.value = [];
+  view.value = "active";
   scheduleLoad();
 }
-function updateBackToTop() { showBackToTop.value = window.scrollY > 600; }
-function scrollToFilters() { filtersEl.value?.scrollIntoView({ behavior: "smooth", block: "start" }); }
 function setView(next: string) { view.value = next as FlatView; }
-function toggleFavorite(item: Listing) {
-  favorites.value = isFavorite(item.id) ? favorites.value.filter((saved) => saved.id !== item.id) : [item, ...favorites.value.filter((saved) => saved.id !== item.id)].slice(0, MAX_SAVED_FLATS);
-  if (isHidden(item.id)) { hidden.value = hidden.value.filter((saved) => saved.id !== item.id); writeStoredList(STORAGE.hidden, hidden.value, MAX_SAVED_FLATS); }
-  writeStoredList(STORAGE.favorites, favorites.value, MAX_SAVED_FLATS);
-}
-function toggleHidden(item: Listing) {
-  hidden.value = isHidden(item.id) ? hidden.value.filter((saved) => saved.id !== item.id) : [item, ...hidden.value.filter((saved) => saved.id !== item.id)].slice(0, MAX_SAVED_FLATS);
-  if (isFavorite(item.id)) { favorites.value = favorites.value.filter((saved) => saved.id !== item.id); writeStoredList(STORAGE.favorites, favorites.value, MAX_SAVED_FLATS); }
-  writeStoredList(STORAGE.hidden, hidden.value, MAX_SAVED_FLATS);
-}
-
 function mapCoordinateLooksSane(listing: Listing): boolean {
   const lat = Number(listing.lat);
   const lng = Number(listing.lng);
@@ -660,15 +514,15 @@ const lightboxIndex = ref<number | null>(null);
 const lightboxPhotos = computed(() => active.value ? visiblePhotos(active.value) : []);
 const lightboxPhoto = computed(() => lightboxIndex.value == null ? null : lightboxPhotos.value[lightboxIndex.value] || null);
 const lightboxPosition = computed(() => (lightboxIndex.value ?? 0) + 1);
-const translatedDescription = ref("");
-const translatingDescription = ref(false);
-const translationFailed = ref(false);
-const translationCache = new Map<string, string>();
-let translationPollTimer: ReturnType<typeof setTimeout> | undefined;
-let translationRequestId = 0;
-const TRANSLATION_MAX_POLL_ATTEMPTS = 159;
-function translationCacheKey(listing: Listing, targetLanguage = locale.value.startsWith("en") ? "en" : "ru"): string { return `${listing.id}:${targetLanguage}`; }
-function stopTranslationPoll() { if (translationPollTimer) clearTimeout(translationPollTimer); translationPollTimer = undefined; }
+const {
+  translatedDescription,
+  translatingDescription,
+  translationFailed,
+  descriptionNeedsTranslation,
+  prepareTranslation,
+  cancelTranslation,
+  translateActiveDescription,
+} = useFlatTranslation(active, locale);
 /**
  * Mirrors the open listing in the address bar, using the same parameters the
  * share button produces, so copying the URL shares exactly what is on screen.
@@ -710,14 +564,7 @@ function removeUnavailableListing(id: string, sourceName = "olx", countryCode = 
   listings.value = listings.value.filter((item) => !listingIdentityMatches(item, id, sourceName, countryCode));
   const removed = before - listings.value.length;
   if (removed > 0) total.value = Math.max(0, total.value - removed);
-  favorites.value = favorites.value.filter((item) => !listingIdentityMatches(item, id, sourceName, countryCode));
-  hidden.value = hidden.value.filter((item) => !listingIdentityMatches(item, id, sourceName, countryCode));
-  recent.value = recent.value.filter((item) => !listingIdentityMatches(item, id, sourceName, countryCode));
-  if (import.meta.client) {
-    writeStoredList(STORAGE.favorites, favorites.value, MAX_SAVED_FLATS);
-    writeStoredList(STORAGE.hidden, hidden.value, MAX_SAVED_FLATS);
-    writeStoredList(STORAGE.recent, recent.value, MAX_RECENT_FLATS);
-  }
+  removeSavedWhere((item) => listingIdentityMatches(item, id, sourceName, countryCode));
   if (active.value && listingIdentityMatches(active.value, id, sourceName, countryCode)) {
     modalOpen.value = false;
     active.value = null;
@@ -761,9 +608,9 @@ async function openListing(l: Listing, olxAlreadyVerified = false) {
       if (checkingListingKey.value === key) checkingListingKey.value = "";
     }
   }
-  stopTranslationPoll(); translationRequestId += 1; lightboxIndex.value = null; active.value = listing;
-  translatedDescription.value = translationCache.get(translationCacheKey(listing)) || ""; translatingDescription.value = false; translationFailed.value = false; modalOpen.value = true;
-  recent.value = [listing, ...recent.value.filter((item) => item.id !== listing.id)].slice(0, MAX_RECENT_FLATS); writeStoredList(STORAGE.recent, recent.value, MAX_RECENT_FLATS);
+  lightboxIndex.value = null; active.value = listing;
+  prepareTranslation(listing); modalOpen.value = true;
+  addRecent(listing);
   syncListingInUrl(listing);
 }
 function modalTitle(listing: Listing | null): string {
@@ -782,18 +629,6 @@ function displayListingTitle(listing: Listing): string {
   const parts = [dealLabel(listing.dealType), listing.rooms != null ? t("roomsN", { n: listing.rooms }) : "", ptLabel(listing.propertyType), listing.district || listing.city || ""].filter(Boolean);
   return parts.join(" · ") || t("listingFallbackTitle");
 }
-function descriptionMatchesTargetLanguage(text: string, targetLanguage: "en" | "ru"): boolean {
-  const normalized = text.toLocaleLowerCase();
-  if (targetLanguage === "ru") {
-    if (/[ўқғҳ]/iu.test(normalized)) return false;
-    const russianSignals = normalized.match(/(?:квартир\p{L}*|комнат\p{L}*|этаж\p{L}*|дом\p{L}*|цен\p{L}*|сда[её]тся|прода[её]тся|аренд\p{L}*|рядом|метро|семейн\p{L}*|коммунальн\p{L}*)/giu) || [];
-    return russianSignals.length >= 2;
-  }
-  const englishVocabulary = new Set(["apartment", "flat", "house", "room", "floor", "price", "rent", "sale", "family", "utilities", "near", "available", "bedroom"]);
-  const englishSignals = (normalized.match(/[a-z]+/g) || []).filter((word) => englishVocabulary.has(word));
-  return englishSignals.length >= 3;
-}
-const descriptionNeedsTranslation = computed(() => { const description = active.value?.description?.trim(); if (!description) return false; const targetLanguage = locale.value.startsWith("en") ? "en" : "ru"; return !descriptionMatchesTargetLanguage(description, targetLanguage); });
 function openLightbox(index: number) { if (!lightboxPhotos.value.length) return; lightboxIndex.value = Math.max(0, Math.min(index, lightboxPhotos.value.length - 1)); }
 function closeLightbox() { lightboxIndex.value = null; }
 function moveLightbox(direction: -1 | 1) { const total = lightboxPhotos.value.length; if (!total || lightboxIndex.value == null) return; lightboxIndex.value = (lightboxIndex.value + direction + total) % total; }
@@ -811,40 +646,13 @@ function releaseStuckScrollLock() {
   body.style.removeProperty("padding-right"); document.documentElement.style.removeProperty("overflow");
 }
 function onLightboxKeydown(event: KeyboardEvent) { if (lightboxIndex.value == null) return; if (event.key === "Escape") closeLightbox(); else if (event.key === "ArrowLeft") moveLightbox(-1); else if (event.key === "ArrowRight") moveLightbox(1); else return; event.preventDefault(); }
-function acceptTranslation(result: TranslationResult, listing: Listing, requestId: number, cacheKey: string): boolean {
-  if (requestId !== translationRequestId || active.value?.id !== listing.id) return true;
-  if (result.status !== "completed") return false;
-  const text = result.data?.translatedText?.trim() || "";
-  if (!text) { translatingDescription.value = false; translationFailed.value = true; return true; }
-  translationCache.set(cacheKey, text); translatedDescription.value = text; translatingDescription.value = false; translationFailed.value = false; return true;
-}
-async function pollTranslation(key: string, listing: Listing, requestId: number, cacheKey: string, attempt = 0) {
-  if (requestId !== translationRequestId || active.value?.id !== listing.id) return;
-  const { data, error } = await safeFetch<TranslationResult>("/flats-translate", { params: { key } });
-  if (requestId !== translationRequestId || active.value?.id !== listing.id) return;
-  if (!error && data && acceptTranslation(data, listing, requestId, cacheKey)) return;
-  if (error || data?.status === "failed" || data?.status === "disabled" || data?.status === "not_found" || attempt >= TRANSLATION_MAX_POLL_ATTEMPTS) { translatingDescription.value = false; translationFailed.value = true; return; }
-  translationPollTimer = setTimeout(() => void pollTranslation(key, listing, requestId, cacheKey, attempt + 1), 1500);
-}
-async function translateActiveDescription() {
-  const listing = active.value;
-  if (!listing?.description || translatingDescription.value || !descriptionNeedsTranslation.value) return;
-  const targetLanguage = locale.value.startsWith("en") ? "en" : "ru";
-  const cacheKey = translationCacheKey(listing, targetLanguage);
-  const cached = translationCache.get(cacheKey); if (cached) { translatedDescription.value = cached; return; }
-  stopTranslationPoll(); const requestId = ++translationRequestId; translatingDescription.value = true; translationFailed.value = false;
-  const { data, error } = await safeFetch<TranslationResult>("/flats-translate", { method: "POST", body: { text: listing.description, targetLanguage } });
-  if (requestId !== translationRequestId || active.value?.id !== listing.id) return;
-  if (error || !data) { translatingDescription.value = false; translationFailed.value = true; return; }
-  if (acceptTranslation(data, listing, requestId, cacheKey)) return;
-  if (data.status === "pending" && data.key) { translationPollTimer = setTimeout(() => void pollTranslation(data.key!, listing, requestId, cacheKey), 1000); return; }
-  translatingDescription.value = false; translationFailed.value = true;
-}
 function openById(id: string) { const found = displayedListings.value.find((l) => l.id === id); if (found) void openListing(found); }
 function priceLabel(l: Listing): string { if (l.price == null) return t("priceNA"); return `${l.price.toLocaleString()} ${l.currency}`.trim(); }
 function updateLightboxZoom(event: MouseEvent) { const image = event.currentTarget as HTMLImageElement; const rect = image.getBoundingClientRect(); image.style.setProperty("--zoom-x", `${((event.clientX - rect.left) / rect.width) * 100}%`); image.style.setProperty("--zoom-y", `${((event.clientY - rect.top) / rect.height) * 100}%`); }
 function resetLightboxZoom(event: MouseEvent) { const image = event.currentTarget as HTMLImageElement; image.style.setProperty("--zoom-x", "50%"); image.style.setProperty("--zoom-y", "50%"); }
-function convert(amount: number, from: string, to: string): number | undefined { const rf = rates.value[(from || "USD").toUpperCase()]; const rt = rates.value[(to || "USD").toUpperCase()]; if (!rf || !rt) return undefined; return (amount * rt) / rf; }
+function convert(amount: number, from: string, to: string): number | undefined {
+  return convertCurrency(amount, from || "USD", to || "USD", rates.value);
+}
 function convertedLabel(l: Listing): string | null { if (l.price == null || !l.currency || l.currency.toUpperCase() === displayCurrency.value.toUpperCase()) return null; const v = convert(l.price, l.currency, displayCurrency.value); return v === undefined ? null : `≈ ${Math.round(v).toLocaleString()} ${displayCurrency.value}`; }
 const dealLabel = (d: Listing["dealType"]) => d === "sale" ? t("dtSale") : d === "longRent" ? t("dtLongRent") : d === "shortRent" ? t("dtShortRent") : "";
 function specLine(l: Listing): string { const parts: string[] = []; if (l.rooms != null) parts.push(t("roomsN", { n: l.rooms })); if (l.areaSqm != null) parts.push(`${l.areaSqm} ${t("sqm")}`); if (l.floor != null) parts.push(l.totalFloors != null ? `${l.floor}/${l.totalFloors} ${t("floorAbbr")}` : `${l.floor} ${t("floorAbbr")}`); return parts.join(" · "); }
@@ -936,24 +744,24 @@ async function openSharedListing(id: string, sourceName = "", countryCode = "", 
   }
   if (data?.warming && attempt < 20) { if (sharedListingTimer) clearTimeout(sharedListingTimer); sharedListingTimer = setTimeout(() => { sharedListingTimer = undefined; void openSharedListing(id, sourceName, countryCode, attempt + 1); }, 1800); }
 }
-function timeAgo(iso: string | null): string { if (!iso) return ""; const days = Math.floor((Date.now() - new Date(iso).getTime()) / 86_400_000); if (Number.isNaN(days)) return ""; if (days <= 0) return t("today"); if (days === 1) return t("yesterday"); if (days < 30) return t("daysAgo", { n: days }); return t("monthsAgo", { n: Math.floor(days / 30) }); }
-function setupInfinitePagination() {
-  infiniteObserver?.disconnect();
-  infiniteObserver = new IntersectionObserver((entries) => { const reachedBottom = entries.some((entry) => entry.isIntersecting); if (!reachedBottom || !hasMore.value || loading.value || loadingMore.value) return; const currentScrollY = window.scrollY; if (currentScrollY <= lastPaginationScrollY + 40) return; lastPaginationScrollY = currentScrollY; void load(true, false); }, { rootMargin: "0px", threshold: 0.01 });
-  if (loadMoreSentinel.value) infiniteObserver.observe(loadMoreSentinel.value);
+function timeAgo(iso: string | null): string {
+  return formatRelativeDate(iso, {
+    today: () => t("today"),
+    yesterday: () => t("yesterday"),
+    daysAgo: (n) => t("daysAgo", { n }),
+    monthsAgo: (n) => t("monthsAgo", { n }),
+  });
 }
-
 onMounted(async () => {
-  window.addEventListener("keydown", onLightboxKeydown); window.addEventListener("scroll", updateBackToTop, { passive: true }); updateBackToTop();
+  window.addEventListener("keydown", onLightboxKeydown);
   const sharedFlatId = queryString(route.query.flat); const sharedFlatSource = queryString(route.query.flatSource); const sharedFlatCountry = queryString(route.query.flatCountry);
   defaultCountry.value = regionalDefaultCountry();
   if (!queryString(route.query.countries)) countries.value = [defaultCountry.value];
   loadPersonalState(); applyQueryParams(route.query); void loadRates(); await loadMeta(); await nextTick(); restoring.value = false;
   if (queryString(route.query.shared) === "1") { showAdvanced.value = true; sharedLinkOpened.value = true; shareModalOpen.value = true; }
-  await load(false); if (sharedFlatId) await openSharedListing(sharedFlatId, sharedFlatSource, sharedFlatCountry); await nextTick(); lastPaginationScrollY = window.scrollY; setupInfinitePagination();
+  await load(false); if (sharedFlatId) await openSharedListing(sharedFlatId, sharedFlatSource, sharedFlatCountry); await nextTick(); lastPaginationScrollY = window.scrollY;
 });
-watch(loadMoreSentinel, (current, previous) => { if (previous) infiniteObserver?.unobserve(previous); if (current) infiniteObserver?.observe(current); });
-watch(modalOpen, (open) => { if (open) return; syncListingInUrl(null); closeLightbox(); stopTranslationPoll(); translationRequestId += 1; translatingDescription.value = false; nextTick(() => setTimeout(releaseStuckScrollLock, 350)); });
+watch(modalOpen, (open) => { if (open) return; syncListingInUrl(null); closeLightbox(); cancelTranslation(); nextTick(() => setTimeout(releaseStuckScrollLock, 350)); });
 watch(lightboxIndex, (index) => { if (index === null) nextTick(() => setTimeout(releaseStuckScrollLock, 350)); });
 // A link that names a listing should open it, whether the page is mounting for
 // the first time or the query changed underneath one that is already up. The
@@ -973,16 +781,21 @@ watch(
 );
 watch(city, () => { if (restoring.value) return; district.value = ""; metro.value = ""; query.value = ""; });
 watch(countries, () => { if (restoring.value) return; district.value = ""; metro.value = ""; city.value = ""; query.value = ""; });
-onBeforeUnmount(() => { modalOpen.value = false; lightboxIndex.value = null; releaseStuckScrollLock(); window.removeEventListener("keydown", onLightboxKeydown); window.removeEventListener("scroll", updateBackToTop); if (loadTimer) clearTimeout(loadTimer); if (warmTimer) clearTimeout(warmTimer); if (sharedListingTimer) clearTimeout(sharedListingTimer); infiniteObserver?.disconnect(); stopTranslationPoll(); });
+onBeforeUnmount(() => { modalOpen.value = false; lightboxIndex.value = null; releaseStuckScrollLock(); window.removeEventListener("keydown", onLightboxKeydown); if (loadTimer) clearTimeout(loadTimer); if (warmTimer) clearTimeout(warmTimer); if (sharedListingTimer) clearTimeout(sharedListingTimer); cancelTranslation(); });
 </script>
 
 <template>
-  <u-container class="flats">
-    <ocean-page-backdrop variant="home" />
-    <div class="flats__header text-center space-y-3">
-      <h1 class="flats__title">{{ t("title") }}</h1>
-      <p class="flats__subtitle text-muted mx-auto">{{ t("subtitle") }}</p>
-    </div>
+  <SearchPageShell
+    class-name="flats"
+    :title="t('title')"
+  >
+    <template #backdrop><ocean-page-backdrop variant="home" /></template>
+    <template #header>
+      <div class="flats__header text-center space-y-3">
+        <h1 class="flats__title">{{ t("title") }}</h1>
+        <p class="flats__subtitle text-muted mx-auto">{{ t("subtitle") }}</p>
+      </div>
+    </template>
 
     <UiResultsLoader :loading="loading" :label="t('searching')" min-height="420px">
     <form ref="filtersEl" class="flats__controls flats__controls_redesign" @submit.prevent="load()">
@@ -995,7 +808,7 @@ onBeforeUnmount(() => { modalOpen.value = false; lightboxIndex.value = null; rel
         <div class="flats__filters">
           <button v-for="opt in sourceOptions" :key="opt.value" type="button" class="flats__pill" :class="{ 'flats__pill_active': source === opt.value }" @click="selectSource(opt.value)">{{ opt.label }}</button>
         </div>
-        <UiSearchViewTabs
+        <SearchSavedTabs
           :model-value="view"
           :items="viewTabs"
           :aria-label="t('personalTabs')"
@@ -1054,7 +867,7 @@ onBeforeUnmount(() => { modalOpen.value = false; lightboxIndex.value = null; rel
         </UiFilterFooter>
       </section>
 
-      <section v-if="showAdvanced" class="advanced-card">
+      <FlatAdvancedFilters v-if="showAdvanced" class="advanced-card">
         <div class="advanced-card__header"><div><u-icon name="i-lucide-filter" /><strong>{{ t("moreFilters") }}</strong></div><button type="button" @click="toggleAdvanced">{{ t("hideFilters") }} <u-icon name="i-lucide-chevron-up" /></button></div>
         <div class="advanced-groups">
           <div class="filter-group filter-group_quick"><h3><u-icon name="i-lucide-sliders-horizontal" /> {{ t('quickOptions') }}</h3><div class="quick-options">
@@ -1088,7 +901,7 @@ onBeforeUnmount(() => { modalOpen.value = false; lightboxIndex.value = null; rel
             <div class="flats__field"><u-input v-model.number="maxAgeDays" type="number" min="1" max="21" :label="t('freshDays')" @change="scheduleLoad()" /></div>
           </div>
         </div>
-      </section>
+      </FlatAdvancedFilters>
       </div>
     </form>
 
@@ -1101,41 +914,45 @@ onBeforeUnmount(() => { modalOpen.value = false; lightboxIndex.value = null; rel
     <FlatsStatsPanel v-if="displayedListings.length" :listings="displayedListings" :display-currency="displayCurrency" :convert="convert" />
 <section v-if="listings.length" class="flats__map-wrap"><flat-map :points="mapPoints" :draw-label="t('drawArea')" :done-label="t('done')" :clear-label="t('clearArea')" :draw-hint="t('drawHint')" :expand-label="t('mapExpand')" :collapse-label="t('mapCollapse')" @select="openById" @area-change="drawnArea = $event" /></section>
 
-    <div class="flats__grid">
-      <article v-for="l in displayedListings" :key="listingKey(l)" class="flat-card" :class="{ 'flat-card_favorite': isFavorite(l.id), 'flat-card_hidden': isHidden(l.id), 'flat-card_checking': checkingListingKey === listingKey(l) }" :aria-busy="checkingListingKey === listingKey(l)" @click="openListing(l)">
-        <div class="flat-card__photo">
-          <img v-if="listingPhoto(l)" :src="listingPhoto(l) || ''" :alt="displayListingTitle(l)" loading="lazy" decoding="async" referrerpolicy="no-referrer" @error="markPhotoFailedFromEvent" />
-          <div v-else class="flat-card__no-photo"><u-icon name="i-lucide-image-off" class="flat-card__no-photo-icon" aria-hidden="true" /><span>{{ t("noPhoto") }}</span></div>
-          <span v-if="cardDealLabel(l)" class="flat-card__deal" :class="`flat-card__deal_${cardDealTone(l)}`">{{ cardDealLabel(l) }}</span>
-          <div class="flat-card__actions">
-            <button type="button" class="flat-card__action" :class="{ 'flat-card__action_active': isFavorite(l.id) }" :aria-label="isFavorite(l.id) ? t('removeFavorite') : t('addFavorite')" @click.stop="toggleFavorite(l)"><u-icon name="i-lucide-heart" /></button>
-            <button type="button" class="flat-card__action" :class="{ 'flat-card__action_active': isHidden(l.id) }" :aria-label="isHidden(l.id) ? t('restoreListing') : t('hideListing')" @click.stop="toggleHidden(l)"><u-icon :name="isHidden(l.id) ? 'i-lucide-eye' : 'i-lucide-eye-off'" /></button>
-          </div>
-        </div>
-        <div class="flat-card__body">
-          <div class="flat-card__price">{{ priceLabel(l) }}</div>
-          <div v-if="convertedLabel(l)" class="flat-card__price-conv text-muted">{{ convertedLabel(l) }}</div>
-          <h3 class="flat-card__title">{{ displayListingTitle(l) }}</h3>
-          <div v-if="specLine(l)" class="flat-card__spec text-muted">{{ specLine(l) }}</div>
-          <div v-if="cardBadges(l).length" class="flat-card__badges"><span v-for="b in cardBadges(l)" :key="b" class="flat-card__badge">{{ b }}</span></div>
-          <div class="flat-card__meta text-muted">
-            <span v-if="locLine(l)" class="flat-card__location"><u-icon name="i-lucide-map-pin" />{{ locLine(l) }}</span>
-            <span class="flat-card__meta-tail"><span class="flat-card__src">{{ l.source }}</span><span v-if="timeAgo(l.createdAt)">· {{ timeAgo(l.createdAt) }}</span></span>
-          </div>
-        </div>
-        <div v-if="checkingListingKey === listingKey(l)" class="flat-card__checking" role="status" aria-live="polite"><u-icon name="i-lucide-loader-circle" class="flat-card__checking-icon" /><span>{{ t("checkingListing") }}</span></div>
-      </article>
-    </div>
+    <FlatGrid :listings="displayedListings">
+      <template #default="{ listing: l }">
+      <FlatCard
+        :key="listingKey(l)"
+        :listing="l"
+        :photo="listingPhoto(l)"
+        :title="displayListingTitle(l)"
+        :price="priceLabel(l)"
+        :converted-price="convertedLabel(l)"
+        :specification="specLine(l)"
+        :location="locLine(l)"
+        :deal-label="cardDealLabel(l)"
+        :deal-tone="cardDealTone(l)"
+        :badges="cardBadges(l)"
+        :date-label="timeAgo(l.createdAt)"
+        :favorite="isFavorite(l.id)"
+        :hidden="isHidden(l.id)"
+        :checking="checkingListingKey === listingKey(l)"
+        :no-photo-label="t('noPhoto')"
+        :checking-label="t('checkingListing')"
+        :favorite-label="isFavorite(l.id) ? t('removeFavorite') : t('addFavorite')"
+        :hide-label="isHidden(l.id) ? t('restoreListing') : t('hideListing')"
+        @open="openListing(l)"
+        @toggle-favorite="toggleFavorite(l)"
+        @toggle-hidden="toggleHidden(l)"
+        @photo-error="markPhotoFailedFromEvent"
+      />
+      </template>
+    </FlatGrid>
 <div ref="loadMoreSentinel" v-if="hasMore" class="flats__sentinel"><span v-if="loadingMore" class="text-muted">{{ t("loadingMore") }}</span></div>
     <div v-if="!loading && !displayedListings.length && !failed" class="flats__empty"><div class="text-muted">{{ t("empty") }}</div><div v-if="drawnArea.length >= 3 && listings.length" class="text-muted">{{ t("emptyArea") }}</div></div>
 
     </UiResultsLoader>
 
-    <u-modal v-model:open="modalOpen" :title="modalTitle(active)" :ui="{ content: 'max-w-4xl' }" :dismissible="lightboxIndex === null">
+    <FlatDetailsModal v-model:open="modalOpen" :title="modalTitle(active)" :ui="{ content: 'max-w-4xl' }" :dismissible="lightboxIndex === null">
       <template #title><h2 class="flat-modal__title">{{ modalTitle(active) }}</h2></template>
       <template #body><div v-if="active" class="flat-modal"><div v-if="visiblePhotos(active).length" class="flat-modal__gallery"><img v-for="(p, i) in visiblePhotos(active)" :key="p" :src="p" :alt="`${modalTitle(active)} (${i + 1})`" class="flat-modal__thumb" loading="lazy" decoding="async" referrerpolicy="no-referrer" @error="markPhotoFailedFromEvent" @click="openLightbox(i)" /></div><div class="flat-modal__price">{{ priceLabel(active) }}<span v-if="convertedLabel(active)" class="flat-modal__price-conv"> ({{ convertedLabel(active) }})</span><span v-if="dealLabel(active.dealType)" class="flat-modal__deal"> · {{ dealLabel(active.dealType) }}</span><span v-if="active.roomOnly" class="flat-modal__deal"> · {{ t("roomShare") }}</span></div><UiSpecTable :rows="specRows" :hide-empty-label="t('hideEmpty')" :empty-value="t('notSpecified')" /><div v-if="active.description && descriptionNeedsTranslation" class="flat-modal__translation"><u-button type="button" variant="outline" color="neutral" size="sm" icon="i-lucide-languages" :loading="translatingDescription" @click="translateActiveDescription">{{ translatingDescription ? t("translatingDescription") : t("translateDescription") }}</u-button><span v-if="translationFailed" class="flat-modal__translation-error">{{ t("translationFailed") }}</span></div><section v-if="translatedDescription" class="flat-modal__translated"><h4 class="flat-modal__translated-title">{{ t("translatedDescription") }}</h4><p class="flat-modal__desc">{{ translatedDescription }}</p></section><details v-if="active.description" class="flat-modal__descbox"><summary>{{ t("origDescription") }}</summary><p class="flat-modal__desc">{{ active.description }}</p></details><div v-if="active.tags && active.tags.length" class="flat-modal__tags"><span v-for="tag in active.tags" :key="tag" class="flat-modal__tag">{{ nearbyItemLabel(tag) }}</span></div></div></template>
       <template #footer><UiModalFooter v-if="active"><u-button variant="outline" color="neutral" icon="i-lucide-heart" @click="toggleFavorite(active)">{{ isFavorite(active.id) ? t("removeFavorite") : t("addFavorite") }}</u-button><u-button variant="outline" color="neutral" :icon="isHidden(active.id) ? 'i-lucide-eye' : 'i-lucide-eye-off'" @click="toggleHidden(active)">{{ isHidden(active.id) ? t("restoreListing") : t("hideListing") }}</u-button><u-button variant="outline" color="neutral" :icon="shareCopied ? 'i-lucide-check' : 'i-lucide-share-2'" @click="shareFlat(active)">{{ shareCopied ? t("shareCopied") : t("share") }}</u-button><a class="modal-footer__primary" :href="active.url" target="_blank" rel="noopener noreferrer">{{ t("open") }} →</a></UiModalFooter></template>
-    </u-modal>
+    </FlatDetailsModal>
 
     <teleport to="body"><div v-if="checkingListingKey" class="flat-verification" role="status" aria-live="assertive"><div class="flat-verification__card"><u-icon name="i-lucide-loader-circle" class="flat-verification__icon" /><span>{{ t("checkingListing") }}</span></div></div></teleport>
 
@@ -1145,7 +962,7 @@ onBeforeUnmount(() => { modalOpen.value = false; lightboxIndex.value = null; rel
     <u-modal v-model:open="shareModalOpen" :title="sharedLinkOpened ? t('sharedSearchApplied') : t('shareSearch')"><template #body><p class="flat-share__hint">{{ sharedLinkOpened ? t("sharedSearchHint") : t("shareSearchHint") }}</p><u-input :model-value="shareUrl" readonly /></template><template #footer><u-button icon="i-lucide-copy" @click="copyShareLink">{{ t("copyLink") }}</u-button></template></u-modal>
     <button v-if="showBackToTop" type="button" class="flats__back-top" :aria-label="t('backToTop')" @click="scrollToFilters"><u-icon name="i-lucide-arrow-up" /><span>{{ t('backToTop') }}</span></button>
     <u-modal v-model:open="listingShareModalOpen" :title="t('shareListing')"><template #body><p class="flat-share__hint">{{ t("shareListingHint") }}</p><u-input :model-value="listingShareUrl" readonly /></template><template #footer><u-button :icon="listingShareCopied ? 'i-lucide-check' : 'i-lucide-copy'" @click="copyListingShareLink">{{ listingShareCopied ? t("shareCopied") : t("copyLink") }}</u-button></template></u-modal>
-  </u-container>
+  </SearchPageShell>
 </template>
 
 <style scoped>

@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import type { HiringCvProfile } from '~/types/hiring'
+import { formatRelativeDate } from '~/utils/search/relativeDate'
+import SearchMatchBadge from '~/components/search/SearchMatchBadge.vue'
 import { locationLabel } from '~/utils/locationLabels'
 import {
   scoreHiringCandidate,
@@ -143,13 +145,12 @@ const cardTags = computed(() => {
 })
 
 function timeAgo(iso: string | null): string {
-  if (!iso) return ''
-  const days = Math.floor((Date.now() - new Date(iso).getTime()) / 86_400_000)
-  if (Number.isNaN(days)) return ''
-  if (days <= 0) return t('today')
-  if (days === 1) return t('yesterday')
-  if (days < 30) return t('daysAgo', { n: days })
-  return t('monthsAgo', { n: Math.floor(days / 30) })
+  return formatRelativeDate(iso, {
+    today: () => t('today'),
+    yesterday: () => t('yesterday'),
+    daysAgo: (n) => t('daysAgo', { n }),
+    monthsAgo: (n) => t('monthsAgo', { n }),
+  })
 }
 
 const sourceLabel = computed(() => props.profile.sourceLabel || props.profile.source)
@@ -231,11 +232,14 @@ function openCard() {
           <span>{{ dateLabel }}</span>
         </span>
       </div>
-      <span
+      <SearchMatchBadge
         v-if="match"
         class="hiring-card__match"
+        :value="match.score"
+        :tier="match.score >= 75 ? 'good' : match.score >= 50 ? 'warning' : 'bad'"
+        :suffix="`% ${t('match')}`"
         :title="t('matchHint', { matched: match.matched, total: match.total })"
-      >{{ match.score }}% {{ t('match') }}</span>
+      />
     </footer>
   </article>
 </template>

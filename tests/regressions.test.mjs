@@ -95,7 +95,7 @@ test('board pages share filter primitives and flat finder starts from a regional
   const jobs = readFileSync(new URL('../app/pages/jobs/index.vue', import.meta.url), 'utf8')
   for (const source of [flat, hiring, jobs]) {
     assert.match(source, /<UiFilterFooter/u)
-    assert.match(source, /<UiSearchViewTabs/u)
+    assert.match(source, /<SearchSavedTabs/u)
   }
   assert.match(hiring, /<UiFilterSection/u)
   assert.match(jobs, /<UiFilterSection/u)
@@ -121,19 +121,22 @@ test('all three listing boards share one accessible sort control', () => {
 
 test('OLX listing verification exposes a localized in-card loader', () => {
   const flat = readFileSync(new URL('../app/pages/flat-finder/index.vue', import.meta.url), 'utf8')
+  const card = readFileSync(new URL('../app/components/flats/FlatCard.vue', import.meta.url), 'utf8')
   const ru = JSON.parse(readFileSync(new URL('../i18n/locales/ru.json', import.meta.url), 'utf8'))
   const en = JSON.parse(readFileSync(new URL('../i18n/locales/en.json', import.meta.url), 'utf8'))
   assert.match(flat, /checkingListingKey\.value\s*=\s*key[\s\S]*?await verifyOlxListing/u)
-  assert.match(flat, /class="flat-card__checking"[\s\S]*?t\("checkingListing"\)/u)
+  assert.match(flat, /:checking="checkingListingKey === listingKey\(l\)"[\s\S]*?:checking-label="t\('checkingListing'\)"/u)
+  assert.match(card, /class="flat-card__checking"[\s\S]*?checkingLabel/u)
   assert.ok(ru.flats.checkingListing)
   assert.ok(en.flats.checkingListing)
 })
 
 test('flat finder exposes photo-only and room-rent filters', () => {
   const flat = readFileSync(new URL('../app/pages/flat-finder/index.vue', import.meta.url), 'utf8')
+  const filters = readFileSync(new URL('../app/composables/flats/useFlatFilters.ts', import.meta.url), 'utf8')
   const ru = JSON.parse(readFileSync(new URL('../i18n/locales/ru.json', import.meta.url), 'utf8'))
   const en = JSON.parse(readFileSync(new URL('../i18n/locales/en.json', import.meta.url), 'utf8'))
-  assert.match(flat, /const onlyWithPhotos = ref\(false\)/u)
+  assert.match(filters, /const onlyWithPhotos = ref\(false\)/u)
   assert.match(flat, /value: "roomRent"/u)
   assert.match(flat, /class="flat-verification"/u)
   assert.ok(ru.flats.onlyWithPhotos && ru.flats.dtRoomRent)
@@ -273,7 +276,7 @@ test('vacancy cards open from the card surface and compact overflowing pills', (
   const card = readFileSync(new URL('../app/components/jobs/JobCard.vue', import.meta.url), 'utf8')
   assert.match(card, /@click="openCard"/u)
   assert.doesNotMatch(card, /viewVacancy/u)
-  assert.match(card, />\{\{ ats\.score \}\}%<\/span>/u)
+  assert.match(card, /<SearchMatchBadge[\s\S]*?:value="ats\.score"/u)
   assert.match(card, /const visibleBadges = computed\(\(\) => cardBadges\.value\.slice\(0, 6\)\)/u)
   assert.match(card, /class="job-card__tag-scroll"/u)
   assert.match(card, /@pointerdown\.stop="startDrag"/u)

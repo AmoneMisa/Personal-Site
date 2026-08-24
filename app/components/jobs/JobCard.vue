@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { scoreColor } from "~/utils/atsScore";
 import type { Job, JobAtsResult } from "~/types/jobs";
+import { formatRelativeDate } from "~/utils/search/relativeDate";
+import SearchMatchBadge from "~/components/search/SearchMatchBadge.vue";
 
 const props = defineProps<{
   job: Job;
@@ -30,11 +32,12 @@ const employerTypeLabel = (value?: Job["employerType"]) => value ? t("employer" 
 const isToday = (iso: string) => new Date(iso).toDateString() === new Date().toDateString();
 
 function timeAgo(iso: string): string {
-  const days = Math.floor((Date.now() - new Date(iso).getTime()) / 86_400_000);
-  if (days <= 0) return t("today");
-  if (days === 1) return t("yesterday");
-  if (days < 30) return t("daysAgo", { n: days });
-  return t("monthsAgo", { n: Math.floor(days / 30) });
+  return formatRelativeDate(iso, {
+    today: () => t("today"),
+    yesterday: () => t("yesterday"),
+    daysAgo: (n) => t("daysAgo", { n }),
+    monthsAgo: (n) => t("monthsAgo", { n }),
+  });
 }
 
 function suspicionHint(job: Job): string {
@@ -93,12 +96,14 @@ function openCard() { if (suppressCardOpen) { suppressCardOpen = false; return; 
   >
     <div class="job-card__head">
       <h3 class="job-card__title">{{ job.title }}</h3>
-      <span
+      <SearchMatchBadge
         v-if="ats"
         class="job-card__ats"
+        :value="ats.score"
+        :tier="ats.score >= 75 ? 'good' : ats.score >= 50 ? 'warning' : 'bad'"
         :style="{ color: scoreColor(ats.score), borderColor: scoreColor(ats.score) }"
         :title="ats.missing.length ? t('atsMissing') + ': ' + ats.missing.join(', ') : ''"
-      >{{ ats.score }}%</span>
+      />
     </div>
 
     <div class="job-card__meta-row">
