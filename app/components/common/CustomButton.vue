@@ -18,38 +18,21 @@ const resolved = computed<Variant>(() => {
   if (props.buttonType === 'gradient-white') return 'primary';
   return 'primary';
 });
+
+const buttonClass = computed(() => ({
+  primary: 'btn_black',
+  full: 'btn_primary',
+  secondary: 'btn_secondary',
+  ghost: 'btn_ghost',
+}[resolved.value]));
+
+const uiVariant = computed(() => resolved.value === 'ghost' ? 'ghost' : 'solid');
 </script>
 
 <template>
   <u-button
-      :class="_class"
-      v-if="resolved === 'primary'"
-      class="btn btn_black"
-  >
-    <slot/>
-  </u-button>
-
-  <u-button
-      :class="_class"
-      v-else-if="resolved === 'full'"
-      class="btn btn_primary"
-  >
-    <slot/>
-  </u-button>
-
-  <u-button
-      :class="_class"
-      v-else-if="resolved === 'secondary'"
-      class="btn btn_secondary"
-  >
-    <slot/>
-  </u-button>
-
-  <u-button
-      :class="_class"
-      v-else
-      variant="ghost"
-      class="btn btn_ghost"
+      :class="['btn', buttonClass, _class]"
+      :variant="uiVariant"
   >
     <slot/>
   </u-button>

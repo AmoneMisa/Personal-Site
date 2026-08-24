@@ -18,6 +18,7 @@ type Props = {
   clearable?: boolean
   min?: number
   max?: number
+  clearLabelKey?: string
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -37,6 +38,7 @@ const props = withDefaults(defineProps<Props>(), {
   modelValue: "",
   min: undefined,
   max: undefined,
+  clearLabelKey: "common.reset",
 })
 
 const emit = defineEmits<{
@@ -127,7 +129,7 @@ function clear() {
         :autocomplete="autocomplete"
         :inputmode="inputmode"
         :clearable="showClear"
-        :clear-label="$t('services.mergeJson.titles.reset')"
+        :clear-label="$t(clearLabelKey)"
         :min="type === 'number' ? min : undefined"
         :max="type === 'number' ? max : undefined"
         @update:model-value="onInput"

@@ -292,6 +292,7 @@
   },
   "common": {
     "add": "Add",
+    "close": "Close",
     "filePicker": {
       "fileTooLarge": "File is too large.",
       "noFile": "No file selected",
@@ -301,6 +302,7 @@
     "pin": "Pin",
     "pinned": "Pinned",
     "remove": "Remove",
+    "reset": "Reset",
     "menu": "Menu",
     "fastNav": "Quick page navigation"
   },

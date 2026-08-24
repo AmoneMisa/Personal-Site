@@ -10,7 +10,7 @@ const props = defineProps<{
   <UModal
       v-model:open="open"
       :ui="{
-      body: props.maxWidthClass || 'sm:max-w-2xl'
+      content: props.maxWidthClass || 'sm:max-w-2xl'
     }"
   >
     <template #content="{ close }">
@@ -24,7 +24,7 @@ const props = defineProps<{
               <slot name="title"/>
             </div>
 
-            <button type="button" class="app-modal__close" @click="close()" aria-label="Close">
+            <button type="button" class="app-modal__close" @click="close()" :aria-label="$t('common.close')">
               <UIcon name="i-lucide-x"/>
             </button>
           </div>
@@ -64,26 +64,6 @@ const props = defineProps<{
   line-height: 1.2;
 }
 
-.app-modal__close {
-  height: 36px;
-  width: 36px;
-  border-radius: 12px;
-  border: 1px solid var(--ui-border);
-  background: rgba(255, 255, 255, 0.02);
-  display: grid;
-  place-items: center;
-  cursor: pointer;
-  transition: filter 160ms ease, transform 140ms ease;
-}
-
-.app-modal__close:hover {
-  filter: brightness(1.06);
-}
-
-.app-modal__close:active {
-  transform: translateY(1px);
-}
-
 .app-modal__actions {
   margin-top: 16px;
   display: flex;
@@ -106,6 +86,10 @@ const props = defineProps<{
 
 .app-modal__close:hover {
   filter: brightness(1.06);
+}
+
+.app-modal__close:active {
+  transform: translateY(1px);
 }
 
 </style>
