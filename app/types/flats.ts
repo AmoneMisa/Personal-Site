@@ -69,8 +69,10 @@ export interface FlatListing {
   tags?: string[];
 }
 
+export type FlatStatsDealKey = "sale" | "longRent" | "shortRent" | "roomRent" | "unknown";
+
 export interface FlatStatsPriceGroup {
-  key: "sale" | "longRent" | "shortRent" | "roomRent" | "unknown";
+  key: FlatStatsDealKey;
   count: number;
   priceCount: number;
   medianUsd: number | null;
@@ -92,6 +94,7 @@ export interface FlatStatistics {
   currency: "USD";
   dealTypes: FlatStatsPriceGroup[];
   geographies: Partial<Record<FlatStatsGeoDimension, FlatStatsGeoRow[]>>;
+  geographiesByDeal?: Partial<Record<FlatStatsDealKey, Partial<Record<FlatStatsGeoDimension, FlatStatsGeoRow[]>>>>;
   ownership: {
     owners: number;
     agencies: number;

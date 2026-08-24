@@ -13,6 +13,6 @@ test('Flat Finder loads the shark placeholder stylesheet', () => {
 test('missing listing photos use the existing shark svg in card and modal', () => {
   assert.match(css, /\.flat-card__no-photo/);
   assert.match(css, /url\('\/svg\/shark\.svg'\)/);
-  assert.match(css, /\.flat-modal:not\(:has\(\.flat-modal__gallery\)\)::before/);
+  assert.match(css, /\.flat-modal:not\(:has\(\.flat-gallery\)\)::before/);
   assert.match(shark, /^<svg\b/);
 });

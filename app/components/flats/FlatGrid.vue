@@ -9,7 +9,7 @@ defineSlots<{ default(props: { listing: FlatListing }): unknown }>();
 </template>
 
 <style scoped>
-.flat-grid { display: grid; gap: 14px; grid-template-columns: 1fr; align-items: start; }
+.flat-grid { display: grid; gap: 14px; grid-template-columns: 1fr; align-items: stretch; grid-auto-rows: 1fr; }
 @media (min-width: 640px) { .flat-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (min-width: 1024px) { .flat-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
 @media (min-width: 1440px) { .flat-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); } }

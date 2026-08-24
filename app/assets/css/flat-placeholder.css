@@ -9,9 +9,9 @@
   display: none !important;
 }
 
-/* Keep the same visual fallback in the listing modal when every source photo is
-   missing or failed to load. Modern browsers used by the site support :has(). */
-.flat-modal:not(:has(.flat-modal__gallery))::before {
+/* Keep the same visual fallback in the listing modal only when the gallery has
+   no usable source photos. FlatGallery owns the actual gallery class. */
+.flat-modal:not(:has(.flat-gallery))::before {
   content: '';
   display: block;
   width: 100%;
