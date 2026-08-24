@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import {nextTick, onBeforeUnmount, onMounted, ref} from "vue";
 import type {TabsItem} from "#ui/components/Tabs.vue";
-import PageHeader from "~/components/common/PageHeader.vue";
 
 type SimpleSort = "len_asc" | "len_desc";
 
@@ -27,15 +26,7 @@ const simpleResultsSorted = computed(() => {
 
 const {t} = useI18n();
 
-useSeoMeta({
-  title: () => t('seo.pages.dockerSearch.title'),
-  description: () => t('seo.pages.dockerSearch.description'),
-  robots: () => t('seo.common.robots'),
-  ogType: "website",
-  ogSiteName: () => t('seo.common.siteName'),
-  ogTitle: () => t('seo.pages.dockerSearch.ogTitle'),
-  ogDescription: () => t('seo.pages.dockerSearch.ogDescription')
-});
+useServiceSeo("dockerSearch");
 
 type ResolveResponse = {
   repo: string;
@@ -262,16 +253,12 @@ function chooseAdvancedTag(tag: string) {
 
 <template>
   <u-container class="docker-search">
-    <ocean-page-backdrop variant="treasure" />
-    <div class="docker-search__header background-hero text-center space-y-3">
-      <page-header
-          title="services.dockerSearch.title"
-          headline="services.dockerSearch.headline"
-          description="services.dockerSearch.subtitle"
-          class="mb-6"
-          :is-centered="true"
-      />
-    </div>
+    <service-page-header
+        backdrop="treasure"
+        title="services.dockerSearch.title"
+        headline="services.dockerSearch.headline"
+        description="services.dockerSearch.subtitle"
+    />
     <div class="tabs-row">
       <div ref="tabsScroll" class="tabs-scroll">
         <div class="tabs-head">

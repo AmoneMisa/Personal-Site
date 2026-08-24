@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import PageHeader from "~/components/common/PageHeader.vue";
 import CustomButton from "~/components/common/CustomButton.vue";
 import FileInput from "~/components/common/FileInput.vue";
 import CustomCheckbox from "~/components/common/CustomCheckbox.vue";
@@ -10,15 +9,7 @@ import {useMergeJsonState} from "~/composables/mergeJson/useMergeJsonState";
 
 const {t} = useI18n();
 
-useSeoMeta({
-  title: () => t('seo.pages.mergeJson.title'),
-  description: () => t('seo.pages.mergeJson.description'),
-  robots: () => t('seo.common.robots'),
-  ogType: "website",
-  ogSiteName: () => t('seo.common.siteName'),
-  ogTitle: () => t('seo.pages.mergeJson.ogTitle'),
-  ogDescription: () => t('seo.pages.mergeJson.ogDescription')
-});
+useServiceSeo("mergeJson");
 const ui = proxyRefs(useMergeJsonState());
 
 const viewModeItems = computed(() => [
@@ -35,16 +26,12 @@ function onDownload() {
 
 <template>
   <u-container class="merge">
-    <ocean-page-backdrop variant="treasure" />
-    <div class="merge__header background-hero text-center space-y-3">
-      <page-header
-          title="services.mergeJson.title"
-          headline="services.mergeJson.headline"
-          description="services.mergeJson.subtitle"
-          class="mb-6"
-          :is-centered="true"
-      />
-    </div>
+    <service-page-header
+        backdrop="treasure"
+        title="services.mergeJson.title"
+        headline="services.mergeJson.headline"
+        description="services.mergeJson.subtitle"
+    />
 
     <section class="merge__card">
       <div class="merge__toolbar">

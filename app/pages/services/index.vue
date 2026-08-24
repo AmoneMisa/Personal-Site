@@ -1,18 +1,8 @@
 <script setup lang="ts">
-import PageHeader from "~/components/common/PageHeader.vue";
-
 const { t } = useI18n();
 const localePath = useLocalePath();
 
-useSeoMeta({
-  title: () => t("seo.pages.services.title"),
-  description: () => t("seo.pages.services.description"),
-  robots: () => t("seo.common.robots"),
-  ogType: "website",
-  ogSiteName: () => t("seo.common.siteName"),
-  ogTitle: () => t("seo.pages.services.ogTitle"),
-  ogDescription: () => t("seo.pages.services.ogDescription"),
-});
+useServiceSeo("services");
 
 // Static tool catalog (was DB-driven). Titles/descriptions reuse the per-tool
 // SEO i18n keys that already exist in the static locale files.

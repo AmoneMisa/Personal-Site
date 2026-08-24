@@ -1,18 +1,9 @@
 <script setup lang="ts">
-import PageHeader from "~/components/common/PageHeader.vue";
 import CustomButton from "~/components/common/CustomButton.vue";
 
 const { t } = useI18n();
 
-useSeoMeta({
-  title: () => t('seo.pages.converter.title'),
-  description: () => t('seo.pages.converter.description'),
-  robots: () => t('seo.common.robots'),
-  ogType: "website",
-  ogSiteName: () => t('seo.common.siteName'),
-  ogTitle: () => t('seo.pages.converter.ogTitle'),
-  ogDescription: () => t('seo.pages.converter.ogDescription')
-});
+useServiceSeo("converter");
 
 type Mode = "media" | "data" | "document";
 type MediaTarget = "png" | "jpg" | "jpeg" | "webp" | "gif" | "bmp" | "tiff" | "avif";
@@ -283,16 +274,12 @@ const targetItems = computed(() =>
 
 <template>
   <u-page :ui="{ center: 'flex flex-col gap-[28px] lg:gap-[32px] xl:gap-[40px] py-12' }">
-    <ocean-page-backdrop variant="reef" />
-    <div class="converter__header background-hero text-center space-y-3">
-      <page-header
-          title="services.converter.hero.titleLine1"
-          headline="services.converter.headline"
-          description="services.emailEditor.subtitle"
-          class="mb-6"
-          :is-centered="true"
-      />
-    </div>
+    <service-page-header
+        backdrop="reef"
+        title="services.converter.hero.titleLine1"
+        headline="services.converter.headline"
+        description="services.emailEditor.subtitle"
+    />
     <u-page-body class="mt-4 pb-0 gap-16 flex flex-col justify-center">
       <u-container class="max-w-6xl mx-auto mb-0">
         <div class="mode-grid">

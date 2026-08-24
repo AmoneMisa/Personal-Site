@@ -1,20 +1,11 @@
 <script setup lang="ts">
-import PageHeader from "~/components/common/PageHeader.vue";
 import CustomButton from "~/components/common/CustomButton.vue";
 import { computed, ref } from "vue";
 
 const config = useRuntimeConfig();
 const { t } = useI18n();
 
-useSeoMeta({
-  title: () => t('seo.pages.pdfEditor.title'),
-  description: () => t('seo.pages.pdfEditor.description'),
-  robots: () => t('seo.common.robots'),
-  ogType: "website",
-  ogSiteName: () => t('seo.common.siteName'),
-  ogTitle: () => t('seo.pages.pdfEditor.ogTitle'),
-  ogDescription: () => t('seo.pages.pdfEditor.ogDescription')
-});
+useServiceSeo("pdfEditor");
 const router = useRouter();
 const localePath = useLocalePath();
 
@@ -84,16 +75,12 @@ async function createDoc() {
 
 <template>
   <u-container class="pdf">
-    <ocean-page-backdrop variant="treasure" />
-    <div class="pdf__header background-hero text-center space-y-3">
-      <page-header
-          title="services.pdfEditor.title"
-          headline="services.pdfEditor.headline"
-          description="services.pdfEditor.subtitle"
-          class="mb-6"
-          :is-centered="true"
-      />
-    </div>
+    <service-page-header
+        backdrop="treasure"
+        title="services.pdfEditor.title"
+        headline="services.pdfEditor.headline"
+        description="services.pdfEditor.subtitle"
+    />
 
     <div class="pdf__grid">
       <section class="ui-anim-border pdf__panel">

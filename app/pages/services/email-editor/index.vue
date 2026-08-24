@@ -1,31 +1,16 @@
 <script setup lang="ts">
-import PageHeader from "~/components/common/PageHeader.vue";
 import EmailEditorShell from "~/components/emailEditor/EmailEditorShell.vue";
 
-const { t } = useI18n();
-
-useSeoMeta({
-  title: () => t("seo.pages.emailEditor.title"),
-  description: () => t("seo.pages.emailEditor.description"),
-  robots: () => t("seo.common.robots"),
-  ogType: "website",
-  ogSiteName: () => t("seo.common.siteName"),
-  ogTitle: () => t("seo.pages.emailEditor.ogTitle"),
-  ogDescription: () => t("seo.pages.emailEditor.ogDescription")
-});
+useServiceSeo("emailEditor");
 </script>
 
 <template>
   <u-container class="email-editor">
-    <ocean-page-backdrop variant="home" />
-    <div class="email-editor__header background-hero text-center space-y-3">
-      <page-header
-          title="services.emailEditor.title"
-          description="services.emailEditor.subtitle"
-          class="mb-6"
-          :is-centered="true"
-      />
-    </div>
+    <service-page-header
+        backdrop="home"
+        title="services.emailEditor.title"
+        description="services.emailEditor.subtitle"
+    />
 
     <EmailEditorShell />
   </u-container>

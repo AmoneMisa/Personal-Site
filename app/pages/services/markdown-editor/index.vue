@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import PageHeader from "~/components/common/PageHeader.vue";
 import CustomButton from "~/components/common/CustomButton.vue";
 import type {TabsItem} from "#ui/components/Tabs.vue";
 import {nextTick, onBeforeUnmount, onMounted} from "vue";
@@ -11,15 +10,7 @@ type ViewMode = "md" | "preview";
 
 const {t, locale} = useI18n();
 
-useSeoMeta({
-  title: () => t('seo.pages.markdownEditor.title'),
-  description: () => t('seo.pages.markdownEditor.description'),
-  robots: () => t('seo.common.robots'),
-  ogType: "website",
-  ogSiteName: () => t('seo.common.siteName'),
-  ogTitle: () => t('seo.pages.markdownEditor.ogTitle'),
-  ogDescription: () => t('seo.pages.markdownEditor.ogDescription')
-});
+useServiceSeo("markdownEditor");
 
 const MAX = 8000;
 const STORAGE_KEY = "services:markdown-editor:v3";
@@ -629,16 +620,12 @@ onBeforeUnmount(() => {
 
 <template>
   <u-container class="markdown-editor">
-    <ocean-page-backdrop variant="reef" />
-    <div class="markdown-editor__header background-hero text-center space-y-3">
-      <page-header
-          title="services.markdownEditor.title"
-          headline="services.markdownEditor.headline"
-          description="services.markdownEditor.subtitle"
-          class="mb-6"
-          :is-centered="true"
-      />
-    </div>
+    <service-page-header
+        backdrop="reef"
+        title="services.markdownEditor.title"
+        headline="services.markdownEditor.headline"
+        description="services.markdownEditor.subtitle"
+    />
     <section class="markdown-editor__card">
       <div class="markdown-editor__top">
         <div class="markdown-editor__toolbar">

@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import PageHeader from "~/components/common/PageHeader.vue";
 import CustomButton from "~/components/common/CustomButton.vue";
 import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from "vue";
 import { BaseFabricObject, Canvas, Ellipse, FabricImage, FabricObject, PencilBrush, Rect, Textbox } from "fabric";
@@ -10,16 +9,8 @@ import { BaseFabricObject, Canvas, Ellipse, FabricImage, FabricObject, PencilBru
 const config = useRuntimeConfig();
 const { t } = useI18n();
 
-useSeoMeta({
-  title: () => t('seo.pages.pdfEditorDoc.title'),
-  description: () => t('seo.pages.pdfEditorDoc.description'),
-  // per-user document workspace: keep these dynamic URLs out of the index
-  robots: "noindex, nofollow",
-  ogType: "website",
-  ogSiteName: () => t('seo.common.siteName'),
-  ogTitle: () => t('seo.pages.pdfEditorDoc.ogTitle'),
-  ogDescription: () => t('seo.pages.pdfEditorDoc.ogDescription')
-});
+// Per-user document workspaces must stay out of the index.
+useServiceSeo("pdfEditorDoc", {robots: "noindex, nofollow"});
 const route = useRoute();
 const router = useRouter();
 const localePath = useLocalePath();
@@ -2019,16 +2010,12 @@ onBeforeUnmount(() => {
 
 <template>
   <u-container class="pdf">
-    <ocean-page-backdrop variant="treasure" />
-    <div class="pdf__header background-hero text-center space-y-3">
-      <page-header
-          title="services.pdfEditor.title"
-          headline="services.pdfEditor.headline"
-          description="services.pdfEditor.subtitle"
-          class="mb-6"
-          :is-centered="true"
-      />
-    </div>
+    <service-page-header
+        backdrop="treasure"
+        title="services.pdfEditor.title"
+        headline="services.pdfEditor.headline"
+        description="services.pdfEditor.subtitle"
+    />
 
     <div class="pdf__grid">
       <section class="ui-anim-border pdf__panel pdf__panel_preview">
