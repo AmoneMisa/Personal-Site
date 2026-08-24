@@ -104,9 +104,11 @@ test('existing US work authorization prevents a false sponsorship blocker', () =
   assert.equal(result.blockers.some((blocker) => blocker.code === 'visa_sponsorship'), false)
 })
 
-test('score colors reserve green for 75% and above', () => {
+test('score colors use red, orange, yellow and green thresholds', () => {
   assert.equal(scoreColor(75), '#34d399')
   assert.equal(scoreColor(74), '#fbbf24')
-  assert.equal(scoreColor(50), '#fbbf24')
-  assert.equal(scoreColor(49), '#f87171')
+  assert.equal(scoreColor(60), '#fbbf24')
+  assert.equal(scoreColor(59), '#fb923c')
+  assert.equal(scoreColor(45), '#fb923c')
+  assert.equal(scoreColor(44), '#f87171')
 })
