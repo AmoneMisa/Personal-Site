@@ -58,17 +58,11 @@ function clampInt(value: unknown, def: number, min: number, max: number): number
 }
 
 async function getStoredSnapshot(): Promise<Awaited<ReturnType<typeof getStoredJobsSnapshot>>> {
-  let timer: ReturnType<typeof setTimeout> | undefined
-  try {
-    return await Promise.race([
-      getStoredJobsSnapshot(),
-      new Promise<Awaited<ReturnType<typeof getStoredJobsSnapshot>>>((resolve) => {
-        timer = setTimeout(() => resolve([]), 750)
-      }),
-    ])
-  } finally {
-    if (timer) clearTimeout(timer)
-  }
+  // The snapshot is a local persistent-volume read, not an upstream crawl. Returning
+  // [] after an arbitrary timeout makes the first filtered request look genuinely
+  // empty while the same read keeps warming in the background. Await it once; the
+  // snapshot module keeps a 60-second in-memory cache for subsequent requests.
+  return getStoredJobsSnapshot()
 }
 
 export default defineEventHandler(async (event) => {
