@@ -12,7 +12,7 @@ import RecentlyViewed from "~/components/jobs/RecentlyViewed.vue";
 import StatsPanel from "~/components/jobs/StatsPanel.vue";
 import type { Job, RecentJob } from "~/types/jobs";
 import { convertCurrency as convertCurrencyValue, convertSalaryPeriod, currencySymbol } from "~/utils/search/money";
-import { useJobFilters } from "~/composables/jobs/useJobFilters";
+import { JOB_SALARY_PERIODS, useJobFilters } from "~/composables/jobs/useJobFilters";
 import { useJobFilterBlocks } from "~/composables/jobs/useJobFilterBlocks";
 import { useJobFeed } from "~/composables/jobs/useJobFeed";
 import { useJobAts } from "~/composables/jobs/useJobAts";
@@ -79,8 +79,7 @@ function formatAmount(n: number, cur: string): string {
 // Pay-period conversion. PER_YEAR turns an amount at a period into a yearly amount
 // (must match server enrich.ts: 160 work hours/month). To convert an amount from
 // period A to B: multiply by PER_YEAR[A] / PER_YEAR[B].
-const periodOptions = ["hour", "month", "year"] as const;
-type Period = (typeof periodOptions)[number];
+type Period = (typeof JOB_SALARY_PERIODS)[number];
 
 function convertPeriod(amount: number, from: Period, to: Period): number {
   return Math.round(convertSalaryPeriod(amount, from, to));
@@ -379,65 +378,9 @@ function resetFilters() {
 // the address bar) AND to localStorage (so a reload restores the last search).
 const SEARCH_STATE_KEY = "jobs:last-search:v1";
 
-function currentState(): Record<string, string> {
-  const s: Record<string, string> = {};
-  if (query.value.trim()) s.q = query.value.trim();
-  if (source.value) s.source = source.value;
-  if (salaryMin.value != null) s.salaryMin = String(salaryMin.value);
-  if (displayCurrency.value !== "USD") s.currency = displayCurrency.value;
-  if (displayPeriod.value !== "month") s.period = displayPeriod.value;
-  if (sort.value !== "date") s.sort = sort.value;
-  if (countries.value.length) s.country = countries.value.join(",");
-  if (cities.value.trim()) s.cities = cities.value.trim();
-  if (includeRu.value) s.includeRu = "1";
-  if (includeBy.value) s.includeBy = "1";
-  if (workMode.value) s.workMode = workMode.value;
-  if (relocation.value) s.relocation = relocation.value;
-  if (employmentKind.value) s.employment = employmentKind.value;
-  if (hasSalary.value) s.hasSalary = "1";
-  if (maxExperience.value != null) s.maxExp = String(maxExperience.value);
-  if (foreignerOnly.value) s.foreigner = "1";
-  if (!hideRisky.value) s.hideRisky = "0";
-  if (noExperience.value) s.noExp = "1";
-  if (language.value) s.language = language.value;
-  if (languageLevel.value) s.level = languageLevel.value;
-  if (excludeLanguages.value.length) s.exclLang = excludeLanguages.value.join(",");
-  if (skills.value.trim()) s.skills = skills.value.trim();
-  return s;
-}
-
-function applyState(s: Record<string, string>) {
-  if (!s || typeof s !== "object") return;
-  query.value = s.q ?? "";
-  source.value = s.source ?? "";
-  salaryMin.value = s.salaryMin ? Number(s.salaryMin) : undefined;
-  displayCurrency.value = s.currency ?? "USD";
-  displayPeriod.value = periodOptions.includes(s.period as Period) ? (s.period as Period) : "month";
-  sort.value = s.sort ?? "date";
-  countries.value = s.country ? s.country.split(",").filter(Boolean) : [];
-  cities.value = s.cities ?? "";
-  includeRu.value = s.includeRu === "1";
-  includeBy.value = s.includeBy === "1";
-  workMode.value = s.workMode ?? "";
-  relocation.value = s.relocation ?? "";
-  employmentKind.value = s.employment ?? "";
-  hasSalary.value = s.hasSalary === "1";
-  maxExperience.value = s.maxExp ? Number(s.maxExp) : undefined;
-  foreignerOnly.value = s.foreigner === "1";
-  hideRisky.value = s.hideRisky !== "0";
-  noExperience.value = s.noExp === "1";
-  language.value = s.language ?? "";
-  languageLevel.value = s.level ?? "";
-  excludeLanguages.value = s.exclLang ? s.exclLang.split(",").filter(Boolean) : [];
-  skills.value = s.skills ?? "";
-  // ATS sort needs a CV, which is never persisted — fall back to newest.
-  if (sort.value === "ats") sort.value = "date";
-}
-
-const { persist: persistState, restore: restoreState } = useJobRouteState({
+const { persist: persistState, restore: restoreState, serialize: currentState } = useJobRouteState({
   storageKey: SEARCH_STATE_KEY,
-  serialize: currentState,
-  deserialize: applyState,
+  filters: jobFilters,
   ignoredUrlKeys: ["job"],
   extraQuery: () => jobModalOpen.value && activeJob.value ? { job: activeJob.value.id } : {},
 });
@@ -609,7 +552,7 @@ const countryItems = computed<Item[]>(() =>
   countryOptions.filter((c) => c.value).map((c) => ({ value: c.value, label: c.label! })),
 );
 const currencyItems = computed<Item[]>(() => currencyOptions.value.map((c) => ({ label: c, value: c })));
-const periodItems = computed<Item[]>(() => periodOptions.map((p) => ({ label: periodLabel(p), value: p })));
+const periodItems = computed<Item[]>(() => JOB_SALARY_PERIODS.map((p) => ({ label: periodLabel(p), value: p })));
 const workModeItems = computed<Item[]>(() => [
   { label: t("any"), value: ANY_SELECT_VALUE },
   { label: t("wmRemote"), value: "remote" },

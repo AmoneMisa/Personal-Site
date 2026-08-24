@@ -19,10 +19,8 @@ import { useLatestRequest } from "~/composables/search/useLatestRequest";
 import { useInfiniteFeed } from "~/composables/search/useInfiniteFeed";
 import { ANY_SELECT_VALUE, useNullableSelect } from "~/composables/search/useNullableSelect";
 import {
-  HIRING_SORTS,
   type HiringCvProfile as CvProfile,
   type HiringFeedResult as FeedResult,
-  type HiringSort,
   type HiringSourceOption as SourceOption,
   type HiringView,
 } from "~/types/hiring";
@@ -30,7 +28,6 @@ import { queryString } from "~/utils/queryParams";
 import { hiringProfessionLocale } from "~~/shared/hiringProfessionLabels";
 import {
   hiringProfessionFilterLabel,
-  normalizeHiringProfessionFilterSelections,
 } from "~~/shared/hiringProfessionGroups";
 
 // Hiring board — CV/resume profiles from candidates looking for work.
@@ -248,52 +245,9 @@ useInfiniteFeed({
   rootMargin: "500px 0px",
 });
 
-function currentFilterQuery(): Record<string, string> {
-  const queryParams: Record<string, string> = {};
-  if (countries.value.length) queryParams.countries = countries.value.join(",");
-  if (city.value) queryParams.city = city.value;
-  if (remote.value === "yes") queryParams.remote = "1";
-  if (remote.value === "no") queryParams.remote = "0";
-  if (experienceMin.value != null) queryParams.experienceMin = String(experienceMin.value);
-  if (salaryFrom.value != null) queryParams.salaryFrom = String(salaryFrom.value);
-  if (salaryTo.value != null) queryParams.salaryTo = String(salaryTo.value);
-  if (salaryCurrency.value !== "USD" || salaryFrom.value != null || salaryTo.value != null || sort.value.startsWith("salary")) queryParams.salaryCurrency = salaryCurrency.value;
-  if (sort.value !== "recent") queryParams.sort = sort.value;
-  if (ageMin.value != null) queryParams.ageMin = String(ageMin.value);
-  if (ageMax.value != null) queryParams.ageMax = String(ageMax.value);
-  if (gender.value) queryParams.gender = gender.value;
-  if (professions.value.length) queryParams.professions = professions.value.join(",");
-  if (query.value.trim()) queryParams.query = query.value.trim();
-  if (seniority.value) queryParams.seniority = seniority.value;
-  const skillQuery = canonicalSkillQuery();
-  if (skillQuery) queryParams.skills = skillQuery;
-  if (source.value) queryParams.sources = source.value;
-  return queryParams;
-}
-
-function applyQueryParams(params: Record<string, unknown>) {
-  const countryParam = queryString(params.countries);
-  if (countryParam) countries.value = countryParam.split(",").filter(Boolean);
-  city.value = queryString(params.city);
-  remote.value = params.remote === "1" ? "yes" : params.remote === "0" ? "no" : "any";
-  experienceMin.value = Number(queryString(params.experienceMin)) || undefined;
-  salaryFrom.value = Number(queryString(params.salaryFrom)) || undefined;
-  salaryTo.value = Number(queryString(params.salaryTo)) || undefined;
-  const requestedSalaryCurrency = queryString(params.salaryCurrency).toUpperCase();
-  salaryCurrency.value = /^[A-Z]{3}$/.test(requestedSalaryCurrency) ? requestedSalaryCurrency : "USD";
-  const requestedSort = queryString(params.sort) as HiringSort;
-  sort.value = HIRING_SORTS.includes(requestedSort) ? requestedSort : "recent";
-  ageMin.value = Number(queryString(params.ageMin)) || undefined;
-  ageMax.value = Number(queryString(params.ageMax)) || undefined;
-  gender.value = ["male", "female", "unknown"].includes(queryString(params.gender)) ? queryString(params.gender) : "";
-  professions.value = normalizeHiringProfessionFilterSelections(
-    queryString(params.professions).split(",").map((v) => v.trim()).filter(Boolean),
-  );
-  query.value = queryString(params.query);
-  seniority.value = ["junior", "middle", "senior", "lead"].includes(queryString(params.seniority)) ? queryString(params.seniority) : "";
-  skills.value = queryString(params.skills);
-  source.value = queryString(params.sources);
-}
+const hiringRouteState = useHiringRouteState({ router, route, filters: hiringFilters, skillQuery: canonicalSkillQuery });
+function currentFilterQuery(): Record<string, string> { return hiringRouteState.serialize(); }
+function applyQueryParams(params: Record<string, unknown>) { hiringRouteState.deserialize(params); }
 
 function activeCvSource(profile: CvProfile): string {
   return profile.sourceKey || profile.origin || profile.source;
@@ -307,7 +261,7 @@ function activeCvQuery(profile: CvProfile): Record<string, string> {
   };
 }
 
-const { schedule: scheduleQuerySync } = useHiringRouteState(router, route, currentFilterQuery, applyQueryParams);
+const { schedule: scheduleQuerySync } = hiringRouteState;
 
 async function syncActiveCvQuery(profile: CvProfile | null) {
   await router.replace({

@@ -9,7 +9,7 @@ import SearchDetailsModal from "~/components/search/SearchDetailsModal.vue";
 import SearchPageShell from "~/components/search/SearchPageShell.vue";
 import SearchSavedTabs from "~/components/search/SearchSavedTabs.vue";
 import SearchFilterBlocks from "~/components/search/SearchFilterBlocks.vue";
-import { queryBoolean, queryString } from "~/utils/queryParams";
+import { queryString } from "~/utils/queryParams";
 import { convertCurrency } from "~/utils/search/money";
 import { useFlatFilters } from "~/composables/flats/useFlatFilters";
 import { useFlatFilterBlocks } from "~/composables/flats/useFlatFilterBlocks";
@@ -29,7 +29,6 @@ import { ANY_SELECT_VALUE, useNullableSelect } from "~/composables/search/useNul
 import type {
   FlatFeedResult as FeedResult,
   FlatListing as Listing,
-  FlatSort,
   FlatView,
 } from "~/types/flats";
 
@@ -287,111 +286,15 @@ useInfiniteFeed({
   threshold: 0.01,
 });
 
-function currentFilterQuery(): Record<string, string> {
-  const q: Record<string, string> = {};
-  if (countries.value.length) q.countries = countries.value.join(",");
-  if (city.value) q.city = city.value;
-  if (district.value) q.district = district.value;
-  if (metro.value) q.metro = metro.value;
-  if (propertyType.value !== "any") q.propertyType = propertyType.value;
-  if (dealType.value !== "any") q.dealType = dealType.value;
-  if (agency.value !== "any") q.agency = agency.value;
-  if (audience.value !== "any") q.audience = audience.value;
-  if (petFriendly.value) q.pets = "1";
-  if (roomOnlyFilter.value) q.roomOnly = "1";
-  if (onlyWithPhotos.value) q.withPhotos = "1";
-  if (childrenRequired.value) q.children = "1";
-  if (newBuildingOnly.value) q.newBuilding = "1";
-  if (dishwasherOnly.value) q.dishwasher = "1";
-  if (airConditionerOnly.value) q.airConditioner = "1";
-  if (parkingOnly.value) q.parking = "1";
-  if (internetOnly.value) q.internet = "1";
-  if (gasOnly.value) q.gas = "1";
-  if (balconyOnly.value) q.balcony = "1";
-  if (terraceOnly.value) q.terrace = "1";
-  if (privateYardOnly.value) q.privateYard = "1";
-  if (sort.value !== "newest") q.sort = sort.value;
-  if (priceMin.value != null) q.priceMin = String(priceMin.value);
-  if (priceMax.value != null) q.priceMax = String(priceMax.value);
-  if (displayCurrency.value !== "USD") q.currency = displayCurrency.value;
-  if (roomsMin.value != null) q.roomsMin = String(roomsMin.value);
-  if (roomsMax.value != null) q.roomsMax = String(roomsMax.value);
-  if (bedroomsMin.value != null) q.bedroomsMin = String(bedroomsMin.value);
-  if (bedroomsMax.value != null) q.bedroomsMax = String(bedroomsMax.value);
-  if (areaMin.value != null) q.areaMin = String(areaMin.value);
-  if (areaMax.value != null) q.areaMax = String(areaMax.value);
-  if (pricePerSqmMin.value != null) q.pricePerSqmMin = String(pricePerSqmMin.value);
-  if (pricePerSqmMax.value != null) q.pricePerSqmMax = String(pricePerSqmMax.value);
-  if (metroMaxM.value != null) q.metroMaxM = String(metroMaxM.value);
-  if (nearbyKind.value) q.nearbyKind = nearbyKind.value;
-  if (nearbyMaxM.value != null) q.nearbyMaxM = String(nearbyMaxM.value);
-  if (floorMin.value != null) q.floorMin = String(floorMin.value);
-  if (floorMax.value != null) q.floorMax = String(floorMax.value);
-  if (totalFloorsMin.value != null) q.totalFloorsMin = String(totalFloorsMin.value);
-  if (totalFloorsMax.value != null) q.totalFloorsMax = String(totalFloorsMax.value);
-  if (yearMin.value != null) q.yearMin = String(yearMin.value);
-  if (yearMax.value != null) q.yearMax = String(yearMax.value);
-  if (maxAgeDays.value != null) q.maxAgeDays = String(maxAgeDays.value);
-  if (query.value.trim()) q.query = query.value.trim();
-  if (source.value) q.sources = source.value;
-  return q;
-}
-function applyQueryParams(params: Record<string, unknown>) {
-  const countryParam = queryString(params.countries);
-  if (countryParam) countries.value = countryParam.split(",").filter(Boolean);
-  city.value = queryString(params.city);
-  district.value = queryString(params.district);
-  propertyType.value = ["flat", "house"].includes(queryString(params.propertyType)) ? queryString(params.propertyType) : "any";
-  dealType.value = ["sale", "longRent", "roomRent", "shortRent"].includes(queryString(params.dealType)) ? queryString(params.dealType) : "any";
-  agency.value = ["owner", "agency"].includes(queryString(params.agency)) ? queryString(params.agency) : "any";
-  audience.value = ["women", "men", "family"].includes(queryString(params.audience)) ? queryString(params.audience) : "any";
-  metro.value = queryString(params.metro);
-  petFriendly.value = queryBoolean(params.pets);
-  roomOnlyFilter.value = queryBoolean(params.roomOnly);
-  onlyWithPhotos.value = queryBoolean(params.withPhotos);
-  childrenRequired.value = queryBoolean(params.children);
-  newBuildingOnly.value = queryBoolean(params.newBuilding);
-  dishwasherOnly.value = queryBoolean(params.dishwasher);
-  airConditionerOnly.value = queryBoolean(params.airConditioner);
-  parkingOnly.value = queryBoolean(params.parking);
-  internetOnly.value = queryBoolean(params.internet);
-  gasOnly.value = queryBoolean(params.gas);
-  balconyOnly.value = queryBoolean(params.balcony);
-  terraceOnly.value = queryBoolean(params.terrace);
-  privateYardOnly.value = queryBoolean(params.privateYard);
-  const sortParam = queryString(params.sort);
-  sort.value = (["newest", "oldest", "priceAsc", "priceDesc", "titleAsc", "titleDesc"].includes(sortParam) ? sortParam : "newest") as FlatSort;
-  priceMin.value = Number(queryString(params.priceMin)) || undefined;
-  priceMax.value = Number(queryString(params.priceMax)) || undefined;
-  if (queryString(params.currency)) displayCurrency.value = queryString(params.currency);
-  roomsMin.value = Number(queryString(params.roomsMin)) || undefined;
-  roomsMax.value = Number(queryString(params.roomsMax)) || undefined;
-  bedroomsMin.value = Number(queryString(params.bedroomsMin)) || undefined;
-  bedroomsMax.value = Number(queryString(params.bedroomsMax)) || undefined;
-  areaMin.value = Number(queryString(params.areaMin)) || undefined;
-  areaMax.value = Number(queryString(params.areaMax)) || undefined;
-  pricePerSqmMin.value = Number(queryString(params.pricePerSqmMin)) || undefined;
-  pricePerSqmMax.value = Number(queryString(params.pricePerSqmMax)) || undefined;
-  metroMaxM.value = Number(queryString(params.metroMaxM)) || undefined;
-  nearbyKind.value = queryString(params.nearbyKind);
-  nearbyMaxM.value = Number(queryString(params.nearbyMaxM)) || undefined;
-  floorMin.value = Number(queryString(params.floorMin)) || undefined;
-  floorMax.value = Number(queryString(params.floorMax)) || undefined;
-  totalFloorsMin.value = Number(queryString(params.totalFloorsMin)) || undefined;
-  totalFloorsMax.value = Number(queryString(params.totalFloorsMax)) || undefined;
-  yearMin.value = Number(queryString(params.yearMin)) || undefined;
-  yearMax.value = Number(queryString(params.yearMax)) || undefined;
-  maxAgeDays.value = Number(queryString(params.maxAgeDays)) || undefined;
-  query.value = queryString(params.query);
-  const sourceParam = queryString(params.sources);
-  source.value = SOURCES.includes(sourceParam) ? sourceParam : "";
-}
+const flatRouteState = useFlatRouteState({ router, route, filters: flatFilters, sources: SOURCES });
+function currentFilterQuery(): Record<string, string> { return flatRouteState.serialize(); }
+function applyQueryParams(params: Record<string, unknown>) { flatRouteState.deserialize(params); }
 // The address bar follows the filters directly instead of waiting for a request
 // to come back. It used to be written only at the end of a successful load, so
 // a failed or still-running request left the URL describing filters that were no
 // longer applied: resetting did not clear it, and removing one of the chips
 // above the results did not take that filter out of the query string either.
-const { schedule: scheduleQuerySync } = useFlatRouteState(router, route, currentFilterQuery, applyQueryParams);
+const { schedule: scheduleQuerySync } = flatRouteState;
 const shareUrl = computed(() => {
   const resolved = router.resolve({ path: route.path, query: { ...currentFilterQuery(), shared: "1" } });
   return import.meta.client ? new URL(resolved.href, window.location.origin).toString() : resolved.href;
