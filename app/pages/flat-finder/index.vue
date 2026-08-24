@@ -873,7 +873,49 @@ const ptLabel = (p: Listing["propertyType"]) => (p === "house" ? t("ptHouse") : 
 const audienceLabel = (a?: Listing["audience"]) => a === "women" ? t("audWomen") : a === "men" ? t("audMen") : a === "family" ? t("audFamily") : t("audAny");
 const conditionLabel = (c?: Listing["condition"]) => c === "needs_renovation" ? t("condNeeds") : c === "basic" ? t("condBasic") : c === "good" ? t("condGood") : c === "modern" ? t("condModern") : c === "luxury" ? t("condLuxury") : t("notSpecified");
 const sourceLabel = (s?: string) => (s === "olx" ? "OLX" : s === "telegram" ? "Telegram" : strOr(s));
-function cardBadges(l: Listing): string[] { const b: string[] = []; b.push(l.byAgency ? t("badgeAgency") : t("badgeOwner")); if (l.newBuilding) b.push(t("badgeNew")); if (l.furnished) b.push(t("badgeFurnished")); if (l.airConditioner) b.push(t("badgeAC")); if (l.balcony) b.push(t("badgeBalcony")); if (l.parking) b.push(t("badgeParking")); if (l.elevator) b.push(t("badgeElevator")); if (l.internet) b.push(t("badgeInternet")); if (l.negotiable) b.push(t("badgeNegotiable")); if (l.petsAllowed) b.push(t("badgePet")); if (l.childrenAllowed) b.push(t("badgeChildren")); if (l.communalSeparated === false) b.push(t("badgeUtilIncl")); if (l.commission === false) b.push(t("badgeNoCommission")); if (l.deposit === true) b.push(t("badgeDeposit")); if (l.roomOnly) b.push(t("badgeRoomOnly")); if (l.audience === "family") b.push(t("badgeFamily")); if (l.audience === "women") b.push(t("badgeWomen")); if (l.audience === "men") b.push(t("badgeMen")); return b; }
+function cardDealTone(l: Listing): "sale" | "rent" | "room" | "short" | "" {
+  if (l.dealType === "shortRent") return "short";
+  if (l.roomOnly) return "room";
+  if (l.dealType === "sale") return "sale";
+  if (l.dealType === "longRent") return "rent";
+  return "";
+}
+function cardDealLabel(l: Listing): string {
+  const filterApplies = view.value === "active";
+  const english = locale.value.startsWith("en");
+  if (l.dealType === "shortRent") return !filterApplies || dealType.value !== "shortRent" ? (english ? "Short-term rent" : "Посуточная аренда") : "";
+  if (l.roomOnly) return !filterApplies || !roomOnlyFilter.value ? t("roomShare") : "";
+  if (!filterApplies || dealType.value === "any") {
+    if (l.dealType === "longRent") return english ? "Rent" : "Аренда";
+    return dealLabel(l.dealType);
+  }
+  return "";
+}
+function cardBadges(l: Listing): string[] {
+  const b: string[] = [];
+  if (view.value !== "active" || agency.value === "any") b.push(l.byAgency ? t("badgeAgency") : t("badgeOwner"));
+  if (l.commission === false) b.push(t("badgeNoCommission"));
+  if (l.newBuilding) b.push(t("badgeNew"));
+  if (l.furnished) b.push(t("badgeFurnished"));
+  if (l.airConditioner) b.push(t("badgeAC"));
+  if (l.balcony) b.push(t("badgeBalcony"));
+  if (l.parking) b.push(t("badgeParking"));
+  if (l.elevator) b.push(t("badgeElevator"));
+  if (l.internet) b.push(t("badgeInternet"));
+  if (l.negotiable) b.push(t("badgeNegotiable"));
+  if (l.petsAllowed) b.push(t("badgePet"));
+  if (l.childrenAllowed) b.push(t("badgeChildren"));
+  if (l.communalSeparated === false) b.push(t("badgeUtilIncl"));
+  if (l.deposit === true) b.push(t("badgeDeposit"));
+  if (l.audience === "family") b.push(t("badgeFamily"));
+  if (l.audience === "women") b.push(t("badgeWomen"));
+  if (l.audience === "men") b.push(t("badgeMen"));
+  for (const tag of l.tags || []) {
+    const label = nearbyItemLabel(tag)?.trim();
+    if (label) b.push(label);
+  }
+  return [...new Set(b)];
+}
 function floorLabel(l: Listing) { if (l.floor != null && l.totalFloors != null) return `${l.floor} / ${l.totalFloors}`; return l.floor != null || l.totalFloors != null ? String(l.floor ?? l.totalFloors) : t("nd"); }
 function depositLabel(l: Listing) { if (l.depositAmount != null) return `${l.depositAmount.toLocaleString()} ${l.depositCurrency || l.currency}`; return fmtBool(l.deposit); }
 function commissionLabel(l: Listing) { if (l.commissionPercent != null) return `${l.commissionPercent}%`; return fmtBool(l.commission); }
@@ -1071,8 +1113,26 @@ onBeforeUnmount(() => { modalOpen.value = false; lightboxIndex.value = null; rel
 
     <div class="flats__grid">
       <article v-for="l in displayedListings" :key="`${l.source}:${l.country}:${l.id}`" class="flat-card" :class="{ 'flat-card_favorite': isFavorite(l.id), 'flat-card_hidden': isHidden(l.id) }" @click="openListing(l)">
-        <div class="flat-card__photo"><img v-if="listingPhoto(l)" :src="listingPhoto(l) || ''" :alt="displayListingTitle(l)" loading="lazy" decoding="async" referrerpolicy="no-referrer" @error="markPhotoFailedFromEvent" /><div v-else class="flat-card__no-photo"><u-icon name="i-lucide-image-off" class="flat-card__no-photo-icon" aria-hidden="true" /><span>{{ t("noPhoto") }}</span></div><span v-if="dealLabel(l.dealType)" class="flat-card__deal">{{ dealLabel(l.dealType) }}</span><span v-if="l.roomOnly" class="flat-card__room">{{ t("roomShare") }}</span></div>
-        <div class="flat-card__body"><div class="flat-card__actions"><button type="button" class="flat-card__action" :class="{ 'flat-card__action_active': isFavorite(l.id) }" :aria-label="isFavorite(l.id) ? t('removeFavorite') : t('addFavorite')" @click.stop="toggleFavorite(l)"><u-icon name="i-lucide-heart" /></button><button type="button" class="flat-card__action" :class="{ 'flat-card__action_active': isHidden(l.id) }" :aria-label="isHidden(l.id) ? t('restoreListing') : t('hideListing')" @click.stop="toggleHidden(l)"><u-icon :name="isHidden(l.id) ? 'i-lucide-eye' : 'i-lucide-eye-off'" /></button></div><div class="flat-card__price">{{ priceLabel(l) }}</div><div v-if="convertedLabel(l)" class="flat-card__price-conv text-muted">{{ convertedLabel(l) }}</div><h3 class="flat-card__title">{{ displayListingTitle(l) }}</h3><div v-if="specLine(l)" class="flat-card__spec text-muted">{{ specLine(l) }}</div><div v-if="cardBadges(l).length" class="flat-card__badges"><span v-for="b in cardBadges(l)" :key="b" class="flat-card__badge">{{ b }}</span></div><div class="flat-card__meta text-muted"><span v-if="locLine(l)">{{ locLine(l) }}</span><span class="flat-card__src">{{ l.source }}</span><span v-if="timeAgo(l.createdAt)">· {{ timeAgo(l.createdAt) }}</span></div></div>
+        <div class="flat-card__photo">
+          <img v-if="listingPhoto(l)" :src="listingPhoto(l) || ''" :alt="displayListingTitle(l)" loading="lazy" decoding="async" referrerpolicy="no-referrer" @error="markPhotoFailedFromEvent" />
+          <div v-else class="flat-card__no-photo"><u-icon name="i-lucide-image-off" class="flat-card__no-photo-icon" aria-hidden="true" /><span>{{ t("noPhoto") }}</span></div>
+          <span v-if="cardDealLabel(l)" class="flat-card__deal" :class="`flat-card__deal_${cardDealTone(l)}`">{{ cardDealLabel(l) }}</span>
+          <div class="flat-card__actions">
+            <button type="button" class="flat-card__action" :class="{ 'flat-card__action_active': isFavorite(l.id) }" :aria-label="isFavorite(l.id) ? t('removeFavorite') : t('addFavorite')" @click.stop="toggleFavorite(l)"><u-icon name="i-lucide-heart" /></button>
+            <button type="button" class="flat-card__action" :class="{ 'flat-card__action_active': isHidden(l.id) }" :aria-label="isHidden(l.id) ? t('restoreListing') : t('hideListing')" @click.stop="toggleHidden(l)"><u-icon :name="isHidden(l.id) ? 'i-lucide-eye' : 'i-lucide-eye-off'" /></button>
+          </div>
+        </div>
+        <div class="flat-card__body">
+          <div class="flat-card__price">{{ priceLabel(l) }}</div>
+          <div v-if="convertedLabel(l)" class="flat-card__price-conv text-muted">{{ convertedLabel(l) }}</div>
+          <h3 class="flat-card__title">{{ displayListingTitle(l) }}</h3>
+          <div v-if="specLine(l)" class="flat-card__spec text-muted">{{ specLine(l) }}</div>
+          <div v-if="cardBadges(l).length" class="flat-card__badges"><span v-for="b in cardBadges(l)" :key="b" class="flat-card__badge">{{ b }}</span></div>
+          <div class="flat-card__meta text-muted">
+            <span v-if="locLine(l)" class="flat-card__location"><u-icon name="i-lucide-map-pin" />{{ locLine(l) }}</span>
+            <span class="flat-card__meta-tail"><span class="flat-card__src">{{ l.source }}</span><span v-if="timeAgo(l.createdAt)">· {{ timeAgo(l.createdAt) }}</span></span>
+          </div>
+        </div>
       </article>
     </div>
 <div ref="loadMoreSentinel" v-if="hasMore" class="flats__sentinel"><span v-if="loadingMore" class="text-muted">{{ t("loadingMore") }}</span></div>
@@ -1142,33 +1202,41 @@ onBeforeUnmount(() => { modalOpen.value = false; lightboxIndex.value = null; rel
 .flats__sort > .flats__field-label { flex: 0 0 auto; }
 .flats__sort .flats__select { flex: 1 1 auto; }
 .flats__map-wrap { position: relative; z-index: 0; isolation: isolate; margin-bottom: 18px; scroll-margin-top: 90px; }
-.flats__grid { display: grid; gap: 14px; grid-template-columns: 1fr; align-items: stretch; grid-auto-rows: 1fr; }
+.flats__grid { display: grid; gap: 14px; grid-template-columns: 1fr; align-items: start; }
 @media (min-width: 640px) { .flats__grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (min-width: 1024px) { .flats__grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
 @media (min-width: 1440px) { .flats__grid { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
-.flat-card { height: 100%; border: 1px solid var(--line); border-radius: 12px; overflow: hidden; background: rgba(255,255,255,0.03); cursor: pointer; transition: transform 140ms ease, border-color 180ms ease; display: flex; flex-direction: column; }
-.flat-card__body { flex: 1 1 auto; position: relative; padding: 12px 14px; display: flex; flex-direction: column; gap: 4px; }
-.flat-card:hover { transform: translateY(-2px); border-color: rgba(224,103,154,0.4); }
-.flat-card__photo { position: relative; width: 100%; height: clamp(220px, 25vw, 310px); flex: 0 0 auto; overflow: hidden; background: var(--bg-panel); }
-.flat-card__photo > img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.flat-card { min-width: 0; border: 1px solid var(--line); border-radius: 12px; overflow: hidden; background: rgba(255,255,255,0.03); cursor: pointer; transition: transform 140ms ease, border-color 180ms ease, box-shadow 180ms ease; display: flex; flex-direction: column; }
+.flat-card:hover { transform: translateY(-2px); border-color: rgba(224,103,154,0.4); box-shadow: 0 12px 30px rgba(0,0,0,.16); }
+.flat-card__photo { position: relative; width: 100%; aspect-ratio: 4 / 3; flex: 0 0 auto; overflow: hidden; background: var(--bg-panel); }
+.flat-card__photo::after { content: ""; position: absolute; inset: 0; pointer-events: none; background: linear-gradient(180deg, rgba(8,11,26,.16) 0%, transparent 28%, transparent 76%, rgba(8,11,26,.18) 100%); }
+.flat-card__photo > img { width: 100%; height: 100%; object-fit: cover; display: block; transition: transform 260ms ease; }
+.flat-card:hover .flat-card__photo > img { transform: scale(1.015); }
 .flat-card__no-photo { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 9px; height: 100%; color: var(--text-muted); font-size: 12px; background: rgba(255,255,255,0.025); }
 .flat-card__no-photo-icon { width: 34px; height: 34px; opacity: 0.48; }
-.flat-card__deal { position: absolute; top: 8px; left: 8px; font-size: 11px; padding: 2px 8px; border-radius: 6px; background: rgba(13,17,40,0.8); color: #e0679a; }
-.flat-card__room { position: absolute; top: 8px; right: 8px; font-size: 11px; padding: 2px 8px; border-radius: 6px; background: rgba(13,17,40,0.8); color: #7189d9; }
-.flat-card__actions { position: absolute; top: 10px; right: 10px; display: flex; gap: 5px; }
-.flat-card__action { width: 29px; height: 29px; display: inline-grid; place-items: center; padding: 0; border: 1px solid var(--line); border-radius: 6px; background: var(--bg-panel); color: var(--text-muted); cursor: pointer; }
-.flat-card__action:hover, .flat-card__action_active { color: var(--accent-pink); border-color: rgba(224,103,154,0.48); }
-.flat-card__price { padding-right: 70px; font-weight: 700; font-size: 16px; color: var(--text-white, inherit); }
-.flat-card__price-conv { font-size: 12px; font-weight: 500; margin-top: 1px; }
-.flat-card__title { font-size: 13.5px; font-weight: 500; line-height: 1.35; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-.flat-card__spec { font-size: 12.5px; }
-.flat-card__badges { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 7px; }
-.flat-card__badge { font-size: 10.5px; font-weight: 600; line-height: 1; padding: 4px 7px; border-radius: 999px; border: 1px solid var(--line); background: rgba(255,255,255,0.05); color: var(--text-primary); white-space: nowrap; }
-.flat-card__meta { display: flex; flex-wrap: wrap; gap: 6px; font-size: 11.5px; margin-top: 2px; }
-.flat-card__src { text-transform: capitalize; opacity: 0.7; }
+.flat-card__deal { position: absolute; z-index: 2; top: 9px; left: 9px; max-width: calc(100% - 92px); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; font-weight: 700; line-height: 1; padding: 6px 9px; border: 1px solid rgba(224,103,154,.42); border-radius: 7px; background: rgba(13,17,40,.86); color: var(--accent-pink); box-shadow: 0 3px 12px rgba(0,0,0,.2); backdrop-filter: blur(8px); }
+.flat-card__deal_sale { color: #f58ab5; border-color: rgba(245,138,181,.45); }
+.flat-card__deal_rent { color: #b79cff; border-color: rgba(183,156,255,.42); }
+.flat-card__deal_room { color: #77d9e8; border-color: rgba(119,217,232,.42); }
+.flat-card__deal_short { color: #f4c86a; border-color: rgba(244,200,106,.45); }
+.flat-card__actions { position: absolute; z-index: 3; top: 8px; right: 8px; display: flex; gap: 5px; }
+.flat-card__action { width: 32px; height: 32px; display: inline-grid; place-items: center; padding: 0; border: 1px solid rgba(66,73,116,.86); border-radius: 7px; background: rgba(13,17,40,.84); color: #c8cbdb; cursor: pointer; box-shadow: 0 3px 12px rgba(0,0,0,.18); backdrop-filter: blur(8px); transition: color 150ms ease, border-color 150ms ease, background-color 150ms ease; }
+.flat-card__action:hover, .flat-card__action_active { color: var(--accent-pink); border-color: rgba(224,103,154,.58); background: rgba(26,29,57,.94); }
+.flat-card__body { padding: 13px 14px 14px; display: flex; flex-direction: column; gap: 5px; }
+.flat-card__price { font-weight: 750; font-size: 18px; line-height: 1.2; color: var(--text-white, inherit); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.flat-card__price-conv { font-size: 12px; font-weight: 500; line-height: 1.35; }
+.flat-card__title { margin-top: 2px; font-size: 14.5px; font-weight: 650; line-height: 1.38; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere; }
+.flat-card__spec { font-size: 12.5px; line-height: 1.4; }
+.flat-card__badges { display: flex; flex-wrap: wrap; align-content: flex-start; gap: 5px; margin-top: 5px; }
+.flat-card__badge { max-width: 100%; font-size: 10.5px; font-weight: 600; line-height: 1.15; padding: 4px 7px; border-radius: 999px; border: 1px solid var(--line); background: rgba(255,255,255,0.05); color: var(--text-primary); white-space: normal; overflow-wrap: anywhere; }
+.flat-card__meta { display: flex; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; gap: 6px 10px; margin-top: 5px; padding-top: 8px; border-top: 1px solid rgba(255,255,255,.055); font-size: 11.5px; line-height: 1.35; }
+.flat-card__location { min-width: 0; display: inline-flex; align-items: flex-start; gap: 5px; flex: 1 1 150px; }
+.flat-card__location svg { flex: 0 0 auto; margin-top: 1px; }
+.flat-card__meta-tail { display: inline-flex; gap: 5px; white-space: nowrap; margin-left: auto; }
+.flat-card__src { text-transform: capitalize; opacity: 0.72; }
 .flats__empty { margin-top: 18px; text-align: center; padding: 18px; border-radius: 10px; border: 1px solid var(--line); background: rgba(255,255,255,0.03); }
 .flats__sentinel { min-height: 44px; display: grid; place-items: center; }
-.flat-card_favorite { border-color: rgba(224,103,154,0.5); }
+.flat-card_favorite { border-color: rgba(224,103,154,0.52); }
 .flat-card_hidden { opacity: 0.64; border-style: dashed; }
 .flat-modal { display: flex; flex-direction: column; gap: 12px; }
 .flat-modal__title { display: -webkit-box; overflow: hidden; margin: 0; padding-right: 36px; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow-wrap: anywhere; font-size: 18px; font-weight: 700; line-height: 1.35; }
@@ -1315,7 +1383,7 @@ onBeforeUnmount(() => { modalOpen.value = false; lightboxIndex.value = null; rel
   .range-field { grid-template-columns: minmax(0,1fr) 10px minmax(0,1fr); }
   .flats__results-toolbar { align-items: stretch; flex-direction: column; }
   .flats__sort { width: 100%; }
-  .flat-card__photo { height: 250px; }
+  .flat-card__photo { aspect-ratio: 16 / 10; }
   .flat-lightbox__stage { width: 92vw; height: 76vh; }
   .flat-lightbox__nav { width: 42px; height: 56px; font-size: 22px; }
   .flat-lightbox__nav_left { left: 8px; } .flat-lightbox__nav_right { right: 8px; } .flat-lightbox__close { top: 10px; right: 10px; }
