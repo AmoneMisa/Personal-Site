@@ -1098,6 +1098,7 @@ onBeforeUnmount(() => { modalOpen.value = false; lightboxIndex.value = null; rel
       <p class="flats__count text-muted">{{ t("found", { n: view === 'active' && !onlyWithPhotos ? total : displayedListings.length }) }}</p>
       <label class="flats__sort"><span class="flats__field-label">{{ extraLabels.sort }}</span><u-select-menu v-model="sort" :items="sortItems" value-key="value" label-key="label" :search-input="false" class="flats__select" @update:model-value="scheduleLoad(0)" /></label>
     </div>
+    <FlatsStatsPanel v-if="displayedListings.length" :listings="displayedListings" :display-currency="displayCurrency" :convert="convert" />
 <section v-if="listings.length" class="flats__map-wrap"><flat-map :points="mapPoints" :draw-label="t('drawArea')" :done-label="t('done')" :clear-label="t('clearArea')" :draw-hint="t('drawHint')" :expand-label="t('mapExpand')" :collapse-label="t('mapCollapse')" @select="openById" @area-change="drawnArea = $event" /></section>
 
     <div class="flats__grid">

@@ -118,6 +118,16 @@ test('flat finder exposes photo-only and room-rent filters', () => {
   assert.ok(en.flats.onlyWithPhotos && en.flats.dtRoomRent)
 })
 
+test('flat finder renders a collapsible localized statistics panel', () => {
+  const flat = readFileSync(new URL('../app/pages/flat-finder/index.vue', import.meta.url), 'utf8')
+  const stats = readFileSync(new URL('../app/components/flats/StatsPanel.vue', import.meta.url), 'utf8')
+  assert.match(flat, /<FlatsStatsPanel/u)
+  assert.match(stats, /expanded = ref\(true\)/u)
+  assert.match(stats, /statsWithPhotos/u)
+  const ru = JSON.parse(readFileSync(new URL('../i18n/locales/ru.json', import.meta.url), 'utf8'))
+  assert.equal(ru.flats.statsTitle, 'Статистика объявлений')
+})
+
 test('country quiz result cards use a responsive four-column grid', () => {
   const quiz = readFileSync(new URL('../app/pages/quizzes/country-fit/index.vue', import.meta.url), 'utf8')
   assert.match(quiz, /@media \(min-width: 1180px\)[\s\S]*?repeat\(4, minmax\(0, 1fr\)\)/u)
