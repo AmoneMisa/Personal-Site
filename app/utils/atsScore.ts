@@ -1,12 +1,18 @@
 import {
   buildCvProfile,
-  scoreColor,
   scoreJob as legacyScoreJob,
   type CvProfile,
 } from '../../internal/legacy/atsScoreCore'
 
-export { buildCvProfile, scoreColor }
+export { buildCvProfile }
 export type { CvProfile }
+
+export function scoreColor(score: number): string {
+  if (score >= 75) return '#34d399' // green: strong match
+  if (score >= 60) return '#fbbf24' // yellow: promising, but with noticeable gaps
+  if (score >= 45) return '#fb923c' // orange: weak-to-moderate match
+  return '#f87171' // red: poor match or eligibility blocker
+}
 
 type AtsJob = Parameters<typeof legacyScoreJob>[1]
 type AtsResult = ReturnType<typeof legacyScoreJob>
