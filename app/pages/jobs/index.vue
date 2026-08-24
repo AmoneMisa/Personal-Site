@@ -1187,20 +1187,31 @@ onBeforeUnmount(() => {
           :key="job.id"
           class="job-card"
           :class="{
+            'job-card_scored': ats,
             'job-card_seen': isSeen(job.id),
             'job-card_favorite': isFavorite(job.id),
             'job-card_hidden': isHidden(job.id),
           }"
+          :style="ats ? { '--job-card-score': scoreColor(ats.score) } : undefined"
       >
         <div class="job-card__head">
           <button type="button" class="job-card__title" @click="openJob(job)">{{ job.title }}</button>
+          <span
+              v-if="ats"
+              class="job-card__ats"
+              :style="{ color: scoreColor(ats.score), borderColor: scoreColor(ats.score) }"
+              :title="ats.missing.length ? t('atsMissing') + ': ' + ats.missing.join(', ') : ''"
+          >{{ ats.score }}% {{ t("atsMatch") }}</span>
+        </div>
+        <div class="job-card__meta-row">
+          <div class="job-card__byline text-muted">
+            <span class="job-card__company">{{ job.company }}</span>
+            <span class="job-card__dot">·</span>
+            <span>{{ job.location }}</span>
+            <span class="job-card__dot">·</span>
+            <span>{{ timeAgo(job.postedAt) }}</span>
+          </div>
           <div class="job-card__actions">
-            <span
-                v-if="ats"
-                class="job-card__ats"
-                :style="{ color: scoreColor(ats.score), borderColor: scoreColor(ats.score) }"
-                :title="ats.missing.length ? t('atsMissing') + ': ' + ats.missing.join(', ') : ''"
-            >{{ ats.score }}% {{ t("atsMatch") }}</span>
             <button
                 type="button"
                 class="job-card__action"
@@ -1234,12 +1245,7 @@ onBeforeUnmount(() => {
             ><u-icon :name="isHidden(job.id) ? 'i-lucide-eye' : 'i-lucide-eye-off'" /></button>
           </div>
         </div>
-        <div class="job-card__meta text-muted">
-          <span class="job-card__company">{{ job.company }}</span>
-          <span class="job-card__dot">·</span>
-          <span>{{ job.location }}</span>
-          <span class="job-card__dot">·</span>
-          <span>{{ timeAgo(job.postedAt) }}</span>
+        <div class="job-card__meta">
           <span v-if="employerTypeLabel(job.employerType)" class="job-card__badge job-card__badge_source">{{ employerTypeLabel(job.employerType) }}</span>
           <span v-if="isToday(job.postedAt)" class="job-card__badge job-card__badge_new">{{ t("newToday") }}</span>
           <span v-if="isSeen(job.id)" class="job-card__badge job-card__badge_seen">{{ t("seen") }}</span>
@@ -1252,10 +1258,14 @@ onBeforeUnmount(() => {
           <span v-if="job.foreignerFriendly" class="job-card__badge job-card__badge_visa">{{ t("cardForeigner") }}</span>
           <span v-if="job.suspicious" class="job-card__badge job-card__badge_suspicious" :title="suspicionHint(job)">⚠ {{ t("suspicious") }}</span>
           <span v-if="job.relocation === 'offered'" class="job-card__badge job-card__badge_reloc">{{ t("cardReloc") }}</span>
-          <span v-if="formatSalary(job)" class="job-card__badge job-card__badge_salary">{{ t("salaryDisclosed") }}</span>
           <span v-if="job.salaryNegotiable" class="job-card__badge job-card__badge_salary">{{ t("salaryNegotiable") }}</span>
-          <span v-if="formatSalary(job)" class="job-card__salary">{{ formatSalary(job) }}</span>
-          <span v-if="convertedSalary(job)" class="job-card__salary job-card__salary_conv">{{ convertedSalary(job) }}</span>
+        </div>
+        <div v-if="formatSalary(job) || convertedSalary(job)" class="job-card__compensation">
+          <u-icon name="i-lucide-banknote" class="job-card__salary-icon" />
+          <div class="job-card__salary-values">
+            <span v-if="formatSalary(job)" class="job-card__salary">{{ formatSalary(job) }}</span>
+            <span v-if="convertedSalary(job)" class="job-card__salary job-card__salary_conv">≈ {{ convertedSalary(job) }}</span>
+          </div>
         </div>
         <div v-if="job.languages && job.languages.length" class="job-card__langs text-muted">
           <u-icon name="i-lucide-languages" class="job-card__lang-icon" />
@@ -1264,29 +1274,34 @@ onBeforeUnmount(() => {
           </span>
         </div>
         <p v-if="job.description" class="job-card__desc text-muted">{{ job.description }}</p>
-        <button type="button" class="job-card__details-btn" @click="openJob(job)">{{ t("viewVacancy") }}</button>
-        <template v-if="ats">
-          <div v-if="ats.matched.length" class="job-card__skills">
-            <span class="job-card__skills-label">{{ t("atsMatched") }}:</span>
-            <span v-for="kw in ats.matched" :key="kw" class="job-card__tag job-card__tag_match">{{ kw }}</span>
+        <div class="job-card__footer">
+          <template v-if="ats">
+            <div v-if="ats.matched.length" class="job-card__skills">
+              <span class="job-card__skills-label">{{ t("atsMatched") }}</span>
+              <span v-for="kw in ats.matched" :key="kw" class="job-card__tag job-card__tag_match">{{ kw }}</span>
+            </div>
+            <div v-if="ats.missing.length" class="job-card__skills">
+              <span class="job-card__skills-label">{{ t("atsMissing") }}</span>
+              <span v-for="kw in ats.missing" :key="kw" class="job-card__tag job-card__tag_miss">{{ kw }}</span>
+            </div>
+            <div v-if="!ats.matched.length && !ats.missing.length" class="job-card__skills">
+              <span class="job-card__skills-label">{{ t("atsNoSkills") }}</span>
+            </div>
+          </template>
+          <div v-else-if="job.skills && job.skills.length" class="job-card__tags">
+            <span v-for="s in job.skills.slice(0, 8)" :key="s" class="job-card__tag job-card__tag_skill">{{ s }}</span>
+            <span v-for="s in (job.niceToHave || []).slice(0, 4)" :key="'plus-' + s" class="job-card__tag job-card__tag_plus" :title="t('vNiceToHave')">+{{ s }}</span>
           </div>
-          <div v-if="ats.missing.length" class="job-card__skills">
-            <span class="job-card__skills-label">{{ t("atsMissing") }}:</span>
-            <span v-for="kw in ats.missing" :key="kw" class="job-card__tag job-card__tag_miss">{{ kw }}</span>
+          <div v-else-if="job.tags.length" class="job-card__tags">
+            <span v-for="tag in job.tags.slice(0, 6)" :key="tag" class="job-card__tag">{{ tag }}</span>
           </div>
-          <div v-if="!ats.matched.length && !ats.missing.length" class="job-card__skills">
-            <span class="job-card__skills-label">{{ t("atsNoSkills") }}</span>
-          </div>
-        </template>
-        <div v-else-if="job.skills && job.skills.length" class="job-card__tags">
-          <span v-for="s in job.skills.slice(0, 8)" :key="s" class="job-card__tag job-card__tag_skill">{{ s }}</span>
-          <span v-for="s in (job.niceToHave || []).slice(0, 4)" :key="'plus-' + s" class="job-card__tag job-card__tag_plus" :title="t('vNiceToHave')">+{{ s }}</span>
-        </div>
-        <div v-else-if="job.tags.length" class="job-card__tags">
-          <span v-for="tag in job.tags.slice(0, 6)" :key="tag" class="job-card__tag">{{ tag }}</span>
+          <button type="button" class="job-card__details-btn" @click="openJob(job)">
+            {{ t("viewVacancy") }}
+            <u-icon name="i-lucide-arrow-right" />
+          </button>
         </div>
       </div>
-     </div>
+    </div>
 <div v-if="!loading && !(warming && savedView === 'active') && !displayedJobs.length && !failed" class="jobs__empty">
       <div class="text-muted">{{ t("empty") }}</div>
     </div>
@@ -1519,42 +1534,52 @@ onBeforeUnmount(() => {
 .stats__chip_skill { border-color: rgba(224, 103, 154,0.35); color: #e79ec0; }
 
 .jobs__grid {
-  display: grid; gap: 12px; grid-template-columns: 1fr; align-items: stretch;
+  display: grid; gap: 14px; grid-template-columns: 1fr; align-items: stretch;
   grid-auto-rows: 1fr; /* every card the same height across all rows */
   @media (min-width: 640px) { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   @media (min-width: 1024px) { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   @media (min-width: 1440px) { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 }
 .job-card {
-  padding: 16px; border-radius: 10px; border: 1px solid var(--line);
-  background: rgba(255,255,255,0.03); box-shadow: inset 0 1px 0 rgba(255,255,255,0.06);
-  transition: transform 140ms ease, border-color 180ms ease;
+  position: relative; isolation: isolate; overflow: hidden;
+  padding: 18px; border-radius: 14px; border: 1px solid var(--line);
+  background:
+    radial-gradient(circle at 100% 0, rgba(224,103,154,0.07), transparent 38%),
+    linear-gradient(145deg, rgba(255,255,255,0.055), rgba(255,255,255,0.025));
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.06), 0 16px 36px rgba(2,6,23,0.12);
+  transition: transform 160ms ease, border-color 180ms ease, box-shadow 180ms ease;
   /* Uniform cards: fill the grid cell so every card in a row is the same height. */
-  height: 100%; min-height: 210px; display: flex; flex-direction: column;
+  height: 100%; min-height: 340px; display: flex; flex-direction: column;
 }
-/* Tags/skills sink to the bottom so cards line up regardless of body length. */
-/* Bottom group (details button + tags/skills) is pushed down via the
-   details button's margin-top:auto, so every card's footer sits at the bottom. */
-.job-card:hover { transform: translateY(-2px); border-color: rgba(224, 103, 154,0.40); }
+.job-card_scored { box-shadow: inset 3px 0 0 var(--job-card-score), inset 0 1px 0 rgba(255,255,255,0.06), 0 16px 36px rgba(2,6,23,0.12); }
+.job-card:hover {
+  transform: translateY(-3px); border-color: rgba(224, 103, 154,0.42);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.08), 0 20px 42px rgba(2,6,23,0.22);
+}
+.job-card_scored:hover { box-shadow: inset 3px 0 0 var(--job-card-score), inset 0 1px 0 rgba(255,255,255,0.08), 0 20px 42px rgba(2,6,23,0.22); }
 .job-card__head {
-  display: grid; grid-template-columns: minmax(0, 1fr);
-  align-items: start; row-gap: 8px;
+  display: grid; grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start; gap: 12px;
+}
+.job-card__meta-row { display: flex; align-items: flex-start; gap: 10px; margin-top: 10px; }
+.job-card__byline {
+  display: flex; flex: 1 1 auto; min-width: 0; flex-wrap: wrap; align-items: center;
+  gap: 5px; padding-top: 4px; font-size: 12px; line-height: 1.35;
 }
 .job-card__actions {
-  width: 100%; justify-self: stretch; display: flex; flex-wrap: wrap; justify-content: flex-end;
-  align-items: center; gap: 5px; max-width: 100%;
+  flex: 0 0 auto; display: flex; justify-content: flex-end; align-items: center; gap: 4px;
 }
-.job-card__actions .job-card__ats { margin-right: auto; }
 .job-card__action {
-  width: 28px; height: 28px; display: inline-grid; place-items: center;
-  padding: 0; border: 1px solid var(--line); border-radius: 6px;
-  background: transparent; color: var(--ui-text-muted); cursor: pointer;
+  width: 27px; height: 27px; display: inline-grid; place-items: center;
+  padding: 0; border: 1px solid var(--line); border-radius: 8px;
+  background: rgba(255,255,255,0.018); color: var(--ui-text-muted); cursor: pointer;
+  transition: color 160ms ease, border-color 160ms ease, background 160ms ease;
 }
 .job-card__action:hover { color: var(--accent-pink, #e0679a); border-color: rgba(224,103,154,0.45); }
 .job-card__action_active { color: var(--accent-pink, #e0679a); background: rgba(224,103,154,0.12); }
 .job-card__title {
   width: 100%; min-width: 0; overflow-wrap: break-word; word-break: normal;
-  font-weight: 600; font-size: 16px; line-height: 1.35;
+  font-weight: 700; font-size: 15px; line-height: 1.4;
   padding: 0; border: 0; background: transparent; cursor: pointer; text-align: left;
   text-decoration: none; color: var(--text-white, inherit);
 }
@@ -1562,13 +1587,13 @@ onBeforeUnmount(() => {
 .job-card__src { justify-self: end; font-size: 11px; text-transform: capitalize; opacity: 0.6; white-space: nowrap; }
 .job-card__ats {
   justify-self: end; white-space: nowrap;
-  font-size: 12px; font-weight: 600; padding: 1px 8px;
-  border: 1px solid; border-radius: 6px;
+  font-size: 11px; font-weight: 700; padding: 2px 8px;
+  border: 1px solid; border-radius: 7px; background: rgba(2,6,23,0.18);
 }
-.job-card__meta { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: 12px; margin-top: 4px; }
+.job-card__meta { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 12px; }
 .job-card__company { font-weight: 600; }
 .job-card__dot { opacity: 0.5; }
-.job-card__badge { flex: 0 0 auto; white-space: nowrap; border-radius: 6px; padding: 1px 7px; font-size: 11px; color: #34d399; background: rgba(52,211,153,0.14); }
+.job-card__badge { flex: 0 0 auto; white-space: nowrap; border-radius: 6px; padding: 2px 8px; font-size: 11px; line-height: 1.35; color: #34d399; background: rgba(52,211,153,0.14); }
 .job-card__badge_mode { color: #38bdf8; background: rgba(56,189,248,0.14); }
 .job-card__badge_visa { color: #fbbf24; background: rgba(251,191,36,0.14); }
 .job-card__badge_suspicious { color: #f87171; background: rgba(248,113,113,0.14); border-color: rgba(248,113,113,0.35); cursor: help; }
@@ -1579,18 +1604,28 @@ onBeforeUnmount(() => {
 .job-card__badge_seniority { color: #f9a8d4; background: rgba(236,72,153,0.13); }
 .job-card__badge_management { color: #fcd34d; background: rgba(245,158,11,0.13); }
 .job-card__badge_salary { color: #f0abfc; background: rgba(217,70,239,0.12); }
-.job-card__salary { border-radius: 6px; padding: 1px 7px; font-size: 11px; color: #e0679a; background: rgba(224, 103, 154,0.14); }
-.job-card__salary_conv { color: #94a3b8; background: rgba(148,163,184,0.12); font-weight: 600; }
+.job-card__compensation {
+  display: flex; align-items: center; gap: 10px; margin-top: 12px; padding: 10px 12px;
+  border: 1px solid rgba(52,211,153,0.34); border-radius: 10px;
+  background: linear-gradient(110deg, rgba(16,185,129,0.18), rgba(52,211,153,0.07));
+  box-shadow: inset 0 1px 0 rgba(167,243,208,0.08);
+}
+.job-card__salary-icon { flex: 0 0 auto; color: #6ee7b7; font-size: 20px; }
+.job-card__salary-values { display: flex; min-width: 0; flex-direction: column; gap: 1px; }
+.job-card__salary { color: #6ee7b7; font-size: 15px; line-height: 1.3; font-weight: 800; letter-spacing: 0.01em; }
+.job-card__salary_conv { color: #a7f3d0; font-size: 11px; font-weight: 600; opacity: 0.78; }
 .job-card__langs { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: 12px; margin-top: 6px; }
 .job-card__lang-icon { font-size: 14px; opacity: 0.7; }
 .job-card__lang:not(:last-child)::after { content: ","; }
 .job-card__desc {
-  margin-top: 8px; font-size: 13px; line-height: 1.45;
+  margin-top: 10px; font-size: 13px; line-height: 1.5;
   display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden;
 }
-.job-card__tags, .job-card__skills { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; align-items: center; }
-.job-card__skills-label { font-size: 11px; opacity: 0.7; }
-.job-card__tag { border-radius: 6px; padding: 2px 8px; font-size: 11px; border: 1px solid var(--line); color: var(--ui-text-muted); }
+.job-card__footer { display: flex; flex-direction: column; margin-top: auto; padding-top: 12px; }
+.job-card__tags, .job-card__skills { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.job-card__skills + .job-card__skills { margin-top: 9px; }
+.job-card__skills-label { flex-basis: 100%; font-size: 11px; line-height: 1.3; opacity: 0.72; }
+.job-card__tag { border-radius: 6px; padding: 3px 8px; font-size: 11px; line-height: 1.3; border: 1px solid var(--line); color: var(--ui-text-muted); }
 .job-card__tag_skill { border-color: rgba(224, 103, 154,0.3); color: #e79ec0; }
 .job-card__tag_plus { border-color: rgba(52,211,153,0.35); color: #6ee7b7; }
 .job-card__tag_match { border-color: rgba(52,211,153,0.45); color: #34d399; background: rgba(52,211,153,0.10); }
@@ -1601,10 +1636,13 @@ onBeforeUnmount(() => {
   justify-content: center; gap: 8px; margin-top: 16px; font-size: 12px;
 }
 .job-card__details-btn {
-  align-self: flex-start; margin-top: auto; padding: 0; background: none; border: none;
-  color: var(--accent-pink, #e0679a); font-size: 12px; font-weight: 600; cursor: pointer;
+  display: inline-flex; align-items: center; gap: 8px; align-self: flex-start;
+  margin-top: 14px; padding: 0; background: none; border: none;
+  color: var(--accent-pink, #e0679a); font-size: 12px; font-weight: 700; cursor: pointer;
 }
+.job-card__details-btn :deep(svg) { transition: transform 160ms ease; }
 .job-card__details-btn:hover { text-decoration: underline; }
+.job-card__details-btn:hover :deep(svg) { transform: translateX(3px); }
 .job-modal { display: flex; flex-direction: column; gap: 12px; }
 .job-modal__meta { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: 12.5px; }
 .job-modal__badges { display: flex; flex-wrap: wrap; gap: 6px; }
@@ -1622,16 +1660,16 @@ onBeforeUnmount(() => {
 .job-card_favorite { border-color: rgba(224,103,154,0.48); }
 .job-card_hidden { opacity: 0.62; border-style: dashed; }
 .job-card__badge_seen { color: #94a3b8; background: rgba(148,163,184,0.14); }
-.recent { margin: 4px 0 18px; }
+.recent { margin: 6px 0 20px; padding-bottom: 16px; border-bottom: 1px solid var(--line); }
 .recent__title {
-  font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em;
-  opacity: 0.7; margin-bottom: 8px;
+  font-size: 13px; font-weight: 700; opacity: 0.9; margin-bottom: 9px;
 }
-.recent__row { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 8px; }
+.recent__row { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 10px; }
 .recent__chip {
   display: flex; flex-direction: column; gap: 2px; text-align: left; min-width: 0;
-  padding: 8px 12px; border-radius: 8px; border: 1px solid var(--line);
-  background: rgba(255,255,255,0.03); cursor: pointer; transition: border-color 160ms ease;
+  padding: 10px 13px; border-radius: 9px; border: 1px solid var(--line);
+  background: linear-gradient(145deg, rgba(255,255,255,0.05), rgba(255,255,255,0.025));
+  cursor: pointer; transition: border-color 160ms ease, background 160ms ease;
 }
 .recent__chip:hover { border-color: rgba(224,103,154,0.4); }
 .recent__chip-title {
@@ -1641,5 +1679,13 @@ onBeforeUnmount(() => {
 .recent__chip-company { font-size: 11px; color: var(--ui-text-muted); }
 @media (max-width: 1100px) {
   .jobs__easter-egg { display: none; }
+}
+@media (max-width: 480px) {
+  .job-card { min-height: 0; padding: 15px; }
+  .job-card__head { grid-template-columns: 1fr; gap: 8px; }
+  .job-card__ats { justify-self: start; }
+  .job-card__meta-row { flex-direction: column; }
+  .job-card__actions { order: -1; align-self: flex-end; margin-bottom: -30px; }
+  .job-card__byline { padding-right: 124px; }
 }
 </style>
