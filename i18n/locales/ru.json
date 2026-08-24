@@ -369,6 +369,7 @@
     "statsSalaryExperience": "Желаемая зарплата и опыт",
     "statsDesiredSalary": "Медианная зарплата",
     "statsSalarySamples": "Зарплат в выборке: {n}",
+    "statsNoSalaryData": "Недостаточно данных о зарплатах для построения графика",
     "statsUnknown": "Не указано",
     "salaryFrom": "От",
     "salaryTo": "До",

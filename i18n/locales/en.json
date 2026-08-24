@@ -369,6 +369,7 @@
     "statsSalaryExperience": "Desired salary by experience",
     "statsDesiredSalary": "Median salary",
     "statsSalarySamples": "Salaries in sample: {n}",
+    "statsNoSalaryData": "Not enough salary data to build this chart",
     "statsUnknown": "Not specified",
     "salaryFrom": "From",
     "salaryTo": "To",

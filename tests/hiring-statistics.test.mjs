@@ -52,4 +52,6 @@ test('hiring feed returns server statistics instead of page-only client sampling
   const panel = readFileSync(new URL('../app/components/hiring/StatsPanel.vue', import.meta.url), 'utf8')
   assert.match(route, /statistics:\s*buildHiringStatistics\(statisticsProfiles/u)
   assert.match(panel, /props\.statistics \|\| localStatistics\.value/u)
+  assert.match(panel, /v-if="salarySamples"/u)
+  assert.match(panel, /statsNoSalaryData/u)
 })
