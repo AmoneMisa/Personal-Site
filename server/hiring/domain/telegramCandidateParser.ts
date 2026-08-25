@@ -52,12 +52,12 @@ export function isLikelyCvPost(text: string, cvFeed = false): boolean {
   const value = text.split('\n').map((line) => line.replace(/\s+/g, ' ').trim()).filter(Boolean).join('\n').trim()
   const compact = value.replace(/\s+/g, ' ')
   if (compact.length < 30) return false
-  if (/^(?:колеги[,!\s]*)?(?:вітаю[,!\s]*)?рекомендую\s+(?:класного\s+)?кандидат\p{L}*[.!\s]+(?:контакт\p{L}*\s+та\s+)?резюме\s+додаю\.?$/iu.test(compact)) return false
+  const candidateSignals = detectCandidatePostSignals(value)
+  if (candidateSignals.emptyRecommendation) return false
 
   const kind = classifySharedHiringMessage(value)
   if (['vacancy', 'vacancy_digest', 'recruitment_ad', 'course', 'job_service', 'closed_vacancy', 'spam'].includes(kind)) return false
   const explicitIntent = kind === 'candidate' || detectHiringIntent(value).intent === 'candidate'
-  const candidateSignals = detectCandidatePostSignals(value)
   const candidateForm = candidateSignals.candidateForm
   if (!explicitIntent && !candidateForm && isLikelyTelegramVacancy(compact)) return false
 
