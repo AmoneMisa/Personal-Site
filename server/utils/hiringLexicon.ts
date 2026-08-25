@@ -184,8 +184,17 @@ export function parseHiringExperience(text: string) {
   return parseExperience(text)
 }
 
+function salaryLanguageCurrency(text: string): 'UZS' | 'KZT' | null {
+  if (/(?:\boylik\b|\boyiga\b|\bmaosh\b|\bish\s+haqi\b|\бойлик\b|\бойига\b|\бмаош\b|\биш\s+ҳақи\b)/iu.test(text)) return 'UZS'
+  if (/(?:\bжалақы\b|\bеңбекақы\b|\bайлық\b|\bайына\b)/iu.test(text)) return 'KZT'
+  return null
+}
+
 export function parseHiringSalary(text: string) {
-  return parseSalary(text)
+  const parsed = parseSalary(text)
+  if (!parsed || parsed.currency) return parsed
+  const currency = salaryLanguageCurrency(text)
+  return currency ? { ...parsed, currency } : parsed
 }
 
 export function parseSharedLanguageContext(text: string, mode: 'vacancy' | 'candidate' | null = null) {
