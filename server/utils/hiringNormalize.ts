@@ -5,6 +5,7 @@ import { extractCandidateContacts } from '@whiteslove/parsing-lexicon/hiring-can
 import {
   extractCandidateExperienceMentions,
   parseCandidateSalary,
+  sameHiringProfessionFamily,
 } from '@whiteslove/parsing-lexicon/hiring-source-semantics'
 import { canonicalSkillName, extractSkillDetails } from '~~/shared/jobSkills'
 import type { CandidateEmploymentType, CvProfile } from './hiringTypes'
@@ -219,11 +220,6 @@ export function normalizeRemotePreference(
   return raw ?? null
 }
 
-function sameProfessionFamily(a: string, b: string): boolean {
-  if (a === b) return true
-  return /Developer$/u.test(a) && /Developer$/u.test(b)
-}
-
 export function normalizeRelevantExperience(
   raw: number | null | undefined,
   targetProfessions: string[],
@@ -243,7 +239,7 @@ export function normalizeRelevantExperience(
     // source explicitly ties those years to a different profession.
     if (!mentioned.length) return true
     return mentioned.some((profession) =>
-      targetProfessions.some((target) => sameProfessionFamily(profession, target)),
+      targetProfessions.some((target) => sameHiringProfessionFamily(profession, target)),
     )
   })
   return hasRelevantEvidence ? raw : null

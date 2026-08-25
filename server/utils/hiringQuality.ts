@@ -10,6 +10,8 @@ import { isHiringNonCityLocation } from '@whiteslove/parsing-lexicon/hiring-loca
 import {
   extractCandidateDisplayName,
   extractCandidateExperienceMentions,
+  isHiringCharityAppeal,
+  isHiringRecruitingOpportunity,
   parseCandidateSalary,
 } from '@whiteslove/parsing-lexicon/hiring-source-semantics'
 import type { CvProfile } from './hiringTypes'
@@ -103,32 +105,14 @@ function candidateSalary(text: string, country: string): Pick<CvProfile, 'salary
  * not the candidate board. Requiring multiple program signals avoids rejecting a
  * real candidate merely because their CV says they previously completed a course.
  */
-// Charity and fundraising appeals: someone is being helped, not hired.
-const APPEAL_RE =
-  /(?:шелтер|притулок|прихисток|благодійн\p{L}*|благотворительн\p{L}*|донат\p{L}*|пожертв\p{L}*|збір\s+(?:кошт|грош)\p{L}*|сбор\s+средств|допоможіть|допомогти\s+(?:родин|дідус|бабус)\p{L}*|потребує\s+допомоги|нуждается\s+в\s+помощи|опікунств\p{L}*|інвалідніст\p{L}*|карта\s+для\s+допомоги|реквізити\s+для|monobank|банка\s+збор)/iu
-
 /** True when the post asks for help rather than offering work. */
 export function isCharityAppeal(text: string): boolean {
-  if (!text) return false
-  const matches = text.match(new RegExp(APPEAL_RE.source, 'giu')) || []
-  return matches.length >= 2
+  return isHiringCharityAppeal(text)
 }
 
 export function isRecruitingOpportunity(text: string): boolean {
-  const value = text.replace(/\s+/g, ' ').trim()
-  if (!value) return false
-
-  const signals = [
-    /(?:\blaboratory\b|\bacademy\b|\bbootcamp\b|\btraining\s+program\b|\binternship\s+program\b|лабораторія|лаборатория|академія|академия|буткемп)/iu,
-    /(?:запрошує|приглашает|приглашаем|набір|набор)[^.]{0,100}(?:кандидат|учасник|участник)/iu,
-    /(?:(?:реєстрац|регистрац)\p{L}*\s+до|\bregistration\b\s+(?:until|by))/iu,
-    /(?:(?:старт|початок)\s*[—:,-]?\s*\d{1,2}\s+\p{L}+|\bstart\b\s*[—:,-]?\s*\d{1,2})/iu,
-    /(?:кількість\s+місць|количество\s+мест|\blimited\s+spots\b|менторськ|менторск|\bmentorship\b)/iu,
-  ].filter((pattern) => pattern.test(value)).length
-
-  return signals >= 2
+  return isHiringRecruitingOpportunity(text)
 }
-
 /** Repair only facts supported by the original source text. */
 export function repairCandidateProfile(profile: CvProfile): CvProfile {
   const text = profile.originalText || profile.description || ''
