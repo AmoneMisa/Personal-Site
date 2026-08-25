@@ -1,0 +1,39 @@
+name: Dedupe search result grids
+
+on:
+  push:
+    branches:
+      - refactor/search-advanced-filters-final
+
+permissions:
+  contents: write
+
+jobs:
+  refactor:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: refactor/search-advanced-filters-final
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Stage parsing lexicon for tests
+        run: |
+          mkdir -p node_modules/@whiteslove/parsing-lexicon
+          curl -fsSL https://github.com/AmoneMisa/parsing-lexicon/archive/2aaafbbc8a064c3d5041f1185eb00f0615891ae2.tar.gz | tar -xz --strip-components=1 -C node_modules/@whiteslove/parsing-lexicon
+      - name: Apply result grid deduplication
+        run: node .github/scripts/dedupe_search_result_grids.mjs
+      - name: Run focused regression tests
+        run: node --experimental-strip-types --import ./tests/setup.mjs --test tests/search-component-dedup.test.mjs tests/flats-layout-and-stats.test.mjs tests/hiring-statistics.test.mjs tests/jobs-statistics.test.mjs
+      - name: Remove one-off migration files
+        run: rm .github/scripts/dedupe_search_result_grids.mjs .github/workflows/dedupe-search-result-grids.yml
+      - name: Commit refactor
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "refactor(search): share result grid across boards"
+          git push origin HEAD:refactor/search-advanced-filters-final
