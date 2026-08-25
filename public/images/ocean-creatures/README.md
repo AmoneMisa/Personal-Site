@@ -1,18 +1,7 @@
-# Ocean creature 2D assets
+# Ocean creatures 2D assets
 
-Transparent WebP character cutouts used by `UnderwaterAmbient2d.client.vue`.
+Lightweight transparent WebP mascots used by `UnderwaterAmbient2d.client.vue`.
 
-Characters:
-- shark
-- fish-blue
-- fish-coral
-- fish-fancy
-- seahorse
-- puffer
-- jelly-blue
-- jelly-pink
+The runtime deliberately stays 2D: fish/shark tails and fins, seahorse tail/fin and jellyfish bell/tentacles are animated with clipped sprite layers. Mouth regions get a small independent deformation for pseudo lip/jaw motion. The puffer uses a soft whole-body breathing/inflating cycle.
 
-The ambient component keeps the artwork 2D and adds lightweight CSS pseudo-animation:
-horizontal swimming routes, bobbing, soft body flex, puffer breathing, seahorse sway and jellyfish pulsing.
-
-No WebGL/Three.js runtime is required for these characters.
+The ambient component is desktop-only and is disabled for `prefers-reduced-motion`.
