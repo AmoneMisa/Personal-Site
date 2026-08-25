@@ -1,6 +1,7 @@
 import type { FlatCardPresentation, FlatListing, FlatView } from "~/types/flats";
 import { locationLabel, type LocationKind } from "~/utils/locationLabels";
 import { formatRelativeDate } from "~/utils/search/relativeDate";
+import { useFlatListingsState } from "~/composables/flats/useFlatFeed";
 
 type Translate = (key: string, params?: Record<string, unknown>) => string;
 
@@ -12,9 +13,9 @@ interface FlatPresentationOptions {
   getDealType: () => string;
   getRoomOnly: () => boolean;
   getAgency: () => string;
-  getDistrict: () => string;
-  getMetro: () => string;
-  getListings: () => FlatListing[];
+  getDistrict?: () => string;
+  getMetro?: () => string;
+  getListings?: () => FlatListing[];
   convert: (amount: number, from: string, to: string) => number | undefined;
 }
 
@@ -58,8 +59,13 @@ const semanticListingTags = new Set([
 
 export function useFlatPresentation(options: FlatPresentationOptions) {
   const { t } = options;
+  const route = useRoute();
+  const sharedListings = useFlatListingsState();
   const locName = (value: string | null | undefined, kind: LocationKind = "any") =>
     locationLabel(value, options.getLocale(), kind);
+  const selectedDistrict = () => options.getDistrict?.() || String(route.query.district || "");
+  const selectedMetro = () => options.getMetro?.() || String(route.query.metro || "");
+  const comparisonListings = () => options.getListings?.() || sharedListings.value;
 
   const dealLabel = (dealType: FlatListing["dealType"]) =>
     dealType === "sale" ? t("dtSale")
@@ -182,13 +188,13 @@ export function useFlatPresentation(options: FlatPresentationOptions) {
     }
 
     const rooms = listing.rooms != null ? t("roomsN", { n: listing.rooms }) : "";
-    if (options.getMetro()) return rooms;
+    if (selectedMetro()) return rooms;
 
     const microdistrict = locName(listing.microdistrict || listing.kvartal, "any");
     const residenceComplex = listing.residenceComplex?.trim() || "";
     const metro = locName(listing.metro, "metro");
 
-    if (options.getDistrict()) {
+    if (selectedDistrict()) {
       return metro || microdistrict || residenceComplex || rooms;
     }
 
@@ -286,7 +292,7 @@ export function useFlatPresentation(options: FlatPresentationOptions) {
     const deal = dealComparisonKey(listing);
     const areaTolerance = listing.areaSqm != null ? Math.max(5, listing.areaSqm * 0.15) : null;
 
-    const prices = options.getListings()
+    const prices = comparisonListings()
       .filter((candidate) => {
         if (candidate.price == null || !candidate.currency) return false;
         if (normalizedGeo(candidate.country) !== country || normalizedGeo(candidate.city) !== city) return false;
