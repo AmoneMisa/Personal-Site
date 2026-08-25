@@ -11,16 +11,17 @@ const shell = await readFile(new URL('../app/components/ui/AnalyticsPanel.vue', 
 const checkbox = await readFile(new URL('../app/components/common/CustomCheckbox.vue', import.meta.url), 'utf8')
 const filterControl = await readFile(new URL('../app/components/search/SearchFilterControl.vue', import.meta.url), 'utf8')
 
-test('vacancy graph view is a list of the same shared Chart.js visualizations as other analytics', () => {
+test('vacancy graph view uses the same shared Chart.js visualizations as other analytics without the redundant salary line', () => {
   assert.match(line, /from "chart\.js"/u)
   assert.match(line, /from "vue-chartjs"/u)
   assert.match(bars, /from "chart\.js"/u)
   assert.match(bars, /from "vue-chartjs"/u)
   assert.match(donut, /from "chart\.js"/u)
   assert.match(donut, /from "vue-chartjs"/u)
-  assert.match(panel, /<UiAnalyticsLine surface/u)
+  assert.doesNotMatch(panel, /<UiAnalyticsLine surface/u)
   assert.match(panel, /<UiAnalyticsBars/u)
   assert.match(panel, /<UiAnalyticsDonut/u)
+  assert.match(panel, /professionSalaryBars/u)
   assert.doesNotMatch(panel, /<USelectMenu/u)
 })
 
