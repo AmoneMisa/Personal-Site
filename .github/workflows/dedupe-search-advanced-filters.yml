@@ -20,8 +20,11 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - name: Install dependencies
-        run: npm install --ignore-scripts --package-lock=false
+      - name: Stage parsing lexicon for tests
+        run: |
+          mkdir -p node_modules/@whiteslove/parsing-lexicon
+          curl -fsSL https://github.com/AmoneMisa/parsing-lexicon/archive/2aaafbbc8a064c3d5041f1185eb00f0615891ae2.tar.gz \
+            | tar -xz --strip-components=1 -C node_modules/@whiteslove/parsing-lexicon
       - name: Apply deduplication
         run: node .github/scripts/dedupe_search_advanced_filters.mjs
       - name: Run focused regression tests
