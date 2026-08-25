@@ -24,6 +24,7 @@ useSeoMeta({
 
 <template>
   <div class="home-page">
+    <ocean-page-backdrop variant="ambient" />
     <fast-nav />
     <hero-section />
     <div class="rd-divider" />
@@ -38,3 +39,20 @@ useSeoMeta({
     <closing-cta />
   </div>
 </template>
+
+<style scoped>
+.home-page {
+  position: relative;
+  isolation: isolate;
+}
+
+/* Every UI section must paint above the fixed decorative ocean canvas. */
+.home-page > :not(.ocean-page-backdrop) {
+  position: relative;
+  z-index: 1;
+}
+
+.home-page > .ocean-page-backdrop {
+  z-index: -1;
+}
+</style>
