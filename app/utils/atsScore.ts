@@ -2,7 +2,7 @@ import {
   buildCvProfile,
   scoreJob as legacyScoreJob,
   type CvProfile,
-} from '../../shared/hiring/ats/scoreCore'
+} from '~~/shared/hiring/ats/scoreCore'
 import { isNoSponsorshipRequirement } from '@whiteslove/parsing-lexicon/hiring-requirements'
 
 // Linguistic evidence comes from parsing-lexicon; this adapter only applies site-specific ATS policy.
