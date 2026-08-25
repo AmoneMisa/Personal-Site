@@ -41,6 +41,22 @@ jobs:
                   raise SystemExit(f'{label}: end marker missing')
               return text[:a] + replacement + text[b:]
 
+          path = Path('shared/hiring/ishBorProfile.ts')
+          text = path.read_text()
+          text = replace_once(
+              text,
+              "  extractCandidateContacts,\n  extractCandidateExperienceYears,\n} from '@whiteslove/parsing-lexicon/hiring-candidate-fields'\n",
+              "  extractCandidateContacts,\n  extractCandidateExperienceYears,\n  parseCandidateExperienceValue,\n} from '@whiteslove/parsing-lexicon/hiring-candidate-fields'\n",
+              'ishbor experience import',
+          )
+          text = replace_once(
+              text,
+              "  return value ? extractCandidateExperienceYears(value) : null\n",
+              "  return value ? parseCandidateExperienceValue(value) : null\n",
+              'ishbor structured experience',
+          )
+          path.write_text(text)
+
           path = Path('server/utils/hiringTargetedSearch.ts')
           text = path.read_text()
           text = replace_once(
@@ -103,13 +119,14 @@ jobs:
       - name: Verify lexicon boundary
         shell: bash
         run: |
-          grep -q '7b8ad79bce520b4d1b8e63331e1ae45de8007c5f' package-lock.json
+          grep -q '5c253176f565eef1db9308038ec9cc534e28e588' package-lock.json
           test "$(wc -l < shared/hiring/candidateFields.ts)" -lt 10
           ! grep -q 'EXPLICIT_FEMALE_RE' shared/hiring/candidateFields.ts
           ! grep -q 'export const CITIES' shared/hiring/webFields.ts
           ! grep -q 'const MONTHS: Record' shared/hiring/webFields.ts
           ! grep -q 'DISTRICT_ALIASES' shared/hiring/ishBorProfile.ts
           ! grep -q 'function triState' shared/hiring/ishBorProfile.ts
+          grep -q 'parseCandidateExperienceValue' shared/hiring/ishBorProfile.ts
           ! grep -q 'const MONTHS: Record' server/utils/hiringTargetedSearch.ts
           ! grep -q 'function contacts' server/utils/hiringTargetedSearch.ts
           ! grep -q 'cityRe' server/utils/hiringTargetedSearch.ts
@@ -122,6 +139,6 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git rm .github/workflows/final-hiring-fields-cleanup.yml
-          git add package-lock.json server/utils/hiringTargetedSearch.ts server/utils/enrich.ts
+          git add package-lock.json shared/hiring/ishBorProfile.ts server/utils/hiringTargetedSearch.ts server/utils/enrich.ts
           git commit -m "refactor: centralize final hiring field semantics"
           git push
