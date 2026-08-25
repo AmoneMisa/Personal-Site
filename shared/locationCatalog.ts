@@ -1,5 +1,4 @@
-import { CITIES as PARSING_CITIES } from '@whiteslove/parsing-lexicon/geo'
-import { aliasesOf } from '@whiteslove/parsing-lexicon/normalization'
+import { CITIES as PARSING_CITIES, aliasesOf } from '@whiteslove/parsing-lexicon'
 import { HIRING_COUNTRIES } from './hiring/hiringMarkets'
 
 export const CITY_LABELS_RU: Record<string, string> = {
