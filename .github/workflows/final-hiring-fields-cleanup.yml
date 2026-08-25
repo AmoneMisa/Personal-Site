@@ -1,0 +1,127 @@
+name: Validate final hiring field cleanup
+
+on:
+  push:
+    branches:
+      - cleanup/final-hiring-fields
+    paths:
+      - '.github/workflows/final-hiring-fields-cleanup.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Remove remaining consumer semantic duplicates
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          def replace_once(text, old, new, label):
+              count = text.count(old)
+              if count != 1:
+                  raise SystemExit(f'{label}: expected one match, got {count}')
+              return text.replace(old, new, 1)
+
+          def replace_between(text, start, end, replacement, label):
+              a = text.find(start)
+              if a < 0:
+                  raise SystemExit(f'{label}: start marker missing')
+              b = text.find(end, a)
+              if b < 0:
+                  raise SystemExit(f'{label}: end marker missing')
+              return text[:a] + replacement + text[b:]
+
+          path = Path('server/utils/hiringTargetedSearch.ts')
+          text = path.read_text()
+          text = replace_once(
+              text,
+              "import { normalizeCandidate } from './hiringNormalize'\nimport type { CvProfile } from './hiringTypes'\nimport { cityRe } from './hiringWebFields'\n",
+              "import { detectCandidateRemotePreference } from '@whiteslove/parsing-lexicon/hiring-semantics'\nimport { parseHiringActivityDate } from '@whiteslove/parsing-lexicon/hiring-temporal'\nimport { normalizeCandidate } from './hiringNormalize'\nimport type { CvProfile } from './hiringTypes'\nimport { absoluteUrl, cityFrom, contacts, employment, htmlText, isRecent, parseSalary } from './hiringWebFields'\n",
+              'targeted imports',
+          )
+          text = replace_once(text, 'const MAX_AGE_MONTHS = 3\n', '', 'targeted max age')
+          text = replace_between(text, 'const MONTHS: Record<string, number> = {', 'function blockAnchors(', '', 'targeted duplicated fields')
+          text = replace_once(text, '  const activity = activityDate(block.text)\n  if (!recent(activity)) return null\n', '  const activity = parseHiringActivityDate(block.text)\n  if (!isRecent(activity)) return null\n', 'targeted activity')
+          text = replace_once(text, "    remote: /удал[её]н|remote|masofadan/iu.test(block.text),\n    employmentTypes: [\n      ...(/полная занятость|полный день|full[- ]?time/iu.test(block.text) ? ['full_time' as const] : []),\n      ...(/неполная занятость|частичная занятость|part[- ]?time/iu.test(block.text) ? ['part_time' as const] : []),\n    ],\n", "    remote: detectCandidateRemotePreference(block.text) ?? false,\n    employmentTypes: employment(block.text),\n", 'targeted remote/employment')
+          text = replace_once(text, '    ...parseSalary(block.text),\n', "    ...parseSalary(block.text, 'UZ'),\n", 'targeted salary')
+          text = replace_once(text, "function flagmaRegion(city: string): string {\n  return cityRe('tashkent|toshkent|ташкент|тошкент').test(city.trim()) ? 'tashkent/' : ''\n}\n", "function flagmaRegion(city: string): string {\n  return cityFrom(city, 'UZ') === 'Tashkent' ? 'tashkent/' : ''\n}\n", 'targeted region')
+          path.write_text(text)
+
+          path = Path('server/utils/enrich.ts')
+          text = path.read_text()
+          text = replace_once(
+              text,
+              "import { classifySuspicion } from './suspicious'\n",
+              "import { extractHiringDeadline } from '@whiteslove/parsing-lexicon/hiring-temporal'\nimport {\n  detectApplicationLanguage as detectSharedApplicationLanguage,\n  detectHiringEducation,\n} from '@whiteslove/parsing-lexicon/hiring-vacancy-fields'\nimport { classifySuspicion } from './suspicious'\n",
+              'enrich shared field imports',
+          )
+          replacement = '''function detectEducation(text: string): string | undefined {
+            const level = detectHiringEducation(text)
+            const labels: Record<string, string> = {
+              doctorate: 'Doctorate',
+              master: "Master's degree",
+              bachelor: "Bachelor's degree",
+              higher: 'Higher education',
+              secondary: 'Secondary education',
+            }
+            return level ? labels[level] : undefined
+          }
+
+          function detectDeadline(text: string): string | undefined {
+            return extractHiringDeadline(text) || undefined
+          }
+
+          function detectApplicationLanguage(text: string): string | undefined {
+            return detectSharedApplicationLanguage(text) || undefined
+          }
+
+          '''
+          replacement = '\n'.join(line[10:] if line.startswith('          ') else line for line in replacement.splitlines()) + '\n'
+          text = replace_between(text, 'function detectEducation(text: string): string | undefined {', "const BOARD_SOURCES = new Set<Job['source']>([", replacement, 'enrich field semantics')
+          path.write_text(text)
+          PY
+
+      - name: Refresh dependency lock
+        run: npm install --ignore-scripts
+
+      - name: Run full tests
+        run: npm test
+
+      - name: Build site
+        run: npm run build
+
+      - name: Verify lexicon boundary
+        shell: bash
+        run: |
+          grep -q '7b8ad79bce520b4d1b8e63331e1ae45de8007c5f' package-lock.json
+          test "$(wc -l < shared/hiring/candidateFields.ts)" -lt 10
+          ! grep -q 'EXPLICIT_FEMALE_RE' shared/hiring/candidateFields.ts
+          ! grep -q 'export const CITIES' shared/hiring/webFields.ts
+          ! grep -q 'const MONTHS: Record' shared/hiring/webFields.ts
+          ! grep -q 'DISTRICT_ALIASES' shared/hiring/ishBorProfile.ts
+          ! grep -q 'function triState' shared/hiring/ishBorProfile.ts
+          ! grep -q 'const MONTHS: Record' server/utils/hiringTargetedSearch.ts
+          ! grep -q 'function contacts' server/utils/hiringTargetedSearch.ts
+          ! grep -q 'cityRe' server/utils/hiringTargetedSearch.ts
+          ! grep -q "master\['’\]?s degree" server/utils/enrich.ts
+          ! grep -q 'application\\s+deadline' server/utils/enrich.ts
+
+      - name: Commit validated cleanup and remove temporary workflow
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git rm .github/workflows/final-hiring-fields-cleanup.yml
+          git add package-lock.json server/utils/hiringTargetedSearch.ts server/utils/enrich.ts
+          git commit -m "refactor: centralize final hiring field semantics"
+          git push
