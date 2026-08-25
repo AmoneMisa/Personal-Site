@@ -51,11 +51,6 @@ withDefaults(defineProps<{
   --ocean-page-mobile-position: 70% top;
 }
 
-/*
- * Animated water is intentionally attached only to the image-backed underwater
- * variants that also render fish/bubbles. The home image and ambient gradient
- * stay completely static.
- */
 .ocean-page-backdrop_has-life::before,
 .ocean-page-backdrop_has-life::after {
   content: "";
@@ -66,8 +61,6 @@ withDefaults(defineProps<{
   transform: translate3d(0, 0, 0);
 }
 
-/* Broad, very slow moving light bands: visible enough to read as water motion,
- * but low-contrast so text/cards above the backdrop never flicker. */
 .ocean-page-backdrop_has-life::before {
   opacity: 0.28;
   background:
@@ -81,8 +74,6 @@ withDefaults(defineProps<{
   animation: ocean-water-caustics 16s ease-in-out infinite alternate;
 }
 
-/* A second phase moving in another direction prevents the backdrop from looking
- * like one texture sliding over the image. */
 .ocean-page-backdrop_has-life::after {
   opacity: 0.2;
   background:
@@ -99,8 +90,6 @@ withDefaults(defineProps<{
   animation: ocean-water-drift 22s ease-in-out infinite alternate;
 }
 
-/* Canvas must stay above the water-light overlay while the complete backdrop
- * remains below the site's interface because its parent is z-index:-1. */
 .ocean-page-backdrop_has-life :deep(.underwater-ambient) {
   z-index: 1;
 }
