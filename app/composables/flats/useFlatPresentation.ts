@@ -12,6 +12,9 @@ interface FlatPresentationOptions {
   getDealType: () => string;
   getRoomOnly: () => boolean;
   getAgency: () => string;
+  getDistrict: () => string;
+  getMetro: () => string;
+  getListings: () => FlatListing[];
   convert: (amount: number, from: string, to: string) => number | undefined;
 }
 
@@ -173,6 +176,25 @@ export function useFlatPresentation(options: FlatPresentationOptions) {
     return "";
   }
 
+  function contextualBadgeLabel(listing: FlatListing): string {
+    if (options.getView() !== "active" || options.getAgency() === "any") {
+      return listing.byAgency ? t("badgeAgency") : t("badgeOwner");
+    }
+
+    const rooms = listing.rooms != null ? t("roomsN", { n: listing.rooms }) : "";
+    if (options.getMetro()) return rooms;
+
+    const microdistrict = locName(listing.microdistrict || listing.kvartal, "any");
+    const residenceComplex = listing.residenceComplex?.trim() || "";
+    const metro = locName(listing.metro, "metro");
+
+    if (options.getDistrict()) {
+      return metro || microdistrict || residenceComplex || rooms;
+    }
+
+    return locName(listing.district, "district") || metro || microdistrict || residenceComplex || rooms;
+  }
+
   function badgeData(listing: FlatListing): { values: string[]; visionLabels: string[] } {
     const values: string[] = [];
     const visionLabels: string[] = [];
@@ -183,7 +205,7 @@ export function useFlatPresentation(options: FlatPresentationOptions) {
       if (visionField && derived.has(visionField)) visionLabels.push(label);
     };
 
-    if (options.getView() !== "active" || options.getAgency() === "any") push(listing.byAgency ? t("badgeAgency") : t("badgeOwner"));
+    push(contextualBadgeLabel(listing));
     if (listing.commission === false) push(t("badgeNoCommission"));
     else if (listing.commissionPercent != null) push(t("badgeCommissionPercent", { n: listing.commissionPercent }));
     else if (listing.commission === true) push(t("badgeCommission"));
@@ -239,6 +261,63 @@ export function useFlatPresentation(options: FlatPresentationOptions) {
     return converted === undefined ? null : `≈ ${Math.round(converted).toLocaleString()} ${displayCurrency}`;
   }
 
+  function dealComparisonKey(listing: FlatListing): string {
+    if (listing.roomOnly) return "roomRent";
+    return listing.dealType || "unknown";
+  }
+
+  function normalizedGeo(value: string | null | undefined): string {
+    return String(value || "").trim().toLocaleLowerCase();
+  }
+
+  function goodPriceData(listing: FlatListing): Pick<FlatCardPresentation, "goodPrice" | "goodPriceMedianUsd" | "goodPriceComparableCount"> {
+    if (listing.price == null || !listing.currency || !listing.city || !listing.dealType) {
+      return { goodPrice: false, goodPriceMedianUsd: null, goodPriceComparableCount: 0 };
+    }
+
+    const listingPriceUsd = options.convert(listing.price, listing.currency, "USD");
+    if (listingPriceUsd == null || !Number.isFinite(listingPriceUsd)) {
+      return { goodPrice: false, goodPriceMedianUsd: null, goodPriceComparableCount: 0 };
+    }
+
+    const country = normalizedGeo(listing.country);
+    const city = normalizedGeo(listing.city);
+    const district = normalizedGeo(listing.district);
+    const deal = dealComparisonKey(listing);
+    const areaTolerance = listing.areaSqm != null ? Math.max(5, listing.areaSqm * 0.15) : null;
+
+    const prices = options.getListings()
+      .filter((candidate) => {
+        if (candidate.price == null || !candidate.currency) return false;
+        if (normalizedGeo(candidate.country) !== country || normalizedGeo(candidate.city) !== city) return false;
+        if (district && normalizedGeo(candidate.district) !== district) return false;
+        if (candidate.propertyType !== listing.propertyType || dealComparisonKey(candidate) !== deal) return false;
+        if (listing.rooms != null) return candidate.rooms === listing.rooms;
+        if (listing.areaSqm != null && candidate.areaSqm != null && areaTolerance != null) {
+          return Math.abs(candidate.areaSqm - listing.areaSqm) <= areaTolerance;
+        }
+        return false;
+      })
+      .map((candidate) => options.convert(candidate.price!, candidate.currency, "USD"))
+      .filter((price): price is number => price != null && Number.isFinite(price))
+      .sort((a, b) => a - b);
+
+    if (prices.length < 3) {
+      return { goodPrice: false, goodPriceMedianUsd: null, goodPriceComparableCount: prices.length };
+    }
+
+    const middle = Math.floor(prices.length / 2);
+    const median = prices.length % 2 === 0
+      ? (prices[middle - 1]! + prices[middle]!) / 2
+      : prices[middle]!;
+
+    return {
+      goodPrice: listingPriceUsd < median,
+      goodPriceMedianUsd: Math.round(median),
+      goodPriceComparableCount: prices.length,
+    };
+  }
+
   function presentCard(listing: FlatListing): FlatCardPresentation {
     const specification: string[] = [];
     if (listing.rooms != null) specification.push(t("roomsN", { n: listing.rooms }));
@@ -249,6 +328,7 @@ export function useFlatPresentation(options: FlatPresentationOptions) {
       locName(listing.city, "city"),
       locName(listing.district, "district"),
     ].filter(Boolean))].join(", ");
+    const priceComparison = goodPriceData(listing);
 
     return {
       title: displayListingTitle(listing),
@@ -260,6 +340,7 @@ export function useFlatPresentation(options: FlatPresentationOptions) {
       dealTone: dealTone(listing),
       badges: badgeResult.values,
       visionBadgeLabels: badgeResult.visionLabels,
+      ...priceComparison,
       dateLabel: formatRelativeDate(listing.createdAt, {
         today: () => t("today"),
         yesterday: () => t("yesterday"),
