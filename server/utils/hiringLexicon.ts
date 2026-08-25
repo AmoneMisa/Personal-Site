@@ -2,14 +2,10 @@ import {
   CANDIDATE_FIELD_TERMS,
   EMPLOYMENT_TYPES,
   EXPERIENCE_REQUIREMENTS,
-  GEOGRAPHY_CITIES,
   HIRING_INTENT,
   HIRING_INTENT_EXTENSIONS,
-  KZ_CITY_CATALOG,
   PROBATION_TERMS,
   SCHEDULE_TERMS,
-  UA_CITY_CATALOG,
-  UZ_CITY_CATALOG,
   WORK_MODES,
   WORK_SCHEDULE_EXTENSIONS,
   aliasesOf,
@@ -26,11 +22,30 @@ import {
   parseSalary,
   resolveProfessionContext,
 } from '@whiteslove/parsing-lexicon'
+import { detectCityFromText } from '@whiteslove/parsing-lexicon/geography-detection'
 import {
   matchExtendedProfessions,
   matchesSourceCandidateIntent,
 } from '@whiteslove/parsing-lexicon/hiring-source-aliases'
 import type { CandidateEmploymentType, CandidateWorkMode } from '../../shared/contracts/hiring'
+
+export {
+  detectCountryCodeFromText as resolveSharedCountryFromText,
+} from '@whiteslove/parsing-lexicon/geography-detection'
+export {
+  detectCandidateFeatureCodes,
+  detectCandidateRelocationPreference,
+  detectDegreeRequirement as detectSharedDegreeRequirement,
+  detectHiringScopeSignals as detectSharedHiringScopeSignals,
+  detectManagementRole as detectSharedManagementRole,
+  extractCandidateContactHours,
+  extractCandidateGoalRole,
+  extractCandidateSalaryField,
+  extractCandidateSkillField,
+  extractCandidateTargetContext,
+  extractCandidateWorkHistory,
+  isCandidateNonTargetContext,
+} from '@whiteslove/parsing-lexicon/hiring-semantics'
 
 const matcher = (entry: { canonical?: string; aliases?: Record<string, readonly string[]> }) =>
   aliasesToRegex([entry.canonical || '', ...aliasesOf(entry)].filter(Boolean))
@@ -47,38 +62,8 @@ export function candidateFieldRegex(key: keyof typeof CANDIDATE_FIELD_TERMS): Re
   return matcher(CANDIDATE_FIELD_TERMS[key])
 }
 
-const HIRING_CITIES = [
-  ...GEOGRAPHY_CITIES.filter((city) => !['UA', 'KZ', 'UZ'].includes(city.country || '')),
-  ...KZ_CITY_CATALOG,
-  ...UZ_CITY_CATALOG,
-  ...UA_CITY_CATALOG,
-]
-
-const escapeRegex = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-const cityInflectionRegex = (aliases: readonly string[]) => {
-  const cyrillic = [...new Set(aliases.filter((alias) => /\p{Script=Cyrillic}/u.test(alias)))]
-  if (!cyrillic.length) return null
-  const patterns = cyrillic.map((alias) => {
-    const maxSuffix = alias.replace(/[^\p{L}\p{N}]/gu, '').length > 3 ? 5 : 3
-    return `${escapeRegex(alias)}(?:\\p{Script=Cyrillic}{0,${maxSuffix}})`
-  })
-  return new RegExp(`(?<![\\p{L}\\p{N}])(?:${patterns.join('|')})(?![\\p{L}\\p{N}])`, 'iu')
-}
-
-const CITY_MATCHERS = HIRING_CITIES.map((city) => {
-  const aliases = [city.canonical, ...aliasesOf(city)]
-  return {
-    city,
-    exact: aliasesToRegex(aliases),
-    inflected: cityInflectionRegex(aliases),
-  }
-})
-
 export function detectLexiconCity(text: string, country?: string | null): string | null {
-  const code = country ? canonicalCountryCode(country) : null
-  return CITY_MATCHERS.find(({ city, exact, inflected }) =>
-    (!code || city.country === code) && (exact.test(text) || Boolean(inflected?.test(text))),
-  )?.city.canonical || null
+  return detectCityFromText(text, country)?.canonical || null
 }
 
 export function detectLexiconDistrict(text: string, city?: string | null): string | null {
