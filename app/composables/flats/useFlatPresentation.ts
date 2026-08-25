@@ -1,7 +1,6 @@
 import type { FlatCardPresentation, FlatListing, FlatView } from "~/types/flats";
 import { locationLabel, type LocationKind } from "~/utils/locationLabels";
 import { formatRelativeDate } from "~/utils/search/relativeDate";
-import { useFlatListingsState } from "~/composables/flats/useFlatFeed";
 
 type Translate = (key: string, params?: Record<string, unknown>) => string;
 
@@ -15,7 +14,6 @@ interface FlatPresentationOptions {
   getAgency: () => string;
   getDistrict?: () => string;
   getMetro?: () => string;
-  getListings?: () => FlatListing[];
   convert: (amount: number, from: string, to: string) => number | undefined;
 }
 
@@ -60,12 +58,17 @@ const semanticListingTags = new Set([
 export function useFlatPresentation(options: FlatPresentationOptions) {
   const { t } = options;
   const route = useRoute();
-  const sharedListings = useFlatListingsState();
   const locName = (value: string | null | undefined, kind: LocationKind = "any") =>
     locationLabel(value, options.getLocale(), kind);
   const selectedDistrict = () => options.getDistrict?.() || String(route.query.district || "");
   const selectedMetro = () => options.getMetro?.() || String(route.query.metro || "");
-  const comparisonListings = () => options.getListings?.() || sharedListings.value;
+  const hasFineGeoFilter = () => Boolean(
+    selectedMetro()
+    || route.query.microdistrict
+    || route.query.kvartal
+    || route.query.residenceComplex
+    || route.query.residence_complex,
+  );
 
   const dealLabel = (dealType: FlatListing["dealType"]) =>
     dealType === "sale" ? t("dtSale")
@@ -188,7 +191,7 @@ export function useFlatPresentation(options: FlatPresentationOptions) {
     }
 
     const rooms = listing.rooms != null ? t("roomsN", { n: listing.rooms }) : "";
-    if (selectedMetro()) return rooms;
+    if (hasFineGeoFilter()) return rooms;
 
     const microdistrict = locName(listing.microdistrict || listing.kvartal, "any");
     const residenceComplex = listing.residenceComplex?.trim() || "";
@@ -267,60 +270,11 @@ export function useFlatPresentation(options: FlatPresentationOptions) {
     return converted === undefined ? null : `≈ ${Math.round(converted).toLocaleString()} ${displayCurrency}`;
   }
 
-  function dealComparisonKey(listing: FlatListing): string {
-    if (listing.roomOnly) return "roomRent";
-    return listing.dealType || "unknown";
-  }
-
-  function normalizedGeo(value: string | null | undefined): string {
-    return String(value || "").trim().toLocaleLowerCase();
-  }
-
   function goodPriceData(listing: FlatListing): Pick<FlatCardPresentation, "goodPrice" | "goodPriceMedianUsd" | "goodPriceComparableCount"> {
-    if (listing.price == null || !listing.currency || !listing.city || !listing.dealType) {
-      return { goodPrice: false, goodPriceMedianUsd: null, goodPriceComparableCount: 0 };
-    }
-
-    const listingPriceUsd = options.convert(listing.price, listing.currency, "USD");
-    if (listingPriceUsd == null || !Number.isFinite(listingPriceUsd)) {
-      return { goodPrice: false, goodPriceMedianUsd: null, goodPriceComparableCount: 0 };
-    }
-
-    const country = normalizedGeo(listing.country);
-    const city = normalizedGeo(listing.city);
-    const district = normalizedGeo(listing.district);
-    const deal = dealComparisonKey(listing);
-    const areaTolerance = listing.areaSqm != null ? Math.max(5, listing.areaSqm * 0.15) : null;
-
-    const prices = comparisonListings()
-      .filter((candidate) => {
-        if (candidate.price == null || !candidate.currency) return false;
-        if (normalizedGeo(candidate.country) !== country || normalizedGeo(candidate.city) !== city) return false;
-        if (district && normalizedGeo(candidate.district) !== district) return false;
-        if (candidate.propertyType !== listing.propertyType || dealComparisonKey(candidate) !== deal) return false;
-        if (listing.rooms != null) return candidate.rooms === listing.rooms;
-        if (listing.areaSqm != null && candidate.areaSqm != null && areaTolerance != null) {
-          return Math.abs(candidate.areaSqm - listing.areaSqm) <= areaTolerance;
-        }
-        return false;
-      })
-      .map((candidate) => options.convert(candidate.price!, candidate.currency, "USD"))
-      .filter((price): price is number => price != null && Number.isFinite(price))
-      .sort((a, b) => a - b);
-
-    if (prices.length < 3) {
-      return { goodPrice: false, goodPriceMedianUsd: null, goodPriceComparableCount: prices.length };
-    }
-
-    const middle = Math.floor(prices.length / 2);
-    const median = prices.length % 2 === 0
-      ? (prices[middle - 1]! + prices[middle]!) / 2
-      : prices[middle]!;
-
     return {
-      goodPrice: listingPriceUsd < median,
-      goodPriceMedianUsd: Math.round(median),
-      goodPriceComparableCount: prices.length,
+      goodPrice: listing.marketComparison?.goodPrice === true,
+      goodPriceMedianUsd: listing.marketComparison?.medianUsd ?? null,
+      goodPriceComparableCount: listing.marketComparison?.comparableCount ?? 0,
     };
   }
 
