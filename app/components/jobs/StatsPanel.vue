@@ -36,7 +36,10 @@ const compactDisplayPeriodLabel = computed(() => {
 const countryStats = computed(() => Object.entries(props.stats.byCountry ?? {}).sort((a, b) => b[1].count - a[1].count));
 const sourceStats = computed(() => Object.entries(props.stats.bySource ?? {}).sort((a, b) => b[1].count - a[1].count));
 const languageStats = computed(() => Object.entries(props.stats.byLanguage ?? {}).sort((a, b) => b[1] - a[1]).slice(0, 10));
-const professionStats = computed(() => props.stats.byProfession ?? []);
+const nonProfessionLabels = new Set(["soft skill", "soft skills"]);
+const professionStats = computed(() => (props.stats.byProfession ?? []).filter(
+  (item) => !nonProfessionLabels.has(item.profession.trim().toLocaleLowerCase("en")),
+));
 const workModeStats = computed(() => [
   { key: "remote", n: props.stats.byWorkMode?.remote ?? 0 },
   { key: "hybrid", n: props.stats.byWorkMode?.hybrid ?? 0 },
@@ -188,25 +191,25 @@ const relocationDonut = computed(() => relocationStats.value.map((item, index) =
         <div v-for="item in experienceStats" :key="item.key" class="stats__row"><span>{{ item.label }}</span><strong>{{ item.n }}</strong></div>
       </article>
 
-      <article v-if="languageStats.length" class="stats__card">
-        <div class="stats__label">{{ t("statLanguages") }}</div>
-        <div class="stats__chips"><span v-for="[language, count] in languageStats" :key="language">{{ language }} · {{ count }}</span></div>
-      </article>
-
-      <article v-if="professionStats.length" class="stats__card stats__card_wide">
-        <div class="stats__label">{{ t("trendPositions") }} · {{ t("statsSalary") }} · {{ t("vExperience") }}</div>
+      <article v-if="professionStats.length" class="stats__card stats__card_positions">
+        <div class="stats__label">{{ t("trendPositions") }} · {{ t("vExperience") }}</div>
         <div class="stats__professions">
           <div v-for="profession in professionStats.slice(0, 12)" :key="profession.profession" class="stats__profession">
-            <div class="stats__profession-head"><span>{{ profession.profession }}</span><strong>{{ profession.salaryCount ? money(profession.medianUsd) : "—" }} <em>({{ profession.count }})</em></strong></div>
+            <div class="stats__profession-head"><span>{{ profession.profession }}</span><strong>{{ profession.count }}</strong></div>
             <div v-if="profession.medianExperienceYears != null" class="stats__sub">{{ t("vExperience") }}: {{ t("experienceYears", { n: profession.medianExperienceYears }) }}</div>
-            <div v-if="profession.geographies.length" class="stats__chips stats__chips_geo"><span v-for="geo in profession.geographies" :key="`${geo.kind}:${geo.key}`">{{ geographyLabel(geo) }} · {{ money(geo.medianUsd) }} <em>({{ geo.salaryCount }})</em></span></div>
+            <div v-if="profession.geographies.length" class="stats__chips stats__chips_geo"><span v-for="geo in profession.geographies" :key="`${geo.kind}:${geo.key}`">{{ geographyLabel(geo) }} · {{ geo.count }}</span></div>
           </div>
         </div>
       </article>
 
-      <article v-if="stats.topSkills.length" class="stats__card stats__card_wide">
+      <article v-if="stats.topSkills.length" class="stats__card stats__card_skills">
         <div class="stats__label">{{ t("statTopSkills") }}</div>
         <div class="stats__chips stats__chips_accent"><span v-for="skill in stats.topSkills" :key="skill.skill">{{ skill.skill }} · {{ skill.count }}</span></div>
+      </article>
+
+      <article v-if="languageStats.length" class="stats__card stats__card_languages">
+        <div class="stats__label">{{ t("statLanguages") }}</div>
+        <div class="stats__chips"><span v-for="[language, count] in languageStats" :key="language">{{ language }} · {{ count }}</span></div>
       </article>
     </div>
 
@@ -225,7 +228,7 @@ const relocationDonut = computed(() => relocationStats.value.map((item, index) =
 </template>
 
 <style scoped>
-.stats__grid,.charts-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}.stats__card,.analytics-card{min-width:0;padding:14px;border:1px solid rgba(85,111,174,.3);border-radius:11px;background:rgba(12,18,48,.9)}.stats__card_wide,.analytics-card_wide{grid-column:span 2}.stats__label,.analytics-card h3{margin:0 0 9px;color:var(--ui-text-muted);font-size:11px;font-weight:750;letter-spacing:.05em;text-transform:uppercase}.stats__big{color:#f08ab8;font-size:28px;font-weight:750;overflow-wrap:anywhere}.stats__sub{margin-top:4px;color:var(--ui-text-muted);font-size:12px}.stats__sub_lead{margin:-2px 0 6px}.stats__row{display:flex;justify-content:space-between;gap:12px;padding:3px 0;font-size:13px}.stats__row span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.stats__row strong{flex:0 0 auto}.stats__row em,.stats__profession em,.stats__chips em{color:var(--ui-text-muted);font-size:11px;font-style:normal}.stats__row_divider{margin-top:5px;padding-top:7px;border-top:1px solid var(--line)}.stats__chips{display:flex;flex-wrap:wrap;gap:6px}.stats__chips span{padding:3px 9px;border:1px solid rgba(85,111,174,.34);border-radius:999px;color:var(--ui-text-muted);font-size:12px}.stats__chips_accent span{border-color:rgba(224,103,154,.38);color:#ee9bc0}.stats__professions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.stats__profession{min-width:0;padding:10px;border:1px solid rgba(85,111,174,.2);border-radius:9px;background:rgba(5,10,31,.32)}.stats__profession-head{display:flex;min-width:0;align-items:baseline;justify-content:space-between;gap:10px;font-size:13px}.stats__profession-head>span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.stats__profession-head strong{flex:0 0 auto;color:#f08ab8}.stats__chips_geo{margin-top:7px}.stats__chips_geo span{padding:2px 7px;font-size:11px}
-@media(max-width:1000px){.stats__grid,.charts-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.stats__card_wide,.analytics-card_wide{grid-column:1/-1}.stats__professions{grid-template-columns:1fr}}
-@media(max-width:650px){.stats__switch{width:100%}.stats__grid,.charts-grid{grid-template-columns:1fr}.stats__card_wide,.analytics-card_wide{grid-column:auto}}
+.stats__grid,.charts-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}.stats__card,.analytics-card{min-width:0;padding:14px;border:1px solid rgba(85,111,174,.3);border-radius:11px;background:rgba(12,18,48,.9)}.stats__card_wide,.analytics-card_wide{grid-column:span 2}.stats__card_positions{grid-column:1/-1}.stats__card_skills{grid-column:span 2}.stats__label,.analytics-card h3{margin:0 0 9px;color:var(--ui-text-muted);font-size:11px;font-weight:750;letter-spacing:.05em;text-transform:uppercase}.stats__big{color:#f08ab8;font-size:28px;font-weight:750;overflow-wrap:anywhere}.stats__sub{margin-top:4px;color:var(--ui-text-muted);font-size:12px}.stats__sub_lead{margin:-2px 0 6px}.stats__row{display:flex;justify-content:space-between;gap:12px;padding:3px 0;font-size:13px}.stats__row span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.stats__row strong{flex:0 0 auto}.stats__row em,.stats__profession em,.stats__chips em{color:var(--ui-text-muted);font-size:11px;font-style:normal}.stats__row_divider{margin-top:5px;padding-top:7px;border-top:1px solid var(--line)}.stats__chips{display:flex;flex-wrap:wrap;gap:6px}.stats__chips span{padding:3px 9px;border:1px solid rgba(85,111,174,.34);border-radius:999px;color:var(--ui-text-muted);font-size:12px}.stats__chips_accent span{border-color:rgba(224,103,154,.38);color:#ee9bc0}.stats__professions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.stats__profession{min-width:0;padding:10px;border:1px solid rgba(85,111,174,.2);border-radius:9px;background:rgba(5,10,31,.32)}.stats__profession-head{display:flex;min-width:0;align-items:baseline;justify-content:space-between;gap:10px;font-size:13px}.stats__profession-head>span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.stats__profession-head strong{flex:0 0 auto;color:var(--ui-text-muted);font-size:12px}.stats__chips_geo{margin-top:7px}.stats__chips_geo span{padding:2px 7px;font-size:11px}
+@media(max-width:1000px){.stats__grid,.charts-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.stats__card_wide,.analytics-card_wide,.stats__card_positions{grid-column:1/-1}.stats__card_skills{grid-column:span 1}.stats__professions{grid-template-columns:1fr}}
+@media(max-width:650px){.stats__switch{width:100%}.stats__grid,.charts-grid{grid-template-columns:1fr}.stats__card_wide,.analytics-card_wide,.stats__card_positions,.stats__card_skills{grid-column:auto}}
 </style>
