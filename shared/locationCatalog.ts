@@ -1,5 +1,16 @@
+import {
+  GEOGRAPHY_CITIES,
+  KZ_CITY_CATALOG,
+  UA_CITY_CATALOG,
+  UZ_CITY_CATALOG,
+  aliasesOf,
+  canonicalAnyCity,
+  canonicalCentralAsiaCity,
+  canonicalUkraineCity,
+} from '@whiteslove/parsing-lexicon'
 import { HIRING_COUNTRIES } from './hiring/hiringMarkets'
 
+// Presentation labels only. Parser aliases live exclusively in @whiteslove/parsing-lexicon.
 export const CITY_LABELS_RU: Record<string, string> = {
   Tashkent: 'Ташкент', Samarkand: 'Самарканд', Bukhara: 'Бухара', Namangan: 'Наманган',
   Andijan: 'Андижан', Fergana: 'Фергана', Nukus: 'Нукус', Navoi: 'Навои', Navoiy: 'Навои', Jizzakh: 'Джизак',
@@ -8,75 +19,61 @@ export const CITY_LABELS_RU: Record<string, string> = {
   Surkhandarya: 'Сурхандарья', Syrdarya: 'Сырдарья', Khorezm: 'Хорезм',
   Almaty: 'Алматы', Astana: 'Астана', Shymkent: 'Шымкент', Karaganda: 'Караганда',
   Aktobe: 'Актобе', Atyrau: 'Атырау', Oral: 'Уральск', Taraz: 'Тараз', Pavlodar: 'Павлодар',
-  Semey: 'Семей', Kostanay: 'Костанай', Kyzylorda: 'Кызылорда', Aktau: 'Актау',
+  Semey: 'Семей', Kostanay: 'Костанай', Kyzylorda: 'Кызылорда', Aktau: 'Актау', Oskemen: 'Усть-Каменогорск',
   Kyiv: 'Киев', Lviv: 'Львов', Odesa: 'Одесса', Kharkiv: 'Харьков', Dnipro: 'Днепр',
   Vinnytsia: 'Винница', 'Ivano-Frankivsk': 'Ивано-Франковск', Lutsk: 'Луцк', Chernivtsi: 'Черновцы',
   Zaporizhzhia: 'Запорожье', Poltava: 'Полтава', Rivne: 'Ровно', Ternopil: 'Тернополь',
   Uzhhorod: 'Ужгород', Khmelnytskyi: 'Хмельницкий', Zhytomyr: 'Житомир', Cherkasy: 'Черкассы',
   Chernihiv: 'Чернигов', Sumy: 'Сумы', Mykolaiv: 'Николаев', Kropyvnytskyi: 'Кропивницкий',
+  Kherson: 'Херсон', 'Kryvyi Rih': 'Кривой Рог', Kremenchuk: 'Кременчуг', 'Bila Tserkva': 'Белая Церковь',
+  Kamianske: 'Каменское', Vyshneve: 'Вишневое', Boryspil: 'Борисполь', Vyshhorod: 'Вышгород',
+  Oleksandriia: 'Александрия', Pavlohrad: 'Павлоград', Nikopol: 'Никополь', Drohobych: 'Дрогобыч',
+  Stryi: 'Стрый', Kolomyia: 'Коломыя', Kalush: 'Калуш', 'Kamianets-Podilskyi': 'Каменец-Подольский',
   Bucharest: 'Бухарест', 'Cluj-Napoca': 'Клуж-Напока', Timisoara: 'Тимишоара',
-  Iasi: 'Яссы', Brasov: 'Брашов', Constanta: 'Констанца', Oradea: 'Орадя',
+  Iasi: 'Яссы', Brasov: 'Брашов', Constanta: 'Констанца', Oradea: 'Орадя', Sibiu: 'Сибиу',
 }
 
-const CITY_ALIASES: Record<string, string[]> = {
-  tashkent: ['tashkent', 'toshkent', 'ташкент', 'тошкент'],
-  samarkand: ['samarkand', 'samarqand', 'самарканд', 'самарқанд'],
-  bukhara: ['bukhara', 'buxoro', 'бухара', 'бухоро'],
-  namangan: ['namangan', 'наманган'],
-  andijan: ['andijan', 'andijon', 'андижан', 'андижон'],
-  fergana: ['fergana', "farg'ona", 'fargona', 'фаргана', 'фергана'],
-  qarshi: ['qarshi', 'karshi', 'карши', 'қарши'],
-  nukus: ['nukus', 'нукус'],
-  urgench: ['urgench', 'urganch', 'ургенч', 'урганч'],
-  khiva: ['khiva', 'xiva', 'хива'],
-  kyiv: ['kyiv', 'kiev', 'киев', 'київ'],
-  lviv: ['lviv', 'львов', 'львів'],
-  odesa: ['odesa', 'odessa', 'одесса', 'одеса'],
-  kharkiv: ['kharkiv', 'kharkov', 'харьков', 'харків'],
-  dnipro: ['dnipro', 'днепр', 'дніпро'],
-  vinnytsia: ['vinnytsia', 'vinnitsa', 'винница', 'вінниця'],
-  zaporizhzhia: ['zaporizhzhia', 'zaporozhye', 'запорожье', 'запоріжжя'],
-  almaty: ['almaty', 'алматы'],
-  astana: ['astana', 'астана'],
-  shymkent: ['shymkent', 'chimkent', 'шымкент', 'чимкент'],
-  karaganda: ['karaganda', 'караганда'],
-  atyrau: ['atyrau', 'атырау'],
-  aktobe: ['aktobe', 'актобе'],
-  bishkek: ['bishkek', 'бишкек'],
-  osh: ['osh', 'ош'],
-  karakol: ['karakol', 'каракол'],
-  bucharest: ['bucharest', 'bucuresti', 'bucurești', 'бухарест'],
-  'cluj-napoca': ['cluj-napoca', 'cluj napoca', 'cluj', 'клуж-напока', 'клуж'],
-  iasi: ['iasi', 'iași', 'яссы'],
-  timisoara: ['timisoara', 'timișoara', 'тимишоара'],
-  brasov: ['brasov', 'brașov', 'брашов'],
+export function normalizeCityValue(value: string): string {
+  return value.trim().toLocaleLowerCase('ru').replace(/ё/g, 'е')
 }
 
+const PARSING_CITIES = [
+  ...GEOGRAPHY_CITIES.filter((city) => !['UA', 'KZ', 'UZ'].includes(city.country || '')),
+  ...KZ_CITY_CATALOG,
+  ...UZ_CITY_CATALOG,
+  ...UA_CITY_CATALOG,
+]
+const PARSING_CITY_BY_KEY = new Map(
+  PARSING_CITIES.map((city) => [normalizeCityValue(city.canonical), city] as const),
+)
 const CITY_LABELS = new Map(
-  [...Object.keys(CITY_LABELS_RU), ...HIRING_COUNTRIES.flatMap((country) => country.cities || [])]
+  [...Object.keys(CITY_LABELS_RU), ...HIRING_COUNTRIES.flatMap((country) => country.cities || []), ...PARSING_CITIES.map((city) => city.canonical)]
     .map((city) => [normalizeCityValue(city), city] as const),
 )
 const LOCALIZED_CITY_KEYS = new Map(
   Object.entries(CITY_LABELS_RU).map(([city, label]) => [normalizeCityValue(label), normalizeCityValue(city)]),
 )
 
-export function normalizeCityValue(value: string): string {
-  return value.trim().toLocaleLowerCase('ru').replace(/ё/g, 'е')
+function sharedCanonicalCity(value: string): string | null {
+  return canonicalUkraineCity(value) || canonicalCentralAsiaCity(value) || canonicalAnyCity(value)
 }
 
 export function canonicalCityKey(value: string): string {
+  const shared = sharedCanonicalCity(value)
+  if (shared) return normalizeCityValue(shared)
   const normalized = normalizeCityValue(value)
-  for (const [canonical, aliases] of Object.entries(CITY_ALIASES)) {
-    if (aliases.some((alias) => normalizeCityValue(alias) === normalized)) return canonical
-  }
   return LOCALIZED_CITY_KEYS.get(normalized) || normalized
 }
 
 export function cityAliases(value: string): string[] {
-  return CITY_ALIASES[canonicalCityKey(value)] || [value]
+  const key = canonicalCityKey(value)
+  const entity = PARSING_CITY_BY_KEY.get(key)
+  return entity ? [...new Set([entity.canonical, ...aliasesOf(entity)])] : [value]
 }
 
 export function canonicalCityValue(value: string): string {
+  const shared = sharedCanonicalCity(value)
+  if (shared) return shared
   const canonical = canonicalCityKey(value)
   return CITY_LABELS.get(canonical) || value.trim()
 }

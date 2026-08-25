@@ -3,23 +3,51 @@
 export type RiskCategory = 'gambling' | 'adult' | 'scam'
 export type WorkMode = 'remote' | 'hybrid' | 'office' | 'unknown'
 export type Relocation = 'offered' | 'none' | 'unknown'
-export type SalaryPeriod = 'hour' | 'month' | 'year'
-export type Seniority = 'intern' | 'junior' | 'middle' | 'senior' | 'staff' | 'principal' | 'lead'
+export type SalaryPeriod = 'hour' | 'day' | 'shift' | 'week' | 'month' | 'year' | 'project' | 'piece'
+export type Seniority = 'intern' | 'junior' | 'middle' | 'senior' | 'staff' | 'principal' | 'lead' | 'head' | 'director' | 'vp' | 'chief'
 export type EmployerType = 'direct' | 'agency' | 'board' | 'telegram'
 export type SponsorshipConfidence = 'explicit' | 'verified' | 'historical'
-export type EmploymentKind = 'fulltime' | 'parttime' | 'contract' | 'internship' | 'temporary'
+export type EmploymentKind =
+  | 'fulltime'
+  | 'parttime'
+  | 'contract'
+  | 'project'
+  | 'freelance'
+  | 'internship'
+  | 'temporary'
+  | 'volunteer'
+  | 'seasonal'
+export type WorkSchedule =
+  | 'fiveTwo'
+  | 'twoTwo'
+  | 'sixOne'
+  | 'threeThree'
+  | 'oneThree'
+  | 'twentyFourFortyEight'
+  | 'shift'
+  | 'flexible'
+  | 'day'
+  | 'night'
+  | 'rotational'
+export type ProbationKind = 'probation' | 'noProbation' | 'paidProbation' | 'unpaidProbation'
+export type ExperienceRequirement = 'noExperience' | 'experienceRequired'
 
 export const EMPLOYMENT_KINDS: EmploymentKind[] = [
   'fulltime',
   'parttime',
   'contract',
+  'project',
+  'freelance',
   'internship',
   'temporary',
+  'volunteer',
+  'seasonal',
 ]
 
 export interface LanguageReq {
   language: string
   level?: string
+  requirement?: 'required' | 'preferred' | 'notRequired'
 }
 
 export interface JobSkillDetail {
@@ -52,7 +80,10 @@ export interface Job {
   sponsorshipConfidence?: SponsorshipConfidence
   sponsorshipEvidence?: string[]
   noExperience?: boolean
+  experienceRequirement?: ExperienceRequirement | null
   employmentKind?: EmploymentKind
+  workSchedules?: WorkSchedule[]
+  probationKind?: ProbationKind | null
   languages?: LanguageReq[]
   skills?: string[]
   niceToHave?: string[]
@@ -72,6 +103,13 @@ export interface Job {
   deadline?: string
   tools?: string[]
   applicationLanguage?: string
+  hiringKind?: 'vacancy' | 'candidate' | 'vacancy_digest' | 'recruitment_ad' | 'course' | 'job_service' | 'closed_vacancy' | 'spam' | 'unknown'
+  vacancyStatus?: string
+  workAuthorization?: string[]
+  travelRequirement?: string
+  benefits?: string[]
+  applicationRequirements?: string[]
+  openingCount?: number
   employerType?: EmployerType
   riskCategory?: RiskCategory | null
   riskReasons?: string[]
