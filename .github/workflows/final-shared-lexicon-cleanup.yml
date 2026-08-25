@@ -42,13 +42,11 @@ jobs:
                   raise SystemExit(f'{label}: end marker not found')
               return text[:a] + replacement + text[b:]
 
-          # Pin verified package commit.
           path = Path('package.json')
           data = json.loads(path.read_text())
           data['dependencies']['@whiteslove/parsing-lexicon'] = f'https://github.com/AmoneMisa/parsing-lexicon/archive/{LEXICON_SHA}.tar.gz'
           path.write_text(json.dumps(data, ensure_ascii=False, indent=2) + '\n')
 
-          # Huge local skill taxonomy becomes a thin package facade.
           Path('shared/jobSkills.ts').write_text("""export {
             SKILL_CATALOG,
             SKILL_KEYWORDS,
@@ -68,10 +66,9 @@ jobs:
           } from '@whiteslove/parsing-lexicon/hiring-skills'
           """)
 
-          # Expose reusable candidate semantics through the existing adapter.
           path = Path('server/utils/hiringLexicon.ts')
           text = path.read_text()
-          old = """export {
+          text = replace_once(text, """export {
             detectCandidateFeatureCodes,
             detectCandidateRelocationPreference,
             detectDegreeRequirement as detectSharedDegreeRequirement,
@@ -85,8 +82,7 @@ jobs:
             extractCandidateWorkHistory,
             isCandidateNonTargetContext,
           } from '@whiteslove/parsing-lexicon/hiring-semantics'
-          """
-          new = """export {
+          """, """export {
             detectCandidateFeatureCodes,
             detectCandidateProfessionLabels,
             detectCandidateRelocationPreference,
@@ -108,11 +104,9 @@ jobs:
             isCandidateStatusOnly,
             isFlexibleCandidateRole,
           } from '@whiteslove/parsing-lexicon/hiring-semantics'
-          """
-          text = replace_once(text, old, new, 'hiringLexicon semantic exports')
+          """, 'hiringLexicon exports')
           path.write_text(text)
 
-          # hiringNormalize: reuse shared remote/employment/role classifiers.
           path = Path('server/utils/hiringNormalize.ts')
           text = path.read_text()
           text = replace_once(text, """  detectCandidateFeatureCodes,
@@ -123,64 +117,39 @@ jobs:
             detectCandidateRemotePreference,
             detectEmploymentTypes,
             detectProfessionMatches,
-          """, 'hiringNormalize imports 1')
+          """, 'normalize imports 1')
           text = replace_once(text, """  isCandidateNonTargetContext,
             resolveSharedProfessionContext,
           """, """  isCandidateNonRoleValue,
             isCandidateNonTargetContext,
             isFlexibleCandidateRole,
             resolveSharedProfessionContext,
-          """, 'hiringNormalize imports 2')
-          text = text.replace('if (FLEXIBLE_ROLE_RE.test(target)) return [\'Any Role\']', "if (isFlexibleCandidateRole(target)) return ['Any Role']")
-          text = text.replace('if (NON_ROLE_RE.test(target)) return []', 'if (isCandidateNonRoleValue(target)) return []')
-          text = replace_between(
-              text,
-              'const REMOTE_POSITIVE_RE =',
-              'function numericExperience(',
-              """export function normalizeRemotePreference(
+          """, 'normalize imports 2')
+          text = replace_once(text, "if (FLEXIBLE_ROLE_RE.test(target)) return ['Any Role']", "if (isFlexibleCandidateRole(target)) return ['Any Role']", 'flexible role call')
+          text = replace_once(text, 'if (NON_ROLE_RE.test(target)) return []', 'if (isCandidateNonRoleValue(target)) return []', 'non-role call')
+          text = replace_between(text, 'const REMOTE_POSITIVE_RE =', 'function numericExperience(', """export function normalizeRemotePreference(
             raw: boolean | null | undefined,
             text: string,
             origin: CvProfile['origin'],
           ): boolean | null {
             const shared = detectCandidateRemotePreference(text)
             if (shared != null) return shared
-            // Legacy Telegram parsing used RegExp.test(), so every post without a remote
-            // marker was persisted as false. Treat that false as unknown; web adapters
-            // can still preserve an explicit structured false from their source.
             if ((origin ?? 'telegram') === 'telegram' && raw === false) return null
             return raw ?? null
           }
 
-          function numericExperience(""",
-              'remote preference semantics',
-          )
-          text = replace_between(
-              text,
-              'export function normalizeEmploymentTypes(',
-              '/** Removes text ligatures emitted by icon fonts',
-              """export function normalizeEmploymentTypes(text: string, raw?: string | null): CandidateEmploymentType[] {
-            return detectEmploymentTypes(`${raw || ''}\\n${text}`)
+          """, 'remote semantics')
+          text = replace_between(text, 'export function normalizeEmploymentTypes(', '/** Removes text ligatures emitted by icon fonts', """export function normalizeEmploymentTypes(text: string, raw?: string | null): CandidateEmploymentType[] {
+            return detectEmploymentTypes(`${raw || ''}\n${text}`)
           }
 
-          /** Removes text ligatures emitted by icon fonts""",
-              'employment type semantics',
-          )
-          text = replace_between(
-              text,
-              'const FLEXIBLE_ROLE_RE =',
-              'function normalizeCandidateEducation(',
-              'function normalizeCandidateEducation(',
-              'candidate standalone role semantics',
-          )
+          """, 'employment semantics')
+          text = replace_between(text, 'const FLEXIBLE_ROLE_RE =', 'function normalizeCandidateEducation(', '', 'standalone role semantics')
           path.write_text(text)
 
-          # hiringQuality: remove secondary profession/country/remote lexicons.
           path = Path('server/utils/hiringQuality.ts')
           text = path.read_text()
-          text = replace_once(
-              text,
-              "import { detectMentionedProfessions } from './hiringNormalize'\n",
-              """import { detectMentionedProfessions } from './hiringNormalize'
+          text = replace_once(text, "import { detectMentionedProfessions } from './hiringNormalize'\n", """import { detectMentionedProfessions } from './hiringNormalize'
           import {
             detectCandidateProfessionLabels,
             detectCandidateRemotePreference,
@@ -194,55 +163,36 @@ jobs:
             normalizeHiringCountry,
             resolveSharedCountryFromText,
           } from './hiringLexicon'
-          """,
-              'hiringQuality imports',
-          )
-          text = replace_between(text, 'const STATUS_ONLY_RE =', 'function field(', 'function field(', 'quality local profession/country catalogs')
-          text = replace_between(
-              text,
-              'function intentLines(',
-              'function repairProfessions(',
-              """function candidateTargetContext(profile: CvProfile, text: string): string {
+          """, 'quality imports')
+          text = replace_between(text, 'const STATUS_ONLY_RE =', 'function field(', '', 'quality local catalogs')
+          text = replace_between(text, 'function intentLines(', 'function repairProfessions(', """function candidateTargetContext(profile: CvProfile, text: string): string {
             const roleFieldRaw = extractCandidateRoleField(text)
             const roleField = roleFieldRaw && !isCandidateStatusOnly(cleanToken(roleFieldRaw)) ? roleFieldRaw : ''
             const goal = extractCandidateGoalField(text) || ''
             const target = extractCandidateTargetContext(text)
-            const headline = text.split('\\n').map((line) => line.trim()).filter(Boolean).slice(0, 4).join('\\n')
-            return [profile.role || '', ...(profile.professions || []), roleField, goal, target, headline].join('\\n')
+            const headline = text.split('\n').map((line) => line.trim()).filter(Boolean).slice(0, 4).join('\n')
+            return [profile.role || '', ...(profile.professions || []), roleField, goal, target, headline].join('\n')
           }
 
-          function repairProfessions(""",
-              'quality candidate target context',
-          )
-          text = replace_between(
-              text,
-              'function repairProfessions(',
-              'function structuredName(',
-              """function repairProfessions(profile: CvProfile, text: string): string[] {
+          """, 'quality target context')
+          text = replace_between(text, 'function repairProfessions(', 'function structuredName(', """function repairProfessions(profile: CvProfile, text: string): string[] {
             const current = unique(profile.professions?.length ? profile.professions : [profile.role || ''])
             const target = candidateTargetContext(profile, text)
             const semantic = [...detectCandidateProfessionLabels(target)]
             if (semantic.length) return unique(semantic)
-
             if (!current.length) {
               const technologies = extractCandidateSkillField(text) || ''
               const inferred = [...detectCandidateProfessionLabels('', `${technologies} ${(profile.skills || []).join(' ')}`)]
               if (inferred.length) return unique(inferred)
-              const headline = text.split('\\n').map((line) => line.trim()).filter(Boolean).slice(0, 8).join('\\n')
+              const headline = text.split('\n').map((line) => line.trim()).filter(Boolean).slice(0, 8).join('\n')
               const headlineProfessions = detectMentionedProfessions(headline)
               if (headlineProfessions.length) return headlineProfessions
             }
             return current
           }
 
-          function structuredName(""",
-              'quality profession repair',
-          )
-          text = replace_between(
-              text,
-              'function explicitLocation(',
-              'function approximateExperience(',
-              """function explicitLocation(text: string): string | null {
+          """, 'quality profession repair')
+          text = replace_between(text, 'function explicitLocation(', 'function approximateExperience(', """function explicitLocation(text: string): string | null {
             return extractCandidateLocationField(text)
           }
 
@@ -264,18 +214,15 @@ jobs:
             return first.slice(0, 80)
           }
 
-          function approximateExperience(""",
-              'quality geography and remote semantics',
-          )
-          text = text.replace('  const remoteSignal = explicitRemote(text)', '  const remoteSignal = detectCandidateRemotePreference(text)')
-          text = text.replace("if (!detectedCity && COUNTRY_ALIASES.some((item) => item.re.test(currentCity))) city = null", 'if (!detectedCity && normalizeHiringCountry(currentCity)) city = null')
+          """, 'quality geography')
+          text = replace_once(text, '  const remoteSignal = explicitRemote(text)', '  const remoteSignal = detectCandidateRemotePreference(text)', 'quality remote call')
+          text = replace_once(text, "if (!detectedCity && COUNTRY_ALIASES.some((item) => item.re.test(currentCity))) city = null", 'if (!detectedCity && normalizeHiringCountry(currentCity)) city = null', 'quality legacy city cleanup')
           path.write_text(text)
 
-          # Display labels keep UI text only; raw normalization comes from package.
           path = Path('shared/hiringProfessionLabels.ts')
           text = path.read_text()
           text = "import { normalizeSourceRole } from '@whiteslove/parsing-lexicon/hiring-source-aliases'\n\n" + text
-          text = replace_between(text, 'const RAW_PROFESSION_LABELS:', 'export function hiringProfessionLabel(', 'export function hiringProfessionLabel(', 'raw profession labels')
+          text = replace_between(text, 'const RAW_PROFESSION_LABELS:', 'export function hiringProfessionLabel(', '', 'raw profession labels')
           old_fn = """export function hiringProfessionLabel(value: string, locale: HiringProfessionLocale): string {
             const key = String(value || '').trim()
             const canonical = HIRING_PROFESSION_LABELS[key]
@@ -301,29 +248,17 @@ jobs:
           text = replace_once(text, old_fn, new_fn, 'profession label function')
           path.write_text(text)
 
-          # Candidate presentation uses the same anchored source-role normalizer.
           path = Path('server/utils/hiringCandidatePresentation.ts')
           text = path.read_text()
-          text = replace_once(
-              text,
-              "import { parseExtendedLanguageContext } from '@whiteslove/parsing-lexicon/hiring-language-extensions'\n",
-              """import { parseExtendedLanguageContext } from '@whiteslove/parsing-lexicon/hiring-language-extensions'
+          text = replace_once(text, "import { parseExtendedLanguageContext } from '@whiteslove/parsing-lexicon/hiring-language-extensions'\n", """import { parseExtendedLanguageContext } from '@whiteslove/parsing-lexicon/hiring-language-extensions'
           import { normalizeSourceRole } from '@whiteslove/parsing-lexicon/hiring-source-aliases'
-          """,
-              'candidate presentation import',
-          )
-          text = replace_between(
-              text,
-              'const STANDALONE_REMOTE_ROLE_RE =',
-              'const LANGUAGE_LABELS_RU:',
-              """export function publicCandidateProfessionKeys(profile: CvProfile): string[] {
+          """, 'presentation import')
+          text = replace_between(text, 'const STANDALONE_REMOTE_ROLE_RE =', 'const LANGUAGE_LABELS_RU:', """export function publicCandidateProfessionKeys(profile: CvProfile): string[] {
             if (normalizeSourceRole(profile.role)?.label === 'Any Role') return ['Any Role']
             return coreProfessionKeys(profile)
           }
 
-          const LANGUAGE_LABELS_RU:""",
-              'candidate presentation role semantics',
-          )
+          """, 'presentation role semantics')
           path.write_text(text)
           PY
 
