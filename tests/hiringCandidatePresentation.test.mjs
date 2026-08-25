@@ -170,11 +170,12 @@ test('Careerist profile text stops before an appended neighbouring resume', () =
   assert.doesNotMatch(trimmed, /Оператор чата/u)
 })
 
-test('languages and proficiency are recovered from free-form CV text', () => {
+test('languages and proficiency are recovered from free-form CV text without cross-language leakage', () => {
   const languages = publicCandidateLanguages(profile({
     originalText: 'Знание профессионального русского языка и базового таджикского языка. English level: B2.',
   }), 'ru')
   assert.ok(languages.includes('Русский — профессиональный'))
   assert.ok(languages.includes('Таджикский — базовый'))
   assert.ok(languages.includes('Английский — B2'))
+  assert.ok(!languages.includes('Таджикский — B2'))
 })
