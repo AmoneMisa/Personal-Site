@@ -2,6 +2,7 @@ import { canonicalTashkentDistrict, parseSalary as parseSharedSalary } from '@wh
 import {
   extractCandidateContacts,
   extractCandidateExperienceYears,
+  parseCandidateExperienceValue,
 } from '@whiteslove/parsing-lexicon/hiring-candidate-fields'
 import {
   detectCandidateFeatureCodes,
@@ -116,7 +117,7 @@ function metaSalary(html: string): Pick<CvProfile, 'salaryMin' | 'salaryMax' | '
 
 function iconExperience(html: string): number | null {
   const value = iconField(html, 'clock')
-  return value ? extractCandidateExperienceYears(value) : null
+  return value ? parseCandidateExperienceValue(value) : null
 }
 
 function iconName(html: string): string {

@@ -3,6 +3,11 @@
 // from title + description + tags (EN/RU/UK/UZ keywords). Results are approximate
 // and meant to power filtering and statistics, not to be authoritative.
 
+import { extractHiringDeadline } from '@whiteslove/parsing-lexicon/hiring-temporal'
+import {
+  detectApplicationLanguage as detectSharedApplicationLanguage,
+  detectHiringEducation,
+} from '@whiteslove/parsing-lexicon/hiring-vacancy-fields'
 import { classifySuspicion } from './suspicious'
 import type {
   EmployerType,
@@ -282,31 +287,23 @@ function detectContractType(text: string, context?: ReturnType<typeof sharedHiri
 }
 
 function detectEducation(text: string): string | undefined {
-  if (/master['’]?s degree|master degree|магистр|магістр/i.test(text)) return "Master's degree"
-  if (/bachelor['’]?s degree|bachelor degree|бакалавр/i.test(text)) return "Bachelor's degree"
-  if (/higher education|высшее образование|вища освіта|олий маълумот/i.test(text)) return 'Higher education'
-  if (/secondary education|среднее образование|середня освіта/i.test(text)) return 'Secondary education'
-  return undefined
+  const level = detectHiringEducation(text)
+  const labels: Record<string, string> = {
+    doctorate: 'Doctorate',
+    master: "Master's degree",
+    bachelor: "Bachelor's degree",
+    higher: 'Higher education',
+    secondary: 'Secondary education',
+  }
+  return level ? labels[level] : undefined
 }
 
 function detectDeadline(text: string): string | undefined {
-  const marker = /(?:application\s+deadline|apply\s+by|closing\s+date|deadline|дедлайн|срок(?:\s+подачи)?|термін(?:\s+подання)?)[\s:–—-]{0,8}([^.;\n]{3,45})/i.exec(text)
-  if (!marker?.[1]) return undefined
-  const date = marker[1].match(/\b(?:\d{4}-\d{2}-\d{2}|\d{1,2}[./-]\d{1,2}[./-]\d{2,4}|\d{1,2}\s+(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:tember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?|янв\w*|фев\w*|мар\w*|апр\w*|ма[йя]|июн\w*|июл\w*|авг\w*|сен\w*|окт\w*|ноя\w*|дек\w*)\.?\s+\d{2,4})\b/i)
-  return date?.[0]?.trim()
+  return extractHiringDeadline(text) || undefined
 }
 
 function detectApplicationLanguage(text: string): string | undefined {
-  const match = /(?:submit|send|provide)[^.;\n]{0,35}(?:application|resume|résumé|cv)[^.;\n]{0,20}\b(?:in|на)\s+(english|russian|ukrainian|uzbek|kazakh|romanian|английском|русском|украинском|українською|узбекском|казахском|румынском)\b/i.exec(text)
-  if (!match?.[1]) return undefined
-  const value = match[1].toLowerCase()
-  if (/english|англий/.test(value)) return 'English'
-  if (/russian|русск/.test(value)) return 'Russian'
-  if (/ukrain|укра/.test(value)) return 'Ukrainian'
-  if (/uzbek|узбек/.test(value)) return 'Uzbek'
-  if (/kazakh|казах/.test(value)) return 'Kazakh'
-  if (/romanian|румын/.test(value)) return 'Romanian'
-  return match[1]
+  return detectSharedApplicationLanguage(text) || undefined
 }
 
 const BOARD_SOURCES = new Set<Job['source']>([
