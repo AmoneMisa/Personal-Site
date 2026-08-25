@@ -29,6 +29,7 @@ import {
   matchExtendedProfessions,
   matchesSourceCandidateIntent,
 } from '@whiteslove/parsing-lexicon/hiring-source-aliases'
+import type { CandidateEmploymentType, CandidateWorkMode } from '../../shared/contracts/hiring'
 
 const matcher = (entry: { canonical?: string; aliases?: Record<string, readonly string[]> }) =>
   aliasesToRegex([entry.canonical || '', ...aliasesOf(entry)].filter(Boolean))
@@ -82,17 +83,6 @@ export function normalizeHiringCountry(value: string | null | undefined): string
   return value ? canonicalCountryCode(value) : null
 }
 
-export type CandidateEmploymentType =
-  | 'full_time'
-  | 'part_time'
-  | 'contract'
-  | 'project'
-  | 'freelance'
-  | 'temporary'
-  | 'internship'
-  | 'volunteer'
-  | 'seasonal'
-
 const EMPLOYMENT_VALUE: Record<string, CandidateEmploymentType> = {
   fullTime: 'full_time',
   partTime: 'part_time',
@@ -116,11 +106,10 @@ export function detectEmploymentTypes(text: string): CandidateEmploymentType[] {
   return [...normalized]
 }
 
-export type WorkMode = 'remote' | 'hybrid' | 'onsite'
-export function detectWorkModes(text: string): WorkMode[] {
-  const values = new Set<WorkMode>()
+export function detectWorkModes(text: string): CandidateWorkMode[] {
+  const values = new Set<CandidateWorkMode>()
   for (const entry of WORK_MODES) {
-    if (findCanonical(text, [entry], { partial: true })) values.add(entry.canonical as WorkMode)
+    if (findCanonical(text, [entry], { partial: true })) values.add(entry.canonical as CandidateWorkMode)
   }
   return [...values]
 }
