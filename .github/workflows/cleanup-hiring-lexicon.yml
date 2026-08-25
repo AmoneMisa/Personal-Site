@@ -1,0 +1,348 @@
+name: Final hiring lexicon cleanup
+
+on:
+  push:
+    paths:
+      - '.github/workflows/cleanup-hiring-lexicon.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Move reusable hiring semantics to parsing lexicon
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          def replace_once(text, old, new, label):
+              count = text.count(old)
+              if count != 1:
+                  raise SystemExit(f'{label}: expected one match, got {count}')
+              return text.replace(old, new, 1)
+
+          def replace_between(text, start_marker, end_marker, replacement, label):
+              start = text.find(start_marker)
+              if start < 0:
+                  raise SystemExit(f'{label}: start marker not found')
+              end = text.find(end_marker, start)
+              if end < 0:
+                  raise SystemExit(f'{label}: end marker not found')
+              return text[:start] + replacement + text[end:]
+
+          # server/utils/hiringNormalize.ts
+          path = Path('server/utils/hiringNormalize.ts')
+          text = path.read_text()
+          text = replace_once(text, """import {
+            detectProfessionMatches,
+            detectSharedSeniority,
+            resolveSharedProfessionContext,
+          } from './hiringLexicon'
+          """, """import {
+            detectCandidateFeatureCodes,
+            detectCandidateRelocationPreference,
+            detectProfessionMatches,
+            detectSharedSeniority,
+            extractCandidateContactHours,
+            extractCandidateGoalRole,
+            extractCandidateSalaryField,
+            extractCandidateSkillField,
+            extractCandidateTargetContext,
+            extractCandidateWorkHistory,
+            isCandidateNonTargetContext,
+            resolveSharedProfessionContext,
+          } from './hiringLexicon'
+          """, 'hiringNormalize imports')
+
+          structured_start = text.find('  const structured = text.match(\n')
+          if structured_start < 0:
+              raise SystemExit('structured skills field: start not found')
+          structured_end = text.find('  )?.[1]\n', structured_start)
+          if structured_end < 0:
+              raise SystemExit('structured skills field: end not found')
+          structured_end += len('  )?.[1]\n')
+          text = text[:structured_start] + '  const structured = extractCandidateSkillField(text)\n' + text[structured_end:]
+
+          text = replace_between(
+              text,
+              'const NON_TARGET_CONTEXT_RE =',
+              'function cleanRole(',
+              '',
+              'candidate target context constants',
+          )
+          text = replace_between(
+              text,
+              'function targetContext(',
+              'function extractGoalRole(',
+              """function targetContext(text: string): string {
+            return extractCandidateTargetContext(text)
+          }
+
+          """,
+              'candidate target context helper',
+          )
+          text = replace_between(
+              text,
+              'function extractGoalRole(',
+              'export function normalizeProfessions(',
+              """function extractGoalRole(text: string): string {
+            return cleanRole(extractCandidateGoalRole(text) || undefined)
+          }
+
+          """,
+              'candidate goal role helper',
+          )
+          count = text.count('NON_TARGET_CONTEXT_RE.test(target)')
+          if count != 2:
+              raise SystemExit(f'non-target checks: expected 2, got {count}')
+          text = text.replace('NON_TARGET_CONTEXT_RE.test(target)', 'isCandidateNonTargetContext(target)')
+
+          text = replace_between(
+              text,
+              'function workHistoryBlock(',
+              'export function normalizePreviousProfessions(',
+              """function workHistoryBlock(text: string): string {
+            return extractCandidateWorkHistory(text)
+          }
+
+          """,
+              'work history helper',
+          )
+          text = replace_between(
+              text,
+              'interface FeatureRule',
+              '// "Murojaat qilish vaqti:',
+              """const CANDIDATE_FEATURE_LABELS: Record<string, string> = {
+            student: 'Student',
+            parentalLeave: 'Parental leave',
+            noExperience: 'No experience',
+            partTime: 'Part-time',
+            nightShift: 'Night shift',
+            openToRelocation: 'Open to relocation',
+          }
+
+          export function extractCandidateFeatures(text: string): string[] {
+            return detectCandidateFeatureCodes(text).map((code) => CANDIDATE_FEATURE_LABELS[code] || code)
+          }
+
+          """,
+              'candidate feature rules',
+          )
+          text = replace_between(
+              text,
+              'const CONTACT_HOURS_RE =',
+              'export function extractContacts(',
+              """export function extractContactHours(text: string): string | null {
+            return extractCandidateContactHours(text)
+          }
+
+          """,
+              'contact hours parser',
+          )
+
+          salary_fn = text.find('export function extractCandidateSalary(')
+          if salary_fn < 0:
+              raise SystemExit('salary function not found')
+          salary_start = text.find('  const field = text.match(\n', salary_fn)
+          if salary_start < 0:
+              raise SystemExit('salary field start not found')
+          salary_end = text.find('  )?.[1]\n', salary_start)
+          if salary_end < 0:
+              raise SystemExit('salary field end not found')
+          salary_end += len('  )?.[1]\n')
+          text = text[:salary_start] + '  const field = extractCandidateSalaryField(text)\n' + text[salary_end:]
+
+          text = replace_between(
+              text,
+              'export function detectRelocationReady(',
+              'const REMOTE_POSITIVE_RE =',
+              """export function detectRelocationReady(text: string): boolean | null {
+            return detectCandidateRelocationPreference(text)
+          }
+
+          """,
+              'relocation preference parser',
+          )
+          path.write_text(text)
+
+          # server/utils/enrich.ts
+          path = Path('server/utils/enrich.ts')
+          text = path.read_text()
+          old_import = """import {
+            detectEmploymentTypes,
+            detectExperienceRequirement,
+            detectProbation,
+            detectSharedSeniority,
+            detectWorkModes,
+            detectWorkSchedules,
+            parseHiringExperience,
+            parseHiringSalary,
+            parseSharedHiringContext,
+            parseSharedLanguageContext,
+          } from './hiringLexicon'
+          """
+          new_import = """import {
+            detectEmploymentTypes,
+            detectExperienceRequirement,
+            detectLexiconCity,
+            detectProbation,
+            detectSharedManagementRole,
+            detectSharedSeniority,
+            detectWorkModes,
+            detectWorkSchedules,
+            parseHiringExperience,
+            parseHiringSalary,
+            parseSharedHiringContext,
+            parseSharedLanguageContext,
+            resolveSharedCountryFromText,
+          } from './hiringLexicon'
+          """
+          text = replace_once(text, old_import, new_import, 'enrich imports')
+          text = replace_between(
+              text,
+              '// ---- Country detection from location text ----',
+              'function detectCountry(job: Job): string {',
+              """// ---- Country detection from location text ----
+          // Country and city aliases live in parsing-lexicon; this module only
+          // decides which vacancy fields have precedence.
+          export function resolveCountry(text: string): string | undefined {
+            return resolveSharedCountryFromText(text) || undefined
+          }
+
+          """,
+              'country patterns',
+          )
+          text = replace_between(
+              text,
+              'function detectCity(job: Job, country: string): string | undefined {',
+              '// ---- Shared vacancy context ----',
+              """function detectCity(job: Job, country: string): string | undefined {
+            const first = cleanText(job.location).split(/[,|·]/)[0]?.trim()
+            if (!first || first.length > 80) return undefined
+            if (/^(remote|worldwide|anywhere|global|other|see listing)$/i.test(first)) return undefined
+            const knownCity = detectLexiconCity(first, country)
+            if (resolveCountry(first) === country && !knownCity) return undefined
+            return knownCity || first
+          }
+
+          // ---- Shared vacancy context ----
+          """,
+              'city aliases',
+          )
+          text = replace_between(
+              text,
+              'function detectManagementRole(title: string, text: string): boolean | undefined {',
+              'function detectSalaryGross(',
+              """function detectManagementRole(title: string, text: string): boolean | undefined {
+            return detectSharedManagementRole(title, text) || undefined
+          }
+
+          """,
+              'management role semantics',
+          )
+          path.write_text(text)
+
+          # shared/hiring/ats/scoreCore.ts
+          path = Path('shared/hiring/ats/scoreCore.ts')
+          text = path.read_text()
+          req_end = "} from '@whiteslove/parsing-lexicon/hiring-requirements'\n"
+          extra_imports = """} from '@whiteslove/parsing-lexicon/hiring-requirements'
+          import { detectCountryCodeFromText } from '@whiteslove/parsing-lexicon/geography-detection'
+          import {
+            detectDegreeRequirement,
+            detectHiringScopeSignals,
+            type HiringScopeCode,
+          } from '@whiteslove/parsing-lexicon/hiring-semantics'
+          """
+          text = replace_once(text, req_end, extra_imports, 'ATS shared imports')
+
+          text = replace_between(
+              text,
+              "type ScopeCode = 'architecture' | 'leadership' | 'mentoring' | 'scale' | 'ownership'",
+              'const DEGREE_RANK:',
+              """type ScopeCode = HiringScopeCode
+          const SCOPE_LABELS: Record<ScopeCode, string> = {
+            architecture: 'Architecture / system design',
+            leadership: 'Technical leadership',
+            mentoring: 'Mentoring engineers',
+            scale: 'Large-scale systems',
+            ownership: 'Product / feature ownership',
+          }
+
+          function scopeScore(jobText: string, cvText: string): { score: number, missing: string[], requiredCount: number } {
+            const required = detectHiringScopeSignals(jobText, { mode: 'vacancy' })
+            if (!required.length) return { score: 100, missing: [], requiredCount: 0 }
+            const matched = new Set(detectHiringScopeSignals(cvText, { mode: 'candidate' }))
+            const missing = required.filter((code) => !matched.has(code)).map((code) => SCOPE_LABELS[code])
+            return {
+              score: Math.round(((required.length - missing.length) / required.length) * 100),
+              missing,
+              requiredCount: required.length,
+            }
+          }
+
+          const DEGREE_RANK:""",
+              'ATS scope signals',
+          )
+          text = replace_between(
+              text,
+              'function jobDegreeRequirement(',
+              'function educationScore(',
+              """function jobDegreeRequirement(requiredText: string): { level?: DegreeLevel, field?: string, equivalentExperience: boolean } {
+            return detectDegreeRequirement(requiredText)
+          }
+
+          """,
+              'ATS degree semantics',
+          )
+          text = replace_between(
+              text,
+              'function isUsRole(',
+              'export interface AtsBlocker',
+              """function isUsRole(job: { country?: string, location?: string, title?: string, description?: string }): boolean {
+            if ((job.country || '').toUpperCase() === 'US') return true
+            const text = `${job.location || ''} ${job.title || ''} ${(job.description || '').slice(0, 1200)}`
+            return detectCountryCodeFromText(text) === 'US'
+          }
+
+          """,
+              'ATS US geography',
+          )
+          path.write_text(text)
+          PY
+
+      - name: Refresh dependency lock and install
+        run: npm install --ignore-scripts
+
+      - name: Run test suite
+        run: npm test
+
+      - name: Verify reusable semantics are no longer local
+        shell: bash
+        run: |
+          ! grep -q 'const COUNTRY_PATTERNS' server/utils/enrich.ts
+          ! grep -q 'const TARGET_CONTEXT_RE' server/utils/hiringNormalize.ts
+          ! grep -q 'const NON_TARGET_CONTEXT_RE' server/utils/hiringNormalize.ts
+          ! grep -q 'const FEATURE_RULES' server/utils/hiringNormalize.ts
+          ! grep -q 'const CONTACT_HOURS_RE' server/utils/hiringNormalize.ts
+          ! grep -q 'const SCOPE_SIGNALS' shared/hiring/ats/scoreCore.ts
+          grep -q 'const TERM_STOP_WORDS' shared/hiring/ats/scoreCore.ts
+
+      - name: Commit cleanup
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add package-lock.json server/utils/hiringNormalize.ts server/utils/enrich.ts shared/hiring/ats/scoreCore.ts
+          git diff --cached --quiet && exit 0
+          git commit -m "refactor: finish shared hiring lexicon cleanup"
+          git push
