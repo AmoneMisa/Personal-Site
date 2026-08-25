@@ -11,6 +11,7 @@ const locations = await readFile(new URL('../app/utils/locationLabels.ts', impor
 const flatFilters = await readFile(new URL('../app/composables/flats/useFlatFilters.ts', import.meta.url), 'utf8')
 const jobFilters = await readFile(new URL('../app/composables/jobs/useJobFilters.ts', import.meta.url), 'utf8')
 const hiringFilters = await readFile(new URL('../app/composables/hiring/useHiringFilters.ts', import.meta.url), 'utf8')
+const jobStats = await readFile(new URL('../app/components/jobs/StatsPanel.vue', import.meta.url), 'utf8')
 
 test('flat cards share one row height and compact title/media geometry', () => {
   assert.match(grid, /align-items: stretch; grid-auto-rows: 1fr/u)
@@ -44,6 +45,13 @@ test('advanced filters are collapsed by default on all three search boards', () 
   assert.match(flatFilters, /const showAdvanced = ref\(false\)/u)
   assert.match(jobFilters, /const showAdvanced = ref\(false\)/u)
   assert.match(hiringFilters, /const showAdvanced = ref\(false\)/u)
+})
+
+test('vacancy graphs do not render the redundant sparse salary line', () => {
+  assert.doesNotMatch(jobStats, /const salaryTrend = computed/u)
+  assert.doesNotMatch(jobStats, /analytics-card__head/u)
+  assert.match(jobStats, /professionSalaryBars/u)
+  assert.match(jobStats, /<UiAnalyticsBars :items="professionSalaryBars" :format="money"/u)
 })
 
 test('room rent remains a deal type but is not duplicated in quick filters', () => {
