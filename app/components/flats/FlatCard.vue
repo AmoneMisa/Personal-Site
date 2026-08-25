@@ -21,6 +21,13 @@ const aiVisionTitle = computed(() => isEnglish.value
   ? "Data from AI Vision"
   : "Данные из AI-Vision");
 const goodPriceLabel = computed(() => isEnglish.value ? "Good price" : "Хорошая цена");
+const showOnMapLabel = computed(() => isEnglish.value ? "Show on map" : "Показать на карте");
+const canShowOnMap = computed(() => {
+  if (props.listing.lat == null || props.listing.lng == null) return false;
+  const lat = Number(props.listing.lat);
+  const lng = Number(props.listing.lng);
+  return Number.isFinite(lat) && Number.isFinite(lng) && Math.abs(lat) <= 90 && Math.abs(lng) <= 180;
+});
 const goodPriceTitle = computed(() => {
   const median = props.presentation.goodPriceMedianUsd;
   const count = props.presentation.goodPriceComparableCount;
@@ -92,6 +99,19 @@ const pillItems = computed<DraggablePillItem[]>(() => {
   return items;
 });
 
+function showOnMap() {
+  if (!canShowOnMap.value || !import.meta.client) return;
+  window.dispatchEvent(new CustomEvent("flat-map-focus", {
+    detail: {
+      id: props.listing.id,
+      source: props.listing.source,
+      country: props.listing.country,
+      lat: Number(props.listing.lat),
+      lng: Number(props.listing.lng),
+    },
+  }));
+}
+
 const emit = defineEmits<{
   open: [];
   toggleFavorite: [];
@@ -108,6 +128,7 @@ const emit = defineEmits<{
       <span v-if="presentation.dealLabel" class="flat-card__deal" :class="`flat-card__deal_${presentation.dealTone}`">{{ presentation.dealLabel }}</span>
       <span v-if="presentation.goodPrice" class="flat-card__good-price" :title="goodPriceTitle"><u-icon name="i-lucide-trending-down" />{{ goodPriceLabel }}</span>
       <div class="flat-card__actions">
+        <button v-if="canShowOnMap" type="button" class="flat-card__action" :aria-label="showOnMapLabel" :title="showOnMapLabel" @click.stop="showOnMap"><u-icon name="i-lucide-map-pinned" /></button>
         <button type="button" class="flat-card__action" :class="{ 'flat-card__action_active': favorite }" :aria-label="favoriteLabel" @click.stop="emit('toggleFavorite')"><u-icon name="i-lucide-heart" /></button>
         <button type="button" class="flat-card__action" :class="{ 'flat-card__action_active': hidden }" :aria-label="hideLabel" @click.stop="emit('toggleHidden')"><u-icon :name="hidden ? 'i-lucide-eye' : 'i-lucide-eye-off'" /></button>
       </div>
@@ -144,7 +165,7 @@ const emit = defineEmits<{
 .flat-card:hover .flat-card__photo > img { transform: scale(1.015); }
 .flat-card__no-photo { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 9px; height: 100%; color: var(--text-muted); font-size: 12px; background: var(--bg-panel-2); }
 .flat-card__no-photo-icon { width: 34px; height: 34px; opacity: 0.48; }
-.flat-card__deal { position: absolute; z-index: 2; top: 9px; left: 9px; max-width: calc(100% - 92px); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; font-weight: 700; line-height: 1; padding: 6px 9px; border: 1px solid rgba(224,103,154,.42); border-radius: 7px; background: #0d1128; color: var(--accent-pink); box-shadow: 0 3px 12px rgba(0,0,0,.2); }
+.flat-card__deal { position: absolute; z-index: 2; top: 9px; left: 9px; max-width: calc(100% - 124px); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; font-weight: 700; line-height: 1; padding: 6px 9px; border: 1px solid rgba(224,103,154,.42); border-radius: 7px; background: #0d1128; color: var(--accent-pink); box-shadow: 0 3px 12px rgba(0,0,0,.2); }
 .flat-card__deal_sale { color: #f58ab5; border-color: rgba(245,138,181,.45); }.flat-card__deal_rent { color: #b79cff; border-color: rgba(183,156,255,.42); }.flat-card__deal_room { color: #77d9e8; border-color: rgba(119,217,232,.42); }.flat-card__deal_short { color: #f4c86a; border-color: rgba(244,200,106,.45); }
 .flat-card__good-price { position: absolute; z-index: 3; left: 9px; bottom: 9px; display: inline-flex; align-items: center; gap: 4px; max-width: calc(100% - 18px); padding: 5px 8px; border: 1px solid rgba(74,222,128,.42); border-radius: 999px; background: rgba(8,31,28,.86); color: #86efac; font-size: 10.5px; font-weight: 700; line-height: 1; box-shadow: 0 3px 12px rgba(0,0,0,.2); }
 .flat-card__good-price :deep(svg) { width: 12px; height: 12px; }
@@ -177,7 +198,7 @@ const emit = defineEmits<{
   .flat-card__meta { gap: 3px; padding-top: 2px; font-size: 8.5px; }
   .flat-card__meta-tail { gap: 2px; }
   .flat-card__location { gap: 2px; }
-  .flat-card__deal { top: 6px; left: 6px; max-width: calc(100% - 62px); padding: 4px 5px; font-size: 8.5px; }
+  .flat-card__deal { top: 6px; left: 6px; max-width: calc(100% - 84px); padding: 4px 5px; font-size: 8.5px; }
   .flat-card__good-price { left: 6px; bottom: 6px; max-width: calc(100% - 12px); padding: 4px 6px; font-size: 8px; gap: 3px; }
   .flat-card__good-price :deep(svg) { width: 9px; height: 9px; }
   .flat-card__actions { top: 5px; right: 5px; gap: 3px; }
