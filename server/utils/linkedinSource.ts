@@ -5,6 +5,7 @@ import {
   linkedinLocationCoverage,
   rotatingSlice,
 } from './jobSearchCoverage'
+import { detectWorkModes } from './hiringLexicon'
 
 // LinkedIn does not expose an open job-search API for ordinary applications.
 // The official Talent Solutions APIs are partner-restricted. Read-only discovery
@@ -115,7 +116,7 @@ function parseCards(html: string): Job[] {
       location,
       url: `https://www.linkedin.com/jobs/view/${jobId}`,
       source: 'linkedin',
-      remote: /remote|anywhere|worldwide|удал[её]н|віддален|дистанц|masofaviy|қашықтан/i.test(`${title} ${location}`),
+      remote: detectWorkModes(`${title} ${location}`).includes('remote'),
       tags: ['LinkedIn'],
       postedAt: posted.toISOString(),
     })
@@ -161,8 +162,6 @@ async function fetchLocation(
         tags: [...new Set([...(job.tags || []), ...tags])],
       })
     }
-    // LinkedIn sometimes repeats the first page while throttling. Stop instead
-    // of repeatedly requesting the same cards.
     if (byId.size === before) break
   }
   console.log(`[jobs:linkedin] location=${location} query=${keywords || '<all>'} jobs=${byId.size}`)

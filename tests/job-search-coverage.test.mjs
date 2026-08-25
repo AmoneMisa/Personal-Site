@@ -39,10 +39,12 @@ test('LinkedIn paginates public guest search and rotates regional coverage', () 
   assert.match(linkedin, /countryRemotePasses/)
 })
 
-test('Threads jobs use bounded regional rotation and reject candidate posts', () => {
+test('Threads jobs use bounded regional rotation and reject candidate posts through shared hiring semantics', () => {
   assert.match(social, /THREADS_JOB_REGIONAL_QUERIES_PER_CYCLE/)
   assert.match(social, /THREADS_JOB_PRIORITY_QUERIES_PER_CYCLE/)
-  assert.match(social, /CANDIDATE_RE\.test\(text\)/)
+  assert.match(social, /classifySharedHiringMessage\(text\)/)
+  assert.match(social, /detectHiringIntent\(text\)/)
+  assert.doesNotMatch(social, /const CANDIDATE_RE\s*=/)
   assert.match(social, /fetched=\$\{items\.length\} recent=\$\{recent\} classified=\$\{jobs\.length\}/)
 })
 

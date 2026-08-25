@@ -1,6 +1,11 @@
 // Candidate profile normalization + deduplication.
 // Free-form posts are normalized without overwriting the original message.
 
+import { extractCandidateContacts } from '@whiteslove/parsing-lexicon/hiring-candidate-fields'
+import {
+  extractCandidateExperienceMentions,
+  parseCandidateSalary,
+} from '@whiteslove/parsing-lexicon/hiring-source-semantics'
 import { canonicalSkillName, extractSkillDetails } from '~~/shared/jobSkills'
 import type { CandidateEmploymentType, CvProfile } from './hiringTypes'
 import type { Seniority } from './jobTypes'
@@ -179,67 +184,24 @@ export function extractContactHours(text: string): string | null {
 }
 
 export function extractContacts(text: string): { telegram?: string; email?: string; phone?: string } {
-  const out: { telegram?: string; email?: string; phone?: string } = {}
-  const tg = text.match(/@[A-Za-z0-9_]{4,32}/)
-  if (tg) out.telegram = tg[0]
-  const email = text.match(/[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/)
-  if (email) out.email = email[0]
-  const phone = text.match(/\+?\d[\d\s().-]{8,}\d/)
-  if (phone) {
-    const digits = phone[0].replace(/\D/g, '')
-    if (digits.length >= 9 && digits.length <= 15) out.phone = phone[0].trim()
-  }
-  return out
+  return { ...extractCandidateContacts(text) }
 }
 
 export function extractAge(text: string): number | null {
   return extractCandidateAge(text)
 }
 
-function parseMoneyNumber(raw: string): number | null {
-  let value = raw.trim().replace(/\s+/g, '')
-  if (!value) return null
-  if (/^\d{1,3}(?:[.,]\d{3})+$/.test(value)) value = value.replace(/[.,]/g, '')
-  else value = value.replace(',', '.')
-  const number = Number(value)
-  return Number.isFinite(number) ? number : null
-}
-
-function defaultCurrency(country: string): string | null {
-  return ({ UZ: 'UZS', UA: 'UAH', KZ: 'KZT', KG: 'KGS' } as Record<string, string>)[country.toUpperCase()] || null
-}
-
 export function extractCandidateSalary(
   text: string,
   country: string,
 ): Pick<CvProfile, 'salaryMin' | 'salaryMax' | 'currency'> {
-  const field = extractCandidateSalaryField(text)
-  if (!field) return {}
-
-  const values = (field.match(/\d[\d\s.,]*\d|\d/g) || [])
-    .map(parseMoneyNumber)
-    .filter((value): value is number => value != null && value > 0)
-    .slice(0, 2)
-  if (!values.length) return {}
-
-  const multiplier = /(?:млн|million|mln)/iu.test(field) ? 1_000_000
-    : /(?:тыс|тис|thousand|ming)/iu.test(field) ? 1_000
-      : 1
-  const amounts = values.map((value) => Math.round(value * multiplier))
-  const currency = /(?:\$|usd|доллар)/iu.test(field) ? 'USD'
-    : /(?:uzs|сум|so(?:'|’)m)/iu.test(field) ? 'UZS'
-      : /(?:uah|грн|грив)/iu.test(field) ? 'UAH'
-        : /(?:kzt|₸|тенге|тг)/iu.test(field) ? 'KZT'
-          : /(?:kgs|сом)/iu.test(field) ? 'KGS'
-            : defaultCurrency(country)
-
-  if (amounts.length > 1) {
-    return { salaryMin: Math.min(...amounts), salaryMax: Math.max(...amounts), currency }
+  const parsed = parseCandidateSalary(text, country)
+  if (!parsed || (parsed.min == null && parsed.max == null)) return {}
+  return {
+    salaryMin: parsed.min,
+    salaryMax: parsed.max,
+    ...(parsed.currency ? { currency: parsed.currency } : {}),
   }
-  if (/\+|(?:^|\s)(?:от|від|from)\s/iu.test(field)) {
-    return { salaryMin: amounts[0], currency }
-  }
-  return { salaryMin: amounts[0], salaryMax: amounts[0], currency }
 }
 
 export function detectRelocationReady(text: string): boolean | null {
@@ -257,19 +219,6 @@ export function normalizeRemotePreference(
   return raw ?? null
 }
 
-function numericExperience(segment: string): number | null {
-  const direct = segment.match(
-    /(?:опыт(?:\s+работы)?|досвід(?:\s+роботи)?|experience|staj|tajriba(?:m)?)\s*[:—-]?\s*(\d+(?:[.,]\d+)?)\+?\s*(?:лет|год(?:а)?|рок(?:и|ів)?|years?|yil|йил)?/iu,
-  )
-  const reverse = segment.match(
-    /(\d+(?:[.,]\d+)?)\+?\s*(?:лет|год(?:а)?|рок(?:и|ів)?|years?|yil(?:lik)?|йил(?:лик)?)[^\n.!?]{0,100}(?:опыт|досвід|experience|staj|tajriba(?:m)?)/iu,
-  )
-  const value = direct?.[1] || reverse?.[1]
-  if (!value) return null
-  const years = Number(value.replace(',', '.'))
-  return Number.isFinite(years) && years >= 0 && years <= 60 ? years : null
-}
-
 function sameProfessionFamily(a: string, b: string): boolean {
   if (a === b) return true
   return /Developer$/u.test(a) && /Developer$/u.test(b)
@@ -284,14 +233,12 @@ export function normalizeRelevantExperience(
   const years = Number(raw)
   if (!Number.isFinite(years)) return null
 
-  const mentions = text
-    .split(/\n|(?<=[.!?])\s+/u)
-    .map((segment) => ({ segment, years: numericExperience(segment) }))
-    .filter((item) => item.years != null && Math.abs(item.years - years) < 0.001)
+  const mentions = extractCandidateExperienceMentions(text)
+    .filter((item) => Math.abs(item.years - years) < 0.001)
   if (!mentions.length || !targetProfessions.length) return raw
 
-  const hasRelevantEvidence = mentions.some(({ segment }) => {
-    const mentioned = collectProfessions(segment)
+  const hasRelevantEvidence = mentions.some(({ context }) => {
+    const mentioned = collectProfessions(context)
     // A generic "3 years experience" remains valid. We reject only when the
     // source explicitly ties those years to a different profession.
     if (!mentioned.length) return true

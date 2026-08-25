@@ -1,4 +1,6 @@
+import { parseHiringSourceSalary } from '@whiteslove/parsing-lexicon/hiring-source-semantics'
 import type { Job } from './jobTypes'
+import { detectWorkModes } from './hiringLexicon'
 
 const UA =
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ' +
@@ -104,27 +106,12 @@ function isRecent(date: string | null | undefined): boolean {
 }
 
 function salary(text: string): Pick<Job, 'salaryMin' | 'salaryMax' | 'salaryCurrency'> {
-  const currency = /(?:\$|USD|доллар)/iu.test(text) ? 'USD'
-    : /(?:€|EUR|евро)/iu.test(text) ? 'EUR'
-      : /(?:UZS|сум|so(?:'|’)m)/iu.test(text) ? 'UZS'
-        : /(?:KZT|₸|тенге|тг\b)/iu.test(text) ? 'KZT'
-          : /(?:UAH|грн|грив)/iu.test(text) ? 'UAH'
-            : /(?:RON|lei\b)/iu.test(text) ? 'RON'
-              : undefined
-  if (!currency) return {}
-
-  const match = text.match(
-    /(?:от\s*)?(\d[\d\s.,]{2,})(?:\s*(?:-|–|—|до|dan|gacha|to)\s*(\d[\d\s.,]{2,}))?\s*(?:UZS|KZT|UAH|RON|USD|EUR|сум|so(?:'|’)m|тенге|грн|lei|\$|€|₸)/iu,
-  )
-  if (!match) return {}
-  const number = (raw: string) => Number(raw.replace(/[\s.,]/g, ''))
-  const first = number(match[1]!)
-  const second = match[2] ? number(match[2]) : undefined
-  if (!Number.isFinite(first) || first <= 0) return {}
+  const parsed = parseHiringSourceSalary(text)
+  if (!parsed || (parsed.min == null && parsed.max == null) || !parsed.currency) return {}
   return {
-    salaryMin: second && Number.isFinite(second) ? Math.min(first, second) : first,
-    salaryMax: second && Number.isFinite(second) ? Math.max(first, second) : undefined,
-    salaryCurrency: currency,
+    salaryMin: parsed.min ?? undefined,
+    salaryMax: parsed.max ?? undefined,
+    salaryCurrency: parsed.currency,
   }
 }
 
@@ -147,9 +134,7 @@ function makeJob(input: {
     location: stripHtml(input.location || 'See listing').slice(0, 240),
     url: input.url,
     source: 'companies',
-    remote: /\bremote\b|удал[её]н|дистанцион|masofaviy|la distanță/iu.test(
-      `${input.title} ${input.location} ${input.description || ''}`,
-    ),
+    remote: detectWorkModes(`${input.title} ${input.location} ${input.description || ''}`).includes('remote'),
     tags: [...new Set([input.label, ...(input.tags || [])])].slice(0, 8),
     postedAt: input.postedAt || new Date().toISOString(),
     employmentType: input.employmentType,
