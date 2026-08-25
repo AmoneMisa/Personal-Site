@@ -5,24 +5,37 @@ import { readFile } from 'node:fs/promises'
 const panel = await readFile(new URL('../app/components/jobs/StatsPanel.vue', import.meta.url), 'utf8')
 const line = await readFile(new URL('../app/components/ui/AnalyticsLine.vue', import.meta.url), 'utf8')
 const bars = await readFile(new URL('../app/components/ui/AnalyticsBars.vue', import.meta.url), 'utf8')
+const bubble = await readFile(new URL('../app/components/ui/AnalyticsBubble.vue', import.meta.url), 'utf8')
 const donut = await readFile(new URL('../app/components/ui/AnalyticsDonut.vue', import.meta.url), 'utf8')
 const tabs = await readFile(new URL('../app/components/ui/AnalyticsTabs.vue', import.meta.url), 'utf8')
 const shell = await readFile(new URL('../app/components/ui/AnalyticsPanel.vue', import.meta.url), 'utf8')
 const checkbox = await readFile(new URL('../app/components/common/CustomCheckbox.vue', import.meta.url), 'utf8')
 const filterControl = await readFile(new URL('../app/components/search/SearchFilterControl.vue', import.meta.url), 'utf8')
 
-test('vacancy graph view uses the same shared Chart.js visualizations as other analytics without the redundant salary line', () => {
+test('vacancy graph view uses shared Chart.js visualizations and adds salary-country-experience bubbles', () => {
   assert.match(line, /from "chart\.js"/u)
   assert.match(line, /from "vue-chartjs"/u)
   assert.match(bars, /from "chart\.js"/u)
   assert.match(bars, /from "vue-chartjs"/u)
+  assert.match(bubble, /BubbleController/u)
+  assert.match(bubble, /from "vue-chartjs"/u)
+  assert.match(bubble, /Math\.sqrt\(point\.count\)/u)
   assert.match(donut, /from "chart\.js"/u)
   assert.match(donut, /from "vue-chartjs"/u)
   assert.doesNotMatch(panel, /<UiAnalyticsLine surface/u)
   assert.match(panel, /<UiAnalyticsBars/u)
-  assert.match(panel, /<UiAnalyticsDonut/u)
+  assert.match(panel, /<UiAnalyticsBubble/u)
+  assert.match(panel, /countrySalaryExperienceSeries/u)
   assert.match(panel, /professionSalaryBars/u)
   assert.doesNotMatch(panel, /<USelectMenu/u)
+})
+
+test('text vacancy analytics omits position and experience blocks while graphs retain them', () => {
+  assert.doesNotMatch(panel, /stats__card_positions/u)
+  assert.doesNotMatch(panel, /<article v-if="experienceStats\.length"/u)
+  assert.match(panel, /<article v-if="experienceBars\.length"/u)
+  assert.match(panel, /<article v-if="professionCountBars\.length"/u)
+  assert.match(panel, /nonProfessionLabels[^\n]*soft skills[^\n]*databases/u)
 })
 
 test('vacancy analytics has exactly one designed data-versus-graphs tab switch', () => {
