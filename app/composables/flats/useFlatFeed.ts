@@ -12,6 +12,7 @@ export function useFlatFeed(options: { onAvailabilityChecked?: (keys: string[]) 
   const failed = ref(false);
   const sourceErrors = ref<FlatFeedResult["sourceErrors"]>([]);
   const statistics = ref<FlatStatistics | null>(null);
+  const statisticsLoading = ref(false);
   const nextCursor = ref<string | null>(null);
   const loadMoreSentinel = ref<HTMLElement | null>(null);
   const requests = useLatestRequest();
@@ -29,6 +30,7 @@ export function useFlatFeed(options: { onAvailabilityChecked?: (keys: string[]) 
   }
 
   async function loadStatistics(params: Record<string, string>, requestId: number) {
+    statisticsLoading.value = true;
     const statsParams = {
       ...params,
       includeStats: "1",
@@ -38,9 +40,13 @@ export function useFlatFeed(options: { onAvailabilityChecked?: (keys: string[]) 
     };
     delete statsParams.cursor;
 
-    const { data, error } = await safeFetch<FlatFeedResult>("/flats-feed", { params: statsParams });
-    if (requestId !== statisticsRequestId || error || !data || data.error) return;
-    if (data.statistics) statistics.value = data.statistics;
+    try {
+      const { data, error } = await safeFetch<FlatFeedResult>("/flats-feed", { params: statsParams });
+      if (requestId !== statisticsRequestId || error || !data || data.error) return;
+      if (data.statistics) statistics.value = data.statistics;
+    } finally {
+      if (requestId === statisticsRequestId) statisticsLoading.value = false;
+    }
   }
 
   async function loadFeed(params: Record<string, string>, options: { append?: boolean; background?: boolean } = {}): Promise<FlatFeedResult | undefined> {
@@ -69,7 +75,7 @@ export function useFlatFeed(options: { onAvailabilityChecked?: (keys: string[]) 
     if (error || !data || data.error) {
       if (!background) {
         failed.value = true;
-        if (!append) { listings.value = []; total.value = 0; statistics.value = null; nextCursor.value = null; }
+        if (!append) { listings.value = []; total.value = 0; nextCursor.value = null; }
         sourceErrors.value = [];
         loading.value = false;
         loadingMore.value = false;
@@ -103,7 +109,10 @@ export function useFlatFeed(options: { onAvailabilityChecked?: (keys: string[]) 
       listings.value = nextListings;
     }
     if (!append) total.value = data.count ?? listings.value.length;
-    if (!append) statistics.value = data.statistics || null;
+    // A page request deliberately omits includeStats, so it must not clear the
+    // previous analytics snapshot while the independent statistics request is
+    // still running. Replace statistics only when a response actually has them.
+    if (!append && data.statistics) statistics.value = data.statistics;
     sourceErrors.value = data.sourceErrors || [];
     warming.value = !!data.warming;
     loading.value = false;
@@ -119,5 +128,5 @@ export function useFlatFeed(options: { onAvailabilityChecked?: (keys: string[]) 
     requests.cancelPending();
   });
 
-  return { listings, total, loading, loadingMore, warming, failed, sourceErrors, statistics, nextCursor, loadMoreSentinel, loadFeed };
+  return { listings, total, loading, loadingMore, warming, failed, sourceErrors, statistics, statisticsLoading, nextCursor, loadMoreSentinel, loadFeed };
 }
