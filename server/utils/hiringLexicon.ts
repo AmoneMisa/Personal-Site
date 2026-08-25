@@ -15,11 +15,15 @@ import {
   aliasesToRegex,
   canonicalCountryCode,
   classifyHiringIntent,
+  classifyHiringMessage,
   findCanonical,
   matchProfessions,
   matchSeniority,
   parseExperience,
+  parseHiringContext,
+  parseLanguageContext,
   parseSalary,
+  resolveProfessionContext,
 } from '@whiteslove/parsing-lexicon'
 
 const matcher = (entry: { canonical?: string; aliases?: Record<string, readonly string[]> }) =>
@@ -129,8 +133,16 @@ export function detectHiringIntent(text: string) {
   return classifyHiringIntent(text)
 }
 
+export function classifySharedHiringMessage(text: string) {
+  return classifyHiringMessage(text)
+}
+
 export function detectProfessionMatches(text: string, limit = 8) {
   return matchProfessions(text, { limit })
+}
+
+export function resolveSharedProfessionContext(text: string, options: { mode?: 'vacancy' | 'candidate' | null; title?: string } = {}) {
+  return resolveProfessionContext(text, options)
 }
 
 export function detectSharedSeniority(text: string) {
@@ -143,4 +155,12 @@ export function parseHiringExperience(text: string) {
 
 export function parseHiringSalary(text: string) {
   return parseSalary(text)
+}
+
+export function parseSharedLanguageContext(text: string, mode: 'vacancy' | 'candidate' | null = null) {
+  return parseLanguageContext(text, { mode })
+}
+
+export function parseSharedHiringContext(text: string, options: { mode?: 'vacancy' | 'candidate' | null; title?: string } = {}) {
+  return parseHiringContext(text, options)
 }
