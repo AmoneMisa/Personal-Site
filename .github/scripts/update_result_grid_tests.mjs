@@ -12,6 +12,12 @@ replaceExact(
   "const grid = await readFile(new URL('../app/components/search/SearchResultGrid.vue', import.meta.url), 'utf8')",
   'flat grid test source',
 );
+replaceExact(
+  'tests/flats-layout-and-stats.test.mjs',
+  "  assert.doesNotMatch(grid, /grid-auto-rows:\\s*1fr/u)\n",
+  "  assert.doesNotMatch(page, /<SearchResultGrid[^>]*\\bequal-rows\\b/u)\n",
+  'flat equal-row assertion',
+);
 
 replaceExact(
   'tests/jobs-statistics.test.mjs',
