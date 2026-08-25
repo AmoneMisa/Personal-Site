@@ -6,6 +6,7 @@ const specTable = await readFile(new URL('../app/components/ui/SpecTable.vue', i
 
 test('flat specs expose AI vision provenance without another network request', () => {
   assert.match(specTable, /flats:recent:v1/)
+  assert.match(specTable, /visionDerivedFields\?: string\[\]/)
   assert.match(specTable, /vision\?: \{ derivedFields\?: string\[\] \}/)
   assert.match(specTable, /flats\.specBedrooms/)
   assert.match(specTable, /flats\.specBathrooms/)
@@ -17,8 +18,8 @@ test('flat specs expose AI vision provenance without another network request', (
   assert.match(specTable, /flats\.specAC/)
   assert.match(specTable, /washingMachine/)
   assert.match(specTable, /dishwasher/)
-  assert.match(specTable, /Распознано при помощи AI-зрения/)
-  assert.match(specTable, /Detected using AI vision/)
+  assert.match(specTable, /Данные из AI-Vision/)
+  assert.match(specTable, /Data from AI Vision/)
   assert.match(specTable, /class="spec-table__ai-hint"/)
   assert.doesNotMatch(specTable, /\$fetch|safeFetch/)
 })
