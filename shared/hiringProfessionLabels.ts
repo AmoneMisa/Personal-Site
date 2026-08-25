@@ -1,3 +1,5 @@
+import { normalizeSourceRole } from '@whiteslove/parsing-lexicon/hiring-source-aliases'
+
 export type HiringProfessionLocale = 'en' | 'ru'
 
 interface ProfessionLabels {
@@ -144,50 +146,11 @@ export function hiringProfessionLocale(value: unknown): HiringProfessionLocale {
   return String(value || '').toLowerCase().startsWith('en') ? 'en' : 'ru'
 }
 
-const RAW_PROFESSION_LABELS: Array<{ re: RegExp; key?: string; en?: string; ru?: string }> = [
-  { re: /^iqt(?:i)?sodchi$/iu, key: 'Economist' },
-  { re: /^iqtisodiy$/iu, key: 'Economist' },
-  { re: /^logist(?:ika)?(?:\s+updater)?$/iu, key: 'Logistics Specialist' },
-  { re: /^ingliz\s+tili\s+ustoz(?:iman)?$/iu, key: 'English Teacher' },
-  { re: /mobilagraf[\s\S]*itishnik[\s\S]*front(?:et|ent|end)/iu, key: 'Frontend Developer' },
-  { re: /farqi\s+yo[\s\S]*bolalarga\s+qarash/iu, key: 'Nanny' },
-  { re: /^(?:sales\s+executive(?:\s+ind)?|роп(?:,?\s*sales\s+executive)?)$/iu, key: 'Sales Manager' },
-  { re: /^(?:оперативник|оперуполномоченн\p{L}*|оперативный\s+уполномоченн\p{L}*)$/iu, key: 'Operative Officer' },
-  { re: /^(?:suv\s+ta['’ʻʼ‘`]?minoti|водоснабжение)$/iu, key: 'Water Supply Specialist' },
-  { re: /^(?:onlayn(?:\s+ish(?:chi)?)?|online(?:\s+ish(?:chi)?)?|онлайн|удал[её]нно|remote(?:\s+work)?|boshqa\s+ishlar?|farqi\s+(?:yo['’ʻʼ‘`]?q|yuq)|tungi|bilmaym\p{L}*)$/iu, key: 'Any Role' },
-  { re: /^ищу\s+работу\s+(?:в\s+)?(?:кафе|ресторанах?|кафе\s+или\s+ресторанах)$/iu, key: 'Restaurant / Cafe Worker' },
-  { re: /^xaydovchilik|^haydovchilik|^shafyorlik|^shofyorlik/iu, key: 'Driver' },
-  { re: /^do['’ʻʼ‘`]?kon$/iu, key: 'Retail Worker' },
-  { re: /^(?:savdo|sotuvchi)$/iu, key: 'Salesperson' },
-  { re: /^(?:dorishunos|farmatsevt|farmatsevt)$/iu, key: 'Pharmacist' },
-  { re: /^(?:natarus|notarius)\s+yordamchisi/iu, key: 'Notary Assistant' },
-  { re: /^kutubxonachi$/iu, key: 'Librarian' },
-  { re: /^(?:vokal\s*:\s*)?xonanda$/iu, key: 'Singer / Vocalist' },
-  { re: /^model$/iu, key: 'Model' },
-  { re: /^bortprovodnik$|^бортпроводник$/iu, key: 'Flight Attendant' },
-  { re: /^(?:konditsaner|kanditsaner|konditsioner)/iu, key: 'HVAC Technician' },
-  { re: /^mobilografiya(?:\s+bo['’ʻʼ‘`]?yicha)?$/iu, key: 'Mobile Content Creator' },
-  { re: /kamera\s+(?:dama?fon|domofon)|domofon\s+xizmat/iu, key: 'CCTV / Intercom Technician' },
-  { re: /^ichki\s+nazoratchi$/iu, key: 'Internal Control Specialist' },
-  { re: /^(?:бренд\s+фейс|brand\s+face)$/iu, key: 'Brand Ambassador' },
-  { re: /^sug['’ʻʼ‘`]?urta$/iu, key: 'Insurance Specialist' },
-  { re: /^стаж[её]р\s+операционист|^операционист$/iu, key: 'Bank Operations Specialist' },
-  { re: /^коммерческ\p{L}*\s+директор|\bchief\s+commercial\s+officer\b|\bCCO\b/iu, key: 'Commercial Director' },
-  { re: /^по\s+безопасност\p{L}*\s+объекта$/iu, key: 'Security Specialist' },
-  { re: /^mededsina$|^meditsina$|^медицина$/iu, key: 'Healthcare Specialist' },
-  { re: /^mehmonxona[^\n]*turfirma|^turfirma[^\n]*mehmonxona/iu, key: 'Tourism / Hospitality Specialist' },
-  { re: /qandolat|qandolatchi/iu, key: 'Confectioner' },
-]
-
 export function hiringProfessionLabel(value: string, locale: HiringProfessionLocale): string {
   const key = String(value || '').trim()
   const canonical = HIRING_PROFESSION_LABELS[key]
   if (canonical) return canonical[locale]
-
-  for (const alias of RAW_PROFESSION_LABELS) {
-    if (!alias.re.test(key)) continue
-    if (alias.key) return HIRING_PROFESSION_LABELS[alias.key]?.[locale] || alias.key
-    return alias[locale] || key
-  }
-  return key
+  const normalized = normalizeSourceRole(key)
+  if (!normalized) return key
+  return HIRING_PROFESSION_LABELS[normalized.label]?.[locale] || normalized.label
 }

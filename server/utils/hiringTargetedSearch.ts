@@ -1,128 +1,20 @@
+import { detectCandidateRemotePreference } from '@whiteslove/parsing-lexicon/hiring-semantics'
+import { parseHiringActivityDate } from '@whiteslove/parsing-lexicon/hiring-temporal'
 import { normalizeCandidate } from './hiringNormalize'
 import type { CvProfile } from './hiringTypes'
-import { cityRe } from './hiringWebFields'
+import { absoluteUrl, cityFrom, contacts, employment, htmlText, isRecent, parseSalary } from './hiringWebFields'
 
 const UA =
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ' +
   '(KHTML, like Gecko) Chrome/126.0 Safari/537.36'
 const REQUEST_TIMEOUT_MS = 25_000
 const MAX_PAGES = 3
-const MAX_AGE_MONTHS = 3
 
 interface CandidateBlock {
   href: string
   title: string
   text: string
   html: string
-}
-
-const MONTHS: Record<string, number> = {
-  январь: 0, января: 0,
-  февраль: 1, февраля: 1,
-  март: 2, марта: 2,
-  апрель: 3, апреля: 3,
-  май: 4, мая: 4,
-  июнь: 5, июня: 5,
-  июль: 6, июля: 6,
-  август: 7, августа: 7,
-  сентябрь: 8, сентября: 8,
-  октябрь: 9, октября: 9,
-  ноябрь: 10, ноября: 10,
-  декабрь: 11, декабря: 11,
-}
-
-function decodeEntities(value: string): string {
-  const named: Record<string, string> = {
-    amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", nbsp: ' ', ndash: '–', mdash: '—',
-  }
-  return value.replace(/&(#x?[0-9a-f]+|[a-z]+);/gi, (match, entity: string) => {
-    if (entity.startsWith('#')) {
-      const hex = entity[1]?.toLowerCase() === 'x'
-      const code = Number.parseInt(entity.slice(hex ? 2 : 1), hex ? 16 : 10)
-      return Number.isFinite(code) ? String.fromCodePoint(code) : match
-    }
-    return named[entity.toLowerCase()] ?? match
-  })
-}
-
-function htmlText(value: string): string {
-  return decodeEntities(value)
-    .replace(/<(script|style|noscript|template)\b[^>]*>[\s\S]*?<\/\1>/gi, ' ')
-    .replace(/<!--[\s\S]*?-->/g, ' ')
-    .replace(/<br\s*\/?>/gi, '\n')
-    .replace(/<\/(?:p|div|li|h[1-6]|tr|section|article)>/gi, '\n')
-    .replace(/<[^>]*>/g, ' ')
-    .split('\n')
-    .map((line) => line.replace(/\s+/g, ' ').trim())
-    .filter(Boolean)
-    .join('\n')
-    .trim()
-}
-
-function absoluteUrl(raw: string, base: string): string {
-  try {
-    const url = new URL(decodeEntities(raw), base)
-    url.hash = ''
-    return url.toString()
-  } catch {
-    return raw
-  }
-}
-
-function cutoffDate(): Date {
-  const value = new Date()
-  value.setUTCMonth(value.getUTCMonth() - MAX_AGE_MONTHS)
-  return value
-}
-
-function recent(iso: string | null): iso is string {
-  if (!iso) return false
-  const time = Date.parse(iso)
-  return Number.isFinite(time)
-    && time >= cutoffDate().getTime()
-    && time <= Date.now() + 48 * 60 * 60 * 1000
-}
-
-function activityDate(text: string): string | null {
-  const now = new Date()
-  if (/(?:^|\s)сегодня(?:\s|$)/iu.test(text)) return now.toISOString()
-  if (/(?:^|\s)вчера(?:\s|$)/iu.test(text)) return new Date(now.getTime() - 86_400_000).toISOString()
-
-  const hours = text.match(/(?:^|\s)(\d{1,3})\s*(?:ч\.?|час(?:а|ов)?)\s+назад(?:\s|$)/iu)
-  if (hours) return new Date(now.getTime() - Number(hours[1]) * 3_600_000).toISOString()
-
-  const days = text.match(/(?:^|\s)(\d{1,3})\s*(?:дн(?:я|ей)?|день)\s+назад(?:\s|$)/iu)
-  if (days) return new Date(now.getTime() - Number(days[1]) * 86_400_000).toISOString()
-
-  const weeks = text.match(/(?:^|\s)(\d{1,2})\s*недел(?:ю|и|ь)\s+назад(?:\s|$)/iu)
-  if (weeks) return new Date(now.getTime() - Number(weeks[1]) * 7 * 86_400_000).toISOString()
-
-  const absolute = text.match(/(?<![\p{L}\p{N}])(\d{1,2})\s+([\p{L}]+),?\s+(20\d{2})(?![\p{L}\p{N}])/iu)
-  if (absolute) {
-    const month = MONTHS[absolute[2]!.toLocaleLowerCase('ru')]
-    if (month != null) return new Date(Date.UTC(Number(absolute[3]), month, Number(absolute[1]), 12)).toISOString()
-  }
-
-  const dotted = text.match(/(?<!\d)(\d{1,2})[./-](\d{1,2})[./-](20\d{2})(?!\d)/)
-  if (dotted) return new Date(Date.UTC(Number(dotted[3]), Number(dotted[2]) - 1, Number(dotted[1]), 12)).toISOString()
-  return null
-}
-
-function parseSalary(text: string): Pick<CvProfile, 'salaryMin' | 'salaryMax' | 'currency'> {
-  const match = text.match(/(?:от\s*)?(\d[\d\s.,]{2,})(?:\s*(?:-|–|—|до)\s*(\d[\d\s.,]{2,}))?\s*(?:UZS|сум|so(?:'|’)m)/iu)
-  if (!match) return {}
-  const parse = (raw: string) => Number(raw.replace(/[\s.,]/g, ''))
-  const first = parse(match[1]!)
-  const second = match[2] ? parse(match[2]) : first
-  if (!Number.isFinite(first) || first <= 0) return {}
-  return { salaryMin: Math.min(first, second), salaryMax: Math.max(first, second), currency: 'UZS' }
-}
-
-function contacts(text: string): CvProfile['contacts'] {
-  const phone = text.match(/(?:\+?998|\+?\d{1,3})?[\s()-]*(?:\d[\s()-]*){8,12}/)?.[0]?.replace(/\s+/g, ' ').trim()
-  const email = text.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/iu)?.[0]
-  const telegram = text.match(/@[A-Za-z0-9_]{5,}/)?.[0]
-  return { ...(phone ? { phone } : {}), ...(email ? { email } : {}), ...(telegram ? { telegram } : {}) }
 }
 
 function blockAnchors(html: string): CandidateBlock[] {
@@ -178,8 +70,8 @@ function profileId(url: string): string {
 }
 
 function parseBlock(block: CandidateBlock): CvProfile | null {
-  const activity = activityDate(block.text)
-  if (!recent(activity)) return null
+  const activity = parseHiringActivityDate(block.text)
+  if (!isRecent(activity)) return null
 
   const lines = block.text.split('\n').map((line) => line.trim()).filter(Boolean)
   const demographicsIndex = lines.findIndex((line) => DEMOGRAPHICS_RE.test(line))
@@ -208,11 +100,8 @@ function parseBlock(block: CandidateBlock): CvProfile | null {
     age: age != null && age >= 14 && age <= 90 ? age : null,
     isAdult: age == null ? true : age >= 18,
     city,
-    remote: /удал[её]н|remote|masofadan/iu.test(block.text),
-    employmentTypes: [
-      ...(/полная занятость|полный день|full[- ]?time/iu.test(block.text) ? ['full_time' as const] : []),
-      ...(/неполная занятость|частичная занятость|part[- ]?time/iu.test(block.text) ? ['part_time' as const] : []),
-    ],
+    remote: detectCandidateRemotePreference(block.text) ?? false,
+    employmentTypes: employment(block.text),
     url: block.href,
     publishedAt: activity,
     updatedAt: activity,
@@ -224,12 +113,12 @@ function parseBlock(block: CandidateBlock): CvProfile | null {
     contacts: publicContacts,
     contact: publicContacts.telegram || publicContacts.email || publicContacts.phone || block.href,
     contactType: hasDirect ? 'direct' : 'platform',
-    ...parseSalary(block.text),
+    ...parseSalary(block.text, 'UZ'),
   })
 }
 
 function flagmaRegion(city: string): string {
-  return cityRe('tashkent|toshkent|ташкент|тошкент').test(city.trim()) ? 'tashkent/' : ''
+  return cityFrom(city, 'UZ') === 'Tashkent' ? 'tashkent/' : ''
 }
 
 function pageUrl(term: string, page: number, city: string): string {

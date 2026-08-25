@@ -34,17 +34,25 @@ export {
 } from '@whiteslove/parsing-lexicon/geography-detection'
 export {
   detectCandidateFeatureCodes,
+  detectCandidateProfessionLabels,
   detectCandidateRelocationPreference,
+  detectCandidateRemotePreference,
   detectDegreeRequirement as detectSharedDegreeRequirement,
   detectHiringScopeSignals as detectSharedHiringScopeSignals,
   detectManagementRole as detectSharedManagementRole,
   extractCandidateContactHours,
+  extractCandidateGoalField,
   extractCandidateGoalRole,
+  extractCandidateLocationField,
+  extractCandidateRoleField,
   extractCandidateSalaryField,
   extractCandidateSkillField,
   extractCandidateTargetContext,
   extractCandidateWorkHistory,
+  isCandidateNonRoleValue,
   isCandidateNonTargetContext,
+  isCandidateStatusOnly,
+  isFlexibleCandidateRole,
 } from '@whiteslove/parsing-lexicon/hiring-semantics'
 
 const matcher = (entry: { canonical?: string; aliases?: Record<string, readonly string[]> }) =>
