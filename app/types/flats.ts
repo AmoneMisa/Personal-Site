@@ -11,6 +11,8 @@ export interface FlatVisionResult {
   data?: Record<string, FlatVisionEvidence>;
 }
 
+export type FlatAudience = "women" | "men" | "family";
+
 export interface FlatListing {
   id: string;
   source: string;
@@ -49,6 +51,9 @@ export interface FlatListing {
   airConditioner?: boolean | null;
   gas?: boolean | null;
   newBuilding?: boolean | null;
+  cadastral?: boolean | null;
+  firstRental?: boolean | null;
+  potentiallyUnsafe?: boolean;
   communalSeparated?: boolean | null;
   kvartal?: string | null;
   area?: string | null;
@@ -60,7 +65,8 @@ export interface FlatListing {
   residenceComplex?: string | null;
   petsAllowed?: boolean | null;
   childrenAllowed?: boolean | null;
-  audience?: "women" | "men" | "family" | null;
+  audience?: FlatAudience | null;
+  audienceAlternatives?: FlatAudience[];
   deposit?: boolean | null;
   depositAmount?: number | null;
   depositCurrency?: string | null;

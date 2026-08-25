@@ -13,10 +13,11 @@ const jobFilters = await readFile(new URL('../app/composables/jobs/useJobFilters
 const hiringFilters = await readFile(new URL('../app/composables/hiring/useHiringFilters.ts', import.meta.url), 'utf8')
 const jobStats = await readFile(new URL('../app/components/jobs/StatsPanel.vue', import.meta.url), 'utf8')
 
-test('flat cards share one row height and compact title/media geometry', () => {
+test('flat cards share one row height and one compact desktop media geometry', () => {
   assert.match(grid, /align-items: stretch; grid-auto-rows: 1fr/u)
   assert.match(card, /\.flat-card \{[^}]*height: 100%/u)
-  assert.match(card, /\.flat-card__photo \{[^}]*aspect-ratio: 16 \/ 9/u)
+  assert.match(card, /\.flat-card__photo \{[^}]*aspect-ratio: 4 \/ 3[^}]*overflow: hidden/u)
+  assert.match(card, /\.flat-card__photo > img \{[^}]*height: 100%[^}]*object-fit: cover/u)
   assert.match(card, /:title="presentation\.title"/u)
   assert.match(card, /-webkit-line-clamp: 1/u)
   assert.doesNotMatch(card, /\.flat-card__meta \{[^}]*border-top/u)

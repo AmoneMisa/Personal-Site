@@ -19,9 +19,9 @@
   align-items: stretch;
 }
 
-/* Favorite / hide / share are utility actions, not competing CTAs. Keep them
-   square on desktop too; their labels remain in the DOM for accessibility while
-   only the icon is shown visually. */
+/* Favorite / hide / share are utility actions, not competing CTAs. Nuxt UI's
+   button component keeps a gap for its visually hidden label; zero that gap and
+   center the icon wrapper itself so every glyph is optically centered. */
 .modal-footer :deep(> button) {
   flex: 0 0 40px;
   width: 40px;
@@ -29,29 +29,34 @@
   min-height: 40px;
   height: 40px;
   padding: 0;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
+  gap: 0 !important;
+  display: inline-grid !important;
+  place-items: center !important;
+  line-height: 0;
   font-size: 0;
   white-space: nowrap;
   overflow-wrap: normal;
 }
 
+.modal-footer :deep(> button > span),
+.modal-footer :deep(> button svg),
+.modal-footer :deep(> button [class*="icon"]) {
+  justify-self: center;
+  align-self: center;
+}
+
 .modal-footer :deep(> button svg),
 .modal-footer :deep(> button [class*="icon"]) {
   display: block;
-  margin: auto;
+  margin: 0 !important;
   width: 18px;
   height: 18px;
   min-width: 18px;
   min-height: 18px;
   font-size: 18px;
+  line-height: 18px;
 }
 
-/* The confirming action (Open / Apply) remains the visual anchor. Pin the
-   default accent to the site's pink instead of inheriting Nuxt UI's blue
-   primary colour on vacancy pages. Pages may still intentionally override the
-   two variables (the candidate popup currently does). */
 .modal-footer :deep(.modal-footer__primary) {
   flex: 1 1 220px;
   width: auto;
@@ -75,8 +80,6 @@
 }
 .modal-footer :deep(.modal-footer__primary:hover) { filter: brightness(1.06); }
 
-/* A second text link, when present (for example "view at source"), stays
-   secondary and compact rather than taking the same weight as the main CTA. */
 .modal-footer :deep(.modal-footer__secondary) {
   flex: 0 1 auto;
   width: auto;
