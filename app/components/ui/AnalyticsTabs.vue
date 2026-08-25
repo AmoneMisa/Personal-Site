@@ -5,15 +5,11 @@ export interface AnalyticsTabItem {
   count?: number;
 }
 
-withDefaults(defineProps<{
+defineProps<{
   modelValue: string;
   items: readonly AnalyticsTabItem[];
   ariaLabel?: string;
-  compact?: boolean;
-}>(), {
-  ariaLabel: undefined,
-  compact: false,
-});
+}>();
 
 defineEmits<{
   "update:modelValue": [value: string];
@@ -21,12 +17,7 @@ defineEmits<{
 </script>
 
 <template>
-  <div
-    class="analytics-tabs"
-    :class="{ 'analytics-tabs_compact': compact }"
-    role="tablist"
-    :aria-label="ariaLabel"
-  >
+  <div class="analytics-tabs" role="tablist" :aria-label="ariaLabel">
     <button
       v-for="item in items"
       :key="item.value"
@@ -88,15 +79,6 @@ defineEmits<{
   font-size: 10px;
   font-weight: 700;
   opacity: 0.72;
-}
-.analytics-tabs_compact {
-  padding: 3px;
-  border-radius: 9px;
-}
-.analytics-tabs_compact .analytics-tabs__item {
-  min-height: 28px;
-  padding: 5px 9px;
-  font-size: 10.5px;
 }
 @media (max-width: 620px) {
   .analytics-tabs {
