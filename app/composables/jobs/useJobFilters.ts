@@ -26,7 +26,7 @@ export function useJobFilters() {
   const languageLevel = ref("");
   const excludeLanguages = ref<string[]>([]);
   const skills = ref("");
-  const showAdvanced = ref(true);
+  const showAdvanced = ref(false);
 
   function buildFeedParams(options: {
     page: number;

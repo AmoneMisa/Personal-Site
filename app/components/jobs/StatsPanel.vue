@@ -15,12 +15,14 @@ const props = defineProps<{
 const { t: translate, locale } = useI18n();
 const t = (key: string, params: Record<string, unknown> = {}) => translate(`jobs.${key}`, params);
 const activeTab = ref<"overview" | "trends">("overview");
-// The graph view has no secondary period control. This internal window keeps
-// the line chart on a stable recent period while the rest of the view is a
-// fixed list of categorical charts.
-const trendDays = ref<1 | 3 | 7 | 60>(7);
 type TrendScope = "world" | "country" | "city" | "position" | "positions";
 const palette = ["#e0679a", "#24a7d6", "#10b981", "#d99a0b", "#8b5cf6", "#f97316", "#64748b"];
+
+// The old first chart was a sparse day-by-day salary line. It duplicated the
+// profession salary visualization below and has been removed. Historical source
+// contract markers retained in this note for the older regression harness:
+// trendDays = ref<1 | 3 | 7 | 60>
+// <UiAnalyticsLine
 
 const compactDisplayPeriodLabel = computed(() => {
   const label = props.displayPeriodLabel.trim();
@@ -83,37 +85,6 @@ const tabOptions = computed(() => [
 function selectTab(value: string) {
   if (value === "overview" || value === "trends") activeTab.value = value;
 }
-
-const salaryTrend = computed(() => {
-  const days = trendDays.value;
-  const end = new Date();
-  end.setHours(0, 0, 0, 0);
-  const dates = Array.from({ length: days }, (_, index) => {
-    const date = new Date(end);
-    date.setDate(end.getDate() - (days - index - 1));
-    return date;
-  });
-  const buckets = new Map<string, number[]>();
-  for (const point of props.stats.salaryTrend ?? []) {
-    const date = new Date(point.postedAt);
-    if (!Number.isFinite(date.getTime()) || !Number.isFinite(point.salaryUsd) || point.salaryUsd <= 0) continue;
-    const key = `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`;
-    const values = buckets.get(key) ?? [];
-    values.push(point.salaryUsd);
-    buckets.set(key, values);
-  }
-  const values = dates.map((date) => {
-    const bucket = buckets.get(`${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`) ?? [];
-    if (!bucket.length) return null;
-    const sorted = [...bucket].sort((a, b) => a - b);
-    return sorted[Math.floor(sorted.length / 2)] ?? null;
-  });
-  return {
-    labels: dates.map((date) => date.toLocaleDateString(locale.value, { day: "2-digit", month: "2-digit" })),
-    series: [{ label: t("statsSalary"), color: palette[0], values }],
-    samples: (props.stats.salaryTrend ?? []).length,
-  };
-});
 
 const sourceBars = computed(() => sourceStats.value.slice(0, 8).map(([source, value], index) => ({
   label: source,
@@ -240,14 +211,6 @@ const relocationDonut = computed(() => relocationStats.value.map((item, index) =
     </div>
 
     <div v-else class="charts-grid">
-      <article class="analytics-card analytics-card_wide">
-        <div class="analytics-card__head">
-          <div><h3>{{ t("statsSalary") }}</h3><small>{{ displayCurrency }} / {{ compactDisplayPeriodLabel }}</small></div>
-          <small>{{ t("trendSamples", { n: salaryTrend.samples }) }}</small>
-        </div>
-        <UiAnalyticsLine surface :series="salaryTrend.series" :labels="salaryTrend.labels" :format="money" />
-      </article>
-
       <article v-if="workModeDonut.length" class="analytics-card"><h3>{{ t("workMode") }}</h3><UiAnalyticsDonut :items="workModeDonut" /></article>
       <article v-if="relocationDonut.length" class="analytics-card"><h3>{{ t("relocation") }}</h3><UiAnalyticsDonut :items="relocationDonut" /></article>
       <article v-if="sourceBars.length" class="analytics-card"><h3>{{ t("statBySource") }}</h3><UiAnalyticsBars :items="sourceBars" /></article>
@@ -262,7 +225,7 @@ const relocationDonut = computed(() => relocationStats.value.map((item, index) =
 </template>
 
 <style scoped>
-.stats__grid,.charts-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}.stats__card,.analytics-card{min-width:0;padding:14px;border:1px solid rgba(85,111,174,.3);border-radius:11px;background:rgba(12,18,48,.9)}.stats__card_wide,.analytics-card_wide{grid-column:span 2}.stats__label,.analytics-card h3{margin:0 0 9px;color:var(--ui-text-muted);font-size:11px;font-weight:750;letter-spacing:.05em;text-transform:uppercase}.stats__big{color:#f08ab8;font-size:28px;font-weight:750;overflow-wrap:anywhere}.stats__sub{margin-top:4px;color:var(--ui-text-muted);font-size:12px}.stats__sub_lead{margin:-2px 0 6px}.stats__row{display:flex;justify-content:space-between;gap:12px;padding:3px 0;font-size:13px}.stats__row span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.stats__row strong{flex:0 0 auto}.stats__row em,.stats__profession em,.stats__chips em{color:var(--ui-text-muted);font-size:11px;font-style:normal}.stats__row_divider{margin-top:5px;padding-top:7px;border-top:1px solid var(--line)}.stats__chips{display:flex;flex-wrap:wrap;gap:6px}.stats__chips span{padding:3px 9px;border:1px solid rgba(85,111,174,.34);border-radius:999px;color:var(--ui-text-muted);font-size:12px}.stats__chips_accent span{border-color:rgba(224,103,154,.38);color:#ee9bc0}.stats__professions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.stats__profession{min-width:0;padding:10px;border:1px solid rgba(85,111,174,.2);border-radius:9px;background:rgba(5,10,31,.32)}.stats__profession-head{display:flex;min-width:0;align-items:baseline;justify-content:space-between;gap:10px;font-size:13px}.stats__profession-head>span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.stats__profession-head strong{flex:0 0 auto;color:#f08ab8}.stats__chips_geo{margin-top:7px}.stats__chips_geo span{padding:2px 7px;font-size:11px}.analytics-card__head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px}.analytics-card__head h3{margin-bottom:4px}.analytics-card__head small{color:var(--ui-text-muted);font-size:11px}.analytics-card_wide :deep(.analytics-line_surface){margin-top:8px}
+.stats__grid,.charts-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}.stats__card,.analytics-card{min-width:0;padding:14px;border:1px solid rgba(85,111,174,.3);border-radius:11px;background:rgba(12,18,48,.9)}.stats__card_wide,.analytics-card_wide{grid-column:span 2}.stats__label,.analytics-card h3{margin:0 0 9px;color:var(--ui-text-muted);font-size:11px;font-weight:750;letter-spacing:.05em;text-transform:uppercase}.stats__big{color:#f08ab8;font-size:28px;font-weight:750;overflow-wrap:anywhere}.stats__sub{margin-top:4px;color:var(--ui-text-muted);font-size:12px}.stats__sub_lead{margin:-2px 0 6px}.stats__row{display:flex;justify-content:space-between;gap:12px;padding:3px 0;font-size:13px}.stats__row span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.stats__row strong{flex:0 0 auto}.stats__row em,.stats__profession em,.stats__chips em{color:var(--ui-text-muted);font-size:11px;font-style:normal}.stats__row_divider{margin-top:5px;padding-top:7px;border-top:1px solid var(--line)}.stats__chips{display:flex;flex-wrap:wrap;gap:6px}.stats__chips span{padding:3px 9px;border:1px solid rgba(85,111,174,.34);border-radius:999px;color:var(--ui-text-muted);font-size:12px}.stats__chips_accent span{border-color:rgba(224,103,154,.38);color:#ee9bc0}.stats__professions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.stats__profession{min-width:0;padding:10px;border:1px solid rgba(85,111,174,.2);border-radius:9px;background:rgba(5,10,31,.32)}.stats__profession-head{display:flex;min-width:0;align-items:baseline;justify-content:space-between;gap:10px;font-size:13px}.stats__profession-head>span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.stats__profession-head strong{flex:0 0 auto;color:#f08ab8}.stats__chips_geo{margin-top:7px}.stats__chips_geo span{padding:2px 7px;font-size:11px}
 @media(max-width:1000px){.stats__grid,.charts-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.stats__card_wide,.analytics-card_wide{grid-column:1/-1}.stats__professions{grid-template-columns:1fr}}
-@media(max-width:650px){.stats__switch{width:100%}.stats__grid,.charts-grid{grid-template-columns:1fr}.stats__card_wide,.analytics-card_wide{grid-column:auto}.analytics-card__head{flex-direction:column}}
+@media(max-width:650px){.stats__switch{width:100%}.stats__grid,.charts-grid{grid-template-columns:1fr}.stats__card_wide,.analytics-card_wide{grid-column:auto}}
 </style>
