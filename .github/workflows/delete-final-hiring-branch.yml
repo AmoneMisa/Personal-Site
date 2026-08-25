@@ -1,0 +1,22 @@
+name: Delete merged hiring cleanup branch
+
+on:
+  push:
+    branches:
+      - master
+    paths:
+      - '.github/workflows/delete-final-hiring-branch.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  delete-branch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Delete merged cleanup branch
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh api --method DELETE \
+            repos/${GITHUB_REPOSITORY}/git/refs/heads/cleanup/final-hiring-fields
