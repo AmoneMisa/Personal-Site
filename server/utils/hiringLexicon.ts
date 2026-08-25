@@ -4,6 +4,7 @@ import {
   EXPERIENCE_REQUIREMENTS,
   GEOGRAPHY_CITIES,
   HIRING_INTENT,
+  HIRING_INTENT_EXTENSIONS,
   KZ_CITY_CATALOG,
   PROBATION_TERMS,
   SCHEDULE_TERMS,
@@ -34,7 +35,12 @@ import type { CandidateEmploymentType, CandidateWorkMode } from '../../shared/co
 const matcher = (entry: { canonical?: string; aliases?: Record<string, readonly string[]> }) =>
   aliasesToRegex([entry.canonical || '', ...aliasesOf(entry)].filter(Boolean))
 
-export const SHARED_CANDIDATE_INTENT_RE = matcher(HIRING_INTENT.candidate)
+export const SHARED_CANDIDATE_INTENT_RE = aliasesToRegex([
+  HIRING_INTENT.candidate.canonical,
+  ...aliasesOf(HIRING_INTENT.candidate),
+  HIRING_INTENT_EXTENSIONS.candidate.canonical,
+  ...aliasesOf(HIRING_INTENT_EXTENSIONS.candidate),
+].filter(Boolean))
 export const SHARED_EMPLOYER_INTENT_RE = matcher(HIRING_INTENT.employer)
 
 export function candidateFieldRegex(key: keyof typeof CANDIDATE_FIELD_TERMS): RegExp {
@@ -144,15 +150,20 @@ export function detectExperienceRequirement(text: string): 'noExperience' | 'exp
   return null
 }
 
+function hasExtendedCandidateIntent(text: string): boolean {
+  return Boolean(findCanonical(text, [HIRING_INTENT_EXTENSIONS.candidate], { partial: true }))
+    || matchesSourceCandidateIntent(text)
+}
+
 export function detectHiringIntent(text: string) {
   const parsed = classifyHiringIntent(text)
-  if (parsed.intent || !matchesSourceCandidateIntent(text)) return parsed
+  if (parsed.intent || !hasExtendedCandidateIntent(text)) return parsed
   return { ...parsed, intent: 'candidate' as const, score: Math.max(parsed.score || 0, 0.9) }
 }
 
 export function classifySharedHiringMessage(text: string) {
   const kind = classifyHiringMessage(text)
-  return kind === 'unknown' && matchesSourceCandidateIntent(text) ? 'candidate' : kind
+  return kind === 'unknown' && hasExtendedCandidateIntent(text) ? 'candidate' : kind
 }
 
 const DISPLAY_CANONICAL_OVERRIDES: Record<string, string> = {
