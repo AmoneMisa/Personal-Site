@@ -4,9 +4,11 @@ import {
   EXPERIENCE_REQUIREMENTS,
   GEOGRAPHY_CITIES,
   HIRING_INTENT,
+  KZ_CITY_CATALOG,
   PROBATION_TERMS,
   SCHEDULE_TERMS,
   UA_CITY_CATALOG,
+  UZ_CITY_CATALOG,
   WORK_MODES,
   aliasesOf,
   aliasesToRegex,
@@ -25,7 +27,9 @@ export function candidateFieldRegex(key: keyof typeof CANDIDATE_FIELD_TERMS): Re
 }
 
 const HIRING_CITIES = [
-  ...GEOGRAPHY_CITIES.filter((city) => city.country !== 'UA'),
+  ...GEOGRAPHY_CITIES.filter((city) => !['UA', 'KZ', 'UZ'].includes(city.country || '')),
+  ...KZ_CITY_CATALOG,
+  ...UZ_CITY_CATALOG,
   ...UA_CITY_CATALOG,
 ]
 const CITY_MATCHERS = HIRING_CITIES.map((city) => ({
