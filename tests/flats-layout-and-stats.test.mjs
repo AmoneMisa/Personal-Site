@@ -6,6 +6,7 @@ const card = await readFile(new URL('../app/components/flats/FlatCard.vue', impo
 const grid = await readFile(new URL('../app/components/flats/FlatGrid.vue', import.meta.url), 'utf8')
 const stats = await readFile(new URL('../app/components/flats/StatsPanel.vue', import.meta.url), 'utf8')
 const feed = await readFile(new URL('../app/composables/flats/useFlatFeed.ts', import.meta.url), 'utf8')
+const presentation = await readFile(new URL('../app/composables/flats/useFlatPresentation.ts', import.meta.url), 'utf8')
 const page = await readFile(new URL('../app/pages/flat-finder/index.vue', import.meta.url), 'utf8')
 const locations = await readFile(new URL('../app/utils/locationLabels.ts', import.meta.url), 'utf8')
 const flatFilters = await readFile(new URL('../app/composables/flats/useFlatFilters.ts', import.meta.url), 'utf8')
@@ -26,6 +27,14 @@ test('flat cards stay equal within a row and use the target compact desktop/mobi
   assert.match(card, /:title="presentation\.title"/u)
   assert.match(card, /-webkit-line-clamp: 1/u)
   assert.doesNotMatch(card, /\.flat-card__meta \{[^}]*border-top/u)
+})
+
+test('flat card footer shows only city and district, without metro duplication', () => {
+  assert.match(presentation, /const cardLocation = \[\.\.\.new Set\(\[/u)
+  assert.match(presentation, /locName\(listing\.city, "city"\)/u)
+  assert.match(presentation, /locName\(listing\.district, "district"\)/u)
+  assert.doesNotMatch(presentation, /cardLocation[\s\S]{0,220}listing\.metro/u)
+  assert.match(presentation, /location: cardLocation/u)
 })
 
 test('flat geography statistics stay populated when a scoped country slice is empty', () => {
