@@ -40,7 +40,10 @@ const activity = computed(() => {
 
 const geography = computed(() => {
   const scoped = props.statistics.geographiesByDeal?.[dealScope.value]?.[geoDimension.value];
-  const rows = scoped ?? props.statistics.geographies[geoDimension.value] ?? [];
+  // Some deal/dimension combinations legitimately have no labelled rows even
+  // though the overall geography does. An empty scoped array must not suppress
+  // the global dimension and make the analytics card look like it vanished.
+  const rows = scoped?.length ? scoped : (props.statistics.geographies[geoDimension.value] ?? []);
   const merged = new Map<string, FlatStatsGeoRow>();
   for (const row of rows) {
     const label = displayGeoLabel(row.label, geoDimension.value);
