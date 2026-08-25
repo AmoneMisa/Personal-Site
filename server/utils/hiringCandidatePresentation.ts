@@ -3,11 +3,11 @@ import { parseExtendedLanguageContext } from '@whiteslove/parsing-lexicon/hiring
 import {
   publicCandidateGender,
   publicCandidateName,
-  publicCandidateProfessionKeys as legacyProfessionKeys,
+  publicCandidateProfessionKeys as coreProfessionKeys,
   publicCandidateRemote,
   publicCandidateSalary,
   type HiringCandidateLocale,
-} from '../../internal/legacy/hiringCandidatePresentationCore'
+} from '../../shared/hiring/candidatePresentationCore'
 
 export {
   publicCandidateGender,
@@ -21,7 +21,7 @@ const STANDALONE_REMOTE_ROLE_RE = /^(?:онлайн|onlayn|online)$/iu
 
 export function publicCandidateProfessionKeys(profile: CvProfile): string[] {
   if (STANDALONE_REMOTE_ROLE_RE.test(String(profile.role || '').trim())) return ['Any Role']
-  return legacyProfessionKeys(profile)
+  return coreProfessionKeys(profile)
 }
 
 const LANGUAGE_LABELS_RU: Record<string, string> = {
