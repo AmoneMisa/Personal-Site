@@ -68,8 +68,11 @@ const emit = defineEmits<{
 .flat-card__checking { position: absolute; z-index: 5; inset: 0; display: grid; place-content: center; justify-items: center; gap: 9px; padding: 18px; background: rgba(7,12,34,.92); color: var(--text-primary); font-size: 12.5px; font-weight: 700; text-align: center; }
 .flat-card__checking-icon { width: 26px; height: 26px; color: var(--accent-pink); animation: flat-card-spin .8s linear infinite; }
 @keyframes flat-card-spin { to { transform: rotate(360deg); } }
-.flat-card__photo { position: relative; width: 100%; aspect-ratio: 16 / 9; flex: 0 0 auto; overflow: visible; background: var(--bg-panel); }
-.flat-card__photo::after { content: ""; position: absolute; z-index: 1; left: 0; right: 0; bottom: -28px; height: 48%; pointer-events: none; background: linear-gradient(180deg, transparent 0%, rgba(11,16,42,.38) 42%, var(--bg-panel) 92%); }
+/* Keep every desktop listing image in one predictable 4:3 media frame. Portrait
+   or extra-wide source photos are cropped with object-fit instead of changing
+   the height of the whole card. This matches the compact landscape card size. */
+.flat-card__photo { position: relative; width: 100%; aspect-ratio: 4 / 3; flex: 0 0 auto; overflow: hidden; background: var(--bg-panel); }
+.flat-card__photo::after { content: ""; position: absolute; z-index: 1; left: 0; right: 0; bottom: 0; height: 36%; pointer-events: none; background: linear-gradient(180deg, transparent 0%, rgba(11,16,42,.34) 52%, var(--bg-panel) 100%); }
 .flat-card__photo > img { width: 100%; height: 100%; object-fit: cover; display: block; transition: transform 260ms ease; }
 .flat-card:hover .flat-card__photo > img { transform: scale(1.015); }
 .flat-card__no-photo { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 9px; height: 100%; color: var(--text-muted); font-size: 12px; background: var(--bg-panel-2); }
