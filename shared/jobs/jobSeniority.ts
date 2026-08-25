@@ -7,7 +7,7 @@ import type { Job, Seniority } from '../contracts/jobs'
  * generic title omits the level.
  */
 export function detectDetailedJobSeniority(title: string, description = ''): Seniority | null {
-  return (matchSeniority(title) || matchSeniority(description) || null) as Seniority | null
+  return (matchSeniority(title)?.canonical || matchSeniority(description)?.canonical || null) as Seniority | null
 }
 
 export function normalizeJobSeniority(job: Job): Job {
