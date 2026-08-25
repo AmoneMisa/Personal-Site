@@ -108,8 +108,8 @@ function parsedCompactLayout(text: string): { rooms: number; floor: number; tota
 
 function parsedArea(text: string): number | null {
   const explicit = text.match(/(?:площад(?:ь|и)|метраж|area|maydon|майдон)\s*[:=\-–—]?\s*(\d{1,3}(?:[.,]\d+)?)\s*(?:м\s*[²2]|m\s*[²2]|кв\.?\s*м|kv\.?\s*m)?/iu)
-    || text.match(/\b(\d{1,3}(?:[.,]\d+)?)\s*(?:м\s*[²2]|m\s*[²2]|кв\.?\s*м|kv\.?\s*m)\b/iu);
-  const shorthand = explicit ? null : text.match(/(?:^|[^\d])(\d{2,3})\s*(?:кв|kv)\b/iu);
+    || text.match(/(?:^|[^\d])(\d{1,3}(?:[.,]\d+)?)\s*(?:м\s*[²2]|m\s*[²2]|кв\.?\s*м|kv\.?\s*m)(?=$|[\s,.;:\/\\])/iu);
+  const shorthand = explicit ? null : text.match(/(?:^|[^\d])(\d{2,3})\s*(?:кв|kv)(?=$|[\s,.;:\/\\])/iu);
   const n = Number(String(explicit?.[1] ?? shorthand?.[1] ?? "").replace(",", "."));
   return Number.isFinite(n) && n >= (explicit ? 5 : 15) && n <= (explicit ? 1000 : 500) ? n : null;
 }
