@@ -1,4 +1,10 @@
+import {
+  detectVisaSponsorshipWording,
+  TEMPORARY_WORK_AUTH_RE,
+} from '@whiteslove/parsing-lexicon/hiring-source-semantics'
 import type { Job, SponsorshipConfidence } from './jobTypes'
+
+export { TEMPORARY_WORK_AUTH_RE }
 
 export type VisaSponsorshipStatus =
   | 'explicit'
@@ -6,16 +12,6 @@ export type VisaSponsorshipStatus =
   | 'historical'
   | 'not_offered'
   | 'unknown'
-
-// Negative wording must be broader than a literal "no sponsorship" check. Large
-// US employers often use legal wording such as "may not be able to ... support
-// future H-1B sponsorship". Some clauses contain abbreviations like "U.S.", so
-// periods are not treated as hard boundaries for the long-form negative branch.
-const NEGATIVE_SPONSORSHIP_RE = /(?:\bno\s+(?:visa\s+|immigration\s+|employment\s+)?sponsorship\b|\b(?:will\s+not|cannot|can't|unable\s+to|not\s+able\s+to)\s+sponsor\b|\bdo(?:es)?\s+not\s+(?:offer|provide)\s+(?:visa\s+|immigration\s+|employment\s+)?sponsorship\b|\bwithout\s+(?:the\s+need\s+for\s+)?(?:current\s+or\s+future\s+)?(?:employer\s+|visa\s+)?sponsorship\b|\bmust\s+(?:be\s+)?(?:legally\s+)?authoriz\w+\s+to\s+work[^.!?]{0,80}\bwithout\s+(?:current\s+or\s+future\s+)?sponsorship\b|\bmust\s+not\s+require\s+(?:current\s+or\s+future\s+)?(?:visa\s+|employment\s+)?sponsorship\b|\b(?:current\s+and\/or\s+future|current\s+or\s+future)\s+sponsorship\s+(?:is\s+)?not\s+(?:available|provided|offered)\b|\bsponsorship\s+(?:is\s+)?not\s+(?:available|provided|offered)\b|\bno\s+c2c(?:\s+or\s+visa\s+sponsorship)?\b|\bmay\s+not\s+be\s+able\s+to\b[^\n!?]{0,450}\b(?:sponsor|support|provide)\b[^\n!?]{0,180}\bsponsorship\b|\b(?:will|can|may)\s+not\b[^\n!?]{0,220}\b(?:support|provide)\b[^\n!?]{0,160}\bsponsorship\b|\bnot\s+(?:currently\s+)?(?:able\s+to\s+)?(?:support|provide)\b[^\n!?]{0,160}\bsponsorship\b)/i
-
-const EXPLICIT_SPONSORSHIP_RE = /(?:\bwill\s+sponsor\b|\bwe\s+sponsor\b|\b(?:can|may)\s+sponsor\b|\bopen\s+to\s+(?:visa\s+)?sponsorship\b|\bvisa\s+sponsorship\s+(?:is\s+)?(?:available|provided|offered|possible)\b|\b(?:h-?1b|h1-b)\s+(?:visa\s+)?sponsorship\b|\bh-?1b\s+transfer\b|\bimmigration\s+sponsorship\b|\bemployment\s+visa\s+sponsorship\b|\bwork\s+visa\s+sponsorship\b|\bsponsor(?:ing)?\s+(?:qualified|eligible|selected)\s+candidates\b|\beligible\s+for\s+(?:visa\s+)?sponsorship\b|\bvisa\s+support\b|\bwork\s+visa\s+support\b)/i
-
-export const TEMPORARY_WORK_AUTH_RE = /\b(?:opt|cpt|stem\s+opt)\b/i
 
 function primarySponsorshipText(job: Pick<Job, 'title' | 'description' | 'tags'>): string {
   return [job.title, job.description, ...(job.tags || [])].filter(Boolean).join(' ')
@@ -45,9 +41,9 @@ export function visaSponsorshipStatus(
   const primaryText = primarySponsorshipText(job)
   const allText = allSponsorshipText(job)
 
-  if (NEGATIVE_SPONSORSHIP_RE.test(allText)) return 'not_offered'
+  if (detectVisaSponsorshipWording(allText) === 'notOffered') return 'not_offered'
 
-  if (EXPLICIT_SPONSORSHIP_RE.test(primaryText)) {
+  if (detectVisaSponsorshipWording(primaryText) === 'offered') {
     return job.sponsorshipConfidence === 'verified' ? 'verified' : 'explicit'
   }
 

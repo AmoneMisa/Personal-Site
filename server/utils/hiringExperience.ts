@@ -1,67 +1,6 @@
+import { extractCandidateExperienceMentions } from '@whiteslove/parsing-lexicon/hiring-source-semantics'
 import { detectMentionedProfessions } from './hiringNormalize'
 import type { CvProfile, ProfessionExperience } from './hiringTypes'
-
-interface ExperienceMention {
-  years: number
-  context: string
-}
-
-function validYears(raw: string): number | null {
-  const years = Number(raw.replace(',', '.'))
-  return Number.isFinite(years) && years >= 0 && years <= 60 ? years : null
-}
-
-function experienceMentions(text: string): ExperienceMention[] {
-  const mentions: ExperienceMention[] = []
-  const segments = text.split(/\n|(?<=[.!?])\s+/u).map((segment) => segment.trim()).filter(Boolean)
-
-  for (const segment of segments) {
-    const reverse = segment.match(
-      /(\d+(?:[.,]\d+)?)\+?\s*(?:лет|год(?:а)?|рок(?:и|ів)?|years?|yil(?:lik)?|йил(?:лик)?)[^\n.!?]{0,140}?(?:опыт|досвід|experience|staj|tajriba(?:m)?)/iu,
-    )
-    if (reverse?.[1]) {
-      const years = validYears(reverse[1])
-      if (years != null) mentions.push({ years, context: reverse[0] })
-      continue
-    }
-
-    // "Опыт работы: 2 мес" — the unit below is optional, so without this a
-    // duration in months was read as that many years, and a two-month stint
-    // was published as two years of experience.
-    const months = segment.match(
-      /(?:опыт(?:\s+работы)?|досвід(?:\s+роботи)?|experience|staj|tajriba(?:m)?)[^\n.!?]{0,100}?(\d{1,2})\s*(?:мес(?:яц\p{L}*)?\.?|міс(?:яц\p{L}*)?\.?|months?|mo\b|oy(?:lik)?)/iu,
-    )
-    if (months?.[1]) {
-      const value = Number(months[1])
-      if (Number.isFinite(value) && value > 0 && value < 24) {
-        // As below: the profession usually follows the duration, so the rest
-        // of the line has to travel with it.
-        const from = (months.index || 0) + months[0].length
-        mentions.push({
-          years: Math.round((value / 12) * 10) / 10,
-          context: `${months[0]} ${segment.slice(from, from + 100)}`.trim(),
-        })
-      }
-      continue
-    }
-
-    const direct = segment.match(
-      /(?:опыт(?:\s+работы)?|досвід(?:\s+роботи)?|experience|staj|tajriba(?:m)?)[^\n.!?]{0,100}?(\d+(?:[.,]\d+)?)\+?\s*(?:лет|год(?:а)?|рок(?:и|ів)?|years?|yil|йил)?/iu,
-    )
-    if (!direct?.[1]) continue
-    const years = validYears(direct[1])
-    if (years == null) continue
-
-    // In forms like "Experience: 3 years backend developer" the profession can
-    // follow the numeric value. Keep only the remainder of this sentence/line,
-    // never the next target-role sentence.
-    const tailStart = (direct.index || 0) + direct[0].length
-    const tail = segment.slice(tailStart, tailStart + 100)
-    mentions.push({ years, context: `${direct[0]} ${tail}`.trim() })
-  }
-
-  return mentions
-}
 
 function normalizeExisting(items: ProfessionExperience[] | undefined): ProfessionExperience[] {
   const out = new Map<string, ProfessionExperience>()
@@ -77,11 +16,9 @@ function normalizeExisting(items: ProfessionExperience[] | undefined): Professio
 
 export function extractProfessionExperience(text: string): ProfessionExperience[] {
   const out = new Map<string, ProfessionExperience>()
-  for (const mention of experienceMentions(text)) {
+  for (const mention of extractCandidateExperienceMentions(text)) {
     for (const profession of detectMentionedProfessions(mention.context)) {
       const previous = out.get(profession)
-      // Prefer the largest explicit duration instead of summing repeated CV
-      // summaries, reposts or duplicate wording for the same profession.
       if (!previous || mention.years > previous.years) {
         out.set(profession, { profession, years: mention.years })
       }
@@ -107,9 +44,6 @@ export function withProfessionExperience(profile: CvProfile): CvProfile {
     const previous = byProfession.get(item.profession)
     if (!previous || item.years > previous.years) byProfession.set(item.profession, item)
   }
-  // Fresh source extraction replaces an older derived value for the same
-  // profession. This repairs rows where "2 мес" was previously stored as
-  // two years; taking the maximum would preserve the stale error forever.
   for (const item of extractProfessionExperience(profile.originalText || profile.description || '')) {
     byProfession.set(item.profession, item)
   }
@@ -122,10 +56,6 @@ export function withProfessionExperience(profile: CvProfile): CvProfile {
   const previousFromExperience = professionExperience
     .filter((item) => !targets.some((target) => sameProfessionFamily(item.profession, target)))
     .map((item) => item.profession)
-
-  // A role-bound target duration is stronger than a missing generic duration.
-  // Otherwise keep normalizeCandidate's value: it already rejects a duration
-  // explicitly tied only to a different profession.
   const inferredTargetYears = targetEntries.length
     ? Math.max(...targetEntries.map((item) => item.years))
     : null

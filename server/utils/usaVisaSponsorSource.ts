@@ -1,3 +1,4 @@
+import { detectUsLocation } from '@whiteslove/parsing-lexicon/hiring-source-semantics'
 import type { Job } from './jobTypes'
 
 const REPO = 'NotifyYouInc/2026-H1B-Sponsor-Jobs'
@@ -71,10 +72,6 @@ function postedAt(value: string | undefined): string {
   return Number.isNaN(parsed) ? new Date().toISOString() : new Date(parsed).toISOString()
 }
 
-function isUsLocation(value: string): boolean {
-  return /\bunited states\b|\busa\b|\bu\.s\.?\b|\bUS(?:\s+remote)?\b|\b(?:AL|AK|AZ|AR|CA|CO|CT|DE|FL|GA|HI|ID|IL|IN|IA|KS|KY|LA|ME|MD|MA|MI|MN|MS|MO|MT|NE|NV|NH|NJ|NM|NY|NC|ND|OH|OK|OR|PA|RI|SC|SD|TN|TX|UT|VT|VA|WA|WV|WI|WY|DC)\b/i.test(value)
-}
-
 function parseJob(markdown: string, filename: string): Job | null {
   const heading = markdown.match(/^#\s+(.+?)\s+at\s+(.+)$/m)
   const companyField = field(markdown, 'Company')
@@ -84,7 +81,7 @@ function parseJob(markdown: string, filename: string): Job | null {
   const category = field(markdown, 'Category') || undefined
   const applyUrl = markdownLinkUrl(field(markdown, 'Apply'))
 
-  if (!title || !company || !applyUrl || !isUsLocation(location)) return null
+  if (!title || !company || !applyUrl || !detectUsLocation(location)) return null
 
   const evidence = 'Current opening from a company included in the 2026 H1B Sponsor Jobs feed; sponsorship for this exact role is not guaranteed.'
 
