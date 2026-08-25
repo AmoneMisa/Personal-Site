@@ -1,4 +1,16 @@
 import { canonicalSkillName, extractSkillNames } from '~~/shared/jobSkills'
+import {
+  SENIORITY_RANK,
+  bucketVacancyText,
+  detectDegreeFields,
+  detectDegreeLevel,
+  detectHiringSeniority,
+  extractRequiredExperienceYears,
+  isNoSponsorshipRequirement,
+  requiresUsSponsorship as detectRequiresUsSponsorship,
+  type DegreeLevel,
+  type HiringSeniority as Seniority,
+} from '@whiteslove/parsing-lexicon/hiring-requirements'
 
 // Client-side ATS (Applicant Tracking System) match scoring.
 // The CV never leaves the browser. Unlike a keyword-only matcher, this scorer
@@ -23,90 +35,6 @@ function canonicalSet(values: string[] | undefined): Set<string> {
     if (normalized) result.add(normalized)
   }
   return result
-}
-
-// Headings/phrases that usually introduce qualifications. Keep this multilingual:
-// vacancy sources in the feed regularly mix English, Russian and Ukrainian text.
-const REQUIRED_MARKER_RE = /\b(requirements?|qualifications?|minimum qualifications?|required skills?|must[- ]?have|you have|what (?:we|you) (?:are looking for|need|bring)|you(?:'|’)ll need|who you are|ideal candidate|what makes you a fit)\b|требован|квалификац|обязательн|необходим(?:о|ые|ый)|что мы (?:жд[её]м|ожидаем)|кого мы ищем|вимог|кваліфікац|обов['’]?язков|необхідн|кого ми шукаємо/i
-const OPTIONAL_MARKER_RE = /\b(nice to have|preferred qualifications?|preferred skills?|bonus points?|would be a plus|plus if|desirable)\b|желательн|будет плюсом|буде плюсом|преимуществ|бажан/i
-const HARD_REQUIREMENT_RE = /\b(must|need to|required|proficien(?:t|cy)|expertise in|experience (?:with|in)|knowledge of|familiarity with|hands[- ]on)\b|обязател|требуется|необходим|знание|опыт (?:с|в)|владение|умение|потрібн|необхідн|досвід (?:з|у|в)|знання/i
-const NOISE_RE = /\b(equal opportunity|eeo|diversity and inclusion|reasonable accommodation|candidate privacy|privacy notice|background check|recruit(?:ment|ing) process|talent acquisition team|compensation range|pay transparency)\b|процесс найма|процес найму|политик[аи] конфиденциальности|політик[аи] конфіденційності/i
-const SECTION_BREAK_RE = /\b(what we offer|benefits|perks|about us|about the company|our company|compensation|salary|responsibilities|what you(?:'|’)ll do|your role)\b|что мы предлагаем|условия работы|о компании|про компанію|обязанности|обов['’]?язки/i
-
-type TextBucket = 'required' | 'optional' | 'context' | 'noise'
-interface TextBuckets {
-  required: string
-  optional: string
-  context: string
-  noise: string
-}
-
-function splitDescription(text: string): string[] {
-  return text
-    .replace(/[•●▪◦·]/g, '. ')
-    .split(/\n+|(?<=[.!?;])\s+/)
-    .map((part) => part.trim())
-    .filter(Boolean)
-}
-
-/**
- * Extract requirement-bearing parts of a description instead of treating every
- * company/benefits/legal paragraph as a candidate requirement.
- */
-function bucketJobText(text: string): TextBuckets {
-  const buckets: Record<TextBucket, string[]> = {
-    required: [], optional: [], context: [], noise: [],
-  }
-  let active: 'required' | 'optional' | null = null
-  let activeTtl = 0
-
-  for (const segment of splitDescription(text)) {
-    if (NOISE_RE.test(segment)) {
-      buckets.noise.push(segment)
-      active = null
-      activeTtl = 0
-      continue
-    }
-
-    buckets.context.push(segment)
-
-    const optionalMarker = OPTIONAL_MARKER_RE.test(segment)
-    const requiredMarker = REQUIRED_MARKER_RE.test(segment)
-    if (optionalMarker) {
-      active = 'optional'
-      activeTtl = 6
-      buckets.optional.push(segment)
-      continue
-    }
-    if (requiredMarker) {
-      active = 'required'
-      activeTtl = 8
-      buckets.required.push(segment)
-      continue
-    }
-
-    if (SECTION_BREAK_RE.test(segment)) {
-      active = null
-      activeTtl = 0
-    }
-
-    if (HARD_REQUIREMENT_RE.test(segment)) {
-      buckets.required.push(segment)
-      continue
-    }
-
-    if (active && activeTtl > 0) {
-      buckets[active].push(segment)
-      activeTtl -= 1
-    }
-  }
-
-  return {
-    required: buckets.required.join(' '),
-    optional: buckets.optional.join(' '),
-    context: buckets.context.join(' '),
-    noise: buckets.noise.join(' '),
-  }
 }
 
 const TERM_STOP_WORDS = new Set([
@@ -137,8 +65,6 @@ function coverage(have: Set<string>, wanted: Set<string>): number {
 }
 
 type CvSection = 'experience' | 'projects' | 'profile' | 'skills' | 'education' | 'other'
-type Seniority = 'intern' | 'junior' | 'middle' | 'senior' | 'staff' | 'lead' | 'principal' | 'manager' | 'director'
-type DegreeLevel = 'secondary' | 'bachelor' | 'master' | 'doctorate'
 
 const CV_SECTION_HEADING_RE = /^\s*(profile|professional profile|summary|professional summary|about me|work experience|professional experience|experience|employment|employment history|projects?|pet projects?|hobbies|skills|technical skills|tech stack|education|languages?|contact|additional information)\s*:?[\s]*$/i
 
@@ -237,59 +163,6 @@ function parsedCvExperienceYears(raw: string, referenceDate: Date): number | und
   return result > 0 ? Math.round(result * 10) / 10 : undefined
 }
 
-function detectSeniority(text: string): Seniority | undefined {
-  const target = /\b(?:looking|searching)\s+for\s+(?:an?\s+)?(?:a\s+)?(intern|junior|middle|mid|senior|staff|principal|lead)\b/i.exec(text)?.[1]
-  const normalize = (value: string): Seniority => value.toLowerCase() === 'mid' ? 'middle' : value.toLowerCase() as Seniority
-  if (target) return normalize(target)
-  const checks: Array<[Seniority, RegExp]> = [
-    ['director', /\b(?:engineering\s+)?director\b|директор/i],
-    ['principal', /\bprincipal\b(?=[^,;\n]{0,60}\b(?:engineer|developer|architect)\b)/i],
-    ['staff', /\bstaff\b(?=[^,;\n]{0,60}\b(?:engineer|developer|architect)\b)/i],
-    ['lead', /\b(?:team\s*lead|tech\s*lead|lead\s+(?:engineer|developer|frontend|backend))\b|тимлид|техлид|ведущ\w*/i],
-    ['manager', /\bengineering manager\b|руководител/i],
-    ['senior', /\bsenior\b(?=[^,;\n]{0,60}\b(?:engineer|developer|frontend|backend|software)\b)|сеньор|старш\w*\s+(?:разработ|инженер)/i],
-    ['middle', /\b(?:middle|mid[- ]?level)\b(?=[^,;\n]{0,60}\b(?:engineer|developer|frontend|backend|software)\b)|мидл/i],
-    ['junior', /\bjunior\b(?=[^,;\n]{0,60}\b(?:engineer|developer|frontend|backend|software)\b)|джун\w*|младш\w*/i],
-    ['intern', /\b(?:intern|trainee)\b|стаж[ёе]р|стажир/i],
-  ]
-  return checks.find(([, pattern]) => pattern.test(text))?.[0]
-}
-
-function degreeLevel(text: string): DegreeLevel | undefined {
-  if (/\b(?:ph\.?d\.?|doctorate|doctoral degree)\b|доктор(?:ская| наук)/i.test(text)) return 'doctorate'
-  if (/master['’]?s degree|master degree|магистр|магістр/i.test(text)) return 'master'
-  if (/bachelor['’]?s degree|bachelor degree|бакалавр/i.test(text)) return 'bachelor'
-  if (/secondary education|среднее образование|середня освіта/i.test(text)) return 'secondary'
-  return undefined
-}
-
-function degreeFields(text: string): Set<string> {
-  const fields = new Set<string>()
-  if (/computer science|computer engineering|software engineering|information technology|informatics|інформатик|информатик/i.test(text)) fields.add('computer_science')
-  if (/\bengineering\b|инженерн|інженерн/i.test(text)) fields.add('engineering')
-  if (/\b(?:civil\s+)?law\b|legal studies|юридич|юриспруд|право\b/i.test(text)) fields.add('law')
-  if (/forensic|criminal investigation|криминалист|криміналіст|следствен|слідч/i.test(text)) fields.add('forensics')
-  if (/business|economics|finance|management|эконом|економ/i.test(text)) fields.add('business')
-  return fields
-}
-
-function hasUsWorkAuthorization(text: string): boolean {
-  return /\b(?:u\.?s\.?|united states)\s+citizen\b|\bgreen card\b|\bpermanent resident\b|\bemployment authorization document\b|\bEAD\b|\bauthoriz\w+\s+to\s+work\s+in\s+(?:the\s+)?(?:u\.?s\.?|united states)(?:[^.!?]{0,50}\bwithout\s+sponsorship\b)?|\bno\s+(?:visa\s+)?sponsorship\s+required\b/i.test(text)
-}
-
-function hasNonUsCitizenship(text: string): boolean {
-  const match = /\bcitizenship\s*[:\-]\s*([^\n|,;]{2,45})/i.exec(text)
-  if (!match?.[1]) return false
-  return !/^\s*(?:u\.?s\.?a?|united states|american)\b/i.test(match[1])
-}
-
-function requiresUsSponsorship(text: string): boolean | undefined {
-  if (hasUsWorkAuthorization(text)) return false
-  if (/\b(?:require|requires|requiring|need|needs|seeking)\b[^.!?]{0,60}\b(?:visa|employment)\s+sponsorship\b|\bneed\s+(?:an?\s+)?(?:h-?1b|work visa)\b/i.test(text)) return true
-  if (hasNonUsCitizenship(text)) return true
-  return undefined
-}
-
 export interface CvProfile {
   skills: Set<string>
   skillEvidence: Map<string, number>
@@ -309,28 +182,12 @@ export function buildCvProfile(cvText: string, referenceDate: Date = new Date())
     terms: extractTerms(cvText),
     raw: cvText,
     experienceYears: parsedCvExperienceYears(cvText, referenceDate),
-    seniority: detectSeniority(cvText),
-    degreeLevel: degreeLevel(cvText),
-    degreeFields: degreeFields(cvText),
-    requiresUsSponsorship: requiresUsSponsorship(cvText),
+    seniority: detectHiringSeniority(cvText) || undefined,
+    degreeLevel: detectDegreeLevel(cvText) || undefined,
+    degreeFields: new Set(detectDegreeFields(cvText)),
+    requiresUsSponsorship: detectRequiresUsSponsorship(cvText) ?? undefined,
   }
 }
-
-function detectRequiredExperience(text: string): number | undefined {
-  const values: number[] = []
-  const patterns = [
-    /\b(\d{1,2}(?:[.,]\d)?)\s*\+?\s*(?:years?|yrs?)\s+(?:of\s+)?[^.;\n]{0,120}\bexperience\b/gi,
-    /\b(?:at least|minimum of|min\.?)\s*(\d{1,2}(?:[.,]\d)?)\s*(?:years?|yrs?)\b/gi,
-    /(?:опыт|досвід)\s+(?:работы\s+)?(?:от\s+)?(\d{1,2}(?:[.,]\d)?)\s*(?:лет|год\w*|рок\w*)/gi,
-  ]
-  for (const pattern of patterns) for (const match of text.matchAll(pattern)) {
-    const value = Number(match[1]?.replace(',', '.'))
-    if (Number.isFinite(value) && value >= 0 && value <= 40) values.push(value)
-  }
-  return values.length ? Math.max(...values) : undefined
-}
-
-const SENIORITY_RANK: Record<Seniority, number> = { intern: 0, junior: 1, middle: 2, senior: 3, staff: 4, lead: 4, manager: 4, principal: 5, director: 6 }
 
 function seniorityScore(candidate: Seniority | undefined, required: Seniority | undefined): { score: number, gap: number } {
   if (!required) return { score: 100, gap: 0 }
@@ -388,8 +245,6 @@ function educationScore(profile: CvProfile, requirement: ReturnType<typeof jobDe
   return { score: 100, fieldMismatch, levelMismatch }
 }
 
-const NO_SPONSORSHIP_RE = /(?:\bno\s+(?:visa\s+|immigration\s+|employment\s+)?sponsorship\b|\b(?:will\s+not|cannot|can't|unable\s+to|not\s+able\s+to)\s+sponsor\b|\bwithout\s+(?:the\s+need\s+for\s+)?(?:current\s+or\s+future\s+)?(?:employer\s+|visa\s+)?sponsorship\b|\bmust\s+(?:be\s+)?(?:legally\s+)?authoriz\w+\s+to\s+work[^.!?]{0,100}\bwithout\s+(?:current\s+or\s+future\s+)?sponsorship\b|\bsponsorship\s+(?:is\s+)?not\s+(?:available|provided|offered)\b|\bmay\s+not\s+be\s+able\s+to\b[^.!?]{0,220}\b(?:sponsor|support|provide)\b[^.!?]{0,90}\bsponsorship\b|\b(?:will|can|may)\s+not\b[^.!?]{0,120}\b(?:support|provide)\b[^.!?]{0,80}\bsponsorship\b)/i
-
 function isUsRole(job: { country?: string, location?: string, title?: string, description?: string }): boolean {
   if ((job.country || '').toUpperCase() === 'US') return true
   return /(?:\bunited states\b|\busa\b|\bu\.s\.?\b|\bsan mateo\s*,?\s*ca\b)/i.test(`${job.location || ''} ${job.title || ''} ${(job.description || '').slice(0, 1200)}`)
@@ -419,7 +274,7 @@ export function scoreJob(profile: CvProfile, job: AtsJob): AtsResult {
   const titleText = job.title || ''
   const tagText = (job.tags || []).join(' ')
   const description = job.description || ''
-  const buckets = bucketJobText(description)
+  const buckets = bucketVacancyText(description)
   const titleSkills = extractSkills(titleText)
   const tagSkills = extractSkills(tagText)
   const requiredTextSkills = extractSkills(buckets.required)
@@ -469,9 +324,9 @@ export function scoreJob(profile: CvProfile, job: AtsJob): AtsResult {
     if (evidence > 0) { earned += 0.35 * evidence; matchedContext.push(skill) }
   }
   const skillsScore = possible > 0 ? Math.round((earned / possible) * 100) : 60
-  const requiredExperience = job.experienceMinYears ?? detectRequiredExperience(`${buckets.required} ${description}`)
+  const requiredExperience = job.experienceMinYears ?? extractRequiredExperienceYears(`${buckets.required} ${description}`) ?? undefined
   const exp = experienceScore(profile.experienceYears, requiredExperience)
-  const requiredSeniority = detectSeniority(titleText) || (job.seniority ? detectSeniority(job.seniority) : undefined)
+  const requiredSeniority = detectHiringSeniority(titleText) || (job.seniority ? detectHiringSeniority(job.seniority) : null) || undefined
   const seniority = seniorityScore(profile.seniority, requiredSeniority)
   const scope = scopeScore(`${titleText} ${buckets.required} ${description}`, profile.raw)
   const educationRequirement = jobDegreeRequirement(`${buckets.required} ${job.education || ''}`)
@@ -491,7 +346,7 @@ export function scoreJob(profile: CvProfile, job: AtsJob): AtsResult {
   fitScore = Math.max(0, Math.min(100, fitScore))
   const blockers: AtsBlocker[] = []
   const sponsorshipText = `${description} ${tagText} ${(job.sponsorshipEvidence || []).join(' ')}`
-  if (isUsRole(job) && profile.requiresUsSponsorship === true && NO_SPONSORSHIP_RE.test(sponsorshipText)) blockers.push({ code: 'visa_sponsorship', label: 'Visa sponsorship unavailable', critical: true })
+  if (isUsRole(job) && profile.requiresUsSponsorship === true && isNoSponsorshipRequirement(sponsorshipText)) blockers.push({ code: 'visa_sponsorship', label: 'Visa sponsorship unavailable', critical: true })
   const missingCriteria: string[] = []
   if (requiredExperience !== undefined && exp.gap > 0) missingCriteria.push(`${requiredExperience}+ years experience`)
   if (requiredSeniority && seniority.gap > 0) missingCriteria.push(`${requiredSeniority.charAt(0).toUpperCase() + requiredSeniority.slice(1)} seniority`)
