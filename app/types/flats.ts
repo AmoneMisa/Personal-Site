@@ -11,6 +11,12 @@ export interface FlatVisionResult {
   data?: Record<string, FlatVisionEvidence>;
 }
 
+export interface FlatMarketComparison {
+  goodPrice: boolean;
+  medianUsd: number | null;
+  comparableCount: number;
+}
+
 export type FlatAudience = "women" | "men" | "family";
 
 export interface FlatListing {
@@ -87,6 +93,7 @@ export interface FlatListing {
   availableFrom?: string | null;
   tags?: string[];
   vision?: FlatVisionResult;
+  marketComparison?: FlatMarketComparison;
 }
 
 export type FlatStatsDealKey = "sale" | "longRent" | "shortRent" | "roomRent" | "unknown";
