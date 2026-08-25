@@ -16,7 +16,6 @@ const heroStats = computed(() =>
 
 <template>
   <section class="rd-section hero" id="hero-anchor">
-    <ocean-page-backdrop variant="ambient" />
     <div class="rd-wrap">
       <div class="hero__grid">
         <div class="hero__content">
@@ -63,8 +62,6 @@ const heroStats = computed(() =>
 <style scoped lang="scss">
 .hero {
   position: relative;
-  isolation: isolate;
-  overflow: hidden;
   padding: 76px 0 68px;
 }
 .hero > .rd-wrap {
