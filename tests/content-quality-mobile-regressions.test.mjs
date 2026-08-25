@@ -68,7 +68,7 @@ test('map cluster browser clamps into the viewport and detail modal wins the z-i
   assert.match(flatMap, /clampRadialCoordinate/u)
   assert.match(flatMap, /window\.innerWidth/u)
   assert.match(flatMap, /window\.innerHeight/u)
-  assert.match(flatMap, /mobile \? 72 : 94/u)
+  assert.match(flatMap, /if \(mobile\) return count <= 4 \? 72 : 94/u)
   assert.match(detailsModal, /z-\[12000\]/u)
   assert.match(detailsModal, /z-\[12001\]/u)
 })
