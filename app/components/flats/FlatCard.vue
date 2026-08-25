@@ -102,7 +102,7 @@ const emit = defineEmits<{
 .flat-card__checking-icon { width: 26px; height: 26px; color: var(--accent-pink); animation: flat-card-spin .8s linear infinite; }
 @keyframes flat-card-spin { to { transform: rotate(360deg); } }
 .flat-card__photo { position: relative; width: 100%; aspect-ratio: 2 / 1; flex: 0 0 auto; overflow: hidden; background: var(--bg-panel); }
-.flat-card__photo::after { content: ""; position: absolute; z-index: 1; left: 0; right: 0; bottom: 0; height: 40%; pointer-events: none; background: linear-gradient(180deg, rgba(11,16,42,0) 0%, rgba(11,16,42,.14) 34%, rgba(11,16,42,.55) 74%, var(--bg-panel) 100%); }
+.flat-card__photo::after { content: ""; position: absolute; z-index: 1; left: 0; right: 0; bottom: 0; height: 62%; pointer-events: none; background: linear-gradient(180deg, rgba(11,16,42,0) 0%, rgba(11,16,42,.16) 28%, rgba(11,16,42,.52) 58%, rgba(11,16,42,.88) 82%, var(--bg-panel) 100%); }
 .flat-card__photo > img { width: 100%; height: 100%; object-fit: cover; display: block; transition: transform 260ms ease; }
 .flat-card:hover .flat-card__photo > img { transform: scale(1.015); }
 .flat-card__no-photo { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 9px; height: 100%; color: var(--text-muted); font-size: 12px; background: var(--bg-panel-2); }
@@ -112,7 +112,7 @@ const emit = defineEmits<{
 .flat-card__actions { position: absolute; z-index: 3; top: 8px; right: 8px; display: flex; gap: 5px; }
 .flat-card__action { width: 32px; height: 32px; display: inline-grid; place-items: center; padding: 0; border: 1px solid rgba(66,73,116,.86); border-radius: 7px; background: #0d1128; color: #c8cbdb; cursor: pointer; box-shadow: 0 3px 12px rgba(0,0,0,.18); transition: color 150ms ease, border-color 150ms ease, background-color 150ms ease; }
 .flat-card__action:hover, .flat-card__action_active { color: var(--accent-pink); border-color: rgba(224,103,154,.58); background: rgba(26,29,57,.94); }
-.flat-card__body { position: relative; z-index: 2; min-height: 0; flex: 1 1 auto; padding: 11px 13px 12px; display: flex; flex-direction: column; gap: 4px; }
+.flat-card__body { position: relative; z-index: 2; min-height: 0; flex: 1 1 auto; margin-top: -1px; padding: 11px 13px 12px; display: flex; flex-direction: column; gap: 4px; background: var(--bg-panel); }
 .flat-card__price { min-height: 22px; font-weight: 750; font-size: 18px; line-height: 1.2; color: var(--text-white, inherit); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
 .flat-card__price-conv { min-height: 16px; font-size: 12px; font-weight: 500; line-height: 1.35; }.flat-card__price-conv_empty { visibility: hidden; }
 .flat-card__title { min-height: 19px; margin-top: 2px; font-size: 14px; font-weight: 650; line-height: 1.36; display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical; overflow: hidden; text-overflow: ellipsis; white-space: normal; overflow-wrap: anywhere; }.flat-card__spec { min-height: 16px; font-size: 12px; line-height: 1.35; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -123,8 +123,8 @@ const emit = defineEmits<{
 @media (max-width: 760px) {
   .flat-card { display: grid; grid-template-columns: minmax(112px, 42%) minmax(0, 1fr); height: 148px; min-height: 148px; }
   .flat-card__photo { width: 100%; height: 148px; min-height: 0; aspect-ratio: auto; overflow: hidden; }
-  .flat-card__photo::after { inset: 0 0 0 auto; width: 36%; height: auto; background: linear-gradient(90deg, rgba(11,16,42,0) 0%, rgba(11,16,42,.16) 34%, rgba(11,16,42,.58) 72%, var(--bg-panel) 100%); }
-  .flat-card__body { min-width: 0; padding: 7px 8px 7px 6px; gap: 1px; overflow: hidden; }
+  .flat-card__photo::after { inset: 0 0 0 auto; width: 44%; height: auto; background: linear-gradient(90deg, rgba(11,16,42,0) 0%, rgba(11,16,42,.18) 26%, rgba(11,16,42,.56) 58%, rgba(11,16,42,.9) 84%, var(--bg-panel) 100%); }
+  .flat-card__body { min-width: 0; margin-top: 0; padding: 7px 8px 7px 6px; gap: 1px; overflow: hidden; }
   .flat-card__price { min-height: 17px; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .flat-card__price-conv { min-height: 12px; font-size: 9.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .flat-card__title { min-height: 15px; margin-top: 1px; font-size: 11.5px; line-height: 1.25; }
