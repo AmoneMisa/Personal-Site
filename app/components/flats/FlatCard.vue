@@ -15,10 +15,16 @@ const props = defineProps<{
   hideLabel: string;
 }>();
 
+const { locale } = useI18n();
+const aiVisionTitle = computed(() => String(locale.value).startsWith("en")
+  ? "Detected using AI vision"
+  : "Распознано при помощи AI-зрения");
+const visionLabels = computed(() => new Set(props.presentation.visionBadgeLabels || []));
 const pillItems = computed<DraggablePillItem[]>(() => props.presentation.badges.map((badge, index) => ({
   key: `${badge}:${index}`,
   label: badge,
-  className: "flat-card__badge",
+  className: visionLabels.value.has(badge) ? "flat-card__badge flat-card__badge_vision" : "flat-card__badge",
+  title: visionLabels.value.has(badge) ? aiVisionTitle.value : undefined,
 })));
 
 const emit = defineEmits<{
@@ -77,8 +83,31 @@ const emit = defineEmits<{
 .flat-card__price { min-height: 22px; font-weight: 750; font-size: 18px; line-height: 1.2; color: var(--text-white, inherit); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
 .flat-card__price-conv { min-height: 16px; font-size: 12px; font-weight: 500; line-height: 1.35; }.flat-card__price-conv_empty { visibility: hidden; }
 .flat-card__title { min-height: 19px; margin-top: 2px; font-size: 14px; font-weight: 650; line-height: 1.36; display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical; overflow: hidden; text-overflow: ellipsis; white-space: normal; overflow-wrap: anywhere; }.flat-card__spec { min-height: 16px; font-size: 12px; line-height: 1.35; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.flat-card__badges { min-height: 27px; margin-top: 5px; }.flat-card__badges :deep(.flat-card__badge) { border-radius: 999px; padding: 4px 7px; font-size: 10.5px; font-weight: 600; line-height: 1.15; background: rgba(255,255,255,0.05); color: var(--text-primary); }
+.flat-card__badges { min-height: 27px; margin-top: 5px; }.flat-card__badges :deep(.flat-card__badge) { border-radius: 999px; padding: 4px 7px; font-size: 10.5px; font-weight: 600; line-height: 1.15; background: rgba(255,255,255,0.05); color: var(--text-primary); }.flat-card__badges :deep(.flat-card__badge_vision) { border-color: rgba(56,189,248,.36); color: #8bdcf7; background: rgba(56,189,248,.08); }
 .flat-card__meta { display: flex; align-items: center; justify-content: space-between; gap: 6px 10px; margin-top: auto; padding-top: 8px; font-size: 11.5px; line-height: 1.35; }.flat-card__location { min-width: 0; display: inline-flex; align-items: center; gap: 5px; flex: 1 1 auto; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }.flat-card__meta-tail { display: inline-flex; flex: 0 0 auto; gap: 5px; white-space: nowrap; margin-left: auto; }.flat-card__src { text-transform: capitalize; opacity: 0.72; }
 .flat-card_favorite { border-color: rgba(224,103,154,0.52); }.flat-card_hidden { opacity: 0.64; border-style: dashed; }
-@media (max-width: 760px) { .flat-card__photo { aspect-ratio: 16 / 10; } }
+
+/* Phone cards are deliberately horizontal and fixed-height. The former 16:10
+   hero image consumed most of a mobile viewport, making one listing roughly
+   twice as tall as needed. */
+@media (max-width: 760px) {
+  .flat-card { display: grid; grid-template-columns: minmax(118px, 40%) minmax(0, 1fr); height: 188px; min-height: 188px; }
+  .flat-card__photo { width: 100%; height: 188px; min-height: 0; aspect-ratio: auto; overflow: hidden; }
+  .flat-card__photo::after { inset: 0 -18px 0 auto; width: 42%; height: auto; background: linear-gradient(90deg, transparent 0%, rgba(11,16,42,.36) 48%, var(--bg-panel) 96%); }
+  .flat-card__body { min-width: 0; padding: 9px 10px 9px 8px; gap: 2px; overflow: hidden; }
+  .flat-card__price { min-height: 19px; font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .flat-card__price-conv { min-height: 14px; font-size: 10.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .flat-card__title { min-height: 17px; margin-top: 1px; font-size: 12.5px; line-height: 1.3; }
+  .flat-card__spec { min-height: 14px; font-size: 10.5px; }
+  .flat-card__badges { min-height: 24px; margin-top: 3px; }
+  .flat-card__badges :deep(.flat-card__badge) { padding: 3px 6px; font-size: 9.5px; }
+  .flat-card__meta { gap: 4px; padding-top: 4px; font-size: 9.5px; }
+  .flat-card__meta-tail { gap: 3px; }
+  .flat-card__location { gap: 3px; }
+  .flat-card__deal { top: 7px; left: 7px; max-width: calc(100% - 70px); padding: 5px 6px; font-size: 9.5px; }
+  .flat-card__actions { top: 6px; right: 6px; gap: 4px; }
+  .flat-card__action { width: 27px; height: 27px; }
+  .flat-card__no-photo { gap: 5px; padding: 8px; font-size: 10px; text-align: center; }
+  .flat-card__no-photo-icon { width: 26px; height: 26px; }
+}
 </style>

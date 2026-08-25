@@ -60,6 +60,14 @@ export function useFlatPresentation(options: FlatPresentationOptions) {
   const ptLabel = (propertyType: FlatListing["propertyType"]) =>
     propertyType === "house" ? t("ptHouse") : t("ptFlat");
 
+  const conditionLabel = (condition?: FlatListing["condition"]) =>
+    condition === "needs_renovation" ? t("condNeeds")
+      : condition === "basic" ? t("condBasic")
+        : condition === "good" ? t("condGood")
+          : condition === "modern" ? t("condModern")
+            : condition === "luxury" ? t("condLuxury")
+              : "";
+
   function hasMeaningfulTitle(value: string): boolean {
     const content = value
       .replace(/[\p{Extended_Pictographic}\p{Emoji_Presentation}\p{Emoji_Modifier}\p{Variation_Selector}\p{Join_Control}]/gu, "")
@@ -113,6 +121,10 @@ export function useFlatPresentation(options: FlatPresentationOptions) {
       "pets allowed": "badgePet",
       "children allowed": "badgeChildren",
       "utilities included": "badgeUtilIncl",
+      "washing machine": "amenityWashingMachine",
+      dishwasher: "amenityDishwasher",
+      tv: "amenityTelevision",
+      television: "amenityTelevision",
     };
     const directKey = direct[normalized];
     if (directKey) return t(directKey);
@@ -141,34 +153,63 @@ export function useFlatPresentation(options: FlatPresentationOptions) {
     return "";
   }
 
-  function badges(listing: FlatListing): string[] {
+  function badgeData(listing: FlatListing): { values: string[]; visionLabels: string[] } {
     const values: string[] = [];
-    if (options.getView() !== "active" || options.getAgency() === "any") values.push(listing.byAgency ? t("badgeAgency") : t("badgeOwner"));
-    if (listing.commission === false) values.push(t("badgeNoCommission"));
-    else if (listing.commissionPercent != null) values.push(t("badgeCommissionPercent", { n: listing.commissionPercent }));
-    else if (listing.commission === true) values.push(t("badgeCommission"));
-    if (listing.newBuilding) values.push(t("badgeNew"));
-    if (listing.furnished) values.push(t("badgeFurnished"));
-    if (listing.airConditioner) values.push(t("badgeAC"));
-    if (listing.balcony) values.push(t("badgeBalcony"));
-    if (listing.parking) values.push(t("badgeParking"));
-    if (listing.elevator) values.push(t("badgeElevator"));
-    if (listing.internet) values.push(t("badgeInternet"));
-    if (listing.negotiable) values.push(t("badgeNegotiable"));
-    if (listing.petsAllowed) values.push(t("badgePet"));
-    if (listing.childrenAllowed) values.push(t("badgeChildren"));
-    if (listing.communalSeparated === false) values.push(t("badgeUtilIncl"));
-    if (listing.deposit === true) values.push(t("badgeDeposit"));
-    if (listing.audience === "family") values.push(t("badgeFamily"));
-    if (listing.audience === "women") values.push(t("badgeWomen"));
-    if (listing.audience === "men") values.push(t("badgeMen"));
+    const visionLabels: string[] = [];
+    const derived = new Set((listing.vision?.derivedFields || []).map(String));
+    const push = (label: string, visionField?: string) => {
+      if (!label) return;
+      values.push(label);
+      if (visionField && derived.has(visionField)) visionLabels.push(label);
+    };
+
+    if (options.getView() !== "active" || options.getAgency() === "any") push(listing.byAgency ? t("badgeAgency") : t("badgeOwner"));
+    if (listing.commission === false) push(t("badgeNoCommission"));
+    else if (listing.commissionPercent != null) push(t("badgeCommissionPercent", { n: listing.commissionPercent }));
+    else if (listing.commission === true) push(t("badgeCommission"));
+    if (listing.newBuilding) push(t("badgeNew"));
+    if (listing.furnished) push(t("badgeFurnished"), "furnished");
+    if (listing.airConditioner) push(t("badgeAC"), "airConditioner");
+    if (listing.balcony) push(t("badgeBalcony"), "balcony");
+    if (listing.parking) push(t("badgeParking"), "parking");
+    if (listing.elevator) push(t("badgeElevator"), "elevator");
+    if (listing.internet) push(t("badgeInternet"));
+    if (listing.negotiable) push(t("badgeNegotiable"));
+    if (listing.petsAllowed) push(t("badgePet"));
+    if (listing.childrenAllowed) push(t("badgeChildren"));
+    if (listing.communalSeparated === false) push(t("badgeUtilIncl"));
+    if (listing.deposit === true) push(t("badgeDeposit"));
+    if (listing.audience === "family") push(t("badgeFamily"));
+    if (listing.audience === "women") push(t("badgeWomen"));
+    if (listing.audience === "men") push(t("badgeMen"));
+
+    // Facts that are normally too detailed for a compact card become useful when
+    // AI vision supplied them: users can immediately see what the photos added.
+    if (derived.has("bedrooms") && listing.bedrooms != null) push(`${t("specBedrooms")}: ${listing.bedrooms}`, "bedrooms");
+    if (derived.has("bathrooms") && listing.bathrooms != null) push(`${t("specBathrooms")}: ${listing.bathrooms}`, "bathrooms");
+    if (derived.has("condition") && listing.condition) push(conditionLabel(listing.condition), "condition");
+
+    const visionAmenityLabels: Record<string, string> = {
+      washingMachine: t("amenityWashingMachine"),
+      dishwasher: t("amenityDishwasher"),
+      tv: t("amenityTelevision"),
+    };
+    for (const [field, label] of Object.entries(visionAmenityLabels)) {
+      if (derived.has(field)) push(label, field);
+    }
+
     for (const tag of listing.tags || []) {
       const normalized = tag.trim().toLowerCase().replace(/[_-]+/g, " ").replace(/\s+/g, " ");
       if (semanticListingTags.has(normalized)) continue;
       const label = nearbyItemLabel(tag).trim();
-      if (label) values.push(label);
+      if (label) push(label);
     }
-    return [...new Set(values)];
+
+    const uniqueValues = [...new Set(values)];
+    return {
+      values: uniqueValues,
+      visionLabels: [...new Set(visionLabels)].filter((label) => uniqueValues.includes(label)),
+    };
   }
 
   function priceLabel(listing: FlatListing): string {
@@ -187,6 +228,7 @@ export function useFlatPresentation(options: FlatPresentationOptions) {
     if (listing.rooms != null) specification.push(t("roomsN", { n: listing.rooms }));
     if (listing.areaSqm != null) specification.push(`${listing.areaSqm} ${t("sqm")}`);
     if (listing.floor != null) specification.push(listing.totalFloors != null ? `${listing.floor}/${listing.totalFloors} ${t("floorAbbr")}` : `${listing.floor} ${t("floorAbbr")}`);
+    const badgeResult = badgeData(listing);
 
     return {
       title: displayListingTitle(listing),
@@ -196,7 +238,8 @@ export function useFlatPresentation(options: FlatPresentationOptions) {
       location: [locName(listing.city, "city"), locName(listing.district, "district"), locName(listing.metro, "metro")].filter(Boolean).join(", "),
       dealLabel: cardDealLabel(listing),
       dealTone: dealTone(listing),
-      badges: badges(listing),
+      badges: badgeResult.values,
+      visionBadgeLabels: badgeResult.visionLabels,
       dateLabel: formatRelativeDate(listing.createdAt, {
         today: () => t("today"),
         yesterday: () => t("yesterday"),

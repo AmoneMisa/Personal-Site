@@ -190,6 +190,17 @@ function clusterSpreadPx(c: Cluster) {
   return Math.hypot(maxX - minX, maxY - minY);
 }
 
+function radialRadius(count: number): number {
+  const mobile = window.innerWidth <= 640;
+  if (mobile) return count <= 4 ? 72 : 94;
+  return count <= 4 ? 112 : 142;
+}
+
+function clampRadialCoordinate(value: number, clearance: number, viewport: number): number {
+  if (viewport <= clearance * 2) return viewport / 2;
+  return Math.min(viewport - clearance, Math.max(clearance, value));
+}
+
 function openCluster(c: Cluster) {
   const L = (window as any).L;
   if (c.items.length === 1) {
@@ -204,7 +215,17 @@ function openCluster(c: Cluster) {
   const pt = map.latLngToContainerPoint([c.lat, c.lng]);
   const rect = el.value?.getBoundingClientRect();
   if (!rect) return;
-  radial.value = { x: rect.left + pt.x, y: rect.top + pt.y, items: [...c.items], page: 0 };
+
+  const count = Math.min(c.items.length, RADIAL_PAGE_SIZE);
+  const radius = radialRadius(count);
+  const mobile = window.innerWidth <= 640;
+  const halfTabWidth = mobile ? 39 : 48;
+  const halfTabHeight = mobile ? 33 : 43;
+  const rawX = rect.left + pt.x;
+  const rawY = rect.top + pt.y;
+  const x = clampRadialCoordinate(rawX, radius + halfTabWidth + 8, window.innerWidth);
+  const y = clampRadialCoordinate(rawY, radius + halfTabHeight + 8, window.innerHeight);
+  radial.value = { x, y, items: [...c.items], page: 0 };
 }
 
 function pick(id: string) {
@@ -213,7 +234,7 @@ function pick(id: string) {
 }
 
 function slotStyle(i: number, n: number) {
-  const radius = n <= 4 ? 112 : 142;
+  const radius = radialRadius(n);
   const angle = (-90 + (360 / Math.max(1, n)) * i) * (Math.PI / 180);
   const x = Math.cos(angle) * radius;
   const y = Math.sin(angle) * radius;
@@ -458,4 +479,17 @@ onBeforeUnmount(() => {
 
 :deep(.leaflet-container) { background: var(--bg-panel); font-family: inherit; }
 :deep(.leaflet-popup-content) { font-size: 13px; }
+
+@media (max-width: 640px) {
+  .flat-map-shell_full { padding: 0; }
+  .flat-map-shell_full .flat-map { border: 0; border-radius: 0; }
+  .flat-map__tools { top: max(8px, env(safe-area-inset-top)); right: 8px; gap: 5px; }
+  .flat-map__tool { min-height: 32px; padding-inline: 8px; font-size: 12px; }
+  .flat-radial__hub { width: 52px; height: 52px; grid-template-columns: 15px 22px 15px; }
+  .flat-radial__hub-arrow { font-size: 23px; }
+  .flat-radial__hub-count { font-size: 9px; }
+  .flat-radial__tab { width: 76px; border-radius: 7px; }
+  .flat-radial__thumb { height: 46px; }
+  .flat-radial__price { padding: 3px 4px; font-size: 10px; }
+}
 </style>
