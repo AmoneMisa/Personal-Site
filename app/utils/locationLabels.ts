@@ -16,10 +16,15 @@ const DISTRICT_RU: Record<string, string> = {
   Almaly: 'Алмалинский', Bostandyk: 'Бостандыкский', Medeu: 'Медеуский',
   Auezov: 'Ауэзовский', Turksib: 'Турксибский', Nauryzbay: 'Наурызбайский',
   Alatau: 'Алатауский', Zhetysu: 'Жетысуский',
-  // Kyiv
-  Podil: 'Подол', Pechersk: 'Печерск', Obolon: 'Оболонь', Shevchenkivskyi: 'Шевченковский',
-  Solomianskyi: 'Соломенский', Darnytskyi: 'Дарницкий', Holosiivskyi: 'Голосеевский',
-  Dniprovskyi: 'Днепровский', Sviatoshynskyi: 'Святошинский', Desnianskyi: 'Деснянский',
+  // Ukraine — canonical backend values are transliterated, display stays localized.
+  Podil: 'Подол', Pechersk: 'Печерск', Pecherskyi: 'Печерский', Obolon: 'Оболонь',
+  Shevchenkivskyi: 'Шевченковский', Solomianskyi: 'Соломенский',
+  Darnytskyi: 'Дарницкий', Holosiivskyi: 'Голосеевский', Dniprovskyi: 'Днепровский',
+  Sviatoshynskyi: 'Святошинский', Desnianskyi: 'Деснянский', Prymorskyi: 'Приморский',
+  Frankivskyi: 'Франковский', Tsentralnyi: 'Центральный', 'Tsentralno-Miskyi': 'Центрально-Городской',
+  // Chernivtsi local areas / microdistricts.
+  Tsentr: 'Центр', Prospekt: 'Проспект', Ruska: 'Русская', Hraviton: 'Гравитон',
+  Komarova: 'Комарова', Roscha: 'Роща', Sadgora: 'Садгора', Avtovokzal: 'Автовокзал',
   // Bucharest
   Pipera: 'Пипера', Militari: 'Милитари', 'Drumul Taberei': 'Друмул Таберей',
   Titan: 'Титан', Berceni: 'Берчень', Floreasca: 'Флоряска', Dorobanti: 'Доробанць',
