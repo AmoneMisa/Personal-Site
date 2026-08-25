@@ -34,7 +34,7 @@ const METRO_RU: Record<string, string> = {
   Paxtakor: 'Пахтакор', 'Xalqlar Dostligi': 'Халклар Дустлиги', 'Milliy Bog': 'Миллий Бог',
   Novza: 'Новза', 'Mirzo Ulugbek': 'Мирзо Улугбек', Chilonzor: 'Чиланзар', Olmazor: 'Алмазар',
   Choshtepa: 'Чаштепа', Ozgarish: 'Узгариш', Sergeli: 'Сергели', Yangihayot: 'Янгихаёт',
-  Chinor: 'Чинар', Beruniy: 'Беруни', Tinchlik: 'Тинлик', Chorsu: 'Чорсу',
+  Chinor: 'Чинар', Beruniy: 'Беруни', Tinchlik: 'Тинчлик', Chorsu: 'Чорсу',
   'Gafur Gulom': 'Гафур Гулям', 'Alisher Navoi': 'Алишер Навои', Ozbekiston: 'Узбекистан',
   Kosmonavtlar: 'Космонавтлар', Oybek: 'Ойбек', Toshkent: 'Ташкент',
   Mashinasozlar: 'Машинасозлар', Dostlik: 'Дустлик', Turkiston: 'Туркистон',
