@@ -3,8 +3,12 @@ import type { FlatFeedResult, FlatListing, FlatStatistics } from "~/types/flats"
 import { safeFetch } from "~/utils/safeFetch";
 import { useLatestRequest } from "~/composables/search/useLatestRequest";
 
+export function useFlatListingsState() {
+  return useState<FlatListing[]>("flat-finder:listings", () => []);
+}
+
 export function useFlatFeed(options: { onAvailabilityChecked?: (keys: string[]) => void } = {}) {
-  const listings = ref<FlatListing[]>([]);
+  const listings = useFlatListingsState();
   const total = ref(0);
   const loading = ref(false);
   const loadingMore = ref(false);
