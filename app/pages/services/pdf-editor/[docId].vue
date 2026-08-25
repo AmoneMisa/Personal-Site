@@ -4,8 +4,10 @@ import PdfEditorControls from "~/components/pdfEditor/PdfEditorControls.vue";
 import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from "vue";
 import { BaseFabricObject, Canvas, Ellipse, FabricImage, FabricObject, PencilBrush, Rect, Textbox } from "fabric";
 import {usePdfDraft} from "~/composables/pdfEditor/usePdfDraft";
+import {usePdfAlignmentGuides} from "~/composables/pdfEditor/usePdfAlignmentGuides";
+import {usePdfCanvasHistory} from "~/composables/pdfEditor/usePdfCanvasHistory";
+import {collectPdfImageEdits, collectPdfTextEdits} from "~/utils/pdfEditor/edits";
 import type {
-  PdfAlignGuide as AlignGuide,
   PdfBrushShape as BrushShape,
   PdfDeletedImage as DeletedImg,
   PdfEditorMode as Mode,
@@ -22,6 +24,7 @@ import type {
 } from "~/types/pdfEditor";
 import {
   PDF_FONT_FAMILIES as FONT_FAMILIES,
+  PDF_SERIALIZED_PROPERTIES,
   clampInt,
   createPdfBlockId as genBlockId,
   ensurePdfEditorFontsReady as ensureEditorFontsReady,
@@ -32,7 +35,6 @@ import {
   resolvePdfFontFamily as resolveFontFamily,
   rgbaFromHex,
   setFabricObjectByTopLeft as setByTopLeft,
-  withPdfPointGeometry as withOrigPoints,
 } from "~/utils/pdfEditor/core";
 
 (BaseFabricObject as any).ownDefaults.originX = "center";
@@ -90,13 +92,6 @@ const displayScale = ref(1);
 const linkArmed = ref(false);
 // pages whose editable text was already auto-loaded on open
 const autoLoaded = reactive<Record<number, boolean>>({});
-
-// --- Figma-style alignment guides (shown while dragging an object)
-// Each guide is a line in displayed-canvas CSS pixels: vertical guides use
-// `pos` as x and span [start,end] in y; horizontal guides are the transpose.
-const alignGuides = ref<AlignGuide[]>([]);
-// snap threshold in CSS px: how close an edge/center must be to lock on
-const SNAP_PX = 6;
 
 // --- original embedded images loaded as movable objects
 // raw extracted image as returned by the backend (PNG pixel space at `dpi`)
@@ -156,15 +151,10 @@ const selected = reactive<PdfSelectedObjectState>({
 // --- draft (per-page json)
 const pageJson = reactive<Record<number, any>>({});
 
-// --- history (per current page)
-const history = reactive({
-  stack: [] as any[],
-  idx: -1,
-  lock: false,
-});
-
 // fabric canvas instance
 let c: Canvas | null = null;
+
+const { alignGuides, clearGuides, onObjectMoving } = usePdfAlignmentGuides(() => c);
 
 // --- preview URL
 const previewUrl = computed(() => {
@@ -205,7 +195,22 @@ const {
   pageJson,
   deletedImages,
   api,
-  getCurrentPageJson: () => c?.toJSON(["id", "tool", "opacityPct", "orig", "name"]) ?? null,
+  getCurrentPageJson: () => c?.toJSON(PDF_SERIALIZED_PROPERTIES) ?? null,
+});
+
+const {
+  history,
+  canUndo,
+  canRedo,
+  pushHistory,
+  undo,
+  redo,
+  resetHistory,
+} = usePdfCanvasHistory({
+  page,
+  pageJson,
+  getCanvas: () => c,
+  scheduleSave: scheduleSaveDraft,
 });
 
 // =========================
@@ -226,18 +231,6 @@ async function refreshInfo() {
 // =========================
 // Fabric helpers
 // =========================
-function pushHistory() {
-  if (!c || history.lock) return;
-
-  const snap = c.toJSON(["id", "tool", "opacityPct", "orig", "name"]);
-  history.stack = history.stack.slice(0, history.idx + 1);
-  history.stack.push(snap);
-  history.idx = history.stack.length - 1;
-
-  pageJson[page.value] = snap;
-  scheduleSaveDraft();
-}
-
 function ensureFabric() {
   if (!overlayCanvasRef.value) return;
 
@@ -310,108 +303,6 @@ function resizeToPreview() {
   displayScale.value = 1 / (calcMultiplier() || 1);
 }
 
-// =========================
-// Alignment guides + snapping (Figma-style)
-// =========================
-type Edges = { left: number; top: number; right: number; bottom: number; cx: number; cy: number };
-
-function edgesOf(o: any): Edges {
-  const r = o.getBoundingRect();
-  return {
-    left: r.left,
-    top: r.top,
-    right: r.left + r.width,
-    bottom: r.top + r.height,
-    cx: r.left + r.width / 2,
-    cy: r.top + r.height / 2,
-  };
-}
-
-function clearGuides() {
-  if (alignGuides.value.length) alignGuides.value = [];
-}
-
-// While dragging: snap the moving object's edges/center to the edges/centers of
-// the other objects (and the canvas centre lines), and surface guide lines for
-// every axis that locked on.
-function onObjectMoving(e: any) {
-  const obj = e?.target;
-  if (!c || !obj) {
-    clearGuides();
-    return;
-  }
-  // only single, axis-aligned objects snap (skip multi-selections & rotated)
-  if (obj.type === "activeselection" || Math.round(obj.angle || 0) % 360 !== 0) {
-    clearGuides();
-    return;
-  }
-
-  const others = c.getObjects().filter((o: any) => o !== obj && o.visible !== false);
-  const m = edgesOf(obj);
-  const cw = c.getWidth();
-  const ch = c.getHeight();
-
-  // vertical (x) snap candidates: {target x, y-extent of the reference}
-  const vCand: { t: number; a: number; b: number }[] = [{ t: cw / 2, a: 0, b: ch }];
-  // horizontal (y) snap candidates: {target y, x-extent of the reference}
-  const hCand: { t: number; a: number; b: number }[] = [{ t: ch / 2, a: 0, b: cw }];
-  for (const o of others) {
-    const r = edgesOf(o);
-    vCand.push({ t: r.left, a: r.top, b: r.bottom });
-    vCand.push({ t: r.cx, a: r.top, b: r.bottom });
-    vCand.push({ t: r.right, a: r.top, b: r.bottom });
-    hCand.push({ t: r.top, a: r.left, b: r.right });
-    hCand.push({ t: r.cy, a: r.left, b: r.right });
-    hCand.push({ t: r.bottom, a: r.left, b: r.right });
-  }
-
-  let bestX: { d: number; t: number; a: number; b: number } | null = null;
-  for (const mv of [m.left, m.cx, m.right]) {
-    for (const cand of vCand) {
-      const d = cand.t - mv;
-      if (Math.abs(d) <= SNAP_PX && (bestX === null || Math.abs(d) < Math.abs(bestX.d))) {
-        bestX = { d, t: cand.t, a: cand.a, b: cand.b };
-      }
-    }
-  }
-
-  let bestY: { d: number; t: number; a: number; b: number } | null = null;
-  for (const mv of [m.top, m.cy, m.bottom]) {
-    for (const cand of hCand) {
-      const d = cand.t - mv;
-      if (Math.abs(d) <= SNAP_PX && (bestY === null || Math.abs(d) < Math.abs(bestY.d))) {
-        bestY = { d, t: cand.t, a: cand.a, b: cand.b };
-      }
-    }
-  }
-
-  if (bestX) obj.left = (obj.left || 0) + bestX.d;
-  if (bestY) obj.top = (obj.top || 0) + bestY.d;
-  if (bestX || bestY) obj.setCoords();
-
-  const guides: AlignGuide[] = [];
-  const mm = edgesOf(obj);
-  if (bestX) {
-    guides.push({
-      k: "v",
-      v: true,
-      pos: bestX.t,
-      start: Math.min(bestX.a, mm.top),
-      end: Math.max(bestX.b, mm.bottom),
-    });
-  }
-  if (bestY) {
-    guides.push({
-      k: "h",
-      v: false,
-      pos: bestY.t,
-      start: Math.min(bestY.a, mm.left),
-      end: Math.max(bestY.b, mm.right),
-    });
-  }
-  alignGuides.value = guides;
-}
-
 // After restoring a draft, rebuild the page's photo frame from any image that
 // still carries a circular clip, so entering/leaving the circle keeps toggling.
 function recoverPhotoFrame(p: number) {
@@ -438,7 +329,7 @@ function loadCanvasForPage(p: number) {
   if (json) {
     c.loadFromJSON(json, () => {
       history.lock = false;
-      history.stack = [c!.toJSON(["id", "tool", "opacityPct", "orig"])];
+      history.stack = [c!.toJSON(PDF_SERIALIZED_PROPERTIES)];
       history.idx = 0;
       recoverPhotoFrame(p);
       c!.requestRenderAll();
@@ -451,7 +342,7 @@ function loadCanvasForPage(p: number) {
     });
   } else {
     history.lock = false;
-    history.stack = [c.toJSON(["id", "tool", "opacityPct", "orig", "name"])];
+    history.stack = [c.toJSON(PDF_SERIALIZED_PROPERTIES)];
     history.idx = 0;
     c.requestRenderAll();
   }
@@ -771,7 +662,7 @@ function clearPage() {
   c.getObjects().forEach(trackDeletedImage);
   c.clear();
   c.requestRenderAll();
-  pageJson[page.value] = c.toJSON(["id", "tool", "opacityPct", "orig", "name"]);
+  pageJson[page.value] = c.toJSON(PDF_SERIALIZED_PROPERTIES);
   scheduleSaveDraft();
 }
 
@@ -1222,38 +1113,6 @@ function toggleFullMode() {
 }
 
 // =========================
-// Undo/Redo (local)
-// =========================
-const canUndo = computed(() => history.idx > 0);
-const canRedo = computed(() => history.idx >= 0 && history.idx < history.stack.length - 1);
-
-function undo() {
-  if (!c || !canUndo.value) return;
-  history.idx -= 1;
-
-  history.lock = true;
-  c.loadFromJSON(history.stack[history.idx], () => {
-    history.lock = false;
-    c!.requestRenderAll();
-    pageJson[page.value] = history.stack[history.idx];
-    scheduleSaveDraft();
-  });
-}
-
-function redo() {
-  if (!c || !canRedo.value) return;
-  history.idx += 1;
-
-  history.lock = true;
-  c.loadFromJSON(history.stack[history.idx], () => {
-    history.lock = false;
-    c!.requestRenderAll();
-    pageJson[page.value] = history.stack[history.idx];
-    scheduleSaveDraft();
-  });
-}
-
-// =========================
 // Page switching
 // =========================
 async function setPage(p: number) {
@@ -1262,7 +1121,7 @@ async function setPage(p: number) {
   const nextP = clampInt(p, 1, pages.value);
   if (nextP === page.value) return;
 
-  pageJson[page.value] = c.toJSON(["id", "tool", "opacityPct", "orig", "name"]);
+  pageJson[page.value] = c.toJSON(PDF_SERIALIZED_PROPERTIES);
   page.value = nextP;
 
   await nextTick();
@@ -1313,104 +1172,6 @@ function calcMultiplier(): number {
   return Number.isFinite(m) && m > 0 ? m : 1;
 }
 
-// Collect editable PDF-text objects (tool === "pdftext") from the current canvas.
-// `mult` converts display coords -> natural PNG pixels; `dpiVal` is the DPI those
-// pixels were rendered at, used to also express geometry in DPI-independent points.
-function collectTextEditsFromCanvas(mult: number, dpiVal: number): TextEditBlock[] {
-  if (!c) return [];
-  const blocks: TextEditBlock[] = [];
-
-  c.getObjects().forEach((o: any) => {
-    if (o?.tool !== "pdftext") return;
-
-    const sw = o.getScaledWidth?.() ?? o.width ?? 0;
-    const sh = o.getScaledHeight?.() ?? o.height ?? 0;
-
-    // natural PNG pixels (at dpiVal), top-left origin
-    const xPx = ((o.left ?? 0) - sw / 2) * mult;
-    const yPx = ((o.top ?? 0) - sh / 2) * mult;
-    const wPx = sw * mult;
-    const hPx = sh * mult;
-    const fsPx = (o.fontSize ?? 12) * mult;
-
-    blocks.push({
-      id: o.id,
-      text: String(o.text ?? ""),
-      x: Math.round(xPx),
-      y: Math.round(yPx),
-      w: Math.round(wPx),
-      h: Math.round(hPx),
-      fontSize: Math.round(fsPx),
-      xPt: pxToPt(xPx, dpiVal),
-      yPt: pxToPt(yPx, dpiVal),
-      wPt: pxToPt(wPx, dpiVal),
-      hPt: pxToPt(hPx, dpiVal),
-      fontSizePt: pxToPt(fsPx, dpiVal),
-      fontName: String(o.fontFamily ?? "Helvetica"),
-      bold: String(o.fontWeight ?? "normal") === "bold",
-      italic: String(o.fontStyle ?? "normal") === "italic",
-      underline: !!o.underline,
-      align: String(o.textAlign ?? "left"),
-      color: hexFromColor(o.fill),
-      opacity: o.opacity ?? 1,
-      angle: o.angle ?? 0,
-      orig: withOrigPoints((o.orig ?? null) as OrigBlockMeta | null),
-    });
-  });
-
-  return blocks;
-}
-
-// Collect moved/resized/rotated original images (tool === "pdfimg") from the
-// current canvas. Only images whose geometry differs from the extracted
-// original are emitted; untouched images are left byte-for-byte in the source.
-function collectImageEditsFromCanvas(mult: number, dpiVal: number): ImageEdit[] {
-  if (!c) return [];
-  const out: ImageEdit[] = [];
-
-  c.getObjects().forEach((o: any) => {
-    if (o?.tool !== "pdfimg" || !o.orig) return;
-
-    const sw = o.getScaledWidth?.() ?? o.width ?? 0;
-    const sh = o.getScaledHeight?.() ?? o.height ?? 0;
-    const ctr = o.getCenterPoint?.() ?? { x: o.left ?? 0, y: o.top ?? 0 };
-
-    // natural PNG pixels (at dpiVal), unrotated box, top-left origin
-    const wPx = sw * mult;
-    const hPx = sh * mult;
-    const xPx = ctr.x * mult - wPx / 2;
-    const yPx = ctr.y * mult - hPx / 2;
-    const angle = o.angle ?? 0;
-
-    const cur = {
-      xPt: pxToPt(xPx, dpiVal),
-      yPt: pxToPt(yPx, dpiVal),
-      wPt: pxToPt(wPx, dpiVal),
-      hPt: pxToPt(hPx, dpiVal),
-    };
-
-    const op = withOrigPoints(o.orig as OrigBlockMeta);
-    const origPt = {
-      xPt: op?.xPt ?? 0,
-      yPt: op?.yPt ?? 0,
-      wPt: op?.wPt ?? 0,
-      hPt: op?.hPt ?? 0,
-    };
-
-    const moved =
-      Math.abs(cur.xPt - origPt.xPt) > 0.5 ||
-      Math.abs(cur.yPt - origPt.yPt) > 0.5 ||
-      Math.abs(cur.wPt - origPt.wPt) > 0.5 ||
-      Math.abs(cur.hPt - origPt.hPt) > 0.5 ||
-      Math.abs(angle) > 0.1;
-    if (!moved) return;
-
-    out.push({ name: String(o.name || ""), ...cur, angle, deleted: false, orig: origPt });
-  });
-
-  return out;
-}
-
 async function exportOverlaysPngByPage(): Promise<{
   overlays: Record<number, string>;
   textEdits: Record<number, TextEditBlock[]>;
@@ -1419,14 +1180,14 @@ async function exportOverlaysPngByPage(): Promise<{
   if (!c) return { overlays: {}, textEdits: {}, imageEdits: {} };
 
   // save current page json
-  pageJson[page.value] = c.toJSON(["id", "tool", "opacityPct", "orig", "name"]);
+  pageJson[page.value] = c.toJSON(PDF_SERIALIZED_PROPERTIES);
 
   const overlays: Record<number, string> = {};
   const textEdits: Record<number, TextEditBlock[]> = {};
   const imageEdits: Record<number, ImageEdit[]> = {};
 
   const curPage = page.value;
-  const curJson = c.toJSON(["id", "tool", "opacityPct", "orig", "name"]);
+  const curJson = c.toJSON(PDF_SERIALIZED_PROPERTIES);
 
   for (let p = 1; p <= pages.value; p++) {
     const json = pageJson[p];
@@ -1442,13 +1203,13 @@ async function exportOverlaysPngByPage(): Promise<{
           const mult = calcMultiplier();
 
           // structured edited text blocks (backend redacts originals / re-typesets)
-          const blocks = collectTextEditsFromCanvas(mult, dpi.value);
+          const blocks = collectPdfTextEdits(c!, mult, dpi.value);
           if (blocks.length) textEdits[p] = blocks;
 
           // structured image edits: changed originals + originals deleted on
           // this page (backend redacts + vector re-inserts). Skip a "deleted"
           // entry whose image is actually still present (e.g. after undo).
-          const changed = collectImageEditsFromCanvas(mult, dpi.value);
+          const changed = collectPdfImageEdits(c!, mult, dpi.value);
           const presentNames = new Set(
             c!.getObjects()
               .filter((o: any) => o?.tool === "pdfimg")
@@ -1688,8 +1449,7 @@ watch(docId, async () => {
   Object.keys(pageLinks).forEach((k) => delete pageLinks[Number(k)]);
   Object.keys(autoLoaded).forEach((k) => delete autoLoaded[Number(k)]);
   Object.keys(deletedImages).forEach((k) => delete deletedImages[Number(k)]);
-  history.stack = [];
-  history.idx = -1;
+  resetHistory();
   errorMsg.value = null;
 
   await nextTick();
@@ -1711,7 +1471,7 @@ onBeforeUnmount(() => {
   if (img && onPreviewLoad) img.removeEventListener("load", onPreviewLoad as any);
 
   if (c) {
-    pageJson[page.value] = c.toJSON(["id", "tool", "opacityPct", "orig", "name"]);
+    pageJson[page.value] = c.toJSON(PDF_SERIALIZED_PROPERTIES);
     saveDraftNow();
     c.dispose();
     c = null;

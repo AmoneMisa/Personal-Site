@@ -1,235 +1,35 @@
 <script setup lang="ts">
 import CustomButton from "~/components/common/CustomButton.vue";
-import {downloadBlob, formatFileSize} from "~/utils/files";
-import {useFileCollection} from "~/composables/ui/useFileCollection";
+import {formatFileSize} from "~/utils/files";
+import {useConverterState} from "~/composables/converter/useConverterState";
 
-const { t } = useI18n();
+const {t} = useI18n();
 
 useServiceSeo("converter");
 
-type Mode = "media" | "data" | "document";
-type MediaTarget = "png" | "jpg" | "jpeg" | "webp" | "gif" | "bmp" | "tiff" | "avif";
-type DataTarget = "csv" | "json" | "xml" | "xlsx" | "yaml" | "tsv";
-type DocTarget = "docx" | "pdf" | "txt" | "html" | "md" | "odt" | "rtf";
-
-const config = useRuntimeConfig();
-
-const mode = ref<Mode>("media");
-
-const targets = computed(() => {
-  if (mode.value === "media") return ["png", "jpeg", "jpg", "webp", "gif", "bmp", "tiff", "avif"] as MediaTarget[];
-  if (mode.value === "data") return ["csv", "json", "xml", "xlsx", "yaml", "tsv"] as DataTarget[];
-  return ["pdf", "docx", "txt", "html", "md", "odt", "rtf"] as DocTarget[];
-});
-
-const target = ref<string>("webp");
-
-watch(mode, (m) => {
-  if (m === "media") target.value = "webp";
-  if (m === "data") target.value = "json";
-  if (m === "document") target.value = "pdf";
-  clearFiles();
-});
-
-const accept = computed(() => {
-  if (mode.value === "media") return ".png,.jpg,.jpeg,.webp,.gif,.bmp,.tif,.tiff,.avif";
-  if (mode.value === "data") return ".csv,.json,.xml,.xlsx,.yaml,.yml,.tsv";
-  return ".docx,.pdf,.txt,.html,.htm,.md,.odt,.rtf";
-});
-
-const maxFiles = computed(() => (mode.value === "media" ? 20 : 1));
-const isMultiple = computed(() => mode.value === "media");
-
-const isLoading = ref(false);
-
-const errorMessage = ref<string | null>(null);
-const successMessage = ref<string | null>(null);
-
 const {
+  mode,
+  target,
+  accept,
+  maxFiles,
+  isMultiple,
+  isLoading,
+  errorMessage,
+  successMessage,
   files,
-  inputRef: fileInputRef,
+  fileInputRef,
   isDragging,
-  pickFromInput,
-  openPicker: openFilePicker,
-  clearFiles: clearSelectedFiles,
   removeFile,
-  onDrop: addDroppedFiles,
   onDragOver,
   onDragLeave,
-} = useFileCollection({
-  multiple: isMultiple,
-  maxFiles,
-  onLimit: (limit) => {
-    successMessage.value = t("services.converter.messages.tookFirst", {count: limit});
-  },
-});
-
-function clearMessages() {
-  errorMessage.value = null;
-  successMessage.value = null;
-}
-
-function clearFiles() {
-  clearSelectedFiles();
-  clearMessages();
-}
-
-function openPicker() {
-  clearMessages();
-  openFilePicker();
-}
-
-function pickFilesFromInput(e: Event) {
-  clearMessages();
-  pickFromInput(e);
-}
-
-function onDrop(e: DragEvent) {
-  clearMessages();
-  addDroppedFiles(e);
-}
-
-function fileExt(name: string) {
-  const p = name.split(".");
-  return (p[p.length - 1] || "").toLowerCase();
-}
-
-function validate(): boolean {
-  clearMessages();
-
-  if (!files.value.length) {
-    errorMessage.value = t("services.converter.messages.noFiles");
-    return false;
-  }
-
-  if (mode.value !== "media" && files.value.length !== 1) {
-    errorMessage.value = t("services.converter.messages.singleOnly");
-    return false;
-  }
-
-  if (mode.value === "media" && files.value.length > 20) {
-    errorMessage.value = t("services.converter.messages.mediaMax");
-    return false;
-  }
-
-  const allowed =
-      mode.value === "media" ? ["png", "jpg", "jpeg", "webp", "gif", "bmp", "tif", "tiff", "avif"]
-          : mode.value === "data" ? ["csv", "json", "xml", "xlsx", "yaml", "yml", "tsv"]
-              : ["docx", "pdf", "txt", "html", "htm", "md", "odt", "rtf"];
-
-  const bad = files.value.find(f => !allowed.includes(fileExt(f.name)));
-  if (bad) {
-    errorMessage.value = t("services.converter.messages.unsupported", { name: bad.name });
-    return false;
-  }
-
-  return true;
-}
-
-function getFilenameFromContentDisposition(cd: string | null) {
-  if (!cd) return null;
-
-  const mStar = cd.match(/filename\*\s*=\s*UTF-8''([^;]+)/i);
-  if (mStar?.[1]) {
-    try {
-      return decodeURIComponent(mStar[1].replace(/"/g, ""));
-    } catch {
-      return mStar[1].replace(/"/g, "");
-    }
-  }
-
-  const m = cd.match(/filename\s*=\s*"([^"]+)"/i) || cd.match(/filename\s*=\s*([^;]+)/i);
-  if (m?.[1]) return m[1].trim().replace(/(^"|"$)/g, "");
-
-  return null;
-}
-
-const endpoint = computed(() => {
-  if (mode.value === "media") return `${config.public.apiBase}/convert/media`;
-  if (mode.value === "data") return `${config.public.apiBase}/convert/data`;
-  return `${config.public.apiBase}/convert/document`;
-});
-
-async function convert() {
-  if (!validate()) return;
-
-  isLoading.value = true;
-  clearMessages();
-
-  try {
-    const fd = new FormData();
-
-    if (mode.value === "media") {
-      for (const f of files.value) fd.append("files", f);
-      fd.append("target", target.value);
-    } else {
-      fd.append("file", files.value[0]);
-      fd.append("target", target.value);
-    }
-
-    const res = await fetch(endpoint.value, {
-      method: "POST",
-      body: fd,
-      credentials: "include",
-    });
-
-    if (!res.ok) {
-      let payload: any = null;
-      try {
-        payload = await res.json();
-      } catch {
-      }
-      errorMessage.value = payload?.detail?.message || payload?.message || t("services.converter.messages.httpError", { status: res.status });
-      return;
-    }
-
-    const blob = await res.blob();
-    const cd = res.headers.get("content-disposition");
-    const serverName = getFilenameFromContentDisposition(cd);
-
-    const normalizedTarget = target.value === "jpeg" ? "jpg" : target.value;
-
-    const fallback =
-        mode.value === "media"
-            ? (files.value.length > 1 ? "converted_media.zip" : `${files.value[0].name.replace(/\.[^.]+$/, "")}.${normalizedTarget}`)
-            : `${files.value[0].name.replace(/\.[^.]+$/, "")}.${normalizedTarget}`;
-
-    downloadBlob(blob, serverName || fallback);
-    successMessage.value = t("services.converter.messages.success");
-  } catch (e: any) {
-    errorMessage.value = e?.message || t("services.converter.messages.failed");
-  } finally {
-    isLoading.value = false;
-  }
-}
-
-const modeCards = computed(() => ([
-  {
-    key: "media" as const,
-    title: t("services.converter.modes.media.title"),
-    desc: t("services.converter.modes.media.desc"),
-    icon: "i-lucide-image"
-  },
-  {
-    key: "data" as const,
-    title: t("services.converter.modes.data.title"),
-    desc: t("services.converter.modes.data.desc"),
-    icon: "i-lucide-database"
-  },
-  {
-    key: "document" as const,
-    title: t("services.converter.modes.docs.title"),
-    desc: t("services.converter.modes.docs.desc"),
-    icon: "i-lucide-file-text"
-  },
-]));
-
-const targetItems = computed(() =>
-    targets.value.map(v => ({
-      label: v.toUpperCase(),
-      value: v
-    }))
-);
+  clearFiles,
+  openPicker,
+  pickFilesFromInput,
+  onDrop,
+  convert,
+  modeCards,
+  targetItems,
+} = useConverterState();
 </script>
 
 <template>

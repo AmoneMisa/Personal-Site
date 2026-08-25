@@ -1,5 +1,7 @@
 import type {PdfOriginalBlockMeta} from "~/types/pdfEditor";
 
+export const PDF_SERIALIZED_PROPERTIES = ["id", "tool", "opacityPct", "orig", "name"];
+
 export const PDF_FONT_FAMILIES = [
   "Helvetica",
   "Arial",

@@ -1,4 +1,4 @@
-import {ref, reactive, computed, watch, type Component} from "vue";
+import {ref, reactive, computed, watch, type Component, type ShallowUnwrapRef} from "vue";
 import type {Truth} from "~/utils/mergeJson/pick";
 import {
     safeParseJson,
@@ -25,6 +25,7 @@ export type SortMode = "asc" | "desc";
 export type ViewMode = "json" | "tree" | "flat";
 export type Pane = "A" | "B" | "R";
 export type Pick = "AUTO" | "A" | "B" | "EDITED" | "ADDED";
+export type MergeJsonUi = ShallowUnwrapRef<ReturnType<typeof useMergeJsonState>>;
 
 export function useMergeJsonState() {
     const viewMode = ref<ViewMode>("json");
