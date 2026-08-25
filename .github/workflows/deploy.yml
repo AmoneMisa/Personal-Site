@@ -3,6 +3,7 @@ name: Build and deploy Personal Site
 on:
   push:
     branches: [ master ]
+  workflow_dispatch:
 
 concurrency:
   group: personal-site-production
@@ -39,10 +40,13 @@ jobs:
         env:
           BEFORE_SHA: ${{ github.event.before }}
           CURRENT_SHA: ${{ github.sha }}
+          EVENT_NAME: ${{ github.event_name }}
         run: |
           set -euo pipefail
 
-          if [[ -z "$BEFORE_SHA" || "$BEFORE_SHA" =~ ^0+$ ]]; then
+          if [[ "$EVENT_NAME" == "workflow_dispatch" ]]; then
+            changed_files="__FULL_BUILD__"
+          elif [[ -z "$BEFORE_SHA" || "$BEFORE_SHA" =~ ^0+$ ]]; then
             changed_files="__FULL_BUILD__"
           else
             changed_files="$(git diff --name-only "$BEFORE_SHA" "$CURRENT_SHA")"
