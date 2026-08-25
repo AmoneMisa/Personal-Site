@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { safeFetch } from "~/utils/safeFetch";
 import JobCard from "~/components/jobs/JobCard.vue";
-import JobGrid from "~/components/jobs/JobGrid.vue";
+import SearchResultGrid from "~/components/search/SearchResultGrid.vue";
 import SearchDetailsModal from "~/components/search/SearchDetailsModal.vue";
 import SearchPageShell from "~/components/search/SearchPageShell.vue";
 import SearchSavedTabs from "~/components/search/SearchSavedTabs.vue";
@@ -624,9 +624,9 @@ onBeforeUnmount(() => {
     />
     <RecentlyViewed :jobs="recentlyViewed" @open="openSharedJob" />
 
-    <JobGrid :items="scored">
-      <template #default="{ job, ats }">
+    <SearchResultGrid class="jobs__grid">
       <JobCard
+          v-for="{ job, ats } in scored"
           :key="job.id"
           :job="job"
           :ats="ats"
@@ -642,8 +642,7 @@ onBeforeUnmount(() => {
           @favorite="toggleFavorite"
           @hidden="toggleHidden"
       />
-      </template>
-    </JobGrid>
+    </SearchResultGrid>
     <SearchEmptyState v-if="!loading && !(warming && savedView === 'active') && !displayedJobs.length && !failed" :message="t('empty')" />
 
     <div v-if="savedView === 'active' && sort !== 'ats' && displayedJobs.length" ref="loadMoreSentinel" class="jobs__load-more">
@@ -771,6 +770,9 @@ onBeforeUnmount(() => {
 }
 @keyframes jobs-warming { to { opacity: 0.35; } }
 .jobs__filter-blocks { grid-column: 1 / -1; }
+.jobs__grid :deep(.job-card) { height: 100%; min-height: 0; }
+.jobs__grid :deep(.job-card__footer) { margin-top: 12px; padding-top: 0; }
+.jobs__grid :deep(.job-card__salary-separator) { display: none; }
 .jobs__filter-blocks :deep(.search-filter-blocks__grid) { align-items: end; }
 .jobs-filter-group__grid { display: grid; grid-template-columns: 1fr; gap: 12px; align-items: end; }
 .jobs-filter-group__flags { display: flex; flex-wrap: wrap; gap: 14px 24px; align-items: center; }

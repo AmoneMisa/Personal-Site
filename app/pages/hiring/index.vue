@@ -2,7 +2,7 @@
 import { safeFetch } from "~/utils/safeFetch";
 import { locationLabel } from "~/utils/locationLabels";
 import CandidateCard from "~/components/hiring/CandidateCard.vue";
-import CandidateGrid from "~/components/hiring/CandidateGrid.vue";
+import SearchResultGrid from "~/components/search/SearchResultGrid.vue";
 import SearchDetailsModal from "~/components/search/SearchDetailsModal.vue";
 import SearchPageShell from "~/components/search/SearchPageShell.vue";
 import SearchSavedTabs from "~/components/search/SearchSavedTabs.vue";
@@ -575,9 +575,9 @@ onBeforeUnmount(() => {
       :rates="usdRates"
       :statistics="view === 'active' ? statistics : null"
     />
-    <CandidateGrid :profiles="displayedProfiles" :dense="denseGrid">
-      <template #default="{ profile }">
+    <SearchResultGrid :dense="denseGrid" equal-rows>
       <CandidateCard
+        v-for="profile in displayedProfiles"
         :key="profile.id"
         :profile="profile"
         :favorite="isFavorite(profile.id)"
@@ -589,8 +589,7 @@ onBeforeUnmount(() => {
         @toggle-favorite="toggleFavorite(profile)"
         @toggle-hidden="toggleHidden(profile)"
       />
-      </template>
-    </CandidateGrid>
+    </SearchResultGrid>
     <div ref="loadMoreSentinel" v-if="hasMore" class="hiring__sentinel">
       <span v-if="loadingMore" class="text-muted">{{ t("loadingMore") }}</span>
     </div>

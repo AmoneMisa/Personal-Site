@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import { readFile } from 'node:fs/promises'
 
 const card = await readFile(new URL('../app/components/flats/FlatCard.vue', import.meta.url), 'utf8')
-const grid = await readFile(new URL('../app/components/flats/FlatGrid.vue', import.meta.url), 'utf8')
+const grid = await readFile(new URL('../app/components/search/SearchResultGrid.vue', import.meta.url), 'utf8')
 const stats = await readFile(new URL('../app/components/flats/StatsPanel.vue', import.meta.url), 'utf8')
 const feed = await readFile(new URL('../app/composables/flats/useFlatFeed.ts', import.meta.url), 'utf8')
 const presentation = await readFile(new URL('../app/composables/flats/useFlatPresentation.ts', import.meta.url), 'utf8')
@@ -19,7 +19,7 @@ const advancedFilters = await readFile(new URL('../app/components/search/SearchA
 
 test('flat cards stay equal within a row and use the target compact desktop/mobile geometry', () => {
   assert.match(grid, /align-items: stretch/u)
-  assert.doesNotMatch(grid, /grid-auto-rows:\s*1fr/u)
+  assert.doesNotMatch(page, /<SearchResultGrid[^>]*\bequal-rows\b/u)
   assert.match(grid, /@media \(min-width: 1440px\)[^}]*repeat\(4, minmax\(0, 1fr\)\)/u)
   assert.doesNotMatch(grid, /repeat\(5, minmax\(0, 1fr\)\)/u)
   assert.match(card, /\.flat-card \{[^}]*height: 100%/u)

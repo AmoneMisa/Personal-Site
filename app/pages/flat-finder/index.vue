@@ -3,7 +3,7 @@ import { safeFetch } from "~/utils/safeFetch";
 import { metroLabelWithAlias, locationLabel, type LocationKind } from "~/utils/locationLabels";
 import FlatMap from "~/components/flats/FlatMap.client.vue";
 import FlatCard from "~/components/flats/FlatCard.vue";
-import FlatGrid from "~/components/flats/FlatGrid.vue";
+import SearchResultGrid from "~/components/search/SearchResultGrid.vue";
 import FlatGallery from "~/components/flats/FlatGallery.vue";
 import SearchDetailsModal from "~/components/search/SearchDetailsModal.vue";
 import SearchPageShell from "~/components/search/SearchPageShell.vue";
@@ -645,9 +645,9 @@ onBeforeUnmount(() => { modalOpen.value = false; lightboxOpen.value = false; rel
     <FlatsStatsPanel v-if="view === 'active' && statistics" :statistics="statistics" :display-currency="displayCurrency" :convert="convert" />
 <section v-if="listings.length" class="flats__map-wrap"><flat-map :points="mapPoints" :draw-label="t('drawArea')" :done-label="t('done')" :clear-label="t('clearArea')" :draw-hint="t('drawHint')" :expand-label="t('mapExpand')" :collapse-label="t('mapCollapse')" @select="openById" @area-change="drawnArea = $event" /></section>
 
-    <FlatGrid :listings="displayedListings">
-      <template #default="{ listing: l }">
+    <SearchResultGrid>
       <FlatCard
+        v-for="l in displayedListings"
         :key="listingKey(l)"
         :listing="l"
         :photo="listingPhoto(l)"
@@ -664,8 +664,7 @@ onBeforeUnmount(() => { modalOpen.value = false; lightboxOpen.value = false; rel
         @toggle-hidden="toggleHidden(l)"
         @photo-error="markPhotoFailedFromEvent"
       />
-      </template>
-    </FlatGrid>
+    </SearchResultGrid>
 <div ref="loadMoreSentinel" v-if="hasMore" class="flats__sentinel"><span v-if="loadingMore" class="text-muted">{{ t("loadingMore") }}</span></div>
     <SearchEmptyState v-if="!loading && !displayedListings.length && !failed" :message="t('empty')"><div v-if="drawnArea.length >= 3 && listings.length" class="text-muted">{{ t("emptyArea") }}</div></SearchEmptyState>
 
