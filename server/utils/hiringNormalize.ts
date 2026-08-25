@@ -8,25 +8,22 @@ import { extractCandidateAge, extractCandidateGender, extractCandidateName } fro
 import { ishBorLocationFromText, trimIshBorProfileText } from './hiringIshBorFields'
 import { careeristRoleFromText, trimCareeristProfileText } from './hiringCareeristFields'
 import { parseSalary as parseWebSalary } from './hiringWebFields'
-
-const B = '(?<![\\p{L}\\p{N}])'
-const E = '(?![\\p{L}\\p{N}])'
-const rule = (body: string) => new RegExp(`${B}(?:${body})${E}`, 'iu')
-
-const SENIORITY_RULES: [Seniority, RegExp][] = [
-  ['lead', rule("tech\\s*lead|team\\s*lead|teamlead|tim\\s*lid|lead|head\\s+of|руководител\\p{L}*|тимлид\\p{L}*|лид")],
-  ['senior', rule('senior|sr\\.?|синьор\\p{L}*|сеньор\\p{L}*|ведущий|старший')],
-  ['middle', rule('middle|mid-?level|mid|мидл\\p{L}*|миддл\\p{L}*|средний\\s+уровень')],
-  ['junior', rule('junior|jr\\.?|джуниор\\p{L}*|джун|младший|trainee|intern(?:ship)?|стажер|стажёр|начинающий')],
-]
+import {
+  detectProfessionMatches,
+  detectSharedSeniority,
+  resolveSharedProfessionContext,
+} from './hiringLexicon'
 
 const JUNIOR_CONTRADICTION_YEARS = 4
 
 export function detectSeniority(text: string, experienceYears?: number | null): Seniority | null {
-  for (const [level, re] of SENIORITY_RULES) {
-    if (!re.test(text)) continue
-    if (level === 'junior' && (experienceYears ?? 0) >= JUNIOR_CONTRADICTION_YEARS) break
-    return level
+  const shared = detectSharedSeniority(text) as Seniority | null
+  if (shared) {
+    // Explicit staff/principal/lead/head/director/vp/chief must never collapse to senior.
+    if ((shared === 'intern' || shared === 'junior') && (experienceYears ?? 0) >= JUNIOR_CONTRADICTION_YEARS) {
+      return (experienceYears ?? 0) >= 6 ? 'senior' : 'middle'
+    }
+    return shared
   }
   if (experienceYears == null) return null
   if (experienceYears >= 6) return 'senior'
@@ -64,134 +61,23 @@ export function normalizeSkills(rawSkills: string[] | undefined, text: string): 
   return [...out]
 }
 
-interface ProfessionRule { name: string; re: RegExp }
-const PROFESSION_RULES: ProfessionRule[] = [
-  // Management / office / sales.
-  { name: 'Chief Executive Officer', re: /\b(?:ceo|chief\s+executive\s+officer)\b|генеральн\p{L}*\s+директор|гендиректор|виконавч\p{L}*\s+директор/iu },
-  { name: 'Chief Technology Officer', re: /\b(?:cto|chief\s+technology\s+officer)\b|техническ\p{L}*\s+директор|технічн\p{L}*\s+директор/iu },
-  { name: 'Sales Manager', re: /\b(?:sales\s+(?:manager|executive|director)|account\s+manager|head\s+of\s+sales)\b|менеджер\s+(?:по\s+)?(?:экспортн\p{L}*\s+)?продаж|менеджер\s+з\s+продаж|руководител\p{L}*\s+отдела\s+продаж|(?<!\p{L})роп(?!\p{L})|sotuv\s+menejer/iu },
-  { name: 'Project Manager', re: /\bproject\s+manager\b|проектн(?:ый|ий)\s+менеджер|менеджер\s+проект|керівник\s+проєкт/iu },
-  { name: 'Product Manager', re: /\bproduct\s+manager\b|продакт\s*менеджер|менеджер\s+продукт/iu },
-  { name: 'Store Manager', re: /\bstore\s+manager\b|управляющ(?:ий|ая)\s+магазин|заведующ(?:ий|ая)\s+магазин|керуюч(?:ий|а)\s+магазин/iu },
-  { name: 'Restaurant Manager', re: /\brestaurant\s+manager\b|управляющ(?:ий|ая)\s+(?:ресторан|кафе)|керуюч(?:ий|а)\s+(?:ресторан|кафе)/iu },
-  { name: 'General Manager', re: /\bgeneral\s+manager\b|управляющ(?:ий|ая)\b|керуюч(?:ий|а)\b|директор|director/iu },
-  { name: 'Supervisor', re: /\bsupervisor\b|супервайзер|старший\s+смены|керівник\s+зміни|начальник\s+отряд/iu },
-  { name: 'Consultant', re: /\bconsultant\b|консультант|консультантка/iu },
-  { name: 'HR / Recruiter', re: /\b(?:hr|human\s+resources|recruiter|talent\s+acquisition|people\s+partner|hrbp|hrd)\b|рекрутер|сорсер|кадровик|кадров\p{L}*\s+аудит|hr[-\s]?менеджер/iu },
-  { name: 'Office Manager', re: /\boffice\s+manager\b|офис[-\s]?менеджер|офіс[-\s]?менеджер/iu },
-  { name: 'Administrator', re: /\badministrator\b|администратор|адміністратор/iu },
-  { name: 'Receptionist', re: /\breceptionist\b|рецепционист|рецепціоніст|ресепшн/iu },
-  { name: 'Manager', re: /\bmanager\b|менеджер|menejer/iu },
-  { name: 'Chief Accountant', re: /\b(?:chief|head)\s+accountant\b|главн\p{L}*\s+б[уy](?:х|x)?галтер|головн\p{L}*\s+бухгалтер|bosh\s+b(?:u(?:x|h)?|o)?galter/iu },
-  { name: 'Accountant', re: /\baccountant\b|б[уy](?:х|x)?галтер(?:ия)?|b(?:u(?:x|h)?|o)?galter(?:iya)?/iu },
-  { name: 'Treasurer', re: /\btreasurer\b|казначей|скарбник|g['’ʻʼ‘`]?aznachi/iu },
-  { name: 'Cashier', re: /\bcashier\b|кассир|касир|kassir|kassa\s+(?:xodimi|mudiri)/iu },
-  { name: 'Salesperson', re: /\b(?:salesperson|sales\s+assistant|shop\s+assistant|seller)\b|продавец|продавець|продавчин|sotuvchi/iu },
-  { name: 'Merchandiser', re: /\bmerchandiser\b|мерчендайзер|мерчандайзер/iu },
-  { name: 'Promoter', re: /\bpromoter\b|промоутер/iu },
-  { name: 'Chat Operator', re: /\bchat[-\s]+operator(?:i)?\b|оператор\s+чат(?:а|у)?|чат[-\s]+оператор/iu },
-  { name: 'Call Center Operator', re: /\b(?:call|koll)[-\s]?(?:center|centre|markaz)\s+operator(?:i)?\b|оператор\s+(?:колл|call)[-\s]?центр|(?:колл|call)[-\s]?центр(?:а|у)?\s+оператор/iu },
-  { name: 'Customer Support', re: /\b(?:customer\s+support|support\s+specialist|call\s*center)\b|поддержк|підтримк|колл[-\s]?центр|call[-\s]?центр/iu },
-  { name: 'Operator', re: /\boperator(?:lik|i)?\b|оператор/iu },
-  { name: 'Copywriter', re: /\bcopywriter\b|копирайтер|копірайтер|составлени\p{L}*\s+текст|наборщик\s+текста/iu },
-
-  // Logistics / security / service.
-  { name: 'Courier', re: /\bcourier\b|курьер|кур'єр|kuryer/iu },
-  { name: 'Driver', re: /\bdriver\b|(?<!\p{L})водитель(?!\p{L})|(?<!\p{L})водій(?!\p{L})|\bhaydovchi\b|\bshafyor\b|(?<!\p{L})[СC][ЕE]\s+категори/iu },
-  { name: 'Logistics Specialist', re: /\b(?:logist|logistician|logistics\s+(?:specialist|coordinator|manager))\b|логист\p{L}*/iu },
-  { name: 'Security Guard', re: /\bsecurity(?:\s+guard)?\b|охранник|охоронець|охорона|qorovul|qoriqlash|xavfsizlik/iu },
-  { name: 'Cleaner', re: /\b(?:cleaner|cleaning|housekeeper)\b|уборщик|уборщица|уборка|прибиральник|прибиральниц|домработниц|farrosh/iu },
-  { name: 'Caregiver', re: /\bcaregiver\b|сиделк|доглядальниц|parvarish/iu },
-
-  // HoReCa.
-  { name: 'Bartender', re: /\b(?:bartender|barman)\b|бармен|barmen/iu },
-  { name: 'Barista', re: /\bbarista\b|бариста/iu },
-  { name: 'Waiter', re: /\b(?:waiter|waitress)\b|официант|офіціант|afitsant/iu },
-  { name: 'Hostess', re: /\bhostess\b|хостес/iu },
-  { name: 'Cook / Chef', re: /\b(?:cook|chef)\b|повар|кухар|ошпаз|oshpaz/iu },
-
-  // Sports.
-  { name: 'Fitness Trainer', re: /\b(?:fitness|gym|personal)\s+(?:trainer|coach)\b|тренер\s+(?:в\s+)?(?:спортзал|спортзале|спортзалі|фитнес|фітнес)|фитнес[-\s]?тренер|фітнес[-\s]?тренер/iu },
-  { name: 'Trainer / Coach', re: /\b(?:trainer|coach)\b|тренер|коуч/iu },
-
-  // Medicine.
-  { name: 'Dentist', re: /\bdentist\b|стоматолог|тиш\s+врач|tish\s+shifokor/iu },
-  { name: 'Pharmacist', re: /\bpharmacist\b|фармацевт|провизор|dorixona\s+xodim/iu },
-  { name: 'Doctor', re: /\bdoctor\b|врач|лікар|доктор|shifokor/iu },
-  { name: 'Nurse', re: /\bnurse\b|медсестр|медбрат|медична\s+сестр|hamshira/iu },
-  { name: 'Medical Assistant', re: /\bmedical\s+assistant\b|фельдшер|медичн(?:ий|а)\s+асистент/iu },
-
-  // Education / childcare.
-  { name: 'Tutor', re: /\btutor\b|репетитор|rep(?:e|i)titor(?:lik)?/iu },
-  { name: 'English Teacher', re: /\b(?:english\s+(?:teacher|tutor)|ingliz\s+tili(?:dan)?\s+(?:o['’ʻʼ‘`]?qituvchi|ustoz(?:iman)?))\b|преподавател\p{L}*\s+английск|учител\p{L}*\s+английск/iu },
-  { name: 'Kindergarten Teacher', re: /\bkindergarten\s+teacher\b|воспитател|виховател|tarbiyachi|(?:xususiy\s+)?bog['’ʻʼ‘`]?cha/iu },
-  { name: 'Nanny', re: /\bnanny\b|няня|нянечк|enaga|bola(?:larga)?\s+qarash|bolaga\s+qarash/iu },
-  { name: 'Teacher', re: /\bteacher\b|учитель|вчитель|преподавател|викладач|тьютор|t(?:yutor|itur)(?:lik)?|o['’ʻʼ‘`]?qituvchi(?:lik)?|ustoz(?:iman)?/iu },
-  { name: 'Psychologist', re: /\bpsychologist\b|психолог|psixolog/iu },
-  { name: 'Speech Therapist', re: /\bspeech\s+therapist\b|логопед|logoped/iu },
-
-  // IT / professional. Keep specializations before the generic developer rule.
-  { name: 'Full-stack Developer', re: /\bfull[- ]?stack\s+(?:developer|engineer|dasturchi)\b|\bfullstack\s+dasturchi\b/iu },
-  { name: 'Backend Developer', re: /\bback[- ]?end\s+(?:developer|engineer|dasturchi)\b|\bbackend\s+dasturchi\b/iu },
-  { name: 'Frontend Developer', re: /\b(?:front[- ]?end|frontend|frontet|frontent|fronend)(?:\s+(?:developer|engineer|dasturchi))?\b|фронтенд/iu },
-  { name: 'Mobile Developer', re: /\b(?:mobile|android|ios)\s+(?:developer|engineer|dasturchi)\b/iu },
-  { name: 'System Administrator', re: /\b(?:system|network|windows\s+server)\s+administrator\b|систем(?:ный|ним)\s+администратор|сисадмин|сетевой\s+администратор|tarmoq\s+administrator|tizim\s+administrator/iu },
-  { name: 'IT Specialist', re: /\bit\s+specialist\b|it[-\s]?специалист|специалист\s+по\s+it|\bit(?:ishnik|[-\s]?shnik)\b|айтишник|kompyuter\s+bo(?:['’ʻʼ‘`]?yicha|yicha)\s+ish/iu },
-  { name: 'Software Developer', re: /\b(?:software\s+)?(?:developer|programmer|frontend|front-end|backend|back-end|full[- ]?stack|android|ios)\b|разработчик|розробник|программист|програміст|dasturchi|dasturlash/iu },
-  { name: 'QA Engineer', re: /\b(?:qa|quality\s+assurance|tester|test\s+engineer)\b|тестировщик|тестувальник/iu },
-  { name: 'DevOps Engineer', re: /\bdevops\b/iu },
-  { name: 'Cybersecurity Specialist', re: /\b(?:cybersecurity|cyber\s+security|ciso)\b|информационн\p{L}*\s+безопасност|axborot\s+xavfsizligi/iu },
-  { name: 'Penetration Tester', re: /\b(?:penetration\s+tester|pentester|ethical\s+hacker)\b|пентестер/iu },
-  { name: 'AI / ML Engineer', re: /\b(?:(?:ai|ml|machine\s+learning)\s+(?:engineer|developer)|machine\s+learning\s+specialist)\b|инженер\s+(?:машинного\s+обучения|ии)/iu },
-  { name: 'Data Scientist', re: /\bdata\s+scientist\b|\bdata\s+science\b|дата[-\s]?сайентист/iu },
-  { name: 'Data Engineer', re: /\bdata\s+engineer\b|инженер\s+данных/iu },
-  { name: 'Engineering Manager', re: /\b(?:vp\s+of\s+engineering|head\s+of\s+engineering|engineering\s+manager)\b/iu },
-  { name: 'Hardware Engineer', re: /\b(?:hardware|embedded|pcb)\s*(?:engineer|developer)?\b|друкован\p{L}*\s+плат|печатн\p{L}*\s+плат|мікроконтролер|микроконтроллер/iu },
-  { name: 'Designer', re: /\b(?:designer|ui\/?ux)\b|дизайнер/iu },
-  { name: 'Architect', re: /\barchitect\b|архитектор|архітектор|arxitektor(?:\s+loyihachi)?/iu },
-  { name: 'Analyst', re: /\banalyst\b|аналитик|аналітик/iu },
-  { name: 'Engineer', re: /\bengineer\b|инженер|інженер|muhandis|injiner/iu },
-  { name: 'Marketer', re: /\b(?:marketer|marketing(?:\s+specialist)?|smm)\b|маркетинг|маркетолог|smm[-\s]?специалист/iu },
-  { name: 'Media Specialist', re: /\bmedia\s+specialist\b|специалист\s+по\s+сми|matbuot/iu },
-  { name: 'Quality Inspector', re: /\bquality\s+inspector\b|инспектор\s+по\s+качеств|інспектор\s+з\s+якост/iu },
-  { name: 'Production Manager', re: /\bproduction\s+(?:manager|director)\b|директор\s+по\s+производств/iu },
-  { name: 'Translator', re: /\b(?:translator|interpreter)\b|переводчик|перекладач|таржимон|tarjimon/iu },
-  { name: 'Lawyer', re: /\b(?:lawyer|attorney|legal\s+specialist)\b|юрист|адвокат|правник|yurist/iu },
-  { name: 'Notary', re: /\bnotar(?:y|ius)\b|нотариус/iu },
-  { name: 'Metrology Specialist', re: /\bmetrolog(?:y|iya)\b|метролог|standartlashtirish/iu },
-  { name: 'Economist', re: /\beconomist\b|экономист|(?<!\p{L})iqt(?:i)?sod(?:chi|iy)(?!\p{L})/iu },
-  { name: 'Finance / Banking Specialist', re: /\b(?:finance|banking)\s+specialist\b|специалист\s+по\s+(?:финанс|банков)|moliya|(?<!\p{L})bank(?!\p{L})|soliq/iu },
-  { name: 'Oil & Gas Worker', re: /\boil\s*(?:&|and)?\s*gas\b|нефт\p{L}*\s*(?:и|&)?\s*газ\p{L}*|neft\s*(?:va\s*)?gaz(?:\s+soha\p{L}*)?/iu },
-  { name: 'Biotechnologist', re: /\bbiotechnologist\b|биотехнолог|biotexnolog/iu },
-  { name: 'Laboratory Technician', re: /\blaboratory\s+technician\b|лаборант|laborant/iu },
-
-  // Construction / production / warehouse.
-  { name: 'General Laborer', re: /\b(?:general\s+laborer|handyman)\b|разнорабоч|різнороб/iu },
-  { name: 'Construction Worker', re: /\b(?:builder|construction\s+worker)\b|строител|будівельник|qurilish/iu },
-  { name: 'Welder', re: /\bwelder\b|сварщик|зварювальник|payvandchi/iu },
-  { name: 'Electrician', re: /\belectrician\b|электрик|електрик/iu },
-  { name: 'Plumber', re: /\bplumber\b|сантехник|сантехнік/iu },
-  { name: 'Mechanic', re: /\bmechanic\b|механик|механік/iu },
-  { name: 'Warehouse Manager', re: /\bwarehouse\s+manager\b|начальник\s+склад|заведующ\p{L}*\s+склад|керівник\s+склад/iu },
-  { name: 'Warehouse Worker', re: /\bwarehouse\b|кладовщик|комплектовщик|комірник|склад(?:ской|ський)?\s+работник/iu },
-  { name: 'Packer', re: /\bpacker\b|упаковщик|упаковщица|пакувальник|qadoqlovchi/iu },
-  { name: 'Factory Worker', re: /\bfactory\s+worker\b|рабоч(?:ий|ая)\s+(?:на\s+)?(?:заводе|производстве)|працівник\s+виробництва|ishlab\s+chiqarish/iu },
-  { name: 'Loader', re: /\bloader\b|грузчик|вантажник/iu },
-  { name: 'Seamstress', re: /\bseamstress\b|швея|швачка|tikuvchi/iu },
-]
-
-const SPECIFIC_MANAGER_ROLES = new Set([
-  'Chief Executive Officer', 'Chief Technology Officer',
-  'Sales Manager', 'Project Manager', 'Product Manager', 'Store Manager', 'Restaurant Manager',
-  'General Manager', 'HR / Recruiter', 'Office Manager', 'Warehouse Manager', 'Logistics Specialist',
+const PROFESSION_ACRONYMS = new Map<string, string>([
+  ['qa', 'QA'], ['hr', 'HR'], ['ui', 'UI'], ['ux', 'UX'], ['ai', 'AI'], ['ml', 'ML'],
+  ['seo', 'SEO'], ['sre', 'SRE'], ['dba', 'DBA'], ['crm', 'CRM'], ['erp', 'ERP'], ['pmo', 'PMO'],
 ])
-const SPECIFIC_DEVELOPER_ROLES = new Set([
-  'Full-stack Developer', 'Backend Developer', 'Frontend Developer', 'Mobile Developer',
-])
-const SPECIFIC_TECH_ROLES = new Set([
-  'QA Engineer', 'DevOps Engineer', 'Cybersecurity Specialist', 'Penetration Tester',
-  'AI / ML Engineer', 'Data Scientist', 'Data Engineer', 'Hardware Engineer',
-])
+
+function formatProfessionCanonical(canonical: string): string {
+  return canonical.split('_').map((part) =>
+    PROFESSION_ACRONYMS.get(part) || `${part.charAt(0).toUpperCase()}${part.slice(1)}`,
+  ).join(' ')
+}
+
+function collectProfessions(source: string): string[] {
+  return [...new Set(
+    detectProfessionMatches(source, 16).map((match) => formatProfessionCanonical(match.canonical)),
+  )]
+}
+
 const NON_TARGET_CONTEXT_RE = /(?:опыт\s+работы|досвід\s+роботи|work\s+experience|previous|раньше|ранее|прежде|работал|работала|працював|працювала|worked\s+(?:as|at)|oldin|avval|ishlagan|ishladim|tajriba|диплом|diplom|mutaxassisligim)/iu
 const TARGET_CONTEXT_RE = /(?:ищу\s+(?:работу|подработку)|шукаю\s+(?:роботу|підробіток)|желаемая\s+(?:должность|работа)|бажана\s+(?:посада|робота)|target\s+role|desired\s+(?:role|position)|looking\s+for\s+(?:a\s+)?(?:job|work)|open\s+to\s+work|menga\s+ish\s+kerak|ish\s+(?:kerak|qidiryapman|qidiraman|izlayapman)|ish\s+joyi\s+kerak|lavozim|kasb|soha|soxa|maqsad(?:im)?)/iu
 
@@ -302,18 +188,22 @@ function extractGoalRole(text: string): string {
 }
 
 export function normalizeProfessions(rawRole: string | undefined, text: string): string[] {
-  // Desired-role text wins, except when a loose source parser handed us an
-  // explicit work-history/education line instead of a target role.
   const target = cleanRole(rawRole)
   if (FLEXIBLE_ROLE_RE.test(target)) return ['Any Role']
   if (NON_ROLE_RE.test(target)) return []
+
+  const resolved = resolveSharedProfessionContext(text, { mode: 'candidate', title: target }) as {
+    desiredProfession?: { canonical?: string } | null
+    mentionedProfessions?: Array<{ canonical?: string }>
+  }
+  const desired = resolved.desiredProfession?.canonical
+  if (desired) return [formatProfessionCanonical(desired)]
+
   if (target && !NON_TARGET_CONTEXT_RE.test(target)) {
     const targetMatches = collectProfessions(target)
     if (targetMatches.length) return targetMatches
   }
 
-  // Fallback is restricted to job-seeker intent/target context. Do not scan the
-  // whole CV: "worked as cashier" must not become a current Cashier target.
   const contextualMatches = collectProfessions(targetContext(text))
   if (contextualMatches.length) return contextualMatches
   return target && !NON_TARGET_CONTEXT_RE.test(target) ? [target] : []
