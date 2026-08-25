@@ -7,6 +7,10 @@ import {
   detectRecruitmentAgency,
   extractNiceToHaveContext,
 } from '@whiteslove/parsing-lexicon/hiring-source-semantics'
+import {
+  isHiringNonCityLocation,
+  isHiringRemoteLocationScope,
+} from '@whiteslove/parsing-lexicon/hiring-location-fields'
 import { extractHiringDeadline } from '@whiteslove/parsing-lexicon/hiring-temporal'
 import {
   detectApplicationLanguage as detectSharedApplicationLanguage,
@@ -166,7 +170,7 @@ export function resolveCountry(text: string): string | undefined {
 
 function detectCountry(job: Job): string {
   const loc = (job.location || '').trim()
-  if (/worldwide|anywhere|global|remote/i.test(loc) && !/[,]/.test(loc)) return 'REMOTE'
+  if (isHiringRemoteLocationScope(loc) || detectWorkModes(loc).includes('remote')) return 'REMOTE'
   // Prefer the location field; but many boards (notably DOU.ua) leave it as a
   // placeholder like "See listing" and only name the city/country in the title,
   // so fall back to the title + tags before giving up.
@@ -183,7 +187,7 @@ function detectCountry(job: Job): string {
 function detectCity(job: Job, country: string): string | undefined {
   const first = cleanText(job.location).split(/[,|·]/)[0]?.trim()
   if (!first || first.length > 80) return undefined
-  if (/^(remote|worldwide|anywhere|global|other|see listing)$/i.test(first)) return undefined
+  if (isHiringNonCityLocation(first) || detectWorkModes(first).includes('remote') || /^(?:other|see listing)$/i.test(first)) return undefined
   const knownCity = detectLexiconCity(first, country)
   if (resolveCountry(first) === country && !knownCity) return undefined
   return knownCity || first
