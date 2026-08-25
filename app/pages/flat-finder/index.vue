@@ -327,15 +327,14 @@ function resetFilters() {
 }
 function setView(next: string) { view.value = next as FlatView; }
 function mapCoordinateLooksSane(listing: Listing): boolean {
+  if (listing.lat == null || listing.lng == null) return false;
   const lat = Number(listing.lat);
   const lng = Number(listing.lng);
-  if (!Number.isFinite(lat) || !Number.isFinite(lng) || Math.abs(lat) > 90 || Math.abs(lng) > 180) return false;
-  // Client-side guard for old cached Odesa rows while the backend repairs and
-  // re-geocodes them. Prevents one offshore point from stretching the whole map.
-  if (listing.country === "UA" && listing.city === "Odesa") {
-    return lat >= 46.25 && lat <= 46.65 && lng >= 30.45 && lng <= 30.88;
-  }
-  return true;
+  // City/locality bounds are validated by the Flat Finder backend. The browser
+  // only rejects malformed global coordinates so newly-supported metropolitan
+  // areas and suburbs are not silently dropped from the map.
+  return Number.isFinite(lat) && Number.isFinite(lng)
+    && Math.abs(lat) <= 90 && Math.abs(lng) <= 180;
 }
 const mapPoints = computed(() => displayedListings.value.filter(mapCoordinateLooksSane).map((l) => ({ id: l.id, lat: l.lat as number, lng: l.lng as number, title: displayListingTitle(l), priceLabel: priceLabel(l), photo: listingPhoto(l) || undefined, source: l.source })));
 
