@@ -63,9 +63,10 @@ export function compactSalaryText(value: string): string {
     const amount = Number(normalized);
     return Number.isFinite(amount) && amount >= 1_000 ? formatCompactNumber(amount) : token;
   });
+  // JavaScript \b is ASCII-oriented, so use explicit Cyrillic token matching.
   return compactNumbers
-    .replace(/\bмесяц\b/giu, "м.")
-    .replace(/\bгод\b/giu, "г.");
+    .replace(/месяц/giu, "м.")
+    .replace(/год/giu, "г.");
 }
 
 export function convertSalaryPeriod(amount: number, from: SalaryPeriod, to: SalaryPeriod): number {
