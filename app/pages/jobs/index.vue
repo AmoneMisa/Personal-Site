@@ -7,6 +7,7 @@ import SearchPageShell from "~/components/search/SearchPageShell.vue";
 import SearchSavedTabs from "~/components/search/SearchSavedTabs.vue";
 import SearchFilterPanel from "~/components/search/SearchFilterPanel.vue";
 import SearchFilterBlocks from "~/components/search/SearchFilterBlocks.vue";
+import SearchAdvancedFilters from "~/components/search/SearchAdvancedFilters.vue";
 import SearchSourceTabs from "~/components/search/SearchSourceTabs.vue";
 import SearchEmptyState from "~/components/search/SearchEmptyState.vue";
 import AtsPanel from "~/components/jobs/AtsPanel.vue";
@@ -590,16 +591,10 @@ onBeforeUnmount(() => {
         </u-button>
       </div>
 
-      <div class="jobs__row jobs__adv-toggle">
-        <button type="button" class="jobs__advbtn" @click="showAdvanced = !showAdvanced">
-          <u-icon :name="showAdvanced ? 'i-lucide-chevron-down' : 'i-lucide-chevron-right'" />
-          {{ t("advanced") }}
-        </button>
-      </div>
-      <div v-if="showAdvanced" class="jobs__advanced">
+      <SearchAdvancedFilters v-model="showAdvanced" :label="t('advanced')">
         <SearchFilterBlocks :blocks="jobFilterBlocks" class="jobs__filter-blocks" />
         <UiFilterFooter class="jobs-filter-actions" :reset-label="t('reset')" @reset="resetFilters" />
-      </div>
+      </SearchAdvancedFilters>
     </SearchFilterPanel>
 
     <div class="jobs__results-toolbar">
@@ -775,17 +770,6 @@ onBeforeUnmount(() => {
   animation: jobs-warming 1s ease-in-out infinite alternate;
 }
 @keyframes jobs-warming { to { opacity: 0.35; } }
-.jobs__adv-toggle { margin-top: -2px; }
-.jobs__advbtn {
-  display: inline-flex; align-items: center; gap: 6px; background: none; border: none;
-  color: var(--ui-text-muted); font-weight: 600; font-size: 13px; cursor: pointer; padding: 0;
-}
-.jobs__advbtn:hover { color: var(--text-white); }
-.jobs__advanced {
-  grid-column: 1 / -1; display: grid; grid-template-columns: 1fr; gap: 12px;
-  padding: 14px; border-radius: 10px; border: 1px solid var(--line); background: var(--ocean-form-surface);
-  box-shadow: 0 18px 42px rgba(2, 5, 18, 0.22);
-}
 .jobs__filter-blocks { grid-column: 1 / -1; }
 .jobs__filter-blocks :deep(.search-filter-blocks__grid) { align-items: end; }
 .jobs-filter-group__grid { display: grid; grid-template-columns: 1fr; gap: 12px; align-items: end; }
@@ -794,7 +778,6 @@ onBeforeUnmount(() => {
 .jobs__field-label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; opacity: 0.7; }
 .jobs__field_inline { align-self: center; min-height: var(--ui-control-h-md); }
 @media (min-width: 700px) {
-  .jobs__advanced { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .jobs-filter-group__grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .jobs-filter-group__grid_salary { grid-template-columns: minmax(0, 1.4fr) minmax(110px, .7fr) minmax(130px, .8fr); }
   .jobs-filter-group__grid_salary .jobs__field_inline { grid-column: 1 / -1; }
@@ -802,7 +785,6 @@ onBeforeUnmount(() => {
   .jobs-filter-actions { grid-column: 1 / -1; }
 }
 @media (min-width: 1200px) {
-  .jobs__advanced { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .jobs-filter-group__grid_location { grid-template-columns: minmax(180px, .8fr) minmax(0, 1.6fr); }
 }
 @media (max-width: 620px) {

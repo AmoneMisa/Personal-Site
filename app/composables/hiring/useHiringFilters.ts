@@ -19,7 +19,7 @@ export function useHiringFilters() {
   const seniority = ref("");
   const skills = ref("");
   const source = ref("");
-  const showAdvanced = ref(true);
+  const showAdvanced = ref(false);
 
   function buildFeedParams(options: { limit: number; offset: number; skillQuery?: string }): Record<string, string> {
     const params: Record<string, string> = { limit: String(options.limit), offset: String(options.offset) };

@@ -9,6 +9,7 @@ import SearchDetailsModal from "~/components/search/SearchDetailsModal.vue";
 import SearchPageShell from "~/components/search/SearchPageShell.vue";
 import SearchSavedTabs from "~/components/search/SearchSavedTabs.vue";
 import SearchFilterBlocks from "~/components/search/SearchFilterBlocks.vue";
+import SearchAdvancedFilters from "~/components/search/SearchAdvancedFilters.vue";
 import SearchPresetDialog from "~/components/search/SearchPresetDialog.vue";
 import SearchShareDialog from "~/components/search/SearchShareDialog.vue";
 import SearchSourceTabs from "~/components/search/SearchSourceTabs.vue";
@@ -249,10 +250,10 @@ function loadPersonalState() {
   loadPresets();
   try { showAdvanced.value = localStorage.getItem("flats:showAdvanced") === "1"; } catch { /* noop */ }
 }
-function toggleAdvanced() {
-  showAdvanced.value = !showAdvanced.value;
-  try { localStorage.setItem("flats:showAdvanced", showAdvanced.value ? "1" : "0"); } catch { /* noop */ }
-}
+watch(showAdvanced, (value) => {
+  if (!import.meta.client) return;
+  try { localStorage.setItem("flats:showAdvanced", value ? "1" : "0"); } catch { /* noop */ }
+});
 
 const activeListings = computed(() => applyDrawnArea(listings.value.filter((item) => !hiddenIds.value.has(item.id))));
 const displayedListings = computed(() => {
@@ -612,7 +613,6 @@ onBeforeUnmount(() => { modalOpen.value = false; lightboxOpen.value = false; rel
         </div>
 
         <UiFilterFooter class="filter-actions-row" :reset-label="t('reset')" @reset="resetFilters">
-          <u-button type="button" variant="outline" color="neutral" icon="i-lucide-sliders-horizontal" :trailing-icon="showAdvanced ? 'i-lucide-chevron-up' : 'i-lucide-chevron-down'" :aria-expanded="showAdvanced" class="advanced-button" @click="toggleAdvanced">{{ showAdvanced ? t("hideFilters") : t("moreFilters") }}</u-button>
           <div class="active-filter-chips">
             <button v-if="district" type="button" class="filter-chip" @click="district = ''; scheduleLoad()">{{ t("district") }}: {{ locName(district, 'district') }} <span>×</span></button>
             <button v-if="roomsMin != null" type="button" class="filter-chip" @click="roomsMin = undefined; scheduleLoad()">{{ roomsMin }}+ {{ t('roomsChip') }} <span>×</span></button>
@@ -621,8 +621,7 @@ onBeforeUnmount(() => { modalOpen.value = false; lightboxOpen.value = false; rel
         </UiFilterFooter>
       </section>
 
-      <section v-if="showAdvanced" class="advanced-card">
-        <div class="advanced-card__header"><div><u-icon name="i-lucide-filter" /><strong>{{ t("moreFilters") }}</strong></div><button type="button" @click="toggleAdvanced">{{ t("hideFilters") }} <u-icon name="i-lucide-chevron-up" /></button></div>
+      <SearchAdvancedFilters v-model="showAdvanced" :label="t('moreFilters')" :hide-label="t('hideFilters')">
         <SearchFilterBlocks :blocks="flatAdvancedFilterBlocks" class="flats__filter-blocks">
           <template #field-quick-options>
             <div class="quick-options">
@@ -633,7 +632,7 @@ onBeforeUnmount(() => { modalOpen.value = false; lightboxOpen.value = false; rel
             </div>
           </template>
         </SearchFilterBlocks>
-      </section>
+      </SearchAdvancedFilters>
       </div>
     </form>
 
@@ -755,15 +754,7 @@ onBeforeUnmount(() => { modalOpen.value = false; lightboxOpen.value = false; rel
   background: var(--ocean-form-surface);
   box-shadow: 0 18px 42px rgba(2, 5, 18, 0.22);
 }
-.filter-card, .advanced-card {
-  position: relative;
-  z-index: 1;
-  border: 0;
-  border-radius: 0;
-  background: transparent;
-  box-shadow: none;
-}
-.filter-card { padding: 16px; }
+.filter-card, .filter-card { padding: 16px; }
 .filter-primary-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; }
 /* Scoped to the value span (not every span, which included the chevron) and
    kept on one line. This rule sits after the one above and previously won with
@@ -786,15 +777,10 @@ onBeforeUnmount(() => { modalOpen.value = false; lightboxOpen.value = false; rel
 .filter-amenities-row__label { margin-right: 4px; white-space: nowrap; }
 .filter-amenities-row :deep(button) { min-height: 30px; height: auto; padding-inline: 9px; white-space: nowrap; }
 .filter-actions-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--line); }
-.advanced-button { flex: 0 0 auto; }
 .active-filter-chips { display: flex; flex: 1 1 300px; gap: 8px; flex-wrap: wrap; min-width: 0; }
 .filter-chip { display: inline-flex; align-items: center; gap: 7px; max-width: 100%; min-height: 34px; padding: 6px 11px; border: 1px solid var(--line); border-radius: 7px; background: var(--bg-panel-2); color: var(--text-primary); white-space: normal; text-align: left; line-height: 1.25; }
 .filter-chip span { color: var(--ui-text-muted); flex: 0 0 auto; }
-.advanced-card { margin-top: 0; overflow: hidden; border-top: 1px solid var(--line); }
-.advanced-card__header { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 14px 16px; border-bottom: 1px solid var(--line); }
-.advanced-card__header > div, .advanced-card__header button { display: inline-flex; align-items: center; gap: 8px; }
-.advanced-card__header button { color: var(--accent-pink); }
-.flats__filter-blocks { grid-template-columns: 1.15fr .95fr 1.1fr 1.1fr 1fr; gap: 0; padding: 16px; }
+.advanced-card__header > div, .flats__filter-blocks { grid-template-columns: 1.15fr .95fr 1.1fr 1.1fr 1fr; gap: 0; padding: 16px; }
 .flats__filter-blocks :deep(.filter-section) { min-width: 0; padding: 0 16px; border: 0; border-left: 1px solid var(--line); border-radius: 0; background: transparent; }
 .flats__filter-blocks :deep(.filter-section:first-child) { padding-left: 0; border-left: 0; }
 .flats__filter-blocks :deep(.filter-section:last-child) { padding-right: 0; }
@@ -823,11 +809,8 @@ onBeforeUnmount(() => { modalOpen.value = false; lightboxOpen.value = false; rel
   .filter-amenities-row__label { flex: 0 0 100%; }
   .filter-amenities-row :deep(button) { flex: 1 1 auto; justify-content: center; }
   .filter-actions-row { align-items: stretch; }
-  .advanced-button { flex: 1 1 100%; justify-content: center; }
-  .active-filter-chips { flex: 1 1 100%; }
-  .advanced-card__header { padding: 13px 12px; }
-  .advanced-card__header strong { line-height: 1.25; }
-  .flats__filter-blocks { grid-template-columns: 1fr; padding: 14px 12px; gap: 0; }
+    .active-filter-chips { flex: 1 1 100%; }
+      .flats__filter-blocks { grid-template-columns: 1fr; padding: 14px 12px; gap: 0; }
   .flats__filter-blocks :deep(.filter-section), .flats__filter-blocks :deep(.filter-section:first-child), .flats__filter-blocks :deep(.filter-section:nth-child(odd)), .flats__filter-blocks :deep(.filter-section:nth-child(even)) { padding: 16px 0; border-left: 0; border-top: 1px solid var(--line); }
   .flats__filter-blocks :deep(.filter-section:first-child) { padding-top: 0; border-top: 0; }
   .flats__filter-blocks :deep(.filter-section:last-child) { padding-bottom: 0; }

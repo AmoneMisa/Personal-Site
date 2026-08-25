@@ -8,6 +8,7 @@ import SearchPageShell from "~/components/search/SearchPageShell.vue";
 import SearchSavedTabs from "~/components/search/SearchSavedTabs.vue";
 import SearchFilterPanel from "~/components/search/SearchFilterPanel.vue";
 import SearchFilterBlocks from "~/components/search/SearchFilterBlocks.vue";
+import SearchAdvancedFilters from "~/components/search/SearchAdvancedFilters.vue";
 import SearchPresetDialog from "~/components/search/SearchPresetDialog.vue";
 import SearchShareDialog from "~/components/search/SearchShareDialog.vue";
 import SearchSourceTabs from "~/components/search/SearchSourceTabs.vue";
@@ -527,7 +528,7 @@ onBeforeUnmount(() => {
         />
       </div>
 
-      <div v-if="showAdvanced" class="hiring__advanced">
+      <SearchAdvancedFilters v-model="showAdvanced" :label="t('advanced')">
         <UiSearchPresets
           :presets="presets"
           :label="t('presets')"
@@ -555,7 +556,7 @@ onBeforeUnmount(() => {
           :reset-label="t('reset')"
           @reset="resetFilters"
         />
-      </div>
+      </SearchAdvancedFilters>
     </SearchFilterPanel>
 
     <div class="hiring__results-toolbar">
@@ -651,36 +652,10 @@ onBeforeUnmount(() => {
 .hiring__results-toolbar .hiring__count { margin: 0; }
 .hiring__sort { flex: 0 0 min(280px, 42vw); min-width: 200px; }
 .hiring__count { font-size: 13px; }
-.hiring__advanced {
-  position: relative; isolation: isolate; overflow: hidden;
-  grid-column: 1 / -1; display: grid; grid-template-columns: 1fr; gap: 12px;
-  padding: 14px; border-radius: 10px; border: 1px solid var(--line); background: var(--ocean-form-surface);
-  box-shadow: 0 18px 42px rgba(2, 5, 18, 0.22);
-}
-.hiring__advanced::before,
-.hiring__advanced::after {
-  content: "";
-  position: absolute;
-  z-index: 2;
-  border-radius: 999px;
-  border: 1px solid rgba(75, 145, 255, 0.12);
-  pointer-events: none;
-}
-.hiring__advanced::before {
-  width: 8px; height: 8px; left: calc(50% - 4px); top: 49%;
-  box-shadow: 0 -142px 0 -2px rgba(67, 119, 221, 0.08);
-}
-.hiring__advanced::after {
-  width: 6px; height: 6px; right: 1.4%; top: 24%;
-  border-color: rgba(207, 92, 220, 0.11);
-  box-shadow: 0 250px 0 -1px rgba(118, 83, 226, 0.07);
-}
-.hiring__advanced > * { position: relative; z-index: 1; }
 .hiring__filter-blocks { grid-column: 1 / -1; }
 .hiring__filter-blocks :deep(.search-filter-blocks__grid) { align-items: end; }
 .hiring-filter-group__grid { display: grid; grid-template-columns: 1fr; gap: 12px; align-items: end; }
 @media (min-width: 700px) {
-  .hiring__advanced { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .hiring-filter-group__grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .hiring-filter-group__grid_salary { grid-template-columns: minmax(0, 1.5fr) minmax(110px, .6fr); }
   .hiring__field_wide { grid-column: span 2; }
