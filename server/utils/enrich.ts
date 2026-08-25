@@ -181,7 +181,6 @@ function detectCity(job: Job, country: string): string | undefined {
 }
 
 // ---- Shared vacancy context ----
-// ---- Shared vacancy context ----
 function detectWorkMode(text: string, job: Job): WorkMode {
   const modes = detectWorkModes(text)
   if (modes.includes('hybrid')) return 'hybrid'
