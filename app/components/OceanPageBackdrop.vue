@@ -17,33 +17,7 @@ const hasUnderwaterLife = computed(() => props.variant === "reef" || props.varia
     ]"
     aria-hidden="true"
   >
-    <svg v-if="hasUnderwaterLife" class="ocean-page-backdrop__defs" focusable="false" aria-hidden="true">
-      <filter id="ocean-page-refraction" x="-8%" y="-8%" width="116%" height="116%">
-        <feTurbulence
-          type="fractalNoise"
-          baseFrequency="0.0018 0.0065"
-          numOctaves="1"
-          seed="7"
-          stitchTiles="stitch"
-          result="noise"
-        >
-          <animate
-            attributeName="baseFrequency"
-            dur="56s"
-            values="0.0018 0.0065;0.0020 0.0061;0.0017 0.0068;0.0018 0.0065"
-            repeatCount="indefinite"
-          />
-        </feTurbulence>
-        <feDisplacementMap in="SourceGraphic" in2="noise" scale="2.8" xChannelSelector="R" yChannelSelector="G">
-          <animate attributeName="scale" dur="44s" values="2.2;3.3;2.6;2.2" repeatCount="indefinite" />
-        </feDisplacementMap>
-      </filter>
-    </svg>
-
-    <div
-      class="ocean-page-backdrop__image"
-      :class="{ 'ocean-page-backdrop__image_refraction': hasUnderwaterLife }"
-    />
+    <div class="ocean-page-backdrop__image" />
     <div v-if="hasUnderwaterLife" class="ocean-page-backdrop__caustics" />
     <underwater-ambient-glb v-if="hasUnderwaterLife" />
   </div>
@@ -58,13 +32,6 @@ const hasUnderwaterLife = computed(() => props.variant === "reef" || props.varia
   overflow: hidden;
   pointer-events: none;
   background-color: #05091d;
-}
-
-.ocean-page-backdrop__defs {
-  position: absolute;
-  width: 0;
-  height: 0;
-  overflow: hidden;
 }
 
 .ocean-page-backdrop__image,
@@ -82,12 +49,6 @@ const hasUnderwaterLife = computed(() => props.variant === "reef" || props.varia
   background-position: center top;
   background-repeat: no-repeat;
   background-size: cover;
-}
-
-.ocean-page-backdrop__image_refraction {
-  filter: url(#ocean-page-refraction);
-  transform: scale(1.025);
-  will-change: filter;
 }
 
 .ocean-page-backdrop__caustics {
@@ -184,11 +145,6 @@ const hasUnderwaterLife = computed(() => props.variant === "reef" || props.varia
 @media (prefers-reduced-motion: reduce) {
   .ocean-page-backdrop__caustics {
     animation: none;
-  }
-
-  .ocean-page-backdrop__image_refraction {
-    filter: none;
-    transform: none;
   }
 }
 </style>
