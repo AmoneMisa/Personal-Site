@@ -3,8 +3,8 @@
 export type RiskCategory = 'gambling' | 'adult' | 'scam'
 export type WorkMode = 'remote' | 'hybrid' | 'office' | 'unknown'
 export type Relocation = 'offered' | 'none' | 'unknown'
-export type SalaryPeriod = 'hour' | 'month' | 'year'
-export type Seniority = 'intern' | 'junior' | 'middle' | 'senior' | 'staff' | 'principal' | 'lead'
+export type SalaryPeriod = 'hour' | 'day' | 'shift' | 'week' | 'month' | 'year' | 'project' | 'piece'
+export type Seniority = 'intern' | 'junior' | 'middle' | 'senior' | 'staff' | 'principal' | 'lead' | 'head' | 'director' | 'vp' | 'chief'
 export type EmployerType = 'direct' | 'agency' | 'board' | 'telegram'
 export type SponsorshipConfidence = 'explicit' | 'verified' | 'historical'
 export type EmploymentKind =
@@ -17,7 +17,18 @@ export type EmploymentKind =
   | 'temporary'
   | 'volunteer'
   | 'seasonal'
-export type WorkSchedule = 'fiveTwo' | 'twoTwo' | 'shift' | 'flexible' | 'day' | 'night' | 'rotational'
+export type WorkSchedule =
+  | 'fiveTwo'
+  | 'twoTwo'
+  | 'sixOne'
+  | 'threeThree'
+  | 'oneThree'
+  | 'twentyFourFortyEight'
+  | 'shift'
+  | 'flexible'
+  | 'day'
+  | 'night'
+  | 'rotational'
 export type ProbationKind = 'probation' | 'noProbation' | 'paidProbation' | 'unpaidProbation'
 export type ExperienceRequirement = 'noExperience' | 'experienceRequired'
 
@@ -218,26 +229,14 @@ export interface JobSalaryTrendPoint {
 }
 
 export interface JobStats {
-  salary: SalaryStat
-  bySource: Partial<Record<JobSource, JobGroupedSalaryStat>>
-  byCountry: Record<string, JobGroupedSalaryStat>
-  byWorkMode: Record<WorkMode, number>
-  byRelocation: Record<Relocation, number>
-  byEmploymentKind: Record<EmploymentKind | 'unknown', number>
-  experience: JobExperienceStats
-  byProfession: JobProfessionStat[]
-  foreignerFriendly: number
-  byLanguage: Record<string, number>
-  topSkills: { skill: string; count: number }[]
-  salaryTrend: JobSalaryTrendPoint[]
-}
-
-export interface JobResponse {
-  jobs: Job[]
   total: number
-  page: number
-  pageSize: number
-  sources: Partial<Record<JobSource, number>>
-  stats: JobStats
-  rates?: Record<string, number>
+  withSalary: number
+  salary: SalaryStat | null
+  bySource: Record<string, number>
+  byCountry: Record<string, number>
+  byCity: Record<string, number>
+  byProfession: JobProfessionStat[]
+  professionGeography: JobProfessionGeographyStat[]
+  experience: JobExperienceStats
+  salaryTrend: JobSalaryTrendPoint[]
 }
