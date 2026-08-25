@@ -1,3 +1,4 @@
+import { CITIES as PARSING_CITIES, aliasesOf } from '@whiteslove/parsing-lexicon/geo'
 import { HIRING_COUNTRIES } from './hiring/hiringMarkets'
 
 export const CITY_LABELS_RU: Record<string, string> = {
@@ -18,17 +19,11 @@ export const CITY_LABELS_RU: Record<string, string> = {
   Iasi: 'Яссы', Brasov: 'Брашов', Constanta: 'Констанца', Oradea: 'Орадя',
 }
 
+const SHARED_CITY_ALIASES: Record<string, string[]> = Object.fromEntries(
+  PARSING_CITIES.map((city) => [normalizeCityValue(city.canonical), aliasesOf(city)]),
+)
+
 const CITY_ALIASES: Record<string, string[]> = {
-  tashkent: ['tashkent', 'toshkent', 'ташкент', 'тошкент'],
-  samarkand: ['samarkand', 'samarqand', 'самарканд', 'самарқанд'],
-  bukhara: ['bukhara', 'buxoro', 'бухара', 'бухоро'],
-  namangan: ['namangan', 'наманган'],
-  andijan: ['andijan', 'andijon', 'андижан', 'андижон'],
-  fergana: ['fergana', "farg'ona", 'fargona', 'фаргана', 'фергана'],
-  qarshi: ['qarshi', 'karshi', 'карши', 'қарши'],
-  nukus: ['nukus', 'нукус'],
-  urgench: ['urgench', 'urganch', 'ургенч', 'урганч'],
-  khiva: ['khiva', 'xiva', 'хива'],
   kyiv: ['kyiv', 'kiev', 'киев', 'київ'],
   lviv: ['lviv', 'львов', 'львів'],
   odesa: ['odesa', 'odessa', 'одесса', 'одеса'],
@@ -36,12 +31,6 @@ const CITY_ALIASES: Record<string, string[]> = {
   dnipro: ['dnipro', 'днепр', 'дніпро'],
   vinnytsia: ['vinnytsia', 'vinnitsa', 'винница', 'вінниця'],
   zaporizhzhia: ['zaporizhzhia', 'zaporozhye', 'запорожье', 'запоріжжя'],
-  almaty: ['almaty', 'алматы'],
-  astana: ['astana', 'астана'],
-  shymkent: ['shymkent', 'chimkent', 'шымкент', 'чимкент'],
-  karaganda: ['karaganda', 'караганда'],
-  atyrau: ['atyrau', 'атырау'],
-  aktobe: ['aktobe', 'актобе'],
   bishkek: ['bishkek', 'бишкек'],
   osh: ['osh', 'ош'],
   karakol: ['karakol', 'каракол'],
@@ -50,6 +39,7 @@ const CITY_ALIASES: Record<string, string[]> = {
   iasi: ['iasi', 'iași', 'яссы'],
   timisoara: ['timisoara', 'timișoara', 'тимишоара'],
   brasov: ['brasov', 'brașov', 'брашов'],
+  ...SHARED_CITY_ALIASES,
 }
 
 const CITY_LABELS = new Map(
