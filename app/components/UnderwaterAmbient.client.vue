@@ -1,19 +1,16 @@
 <script setup lang="ts">
-import { onBeforeUnmount, onMounted, watch } from "vue";
-
-const route = useRoute();
+import { onBeforeUnmount, onMounted } from "vue";
 
 const canvasRef = ref<HTMLCanvasElement | null>(null);
 
-const DESKTOP_MIN_WIDTH = 1440;
+const MIN_WIDTH = 1200;
 const MAX_DPR = 1.5;
-const TARGET_BUBBLES = 24;
-const TARGET_FISH = 3;
-const TWO_PI = Math.PI * 2;
+const BUBBLE_COUNT = 22;
+const FISH_COUNT = 3;
+const TAU = Math.PI * 2;
 
+type Point = { x: number; y: number };
 type FishState = "cruise" | "startled" | "glance" | "follow" | "hide";
-
-type Vec2 = { x: number; y: number };
 
 type Bubble = {
   x: number;
@@ -23,17 +20,15 @@ type Bubble = {
   speed: number;
   drift: number;
   phase: number;
-  wobble: number;
   stream: number;
 };
 
-type Pop = {
+type Burst = {
   x: number;
   y: number;
+  radius: number;
   age: number;
-  life: number;
-  size: number;
-  sparks: Array<{ angle: number; speed: number; radius: number }>;
+  sparks: Array<{ angle: number; distance: number; size: number }>;
 };
 
 type Fish = {
@@ -41,65 +36,50 @@ type Fish = {
   y: number;
   vx: number;
   vy: number;
-  baseSpeed: number;
   size: number;
-  depth: number;
+  baseSpeed: number;
+  direction: 1 | -1;
   phase: number;
+  depth: number;
   hue: number;
   variant: number;
-  direction: 1 | -1;
   state: FishState;
-  stateUntil: number;
+  until: number;
   followUntil: number;
-  hideTarget: Vec2 | null;
+  hideTarget: Point | null;
   annoyed: number;
 };
 
 let ctx: CanvasRenderingContext2D | null = null;
-let raf = 0;
-let lastTime = 0;
 let width = 0;
 let height = 0;
 let dpr = 1;
-let active = false;
-let mediaDesktop: MediaQueryList | null = null;
-let mediaMotion: MediaQueryList | null = null;
+let raf = 0;
+let running = false;
+let last = 0;
+let desktopMq: MediaQueryList | null = null;
+let motionMq: MediaQueryList | null = null;
 
 const bubbles: Bubble[] = [];
-const pops: Pop[] = [];
+const bursts: Burst[] = [];
 const fish: Fish[] = [];
-const pointer = { x: -10_000, y: -10_000, visible: false };
+const pointer = { x: -9999, y: -9999, visible: false };
+const streams = [0.07, 0.2, 0.79, 0.93];
 
-const streamX = [0.08, 0.23, 0.76, 0.92];
-
-function rand(min: number, max: number) {
-  return min + Math.random() * (max - min);
-}
-
-function clamp(value: number, min: number, max: number) {
-  return Math.max(min, Math.min(max, value));
-}
-
-function routeAllowsAmbient() {
-  return !/(^|\/)cv(\/|$)/i.test(route.path);
-}
+const rand = (min: number, max: number) => min + Math.random() * (max - min);
+const clamp = (n: number, min: number, max: number) => Math.max(min, Math.min(max, n));
 
 function shouldRun() {
-  return Boolean(
-    mediaDesktop?.matches &&
-    !mediaMotion?.matches &&
-    routeAllowsAmbient()
-  );
+  return Boolean(desktopMq?.matches && !motionMq?.matches && !document.hidden);
 }
 
-function resizeCanvas() {
+function resize() {
   const canvas = canvasRef.value;
   if (!canvas) return;
 
   width = window.innerWidth;
   height = window.innerHeight;
   dpr = Math.min(window.devicePixelRatio || 1, MAX_DPR);
-
   canvas.width = Math.round(width * dpr);
   canvas.height = Math.round(height * dpr);
   canvas.style.width = `${width}px`;
@@ -109,539 +89,476 @@ function resizeCanvas() {
   ctx?.setTransform(dpr, 0, 0, dpr, 0, 0);
 }
 
-function makeBubble(fromBottom = false): Bubble {
+function createBubble(startAnywhere = false): Bubble {
   const depth = Math.random();
-  const stream = Math.floor(Math.random() * streamX.length);
-  const baseX = streamX[stream] * width;
-  const r = rand(3.5, 10) * (0.55 + depth * 0.85);
-
+  const stream = Math.floor(Math.random() * streams.length);
+  const r = rand(4, 11) * (0.65 + depth * 0.75);
   return {
-    x: clamp(baseX + rand(-45, 45), 12, Math.max(12, width - 12)),
-    y: fromBottom ? height + rand(10, height * 0.22) : rand(0, height),
+    x: clamp(streams[stream] * width + rand(-42, 42), 16, width - 16),
+    y: startAnywhere ? rand(0, height) : height + rand(8, height * 0.22),
     r,
     depth,
-    speed: rand(18, 42) * (0.72 + depth * 0.62),
-    drift: rand(-5, 5),
-    phase: rand(0, TWO_PI),
-    wobble: rand(8, 26),
+    speed: rand(18, 40) * (0.8 + depth * 0.55),
+    drift: rand(-4, 4),
+    phase: rand(0, TAU),
     stream,
   };
 }
 
-function respawnBubble(bubble: Bubble) {
-  Object.assign(bubble, makeBubble(true));
+function resetBubble(bubble: Bubble) {
+  Object.assign(bubble, createBubble(false));
 }
 
-function makeFish(index: number): Fish {
-  const fromLeft = Math.random() > 0.5;
-  const direction: 1 | -1 = fromLeft ? 1 : -1;
-  const size = [58, 72, 48][index % 3] * rand(0.9, 1.12);
-  const speed = rand(24, 38);
+function createFish(variant: number, startVisible = true): Fish {
+  const direction: 1 | -1 = Math.random() > 0.5 ? 1 : -1;
+  const size = [62, 72, 52][variant % 3] * rand(0.92, 1.12);
+  const baseSpeed = rand(26, 39);
+  const startX = startVisible
+    ? rand(width * 0.05, width * 0.95)
+    : direction === 1 ? -size * 2.5 : width + size * 2.5;
 
   return {
-    x: fromLeft ? -size * 2.4 : width + size * 2.4,
-    y: rand(height * 0.16, height * 0.82),
-    vx: speed * direction,
-    vy: rand(-3, 3),
-    baseSpeed: speed,
+    x: startX,
+    y: rand(height * 0.16, height * 0.84),
+    vx: baseSpeed * direction,
+    vy: rand(-4, 4),
     size,
-    depth: rand(0.35, 0.9),
-    phase: rand(0, TWO_PI),
-    hue: [195, 320, 268][index % 3],
-    variant: index % 3,
+    baseSpeed,
     direction,
+    phase: rand(0, TAU),
+    depth: rand(0.4, 0.95),
+    hue: [196, 322, 270][variant % 3],
+    variant,
     state: "cruise",
-    stateUntil: 0,
+    until: 0,
     followUntil: 0,
     hideTarget: null,
     annoyed: 0,
   };
 }
 
-function respawnFish(item: Fish, now: number) {
-  const fresh = makeFish(item.variant);
-  fresh.variant = item.variant;
-  fresh.hue = item.hue;
-  fresh.stateUntil = now + rand(500, 1500);
-  Object.assign(item, fresh);
+function resetFish(item: Fish) {
+  Object.assign(item, createFish(item.variant, false));
 }
 
 function initScene() {
-  bubbles.length = 0;
-  pops.length = 0;
-  fish.length = 0;
-
-  for (let i = 0; i < TARGET_BUBBLES; i += 1) bubbles.push(makeBubble(false));
-  for (let i = 0; i < TARGET_FISH; i += 1) fish.push(makeFish(i));
+  bubbles.splice(0, bubbles.length, ...Array.from({ length: BUBBLE_COUNT }, () => createBubble(true)));
+  fish.splice(0, fish.length, ...Array.from({ length: FISH_COUNT }, (_, i) => createFish(i, true)));
+  bursts.length = 0;
 }
 
 function drawWater(time: number) {
   if (!ctx) return;
 
-  const g = ctx.createLinearGradient(0, 0, 0, height);
-  g.addColorStop(0, "rgba(16, 77, 125, 0.065)");
-  g.addColorStop(0.48, "rgba(8, 45, 89, 0.028)");
-  g.addColorStop(1, "rgba(2, 18, 48, 0.055)");
-  ctx.fillStyle = g;
+  const haze = ctx.createLinearGradient(0, 0, 0, height);
+  haze.addColorStop(0, "rgba(72, 170, 235, .045)");
+  haze.addColorStop(.45, "rgba(28, 105, 175, .018)");
+  haze.addColorStop(1, "rgba(5, 40, 95, .035)");
+  ctx.fillStyle = haze;
   ctx.fillRect(0, 0, width, height);
 
   ctx.save();
   ctx.globalCompositeOperation = "screen";
-  ctx.lineWidth = 1.2;
-
   for (let band = 0; band < 4; band += 1) {
-    const baseY = height * (0.09 + band * 0.16);
     ctx.beginPath();
-    for (let x = -40; x <= width + 40; x += 22) {
+    const baseY = height * (.08 + band * .15);
+    for (let x = -30; x <= width + 30; x += 18) {
       const y = baseY
-        + Math.sin(x * 0.008 + time * 0.00024 + band * 1.7) * (5 + band * 1.3)
-        + Math.sin(x * 0.003 - time * 0.00017) * 3;
-      if (x === -40) ctx.moveTo(x, y);
+        + Math.sin(x * .007 + time * .00022 + band * 1.35) * (4.5 + band)
+        + Math.sin(x * .0027 - time * .00016) * 2.5;
+      if (x === -30) ctx.moveTo(x, y);
       else ctx.lineTo(x, y);
     }
-    ctx.strokeStyle = `rgba(102, 194, 255, ${0.018 - band * 0.002})`;
+    ctx.strokeStyle = `rgba(125, 211, 255, ${.026 - band * .003})`;
+    ctx.lineWidth = 1.15;
     ctx.stroke();
   }
 
-  const glowX = width * (0.68 + Math.sin(time * 0.00008) * 0.03);
-  const glow = ctx.createRadialGradient(glowX, -height * 0.1, 0, glowX, 0, height * 0.58);
-  glow.addColorStop(0, "rgba(105, 207, 255, 0.055)");
-  glow.addColorStop(1, "rgba(105, 207, 255, 0)");
+  const gx = width * (.66 + Math.sin(time * .00007) * .045);
+  const glow = ctx.createRadialGradient(gx, -40, 0, gx, 0, height * .62);
+  glow.addColorStop(0, "rgba(120, 220, 255, .065)");
+  glow.addColorStop(1, "rgba(120, 220, 255, 0)");
   ctx.fillStyle = glow;
-  ctx.fillRect(0, 0, width, height * 0.68);
+  ctx.fillRect(0, 0, width, height * .7);
   ctx.restore();
+}
+
+function updateBubbles(dt: number, now: number) {
+  for (const b of bubbles) {
+    b.y -= b.speed * dt;
+    b.x += (b.drift + Math.sin(now * .001 + b.phase) * 3.8) * dt;
+    if (b.y < -b.r * 3 || b.x < -60 || b.x > width + 60) resetBubble(b);
+  }
 }
 
 function drawBubble(b: Bubble, foreground: boolean) {
-  if (!ctx) return;
-  const isForeground = b.depth >= 0.62;
-  if (isForeground !== foreground) return;
+  if (!ctx || (b.depth >= .62) !== foreground) return;
+  const alpha = .23 + b.depth * .32;
 
-  const alpha = 0.16 + b.depth * 0.24;
   ctx.save();
   ctx.translate(b.x, b.y);
 
-  const fill = ctx.createRadialGradient(-b.r * 0.34, -b.r * 0.38, b.r * 0.06, 0, 0, b.r);
-  fill.addColorStop(0, `rgba(255,255,255,${alpha * 0.72})`);
-  fill.addColorStop(0.16, `rgba(171,226,255,${alpha * 0.16})`);
-  fill.addColorStop(0.67, `rgba(74,153,255,${alpha * 0.07})`);
-  fill.addColorStop(1, `rgba(183,226,255,${alpha * 0.2})`);
+  const fill = ctx.createRadialGradient(-b.r * .32, -b.r * .38, b.r * .05, 0, 0, b.r);
+  fill.addColorStop(0, `rgba(255,255,255,${alpha * .9})`);
+  fill.addColorStop(.18, `rgba(190,235,255,${alpha * .16})`);
+  fill.addColorStop(.68, `rgba(80,160,255,${alpha * .06})`);
+  fill.addColorStop(1, `rgba(205,239,255,${alpha * .18})`);
   ctx.fillStyle = fill;
   ctx.beginPath();
-  ctx.arc(0, 0, b.r, 0, TWO_PI);
+  ctx.arc(0, 0, b.r, 0, TAU);
   ctx.fill();
 
-  ctx.strokeStyle = `rgba(214, 240, 255, ${alpha * 0.75})`;
-  ctx.lineWidth = Math.max(0.7, b.r * 0.075);
+  ctx.strokeStyle = `rgba(220,245,255,${alpha * .88})`;
+  ctx.lineWidth = Math.max(.8, b.r * .075);
   ctx.beginPath();
-  ctx.arc(0, 0, b.r - ctx.lineWidth * 0.5, 0, TWO_PI);
+  ctx.arc(0, 0, b.r - 1, 0, TAU);
   ctx.stroke();
 
-  ctx.strokeStyle = `rgba(255,255,255,${alpha * 0.95})`;
-  ctx.lineWidth = Math.max(0.8, b.r * 0.1);
+  ctx.strokeStyle = `rgba(255,255,255,${alpha})`;
+  ctx.lineWidth = Math.max(.8, b.r * .1);
   ctx.beginPath();
-  ctx.arc(-b.r * 0.2, -b.r * 0.18, b.r * 0.54, Math.PI * 1.08, Math.PI * 1.52);
+  ctx.arc(-b.r * .18, -b.r * .2, b.r * .5, Math.PI * 1.05, Math.PI * 1.48);
   ctx.stroke();
-
   ctx.restore();
 }
 
-function fishTarget(item: Fish, now: number): Vec2 | null {
-  if (item.state === "hide" && item.hideTarget) return item.hideTarget;
-  if (item.state === "follow" && pointer.visible && now < item.followUntil) {
-    const side = pointer.x < width / 2 ? 1 : -1;
-    return {
-      x: pointer.x + side * (170 + item.size),
-      y: pointer.y + Math.sin(now * 0.002 + item.phase) * 55,
-    };
-  }
-  return null;
+function nearestForegroundBubble(item: Fish): Point {
+  const candidate = bubbles
+    .filter((b) => b.depth >= .62)
+    .sort((a, b) => Math.hypot(a.x - item.x, a.y - item.y) - Math.hypot(b.x - item.x, b.y - item.y))[0];
+  return candidate
+    ? { x: candidate.x, y: candidate.y + candidate.r * 1.4 }
+    : { x: width * streams[Math.floor(Math.random() * streams.length)], y: height * rand(.28, .76) };
 }
 
 function updateFish(item: Fish, dt: number, now: number) {
-  if (item.state === "startled" && now >= item.stateUntil) {
+  if (item.state === "startled" && now >= item.until) {
     item.state = "glance";
-    item.stateUntil = now + 480;
-  } else if (item.state === "glance" && now >= item.stateUntil) {
+    item.until = now + 480;
+  } else if (item.state === "glance" && now >= item.until) {
     item.state = "follow";
     item.followUntil = now + 6500;
   } else if (item.state === "follow" && now >= item.followUntil) {
     item.state = "cruise";
-    item.hideTarget = null;
-  } else if (item.state === "hide" && now >= item.stateUntil) {
+  } else if (item.state === "hide" && now >= item.until) {
     item.state = "follow";
-    item.followUntil = now + 3000;
+    item.followUntil = now + 3200;
     item.hideTarget = null;
   }
 
   if (item.state === "follow" && pointer.visible) {
-    const dx = pointer.x - item.x;
-    const dy = pointer.y - item.y;
-    const dist = Math.hypot(dx, dy);
+    const dist = Math.hypot(pointer.x - item.x, pointer.y - item.y);
     if (dist < 125) {
       item.state = "hide";
-      item.stateUntil = now + rand(1200, 1900);
-      const candidate = bubbles
-        .filter((b) => b.depth >= 0.62)
-        .sort((a, b) => Math.hypot(a.x - item.x, a.y - item.y) - Math.hypot(b.x - item.x, b.y - item.y))[0];
-      item.hideTarget = candidate
-        ? { x: candidate.x, y: candidate.y + candidate.r * 1.5 }
-        : { x: width * streamX[Math.floor(Math.random() * streamX.length)], y: height * rand(0.3, 0.75) };
+      item.until = now + rand(1200, 1900);
+      item.hideTarget = nearestForegroundBubble(item);
     }
   }
 
-  const target = fishTarget(item, now);
+  let target: Point | null = null;
+  if (item.state === "hide") target = item.hideTarget;
+  if (item.state === "follow" && pointer.visible) {
+    const side = pointer.x < width / 2 ? 1 : -1;
+    target = {
+      x: pointer.x + side * (175 + item.size),
+      y: pointer.y + Math.sin(now * .002 + item.phase) * 48,
+    };
+  }
+
   if (target) {
     const dx = target.x - item.x;
     const dy = target.y - item.y;
-    const dist = Math.max(1, Math.hypot(dx, dy));
-    const desired = item.state === "hide" ? item.baseSpeed * 2.1 : item.baseSpeed * 1.18;
-    item.vx += ((dx / dist) * desired - item.vx) * Math.min(1, dt * 1.9);
-    item.vy += ((dy / dist) * desired - item.vy) * Math.min(1, dt * 1.9);
+    const distance = Math.max(1, Math.hypot(dx, dy));
+    const desired = item.baseSpeed * (item.state === "hide" ? 2.1 : 1.2);
+    item.vx += ((dx / distance) * desired - item.vx) * Math.min(1, dt * 2);
+    item.vy += ((dy / distance) * desired - item.vy) * Math.min(1, dt * 2);
   } else if (item.state === "cruise") {
-    const desiredX = item.baseSpeed * item.direction;
-    const desiredY = Math.sin(now * 0.00065 + item.phase) * 9;
-    item.vx += (desiredX - item.vx) * Math.min(1, dt * 0.8);
-    item.vy += (desiredY - item.vy) * Math.min(1, dt * 0.65);
+    item.vx += (item.baseSpeed * item.direction - item.vx) * Math.min(1, dt * .8);
+    item.vy += (Math.sin(now * .0007 + item.phase) * 9 - item.vy) * Math.min(1, dt * .7);
   } else if (item.state === "glance") {
-    item.vx *= Math.pow(0.93, dt * 60);
-    item.vy *= Math.pow(0.93, dt * 60);
+    item.vx *= Math.pow(.93, dt * 60);
+    item.vy *= Math.pow(.93, dt * 60);
   }
 
   const speed = Math.hypot(item.vx, item.vy);
-  const maxSpeed = item.baseSpeed * (item.state === "startled" ? 3.2 : 2.25);
-  if (speed > maxSpeed) {
-    item.vx = item.vx / speed * maxSpeed;
-    item.vy = item.vy / speed * maxSpeed;
+  const max = item.baseSpeed * (item.state === "startled" ? 3.2 : 2.25);
+  if (speed > max) {
+    item.vx = item.vx / speed * max;
+    item.vy = item.vy / speed * max;
   }
 
   if (Math.abs(item.vx) > 2) item.direction = item.vx >= 0 ? 1 : -1;
   item.x += item.vx * dt;
-  item.y += item.vy * dt;
-  item.y = clamp(item.y, item.size * 0.7, height - item.size * 0.7);
-  item.annoyed = Math.max(0, item.annoyed - dt * 0.12);
+  item.y = clamp(item.y + item.vy * dt, item.size * .65, height - item.size * .65);
+  item.annoyed = Math.max(0, item.annoyed - dt * .14);
 
-  const margin = item.size * 3.2;
-  if (item.state === "cruise" && (item.x < -margin || item.x > width + margin)) {
-    respawnFish(item, now);
-  }
+  const margin = item.size * 3;
+  if (item.state === "cruise" && (item.x < -margin || item.x > width + margin)) resetFish(item);
 }
 
-function drawFish(item: Fish, time: number) {
+function drawFish(item: Fish, now: number) {
   if (!ctx) return;
 
+  const fast = item.state === "startled" || item.state === "hide";
+  const tail = Math.sin(now * (fast ? .019 : .011) + item.phase);
+  const bodyW = item.size * (item.variant === 0 ? 1.7 : 1.48);
+  const bodyH = item.size * (item.variant === 1 ? .78 : .62);
   const angle = Math.atan2(item.vy, Math.abs(item.vx)) * item.direction;
-  const tail = Math.sin(time * (item.state === "startled" || item.state === "hide" ? 0.018 : 0.010) + item.phase);
-  const bodyW = item.size * (item.variant === 0 ? 1.7 : 1.45);
-  const bodyH = item.size * (item.variant === 1 ? 0.78 : 0.62);
-  const alpha = (0.42 + item.depth * 0.34) * (item.state === "hide" ? 0.66 : 1);
 
   ctx.save();
   ctx.translate(item.x, item.y);
   ctx.scale(item.direction, 1);
   ctx.rotate(angle);
-  ctx.globalAlpha = alpha;
+  ctx.globalAlpha = (.66 + item.depth * .25) * (item.state === "hide" ? .7 : 1);
 
-  const tailX = -bodyW * 0.48;
   ctx.save();
-  ctx.translate(tailX, 0);
-  ctx.rotate(tail * 0.22);
-  ctx.fillStyle = `hsla(${item.hue + 12}, 68%, 55%, 0.9)`;
+  ctx.translate(-bodyW * .47, 0);
+  ctx.rotate(tail * .24);
+  ctx.fillStyle = `hsl(${item.hue + 12} 68% 55%)`;
   ctx.beginPath();
-  ctx.moveTo(2, 0);
-  ctx.quadraticCurveTo(-item.size * 0.46, -item.size * 0.45, -item.size * 0.62, -item.size * 0.3);
-  ctx.quadraticCurveTo(-item.size * 0.48, 0, -item.size * 0.62, item.size * 0.3);
-  ctx.quadraticCurveTo(-item.size * 0.42, item.size * 0.43, 2, 0);
+  ctx.moveTo(3, 0);
+  ctx.quadraticCurveTo(-item.size * .45, -item.size * .44, -item.size * .65, -item.size * .3);
+  ctx.quadraticCurveTo(-item.size * .49, 0, -item.size * .65, item.size * .3);
+  ctx.quadraticCurveTo(-item.size * .43, item.size * .44, 3, 0);
   ctx.fill();
   ctx.restore();
 
   const body = ctx.createLinearGradient(-bodyW / 2, -bodyH / 2, bodyW / 2, bodyH / 2);
-  body.addColorStop(0, `hsl(${item.hue}, 72%, 68%)`);
-  body.addColorStop(0.58, `hsl(${item.hue + 9}, 67%, 53%)`);
-  body.addColorStop(1, `hsl(${item.hue + 18}, 64%, 39%)`);
+  body.addColorStop(0, `hsl(${item.hue} 74% 70%)`);
+  body.addColorStop(.58, `hsl(${item.hue + 8} 68% 54%)`);
+  body.addColorStop(1, `hsl(${item.hue + 17} 64% 40%)`);
   ctx.fillStyle = body;
   ctx.beginPath();
-  ctx.ellipse(0, 0, bodyW / 2, bodyH / 2, 0, 0, TWO_PI);
+  ctx.ellipse(0, 0, bodyW / 2, bodyH / 2, 0, 0, TAU);
   ctx.fill();
 
-  // Soft belly highlight keeps the procedural fish in the same friendly, rounded mascot language.
-  ctx.fillStyle = "rgba(255,255,255,0.12)";
+  ctx.fillStyle = "rgba(255,255,255,.14)";
   ctx.beginPath();
-  ctx.ellipse(bodyW * 0.08, bodyH * 0.16, bodyW * 0.33, bodyH * 0.16, -0.08, 0, TWO_PI);
+  ctx.ellipse(bodyW * .08, bodyH * .16, bodyW * .32, bodyH * .15, -.08, 0, TAU);
   ctx.fill();
 
-  ctx.fillStyle = `hsla(${item.hue - 8}, 68%, 48%, 0.88)`;
+  ctx.fillStyle = `hsl(${item.hue - 7} 67% 48%)`;
   ctx.beginPath();
-  ctx.moveTo(-bodyW * 0.05, -bodyH * 0.42);
-  ctx.quadraticCurveTo(-bodyW * 0.02, -bodyH * 0.88, bodyW * 0.18, -bodyH * 0.38);
+  ctx.moveTo(-bodyW * .04, -bodyH * .4);
+  ctx.quadraticCurveTo(0, -bodyH * .88, bodyW * .18, -bodyH * .37);
   ctx.closePath();
   ctx.fill();
 
   ctx.save();
-  ctx.translate(bodyW * 0.02, bodyH * 0.2);
-  ctx.rotate(0.18 + tail * 0.12);
+  ctx.translate(bodyW * .02, bodyH * .2);
+  ctx.rotate(.18 + tail * .12);
   ctx.beginPath();
   ctx.moveTo(0, 0);
-  ctx.quadraticCurveTo(item.size * 0.2, item.size * 0.36, item.size * 0.42, item.size * 0.28);
-  ctx.quadraticCurveTo(item.size * 0.22, item.size * 0.05, 0, 0);
+  ctx.quadraticCurveTo(item.size * .2, item.size * .36, item.size * .42, item.size * .27);
+  ctx.quadraticCurveTo(item.size * .22, item.size * .04, 0, 0);
   ctx.fill();
   ctx.restore();
 
-  const eyeX = bodyW * 0.29;
-  const eyeY = -bodyH * 0.1;
-  const glance = item.state === "glance" && pointer.visible;
-  const pupilShiftX = glance ? clamp((pointer.x - item.x) * item.direction / 160, -2.7, 2.7) : 1.4;
-  const pupilShiftY = glance ? clamp((pointer.y - item.y) / 160, -2, 2) : 0;
+  const eyeX = bodyW * .29;
+  const eyeY = -bodyH * .1;
+  const looking = item.state === "glance" && pointer.visible;
+  const px = looking ? clamp((pointer.x - item.x) * item.direction / 150, -3, 3) : 1.4;
+  const py = looking ? clamp((pointer.y - item.y) / 150, -2.2, 2.2) : 0;
 
-  ctx.fillStyle = "rgba(248, 252, 255, 0.95)";
+  ctx.fillStyle = "rgba(250,253,255,.98)";
   ctx.beginPath();
-  ctx.ellipse(eyeX, eyeY, item.size * 0.095, item.size * (item.annoyed > 0 ? 0.072 : 0.1), -0.06, 0, TWO_PI);
+  ctx.ellipse(eyeX, eyeY, item.size * .098, item.size * (item.annoyed ? .073 : .1), 0, 0, TAU);
+  ctx.fill();
+  ctx.fillStyle = "rgba(7,13,25,.98)";
+  ctx.beginPath();
+  ctx.arc(eyeX + px, eyeY + py, item.size * .039, 0, TAU);
   ctx.fill();
 
-  ctx.fillStyle = "rgba(8, 15, 28, 0.95)";
-  ctx.beginPath();
-  ctx.arc(eyeX + pupilShiftX, eyeY + pupilShiftY, item.size * 0.038, 0, TWO_PI);
-  ctx.fill();
-
-  if (item.annoyed > 0) {
-    ctx.strokeStyle = "rgba(26, 22, 39, 0.76)";
-    ctx.lineWidth = Math.max(1.2, item.size * 0.026);
+  if (item.annoyed) {
+    ctx.strokeStyle = "rgba(23,20,38,.8)";
+    ctx.lineWidth = Math.max(1.2, item.size * .026);
     ctx.beginPath();
-    ctx.moveTo(eyeX - item.size * 0.08, eyeY - item.size * 0.08);
-    ctx.lineTo(eyeX + item.size * 0.08, eyeY - item.size * 0.035);
+    ctx.moveTo(eyeX - item.size * .08, eyeY - item.size * .08);
+    ctx.lineTo(eyeX + item.size * .08, eyeY - item.size * .035);
     ctx.stroke();
   }
 
-  ctx.strokeStyle = "rgba(23, 24, 43, 0.48)";
-  ctx.lineWidth = Math.max(1.1, item.size * 0.018);
+  ctx.strokeStyle = "rgba(20,22,40,.55)";
+  ctx.lineWidth = Math.max(1.1, item.size * .018);
   ctx.lineCap = "round";
   ctx.beginPath();
-  ctx.arc(bodyW * 0.36, bodyH * 0.08, item.size * 0.09, 0.2, 1.25);
+  ctx.arc(bodyW * .36, bodyH * .08, item.size * .09, .2, 1.25);
   ctx.stroke();
-
   ctx.restore();
 }
 
-function drawPop(pop: Pop) {
+function updateBursts(dt: number) {
+  for (let i = bursts.length - 1; i >= 0; i -= 1) {
+    bursts[i].age += dt;
+    if (bursts[i].age >= 1) bursts.splice(i, 1);
+  }
+}
+
+function drawBursts() {
   if (!ctx) return;
-  const p = clamp(pop.age / pop.life, 0, 1);
-  const alpha = 1 - p;
-
-  ctx.save();
-  ctx.globalAlpha = alpha;
-  ctx.strokeStyle = "rgba(220, 244, 255, 0.78)";
-  ctx.lineWidth = 1.25;
-  ctx.beginPath();
-  ctx.arc(pop.x, pop.y, pop.size * (0.75 + p * 1.45), 0, TWO_PI);
-  ctx.stroke();
-
-  ctx.fillStyle = "rgba(206, 239, 255, 0.72)";
-  for (const spark of pop.sparks) {
-    const distance = spark.speed * p;
+  for (const burst of bursts) {
+    const p = burst.age;
+    ctx.save();
+    ctx.globalAlpha = 1 - p;
+    ctx.strokeStyle = "rgba(226,247,255,.9)";
+    ctx.lineWidth = 1.3;
     ctx.beginPath();
-    ctx.arc(
-      pop.x + Math.cos(spark.angle) * distance,
-      pop.y + Math.sin(spark.angle) * distance,
-      spark.radius * (1 - p * 0.45),
-      0,
-      TWO_PI,
-    );
-    ctx.fill();
-  }
-  ctx.restore();
-}
-
-function update(dt: number, now: number) {
-  for (const b of bubbles) {
-    b.y -= b.speed * dt;
-    b.x += (b.drift + Math.sin(now * 0.0011 + b.phase) * b.wobble * 0.13) * dt;
-    if (b.y < -b.r * 3 || b.x < -80 || b.x > width + 80) respawnBubble(b);
-  }
-
-  for (const item of fish) updateFish(item, dt, now);
-
-  for (let i = pops.length - 1; i >= 0; i -= 1) {
-    pops[i].age += dt * 1000;
-    if (pops[i].age >= pops[i].life) pops.splice(i, 1);
+    ctx.arc(burst.x, burst.y, burst.radius * (.8 + p * 1.5), 0, TAU);
+    ctx.stroke();
+    ctx.fillStyle = "rgba(215,242,255,.85)";
+    for (const spark of burst.sparks) {
+      ctx.beginPath();
+      ctx.arc(
+        burst.x + Math.cos(spark.angle) * spark.distance * p,
+        burst.y + Math.sin(spark.angle) * spark.distance * p,
+        spark.size * (1 - p * .45),
+        0,
+        TAU,
+      );
+      ctx.fill();
+    }
+    ctx.restore();
   }
 }
 
 function frame(now: number) {
-  if (!active || !ctx) return;
-  const dt = Math.min(0.034, Math.max(0.001, (now - (lastTime || now)) / 1000));
-  lastTime = now;
+  if (!running || !ctx) return;
+  const dt = Math.min(.034, Math.max(.001, (now - (last || now)) / 1000));
+  last = now;
 
   ctx.clearRect(0, 0, width, height);
   drawWater(now);
-  update(dt, now);
-
+  updateBubbles(dt, now);
+  updateBursts(dt * 2.6);
   for (const b of bubbles) drawBubble(b, false);
-  for (const item of fish) drawFish(item, now);
+  for (const item of fish) {
+    updateFish(item, dt, now);
+    drawFish(item, now);
+  }
   for (const b of bubbles) drawBubble(b, true);
-  for (const pop of pops) drawPop(pop);
-
+  drawBursts();
   raf = requestAnimationFrame(frame);
 }
 
 function start() {
-  if (active || !shouldRun()) return;
-  active = true;
-  resizeCanvas();
+  if (running || !shouldRun()) return;
+  running = true;
+  resize();
   initScene();
-  lastTime = performance.now();
+  last = performance.now();
   raf = requestAnimationFrame(frame);
 }
 
 function stop() {
-  active = false;
+  running = false;
   cancelAnimationFrame(raf);
   raf = 0;
   const canvas = canvasRef.value;
-  if (canvas) {
-    const local = canvas.getContext("2d");
-    local?.clearRect(0, 0, canvas.width, canvas.height);
-  }
+  if (canvas) canvas.getContext("2d")?.clearRect(0, 0, canvas.width, canvas.height);
 }
 
-function syncState() {
+function sync() {
   if (shouldRun()) start();
   else stop();
 }
 
-function handleResize() {
-  if (!active) return;
-  resizeCanvas();
-}
-
-function handlePointerMove(event: PointerEvent) {
-  pointer.x = event.clientX;
-  pointer.y = event.clientY;
-  pointer.visible = true;
-}
-
-function handlePointerLeave() {
-  pointer.visible = false;
-}
-
-function isInteractiveUiTarget(target: EventTarget | null) {
+function isUi(target: EventTarget | null) {
   return target instanceof Element && Boolean(target.closest(
     "a,button,input,select,textarea,summary,[role='button'],[role='link'],[contenteditable='true'],[data-underwater-ignore]",
   ));
 }
 
-function popBubbleAt(index: number) {
-  const b = bubbles[index];
-  pops.push({
-    x: b.x,
-    y: b.y,
-    age: 0,
-    life: 410,
-    size: b.r,
-    sparks: Array.from({ length: 7 }, () => ({
-      angle: rand(0, TWO_PI),
-      speed: rand(b.r * 1.7, b.r * 3.6),
-      radius: rand(0.7, 1.8),
-    })),
-  });
-  respawnBubble(b);
+function onPointerMove(event: PointerEvent) {
+  pointer.x = event.clientX;
+  pointer.y = event.clientY;
+  pointer.visible = true;
 }
 
-function startleFish(item: Fish, x: number, y: number, now: number) {
-  let dx = item.x - x;
-  let dy = item.y - y;
-  const len = Math.hypot(dx, dy) || 1;
-  dx /= len;
-  dy /= len;
-
-  item.state = "startled";
-  item.stateUntil = now + 620;
-  item.followUntil = 0;
-  item.hideTarget = null;
-  item.annoyed = 1;
-  item.vx = dx * item.baseSpeed * 2.8;
-  item.vy = dy * item.baseSpeed * 2.25;
-  if (Math.abs(item.vx) < item.baseSpeed * 1.15) item.vx += item.direction * item.baseSpeed * 1.35;
-}
-
-function handlePointerDown(event: PointerEvent) {
-  if (!active || isInteractiveUiTarget(event.target)) return;
+function onPointerDown(event: PointerEvent) {
+  if (!running || isUi(event.target)) return;
   const x = event.clientX;
   const y = event.clientY;
 
-  let bubbleIndex = -1;
-  let bubbleDistance = Number.POSITIVE_INFINITY;
-  for (let i = 0; i < bubbles.length; i += 1) {
-    const b = bubbles[i];
-    const d = Math.hypot(x - b.x, y - b.y);
-    if (d < Math.max(11, b.r * 1.35) && d < bubbleDistance) {
-      bubbleIndex = i;
-      bubbleDistance = d;
+  let bubble: Bubble | null = null;
+  let nearest = Infinity;
+  for (const b of bubbles) {
+    const distance = Math.hypot(x - b.x, y - b.y);
+    if (distance <= Math.max(12, b.r * 1.45) && distance < nearest) {
+      bubble = b;
+      nearest = distance;
     }
   }
-  if (bubbleIndex >= 0) {
-    popBubbleAt(bubbleIndex);
+
+  if (bubble) {
+    bursts.push({
+      x: bubble.x,
+      y: bubble.y,
+      radius: bubble.r,
+      age: 0,
+      sparks: Array.from({ length: 7 }, () => ({
+        angle: rand(0, TAU),
+        distance: rand(bubble!.r * 1.8, bubble!.r * 3.8),
+        size: rand(.8, 1.8),
+      })),
+    });
+    resetBubble(bubble);
     return;
   }
 
   const now = performance.now();
   for (const item of [...fish].sort((a, b) => b.depth - a.depth)) {
-    const rx = item.size * 1.1;
-    const ry = item.size * 0.58;
-    const dx = (x - item.x) / rx;
-    const dy = (y - item.y) / ry;
-    if (dx * dx + dy * dy <= 1) {
-      startleFish(item, x, y, now);
-      return;
-    }
+    const dx = (x - item.x) / (item.size * 1.15);
+    const dy = (y - item.y) / (item.size * .62);
+    if (dx * dx + dy * dy > 1) continue;
+
+    let ax = item.x - x;
+    let ay = item.y - y;
+    const length = Math.hypot(ax, ay) || 1;
+    ax /= length;
+    ay /= length;
+    item.state = "startled";
+    item.until = now + 620;
+    item.annoyed = 1;
+    item.hideTarget = null;
+    item.vx = ax * item.baseSpeed * 2.9 + item.direction * item.baseSpeed;
+    item.vy = ay * item.baseSpeed * 2.2;
+    return;
   }
 }
 
-function handleVisibility() {
-  if (document.hidden) stop();
-  else syncState();
-}
-
 onMounted(() => {
-  mediaDesktop = window.matchMedia(`(min-width: ${DESKTOP_MIN_WIDTH}px)`);
-  mediaMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
-
-  mediaDesktop.addEventListener("change", syncState);
-  mediaMotion.addEventListener("change", syncState);
-  window.addEventListener("resize", handleResize, { passive: true });
-  window.addEventListener("pointermove", handlePointerMove, { passive: true });
-  window.addEventListener("pointerdown", handlePointerDown, { passive: true });
-  window.addEventListener("blur", handlePointerLeave);
-  document.addEventListener("visibilitychange", handleVisibility);
-  syncState();
+  desktopMq = window.matchMedia(`(min-width: ${MIN_WIDTH}px)`);
+  motionMq = window.matchMedia("(prefers-reduced-motion: reduce)");
+  desktopMq.addEventListener("change", sync);
+  motionMq.addEventListener("change", sync);
+  window.addEventListener("resize", resize, { passive: true });
+  window.addEventListener("pointermove", onPointerMove, { passive: true });
+  window.addEventListener("pointerdown", onPointerDown, { passive: true });
+  window.addEventListener("blur", () => { pointer.visible = false; });
+  document.addEventListener("visibilitychange", sync);
+  sync();
 });
-
-watch(() => route.path, syncState);
 
 onBeforeUnmount(() => {
   stop();
-  mediaDesktop?.removeEventListener("change", syncState);
-  mediaMotion?.removeEventListener("change", syncState);
-  window.removeEventListener("resize", handleResize);
-  window.removeEventListener("pointermove", handlePointerMove);
-  window.removeEventListener("pointerdown", handlePointerDown);
-  window.removeEventListener("blur", handlePointerLeave);
-  document.removeEventListener("visibilitychange", handleVisibility);
+  desktopMq?.removeEventListener("change", sync);
+  motionMq?.removeEventListener("change", sync);
+  window.removeEventListener("resize", resize);
+  window.removeEventListener("pointermove", onPointerMove);
+  window.removeEventListener("pointerdown", onPointerDown);
+  document.removeEventListener("visibilitychange", sync);
 });
 </script>
 
 <template>
-  <canvas
-    ref="canvasRef"
-    class="underwater-ambient"
-    aria-hidden="true"
-  />
+  <canvas ref="canvasRef" class="underwater-ambient" aria-hidden="true" />
 </template>
 
 <style scoped>
 .underwater-ambient {
   position: fixed;
   inset: 0;
-  z-index: 0;
+  z-index: 1;
   display: none;
   width: 100vw;
   height: 100vh;
@@ -649,9 +566,7 @@ onBeforeUnmount(() => {
   user-select: none;
 }
 
-@media (min-width: 1440px) and (prefers-reduced-motion: no-preference) {
-  .underwater-ambient {
-    display: block;
-  }
+@media (min-width: 1200px) and (prefers-reduced-motion: no-preference) {
+  .underwater-ambient { display: block; }
 }
 </style>
