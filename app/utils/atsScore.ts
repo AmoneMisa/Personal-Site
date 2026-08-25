@@ -2,7 +2,7 @@ import {
   buildCvProfile,
   scoreJob as legacyScoreJob,
   type CvProfile,
-} from '../../internal/legacy/atsScoreCore'
+} from '../../shared/hiring/ats/scoreCore'
 
 export { buildCvProfile }
 export type { CvProfile }
