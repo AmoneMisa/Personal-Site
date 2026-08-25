@@ -19,6 +19,7 @@ test('vacancy analytics has one designed data-versus-graphs tab switch', () => {
   assert.match(panel, /<USelectMenu[\s\S]*:model-value="String\(trendDays\)"/u)
   assert.match(panel, /<USelectMenu[\s\S]*:model-value="trendScope"/u)
   assert.match(tabs, /role="tablist"/u)
+  assert.doesNotMatch(tabs, /compact/u)
   assert.match(tabs, /linear-gradient\(135deg, rgba\(224, 103, 154/u)
 })
 
