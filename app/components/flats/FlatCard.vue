@@ -137,7 +137,7 @@ const emit = defineEmits<{
 .flat-card__checking { position: absolute; z-index: 5; inset: 0; display: grid; place-content: center; justify-items: center; gap: 9px; padding: 18px; background: rgba(7,12,34,.92); color: var(--text-primary); font-size: 12.5px; font-weight: 700; text-align: center; }
 .flat-card__checking-icon { width: 26px; height: 26px; color: var(--accent-pink); animation: flat-card-spin .8s linear infinite; }
 @keyframes flat-card-spin { to { transform: rotate(360deg); } }
-.flat-card__photo { position: relative; width: 100%; aspect-ratio: 16 / 9; flex: 0 0 auto; overflow: hidden; background: var(--bg-panel); }
+.flat-card__photo { position: relative; width: 100%; aspect-ratio: 1.5; flex: 0 0 auto; overflow: hidden; background: var(--bg-panel); }
 .flat-card__photo::before { content: ""; position: absolute; z-index: 1; left: 0; right: 0; bottom: 0; height: 64%; pointer-events: none; background: linear-gradient(180deg, rgba(11,16,42,0) 0%, rgba(11,16,42,.08) 24%, rgba(11,16,42,.38) 52%, rgba(11,16,42,.78) 78%, var(--bg-panel) 100%); }
 .flat-card__photo::after { content: ""; position: absolute; z-index: 1; left: 0; right: 0; bottom: 0; height: 40%; pointer-events: none; background: linear-gradient(180deg, rgba(11,16,42,0) 0%, rgba(11,16,42,.14) 34%, rgba(11,16,42,.55) 74%, var(--bg-panel) 100%); }
 .flat-card__photo > img { width: 100%; height: 100%; object-fit: cover; display: block; transition: transform 260ms ease; }
