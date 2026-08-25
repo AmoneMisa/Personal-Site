@@ -229,14 +229,26 @@ export interface JobSalaryTrendPoint {
 }
 
 export interface JobStats {
-  total: number
-  withSalary: number
-  salary: SalaryStat | null
-  bySource: Record<string, number>
-  byCountry: Record<string, number>
-  byCity: Record<string, number>
-  byProfession: JobProfessionStat[]
-  professionGeography: JobProfessionGeographyStat[]
+  salary: SalaryStat
+  bySource: Partial<Record<JobSource, JobGroupedSalaryStat>>
+  byCountry: Record<string, JobGroupedSalaryStat>
+  byWorkMode: Record<WorkMode, number>
+  byRelocation: Record<Relocation, number>
+  byEmploymentKind: Record<EmploymentKind | 'unknown', number>
   experience: JobExperienceStats
+  byProfession: JobProfessionStat[]
+  foreignerFriendly: number
+  byLanguage: Record<string, number>
+  topSkills: { skill: string; count: number }[]
   salaryTrend: JobSalaryTrendPoint[]
+}
+
+export interface JobResponse {
+  jobs: Job[]
+  total: number
+  page: number
+  pageSize: number
+  sources: Partial<Record<JobSource, number>>
+  stats: JobStats
+  rates?: Record<string, number>
 }
