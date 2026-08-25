@@ -12,6 +12,8 @@ interface FlatPresentationOptions {
   getDealType: () => string;
   getRoomOnly: () => boolean;
   getAgency: () => string;
+  getDistrict?: () => string;
+  getMetro?: () => string;
   convert: (amount: number, from: string, to: string) => number | undefined;
 }
 
@@ -55,8 +57,18 @@ const semanticListingTags = new Set([
 
 export function useFlatPresentation(options: FlatPresentationOptions) {
   const { t } = options;
+  const route = useRoute();
   const locName = (value: string | null | undefined, kind: LocationKind = "any") =>
     locationLabel(value, options.getLocale(), kind);
+  const selectedDistrict = () => options.getDistrict?.() || String(route.query.district || "");
+  const selectedMetro = () => options.getMetro?.() || String(route.query.metro || "");
+  const hasFineGeoFilter = () => Boolean(
+    selectedMetro()
+    || route.query.microdistrict
+    || route.query.kvartal
+    || route.query.residenceComplex
+    || route.query.residence_complex,
+  );
 
   const dealLabel = (dealType: FlatListing["dealType"]) =>
     dealType === "sale" ? t("dtSale")
@@ -173,6 +185,25 @@ export function useFlatPresentation(options: FlatPresentationOptions) {
     return "";
   }
 
+  function contextualBadgeLabel(listing: FlatListing): string {
+    if (options.getView() !== "active" || options.getAgency() === "any") {
+      return listing.byAgency ? t("badgeAgency") : t("badgeOwner");
+    }
+
+    const rooms = listing.rooms != null ? t("roomsN", { n: listing.rooms }) : "";
+    if (hasFineGeoFilter()) return rooms;
+
+    const microdistrict = locName(listing.microdistrict || listing.kvartal, "any");
+    const residenceComplex = listing.residenceComplex?.trim() || "";
+    const metro = locName(listing.metro, "metro");
+
+    if (selectedDistrict()) {
+      return metro || microdistrict || residenceComplex || rooms;
+    }
+
+    return locName(listing.district, "district") || metro || microdistrict || residenceComplex || rooms;
+  }
+
   function badgeData(listing: FlatListing): { values: string[]; visionLabels: string[] } {
     const values: string[] = [];
     const visionLabels: string[] = [];
@@ -183,7 +214,7 @@ export function useFlatPresentation(options: FlatPresentationOptions) {
       if (visionField && derived.has(visionField)) visionLabels.push(label);
     };
 
-    if (options.getView() !== "active" || options.getAgency() === "any") push(listing.byAgency ? t("badgeAgency") : t("badgeOwner"));
+    push(contextualBadgeLabel(listing));
     if (listing.commission === false) push(t("badgeNoCommission"));
     else if (listing.commissionPercent != null) push(t("badgeCommissionPercent", { n: listing.commissionPercent }));
     else if (listing.commission === true) push(t("badgeCommission"));
@@ -239,23 +270,37 @@ export function useFlatPresentation(options: FlatPresentationOptions) {
     return converted === undefined ? null : `≈ ${Math.round(converted).toLocaleString()} ${displayCurrency}`;
   }
 
+  function goodPriceData(listing: FlatListing): Pick<FlatCardPresentation, "goodPrice" | "goodPriceMedianUsd" | "goodPriceComparableCount"> {
+    return {
+      goodPrice: listing.marketComparison?.goodPrice === true,
+      goodPriceMedianUsd: listing.marketComparison?.medianUsd ?? null,
+      goodPriceComparableCount: listing.marketComparison?.comparableCount ?? 0,
+    };
+  }
+
   function presentCard(listing: FlatListing): FlatCardPresentation {
     const specification: string[] = [];
     if (listing.rooms != null) specification.push(t("roomsN", { n: listing.rooms }));
     if (listing.areaSqm != null) specification.push(`${listing.areaSqm} ${t("sqm")}`);
     if (listing.floor != null) specification.push(listing.totalFloors != null ? `${listing.floor}/${listing.totalFloors} ${t("floorAbbr")}` : `${listing.floor} ${t("floorAbbr")}`);
     const badgeResult = badgeData(listing);
+    const cardLocation = [...new Set([
+      locName(listing.city, "city"),
+      locName(listing.district, "district"),
+    ].filter(Boolean))].join(", ");
+    const priceComparison = goodPriceData(listing);
 
     return {
       title: displayListingTitle(listing),
       price: priceLabel(listing),
       convertedPrice: convertedLabel(listing),
       specification: specification.join(" · "),
-      location: [locName(listing.city, "city"), locName(listing.district, "district"), locName(listing.metro, "metro")].filter(Boolean).join(", "),
+      location: cardLocation,
       dealLabel: cardDealLabel(listing),
       dealTone: dealTone(listing),
       badges: badgeResult.values,
       visionBadgeLabels: badgeResult.visionLabels,
+      ...priceComparison,
       dateLabel: formatRelativeDate(listing.createdAt, {
         today: () => t("today"),
         yesterday: () => t("yesterday"),
