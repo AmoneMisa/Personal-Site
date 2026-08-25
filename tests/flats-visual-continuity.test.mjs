@@ -10,7 +10,7 @@ test('primary flat filters keep breathing room below the divider', () => {
 })
 
 test('flat photos dissolve into the card with a contained dark fade on desktop and mobile', () => {
-  assert.match(card, /\.flat-card__photo \{[^}]*aspect-ratio: 2 \/ 1[^}]*overflow: hidden/u)
+  assert.match(card, /\.flat-card__photo \{[^}]*aspect-ratio: 1\.5[^}]*overflow: hidden/u)
   assert.match(card, /bottom: 0; height: 40%/u)
   assert.doesNotMatch(card, /backdrop-filter/u)
   assert.match(card, /linear-gradient\(180deg, rgba\(11,16,42,0\) 0%, rgba\(11,16,42,\.14\) 34%, rgba\(11,16,42,\.55\) 74%, var\(--bg-panel\) 100%\)/u)

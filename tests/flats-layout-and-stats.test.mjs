@@ -23,7 +23,7 @@ test('flat cards stay equal within a row and use the target compact desktop/mobi
   assert.match(grid, /@media \(min-width: 1440px\)[^}]*repeat\(4, minmax\(0, 1fr\)\)/u)
   assert.doesNotMatch(grid, /repeat\(5, minmax\(0, 1fr\)\)/u)
   assert.match(card, /\.flat-card \{[^}]*height: 100%/u)
-  assert.match(card, /\.flat-card__photo \{[^}]*aspect-ratio: 2 \/ 1[^}]*overflow: hidden/u)
+  assert.match(card, /\.flat-card__photo \{[^}]*aspect-ratio: 1\.5[^}]*overflow: hidden/u)
   assert.match(card, /\.flat-card__photo > img \{[^}]*height: 100%[^}]*object-fit: cover/u)
   assert.match(card, /@media \(max-width: 760px\)[\s\S]*?height: 148px; min-height: 148px/u)
   assert.match(card, /grid-template-columns: minmax\(112px, 42%\) minmax\(0, 1fr\)/u)

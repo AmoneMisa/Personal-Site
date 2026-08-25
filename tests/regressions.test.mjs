@@ -268,7 +268,7 @@ test('job statistics use the ocean design and expose localized salary trends', (
 test('listing photos dissolve into cards and job salaries use a simple accent', () => {
   const flats = readFileSync(new URL('../app/components/flats/FlatCard.vue', import.meta.url), 'utf8')
   const jobs = readFileSync(new URL('../app/components/jobs/JobCard.vue', import.meta.url), 'utf8')
-  assert.match(flats, /aspect-ratio: 2 \/ 1[\s\S]*?bottom: 0; height: 40%[\s\S]*?linear-gradient\(180deg, rgba\(11,16,42,0\) 0%/u)
+  assert.match(flats, /aspect-ratio: 1\.5[\s\S]*?bottom: 0; height: 40%[\s\S]*?linear-gradient\(180deg, rgba\(11,16,42,0\) 0%/u)
   assert.match(jobs, /\.job-card__compensation \{ min-width: 0; margin-top: 12px; \}/u)
   assert.match(jobs, /\.job-card__salary \{ color: #f08ab8/u)
   assert.doesNotMatch(jobs, /job-card__salary-icon/u)
