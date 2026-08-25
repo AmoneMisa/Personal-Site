@@ -1,9 +1,11 @@
 <script setup lang="ts">
-withDefaults(defineProps<{
+const props = withDefaults(defineProps<{
   variant?: "reef" | "treasure" | "home" | "ambient";
 }>(), {
   variant: "reef",
 });
+
+const hasUnderwaterLife = computed(() => props.variant === "reef" || props.variant === "treasure");
 </script>
 
 <template>
@@ -11,11 +13,11 @@ withDefaults(defineProps<{
     class="ocean-page-backdrop"
     :class="[
       `ocean-page-backdrop_${variant}`,
-      { 'ocean-page-backdrop_has-life': variant === 'reef' || variant === 'treasure' },
+      { 'ocean-page-backdrop_has-life': hasUnderwaterLife },
     ]"
     aria-hidden="true"
   >
-    <underwater-ambient v-if="variant === 'reef' || variant === 'treasure'" />
+    <underwater-ambient v-if="hasUnderwaterLife" />
   </div>
 </template>
 
