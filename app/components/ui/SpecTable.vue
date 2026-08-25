@@ -17,7 +17,9 @@ const props = withDefaults(defineProps<{
   emptyValue?: string;
   /** Whether the toggle starts on. */
   hideEmptyDefault?: boolean;
-}>(), { hideEmptyDefault: true });
+  /** Explicit provenance from the currently opened flat. */
+  visionDerivedFields?: string[];
+}>(), { hideEmptyDefault: true, visionDerivedFields: () => [] });
 
 const hideEmpty = ref(props.hideEmptyDefault);
 const route = useRoute();
@@ -33,11 +35,15 @@ type StoredFlat = {
   country?: string;
   dealType?: "sale" | "longRent" | "shortRent" | null;
   description?: string;
+  rooms?: number | null;
+  areaSqm?: number | null;
   bedrooms?: number | null;
   bathrooms?: number | null;
   floor?: number | null;
   totalFloors?: number | null;
   address?: string | null;
+  audience?: "women" | "men" | "family" | null;
+  audienceAlternatives?: Array<"women" | "men" | "family">;
   commission?: boolean | null;
   commissionPercent?: number | null;
   cadastral?: boolean | null;
@@ -88,7 +94,29 @@ function parsedBathrooms(text: string): number | null {
   return parsedCount(text, "сан\\s*уз(?:ел|ла|лов|лы)?|с\\s*[/\\\\]\\s*у|bathrooms?|sanuzel(?:lar)?|hammom(?:lar)?|hojatxona(?:lar)?");
 }
 
+function parsedCompactLayout(text: string): { rooms: number; floor: number; total: number } | null {
+  const match = text.match(/(?:^|[^\d])(\d{1,2})\s*[\/\\]{1,2}\s*(\d{1,2})\s*[\/\\]{1,2}\s*(\d{1,2})(?=\s*[\/\\]*[^\d]|$)/u);
+  const rooms = Number(match?.[1]);
+  const floor = Number(match?.[2]);
+  const total = Number(match?.[3]);
+  return Number.isInteger(rooms) && rooms >= 1 && rooms <= 12
+    && Number.isInteger(floor) && Number.isInteger(total)
+    && floor >= 0 && floor <= total && total <= 40
+    ? { rooms, floor, total }
+    : null;
+}
+
+function parsedArea(text: string): number | null {
+  const explicit = text.match(/(?:площад(?:ь|и)|метраж|area|maydon|майдон)\s*[:=\-–—]?\s*(\d{1,3}(?:[.,]\d+)?)\s*(?:м\s*[²2]|m\s*[²2]|кв\.?\s*м|kv\.?\s*m)?/iu)
+    || text.match(/\b(\d{1,3}(?:[.,]\d+)?)\s*(?:м\s*[²2]|m\s*[²2]|кв\.?\s*м|kv\.?\s*m)\b/iu);
+  const shorthand = explicit ? null : text.match(/(?:^|[^\d])(\d{2,3})\s*(?:кв|kv)\b/iu);
+  const n = Number(String(explicit?.[1] ?? shorthand?.[1] ?? "").replace(",", "."));
+  return Number.isFinite(n) && n >= (explicit ? 5 : 15) && n <= (explicit ? 1000 : 500) ? n : null;
+}
+
 function parsedFloor(text: string): { floor: number; total: number } | null {
+  const compact = parsedCompactLayout(text);
+  if (compact) return { floor: compact.floor, total: compact.total };
   const match = text.match(/(?:этаж|эт\.|поверх|qavat|қабат|floor)[^\d\r\n]{0,8}(\d{1,2})\s*[\/\\]\s*(\d{1,2})|(?:^|[\r\n;|])\s*(\d{1,2})\s*[\/\\]\s*(\d{1,2})\s*(?=$|[\r\n;|])/imu);
   const floor = Number(match?.[1] ?? match?.[3]);
   const total = Number(match?.[2] ?? match?.[4]);
@@ -122,6 +150,12 @@ function parsedFirstRental(text: string): boolean | null {
   return null;
 }
 
+function parsedMixedAudience(text: string): boolean {
+  const family = /(?:семь[яеию]|семейн[а-яё]*|family|oila(?:ga|lar|li)?|оилага|оелага|oelaga)/iu.test(text);
+  const women = /(?:девушк[а-яё]*|женщин[а-яё]*|girls?|women|qiz(?:lar)?(?:ga)?|киз(?:лар)?(?:га)?|қиз(?:лар)?(?:га)?)/iu.test(text);
+  return family && women;
+}
+
 function clientPotentiallyUnsafe(listing: StoredFlat, text: string): boolean {
   if (listing.potentiallyUnsafe) return true;
   const singleWoman = /(?:только|нужн[а-яё]*|ищ[еу][а-яё]*|подсел[а-яё]*)[^\r\n.!?]{0,24}(?:одн(?:а|ой|у)|1)\s+(?:девушк[а-яё]*|женщин[а-яё]*)|(?:faqat\s+)?(?:1|bitta)\s+(?:qiz|ayol)(?:\s+(?:kerak|uchun))?/iu.test(text);
@@ -133,9 +167,11 @@ function clientPotentiallyUnsafe(listing: StoredFlat, text: string): boolean {
 }
 
 const flatVisionDerivedFields = computed(() => new Set(
-  Array.isArray(currentFlatListing.value?.vision?.derivedFields)
-    ? currentFlatListing.value!.vision!.derivedFields!.map(String)
-    : [],
+  props.visionDerivedFields.length
+    ? props.visionDerivedFields.map(String)
+    : Array.isArray(currentFlatListing.value?.vision?.derivedFields)
+      ? currentFlatListing.value!.vision!.derivedFields!.map(String)
+      : [],
 ));
 
 const flatFieldByLabel = computed(() => new Map<string, string>([
@@ -160,8 +196,8 @@ const visionAmenityFields = new Set([
 ]);
 
 const aiVisionTitle = computed(() => locale.value.startsWith("en")
-  ? "Detected using AI vision"
-  : "Распознано при помощи AI-зрения");
+  ? "Data from AI Vision"
+  : "Данные из AI-Vision");
 
 function aiHintForRow(row: SpecRow): string | null {
   const fields = flatVisionDerivedFields.value;
@@ -181,20 +217,28 @@ const contextualRows = computed<SpecRow[]>(() => {
 
   const empty = props.emptyValue || t("flats.notSpecified");
   const text = String(listing.description || "");
+  const compact = parsedCompactLayout(text);
+  const roomCount = listing.rooms ?? compact?.rooms ?? null;
+  const areaSqm = listing.areaSqm ?? parsedArea(text);
   const bedroomCount = listing.bedrooms ?? parsedBedrooms(text);
   const bathroomCount = listing.bathrooms ?? parsedBathrooms(text);
   const floor = (listing.floor == null || listing.totalFloors == null) ? parsedFloor(text) : null;
   const commission = listing.commissionPercent ?? parsedCommission(text);
   const isSale = listing.dealType === "sale";
   const saleHiddenLabels = new Set([t("flats.specAudience"), t("flats.specRoomShare")]);
+  const alternatives = new Set(listing.audienceAlternatives || []);
+  const mixedAudience = (alternatives.has("family") && alternatives.has("women")) || parsedMixedAudience(text);
 
   let rows = props.rows
     .filter((row) => !(isSale && saleHiddenLabels.has(row.label)))
     .map((row): SpecRow => {
+      if (row.label === t("flats.specRooms") && roomCount != null) return { ...row, value: String(roomCount), empty: false };
+      if (row.label === t("flats.specArea") && areaSqm != null) return { ...row, value: `${areaSqm} ${t("flats.sqm")}`, empty: false };
       if (row.label === t("flats.specBedrooms") && bedroomCount != null) return { ...row, value: String(bedroomCount), empty: false };
       if (row.label === t("flats.specBathrooms") && bathroomCount != null) return { ...row, value: String(bathroomCount), empty: false };
       if (row.label === t("flats.specFloor") && floor) return { ...row, value: `${floor.floor} / ${floor.total}`, empty: false };
       if (row.label === t("flats.specCommission") && commission != null) return { ...row, value: `${commission}%`, empty: false };
+      if (row.label === t("flats.specAudience") && mixedAudience) return { ...row, value: locale.value.startsWith("en") ? "Family or women" : "Семья или девушки", empty: false };
       if (row.label === t("flats.specAddress") && phoneLike(row.value)) return { ...row, value: empty, empty: true };
       return row;
     });
