@@ -2,9 +2,11 @@ import { canonicalSkillName, extractSkillNames } from '~~/shared/jobSkills'
 import {
   SENIORITY_RANK,
   bucketVacancyText,
+  classifyCvSectionHeading,
   detectDegreeFields,
   detectDegreeLevel,
   detectHiringSeniority,
+  extractCvExperienceYears,
   extractRequiredExperienceYears,
   isNoSponsorshipRequirement,
   requiresUsSponsorship as detectRequiresUsSponsorship,
@@ -66,36 +68,6 @@ function coverage(have: Set<string>, wanted: Set<string>): number {
 
 type CvSection = 'experience' | 'projects' | 'profile' | 'skills' | 'education' | 'other'
 
-const CV_SECTION_HEADING_RE = /^\s*(profile|professional profile|summary|professional summary|about me|work experience|professional experience|experience|employment|employment history|projects?|pet projects?|hobbies|skills|technical skills|tech stack|education|languages?|contact|additional information)\s*:?[\s]*$/i
-
-function cvSectionKind(heading: string): CvSection {
-  const h = heading.toLowerCase()
-  if (/work experience|professional experience|^experience$|employment/.test(h)) return 'experience'
-  if (/project|hobbies/.test(h)) return 'projects'
-  if (/profile|summary|about me/.test(h)) return 'profile'
-  if (/skills|tech stack/.test(h)) return 'skills'
-  if (/education/.test(h)) return 'education'
-  return 'other'
-}
-
-function cvSectionText(raw: string, wanted: CvSection): string {
-  const lines = raw.replace(/\r/g, '').split('\n')
-  const collected: string[] = []
-  let section: CvSection = 'other'
-  let sawHeading = false
-  for (const line of lines) {
-    const trimmed = line.trim()
-    const heading = CV_SECTION_HEADING_RE.exec(trimmed)
-    if (heading?.[1]) {
-      section = cvSectionKind(heading[1])
-      sawHeading = true
-      continue
-    }
-    if (section === wanted && trimmed) collected.push(trimmed)
-  }
-  return sawHeading ? collected.join('\n') : ''
-}
-
 const SECTION_EVIDENCE_WEIGHT: Record<CvSection, number> = {
   experience: 1,
   projects: 0.7,
@@ -114,53 +86,15 @@ function skillEvidenceFromCv(raw: string): Map<string, number> {
   }
   for (const line of lines) {
     const trimmed = line.trim()
-    const heading = CV_SECTION_HEADING_RE.exec(trimmed)
-    if (heading?.[1]) {
-      section = cvSectionKind(heading[1])
+    const nextSection = classifyCvSectionHeading(trimmed)
+    if (nextSection) {
+      section = nextSection
       continue
     }
     if (trimmed) add(trimmed, SECTION_EVIDENCE_WEIGHT[section])
   }
   for (const skill of extractSkills(raw)) if (!evidence.has(skill)) evidence.set(skill, 0.45)
   return evidence
-}
-
-function monthIndex(year: number, month = 1): number {
-  return year * 12 + Math.max(1, Math.min(12, month)) - 1
-}
-
-function parsedCvExperienceYears(raw: string, referenceDate: Date): number | undefined {
-  const experienceSection = cvSectionText(raw, 'experience')
-  const datedSource = experienceSection || raw
-  const intervals: Array<[number, number]> = []
-  const ranges = /\b(19\d{2}|20\d{2})(?:[-/.](0?[1-9]|1[0-2]))?\s*(?:-|–|—|to)\s*(?:(present|current|now)|((?:19|20)\d{2})(?:[-/.](0?[1-9]|1[0-2]))?)/gi
-  for (const match of datedSource.matchAll(ranges)) {
-    const startYear = Number(match[1])
-    const startMonth = Number(match[2] || 1)
-    const endYear = match[3] ? referenceDate.getFullYear() : Number(match[4])
-    const endMonth = match[3] ? referenceDate.getMonth() + 1 : Number(match[5] || 12)
-    if (!startYear || !endYear) continue
-    const start = monthIndex(startYear, startMonth)
-    const end = monthIndex(endYear, endMonth)
-    if (end >= start && end - start <= 12 * 50) intervals.push([start, end])
-  }
-  intervals.sort((a, b) => a[0] - b[0])
-  const merged: Array<[number, number]> = []
-  for (const interval of intervals) {
-    const last = merged[merged.length - 1]
-    if (!last || interval[0] > last[1] + 1) merged.push([...interval])
-    else last[1] = Math.max(last[1], interval[1])
-  }
-  const datedMonths = merged.reduce((sum, [start, end]) => sum + end - start + 1, 0)
-  const datedYears = datedMonths ? datedMonths / 12 : 0
-  let explicitYears = 0
-  const explicit = /\b(?:over|more than|at least|about|approximately|approx\.?|around)?\s*(\d{1,2}(?:[.,]\d)?)\+?\s*(?:years?|yrs?)\s+(?:of\s+)?(?:hands[- ]on\s+|professional\s+|commercial\s+)?experience\b/gi
-  for (const match of raw.matchAll(explicit)) {
-    const years = Number(match[1]?.replace(',', '.'))
-    if (Number.isFinite(years) && years >= 0 && years <= 50) explicitYears = Math.max(explicitYears, years)
-  }
-  const result = Math.max(datedYears, explicitYears)
-  return result > 0 ? Math.round(result * 10) / 10 : undefined
 }
 
 export interface CvProfile {
@@ -181,7 +115,7 @@ export function buildCvProfile(cvText: string, referenceDate: Date = new Date())
     skillEvidence: skillEvidenceFromCv(cvText),
     terms: extractTerms(cvText),
     raw: cvText,
-    experienceYears: parsedCvExperienceYears(cvText, referenceDate),
+    experienceYears: extractCvExperienceYears(cvText, referenceDate) ?? undefined,
     seniority: detectHiringSeniority(cvText) || undefined,
     degreeLevel: detectDegreeLevel(cvText) || undefined,
     degreeFields: new Set(detectDegreeFields(cvText)),
