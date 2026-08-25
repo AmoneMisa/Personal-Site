@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { Job, JobProfessionGeographyStat, JobSalaryTrendPoint, JobStats } from "~/types/jobs";
+import USelectMenu from "~/components/U/SelectMenu.vue";
 import { locationLabel } from "~/utils/locationLabels";
 import { canonicalCityValue } from "~~/shared/locationCatalog";
 
@@ -138,12 +139,12 @@ const scopeOptions = computed(() => [
 function selectTab(value: string) {
   if (value === "overview" || value === "trends") activeTab.value = value;
 }
-function selectTrendDays(value: string) {
+function selectTrendDays(value: unknown) {
   const next = Number(value);
   if (next === 1 || next === 3 || next === 7 || next === 60) trendDays.value = next;
 }
-function selectTrendScope(value: string) {
-  if (["world", "country", "city", "position", "positions"].includes(value)) {
+function selectTrendScope(value: unknown) {
+  if (typeof value === "string" && ["world", "country", "city", "position", "positions"].includes(value)) {
     trendScope.value = value as typeof trendScope.value;
   }
 }
@@ -242,20 +243,22 @@ function selectTrendScope(value: string) {
     <div v-else class="trends">
       <article class="stats__card stats__card_wide trends__card">
         <div class="trends__filters">
-          <UiAnalyticsTabs
-            class="stats__switch"
+          <USelectMenu
+            class="trends__filter trends__filter_period"
             :model-value="String(trendDays)"
             :items="periodOptions"
-            compact
-            :aria-label="t('period')"
+            value-key="value"
+            label-key="label"
+            :search-input="false"
             @update:model-value="selectTrendDays"
           />
-          <UiAnalyticsTabs
-            class="stats__switch stats__switch_scope"
+          <USelectMenu
+            class="trends__filter trends__filter_scope"
             :model-value="trendScope"
             :items="scopeOptions"
-            compact
-            :aria-label="t('statsTrends')"
+            value-key="value"
+            label-key="label"
+            :search-input="false"
             @update:model-value="selectTrendScope"
           />
         </div>
@@ -299,8 +302,9 @@ function selectTrendScope(value: string) {
 .stats__chips_geo { margin-top: 7px; }
 .stats__chips_geo span { padding: 2px 7px; font-size: 11px; }
 .trends__card { padding: 14px; background: rgba(8, 13, 39, 0.82); }
-.trends__filters { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; margin-bottom: 14px; padding-bottom: 12px; border-bottom: 1px solid rgba(85,111,174,.2); }
-.stats__switch_scope { justify-content: flex-end; }
+.trends__filters { display: flex; justify-content: flex-end; align-items: center; gap: 8px; margin-bottom: 14px; padding-bottom: 12px; border-bottom: 1px solid rgba(85,111,174,.2); }
+.trends__filter { width: 210px; max-width: 100%; }
+.trends__filter_period { width: 150px; }
 .trends__chart-wrap { min-width: 0; display: grid; gap: 10px; }
 .trends__chart-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; padding: 0 2px; }
 .trends__chart-label { margin-bottom: 3px; }
@@ -312,13 +316,13 @@ function selectTrendScope(value: string) {
   .stats__grid{grid-template-columns:repeat(2,minmax(0,1fr))}
   .stats__card_wide{grid-column:1/-1}
   .stats__professions{grid-template-columns:1fr}
-  .trends__filters{flex-direction:column}
-  .stats__switch_scope{justify-content:flex-start}
 }
 @media(max-width:620px){
   .stats__switch{width:100%}
   .stats__grid{grid-template-columns:1fr}
   .stats__card_wide{grid-column:auto}
+  .trends__filters{align-items:stretch;flex-direction:column}
+  .trends__filter,.trends__filter_period{width:100%}
   .trends__chart-head{align-items:flex-start;flex-direction:column}
   .trends__sample-pill{align-self:flex-start}
 }
