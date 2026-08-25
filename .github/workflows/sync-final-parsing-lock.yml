@@ -1,0 +1,26 @@
+name: Sync final parsing lock
+
+on:
+  push:
+    paths:
+      - .github/workflows/sync-final-parsing-lock.yml
+
+permissions:
+  contents: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - run: npm install --package-lock-only --ignore-scripts
+      - run: |
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add package-lock.json
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -m "chore: sync final parsing lexicon lock"
+          git push
