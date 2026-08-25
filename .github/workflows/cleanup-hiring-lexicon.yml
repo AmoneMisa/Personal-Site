@@ -290,7 +290,7 @@ jobs:
             }
           }
 
-          const DEGREE_RANK:""",
+          """,
               'ATS scope signals',
           )
           text = replace_between(
