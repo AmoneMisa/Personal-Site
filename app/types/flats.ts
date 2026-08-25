@@ -1,3 +1,16 @@
+export interface FlatVisionEvidence {
+  value?: boolean | number | string | null;
+  confidence?: number;
+  evidence?: string[];
+}
+
+export interface FlatVisionResult {
+  provider?: string | null;
+  analyzedAt?: string | null;
+  derivedFields?: string[];
+  data?: Record<string, FlatVisionEvidence>;
+}
+
 export interface FlatListing {
   id: string;
   source: string;
@@ -67,6 +80,7 @@ export interface FlatListing {
   minLeaseTerm?: string | null;
   availableFrom?: string | null;
   tags?: string[];
+  vision?: FlatVisionResult;
 }
 
 export type FlatStatsDealKey = "sale" | "longRent" | "shortRent" | "roomRent" | "unknown";
@@ -147,6 +161,7 @@ export interface FlatCardPresentation {
   dealLabel: string;
   dealTone: "sale" | "rent" | "room" | "short" | "";
   badges: string[];
+  visionBadgeLabels: string[];
   dateLabel: string;
 }
 
