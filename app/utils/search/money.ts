@@ -54,16 +54,18 @@ export function formatCompactNumber(amount: number): string {
 }
 
 /**
- * Compact only numeric salary fragments, preserving currency symbols, ranges and
- * localized period labels. The unabridged string remains available for tooltips
- * and detail views, so card density never costs information.
+ * Compact card-only salary text. Full source strings stay untouched and remain
+ * available in card tooltips and vacancy details.
  */
 export function compactSalaryText(value: string): string {
-  return value.replace(/\d(?:[\d\s\u00a0\u202f,.]*\d)?/g, (token) => {
+  const compactNumbers = value.replace(/\d(?:[\d\s\u00a0\u202f,.]*\d)?/g, (token) => {
     const normalized = token.replace(/[\s\u00a0\u202f,]/g, "");
     const amount = Number(normalized);
     return Number.isFinite(amount) && amount >= 1_000 ? formatCompactNumber(amount) : token;
   });
+  return compactNumbers
+    .replace(/\bмесяц\b/giu, "м.")
+    .replace(/\bгод\b/giu, "г.");
 }
 
 export function convertSalaryPeriod(amount: number, from: SalaryPeriod, to: SalaryPeriod): number {
