@@ -64,7 +64,7 @@ const heroStats = computed(() =>
 .hero {
   position: relative;
   isolation: isolate;
-  overflow: hidden;
+  overflow: visible;
   padding: 76px 0 68px;
 }
 .hero > .rd-wrap {
