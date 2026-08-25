@@ -754,7 +754,7 @@ onBeforeUnmount(() => { modalOpen.value = false; lightboxOpen.value = false; rel
   background: var(--ocean-form-surface);
   box-shadow: 0 18px 42px rgba(2, 5, 18, 0.22);
 }
-.filter-card, .filter-card { padding: 16px; }
+.filter-card { padding: 16px; }
 .filter-primary-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; }
 /* Scoped to the value span (not every span, which included the chevron) and
    kept on one line. This rule sits after the one above and previously won with
@@ -780,7 +780,7 @@ onBeforeUnmount(() => { modalOpen.value = false; lightboxOpen.value = false; rel
 .active-filter-chips { display: flex; flex: 1 1 300px; gap: 8px; flex-wrap: wrap; min-width: 0; }
 .filter-chip { display: inline-flex; align-items: center; gap: 7px; max-width: 100%; min-height: 34px; padding: 6px 11px; border: 1px solid var(--line); border-radius: 7px; background: var(--bg-panel-2); color: var(--text-primary); white-space: normal; text-align: left; line-height: 1.25; }
 .filter-chip span { color: var(--ui-text-muted); flex: 0 0 auto; }
-.advanced-card__header > div, .flats__filter-blocks { grid-template-columns: 1.15fr .95fr 1.1fr 1.1fr 1fr; gap: 0; padding: 16px; }
+.flats__filter-blocks { grid-template-columns: 1.15fr .95fr 1.1fr 1.1fr 1fr; gap: 0; padding: 16px; }
 .flats__filter-blocks :deep(.filter-section) { min-width: 0; padding: 0 16px; border: 0; border-left: 1px solid var(--line); border-radius: 0; background: transparent; }
 .flats__filter-blocks :deep(.filter-section:first-child) { padding-left: 0; border-left: 0; }
 .flats__filter-blocks :deep(.filter-section:last-child) { padding-right: 0; }
@@ -809,8 +809,8 @@ onBeforeUnmount(() => { modalOpen.value = false; lightboxOpen.value = false; rel
   .filter-amenities-row__label { flex: 0 0 100%; }
   .filter-amenities-row :deep(button) { flex: 1 1 auto; justify-content: center; }
   .filter-actions-row { align-items: stretch; }
-    .active-filter-chips { flex: 1 1 100%; }
-      .flats__filter-blocks { grid-template-columns: 1fr; padding: 14px 12px; gap: 0; }
+  .active-filter-chips { flex: 1 1 100%; }
+  .flats__filter-blocks { grid-template-columns: 1fr; padding: 14px 12px; gap: 0; }
   .flats__filter-blocks :deep(.filter-section), .flats__filter-blocks :deep(.filter-section:first-child), .flats__filter-blocks :deep(.filter-section:nth-child(odd)), .flats__filter-blocks :deep(.filter-section:nth-child(even)) { padding: 16px 0; border-left: 0; border-top: 1px solid var(--line); }
   .flats__filter-blocks :deep(.filter-section:first-child) { padding-top: 0; border-top: 0; }
   .flats__filter-blocks :deep(.filter-section:last-child) { padding-bottom: 0; }

@@ -92,6 +92,7 @@ test('advanced filters share one collapsed shell on all three search boards', ()
   assert.match(advancedFilters, /:aria-expanded="open"/u)
   assert.doesNotMatch(jobPage, /showAdvanced = !showAdvanced/u)
   assert.doesNotMatch(hiringPage, /v-if="showAdvanced" class="hiring__advanced"/u)
+  assert.doesNotMatch(page, /advanced-card|advanced-button|toggleAdvanced/u)
 })
 
 test('vacancy graphs do not render the redundant sparse salary line', () => {
