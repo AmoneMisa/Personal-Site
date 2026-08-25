@@ -9,11 +9,11 @@ test('primary flat filters keep breathing room below the divider', () => {
   assert.match(flatCss, /\.filter-primary-grid\s*\{[\s\S]*?margin-top:\s*14px/u)
 })
 
-test('flat photos use a contained gradient blend without blurring the image or card body', () => {
+test('flat photos keep the subtle clipped fade without backdrop blur', () => {
   assert.match(card, /\.flat-card__photo \{[^}]*overflow: hidden/u)
-  assert.match(card, /bottom: 0; height: 34%/u)
+  assert.match(card, /bottom: -28px; height: 48%/u)
   assert.doesNotMatch(card, /backdrop-filter/u)
-  assert.match(card, /rgba\(11,16,42,\.62\) 78%, var\(--bg-panel\) 100%/u)
+  assert.match(card, /linear-gradient\(180deg, transparent 0%, rgba\(11,16,42,\.34\) 52%, var\(--bg-panel\) 100%\)/u)
   assert.match(card, /@media \(max-width: 760px\)[\s\S]*?overflow: hidden/u)
-  assert.match(card, /linear-gradient\(90deg, rgba\(11,16,42,0\) 0%/u)
+  assert.match(card, /linear-gradient\(90deg, transparent 0%, rgba\(11,16,42,\.36\) 48%, var\(--bg-panel\) 96%\)/u)
 })
