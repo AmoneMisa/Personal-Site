@@ -2,7 +2,20 @@ import type { Seniority } from './jobs'
 
 export type HiringSource = 'telegram' | (string & {})
 export type CandidateOrigin = 'telegram' | 'web' | 'facebook' | 'threads' | 'linkedin'
-export type CandidateEmploymentType = 'full_time' | 'part_time'
+export type CandidateEmploymentType =
+  | 'full_time'
+  | 'part_time'
+  | 'contract'
+  | 'project'
+  | 'freelance'
+  | 'temporary'
+  | 'internship'
+  | 'volunteer'
+  | 'seasonal'
+export type CandidateWorkMode = 'remote' | 'hybrid' | 'onsite'
+export type CandidateWorkSchedule = 'fiveTwo' | 'twoTwo' | 'shift' | 'flexible' | 'day' | 'night' | 'rotational'
+export type CandidateProbationKind = 'probation' | 'noProbation' | 'paidProbation' | 'unpaidProbation'
+export type CandidateExperienceRequirement = 'noExperience' | 'experienceRequired'
 export type CandidateContactType = 'direct' | 'platform'
 export type CandidateGender = 'male' | 'female' | 'unknown'
 
@@ -49,6 +62,7 @@ export interface CvProfile {
   gender?: CandidateGender
   isAdult?: boolean
   experienceYears?: number | null
+  experienceRequirement?: CandidateExperienceRequirement | null
   salaryMin?: number | null
   salaryMax?: number | null
   currency?: string | null
@@ -57,6 +71,9 @@ export interface CvProfile {
   remote?: boolean | null
   relocationReady?: boolean | null
   employmentTypes?: CandidateEmploymentType[]
+  workModes?: CandidateWorkMode[]
+  schedules?: CandidateWorkSchedule[]
+  probationKind?: CandidateProbationKind | null
   photo?: string | null
   photos?: string[]
   url: string
