@@ -14,6 +14,7 @@ import {
   aliasesOf,
   aliasesToRegex,
   canonicalCountryCode,
+  canonicalTashkentDistrict,
   classifyHiringIntent,
   classifyHiringMessage,
   findCanonical,
@@ -50,6 +51,10 @@ const CITY_MATCHERS = HIRING_CITIES.map((city) => ({
 export function detectLexiconCity(text: string, country?: string | null): string | null {
   const code = country ? canonicalCountryCode(country) : null
   return CITY_MATCHERS.find(({ city, re }) => (!code || city.country === code) && re.test(text))?.city.canonical || null
+}
+
+export function detectLexiconDistrict(text: string, city?: string | null): string | null {
+  return city === 'Tashkent' ? canonicalTashkentDistrict(text) : null
 }
 
 export function normalizeHiringCountry(value: string | null | undefined): string | null {
