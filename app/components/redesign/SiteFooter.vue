@@ -15,11 +15,15 @@ function resolveHref(href: string) {
 
 const contactLinks = computed(() =>
   [
-    { label: "Telegram", href: CONTACTS.telegram },
-    { label: "WhatsApp", href: CONTACTS.whatsapp },
-    { label: "LinkedIn", href: CONTACTS.linkedin },
-    { label: "GitHub", href: CONTACTS.github },
-    { label: "Email", href: CONTACTS.email ? `mailto:${CONTACTS.email}` : "" },
+    { label: "Telegram", href: CONTACTS.telegram, icon: "i-lucide-send" },
+    { label: "WhatsApp", href: CONTACTS.whatsapp, icon: "i-lucide-message-circle" },
+    { label: "LinkedIn", href: CONTACTS.linkedin, icon: "i-lucide-linkedin" },
+    { label: "GitHub", href: CONTACTS.github, icon: "i-lucide-github" },
+    {
+      label: "Email",
+      href: CONTACTS.email ? `mailto:${CONTACTS.email}` : "",
+      icon: "i-lucide-mail",
+    },
   ].filter((c) => c.href)
 );
 function isExternal(href: string) {
@@ -38,24 +42,39 @@ function isExternal(href: string) {
           </a>
           <p class="site-footer__tagline">{{ f.tag }}</p>
         </div>
-        <div class="site-footer__links">
-          <div class="site-footer__column">
+
+        <div class="site-footer__content">
+          <nav class="site-footer__nav" :aria-label="f.navTitle">
             <h6 class="site-footer__column-title mono">{{ f.navTitle }}</h6>
-            <a v-for="l in f.navLinks" :key="l.label" class="site-footer__link" :href="resolveHref(l.href)">{{ l.label }}</a>
-          </div>
-          <div class="site-footer__column">
+            <div class="site-footer__nav-grid">
+              <a
+                v-for="l in f.navLinks"
+                :key="l.label"
+                class="site-footer__link"
+                :href="resolveHref(l.href)"
+              >{{ l.label }}</a>
+            </div>
+          </nav>
+
+          <div class="site-footer__contacts">
             <h6 class="site-footer__column-title mono">{{ f.contactsTitle }}</h6>
-            <a
+            <div class="site-footer__contacts-row">
+              <a
                 v-for="c in contactLinks"
                 :key="c.label"
-                class="site-footer__link"
+                class="site-footer__contact-link"
                 :href="c.href"
                 :target="isExternal(c.href) ? '_blank' : undefined"
                 :rel="isExternal(c.href) ? 'noopener noreferrer' : undefined"
-            >{{ c.label }}</a>
+              >
+                <u-icon :name="c.icon" class="site-footer__contact-icon" aria-hidden="true" />
+                <span>{{ c.label }}</span>
+              </a>
+            </div>
           </div>
         </div>
       </div>
+
       <div class="site-footer__bottom mono">
         <span>{{ f.copyright }}</span>
         <span class="site-footer__motto">
@@ -77,12 +96,14 @@ function isExternal(href: string) {
   background: #070c22;
   box-shadow: 0 -18px 48px rgba(4, 8, 28, 0.36);
 }
+
 .site-footer__grid {
-  display: flex;
-  justify-content: space-between;
+  display: grid;
+  grid-template-columns: minmax(260px, 1fr) minmax(0, 1fr);
   gap: 40px;
-  flex-wrap: wrap;
+  align-items: start;
 }
+
 .site-footer__logo {
   display: flex;
   align-items: center;
@@ -91,6 +112,7 @@ function isExternal(href: string) {
   font-size: 17px;
   color: var(--text-primary);
 }
+
 .site-footer__tagline {
   color: var(--text-muted);
   font-size: 13px;
@@ -98,26 +120,72 @@ function isExternal(href: string) {
   margin-top: 14px;
   line-height: 1.6;
 }
-.site-footer__links {
-  display: flex;
-  gap: 36px;
-  flex-wrap: wrap;
+
+.site-footer__content {
+  display: grid;
+  gap: 24px;
+  min-width: 0;
 }
+
+.site-footer__nav {
+  min-width: 0;
+}
+
+.site-footer__nav-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  column-gap: 36px;
+  row-gap: 9px;
+}
+
 .site-footer__column-title {
   font-size: 11px;
   color: var(--text-muted);
   margin-bottom: 12px;
   font-weight: 400;
 }
-.site-footer__link {
-  display: block;
+
+.site-footer__link,
+.site-footer__contact-link {
   font-size: 13.5px;
   color: var(--text-muted);
-  margin-bottom: 9px;
 }
-.site-footer__link:hover {
+
+.site-footer__link {
+  display: block;
+}
+
+.site-footer__link:hover,
+.site-footer__contact-link:hover {
   color: var(--text-primary);
 }
+
+.site-footer__contacts {
+  min-width: 0;
+}
+
+.site-footer__contacts-row {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 16px;
+  align-items: center;
+}
+
+.site-footer__contact-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+  white-space: nowrap;
+}
+
+.site-footer__contact-icon {
+  width: 16px;
+  height: 16px;
+  flex: 0 0 16px;
+  color: currentColor;
+}
+
 .site-footer__bottom {
   margin-top: 32px;
   padding-top: 18px;
@@ -130,9 +198,28 @@ function isExternal(href: string) {
   gap: 16px;
   flex-wrap: wrap;
 }
+
 .site-footer__motto {
   display: flex;
   align-items: center;
   gap: 6px;
+}
+
+@media (max-width: 980px) {
+  .site-footer__grid {
+    grid-template-columns: 1fr;
+  }
+
+  .site-footer__contacts-row {
+    grid-template-columns: repeat(5, max-content);
+    justify-content: space-between;
+  }
+}
+
+@media (max-width: 700px) {
+  .site-footer__contacts-row {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px 20px;
+  }
 }
 </style>
