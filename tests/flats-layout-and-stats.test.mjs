@@ -7,6 +7,10 @@ const grid = await readFile(new URL('../app/components/flats/FlatGrid.vue', impo
 const stats = await readFile(new URL('../app/components/flats/StatsPanel.vue', import.meta.url), 'utf8')
 const feed = await readFile(new URL('../app/composables/flats/useFlatFeed.ts', import.meta.url), 'utf8')
 const page = await readFile(new URL('../app/pages/flat-finder/index.vue', import.meta.url), 'utf8')
+const locations = await readFile(new URL('../app/utils/locationLabels.ts', import.meta.url), 'utf8')
+const flatFilters = await readFile(new URL('../app/composables/flats/useFlatFilters.ts', import.meta.url), 'utf8')
+const jobFilters = await readFile(new URL('../app/composables/jobs/useJobFilters.ts', import.meta.url), 'utf8')
+const hiringFilters = await readFile(new URL('../app/composables/hiring/useHiringFilters.ts', import.meta.url), 'utf8')
 
 test('flat cards share one row height and compact title/media geometry', () => {
   assert.match(grid, /align-items: stretch; grid-auto-rows: 1fr/u)
@@ -24,10 +28,22 @@ test('flat geography statistics stay populated when a scoped country slice is em
   assert.match(stats, /<SearchSourceTabs v-model="dealScope"/u)
 })
 
+test('country geography is a supported display kind instead of crashing the analytics render', () => {
+  assert.match(locations, /LocationKind = 'country' \| 'city' \| 'district' \| 'metro' \| 'any'/u)
+  assert.match(locations, /if \(kind === 'country'\) return countryDisplayLabel\(value, locale\)/u)
+  assert.match(locations, /new Intl\.DisplayNames\(\[locale \|\| 'en'\], \{ type: 'region' \}\)/u)
+})
+
 test('flat statistics are not cleared while a country refresh waits for the background aggregate', () => {
   assert.match(feed, /if \(!append && data\.statistics\) statistics\.value = data\.statistics/u)
   assert.doesNotMatch(feed, /statistics\.value = data\.statistics \|\| null/u)
   assert.match(feed, /const statisticsLoading = ref\(false\)/u)
+})
+
+test('advanced filters are collapsed by default on all three search boards', () => {
+  assert.match(flatFilters, /const showAdvanced = ref\(false\)/u)
+  assert.match(jobFilters, /const showAdvanced = ref\(false\)/u)
+  assert.match(hiringFilters, /const showAdvanced = ref\(false\)/u)
 })
 
 test('room rent remains a deal type but is not duplicated in quick filters', () => {
