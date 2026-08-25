@@ -18,7 +18,6 @@ import {
   classifyHiringIntent,
   classifyHiringMessage,
   findCanonical,
-  matchProfessions,
   matchSeniority,
   parseExperience,
   parseHiringContext,
@@ -26,6 +25,10 @@ import {
   parseSalary,
   resolveProfessionContext,
 } from '@whiteslove/parsing-lexicon'
+import {
+  matchExtendedProfessions,
+  matchesSourceCandidateIntent,
+} from '@whiteslove/parsing-lexicon/hiring-source-aliases'
 
 const matcher = (entry: { canonical?: string; aliases?: Record<string, readonly string[]> }) =>
   aliasesToRegex([entry.canonical || '', ...aliasesOf(entry)].filter(Boolean))
@@ -43,14 +46,32 @@ const HIRING_CITIES = [
   ...UZ_CITY_CATALOG,
   ...UA_CITY_CATALOG,
 ]
-const CITY_MATCHERS = HIRING_CITIES.map((city) => ({
-  city,
-  re: aliasesToRegex([city.canonical, ...aliasesOf(city)]),
-}))
+
+const escapeRegex = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+const cityInflectionRegex = (aliases: readonly string[]) => {
+  const cyrillic = [...new Set(aliases.filter((alias) => /\p{Script=Cyrillic}/u.test(alias)))]
+  if (!cyrillic.length) return null
+  const patterns = cyrillic.map((alias) => {
+    const maxSuffix = alias.replace(/[^\p{L}\p{N}]/gu, '').length > 3 ? 5 : 3
+    return `${escapeRegex(alias)}(?:\\p{Script=Cyrillic}{0,${maxSuffix}})`
+  })
+  return new RegExp(`(?<![\\p{L}\\p{N}])(?:${patterns.join('|')})(?![\\p{L}\\p{N}])`, 'iu')
+}
+
+const CITY_MATCHERS = HIRING_CITIES.map((city) => {
+  const aliases = [city.canonical, ...aliasesOf(city)]
+  return {
+    city,
+    exact: aliasesToRegex(aliases),
+    inflected: cityInflectionRegex(aliases),
+  }
+})
 
 export function detectLexiconCity(text: string, country?: string | null): string | null {
   const code = country ? canonicalCountryCode(country) : null
-  return CITY_MATCHERS.find(({ city, re }) => (!code || city.country === code) && re.test(text))?.city.canonical || null
+  return CITY_MATCHERS.find(({ city, exact, inflected }) =>
+    (!code || city.country === code) && (exact.test(text) || Boolean(inflected?.test(text))),
+  )?.city.canonical || null
 }
 
 export function detectLexiconDistrict(text: string, city?: string | null): string | null {
@@ -135,15 +156,28 @@ export function detectExperienceRequirement(text: string): 'noExperience' | 'exp
 }
 
 export function detectHiringIntent(text: string) {
-  return classifyHiringIntent(text)
+  const parsed = classifyHiringIntent(text)
+  if (parsed.intent || !matchesSourceCandidateIntent(text)) return parsed
+  return { ...parsed, intent: 'candidate' as const, score: Math.max(parsed.score || 0, 0.9) }
 }
 
 export function classifySharedHiringMessage(text: string) {
-  return classifyHiringMessage(text)
+  const kind = classifyHiringMessage(text)
+  return kind === 'unknown' && matchesSourceCandidateIntent(text) ? 'candidate' : kind
+}
+
+const DISPLAY_CANONICAL_OVERRIDES: Record<string, string> = {
+  oil_gas_worker: 'oil_&_gas_worker',
+  finance_banking_specialist: 'finance_/_banking_specialist',
+  it_specialist: 'IT_specialist',
+  logistics_manager: 'logistics_specialist',
 }
 
 export function detectProfessionMatches(text: string, limit = 8) {
-  return matchProfessions(text, { limit })
+  return matchExtendedProfessions(text, { limit }).map((match) => ({
+    ...match,
+    canonical: DISPLAY_CANONICAL_OVERRIDES[match.canonical] || match.canonical,
+  }))
 }
 
 export function resolveSharedProfessionContext(text: string, options: { mode?: 'vacancy' | 'candidate' | null; title?: string } = {}) {
