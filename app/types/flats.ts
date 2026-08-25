@@ -168,6 +168,9 @@ export interface FlatCardPresentation {
   dealTone: "sale" | "rent" | "room" | "short" | "";
   badges: string[];
   visionBadgeLabels: string[];
+  goodPrice: boolean;
+  goodPriceMedianUsd: number | null;
+  goodPriceComparableCount: number;
   dateLabel: string;
 }
 
