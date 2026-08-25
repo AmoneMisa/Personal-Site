@@ -9,8 +9,17 @@ import { ishBorLocationFromText, trimIshBorProfileText } from './hiringIshBorFie
 import { careeristRoleFromText, trimCareeristProfileText } from './hiringCareeristFields'
 import { parseSalary as parseWebSalary } from './hiringWebFields'
 import {
+  detectCandidateFeatureCodes,
+  detectCandidateRelocationPreference,
   detectProfessionMatches,
   detectSharedSeniority,
+  extractCandidateContactHours,
+  extractCandidateGoalRole,
+  extractCandidateSalaryField,
+  extractCandidateSkillField,
+  extractCandidateTargetContext,
+  extractCandidateWorkHistory,
+  isCandidateNonTargetContext,
   resolveSharedProfessionContext,
 } from './hiringLexicon'
 
@@ -48,9 +57,7 @@ export function normalizeSkills(rawSkills: string[] | undefined, text: string): 
   // Structured UZ CV cards commonly call this field `Texnologiya`, singular.
   // Keep unknown but meaningful entries (e.g. DRF, Telegram Bot) instead of
   // relying only on the canonical skill catalogue.
-  const structured = text.match(
-    /(?:^|\n)[^\p{L}\p{N}\n]{0,10}(?:skills|навыки|навички|стек|stack|technologies|texnologiya(?:lar)?|ko(?:'|’)nikmalar)\s*[:—-]\s*([^\n]{2,500})/iu,
-  )?.[1]
+  const structured = extractCandidateSkillField(text)
   if (structured) {
     for (const raw of structured.split(/[,;/|•·]+/)) {
       if (raw.trim()) addSkill(out, raw)
@@ -78,9 +85,6 @@ function collectProfessions(source: string): string[] {
   )]
 }
 
-const NON_TARGET_CONTEXT_RE = /(?:опыт\s+работы|досвід\s+роботи|work\s+experience|previous|раньше|ранее|прежде|работал|работала|працював|працювала|worked\s+(?:as|at)|oldin|avval|ishlagan|ishladim|tajriba|диплом|diplom|mutaxassisligim)/iu
-const TARGET_CONTEXT_RE = /(?:ищу\s+(?:работу|подработку)|шукаю\s+(?:роботу|підробіток)|желаемая\s+(?:должность|работа)|бажана\s+(?:посада|робота)|target\s+role|desired\s+(?:role|position)|looking\s+for\s+(?:a\s+)?(?:job|work)|open\s+to\s+work|menga\s+ish\s+kerak|ish\s+(?:kerak|qidiryapman|qidiraman|izlayapman)|ish\s+joyi\s+kerak|lavozim|kasb|soha|soxa|maqsad(?:im)?)/iu
-
 function cleanRole(raw: string | undefined): string {
   return (raw || '').trim().replace(/^[#\-–—•*\s]+/, '').replace(/[.;,]+$/, '').replace(/\s{2,}/g, ' ').slice(0, 180)
 }
@@ -107,27 +111,11 @@ function normalizeProvidedProfessions(items: string[] | undefined): string[] {
 }
 
 function targetContext(text: string): string {
-  const lines = text.split('\n').map((line) => line.trim()).filter(Boolean)
-  const picked: string[] = []
-  for (let i = 0; i < lines.length; i += 1) {
-    if (!TARGET_CONTEXT_RE.test(lines[i]!)) continue
-    for (let offset = 0; offset < 3 && i + offset < lines.length; offset += 1) {
-      const line = lines[i + offset]!
-      if (offset > 0 && NON_TARGET_CONTEXT_RE.test(line)) break
-      picked.push(line)
-    }
-  }
-  return picked.join('\n')
+  return extractCandidateTargetContext(text)
 }
 
 function extractGoalRole(text: string): string {
-  // Uzbek CV cards often put unrelated past experience and the actual target
-  // into one "Maqsad" paragraph. Prefer the explicit "X sifatida ish topish"
-  // construction so the earlier profession cannot become the desired role.
-  const asRole = text.match(
-    /\b((?:(?:frontend|front-end|backend|back-end|full[- ]?stack|mobile|android|ios)\s+)?(?:dasturchi|developer|programmer))\s+sifatida\s+(?:ish\s+(?:topish|qidirish|izlash)|ishlash)\b/iu,
-  )
-  return cleanRole(asRole?.[1])
+  return cleanRole(extractCandidateGoalRole(text) || undefined)
 }
 
 export function normalizeProfessions(rawRole: string | undefined, text: string): string[] {
@@ -142,14 +130,14 @@ export function normalizeProfessions(rawRole: string | undefined, text: string):
   const desired = resolved.desiredProfession?.canonical
   if (desired) return [formatProfessionCanonical(desired)]
 
-  if (target && !NON_TARGET_CONTEXT_RE.test(target)) {
+  if (target && !isCandidateNonTargetContext(target)) {
     const targetMatches = collectProfessions(target)
     if (targetMatches.length) return targetMatches
   }
 
   const contextualMatches = collectProfessions(targetContext(text))
   if (contextualMatches.length) return contextualMatches
-  return target && !NON_TARGET_CONTEXT_RE.test(target) ? [target] : []
+  return target && !isCandidateNonTargetContext(target) ? [target] : []
 }
 
 export function normalizeRole(role: string | undefined, text: string): string {
@@ -157,12 +145,7 @@ export function normalizeRole(role: string | undefined, text: string): string {
 }
 
 function workHistoryBlock(text: string): string {
-  const explicit = text.match(/(?:^|\n)\s*(?:опыт\s+работы|досвід\s+роботи|work\s+experience|previous\s+(?:jobs?|positions?)|tajriba|ish\s+tajribasi)\s*[:—-]?\s*([\s\S]{1,2600}?)(?=\n\s*(?:навыки|навички|skills|образование|освіта|education|контакт|contact|ожидания|salary|языки|мови|languages)\s*[:—-]|$)/iu)
-  if (explicit?.[1]) return explicit[1]
-
-  return text.split(/\n|(?<=[.!?])\s+/u).filter((line) =>
-    /(?:работал[аи]?|працюва(?:в|ла)|worked\s+(?:as|at)|oldin|avval|ishlagan|ishladim|ishlaganman|tajriba(?:m)?\s+bor)/iu.test(line),
-  ).join('\n')
+  return extractCandidateWorkHistory(text)
 }
 
 export function normalizePreviousProfessions(text: string): string[] {
@@ -170,33 +153,25 @@ export function normalizePreviousProfessions(text: string): string[] {
   return history ? collectProfessions(history) : []
 }
 
-interface FeatureRule { name: string; re: RegExp }
-const FEATURE_RULES: FeatureRule[] = [
-  { name: 'Student', re: /\bstudent\b|студент|студентк|talaba/iu },
-  { name: 'Parental leave', re: /декрет|в\s+декрете|у\s+декреті|maternity\s+leave|parental\s+leave/iu },
-  { name: 'No experience', re: /без\s+опыта|без\s+досвіду|no\s+experience|tajriba\s+yo(?:'|’)q/iu },
-  { name: 'Part-time', re: /подработк|підробіт|part[-\s]?time|неполный\s+день|неповн(?:ий|а)\s+день|yarim\s+stavka/iu },
-  { name: 'Night shift', re: /ночн(?:ая|ую|ой)\s+смен|нічн(?:а|у|ої)\s+змін|night\s+shift|tungi\s+smena/iu },
-  { name: 'Open to relocation', re: /готов\p{L}*\s+к\s+переезду|готов\p{L}*\s+переехать|готов\p{L}*\s+до\s+переїзду|relocat(?:e|ion)|ko(?:'|’)chib\s+o(?:'|’)tish/iu },
-]
+const CANDIDATE_FEATURE_LABELS: Record<string, string> = {
+  student: 'Student',
+  parentalLeave: 'Parental leave',
+  noExperience: 'No experience',
+  partTime: 'Part-time',
+  nightShift: 'Night shift',
+  openToRelocation: 'Open to relocation',
+}
 
 export function extractCandidateFeatures(text: string): string[] {
-  return FEATURE_RULES.filter((feature) => feature.re.test(text)).map((feature) => feature.name)
+  return detectCandidateFeatureCodes(text).map((code) => CANDIDATE_FEATURE_LABELS[code] || code)
 }
 
 // "Murojaat qilish vaqti: 8:00 - 22:00" is on nearly every structured UZ card
 // and answers a real question — when may I call this person. Deliberately not
 // matched on a bare "ish vaqti", which is the working schedule the candidate
 // wants, not the hours they answer the phone.
-const CONTACT_HOURS_RE =
-  /(?:^|\n)[^\p{L}\p{N}\n]{0,10}(?:murojaat\s+qilish\s+vaqti|aloqa\s+vaqti|qo(?:'|’)ng(?:'|’)iroq\s+vaqti|bog(?:'|’)lanish\s+vaqti|время\s+(?:связи|звонков|для\s+связи)|звонить\s+(?:с|в)|contact\s+(?:hours|time)|call\s+time)\s*[:—-]?\s*([^\n]{3,60})/iu;
-
 export function extractContactHours(text: string): string | null {
-  const raw = text.match(CONTACT_HOURS_RE)?.[1];
-  if (!raw) return null;
-  const cleaned = raw.replace(/\s{2,}/g, ' ').replace(/[.;,]+$/, '').trim();
-  // A time range is what makes this field worth showing at all.
-  return /\b24\s*\/\s*7\b|\d{1,2}[:.]\d{2}|\d{1,2}\s*[-–—]\s*\d{1,2}/.test(cleaned) ? cleaned.slice(0, 60) : null;
+  return extractCandidateContactHours(text)
 }
 
 export function extractContacts(text: string): { telegram?: string; email?: string; phone?: string } {
@@ -234,9 +209,7 @@ export function extractCandidateSalary(
   text: string,
   country: string,
 ): Pick<CvProfile, 'salaryMin' | 'salaryMax' | 'currency'> {
-  const field = text.match(
-    /(?:^|\n)[^\p{L}\p{N}\n]{0,10}(?:narxi?|salary|expected\s+salary|зарплата|зп|бажана\s+зарплата|oylik|maosh|ish\s+haqi)\s*[:—-]\s*([^\n]{1,120})/iu,
-  )?.[1]
+  const field = extractCandidateSalaryField(text)
   if (!field) return {}
 
   const values = (field.match(/\d[\d\s.,]*\d|\d/g) || [])
@@ -266,9 +239,7 @@ export function extractCandidateSalary(
 }
 
 export function detectRelocationReady(text: string): boolean | null {
-  if (/не\s+готов\p{L}*\s+к\s+переезду|не\s+розгляда\p{L}*\s+переїзд|not\s+(?:open|ready)\s+to\s+relocat/iu.test(text)) return false
-  if (/готов\p{L}*\s+к\s+переезду|готов\p{L}*\s+переехать|готов\p{L}*\s+до\s+переїзду|relocat(?:e|ion)|ko(?:'|’)chib\s+o(?:'|’)tish/iu.test(text)) return true
-  return null
+  return detectCandidateRelocationPreference(text)
 }
 
 const REMOTE_POSITIVE_RE = /\bremote\b|удал[её]н\p{L}*|віддален|дистанцион|masofaviy|(?<!\p{L})onlayn(?!\p{L})|online\s+(?:work|job)|онлайн\s+работ/iu

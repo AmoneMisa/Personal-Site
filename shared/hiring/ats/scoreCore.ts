@@ -13,6 +13,12 @@ import {
   type DegreeLevel,
   type HiringSeniority as Seniority,
 } from '@whiteslove/parsing-lexicon/hiring-requirements'
+import { detectCountryCodeFromText } from '@whiteslove/parsing-lexicon/geography-detection'
+import {
+  detectDegreeRequirement,
+  detectHiringScopeSignals,
+  type HiringScopeCode,
+} from '@whiteslove/parsing-lexicon/hiring-semantics'
 
 // Client-side ATS (Applicant Tracking System) match scoring.
 // The CV never leaves the browser. Unlike a keyword-only matcher, this scorer
@@ -142,30 +148,31 @@ function experienceScore(candidate: number | undefined, required: number | undef
   return { score, gap: Math.max(0, Math.round((required - candidate) * 10) / 10) }
 }
 
-type ScopeCode = 'architecture' | 'leadership' | 'mentoring' | 'scale' | 'ownership'
-const SCOPE_SIGNALS: Array<{ code: ScopeCode, label: string, job: RegExp, cv: RegExp }> = [
-  { code: 'architecture', label: 'Architecture / system design', job: /\barchitect(?:ure|ing)?\b|\bsystem design\b|\btechnical roadmap\b|\blong[- ]term solutions?\b/i, cv: /\barchitect(?:ed|ure|ing)?\b|\bsystem design\b|\btechnical roadmap\b|\bsolution architecture\b/i },
-  { code: 'leadership', label: 'Technical leadership', job: /\btechnical leader(?:ship)?\b|\bengineering standards\b|\bdrive product vision\b|\blead technical\b/i, cv: /\btechnical leader(?:ship)?\b|\bengineering standards\b|\bled\s+(?:a\s+)?(?:team|project|initiative)\b|\btech(?:nical)? lead\b/i },
-  { code: 'mentoring', label: 'Mentoring engineers', job: /\bmentor(?:ing|ed)?\s+(?:other\s+)?(?:engineers?|developers?|team members?)\b|\bcoach(?:ing|ed)?\s+(?:engineers?|developers?)\b/i, cv: /\bmentor(?:ing|ed)?\s+(?:other\s+)?(?:engineers?|developers?|team members?)\b|\bcoach(?:ing|ed)?\s+(?:engineers?|developers?)\b/i },
-  { code: 'scale', label: 'Large-scale systems', job: /\b(?:millions?|billions?)\s+of\s+(?:users|people|requests|events)\b|\bat scale\b|\bhigh[- ]scale\b|\blarge[- ]scale\b/i, cv: /\b(?:millions?|billions?)\s+of\s+(?:users|requests|events)\b|\bat scale\b|\bhigh[- ]scale\b|\blarge[- ]scale\b|\bhigh[- ]traffic\b/i },
-  { code: 'ownership', label: 'Product / feature ownership', job: /\bown\s+(?:critical\s+)?(?:features?|systems?|services?|roadmap)\b|\bproduct owner\b|\bdrive product\b/i, cv: /\bown(?:ed|ership)?\s+(?:features?|systems?|services?|roadmap|product)\b|\bproduct owner\b|\bdrove\s+(?:a\s+)?(?:feature|product|initiative)\b/i },
-]
+type ScopeCode = HiringScopeCode
+const SCOPE_LABELS: Record<ScopeCode, string> = {
+  architecture: 'Architecture / system design',
+  leadership: 'Technical leadership',
+  mentoring: 'Mentoring engineers',
+  scale: 'Large-scale systems',
+  ownership: 'Product / feature ownership',
+}
 
 function scopeScore(jobText: string, cvText: string): { score: number, missing: string[], requiredCount: number } {
-  const required = SCOPE_SIGNALS.filter((signal) => signal.job.test(jobText))
+  const required = detectHiringScopeSignals(jobText, { mode: 'vacancy' })
   if (!required.length) return { score: 100, missing: [], requiredCount: 0 }
-  const matched = required.filter((signal) => signal.cv.test(cvText))
-  return { score: Math.round((matched.length / required.length) * 100), missing: required.filter((signal) => !signal.cv.test(cvText)).map((signal) => signal.label), requiredCount: required.length }
+  const matched = new Set(detectHiringScopeSignals(cvText, { mode: 'candidate' }))
+  const missing = required.filter((code) => !matched.has(code)).map((code) => SCOPE_LABELS[code])
+  return {
+    score: Math.round(((required.length - missing.length) / required.length) * 100),
+    missing,
+    requiredCount: required.length,
+  }
 }
 
 const DEGREE_RANK: Record<DegreeLevel, number> = { secondary: 0, bachelor: 1, master: 2, doctorate: 3 }
 
 function jobDegreeRequirement(requiredText: string): { level?: DegreeLevel, field?: string, equivalentExperience: boolean } {
-  const level = detectDegreeLevel(requiredText) || undefined
-  let field: string | undefined
-  if (/computer science|computer engineering|software engineering|information technology|informatics|related\s+(?:technical|engineering|computer)\s+field/i.test(requiredText)) field = 'computer_science'
-  else if (/\bengineering\b[^.;\n]{0,60}\bdegree\b|\bdegree\b[^.;\n]{0,60}\bengineering\b/i.test(requiredText)) field = 'engineering'
-  return { level, field, equivalentExperience: /equivalent\s+(?:professional\s+|work\s+)?experience|or\s+equivalent\s+experience/i.test(requiredText) }
+  return detectDegreeRequirement(requiredText)
 }
 
 function educationScore(profile: CvProfile, requirement: ReturnType<typeof jobDegreeRequirement>): { score: number, fieldMismatch: boolean, levelMismatch: boolean } {
@@ -181,7 +188,8 @@ function educationScore(profile: CvProfile, requirement: ReturnType<typeof jobDe
 
 function isUsRole(job: { country?: string, location?: string, title?: string, description?: string }): boolean {
   if ((job.country || '').toUpperCase() === 'US') return true
-  return /(?:\bunited states\b|\busa\b|\bu\.s\.?\b|\bsan mateo\s*,?\s*ca\b)/i.test(`${job.location || ''} ${job.title || ''} ${(job.description || '').slice(0, 1200)}`)
+  const text = `${job.location || ''} ${job.title || ''} ${(job.description || '').slice(0, 1200)}`
+  return detectCountryCodeFromText(text) === 'US'
 }
 
 export interface AtsBlocker { code: 'visa_sponsorship'; label: string; critical: true }

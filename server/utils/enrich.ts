@@ -18,7 +18,9 @@ import { toUsd } from './currency'
 import {
   detectEmploymentTypes,
   detectExperienceRequirement,
+  detectLexiconCity,
   detectProbation,
+  detectSharedManagementRole,
   detectSharedSeniority,
   detectWorkModes,
   detectWorkSchedules,
@@ -26,6 +28,7 @@ import {
   parseHiringSalary,
   parseSharedHiringContext,
   parseSharedLanguageContext,
+  resolveSharedCountryFromText,
 } from './hiringLexicon'
 import {
   extractSkillDetails,
@@ -146,35 +149,10 @@ function salaryUsd(job: Job, period: SalaryPeriod): number | undefined {
 }
 
 // ---- Country detection from location text ----
-const COUNTRY_PATTERNS: [string, RegExp][] = [
-  ['UZ', /uzbek|tashkent|ташкент|узбек|toshkent|samarkand|самарканд/i],
-  ['UA', /ukrain|kyiv|kiev|lviv|kharkiv|україн|украин|киї?в|львів|харків|одеса|dnipro/i],
-  ['KZ', /kazakh|almaty|astana|казах|алматы|астана|нур-султан/i],
-  ['GE', /georgia|tbilisi|груз|тбилиси|batumi/i],
-  ['AZ', /azerbaij|baku|азербайдж|баку/i],
-  ['AM', /armenia|yerevan|армен|ереван/i],
-  ['KG', /kyrgyz|bishkek|киргиз|кыргыз|бишкек/i],
-  ['MD', /moldova|chisinau|молдов|кишин/i],
-  ['RO', /romania|bucharest|bucurești|bucuresti|румын|румун|бухарест/i],
-  ['TJ', /tajik|dushanbe|таджик|душанбе/i],
-  ['TM', /turkmen|ashgabat|туркмен|ашхабад/i],
-  ['PL', /poland|warsaw|krak|polska|польш|варшав|краков/i],
-  ['DE', /german|berlin|munich|герман|берлин|deutschland/i],
-  ['GB', /united kingdom|london|england|британ|лондон/i],
-  ['US', /united states|\busa\b|new york|сша|remote us/i],
-  ['CN', /\bchina\b|beijing|shanghai|shenzhen|guangzhou|hangzhou|китай|пекин|шанхай/i],
-  ['JP', /\bjapan\b|tokyo|osaka|kyoto|япони|токио|осака/i],
-  ['KR', /south korea|\bkorea\b|seoul|busan|коре|сеул/i],
-  ['TW', /taiwan|taipei|kaohsiung|taichung|тайван|тайбэй|臺灣|台灣|台北/i],
-]
-
-// Resolve a free-text blob (EN/RU/UK; country name OR capital city) to an ISO-2
-// code, or undefined. Exported so the location filter can match typed queries
-// like "Узбекистан"/"Ташкент"/"Uzbekistan" against a job's detected country.
+// Country and city aliases live in parsing-lexicon; this module only
+// decides which vacancy fields have precedence.
 export function resolveCountry(text: string): string | undefined {
-  if (!text) return undefined
-  for (const [code, re] of COUNTRY_PATTERNS) if (re.test(text)) return code
-  return undefined
+  return resolveSharedCountryFromText(text) || undefined
 }
 
 function detectCountry(job: Job): string {
@@ -197,12 +175,12 @@ function detectCity(job: Job, country: string): string | undefined {
   const first = cleanText(job.location).split(/[,|·]/)[0]?.trim()
   if (!first || first.length > 80) return undefined
   if (/^(remote|worldwide|anywhere|global|other|see listing)$/i.test(first)) return undefined
-  if (resolveCountry(first) === country && !/tashkent|toshkent|almaty|astana|bishkek|bucharest|bucure|tokyo|osaka|kyiv|kiev|lviv|kharkiv|warsaw|berlin|london|new york|denver/i.test(first)) {
-    return undefined
-  }
-  return first
+  const knownCity = detectLexiconCity(first, country)
+  if (resolveCountry(first) === country && !knownCity) return undefined
+  return knownCity || first
 }
 
+// ---- Shared vacancy context ----
 // ---- Shared vacancy context ----
 function detectWorkMode(text: string, job: Job): WorkMode {
   const modes = detectWorkModes(text)
@@ -272,9 +250,7 @@ function detectSeniority(title: string, text: string): Seniority | null {
 }
 
 function detectManagementRole(title: string, text: string): boolean | undefined {
-  if (/\b(?:head|director|chief|manager|supervisor|team\s*lead|tech\s*lead)\b|руководител|начальник|директор|тимлид|заведующ/i.test(title)) return true
-  if (/manage(?:s|ment|ing)?\s+(?:a\s+)?(?:team|people|staff)|people management|direct reports|руковод(?:ить|ство)\s+(?:команд|сотруд)|управлени[ея]\s+(?:команд|персонал)/i.test(text)) return true
-  return undefined
+  return detectSharedManagementRole(title, text) || undefined
 }
 
 function detectSalaryGross(text: string): boolean | undefined {
