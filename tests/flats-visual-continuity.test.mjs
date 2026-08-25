@@ -9,11 +9,11 @@ test('primary flat filters keep breathing room below the divider', () => {
   assert.match(flatCss, /\.filter-primary-grid\s*\{[\s\S]*?margin-top:\s*14px/u)
 })
 
-test('flat photos keep the subtle clipped fade without backdrop blur', () => {
-  assert.match(card, /\.flat-card__photo \{[^}]*overflow: hidden/u)
-  assert.match(card, /bottom: -28px; height: 48%/u)
+test('flat photos dissolve into the card with a contained dark fade on desktop and mobile', () => {
+  assert.match(card, /\.flat-card__photo \{[^}]*aspect-ratio: 2 \/ 1[^}]*overflow: hidden/u)
+  assert.match(card, /bottom: 0; height: 40%/u)
   assert.doesNotMatch(card, /backdrop-filter/u)
-  assert.match(card, /linear-gradient\(180deg, transparent 0%, rgba\(11,16,42,\.34\) 52%, var\(--bg-panel\) 100%\)/u)
-  assert.match(card, /@media \(max-width: 760px\)[\s\S]*?overflow: hidden/u)
-  assert.match(card, /linear-gradient\(90deg, transparent 0%, rgba\(11,16,42,\.36\) 48%, var\(--bg-panel\) 96%\)/u)
+  assert.match(card, /linear-gradient\(180deg, rgba\(11,16,42,0\) 0%, rgba\(11,16,42,\.14\) 34%, rgba\(11,16,42,\.55\) 74%, var\(--bg-panel\) 100%\)/u)
+  assert.match(card, /@media \(max-width: 760px\)[\s\S]*?height: 148px/u)
+  assert.match(card, /linear-gradient\(90deg, rgba\(11,16,42,0\) 0%, rgba\(11,16,42,\.16\) 34%, rgba\(11,16,42,\.58\) 72%, var\(--bg-panel\) 100%\)/u)
 })

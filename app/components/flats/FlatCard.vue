@@ -101,8 +101,8 @@ const emit = defineEmits<{
 .flat-card__checking { position: absolute; z-index: 5; inset: 0; display: grid; place-content: center; justify-items: center; gap: 9px; padding: 18px; background: rgba(7,12,34,.92); color: var(--text-primary); font-size: 12.5px; font-weight: 700; text-align: center; }
 .flat-card__checking-icon { width: 26px; height: 26px; color: var(--accent-pink); animation: flat-card-spin .8s linear infinite; }
 @keyframes flat-card-spin { to { transform: rotate(360deg); } }
-.flat-card__photo { position: relative; width: 100%; aspect-ratio: 4 / 3; flex: 0 0 auto; overflow: hidden; background: var(--bg-panel); }
-.flat-card__photo::after { content: ""; position: absolute; z-index: 1; left: 0; right: 0; bottom: -28px; height: 48%; pointer-events: none; background: linear-gradient(180deg, transparent 0%, rgba(11,16,42,.34) 52%, var(--bg-panel) 100%); }
+.flat-card__photo { position: relative; width: 100%; aspect-ratio: 2 / 1; flex: 0 0 auto; overflow: hidden; background: var(--bg-panel); }
+.flat-card__photo::after { content: ""; position: absolute; z-index: 1; left: 0; right: 0; bottom: 0; height: 40%; pointer-events: none; background: linear-gradient(180deg, rgba(11,16,42,0) 0%, rgba(11,16,42,.14) 34%, rgba(11,16,42,.55) 74%, var(--bg-panel) 100%); }
 .flat-card__photo > img { width: 100%; height: 100%; object-fit: cover; display: block; transition: transform 260ms ease; }
 .flat-card:hover .flat-card__photo > img { transform: scale(1.015); }
 .flat-card__no-photo { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 9px; height: 100%; color: var(--text-muted); font-size: 12px; background: var(--bg-panel-2); }
@@ -121,23 +121,23 @@ const emit = defineEmits<{
 .flat-card_favorite { border-color: rgba(224,103,154,0.52); }.flat-card_hidden { opacity: 0.64; border-style: dashed; }
 
 @media (max-width: 760px) {
-  .flat-card { display: grid; grid-template-columns: minmax(118px, 40%) minmax(0, 1fr); height: 188px; min-height: 188px; }
-  .flat-card__photo { width: 100%; height: 188px; min-height: 0; aspect-ratio: auto; overflow: hidden; }
-  .flat-card__photo::after { inset: 0 -18px 0 auto; width: 42%; height: auto; background: linear-gradient(90deg, transparent 0%, rgba(11,16,42,.36) 48%, var(--bg-panel) 96%); }
-  .flat-card__body { min-width: 0; padding: 9px 10px 9px 8px; gap: 2px; overflow: hidden; }
-  .flat-card__price { min-height: 19px; font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .flat-card__price-conv { min-height: 14px; font-size: 10.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .flat-card__title { min-height: 17px; margin-top: 1px; font-size: 12.5px; line-height: 1.3; }
-  .flat-card__spec { min-height: 14px; font-size: 10.5px; }
-  .flat-card__badges { min-height: 24px; margin-top: 3px; }
-  .flat-card__badges :deep(.flat-card__badge) { padding: 3px 6px; font-size: 9.5px; }
-  .flat-card__meta { gap: 4px; padding-top: 4px; font-size: 9.5px; }
-  .flat-card__meta-tail { gap: 3px; }
-  .flat-card__location { gap: 3px; }
-  .flat-card__deal { top: 7px; left: 7px; max-width: calc(100% - 70px); padding: 5px 6px; font-size: 9.5px; }
-  .flat-card__actions { top: 6px; right: 6px; gap: 4px; }
-  .flat-card__action { width: 27px; height: 27px; }
-  .flat-card__no-photo { gap: 5px; padding: 8px; font-size: 10px; text-align: center; }
-  .flat-card__no-photo-icon { width: 26px; height: 26px; }
+  .flat-card { display: grid; grid-template-columns: minmax(112px, 42%) minmax(0, 1fr); height: 148px; min-height: 148px; }
+  .flat-card__photo { width: 100%; height: 148px; min-height: 0; aspect-ratio: auto; overflow: hidden; }
+  .flat-card__photo::after { inset: 0 0 0 auto; width: 36%; height: auto; background: linear-gradient(90deg, rgba(11,16,42,0) 0%, rgba(11,16,42,.16) 34%, rgba(11,16,42,.58) 72%, var(--bg-panel) 100%); }
+  .flat-card__body { min-width: 0; padding: 7px 8px 7px 6px; gap: 1px; overflow: hidden; }
+  .flat-card__price { min-height: 17px; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .flat-card__price-conv { min-height: 12px; font-size: 9.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .flat-card__title { min-height: 15px; margin-top: 1px; font-size: 11.5px; line-height: 1.25; }
+  .flat-card__spec { min-height: 12px; font-size: 9.5px; line-height: 1.25; }
+  .flat-card__badges { min-height: 20px; margin-top: 2px; }
+  .flat-card__badges :deep(.flat-card__badge) { padding: 3px 5px; font-size: 8.5px; }
+  .flat-card__meta { gap: 3px; padding-top: 2px; font-size: 8.5px; }
+  .flat-card__meta-tail { gap: 2px; }
+  .flat-card__location { gap: 2px; }
+  .flat-card__deal { top: 6px; left: 6px; max-width: calc(100% - 62px); padding: 4px 5px; font-size: 8.5px; }
+  .flat-card__actions { top: 5px; right: 5px; gap: 3px; }
+  .flat-card__action { width: 24px; height: 24px; border-radius: 6px; }
+  .flat-card__no-photo { gap: 4px; padding: 6px; font-size: 9px; text-align: center; }
+  .flat-card__no-photo-icon { width: 23px; height: 23px; }
 }
 </style>
