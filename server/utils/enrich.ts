@@ -15,7 +15,18 @@ import type {
   WorkMode,
 } from './jobTypes'
 import { toUsd } from './currency'
-import { parseHiringSalary } from './hiringLexicon'
+import {
+  detectEmploymentTypes,
+  detectExperienceRequirement,
+  detectProbation,
+  detectSharedSeniority,
+  detectWorkModes,
+  detectWorkSchedules,
+  parseHiringExperience,
+  parseHiringSalary,
+  parseSharedHiringContext,
+  parseSharedLanguageContext,
+} from './hiringLexicon'
 import {
   extractSkillDetails,
   extractSkillNames,
@@ -192,121 +203,72 @@ function detectCity(job: Job, country: string): string | undefined {
   return first
 }
 
-// ---- Work mode ----
+// ---- Shared vacancy context ----
 function detectWorkMode(text: string, job: Job): WorkMode {
-  if (/hybrid|гибрид|гібрид|part[- ]?remote/i.test(text)) return 'hybrid'
-  if (/\bremote\b|удал[её]нк|віддален|home ?office|\bwfh\b|дистанцион/i.test(text) || job.remote) {
-    if (/on[- ]?site|in[- ]?office|в офис|в офіс/i.test(text) && !job.remote) return 'hybrid'
-    return 'remote'
-  }
-  if (/on[- ]?site|in[- ]?office|\boffice\b|в офисе|в офіс|офіс|офис|с рабочего места|иш жойидан|ish joyidan/i.test(text)) return 'office'
+  const modes = detectWorkModes(text)
+  if (modes.includes('hybrid')) return 'hybrid'
+  if (modes.includes('remote') || job.remote) return 'remote'
+  if (modes.includes('onsite')) return 'office'
   return 'unknown'
 }
 
-// ---- Relocation ----
-function detectRelocation(text: string): Relocation {
-  if (/no relocation|without relocation|без переезд|без релокац|no reloc/i.test(text)) return 'none'
-  if (/relocation|reloc\b|переезд|релокац|релокейт|переїзд|relocation package|help.*relocat/i.test(text)) {
-    return 'offered'
+function sharedHiringContext(text: string, title: string) {
+  return parseSharedHiringContext(text, { mode: 'vacancy', title }) as {
+    kind: Job['hiringKind']
+    relocation: 'offered' | 'required' | 'notOffered' | null
+    workAuthorization: string[]
+    travel: string | null
+    benefits: string[]
+    application: string[]
+    openingCount: number | null
+    vacancyStatus: string | null
+    educationContext: string | null
+    contracts: string[]
   }
+}
+
+function detectRelocation(context: ReturnType<typeof sharedHiringContext>): Relocation {
+  if (context.relocation === 'offered') return 'offered'
+  if (context.relocation === 'notOffered') return 'none'
   return 'unknown'
 }
 
-// ---- Foreigner-friendly (visa sponsorship / open to foreigners) ----
-function detectForeignerFriendly(text: string): boolean | undefined {
-  // Explicit "no sponsorship / must already be authorized" beats any bare mention
-  // of the word "sponsorship" (e.g. "without the need for employer sponsorship",
-  // "must be legally authorized to work in the United States").
-  if (
-    /\bno (?:visa )?sponsorship\b|without (?:the need for )?(?:employer |visa )?sponsorship|not (?:able|eligible) to sponsor|do(?:es)? not (?:offer |provide )?sponsor|sponsorship (?:is )?not (?:available|provided|offered)|must be (?:legally )?authoriz\w+ to work|legally authoriz\w+ to work in the (?:us\b|u\.s|united states)/i.test(
-      text,
-    )
-  ) {
-    return false
-  }
-  if (/visa sponsor|visa support|will sponsor|sponsorship (?:available|provided|offered|possible)|work permit|for foreigners|open to foreigner|иностранц|для иностран|іноземц|relocation package|work visa|relocation (?:support|assistance|help)|help(?:s|ing)? (?:with )?relocat|спонсорство виз|виз[ауы]\s*(?:поддержк|спонсор)/i.test(text)) {
-    return true
-  }
+function detectForeignerFriendly(context: ReturnType<typeof sharedHiringContext>): boolean | undefined {
+  if (context.workAuthorization.includes('sponsorshipOffered')) return true
+  if (context.workAuthorization.some((item) => ['noSponsorship', 'workPermitRequired', 'citizenshipRequired'].includes(item))) return false
   return undefined
 }
 
-// ---- Entry level / no prior experience required ----
-// Explicit "no experience" phrasing OR an entry-level role type (trainee/intern/
-// junior/graduate), across EN/RU/UK. Heuristic — meant for the "without experience"
-// filter, not an authoritative seniority label.
 function detectNoExperience(text: string): boolean {
-  if (
-    /no experience (required|needed|necessary)|without (any )?experience|no prior experience|entry[- ]level|без опыта|без досвід|досвід не потр|опыт работы не|опыт не требуется/i.test(
-      text,
-    )
-  ) {
-    return true
-  }
-  return /\b(trainee|intern|internship|graduate|junior)\b|джун\w*|джуніор|стаж[ёе]р|стажир|стажув|стажов|початківц|начинающ/i.test(
-    text,
-  )
+  return detectExperienceRequirement(text) === 'noExperience'
 }
 
 function detectExperienceYears(text: string): { min?: number, max?: number } {
-  const minimums: number[] = []
-  const maximums: number[] = []
-  const patterns = [
-    /\b(\d{1,2}(?:[.,]\d)?)\s*(?:[-–]\s*(\d{1,2}(?:[.,]\d)?))?\s*\+?\s*(?:years?|yrs?)\s+(?:of\s+)?[^.;\n]{0,120}\bexperience\b/gi,
-    /\b(?:at least|minimum of|min\.?)\s*(\d{1,2}(?:[.,]\d)?)\s*(?:years?|yrs?)\b/gi,
-    /(?:опыт|досвід)\s+(?:работы\s+)?(?:от\s+)?(\d{1,2}(?:[.,]\d)?)\s*(?:[-–]\s*(\d{1,2}(?:[.,]\d)?))?\s*(?:лет|год[а]?|рок[иів]?)/gi,
-    /\b(\d{1,2}(?:[.,]\d)?)\s*(?:[-–]\s*(\d{1,2}(?:[.,]\d)?))?\s*(?:йил|yil)(?:дан)?[^.;\n]{0,32}(?:тажриб|tajriba)/gi,
-    // RU/UK, number-first: "від 1 року досвіду", "3 роки досвіду", "2 года опыта".
-    /\b(\d{1,2}(?:[.,]\d)?)\s*(?:[-–]\s*(\d{1,2}(?:[.,]\d)?))?\s*(?:рок\w*|рік|год\w*|лет)[^.;\n]{0,25}(?:досвід\w*|опыт\w*)/gi,
-  ]
-  for (const pattern of patterns) {
-    for (const match of text.matchAll(pattern)) {
-      const minimum = Number(String(match[1]).replace(',', '.'))
-      const maximum = match[2] == null ? undefined : Number(String(match[2]).replace(',', '.'))
-      if (Number.isFinite(minimum) && minimum >= 0 && minimum <= 40) minimums.push(minimum)
-      if (maximum !== undefined && Number.isFinite(maximum) && maximum >= minimum && maximum <= 40) maximums.push(maximum)
-    }
+  const parsed = parseHiringExperience(text)
+  return {
+    min: parsed?.minYears ?? undefined,
+    max: parsed?.maxYears ?? undefined,
   }
-  const min = minimums.length ? Math.max(...minimums) : undefined
-  const max = maximums.length ? Math.max(...maximums) : undefined
-  return { min, max: max !== undefined && (min === undefined || max >= min) ? max : undefined }
 }
 
-// ---- Employment type (full-time / part-time / contract / internship / temporary) ----
-// Normalizes the source's raw employmentType plus title/description wording across
-// EN/RU/UK/UZ. "project"/freelance/B2B/outstaff collapse into 'contract'. Order
-// matters: part-time is checked before full-time so "part-time" never reads as full.
 function detectEmploymentKind(job: Job, text: string): EmploymentKind | undefined {
-  const hay = `${job.employmentType || ''} ${text}`.toLowerCase()
-  if (/part[\s._-]?time|неполн\w*|неполный день|yarim stavka|yarim kunlik|part[\s-]?time/.test(hay)) return 'parttime'
-  if (/\bintern(ship)?\b|\btrainee\b|стаж(ир|ер|ёр|ув)\w*|стажировк\w*|amaliyot/.test(hay)) return 'internship'
-  if (/\bcontract\b|freelanc\w*|\bb2b\b|contractor|проектн\w*|\bпроект\b|\bgig\b|outstaff|фриланс/.test(hay)) return 'contract'
-  if (/temporary|\btemp\b|seasonal|времен\w*|тимчасов\w*/.test(hay)) return 'temporary'
-  if (/full[\s._-]?time|permanent|полн\w*\s+занятост\w*|полный день|to['’]?liq stavka|to['’]?liq kunlik/.test(hay)) return 'fulltime'
-  return undefined
+  const detected = detectEmploymentTypes(`${job.employmentType || ''} ${text}`)[0]
+  const map: Record<string, EmploymentKind> = {
+    full_time: 'fulltime',
+    part_time: 'parttime',
+    contract: 'contract',
+    project: 'project',
+    freelance: 'freelance',
+    internship: 'internship',
+    temporary: 'temporary',
+    volunteer: 'volunteer',
+    seasonal: 'seasonal',
+  }
+  return detected ? map[detected] : undefined
 }
 
-// ---- Canonical vacancy metadata ----
 function detectSeniority(title: string, text: string): Seniority | null {
-  const classify = (value: string, isTitle = false): Seniority | null => {
-    const leadPattern = isTitle
-      ? /\b(?:team\s*lead|tech\s*lead|lead|principal|staff)\b|тимлид|техлид|ведущ\w*/i
-      : /\b(?:team\s*lead|tech\s*lead|lead\s+(?:developer|engineer|designer|analyst)|principal\s+\w+|staff\s+(?:developer|engineer))\b|тимлид|техлид|ведущ\w*/i
-    if (leadPattern.test(value)) return 'lead'
-    const seniorPattern = isTitle
-      ? /\bsenior\b|старш\w*|сеньор/i
-      : /\bsenior[- ](?:level|developer|engineer|designer|analyst|specialist|role)\b|старш\w*\s+(?:разработ|инженер|аналитик|специалист)|сеньор/i
-    if (seniorPattern.test(value)) return 'senior'
-    const middlePattern = isTitle
-      ? /\bmid(?:dle)?(?:[-+\s]|$)|мидл|средн(?:ий|яя)\s+(?:уров|разработ)/i
-      : /\bmid(?:dle)?[- ](?:level|developer|engineer|designer|analyst|specialist|role)\b|мидл/i
-    if (middlePattern.test(value)) return 'middle'
-    const juniorPattern = isTitle
-      ? /\bjunior\b|\bintern(?:ship)?\b|\btrainee\b|джун\w*|младш\w*|стаж[ёе]р|стажир/i
-      : /\bjunior[- ](?:level|developer|engineer|designer|analyst|specialist|role)\b|\binternship\b|\btrainee\s+(?:role|position)|джун\w*|младш\w*\s+(?:разработ|инженер|аналитик|специалист)|стаж[ёе]р|стажир/i
-    if (juniorPattern.test(value)) return 'junior'
-    return null
-  }
-  return classify(title, true) || classify(text)
+  return detectSharedSeniority(`${title}\n${text}`) as Seniority | null
 }
 
 function detectManagementRole(title: string, text: string): boolean | undefined {
@@ -316,32 +278,31 @@ function detectManagementRole(title: string, text: string): boolean | undefined 
 }
 
 function detectSalaryGross(text: string): boolean | undefined {
-  if (/\b(?:net|netto)\b|after tax|take[- ]home|на руки|после налог|чистыми/i.test(text)) return false
-  if (/\b(?:gross|brutto)\b|before tax|до вычета|до налог|гросс/i.test(text)) return true
-  return undefined
+  return parseHiringSalary(text)?.gross ?? undefined
 }
 
 function detectSalaryNegotiable(text: string): boolean | undefined {
-  return /salary negotiable|negotiable salary|compensation negotiable|договорн(?:ая|ой)|зарплата обсуждается|по результатам собеседования|maosh kelishiladi/i.test(text)
-    ? true
-    : undefined
+  return parseHiringSalary(text)?.negotiable || undefined
 }
 
 function detectSchedule(text: string): string | undefined {
-  const numeric = text.match(/(?:график|schedule|режим)[^.;\n]{0,35}\b([1-7]\s*\/\s*[1-7])\b|\b([1-7]\s*\/\s*[1-7])\b[^.;\n]{0,25}(?:график|schedule|режим)/i)
-  if (numeric) return (numeric[1] || numeric[2])?.replace(/\s/g, '')
-  if (/flexible schedule|гибкий график|гнучкий графік/i.test(text)) return 'Flexible'
-  if (/shift work|shift schedule|сменн\w* график|работа по сменам|позмінн/i.test(text)) return 'Shift work'
-  if (/full working day|полный рабочий день|повний робочий день/i.test(text)) return 'Full working day'
-  return undefined
+  const schedule = detectWorkSchedules(text)[0]
+  const labels: Record<string, string> = {
+    fiveTwo: '5/2', twoTwo: '2/2', sixOne: '6/1', threeThree: '3/3', oneThree: '1/3',
+    twentyFourFortyEight: '24/48', shift: 'Shift work', flexible: 'Flexible', day: 'Day',
+    night: 'Night', rotational: 'Rotational',
+  }
+  return schedule ? labels[schedule] || schedule : undefined
 }
 
-function detectContractType(text: string): string | undefined {
+function detectContractType(text: string, context?: ReturnType<typeof sharedHiringContext>): string | undefined {
+  const contract = context?.contracts?.[0]
+  const labels: Record<string, string> = {
+    employmentContract: 'Employment contract', civilContract: 'Civil contract',
+    freelance: 'Freelance', contractor: 'Contractor', b2b: 'B2B',
+  }
+  if (contract) return labels[contract] || contract
   if (/\bB2B\b/i.test(text)) return 'B2B'
-  if (/employment contract|трудов(?:ой|ому) договор|трудовий договір/i.test(text)) return 'Employment contract'
-  if (/civil(?: law)? contract|гпх|цивільно-правов/i.test(text)) return 'Civil contract'
-  if (/freelanc/i.test(text)) return 'Freelance'
-  if (/independent contractor|contractor agreement/i.test(text)) return 'Contractor'
   return undefined
 }
 
@@ -386,55 +347,18 @@ function detectEmployerType(job: Job, text: string): EmployerType {
   return 'direct'
 }
 
-// ---- Languages + levels ----
-const LANGUAGES: [string, RegExp][] = [
-  ['English', /english|англий|англ\.|англійськ/i],
-  ['German', /german|deutsch|немецк|німецьк/i],
-  ['Russian', /russian|русск|російськ/i],
-  ['Ukrainian', /ukrainian|українськ|украинск/i],
-  ['Uzbek', /uzbek|узбекск|o'zbek/i],
-  ['Kazakh', /kazakh|қазақ|казахск/i],
-  ['French', /french|français|французск/i],
-  ['Spanish', /spanish|español|испанск/i],
-  ['Polish', /polish|polski|польск/i],
-  ['Turkish', /turkish|türkçe|турецк/i],
-  ['Japanese', /japanese|日本語|японск/i],
-]
-
-function normalizeLevel(raw: string): string {
-  const s = raw.toLowerCase()
-  if (/^[abc][12]$/.test(s)) return s.toUpperCase()
-  if (/upper/.test(s)) return 'Upper-Intermediate'
-  if (/pre-?inter/.test(s)) return 'Pre-Intermediate'
-  if (/inter|средн|разговорн|conversational/.test(s)) return 'Intermediate'
-  if (/advanc|proficient|свободн/.test(s)) return 'Advanced'
-  if (/fluent/.test(s)) return 'Fluent'
-  if (/native/.test(s)) return 'Native'
-  if (/business/.test(s)) return 'Business'
-  if (/element|basic|beginner|базов|начальн/.test(s)) return 'Basic'
-  return raw
-}
-
+// ---- Languages + contextual requirement relation ----
 function detectLanguages(text: string): LanguageReq[] {
-  const out: LanguageReq[] = []
-  for (const [name, re] of LANGUAGES) {
-    const m = re.exec(text)
-    if (!m) continue
-    // Prefer a level directly adjacent to the language. This distinguishes
-    // "Business level English and native level Japanese" correctly.
-    const before = text.slice(Math.max(0, m.index - 40), m.index)
-    const after = text.slice(m.index + m[0].length, m.index + m[0].length + 30)
-    const beforeLevel = before.match(
-      /\b(a1|a2|b1|b2|c1|c2|pre-?intermediate|upper[- ]?intermediate|intermediate|elementary|advanced|proficient|fluent|native|business|beginner|basic|conversational)\s*(?:level|proficiency)?\s*$/i,
-    )
-    const afterLevel = after.match(
-      /^\s*(?:[-:(),]|at|level|proficiency)*\s*(a1|a2|b1|b2|c1|c2|pre-?intermediate|upper[- ]?intermediate|intermediate|elementary|advanced|proficient|fluent|native|business|beginner|basic|conversational)\b/i,
-    )
-    const listLevel = /\bfluent\s+in\s+[^.;\n]{0,100}$/i.test(before) ? 'fluent' : undefined
-    const rawLevel = beforeLevel?.[1] || afterLevel?.[1] || listLevel
-    out.push({ language: name, level: rawLevel ? normalizeLevel(rawLevel) : undefined })
-  }
-  return out
+  return (parseSharedLanguageContext(text, 'vacancy') as Array<{
+    name: string
+    relation: 'required' | 'preferred' | 'notRequired' | 'candidateHas' | null
+    level: string | null
+    cefr: string | null
+  }>).map((item) => ({
+    language: item.name,
+    level: item.cefr || item.level || undefined,
+    requirement: item.relation && item.relation !== 'candidateHas' ? item.relation : undefined,
+  }))
 }
 
 // Most skills use literal Unicode-aware aliases from shared/jobSkills. A small
@@ -499,6 +423,7 @@ export function enrichJob(job: Job): Job {
     salaryCurrency: job.salaryCurrency ?? extractedSalary.salaryCurrency,
   }
   const text = `${title} \n ${job.tags.join(' ')} \n ${description}`
+  const hiringContext = sharedHiringContext(text, title)
   const allSkillDetails = matchSkillDetails(text)
   const skills = allSkillDetails.map(({ name }) => name)
   const niceToHave = detectNiceToHave(text)
@@ -526,9 +451,9 @@ export function enrichJob(job: Job): Job {
     country,
     city: detectCity(clean, country),
     workMode: detectWorkMode(text, job),
-    relocation: detectRelocation(text),
+    relocation: detectRelocation(hiringContext),
     employmentKind: detectEmploymentKind(clean, text),
-    foreignerFriendly: detectForeignerFriendly(text),
+    foreignerFriendly: detectForeignerFriendly(hiringContext),
     noExperience: detectNoExperience(text) || experienceMinYears === 0,
     experienceMinYears,
     experienceMaxYears: experience.max,
@@ -544,10 +469,20 @@ export function enrichJob(job: Job): Job {
     salaryGross: detectSalaryGross(text),
     salaryNegotiable: detectSalaryNegotiable(text),
     schedule: detectSchedule(text),
-    contractType: detectContractType(text),
-    education: detectEducation(text),
+    workSchedules: detectWorkSchedules(text),
+    probationKind: detectProbation(text),
+    experienceRequirement: detectExperienceRequirement(text),
+    contractType: detectContractType(text, hiringContext),
+    education: hiringContext.educationContext || detectEducation(text),
     deadline: detectDeadline(text),
     applicationLanguage: detectApplicationLanguage(text),
+    hiringKind: hiringContext.kind,
+    vacancyStatus: hiringContext.vacancyStatus || undefined,
+    workAuthorization: hiringContext.workAuthorization,
+    travelRequirement: hiringContext.travel || undefined,
+    benefits: hiringContext.benefits,
+    applicationRequirements: hiringContext.application,
+    openingCount: hiringContext.openingCount ?? undefined,
     salaryPeriod,
     salaryUsd: salaryPeriod ? salaryUsd(clean, salaryPeriod) : undefined,
     ...suspicion,

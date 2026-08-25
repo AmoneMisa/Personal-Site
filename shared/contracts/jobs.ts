@@ -47,6 +47,7 @@ export const EMPLOYMENT_KINDS: EmploymentKind[] = [
 export interface LanguageReq {
   language: string
   level?: string
+  requirement?: 'required' | 'preferred' | 'notRequired'
 }
 
 export interface JobSkillDetail {
@@ -102,6 +103,13 @@ export interface Job {
   deadline?: string
   tools?: string[]
   applicationLanguage?: string
+  hiringKind?: 'vacancy' | 'candidate' | 'vacancy_digest' | 'recruitment_ad' | 'course' | 'job_service' | 'closed_vacancy' | 'spam' | 'unknown'
+  vacancyStatus?: string
+  workAuthorization?: string[]
+  travelRequirement?: string
+  benefits?: string[]
+  applicationRequirements?: string[]
+  openingCount?: number
   employerType?: EmployerType
   riskCategory?: RiskCategory | null
   riskReasons?: string[]
