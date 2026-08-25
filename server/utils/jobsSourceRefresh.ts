@@ -54,6 +54,23 @@ type StoredJob = Job & {
   ai?: unknown
 }
 
+function normalizedTagKey(value: string): string {
+  return value.normalize('NFKC').replace(/[^\p{L}\p{N}+#.]+/gu, ' ').trim().toLocaleLowerCase('en')
+}
+
+function cleanJobTags(job: Job): Job {
+  const company = normalizedTagKey(job.company || '')
+  const seen = new Set<string>()
+  const tags = (job.tags || []).filter((tag) => {
+    const key = normalizedTagKey(String(tag || ''))
+    if (!key || key === company || seen.has(key)) return false
+    seen.add(key)
+    return true
+  })
+  if (tags.length === (job.tags || []).length) return job
+  return { ...job, tags }
+}
+
 /**
  * A few HTML boards hand the source adapter a whole detail page. If that
  * adapter strips tags without first removing <script>, the script *contents*
@@ -64,7 +81,8 @@ type StoredJob = Job & {
  * board-specific parser can still be fixed independently, while executable
  * page plumbing never becomes vacancy content or ATS keywords again.
  */
-export function sanitizeFetchedJob(job: Job): Job {
+export function sanitizeFetchedJob(input: Job): Job {
+  const job = cleanJobTags(input)
   const raw = String(job.description || '').replace(/\s+/g, ' ').trim()
   if (!raw) return job
 
@@ -248,7 +266,11 @@ async function mergeFetchedSource(source: JobSource, jobs: Job[]) {
   const existing = raw ? JSON.parse(raw) as StoredJob[] : []
   const byKey = new Map<string, StoredJob>()
 
-  for (const job of existing) {
+  // Re-sanitize old snapshot entries too. This makes source-level cleanup (for
+  // example a company name that was historically stored as a tag) visible as
+  // soon as any queue refresh touches the store, without waiting 14 days.
+  for (const stored of existing) {
+    const job = sanitizeFetchedJob(stored) as StoredJob
     byKey.set(dedupKey(job), job)
   }
 
