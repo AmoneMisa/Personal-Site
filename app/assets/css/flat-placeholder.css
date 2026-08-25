@@ -20,3 +20,8 @@
   border-radius: 8px;
   background: var(--bg-panel-2) url('/svg/shark.svg') center / min(34%, 180px) auto no-repeat;
 }
+
+/* Keep the primary filter row visually detached from the divider above it. */
+.filter-primary-grid {
+  margin-top: 14px;
+}

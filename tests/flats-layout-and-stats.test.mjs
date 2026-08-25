@@ -16,7 +16,7 @@ const jobStats = await readFile(new URL('../app/components/jobs/StatsPanel.vue',
 test('flat cards share one row height and one compact desktop media geometry', () => {
   assert.match(grid, /align-items: stretch; grid-auto-rows: 1fr/u)
   assert.match(card, /\.flat-card \{[^}]*height: 100%/u)
-  assert.match(card, /\.flat-card__photo \{[^}]*aspect-ratio: 4 \/ 3[^}]*overflow: hidden/u)
+  assert.match(card, /\.flat-card__photo \{[^}]*aspect-ratio: 4 \/ 3[^}]*overflow: visible/u)
   assert.match(card, /\.flat-card__photo > img \{[^}]*height: 100%[^}]*object-fit: cover/u)
   assert.match(card, /:title="presentation\.title"/u)
   assert.match(card, /-webkit-line-clamp: 1/u)
