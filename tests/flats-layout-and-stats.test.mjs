@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import { readFile } from 'node:fs/promises'
 
 const card = await readFile(new URL('../app/components/flats/FlatCard.vue', import.meta.url), 'utf8')
-const grid = await readFile(new URL('../app/components/flats/FlatGrid.vue', import.meta.url), 'utf8')
+const grid = await readFile(new URL('../app/components/search/SearchResultGrid.vue', import.meta.url), 'utf8')
 const stats = await readFile(new URL('../app/components/flats/StatsPanel.vue', import.meta.url), 'utf8')
 const feed = await readFile(new URL('../app/composables/flats/useFlatFeed.ts', import.meta.url), 'utf8')
 const presentation = await readFile(new URL('../app/composables/flats/useFlatPresentation.ts', import.meta.url), 'utf8')
@@ -13,14 +13,17 @@ const flatFilters = await readFile(new URL('../app/composables/flats/useFlatFilt
 const jobFilters = await readFile(new URL('../app/composables/jobs/useJobFilters.ts', import.meta.url), 'utf8')
 const hiringFilters = await readFile(new URL('../app/composables/hiring/useHiringFilters.ts', import.meta.url), 'utf8')
 const jobStats = await readFile(new URL('../app/components/jobs/StatsPanel.vue', import.meta.url), 'utf8')
+const jobPage = await readFile(new URL('../app/pages/jobs/index.vue', import.meta.url), 'utf8')
+const hiringPage = await readFile(new URL('../app/pages/hiring/index.vue', import.meta.url), 'utf8')
+const advancedFilters = await readFile(new URL('../app/components/search/SearchAdvancedFilters.vue', import.meta.url), 'utf8')
 
 test('flat cards stay equal within a row and use the target compact desktop/mobile geometry', () => {
   assert.match(grid, /align-items: stretch/u)
-  assert.doesNotMatch(grid, /grid-auto-rows:\s*1fr/u)
+  assert.doesNotMatch(page, /<SearchResultGrid[^>]*\bequal-rows\b/u)
   assert.match(grid, /@media \(min-width: 1440px\)[^}]*repeat\(4, minmax\(0, 1fr\)\)/u)
   assert.doesNotMatch(grid, /repeat\(5, minmax\(0, 1fr\)\)/u)
   assert.match(card, /\.flat-card \{[^}]*height: 100%/u)
-  assert.match(card, /\.flat-card__photo \{[^}]*aspect-ratio: 2 \/ 1[^}]*overflow: hidden/u)
+  assert.match(card, /\.flat-card__photo \{[^}]*aspect-ratio: 1\.5[^}]*overflow: hidden/u)
   assert.match(card, /\.flat-card__photo > img \{[^}]*height: 100%[^}]*object-fit: cover/u)
   assert.match(card, /@media \(max-width: 760px\)[\s\S]*?height: 148px; min-height: 148px/u)
   assert.match(card, /grid-template-columns: minmax\(112px, 42%\) minmax\(0, 1fr\)/u)
@@ -78,10 +81,18 @@ test('flat statistics are not cleared while a country refresh waits for the back
   assert.match(feed, /const statisticsLoading = ref\(false\)/u)
 })
 
-test('advanced filters are collapsed by default on all three search boards', () => {
+test('advanced filters share one collapsed shell on all three search boards', () => {
   assert.match(flatFilters, /const showAdvanced = ref\(false\)/u)
   assert.match(jobFilters, /const showAdvanced = ref\(false\)/u)
   assert.match(hiringFilters, /const showAdvanced = ref\(false\)/u)
+  assert.match(page, /<SearchAdvancedFilters v-model="showAdvanced"/u)
+  assert.match(jobPage, /<SearchAdvancedFilters v-model="showAdvanced"/u)
+  assert.match(hiringPage, /<SearchAdvancedFilters v-model="showAdvanced"/u)
+  assert.match(advancedFilters, /const open = defineModel<boolean>\(\{ default: false \}\)/u)
+  assert.match(advancedFilters, /:aria-expanded="open"/u)
+  assert.doesNotMatch(jobPage, /showAdvanced = !showAdvanced/u)
+  assert.doesNotMatch(hiringPage, /v-if="showAdvanced" class="hiring__advanced"/u)
+  assert.doesNotMatch(page, /advanced-card|advanced-button|toggleAdvanced/u)
 })
 
 test('vacancy graphs do not render the redundant sparse salary line', () => {
