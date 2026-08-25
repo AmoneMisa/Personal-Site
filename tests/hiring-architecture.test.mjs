@@ -54,3 +54,17 @@ test('legacy Telegram hiring store and facade are removed', async () => {
   await assert.rejects(read('server/utils/hiringStore.ts'), { code: 'ENOENT' })
   await assert.rejects(read('server/hiring/sources/telegramRefresh.ts'), { code: 'ENOENT' })
 })
+
+test('ATS linguistic parsing stays centralized in parsing-lexicon', async () => {
+  const core = await read('shared/hiring/ats/scoreCore.ts')
+  const adapter = await read('app/utils/atsScore.ts')
+
+  assert.match(core, /@whiteslove\/parsing-lexicon\/hiring-requirements/)
+  assert.match(core, /detectHiringSeniority/)
+  assert.match(core, /extractCvExperienceYears/)
+  assert.match(core, /bucketVacancyText/)
+  assert.match(adapter, /isNoSponsorshipRequirement/)
+
+  assert.doesNotMatch(core, /CV_SECTION_HEADING_RE|NO_SPONSORSHIP_RE|function detectSeniority|function detectRequiredExperience|function degreeLevel|function degreeFields|parsedCvExperienceYears/)
+  assert.doesNotMatch(adapter, /LONG_FORM_NO_SPONSORSHIP_RE/)
+})
