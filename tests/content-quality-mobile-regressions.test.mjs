@@ -60,8 +60,8 @@ test('flat cards surface AI vision provenance and stay compact on phones', () =>
   assert.match(flatPresentation, /listing\.vision\?\.derivedFields/u)
   assert.match(flatPresentation, /visionBadgeLabels/u)
   assert.match(flatCard, /flat-card__badge_vision/u)
-  assert.match(flatCard, /grid-template-columns: minmax\(118px, 40%\)/u)
-  assert.match(flatCard, /height: 188px/u)
+  assert.match(flatCard, /grid-template-columns: minmax\(112px, 42%\)/u)
+  assert.match(flatCard, /height: 148px/u)
 })
 
 test('map cluster browser clamps into the viewport and detail modal wins the z-index stack', () => {
