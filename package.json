@@ -14,7 +14,7 @@
     "@nuxt/icon": "^2.5.0",
     "@nuxt/image": "^2.1.0",
     "@nuxtjs/i18n": "^10.6.0",
-    "@whiteslove/parsing-lexicon": "https://github.com/AmoneMisa/parsing-lexicon/archive/22fcdf4820d60ee5c05bb0c90c3883f00ea4360e.tar.gz",
+    "@whiteslove/parsing-lexicon": "https://github.com/AmoneMisa/parsing-lexicon/archive/0f1040cdf6b448fd9f578425b6a5ac9399df1abc.tar.gz",
     "chart.js": "^4.5.1",
     "emoji-picker-element": "^1.29.1",
     "fabric": "^7.4.0",
