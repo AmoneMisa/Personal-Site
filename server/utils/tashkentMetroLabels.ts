@@ -1,7 +1,7 @@
 import {
   TASHKENT_METRO_BY_NAME,
   canonicalTashkentMetro,
-} from '@whiteslove/parsing-lexicon/geo'
+} from '@whiteslove/parsing-lexicon'
 
 export function metroLabel(value: string, locale = 'en'): string {
   const canonical = canonicalTashkentMetro(value) || value
