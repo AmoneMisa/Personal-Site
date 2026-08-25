@@ -37,6 +37,27 @@ test('flat card footer shows only city and district, without metro duplication',
   assert.match(presentation, /location: cardLocation/u)
 })
 
+test('flat card context badge follows ownership and geography filters', () => {
+  assert.match(presentation, /function contextualBadgeLabel\(listing: FlatListing\)/u)
+  assert.match(presentation, /options\.getAgency\(\) === "any"/u)
+  assert.match(presentation, /return listing\.byAgency \? t\("badgeAgency"\) : t\("badgeOwner"\)/u)
+  assert.match(presentation, /if \(selectedMetro\(\)\) return rooms/u)
+  assert.match(presentation, /if \(selectedDistrict\(\)\)[\s\S]*?return metro \|\| microdistrict \|\| residenceComplex \|\| rooms/u)
+  assert.match(presentation, /return locName\(listing\.district, "district"\) \|\| metro \|\| microdistrict \|\| residenceComplex \|\| rooms/u)
+})
+
+test('good price badge compares similar flats and stays pinned to the photo corner', () => {
+  assert.match(feed, /useState<FlatListing\[]>\("flat-finder:listings"/u)
+  assert.match(presentation, /function goodPriceData\(listing: FlatListing\)/u)
+  assert.match(presentation, /candidate\.propertyType !== listing\.propertyType \|\| dealComparisonKey\(candidate\) !== deal/u)
+  assert.match(presentation, /if \(listing\.rooms != null\) return candidate\.rooms === listing\.rooms/u)
+  assert.match(presentation, /Math\.abs\(candidate\.areaSqm - listing\.areaSqm\) <= areaTolerance/u)
+  assert.match(presentation, /prices\.length < 3/u)
+  assert.match(presentation, /goodPrice: listingPriceUsd < median/u)
+  assert.match(card, /v-if="presentation\.goodPrice" class="flat-card__good-price"/u)
+  assert.match(card, /\.flat-card__good-price \{[^}]*left: 9px; bottom: 9px/u)
+})
+
 test('flat geography statistics stay populated when a scoped country slice is empty', () => {
   assert.match(stats, /geographiesByDeal\?\.\[dealScope\.value\]/u)
   assert.match(stats, /scoped\?\.length \? scoped : \(props\.statistics\.geographies\[geoDimension\.value\]/u)
