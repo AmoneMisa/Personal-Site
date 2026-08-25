@@ -1,3 +1,8 @@
+import {
+  isRoomOnlyHousing,
+  resolveExtendedHousingIntent,
+} from '@whiteslove/parsing-lexicon/housing-source-aliases'
+
 export type FlatDealType = 'sale' | 'longRent' | 'shortRent'
 
 const SOCIAL_SOURCES = new Set(['telegram', 'facebook', 'threads'])
@@ -25,11 +30,15 @@ function listingText(listing: any): string {
   ].filter(Boolean).join(' '))
 }
 
+function explicitDealFromText(text: string): FlatDealType | null {
+  const resolved = resolveExtendedHousingIntent(text)
+  return resolved?.dealType || null
+}
+
 export function normalizeFlatRoomOnly(listing: any): boolean {
   if (listing?.roomOnly === true) return true
   const text = listingText(listing)
-  const explicitRoom = /(?:student\s+qizlarga|talaba\s+qizlarga|qiz\s+olinadi|opshijit\s+dom|obshijit\s+dom|общежити\p{L}*|yotoqxona|подселени\p{L}*|койко\s+мест\p{L}*|шеринг|room\s+only)/u.test(text)
-  if (explicitRoom) return true
+  if (isRoomOnlyHousing(text)) return true
 
   // Price is only a fallback when the source gave us no deal information.
   if (normalizedText(listing?.dealType) || explicitDealFromText(text)) return false
@@ -110,13 +119,6 @@ function priceBand(listing: any): 'room' | 'rent' | 'sale' | null {
   if (price <= threshold.roomMax) return 'room'
   if (price >= threshold.saleMin) return 'sale'
   return 'rent'
-}
-
-function explicitDealFromText(text: string): FlatDealType | null {
-  if (/(?:посуточн\p{L}*|сутк\p{L}*|на сутки|кунлик|kunlik|sutkalik|суткалик)/u.test(text)) return 'shortRent'
-  if (/(?:продам|продается|продажа|sotiladi|sotaman|sotuv|for sale)/u.test(text)) return 'sale'
-  if (/(?:сдам|сдается|снять|аренд\p{L}*|ижара\p{L}*|ijara\p{L}*|ijaraga|берилади|beriladi|for rent|oyiga|в месяц|месяц|mingdan|мингдан|qiz\s+olinadi|student\s+qizlarga|talaba\s+qizlarga)/u.test(text)) return 'longRent'
-  return null
 }
 
 /**
