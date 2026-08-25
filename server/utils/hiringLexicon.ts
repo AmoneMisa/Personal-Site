@@ -185,8 +185,8 @@ export function parseHiringExperience(text: string) {
 }
 
 function salaryLanguageCurrency(text: string): 'UZS' | 'KZT' | null {
-  if (/(?:\boylik\b|\boyiga\b|\bmaosh\b|\bish\s+haqi\b|\бойлик\b|\бойига\b|\бмаош\b|\биш\s+ҳақи\b)/iu.test(text)) return 'UZS'
-  if (/(?:\bжалақы\b|\bеңбекақы\b|\bайлық\b|\bайына\b)/iu.test(text)) return 'KZT'
+  if (/(?:^|[^\p{L}\p{N}])(?:oylik|oyiga|maosh|ish\s+haqi|ойлик|ойига|маош|иш\s+ҳақи)(?=$|[^\p{L}\p{N}])/iu.test(text)) return 'UZS'
+  if (/(?:^|[^\p{L}\p{N}])(?:жалақы|еңбекақы|айлық|айына)(?=$|[^\p{L}\p{N}])/iu.test(text)) return 'KZT'
   return null
 }
 
