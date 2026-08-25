@@ -7,14 +7,30 @@ export type SalaryPeriod = 'hour' | 'month' | 'year'
 export type Seniority = 'intern' | 'junior' | 'middle' | 'senior' | 'staff' | 'principal' | 'lead'
 export type EmployerType = 'direct' | 'agency' | 'board' | 'telegram'
 export type SponsorshipConfidence = 'explicit' | 'verified' | 'historical'
-export type EmploymentKind = 'fulltime' | 'parttime' | 'contract' | 'internship' | 'temporary'
+export type EmploymentKind =
+  | 'fulltime'
+  | 'parttime'
+  | 'contract'
+  | 'project'
+  | 'freelance'
+  | 'internship'
+  | 'temporary'
+  | 'volunteer'
+  | 'seasonal'
+export type WorkSchedule = 'fiveTwo' | 'twoTwo' | 'shift' | 'flexible' | 'day' | 'night' | 'rotational'
+export type ProbationKind = 'probation' | 'noProbation' | 'paidProbation' | 'unpaidProbation'
+export type ExperienceRequirement = 'noExperience' | 'experienceRequired'
 
 export const EMPLOYMENT_KINDS: EmploymentKind[] = [
   'fulltime',
   'parttime',
   'contract',
+  'project',
+  'freelance',
   'internship',
   'temporary',
+  'volunteer',
+  'seasonal',
 ]
 
 export interface LanguageReq {
@@ -52,7 +68,10 @@ export interface Job {
   sponsorshipConfidence?: SponsorshipConfidence
   sponsorshipEvidence?: string[]
   noExperience?: boolean
+  experienceRequirement?: ExperienceRequirement | null
   employmentKind?: EmploymentKind
+  workSchedules?: WorkSchedule[]
+  probationKind?: ProbationKind | null
   languages?: LanguageReq[]
   skills?: string[]
   niceToHave?: string[]
