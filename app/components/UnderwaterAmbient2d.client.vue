@@ -23,7 +23,7 @@ const creatures: CreaturePreset[] = [
     duration: "30s",
     delay: "-9s",
     direction: "rtl",
-    opacity: .97,
+    opacity: 0.97,
   },
   {
     id: "fish-blue",
@@ -34,7 +34,7 @@ const creatures: CreaturePreset[] = [
     duration: "19s",
     delay: "-3s",
     direction: "ltr",
-    opacity: .93,
+    opacity: 0.93,
   },
   {
     id: "fish-coral",
@@ -45,7 +45,7 @@ const creatures: CreaturePreset[] = [
     duration: "23s",
     delay: "-14s",
     direction: "rtl",
-    opacity: .88,
+    opacity: 0.88,
   },
   {
     id: "fish-fancy",
@@ -56,7 +56,7 @@ const creatures: CreaturePreset[] = [
     duration: "25s",
     delay: "-18s",
     direction: "ltr",
-    opacity: .82,
+    opacity: 0.82,
   },
   {
     id: "seahorse",
@@ -67,7 +67,7 @@ const creatures: CreaturePreset[] = [
     duration: "34s",
     delay: "-21s",
     direction: "rtl",
-    opacity: .9,
+    opacity: 0.9,
   },
   {
     id: "puffer",
@@ -78,7 +78,7 @@ const creatures: CreaturePreset[] = [
     duration: "27s",
     delay: "-11s",
     direction: "ltr",
-    opacity: .9,
+    opacity: 0.9,
   },
   {
     id: "jelly-blue",
@@ -89,7 +89,7 @@ const creatures: CreaturePreset[] = [
     duration: "38s",
     delay: "-28s",
     direction: "ltr",
-    opacity: .76,
+    opacity: 0.76,
   },
   {
     id: "jelly-pink",
@@ -100,7 +100,7 @@ const creatures: CreaturePreset[] = [
     duration: "41s",
     delay: "-6s",
     direction: "rtl",
-    opacity: .72,
+    opacity: 0.72,
   },
 ];
 </script>
@@ -125,27 +125,10 @@ const creatures: CreaturePreset[] = [
       }"
     >
       <div class="underwater-2d__bob">
-        <div class="underwater-2d__puppet">
-          <img class="underwater-2d__part underwater-2d__part_body" :src="creature.src" alt="" draggable="false" />
-
-          <template v-if="creature.kind === 'fish' || creature.kind === 'shark'">
-            <img class="underwater-2d__part underwater-2d__part_tail" :src="creature.src" alt="" draggable="false" />
-            <img class="underwater-2d__part underwater-2d__part_fin" :src="creature.src" alt="" draggable="false" />
-          </template>
-
-          <template v-else-if="creature.kind === 'seahorse'">
-            <img class="underwater-2d__part underwater-2d__part_seahorse-tail" :src="creature.src" alt="" draggable="false" />
-            <img class="underwater-2d__part underwater-2d__part_seahorse-fin" :src="creature.src" alt="" draggable="false" />
-          </template>
-
-          <template v-else-if="creature.kind === 'jelly'">
-            <img class="underwater-2d__part underwater-2d__part_jelly-bell" :src="creature.src" alt="" draggable="false" />
-            <img class="underwater-2d__part underwater-2d__part_jelly-tentacles" :src="creature.src" alt="" draggable="false" />
-          </template>
-
+        <div class="underwater-2d__facing">
           <img
-            v-if="creature.kind === 'fish' || creature.kind === 'shark' || creature.kind === 'seahorse'"
-            class="underwater-2d__part underwater-2d__part_mouth"
+            class="underwater-2d__creature"
+            :class="`underwater-2d__creature_${creature.kind}`"
             :src="creature.src"
             alt=""
             draggable="false"
@@ -171,7 +154,7 @@ const creatures: CreaturePreset[] = [
   width: var(--creature-size);
   opacity: var(--creature-opacity);
   will-change: transform;
-  filter: drop-shadow(0 8px 18px rgba(8, 34, 93, .2));
+  filter: drop-shadow(0 8px 18px rgba(8, 34, 93, 0.2));
 }
 
 .underwater-2d__swimmer_ltr {
@@ -187,119 +170,58 @@ const creatures: CreaturePreset[] = [
 .underwater-2d__bob {
   width: 100%;
   animation: ocean-creature-bob 3.8s ease-in-out infinite alternate;
+  will-change: transform;
 }
 
-.underwater-2d__puppet {
-  position: relative;
+.underwater-2d__facing {
   width: 100%;
+  transform-origin: center;
 }
 
-.underwater-2d__puppet::before {
-  content: "";
-  display: block;
-  padding-top: 64%;
-}
-
-.underwater-2d__swimmer_seahorse .underwater-2d__puppet::before { padding-top: 171%; }
-.underwater-2d__swimmer_jelly-blue .underwater-2d__puppet::before { padding-top: 114%; }
-.underwater-2d__swimmer_jelly-pink .underwater-2d__puppet::before { padding-top: 91%; }
-
-.underwater-2d__swimmer_rtl .underwater-2d__puppet {
+.underwater-2d__swimmer_rtl .underwater-2d__facing {
   transform: scaleX(-1);
 }
 
-.underwater-2d__part {
-  position: absolute;
-  inset: 0;
+.underwater-2d__creature {
+  display: block;
   width: 100%;
-  height: 100%;
+  height: auto;
   object-fit: contain;
   user-select: none;
   -webkit-user-drag: none;
   backface-visibility: hidden;
+  transform-origin: 50% 50%;
+  will-change: transform;
 }
 
-.underwater-2d__swimmer_fish .underwater-2d__part_body,
-.underwater-2d__swimmer_shark .underwater-2d__part_body {
-  clip-path: polygon(27% 0, 100% 0, 100% 100%, 27% 100%);
+/*
+ * Keep each source image intact. The previous implementation rendered the same
+ * sprite several times and clipped those copies into "body", "tail", "fin"
+ * and "mouth" regions. Because the source files are already final composite
+ * sprites, those clipped copies exposed detached fins/tails next to the animal.
+ * Whole-sprite deformation is deliberately subtle until true layered source
+ * art is available.
+ */
+.underwater-2d__creature_fish {
+  animation: ocean-fish-swim 1.35s ease-in-out infinite alternate;
 }
 
-.underwater-2d__swimmer_fish .underwater-2d__part_tail,
-.underwater-2d__swimmer_shark .underwater-2d__part_tail {
-  clip-path: polygon(0 0, 34% 0, 34% 100%, 0 100%);
-  transform-origin: 31% 52%;
-  animation: ocean-tail-sway 1.08s ease-in-out infinite alternate;
+.underwater-2d__creature_shark {
+  animation: ocean-shark-swim 1.7s ease-in-out infinite alternate;
 }
 
-.underwater-2d__swimmer_fish .underwater-2d__part_fin,
-.underwater-2d__swimmer_shark .underwater-2d__part_fin {
-  clip-path: polygon(42% 50%, 76% 50%, 76% 100%, 39% 100%);
-  transform-origin: 54% 58%;
-  animation: ocean-fin-flap 1.45s ease-in-out infinite alternate;
+.underwater-2d__creature_seahorse {
+  transform-origin: 52% 46%;
+  animation: ocean-seahorse-drift 2.8s ease-in-out infinite alternate;
 }
 
-.underwater-2d__swimmer_shark .underwater-2d__part_tail {
-  animation-duration: 1.3s;
-}
-
-.underwater-2d__swimmer_shark .underwater-2d__part_fin {
-  clip-path: polygon(37% 55%, 82% 55%, 82% 100%, 35% 100%);
-  animation-duration: 1.7s;
-}
-
-.underwater-2d__swimmer_seahorse .underwater-2d__part_body {
-  clip-path: polygon(0 0, 100% 0, 100% 72%, 58% 72%, 45% 58%, 25% 58%, 0 70%);
-}
-
-.underwater-2d__part_seahorse-tail {
-  clip-path: polygon(0 53%, 74% 53%, 84% 100%, 0 100%);
-  transform-origin: 56% 58%;
-  animation: ocean-seahorse-tail 2.4s ease-in-out infinite alternate;
-}
-
-.underwater-2d__part_seahorse-fin {
-  clip-path: polygon(0 31%, 34% 30%, 39% 63%, 0 67%);
-  transform-origin: 28% 48%;
-  animation: ocean-fin-flap .78s ease-in-out infinite alternate;
-}
-
-.underwater-2d__swimmer_jelly .underwater-2d__part_body {
-  display: none;
-}
-
-.underwater-2d__part_jelly-bell {
-  clip-path: polygon(0 0, 100% 0, 100% 47%, 0 47%);
-  transform-origin: 50% 45%;
-  animation: ocean-jelly-bell 2.3s ease-in-out infinite;
-}
-
-.underwater-2d__part_jelly-tentacles {
-  clip-path: polygon(0 39%, 100% 39%, 100% 100%, 0 100%);
-  transform-origin: 50% 40%;
-  animation: ocean-jelly-tentacles 2.3s ease-in-out infinite;
-}
-
-.underwater-2d__swimmer_puffer .underwater-2d__part_body {
+.underwater-2d__creature_puffer {
   animation: ocean-puffer-breathe 3.1s ease-in-out infinite;
 }
 
-.underwater-2d__part_mouth {
-  z-index: 5;
-  transform-origin: 82% 66%;
-  animation: ocean-mouth-wiggle 4.8s ease-in-out infinite;
-}
-
-.underwater-2d__swimmer_shark .underwater-2d__part_mouth {
-  clip-path: polygon(61% 52%, 100% 49%, 100% 86%, 58% 86%);
-}
-
-.underwater-2d__swimmer_fish .underwater-2d__part_mouth {
-  clip-path: polygon(67% 49%, 100% 48%, 100% 85%, 64% 85%);
-}
-
-.underwater-2d__swimmer_seahorse .underwater-2d__part_mouth {
-  clip-path: polygon(56% 19%, 100% 17%, 100% 43%, 55% 44%);
-  transform-origin: 78% 34%;
+.underwater-2d__creature_jelly {
+  transform-origin: 50% 30%;
+  animation: ocean-jelly-pulse 2.4s ease-in-out infinite;
 }
 
 .underwater-2d__swimmer_fish-blue .underwater-2d__bob { animation-duration: 3.2s; }
@@ -324,55 +246,50 @@ const creatures: CreaturePreset[] = [
   100% { transform: translate3d(0, 8px, 0) rotate(1deg); }
 }
 
-@keyframes ocean-tail-sway {
-  0% { transform: rotate(-5.5deg) scaleY(.98); }
-  100% { transform: rotate(5.5deg) scaleY(1.02); }
+@keyframes ocean-fish-swim {
+  0% { transform: skewY(-1deg) scaleX(0.992) scaleY(1.008) rotate(-0.35deg); }
+  50% { transform: skewY(0.6deg) scaleX(1.006) scaleY(0.994) rotate(0.2deg); }
+  100% { transform: skewY(1deg) scaleX(0.995) scaleY(1.005) rotate(0.35deg); }
 }
 
-@keyframes ocean-fin-flap {
-  0% { transform: rotate(-3deg) scaleY(.94); }
-  100% { transform: rotate(5deg) scaleY(1.04); }
+@keyframes ocean-shark-swim {
+  0% { transform: skewY(-0.7deg) scaleX(0.995) rotate(-0.25deg); }
+  100% { transform: skewY(0.7deg) scaleX(1.004) rotate(0.25deg); }
 }
 
-@keyframes ocean-seahorse-tail {
-  0% { transform: rotate(-2.5deg) scaleX(.98); }
-  100% { transform: rotate(3deg) scaleX(1.02); }
-}
-
-@keyframes ocean-jelly-bell {
-  0%, 100% { transform: scale(1, .98); }
-  46% { transform: scale(1.045, 1.045); }
-  68% { transform: scale(.985, .955); }
-}
-
-@keyframes ocean-jelly-tentacles {
-  0%, 100% { transform: translateY(-1%) scaleX(.97); }
-  46% { transform: translateY(2.5%) scaleX(1.03); }
-  68% { transform: translateY(4%) scaleX(.99); }
+@keyframes ocean-seahorse-drift {
+  0% { transform: rotate(-1.6deg) scaleX(0.99); }
+  100% { transform: rotate(1.8deg) scaleX(1.01); }
 }
 
 @keyframes ocean-puffer-breathe {
   0%, 100% { transform: scale(1); }
-  48% { transform: scale(1.045, 1.075); }
-  58% { transform: scale(1.02, 1.035); }
+  48% { transform: scale(1.035, 1.055); }
+  60% { transform: scale(1.012, 1.025); }
 }
 
-@keyframes ocean-mouth-wiggle {
-  0%, 66%, 100% { transform: translateY(0) scaleY(1); }
-  70% { transform: translateY(1.2%) scaleY(1.035); }
-  74% { transform: translateY(-.4%) scaleY(.985); }
-  79% { transform: translateY(1.6%) scaleY(1.045); }
-  84% { transform: translateY(0) scaleY(1); }
+@keyframes ocean-jelly-pulse {
+  0%, 100% { transform: translateY(0) scale(1, 0.985); }
+  45% { transform: translateY(-2px) scale(1.035, 1.035); }
+  68% { transform: translateY(2px) scale(0.99, 0.96); }
 }
 
-@media (max-width: 1199px) {
-  .underwater-2d {
-    display: none;
-  }
+@media (max-width: 900px) {
+  .underwater-2d__swimmer_shark { width: clamp(150px, 28vw, 240px); }
+  .underwater-2d__swimmer_fish { width: clamp(74px, 15vw, 120px); }
+  .underwater-2d__swimmer_seahorse,
+  .underwater-2d__swimmer_puffer,
+  .underwater-2d__swimmer_jelly { width: clamp(62px, 12vw, 102px); }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .underwater-2d {
+  .underwater-2d__swimmer,
+  .underwater-2d__bob,
+  .underwater-2d__creature {
+    animation: none !important;
+  }
+
+  .underwater-2d__swimmer {
     display: none;
   }
 }
