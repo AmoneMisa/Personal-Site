@@ -10,10 +10,16 @@ import {
   UA_CITY_CATALOG,
   UZ_CITY_CATALOG,
   WORK_MODES,
+  WORK_SCHEDULE_EXTENSIONS,
   aliasesOf,
   aliasesToRegex,
   canonicalCountryCode,
+  classifyHiringIntent,
   findCanonical,
+  matchProfessions,
+  matchSeniority,
+  parseExperience,
+  parseSalary,
 } from '@whiteslove/parsing-lexicon'
 
 const matcher = (entry: { canonical?: string; aliases?: Record<string, readonly string[]> }) =>
@@ -89,10 +95,13 @@ export function detectWorkModes(text: string): WorkMode[] {
   return [...values]
 }
 
-export type WorkSchedule = 'fiveTwo' | 'twoTwo' | 'shift' | 'flexible' | 'day' | 'night' | 'rotational'
+export type WorkSchedule =
+  | 'fiveTwo' | 'twoTwo' | 'sixOne' | 'threeThree' | 'oneThree' | 'twentyFourFortyEight'
+  | 'shift' | 'flexible' | 'day' | 'night' | 'rotational'
+
 export function detectWorkSchedules(text: string): WorkSchedule[] {
   const values = new Set<WorkSchedule>()
-  for (const entry of SCHEDULE_TERMS) {
+  for (const entry of [...SCHEDULE_TERMS, ...WORK_SCHEDULE_EXTENSIONS]) {
     if (findCanonical(text, [entry], { partial: true })) values.add(entry.canonical as WorkSchedule)
   }
   return [...values]
@@ -107,8 +116,31 @@ export function detectProbation(text: string): ProbationKind | null {
 }
 
 export function detectExperienceRequirement(text: string): 'noExperience' | 'experienceRequired' | null {
+  const parsed = parseExperience(text)
+  if (parsed?.requirement === 'none') return 'noExperience'
+  if (parsed?.requirement === 'required') return 'experienceRequired'
   for (const entry of Object.values(EXPERIENCE_REQUIREMENTS)) {
     if (findCanonical(text, [entry], { partial: true })) return entry.canonical as 'noExperience' | 'experienceRequired'
   }
   return null
+}
+
+export function detectHiringIntent(text: string) {
+  return classifyHiringIntent(text)
+}
+
+export function detectProfessionMatches(text: string, limit = 8) {
+  return matchProfessions(text, { limit })
+}
+
+export function detectSharedSeniority(text: string) {
+  return matchSeniority(text)?.canonical || null
+}
+
+export function parseHiringExperience(text: string) {
+  return parseExperience(text)
+}
+
+export function parseHiringSalary(text: string) {
+  return parseSalary(text)
 }
