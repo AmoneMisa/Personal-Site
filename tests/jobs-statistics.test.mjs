@@ -129,14 +129,19 @@ test('job statistics cover platform, relocation, work mode, employment, language
 test('salary card text compacts large amounts and Russian period labels without changing the full source string', () => {
   const annual = '$174,000–352,500/год'
   const monthly = '≈ $14,500–29,300/месяц'
+  const annualCode = '130,000–280,000 USD/год'
   assert.equal(compactSalaryText(annual), '$174K–352.5K/г.')
   assert.equal(compactSalaryText(monthly), '≈ $14.5K–29.3K/м.')
+  assert.equal(compactSalaryText(annualCode), '$130K–280K/г.')
   assert.equal(annual, '$174,000–352,500/год')
   assert.equal(monthly, '≈ $14,500–29,300/месяц')
+  assert.equal(annualCode, '130,000–280,000 USD/год')
 })
 
 test('listing cards expose only save/hide actions while detail views keep source/share flows', () => {
   const jobCard = readFileSync(new URL('../app/components/jobs/JobCard.vue', import.meta.url), 'utf8')
+  const jobGrid = readFileSync(new URL('../app/components/jobs/JobGrid.vue', import.meta.url), 'utf8')
+  const statsPanel = readFileSync(new URL('../app/components/jobs/StatsPanel.vue', import.meta.url), 'utf8')
   const flatCard = readFileSync(new URL('../app/components/flats/FlatCard.vue', import.meta.url), 'utf8')
   const jobsPage = readFileSync(new URL('../app/pages/jobs/index.vue', import.meta.url), 'utf8')
 
@@ -148,6 +153,10 @@ test('listing cards expose only save/hide actions while detail views keep source
   assert.match(jobCard, /i-lucide-eye/u)
   assert.match(jobCard, /job-card__head-side/u)
   assert.match(jobCard, /job-card__bottom/u)
+  assert.match(jobGrid, /align-items:\s*stretch/u)
+  assert.match(jobGrid, /job-card__salary-separator[^}]*display:\s*none/su)
+  assert.match(statsPanel, /nonProfessionLabels[^\n]*soft skills/u)
+  assert.ok(statsPanel.indexOf('stats__card_skills') < statsPanel.indexOf('stats__card_languages'))
   assert.match(jobsPage, /shareActiveJob/u)
   assert.match(jobsPage, /t\("openSource"\)/u)
 })
