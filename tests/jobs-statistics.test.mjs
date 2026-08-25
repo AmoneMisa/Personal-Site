@@ -126,10 +126,13 @@ test('job statistics cover platform, relocation, work mode, employment, language
   assert.ok(stats.salaryTrend.every((point) => point.profession))
 })
 
-test('salary card text compacts large amounts without losing the full source string', () => {
-  const full = '$174,000–352,500/year'
-  assert.equal(compactSalaryText(full), '$174K–352.5K/year')
-  assert.equal(full, '$174,000–352,500/year')
+test('salary card text compacts large amounts and Russian period labels without changing the full source string', () => {
+  const annual = '$174,000–352,500/год'
+  const monthly = '≈ $14,500–29,300/месяц'
+  assert.equal(compactSalaryText(annual), '$174K–352.5K/г.')
+  assert.equal(compactSalaryText(monthly), '≈ $14.5K–29.3K/м.')
+  assert.equal(annual, '$174,000–352,500/год')
+  assert.equal(monthly, '≈ $14,500–29,300/месяц')
 })
 
 test('listing cards expose only save/hide actions while detail views keep source/share flows', () => {
