@@ -47,7 +47,7 @@ test('flat card context badge follows ownership and geography filters', () => {
 })
 
 test('good price badge compares similar flats and stays pinned to the photo corner', () => {
-  assert.match(feed, /useState<FlatListing\[]>\("flat-finder:listings"/u)
+  assert.ok(feed.includes('useState<FlatListing[]>("flat-finder:listings"'))
   assert.match(presentation, /function goodPriceData\(listing: FlatListing\)/u)
   assert.match(presentation, /candidate\.propertyType !== listing\.propertyType \|\| dealComparisonKey\(candidate\) !== deal/u)
   assert.match(presentation, /if \(listing\.rooms != null\) return candidate\.rooms === listing\.rooms/u)
