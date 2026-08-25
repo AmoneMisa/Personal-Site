@@ -1,0 +1,94 @@
+name: Migrate ATS CV parsing
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - .github/workflows/migrate-ats-cv-parsing.yml
+
+permissions:
+  contents: write
+
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: master
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - name: Use shared CV parsing
+        shell: python
+        run: |
+          from pathlib import Path
+          import re
+
+          path = Path('shared/hiring/ats/scoreCore.ts')
+          text = path.read_text()
+
+          anchor = "  bucketVacancyText,\n"
+          if anchor not in text:
+              raise SystemExit('hiring requirements import anchor not found')
+          text = text.replace(anchor, anchor + "  classifyCvSectionHeading,\n", 1)
+          anchor = "  extractRequiredExperienceYears,\n"
+          text = text.replace(anchor, "  extractCvExperienceYears,\n" + anchor, 1)
+
+          text, count = re.subn(
+              r"const CV_SECTION_HEADING_RE = .*?(?=const SECTION_EVIDENCE_WEIGHT)",
+              "",
+              text,
+              count=1,
+              flags=re.S,
+          )
+          if count != 1:
+              raise SystemExit(f'CV section block: expected 1 replacement, got {count}')
+
+          old = """    const heading = CV_SECTION_HEADING_RE.exec(trimmed)\n    if (heading?.[1]) {\n      section = cvSectionKind(heading[1])\n      continue\n    }"""
+          new = """    const nextSection = classifyCvSectionHeading(trimmed)\n    if (nextSection) {\n      section = nextSection\n      continue\n    }"""
+          if old not in text:
+              raise SystemExit('skill evidence section anchor not found')
+          text = text.replace(old, new, 1)
+
+          text, count = re.subn(
+              r"function monthIndex\(year: number, month = 1\): number \{.*?(?=export interface CvProfile)",
+              "",
+              text,
+              count=1,
+              flags=re.S,
+          )
+          if count != 1:
+              raise SystemExit(f'CV experience block: expected 1 replacement, got {count}')
+
+          old = '    experienceYears: parsedCvExperienceYears(cvText, referenceDate),'
+          new = '    experienceYears: extractCvExperienceYears(cvText, referenceDate) ?? undefined,'
+          if old not in text:
+              raise SystemExit('CV experience assignment anchor not found')
+          text = text.replace(old, new, 1)
+          path.write_text(text)
+
+          package_path = Path('package.json')
+          package = package_path.read_text()
+          package, count = re.subn(
+              r'https://github\.com/AmoneMisa/parsing-lexicon/archive/[0-9a-f]{40}\.tar\.gz',
+              'https://github.com/AmoneMisa/parsing-lexicon/archive/cbd92aaa2eb61a25e19c55fda062438de8cc69bd.tar.gz',
+              package,
+              count=1,
+          )
+          if count != 1:
+              raise SystemExit(f'package pin: expected 1 replacement, got {count}')
+          package_path.write_text(package)
+      - name: Refresh lockfile
+        run: npm install --package-lock-only --ignore-scripts
+      - name: Commit migration and remove temporary workflow
+        run: |
+          rm .github/workflows/migrate-ats-cv-parsing.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add package.json package-lock.json shared/hiring/ats/scoreCore.ts .github/workflows/migrate-ats-cv-parsing.yml
+          git commit -m "refactor: use shared ATS CV parsing"
+          git pull --rebase origin master
+          git push origin HEAD:master
