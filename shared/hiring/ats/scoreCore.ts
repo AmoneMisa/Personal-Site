@@ -161,7 +161,7 @@ function scopeScore(jobText: string, cvText: string): { score: number, missing: 
 const DEGREE_RANK: Record<DegreeLevel, number> = { secondary: 0, bachelor: 1, master: 2, doctorate: 3 }
 
 function jobDegreeRequirement(requiredText: string): { level?: DegreeLevel, field?: string, equivalentExperience: boolean } {
-  const level = degreeLevel(requiredText)
+  const level = detectDegreeLevel(requiredText) || undefined
   let field: string | undefined
   if (/computer science|computer engineering|software engineering|information technology|informatics|related\s+(?:technical|engineering|computer)\s+field/i.test(requiredText)) field = 'computer_science'
   else if (/\bengineering\b[^.;\n]{0,60}\bdegree\b|\bdegree\b[^.;\n]{0,60}\bengineering\b/i.test(requiredText)) field = 'engineering'
