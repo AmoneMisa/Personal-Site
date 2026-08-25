@@ -15,8 +15,16 @@ const props = withDefaults(defineProps<{
   ariaLabel: "",
 });
 
+function displayLabel(value: string): string {
+  const trimmed = value.trim();
+  if (!trimmed) return trimmed;
+  const chars = Array.from(trimmed);
+  chars[0] = chars[0]!.toLocaleUpperCase();
+  return chars.join("");
+}
+
 const hiddenCount = computed(() => Math.max(0, props.items.length - props.visibleHintCount));
-const hiddenTitle = computed(() => props.items.slice(props.visibleHintCount).map((item) => item.label).join(", "));
+const hiddenTitle = computed(() => props.items.slice(props.visibleHintCount).map((item) => displayLabel(item.label)).join(", "));
 
 const rail = ref<HTMLElement | null>(null);
 let pointerId: number | null = null;
@@ -61,7 +69,7 @@ function stopDrag(event: PointerEvent) {
         class="draggable-pills__pill"
         :class="item.className"
         :title="item.title"
-      >{{ item.label }}</span>
+      >{{ displayLabel(item.label) }}</span>
     </div>
     <span v-if="hiddenCount" class="draggable-pills__more" :title="hiddenTitle">+{{ hiddenCount }}</span>
   </div>
