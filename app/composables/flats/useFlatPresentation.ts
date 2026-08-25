@@ -41,6 +41,13 @@ const nearbyTranslationKeys: Record<string, string> = {
   Towels: "amenityTowels",
 };
 
+const nearbyRuLabels: Record<string, string> = {
+  "Sergili Car Market": "Сергелийский авторынок",
+  "Sergili Farmers Market": "Сергелийский дехканский рынок",
+  "Turon Avto": "Туран Авто",
+  "Sergeli Car Bazaar": "Сергелийский авторынок",
+};
+
 const semanticListingTags = new Set([
   "for sale", "sale", "long term rent", "rent", "short term rent", "daily rent", "room rent", "room only",
   "agency", "owner", "no commission", "commission",
@@ -90,6 +97,8 @@ export function useFlatPresentation(options: FlatPresentationOptions) {
   function nearbyItemLabel(value: string): string {
     const key = nearbyTranslationKeys[value];
     if (key) return t(key);
+    if (options.getLocale().toLowerCase().startsWith("ru") && nearbyRuLabels[value]) return nearbyRuLabels[value]!;
+
     const normalized = value.trim().toLowerCase().replace(/[_-]+/g, " ").replace(/\s+/g, " ");
     const direct: Record<string, string> = {
       "for sale": "dtSale",
@@ -131,6 +140,17 @@ export function useFlatPresentation(options: FlatPresentationOptions) {
     const rooms = normalized.match(/^(\d+)\s+rooms?$/);
     if (rooms) return t("roomsN", { n: Number(rooms[1]) });
     return locName(value, "any");
+  }
+
+  function audienceBadgeLabel(listing: FlatListing): string {
+    const alternatives = new Set(listing.audienceAlternatives || []);
+    if (alternatives.has("family") && alternatives.has("women")) {
+      return options.getLocale().toLowerCase().startsWith("ru") ? "Семья или девушки" : "Family or women";
+    }
+    if (listing.audience === "family") return t("badgeFamily");
+    if (listing.audience === "women") return t("badgeWomen");
+    if (listing.audience === "men") return t("badgeMen");
+    return "";
   }
 
   function dealTone(listing: FlatListing): FlatCardPresentation["dealTone"] {
@@ -179,12 +199,8 @@ export function useFlatPresentation(options: FlatPresentationOptions) {
     if (listing.childrenAllowed) push(t("badgeChildren"));
     if (listing.communalSeparated === false) push(t("badgeUtilIncl"));
     if (listing.deposit === true) push(t("badgeDeposit"));
-    if (listing.audience === "family") push(t("badgeFamily"));
-    if (listing.audience === "women") push(t("badgeWomen"));
-    if (listing.audience === "men") push(t("badgeMen"));
+    push(audienceBadgeLabel(listing));
 
-    // Facts that are normally too detailed for a compact card become useful when
-    // AI vision supplied them: users can immediately see what the photos added.
     if (derived.has("bedrooms") && listing.bedrooms != null) push(`${t("specBedrooms")}: ${listing.bedrooms}`, "bedrooms");
     if (derived.has("bathrooms") && listing.bathrooms != null) push(`${t("specBathrooms")}: ${listing.bathrooms}`, "bathrooms");
     if (derived.has("condition") && listing.condition) push(conditionLabel(listing.condition), "condition");
