@@ -31,7 +31,7 @@ const CANDIDATE_FORM_RE =
   /(?:^|\n)\s*[^\p{L}\p{N}\n]{0,8}(?:ism(?:i|im)?(?:\s*[-–—]\s*(?:familya|familiya))?|familya|familiya|f\.?i\.?o\.?|фио|имя|yoshi|yoshim|tug(?:['’‘])ilgan\s+yili|возраст|qidirayotgan\s+kasb|so(?:['’‘])ralgan\s+ish\s+(?:joyi|turi)|yashash\s+manzili|ma(?:['’‘])lumoti|ожидаемая\s+работа|желаемая\s+(?:должность|работа)|tajribasi?|опыт\s+работы)\s*[:—-]/imu
 
 const CV_MARKER_RE = /(?:резюме|resume|\bcv\b|curriculum vitae|анкета|профиль кандидата|профіль кандидата|кандидат(?:ка)?|candidate profile|mening\s+(?:cv|rezume)|my\s+cv)/iu
-const FIRST_PERSON_RE = /(?:^|\n)\s*[^\p{L}\p{N}\n]{0,6}(?:я[\s—,-]|я\s+(?:ищу|шукаю)|men[\s,]|mening[\s,]|my name is|i am a|i'm a|ismim\b)/iu
+const FIRST_PERSON_RE = /(?:^|\n)\s*[^\p{L}\p{N}\n]{0,6}(?:я[\s—,-]|я\s+(?:ищу|шукаю)|(?:ищу|шукаю)\b|men[\s,]|mening[\s,]|my name is|i am a|i'm a|ismim\b)/iu
 const CONTACT_RE = /(?:\+?\d[\d\s()\-]{7,}|@[a-z0-9_]{4,}|(?:telegram|телефон|phone|tel|aloqa|murojaat|bog(?:'|’)lanish)\s*[:—-])/iu
 const SECTION_PATTERNS = {
   experience: /(?:опыт|досвід|experience|staj|tajriba|ish\s+tajribasi)/iu,
