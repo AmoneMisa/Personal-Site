@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
+import type { FlatMapFeedResult, FlatMapPoint } from "~/types/flats";
 
 interface FlatPoint {
   id: string;
@@ -9,6 +10,7 @@ interface FlatPoint {
   priceLabel?: string;
   photo?: string;
   source?: string;
+  country?: string;
 }
 
 const props = defineProps<{
@@ -26,12 +28,15 @@ const emit = defineEmits<{
   (e: "area-change", points: Array<{ lat: number; lng: number }>): void;
 }>();
 
+const route = useRoute();
+const router = useRouter();
 const LEAFLET_JS = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.js";
 const LEAFLET_CSS = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.css";
 const CLUSTER_PX = 38;
 const ZOOM_CLUSTER_THRESHOLD = 24;
 const SPREAD_PX = 50;
 const RADIAL_PAGE_SIZE = 9;
+const DETAIL_QUERY_KEYS = new Set(["flat", "flatSource", "flatCountry", "shared"]);
 
 const el = ref<HTMLElement | null>(null);
 const failed = ref(false);
@@ -39,6 +44,73 @@ const drawing = ref(false);
 const area = ref<Array<{ lat: number; lng: number }>>([]);
 const radial = ref<{ x: number; y: number; items: FlatPoint[]; page: number } | null>(null);
 const expanded = ref(false);
+const remotePoints = ref<FlatPoint[]>([]);
+let mapFeedSequence = 0;
+let lastMapFeedKey = "";
+
+function pointKey(point: Pick<FlatPoint, "id" | "source" | "country">): string {
+  return `${point.source || ""}:${point.country || ""}:${point.id}`;
+}
+
+function fallbackPriceLabel(point: FlatMapPoint): string | undefined {
+  if (point.price == null || !Number.isFinite(Number(point.price))) return undefined;
+  const value = Number(point.price).toLocaleString(undefined, { maximumFractionDigits: 0 });
+  return point.currency ? `${value} ${point.currency}` : value;
+}
+
+function normalizedRouteQuery(): Record<string, string> {
+  const query: Record<string, string> = {};
+  for (const [key, raw] of Object.entries(route.query)) {
+    if (DETAIL_QUERY_KEYS.has(key)) continue;
+    const value = Array.isArray(raw) ? raw[0] : raw;
+    if (value == null || value === "") continue;
+    query[key] = String(value);
+  }
+  return query;
+}
+
+async function loadFullMapFeed() {
+  if (!import.meta.client) return;
+  const query = normalizedRouteQuery();
+  const key = new URLSearchParams(query).toString();
+  if (key === lastMapFeedKey && remotePoints.value.length) return;
+  lastMapFeedKey = key;
+  const sequence = ++mapFeedSequence;
+  try {
+    const data = await $fetch<FlatMapFeedResult>("/flats-map", { query });
+    if (sequence !== mapFeedSequence) return;
+    remotePoints.value = (data?.mapPoints || [])
+      .filter((point) => Number.isFinite(Number(point.lat)) && Number.isFinite(Number(point.lng)))
+      .map((point) => ({
+        id: String(point.id),
+        source: point.source,
+        country: point.country,
+        lat: Number(point.lat),
+        lng: Number(point.lng),
+        title: point.title || "",
+        priceLabel: fallbackPriceLabel(point),
+      }));
+  } catch {
+    // The already-loaded page points remain a complete fallback when the compact
+    // map request is unavailable; never take the map down with the secondary feed.
+  }
+}
+
+const renderedPoints = computed<FlatPoint[]>(() => {
+  const merged = new Map<string, FlatPoint>();
+  for (const point of remotePoints.value) merged.set(pointKey(point), point);
+  // Loaded cards win: they contain localized titles, converted prices and photos.
+  for (const point of props.points) {
+    const exactKey = pointKey(point);
+    if (point.country || !point.source) {
+      merged.set(exactKey, point);
+      continue;
+    }
+    const remote = remotePoints.value.find((candidate) => candidate.id === point.id && candidate.source === point.source);
+    merged.set(remote ? pointKey(remote) : exactKey, { ...remote, ...point });
+  }
+  return [...merged.values()];
+});
 
 const radialPageCount = computed(() => {
   const count = radial.value?.items.length ?? 0;
@@ -133,7 +205,7 @@ interface Cluster { lat: number; lng: number; items: FlatPoint[] }
 
 function clusterPoints(): Cluster[] {
   const clusters: Array<{ x: number; y: number; latSum: number; lngSum: number; items: FlatPoint[] }> = [];
-  for (const p of props.points) {
+  for (const p of renderedPoints.value) {
     if (!Number.isFinite(p.lat) || !Number.isFinite(p.lng)) continue;
     const pt = map.latLngToContainerPoint([p.lat, p.lng]);
     let placed = false;
@@ -201,10 +273,28 @@ function clampRadialCoordinate(value: number, clearance: number, viewport: numbe
   return Math.min(viewport - clearance, Math.max(clearance, value));
 }
 
+function openPoint(point: FlatPoint) {
+  closeRadial();
+  const loaded = props.points.some((candidate) => candidate.id === point.id && (!point.source || candidate.source === point.source));
+  if (loaded) {
+    emit("select", point.id);
+    return;
+  }
+  if (!point.source || !point.country) return;
+  void router.replace({
+    query: {
+      ...route.query,
+      flat: point.id,
+      flatSource: point.source,
+      flatCountry: point.country,
+    },
+  });
+}
+
 function openCluster(c: Cluster) {
   const L = (window as any).L;
   if (c.items.length === 1) {
-    emit("select", c.items[0].id);
+    openPoint(c.items[0]);
     return;
   }
   if (c.items.length > ZOOM_CLUSTER_THRESHOLD && clusterSpreadPx(c) > SPREAD_PX) {
@@ -228,11 +318,6 @@ function openCluster(c: Cluster) {
   radial.value = { x, y, items: [...c.items], page: 0 };
 }
 
-function pick(id: string) {
-  closeRadial();
-  emit("select", id);
-}
-
 function slotStyle(i: number, n: number) {
   const radius = radialRadius(n);
   const angle = (-90 + (360 / Math.max(1, n)) * i) * (Math.PI / 180);
@@ -246,10 +331,10 @@ function slotStyle(i: number, n: number) {
 
 function fitToPoints() {
   const bounds: [number, number][] = [];
-  for (const p of props.points) {
+  for (const p of renderedPoints.value) {
     if (Number.isFinite(p.lat) && Number.isFinite(p.lng)) bounds.push([p.lat, p.lng]);
   }
-  const sig = props.points.map((p) => p.id).sort().join(",");
+  const sig = renderedPoints.value.map(pointKey).sort().join(",");
   if (bounds.length && sig !== lastFitSig) {
     lastFitSig = sig;
     map.fitBounds(bounds, { padding: [30, 30], maxZoom: 14 });
@@ -286,6 +371,7 @@ function clearArea() {
 onMounted(async () => {
   window.addEventListener("keydown", onKeydown);
   window.addEventListener("scroll", closeRadial, { passive: true });
+  void loadFullMapFeed();
   if (!el.value) return;
   let L: any;
   try {
@@ -318,9 +404,11 @@ onMounted(async () => {
   fitToPoints();
 });
 
-watch(() => props.points, () => { renderMarkers(); fitToPoints(); }, { deep: true });
+watch(renderedPoints, () => { renderMarkers(); fitToPoints(); }, { deep: true });
+watch(() => route.query, () => { void loadFullMapFeed(); }, { deep: true });
 
 onBeforeUnmount(() => {
+  mapFeedSequence += 1;
   window.removeEventListener("keydown", onKeydown);
   window.removeEventListener("scroll", closeRadial);
   document.body.style.overflow = "";
@@ -382,11 +470,11 @@ onBeforeUnmount(() => {
 
         <div
           v-for="(item, i) in visibleRadialItems"
-          :key="`${radial.page}:${item.id}`"
+          :key="`${radial.page}:${pointKey(item)}`"
           class="flat-radial__slot"
           :style="slotStyle(i, visibleRadialItems.length)"
         >
-          <button type="button" class="flat-radial__tab" @click="pick(item.id)">
+          <button type="button" class="flat-radial__tab" @click="openPoint(item)">
             <span class="flat-radial__thumb">
               <img v-if="item.photo" :src="item.photo" :alt="item.title" loading="lazy" decoding="async" referrerpolicy="no-referrer" />
               <img v-else src="/svg/shark.svg" alt="" class="flat-radial__thumb-empty" loading="lazy" />

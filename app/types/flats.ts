@@ -96,6 +96,27 @@ export interface FlatListing {
   marketComparison?: FlatMarketComparison;
 }
 
+export interface FlatMapPoint {
+  id: string;
+  source: string;
+  country: string;
+  lat: number;
+  lng: number;
+  title?: string;
+  price?: number | null;
+  currency?: string;
+}
+
+export interface FlatMapFeedResult {
+  count: number;
+  mapPoints: FlatMapPoint[];
+  mapPointsTruncated?: boolean;
+  mapPointLimit?: number;
+  queryMs?: number;
+  stale?: boolean;
+  error?: string;
+}
+
 export type FlatStatsDealKey = "sale" | "longRent" | "shortRent" | "roomRent" | "unknown";
 
 export interface FlatStatsPriceGroup {
