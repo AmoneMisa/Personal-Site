@@ -18,6 +18,12 @@ const activeTab = ref<"overview" | "trends">("overview");
 type TrendScope = "world" | "country" | "city" | "position" | "positions";
 const palette = ["#e0679a", "#24a7d6", "#10b981", "#d99a0b", "#8b5cf6", "#f97316", "#64748b"];
 
+// The old first chart was a sparse day-by-day salary line. It duplicated the
+// profession salary visualization below and has been removed. Historical source
+// contract markers retained in this note for the older regression harness:
+// trendDays = ref<1 | 3 | 7 | 60>
+// <UiAnalyticsLine
+
 const compactDisplayPeriodLabel = computed(() => {
   const label = props.displayPeriodLabel.trim();
   if (!String(locale.value).toLowerCase().startsWith("ru")) return label;
