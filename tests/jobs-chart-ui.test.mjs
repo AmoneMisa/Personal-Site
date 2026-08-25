@@ -23,5 +23,5 @@ test('vacancy statistics use the shared designed analytics tabs', () => {
 test('Russian salary period labels are compact in vacancy statistics', () => {
   assert.match(panel, /normalized === "год"\) return "г\."/u)
   assert.match(panel, /normalized === "месяц"\) return "м\."/u)
-  assert.match(panel, /displayCurrency\}\}\/\{\{ compactDisplayPeriodLabel/u)
+  assert.match(panel, /\{\{\s*displayCurrency\s*\}\}\/\{\{\s*compactDisplayPeriodLabel\s*\}\}/u)
 })
