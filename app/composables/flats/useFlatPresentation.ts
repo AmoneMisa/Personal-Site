@@ -245,13 +245,17 @@ export function useFlatPresentation(options: FlatPresentationOptions) {
     if (listing.areaSqm != null) specification.push(`${listing.areaSqm} ${t("sqm")}`);
     if (listing.floor != null) specification.push(listing.totalFloors != null ? `${listing.floor}/${listing.totalFloors} ${t("floorAbbr")}` : `${listing.floor} ${t("floorAbbr")}`);
     const badgeResult = badgeData(listing);
+    const cardLocation = [...new Set([
+      locName(listing.city, "city"),
+      locName(listing.district, "district"),
+    ].filter(Boolean))].join(", ");
 
     return {
       title: displayListingTitle(listing),
       price: priceLabel(listing),
       convertedPrice: convertedLabel(listing),
       specification: specification.join(" · "),
-      location: [locName(listing.city, "city"), locName(listing.district, "district"), locName(listing.metro, "metro")].filter(Boolean).join(", "),
+      location: cardLocation,
       dealLabel: cardDealLabel(listing),
       dealTone: dealTone(listing),
       badges: badgeResult.values,
