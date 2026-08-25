@@ -23,7 +23,7 @@ jobs:
       - name: Apply deduplication
         run: node .github/scripts/dedupe_search_advanced_filters.mjs
       - name: Run focused regression tests
-        run: node --test tests/flats-layout-and-stats.test.mjs tests/hiring-statistics.test.mjs
+        run: node --experimental-strip-types --import ./tests/setup.mjs --test tests/flats-layout-and-stats.test.mjs tests/hiring-statistics.test.mjs
       - name: Remove one-off migration files
         run: rm .github/scripts/dedupe_search_advanced_filters.mjs .github/workflows/dedupe-search-advanced-filters.yml
       - name: Commit refactor
