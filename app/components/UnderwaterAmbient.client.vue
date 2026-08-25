@@ -193,7 +193,6 @@ function initScene(now: number) {
   bursts.length = 0;
   creatures.splice(0, creatures.length, ...PRESETS.map((preset, index) => createCreature(preset, now, index < 5)));
 
-  // Stagger the initial visible creatures so they do not look like a synchronized school.
   creatures.forEach((item, index) => {
     if (index < 5 && item.preset.kind !== "jelly") {
       item.x = width * [.12, .34, .62, .83, .48][index];
@@ -215,8 +214,6 @@ function drawWater(time: number) {
   ctx.save();
   ctx.globalCompositeOperation = "screen";
 
-  // Broad shafts of refracted sunlight from the surface. They move laterally,
-  // but never form rings or obvious geometric waves.
   const drift = Math.sin(time * .00009) * width * .025;
   const shafts = [
     { x: .08, w: .11, a: .026, tilt: .11 },
@@ -243,7 +240,6 @@ function drawWater(time: number) {
     ctx.fill();
   }
 
-  // Irregular caustic streaks: short, stretched highlights that slide slowly.
   ctx.lineCap = "round";
   for (let row = 0; row < 5; row += 1) {
     const y = height * (.07 + row * .11);
@@ -318,24 +314,12 @@ function routeVelocity(item: Creature, now: number): Point {
   const route = item.preset.route;
   const t = now * .001 + item.phase;
 
-  if (route === "top-glide") {
-    return { x: item.baseSpeed * item.direction, y: Math.sin(t * .72) * 5.5 };
-  }
-  if (route === "mid-arc") {
-    return { x: item.baseSpeed * item.direction, y: Math.sin(t * .45) * 12 };
-  }
-  if (route === "bottom-wander") {
-    return { x: item.baseSpeed * item.direction, y: Math.sin(t * .92) * 8 + Math.sin(t * .31) * 4 };
-  }
-  if (route === "deep-curve") {
-    return { x: item.baseSpeed * item.direction, y: Math.sin(t * .34) * 15 };
-  }
-  if (route === "shark-sweep") {
-    return { x: item.baseSpeed * item.direction, y: Math.sin(t * .22) * 7 };
-  }
-  if (route === "shark-deep") {
-    return { x: item.baseSpeed * item.direction, y: Math.sin(t * .3) * 9 };
-  }
+  if (route === "top-glide") return { x: item.baseSpeed * item.direction, y: Math.sin(t * .72) * 5.5 };
+  if (route === "mid-arc") return { x: item.baseSpeed * item.direction, y: Math.sin(t * .45) * 12 };
+  if (route === "bottom-wander") return { x: item.baseSpeed * item.direction, y: Math.sin(t * .92) * 8 + Math.sin(t * .31) * 4 };
+  if (route === "deep-curve") return { x: item.baseSpeed * item.direction, y: Math.sin(t * .34) * 15 };
+  if (route === "shark-sweep") return { x: item.baseSpeed * item.direction, y: Math.sin(t * .22) * 7 };
+  if (route === "shark-deep") return { x: item.baseSpeed * item.direction, y: Math.sin(t * .3) * 9 };
   return { x: Math.sin(t * .35) * 4, y: -item.baseSpeed + Math.sin(t * .5) * 2.2 };
 }
 
@@ -532,6 +516,10 @@ function onPointerMove(event: PointerEvent) {
   pointer.visible = true;
 }
 
+function onPointerLeave() {
+  pointer.visible = false;
+}
+
 function isUiTarget(target: EventTarget | null) {
   return target instanceof Element && Boolean(target.closest(
     "a,button,input,select,textarea,summary,[role='button'],[role='link'],[contenteditable='true'],[data-underwater-ignore]",
@@ -614,7 +602,7 @@ onMounted(() => {
   window.addEventListener("resize", resize, { passive: true });
   window.addEventListener("pointermove", onPointerMove, { passive: true });
   window.addEventListener("pointerdown", onPointerDown, { passive: true });
-  window.addEventListener("blur", () => { pointer.visible = false; });
+  window.addEventListener("blur", onPointerLeave);
   document.addEventListener("visibilitychange", sync);
   sync();
 });
@@ -626,6 +614,7 @@ onBeforeUnmount(() => {
   window.removeEventListener("resize", resize);
   window.removeEventListener("pointermove", onPointerMove);
   window.removeEventListener("pointerdown", onPointerDown);
+  window.removeEventListener("blur", onPointerLeave);
   document.removeEventListener("visibilitychange", sync);
 });
 </script>
