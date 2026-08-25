@@ -102,7 +102,7 @@ const emit = defineEmits<{
 .flat-card__checking-icon { width: 26px; height: 26px; color: var(--accent-pink); animation: flat-card-spin .8s linear infinite; }
 @keyframes flat-card-spin { to { transform: rotate(360deg); } }
 .flat-card__photo { position: relative; width: 100%; aspect-ratio: 4 / 3; flex: 0 0 auto; overflow: visible; background: var(--bg-panel); }
-.flat-card__photo::after { content: ""; position: absolute; z-index: 1; left: 0; right: 0; bottom: -30px; height: 58%; pointer-events: none; background: linear-gradient(180deg, transparent 0%, rgba(11,16,42,.20) 32%, rgba(11,16,42,.68) 72%, var(--bg-panel) 100%); -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); }
+.flat-card__photo::after { content: ""; position: absolute; z-index: 1; left: 0; right: 0; bottom: -28px; height: 48%; pointer-events: none; background: linear-gradient(180deg, transparent 0%, rgba(11,16,42,.20) 32%, rgba(11,16,42,.68) 72%, var(--bg-panel) 100%); -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); }
 .flat-card__photo > img { width: 100%; height: 100%; object-fit: cover; display: block; transition: transform 260ms ease; }
 .flat-card:hover .flat-card__photo > img { transform: scale(1.015); }
 .flat-card__no-photo { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 9px; height: 100%; color: var(--text-muted); font-size: 12px; background: var(--bg-panel-2); }
