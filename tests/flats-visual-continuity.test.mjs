@@ -9,11 +9,11 @@ test('primary flat filters keep breathing room below the divider', () => {
   assert.match(flatCss, /\.filter-primary-grid\s*\{[\s\S]*?margin-top:\s*14px/u)
 })
 
-test('flat photos blend into the card instead of ending on a hard edge', () => {
-  assert.match(card, /\.flat-card__photo \{[^}]*overflow: visible/u)
+test('flat photos keep the subtle clipped fade without backdrop blur', () => {
+  assert.match(card, /\.flat-card__photo \{[^}]*overflow: hidden/u)
   assert.match(card, /bottom: -28px; height: 48%/u)
-  assert.match(card, /backdrop-filter: blur\(6px\)/u)
-  assert.match(card, /rgba\(11,16,42,\.68\)[\s\S]*?var\(--bg-panel\) 100%/u)
-  assert.match(card, /@media \(max-width: 760px\)[\s\S]*?overflow: visible/u)
-  assert.match(card, /linear-gradient\(90deg, transparent 0%, rgba\(11,16,42,\.30\)/u)
+  assert.doesNotMatch(card, /backdrop-filter/u)
+  assert.match(card, /linear-gradient\(180deg, transparent 0%, rgba\(11,16,42,\.34\) 52%, var\(--bg-panel\) 100%\)/u)
+  assert.match(card, /@media \(max-width: 760px\)[\s\S]*?overflow: hidden/u)
+  assert.match(card, /linear-gradient\(90deg, transparent 0%, rgba\(11,16,42,\.36\) 48%, var\(--bg-panel\) 96%\)/u)
 })
