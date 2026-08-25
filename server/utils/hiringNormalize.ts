@@ -89,63 +89,6 @@ function comparableRoleText(raw: string | undefined): string {
   return cleanRole(raw).toLocaleLowerCase('ru').replace(/[^\p{L}\p{N}]+/gu, '')
 }
 
-function collectProfessions(source: string): string[] {
-  const matches: Array<{ name: string; index: number }> = []
-  for (const profession of PROFESSION_RULES) {
-    const match = profession.re.exec(source)
-    if (match?.index != null) matches.push({ name: profession.name, index: match.index })
-  }
-  matches.sort((a, b) => a.index - b.index)
-  const names = [...new Set(matches.map((item) => item.name))]
-  if (names.some((name) => SPECIFIC_MANAGER_ROLES.has(name))) {
-    const generic = names.indexOf('Manager')
-    if (generic >= 0) names.splice(generic, 1)
-  }
-  if (names.includes('Production Manager') || names.includes('Engineering Manager') || names.includes('Chief Executive Officer') || names.includes('Chief Technology Officer')) {
-    const generic = names.indexOf('General Manager')
-    if (generic >= 0) names.splice(generic, 1)
-  }
-  if (names.some((name) => SPECIFIC_DEVELOPER_ROLES.has(name))) {
-    for (const genericName of ['Software Developer', 'IT Specialist']) {
-      const generic = names.indexOf(genericName)
-      if (generic >= 0) names.splice(generic, 1)
-    }
-  }
-  if (names.some((name) => SPECIFIC_TECH_ROLES.has(name))) {
-    for (const genericName of ['Engineer', 'IT Specialist']) {
-      const generic = names.indexOf(genericName)
-      if (generic >= 0) names.splice(generic, 1)
-    }
-  }
-  if (names.includes('System Administrator')) {
-    const generic = names.indexOf('Administrator')
-    if (generic >= 0) names.splice(generic, 1)
-  }
-  if (names.includes('Fitness Trainer')) {
-    const generic = names.indexOf('Trainer / Coach')
-    if (generic >= 0) names.splice(generic, 1)
-  }
-  if (names.includes('Dentist')) {
-    const generic = names.indexOf('Doctor')
-    if (generic >= 0) names.splice(generic, 1)
-  }
-  if (names.includes('English Teacher')) {
-    const generic = names.indexOf('Teacher')
-    if (generic >= 0) names.splice(generic, 1)
-  }
-  if (names.includes('Call Center Operator') || names.includes('Chat Operator')) {
-    for (const genericName of ['Customer Support', 'Operator']) {
-      const generic = names.indexOf(genericName)
-      if (generic >= 0) names.splice(generic, 1)
-    }
-  }
-  if (names.includes('Chief Accountant')) {
-    const generic = names.indexOf('Accountant')
-    if (generic >= 0) names.splice(generic, 1)
-  }
-  return names
-}
-
 export function detectMentionedProfessions(source: string): string[] {
   return collectProfessions(source)
 }
