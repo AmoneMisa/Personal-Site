@@ -196,10 +196,10 @@ test('all three listing boards use the shared Chart.js analytics components', ()
 })
 
 test('home uses the image-free error ambience while every service gets an illustrated backdrop', () => {
-  const hero = readFileSync(new URL('../app/components/redesign/HeroSection.vue', import.meta.url), 'utf8')
+  const home = readFileSync(new URL('../app/pages/index.vue', import.meta.url), 'utf8')
   const backdrop = readFileSync(new URL('../app/components/OceanPageBackdrop.vue', import.meta.url), 'utf8')
   const serviceHeader = readFileSync(new URL('../app/components/services/ServicePageHeader.vue', import.meta.url), 'utf8')
-  assert.match(hero, /ocean-page-backdrop variant="ambient"/u)
+  assert.match(home, /ocean-page-backdrop variant="ambient"/u)
   assert.match(backdrop, /ocean-page-backdrop_ambient/u)
   assert.doesNotMatch(backdrop, /ocean-page-backdrop_ambient[^}]*url\(/u)
   assert.match(readFileSync(new URL('../app/pages/services/index.vue', import.meta.url), 'utf8'), /ocean-page-backdrop/u)
