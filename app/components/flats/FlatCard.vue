@@ -16,16 +16,48 @@ const props = defineProps<{
 }>();
 
 const { locale } = useI18n();
-const aiVisionTitle = computed(() => String(locale.value).startsWith("en")
+const isEnglish = computed(() => String(locale.value).startsWith("en"));
+const aiVisionTitle = computed(() => isEnglish.value
   ? "Detected using AI vision"
   : "Распознано при помощи AI-зрения");
 const visionLabels = computed(() => new Set(props.presentation.visionBadgeLabels || []));
-const pillItems = computed<DraggablePillItem[]>(() => props.presentation.badges.map((badge, index) => ({
-  key: `${badge}:${index}`,
-  label: badge,
-  className: visionLabels.value.has(badge) ? "flat-card__badge flat-card__badge_vision" : "flat-card__badge",
-  title: visionLabels.value.has(badge) ? aiVisionTitle.value : undefined,
-})));
+
+function suspiciousRoomShare(listing: FlatListing): boolean {
+  if (listing.potentiallyUnsafe === true) return true;
+  const text = `${listing.title || ""}\n${listing.description || ""}`;
+  const roomOnly = listing.roomOnly === true || /(?:подселени|койко[-\s]?мест|место\s+в\s+(?:комнат|квартир)|одно\s+место|1\s+место|bed\s*space|roommate|flatmate|sherik(?:ka|lik)|шерик(?:ка|лик)|(?:bitta|1)\s+joy\s+(?:bor|mavjud)|(?:битта|1)\s+жой\s+(?:бор|мавжуд))/iu.test(text);
+  if (!roomOnly) return false;
+  const oneWoman = /(?:только|нужн[а-яё]*|ищ[еу][а-яё]*|подсел[а-яё]*)[^\r\n.!?]{0,24}(?:одн(?:а|ой|у)|1)\s+(?:девушк[а-яё]*|женщин[а-яё]*)|(?:faqat\s+)?(?:1|bitta)\s+(?:qiz|ayol)(?:\s+(?:kerak|uchun))?/iu.test(text);
+  if (!oneWoman) return false;
+  const thresholds: Record<string, number> = { USD: 120, EUR: 110, UZS: 1_500_000, KZT: 55_000, UAH: 4_500, RON: 500 };
+  const limit = thresholds[String(listing.currency || "").toUpperCase()];
+  const price = Number(listing.price);
+  return limit != null && Number.isFinite(price) && price > 0 && price <= limit;
+}
+
+const unsafeListing = computed(() => suspiciousRoomShare(props.listing));
+const unsafeLabel = computed(() => isEnglish.value ? "Potentially unsafe" : "Потенциально опасное");
+const unsafeTitle = computed(() => isEnglish.value
+  ? "Unusually low-price room share seeking one woman. Verify the landlord and terms before meeting or paying."
+  : "Подселение по необычно низкой цене с поиском одной женщины. Проверьте арендодателя и условия до встречи или оплаты.");
+
+const pillItems = computed<DraggablePillItem[]>(() => {
+  const items: DraggablePillItem[] = props.presentation.badges.map((badge, index) => ({
+    key: `${badge}:${index}`,
+    label: badge,
+    className: visionLabels.value.has(badge) ? "flat-card__badge flat-card__badge_vision" : "flat-card__badge",
+    title: visionLabels.value.has(badge) ? aiVisionTitle.value : undefined,
+  }));
+  if (unsafeListing.value) {
+    items.unshift({
+      key: "potentially-unsafe",
+      label: unsafeLabel.value,
+      className: "flat-card__badge flat-card__badge_warning",
+      title: unsafeTitle.value,
+    });
+  }
+  return items;
+});
 
 const emit = defineEmits<{
   open: [];
@@ -36,7 +68,7 @@ const emit = defineEmits<{
 </script>
 
 <template>
-  <article class="flat-card" :class="{ 'flat-card_favorite': favorite, 'flat-card_hidden': hidden, 'flat-card_checking': checking }" :aria-busy="checking" @click="emit('open')">
+  <article class="flat-card" :class="{ 'flat-card_favorite': favorite, 'flat-card_hidden': hidden, 'flat-card_checking': checking, 'flat-card_warning': unsafeListing }" :aria-busy="checking" @click="emit('open')">
     <div class="flat-card__photo">
       <img v-if="photo" :src="photo" :alt="presentation.title" loading="lazy" decoding="async" referrerpolicy="no-referrer" @error="emit('photoError', $event)">
       <div v-else class="flat-card__no-photo"><u-icon name="i-lucide-image-off" class="flat-card__no-photo-icon" aria-hidden="true" /><span>{{ noPhotoLabel }}</span></div>
@@ -64,13 +96,11 @@ const emit = defineEmits<{
 <style scoped>
 .flat-card { position: relative; min-width: 0; height: 100%; align-self: stretch; border: 1px solid var(--line); border-radius: 12px; overflow: hidden; background: var(--bg-panel); cursor: pointer; transition: transform 140ms ease, border-color 180ms ease, box-shadow 180ms ease; display: flex; flex-direction: column; }
 .flat-card:hover { transform: translateY(-2px); border-color: rgba(224,103,154,0.4); box-shadow: 0 12px 30px rgba(0,0,0,.16); }
+.flat-card_warning { border-color: rgba(242,184,107,.56); box-shadow: inset 0 0 0 1px rgba(242,184,107,.08); }
 .flat-card_checking { pointer-events: none; }
 .flat-card__checking { position: absolute; z-index: 5; inset: 0; display: grid; place-content: center; justify-items: center; gap: 9px; padding: 18px; background: rgba(7,12,34,.92); color: var(--text-primary); font-size: 12.5px; font-weight: 700; text-align: center; }
 .flat-card__checking-icon { width: 26px; height: 26px; color: var(--accent-pink); animation: flat-card-spin .8s linear infinite; }
 @keyframes flat-card-spin { to { transform: rotate(360deg); } }
-/* Keep every desktop listing image in one predictable 4:3 media frame. Portrait
-   or extra-wide source photos are cropped with object-fit instead of changing
-   the height of the whole card. This matches the compact landscape card size. */
 .flat-card__photo { position: relative; width: 100%; aspect-ratio: 4 / 3; flex: 0 0 auto; overflow: hidden; background: var(--bg-panel); }
 .flat-card__photo::after { content: ""; position: absolute; z-index: 1; left: 0; right: 0; bottom: 0; height: 36%; pointer-events: none; background: linear-gradient(180deg, transparent 0%, rgba(11,16,42,.34) 52%, var(--bg-panel) 100%); }
 .flat-card__photo > img { width: 100%; height: 100%; object-fit: cover; display: block; transition: transform 260ms ease; }
@@ -86,13 +116,10 @@ const emit = defineEmits<{
 .flat-card__price { min-height: 22px; font-weight: 750; font-size: 18px; line-height: 1.2; color: var(--text-white, inherit); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
 .flat-card__price-conv { min-height: 16px; font-size: 12px; font-weight: 500; line-height: 1.35; }.flat-card__price-conv_empty { visibility: hidden; }
 .flat-card__title { min-height: 19px; margin-top: 2px; font-size: 14px; font-weight: 650; line-height: 1.36; display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical; overflow: hidden; text-overflow: ellipsis; white-space: normal; overflow-wrap: anywhere; }.flat-card__spec { min-height: 16px; font-size: 12px; line-height: 1.35; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.flat-card__badges { min-height: 27px; margin-top: 5px; }.flat-card__badges :deep(.flat-card__badge) { border-radius: 999px; padding: 4px 7px; font-size: 10.5px; font-weight: 600; line-height: 1.15; background: rgba(255,255,255,0.05); color: var(--text-primary); }.flat-card__badges :deep(.flat-card__badge_vision) { border-color: rgba(56,189,248,.36); color: #8bdcf7; background: rgba(56,189,248,.08); }
+.flat-card__badges { min-height: 27px; margin-top: 5px; }.flat-card__badges :deep(.flat-card__badge) { border-radius: 999px; padding: 4px 7px; font-size: 10.5px; font-weight: 600; line-height: 1.15; background: rgba(255,255,255,0.05); color: var(--text-primary); }.flat-card__badges :deep(.flat-card__badge_vision) { border-color: rgba(56,189,248,.36); color: #8bdcf7; background: rgba(56,189,248,.08); }.flat-card__badges :deep(.flat-card__badge_warning) { border-color: rgba(242,184,107,.52); color: #f2b86b; background: rgba(242,184,107,.1); }
 .flat-card__meta { display: flex; align-items: center; justify-content: space-between; gap: 6px 10px; margin-top: auto; padding-top: 8px; font-size: 11.5px; line-height: 1.35; }.flat-card__location { min-width: 0; display: inline-flex; align-items: center; gap: 5px; flex: 1 1 auto; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }.flat-card__meta-tail { display: inline-flex; flex: 0 0 auto; gap: 5px; white-space: nowrap; margin-left: auto; }.flat-card__src { text-transform: capitalize; opacity: 0.72; }
 .flat-card_favorite { border-color: rgba(224,103,154,0.52); }.flat-card_hidden { opacity: 0.64; border-style: dashed; }
 
-/* Phone cards are deliberately horizontal and fixed-height. The former 16:10
-   hero image consumed most of a mobile viewport, making one listing roughly
-   twice as tall as needed. */
 @media (max-width: 760px) {
   .flat-card { display: grid; grid-template-columns: minmax(118px, 40%) minmax(0, 1fr); height: 188px; min-height: 188px; }
   .flat-card__photo { width: 100%; height: 188px; min-height: 0; aspect-ratio: auto; overflow: hidden; }
