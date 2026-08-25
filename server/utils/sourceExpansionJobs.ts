@@ -1,4 +1,6 @@
+import { detectHiringLocationName } from '@whiteslove/parsing-lexicon/hiring-location-fields'
 import { parseHiringSourceSalary } from '@whiteslove/parsing-lexicon/hiring-source-semantics'
+import { parseHiringActivityDate } from '@whiteslove/parsing-lexicon/hiring-temporal'
 import type { Job } from './jobTypes'
 import { detectWorkModes } from './hiringLexicon'
 
@@ -78,26 +80,6 @@ function jobId(label: string, url: string): string {
   return `companies-${label.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-${token}`
 }
 
-function parseRelativeDate(text: string): string | null {
-  const now = Date.now()
-  if (/\b(?:сегодня|today|astăzi|azi)\b/iu.test(text)) return new Date(now).toISOString()
-  if (/\b(?:вчера|yesterday|ieri)\b/iu.test(text)) return new Date(now - 86_400_000).toISOString()
-
-  const days = text.match(/\b(\d{1,2})\s*(?:дн(?:я|ей)?|days?|zile)\s*(?:назад|ago)?\b/iu)
-  if (days) return new Date(now - Number(days[1]) * 86_400_000).toISOString()
-  const hours = text.match(/\b(\d{1,2})\s*(?:ч(?:ас(?:а|ов)?)?|hours?|hrs?)\s*(?:назад|ago)?\b/iu)
-  if (hours) return new Date(now - Number(hours[1]) * 3_600_000).toISOString()
-  return null
-}
-
-function parseDottedDate(text: string): string | null {
-  const values: number[] = []
-  for (const match of text.matchAll(/\b(\d{1,2})[./-](\d{1,2})[./-](20\d{2})\b/g)) {
-    const value = Date.UTC(Number(match[3]), Number(match[2]) - 1, Number(match[1]), 12)
-    if (Number.isFinite(value) && value <= Date.now() + 48 * 60 * 60 * 1000) values.push(value)
-  }
-  return values.length ? new Date(Math.max(...values)).toISOString() : null
-}
 
 function isRecent(date: string | null | undefined): boolean {
   if (!date) return false
@@ -154,7 +136,8 @@ function filterQuery(jobs: Job[], q: string): Job[] {
   )
 }
 
-const ISHKOP_CITIES: Array<[string, string]> = [
+// Source routing matrix: Cyrillic city slugs are part of Ishkop URLs, not semantic detection.
+const ISHKOP_CITY_ROUTES: Array<[string, string]> = [
   ['Tashkent', 'Ташкент'],
   ['Samarkand', 'Самарканд'],
   ['Bukhara', 'Бухара'],
@@ -171,7 +154,7 @@ function likelyCompany(lines: string[], title: string): string {
   const index = lines.findIndex((line) => line === title || line.includes(title))
   for (const line of lines.slice(Math.max(0, index + 1), Math.max(0, index + 5))) {
     if (line.length < 2 || line.length > 120) continue
-    if (/UZS|USD|сум|дн(?:я|ей)? назад|вчера|сегодня|Ташкент|Самарканд|Бухара|Ферган|Андижан|Наманган|Нукус|Навои|Ургенч|Карши/iu.test(line)) continue
+    if (/UZS|USD|сум/iu.test(line) || parseHiringActivityDate(line) || detectHiringLocationName(line, 'UZ')) continue
     if (/^(?:обязанности|требования|условия|скрыть|вакансия скрыта)/iu.test(line)) continue
     return line
   }
@@ -191,13 +174,11 @@ function parseIshkopPage(html: string, location: string): Job[] {
     const end = matches[i + 1]?.index ?? Math.min(html.length, start + 8_000)
     const block = html.slice(start, end)
     const text = htmlLines(block).join('\n')
-    const postedAt = parseRelativeDate(text)
+    const postedAt = parseHiringActivityDate(text)
     if (!isRecent(postedAt)) continue
     const url = absoluteUrl(match[1]!, base)
     const lines = htmlLines(block)
-    const detectedLocation = lines.find((line) =>
-      /(?:Ташкент|Самарканд|Бухар|Ферган|Андижан|Наманган|Нукус|Навои|Ургенч|Карши)(?:\b|,)/iu.test(line),
-    ) || `${location}, Uzbekistan`
+    const detectedLocation = lines.find((line) => Boolean(detectHiringLocationName(line, 'UZ'))) || `${location}, Uzbekistan`
 
     out.push({
       ...makeJob({
@@ -219,7 +200,7 @@ function parseIshkopPage(html: string, location: string): Job[] {
 
 async function fetchIshkop(): Promise<Job[]> {
   const pages = await Promise.allSettled(
-    ISHKOP_CITIES.map(async ([label, city]) => {
+    ISHKOP_CITY_ROUTES.map(async ([label, city]) => {
       const url = `https://ishkop.uz/${encodeURIComponent('вакансии')}/${encodeURIComponent(city)}`
       return parseIshkopPage(await fetchHtml(url), label)
     }),
@@ -254,14 +235,14 @@ async function fetchIshBor(): Promise<Job[]> {
     try {
       const detail = await fetchHtml(summary.url)
       detailText = htmlLines(detail).join('\n')
-      postedAt = parseDottedDate(detailText) || parseRelativeDate(detailText)
+      postedAt = parseHiringActivityDate(detailText)
     } catch {
       // Presence on the current first page is still a strong active-listing
       // signal. A detail-page failure must not discard the whole board.
     }
     if (postedAt && !isRecent(postedAt)) return null
     const lines = summary.text.split('\n').filter(Boolean)
-    const location = lines.find((line) => /Ташкент|Самарканд|Бухар|Ферган|Андижан|Наманган|Навои|Нукус|обл\./iu.test(line)) || 'Uzbekistan'
+    const location = lines.find((line) => Boolean(detectHiringLocationName(line, 'UZ'))) || 'Uzbekistan'
     return {
       ...makeJob({
         label: 'ish-bor.uz',
@@ -294,13 +275,13 @@ function parseIshPlusPage(html: string, pageUrl: string): Job[] {
     const end = matches[i + 1]?.index ?? Math.min(html.length, (match.index || 0) + 7_000)
     const block = html.slice(start, end)
     const text = htmlLines(block).join('\n')
-    const postedAt = parseDottedDate(text)
+    const postedAt = parseHiringActivityDate(text)
     if (!isRecent(postedAt)) continue
     const company = text.match(/(?:Организация|Tashkilot)\s*:\s*([^\n]{2,220})/iu)?.[1]?.trim() || 'IshPlus employer'
     const detailHref = [...block.matchAll(/<a\b[^>]*href=["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>/gi)]
       .map((item) => ({ href: item[1]!, text: stripHtml(item[2]) }))
       .find((item) => /подробнее|batafsil|details/iu.test(item.text) || /vacanc/i.test(item.href))?.href
-    const location = text.split('\n').find((line) => /Ташкент|Toshkent|Чиланзар|Юнусабад|Мирабад|Учтеп|Алмазар|Olmazor|Uchtepa|Mirobod|Chilonzor/iu.test(line)) || 'Tashkent, Uzbekistan'
+    const location = text.split('\n').find((line) => Boolean(detectHiringLocationName(line, 'UZ'))) || 'Tashkent, Uzbekistan'
     const url = detailHref ? absoluteUrl(detailHref, pageUrl) : `${pageUrl}#${encodeURIComponent(title)}`
     out.push({
       ...makeJob({

@@ -1,4 +1,6 @@
+import { detectUsLocation } from '@whiteslove/parsing-lexicon/hiring-source-semantics'
 import type { Job, SponsorshipConfidence } from './jobTypes'
+import { detectWorkModes } from './hiringLexicon'
 
 type PublicBoard = {
   label: string
@@ -94,7 +96,7 @@ function parseFlagmaVacancies(html: string, board: PublicBoard): Job[] {
         || '',
       url,
       source: 'companies',
-      remote: /удал[её]н|remote|masofaviy|la distanță/iu.test(text),
+      remote: detectWorkModes(text).includes('remote'),
       postedAt: new Date().toISOString(),
       description: lines.slice(0, 8).join(' · ').slice(0, 600),
       tags: [board.label, ...(board.country ? [board.country] : [])],
@@ -251,9 +253,6 @@ function locationFromPosting(posting: any): string {
   return 'See listing'
 }
 
-function isUsLocation(value: string): boolean {
-  return /\bunited states\b|\busa\b|\bu\.s\.?\b|\bUS(?:\s+remote)?\b|\b(?:AL|AK|AZ|AR|CA|CO|CT|DE|FL|GA|HI|ID|IL|IN|IA|KS|KY|LA|ME|MD|MA|MI|MN|MS|MO|MT|NE|NV|NH|NJ|NM|NY|NC|ND|OH|OK|OR|PA|RI|SC|SD|TN|TX|UT|VT|VA|WA|WV|WI|WY|DC)\b/i.test(value)
-}
 
 function boardTags(board: PublicBoard): string[] {
   const tags = [board.label]
@@ -299,7 +298,7 @@ function parseJsonLd(html: string, board: PublicBoard): Job[] {
       const url = absoluteUrl(String(node.url || node.sameAs || ''), board.url)
       if (!url) continue
       const location = locationFromPosting(node)
-      if (board.usOnly && !board.assumeUs && !isUsLocation(location)) continue
+      if (board.usOnly && !board.assumeUs && !detectUsLocation(location)) continue
       const company = stripHtml(node?.hiringOrganization?.name) || board.label
       const description = stripHtml(node.description)
 
