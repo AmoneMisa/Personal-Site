@@ -89,10 +89,29 @@ async function hydrateFromDb(): Promise<StoredProfile[]> {
   return restored
 }
 
+/**
+ * Community channels also publish workshops, webinars and educational events.
+ * Such posts can mention a recruiter, years of experience and AI tooling, which
+ * used to satisfy generic CV heuristics. Require two independent event signals
+ * so a real CV that merely mentions attending a course is not discarded.
+ */
+export function isCandidateEventPromotion(text: string): boolean {
+  const value = String(text || '').replace(/\s+/g, ' ').trim()
+  if (!value) return false
+  const signals = [
+    /(?:воркшоп\p{L}*|workshops?|вебінар\p{L}*|вебинар\p{L}*|webinars?|майстер[- ]?клас\p{L}*|мастер[- ]?класс\p{L}*)/iu,
+    /(?:сері(?:я|ї)\s+практичн\p{L}*|серия\s+практическ\p{L}*|що\s+буде\s+на\s+воркшоп|что\s+будет\s+на\s+воркшоп|workshop\s+(?:agenda|program))/iu,
+    /(?:\d{1,2}\s+\p{L}+\s+(?:стартує|стартует|починається|начинается)|(?:стартує|стартует|починається|начинается)\s+\d{1,2}\s+\p{L}+|starts?\s+(?:on\s+)?\d{1,2})/iu,
+    /(?:реєстрац\p{L}*|регистрац\p{L}*|register\b|квитк\p{L}*|билет\p{L}*|tickets?\b|участь\s+у\s+(?:воркшоп|вебінар))/iu,
+    /(?:проводить|проводит|спікер\p{L}*|спикер\p{L}*|speaker\b|hosted\s+by)[^.]{0,160}(?:recruit|рекрут|team\s+lead|hr\b)/iu,
+  ].filter((pattern) => pattern.test(value)).length
+  return signals >= 2
+}
+
 function isVisible(profile: StoredProfile): boolean {
   if (profile.origin === 'web') return true
   const text = `${profile.name || ''}\n${profile.role || ''}\n${profile.originalText || profile.description || ''}`
-  if (isRecruitingOpportunity(text) || isCharityAppeal(text)) return false
+  if (isRecruitingOpportunity(text) || isCandidateEventPromotion(text) || isCharityAppeal(text)) return false
   return isLikelyCvPost(text, true)
 }
 
@@ -308,7 +327,8 @@ export async function persistTelegramCandidates(
 
     for (const rawProfile of profiles) {
       const profile = repaired(rawProfile)
-      if (isRecruitingOpportunity(profile.originalText || profile.description || '')) continue
+      const sourceText = profile.originalText || profile.description || ''
+      if (isRecruitingOpportunity(sourceText) || isCandidateEventPromotion(sourceText)) continue
       const key = dedupKey(profile)
       const previous = byKey.get(key)
       const input = candidateAiInput(profile)
