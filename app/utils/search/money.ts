@@ -64,9 +64,21 @@ export function compactSalaryText(value: string): string {
     return Number.isFinite(amount) && amount >= 1_000 ? formatCompactNumber(amount) : token;
   });
   // JavaScript \b is ASCII-oriented, so use explicit Cyrillic token matching.
-  return compactNumbers
+  const compactPeriods = compactNumbers
     .replace(/месяц/giu, "м.")
     .replace(/год/giu, "г.");
+
+  const currencyCodes = Object.keys(CURRENCY_SYMBOLS).join("|");
+  const amountBeforeCurrency = new RegExp(
+    `([+-]?\\d[\\d.,]*(?:K|M|B)?(?:\\s*[–—-]\\s*[+-]?\\d[\\d.,]*(?:K|M|B)?)?)\\s+(${currencyCodes})\\b`,
+    "gi",
+  );
+  const currencyCode = new RegExp(`\\b(${currencyCodes})\\b`, "gi");
+
+  return compactPeriods
+    .replace(amountBeforeCurrency, (_match, amount: string, code: string) => `${currencySymbol(code)}${amount}`)
+    .replace(currencyCode, (code) => currencySymbol(code))
+    .replace(/([$€£])\s+(?=\d)/g, (symbol) => symbol);
 }
 
 export function convertSalaryPeriod(amount: number, from: SalaryPeriod, to: SalaryPeriod): number {
