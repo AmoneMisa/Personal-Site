@@ -1,0 +1,37 @@
+name: Refactor Telegram candidate parser
+
+on:
+  push:
+    branches:
+      - feat/shared-parsing-lexicon
+    paths:
+      - .github/workflows/refactor-telegram-candidate-shared.yml
+
+permissions:
+  contents: write
+
+jobs:
+  refactor:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/shared-parsing-lexicon
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Replace local hiring lexicon with shared semantics
+        run: python .github/scripts/refactor_telegram_candidate_shared.py
+      - name: Commit phase
+        shell: bash
+        run: |
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add server/hiring/domain/telegramCandidateParser.ts
+          if git diff --cached --quiet; then
+            echo 'No Telegram candidate changes to commit'
+            exit 0
+          fi
+          git commit -m 'refactor(hiring): share Telegram candidate semantics'
+          git push origin HEAD:feat/shared-parsing-lexicon
