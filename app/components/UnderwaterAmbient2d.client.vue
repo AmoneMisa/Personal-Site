@@ -17,39 +17,9 @@ type CreaturePreset = {
 };
 
 const creatures: CreaturePreset[] = [
-  {
-    id: "shark",
-    src: "/images/ocean-creatures/shark.webp",
-    kind: "shark",
-    top: "20%",
-    size: "clamp(190px, 18vw, 330px)",
-    duration: "30s",
-    delay: "-9s",
-    direction: "rtl",
-    opacity: 0.97,
-  },
-  {
-    id: "fish-blue",
-    src: "/images/ocean-creatures/fish-blue.webp",
-    kind: "fish",
-    top: "42%",
-    size: "clamp(105px, 9vw, 165px)",
-    duration: "19s",
-    delay: "-3s",
-    direction: "ltr",
-    opacity: 0.93,
-  },
-  {
-    id: "fish-coral",
-    src: "/images/ocean-creatures/fish-coral.webp",
-    kind: "fish",
-    top: "69%",
-    size: "clamp(98px, 8.5vw, 155px)",
-    duration: "23s",
-    delay: "-14s",
-    direction: "rtl",
-    opacity: 0.88,
-  },
+  { id: "shark", src: "/images/ocean-creatures/shark.webp", kind: "shark", top: "20%", size: "clamp(190px, 18vw, 330px)", duration: "30s", delay: "-9s", direction: "rtl", opacity: 0.97 },
+  { id: "fish-blue", src: "/images/ocean-creatures/fish-blue.webp", kind: "fish", top: "42%", size: "clamp(105px, 9vw, 165px)", duration: "19s", delay: "-3s", direction: "ltr", opacity: 0.93 },
+  { id: "fish-coral", src: "/images/ocean-creatures/fish-coral.webp", kind: "fish", top: "69%", size: "clamp(98px, 8.5vw, 155px)", duration: "23s", delay: "-14s", direction: "rtl", opacity: 0.88 },
   {
     // The old fish-fancy file contains baked rendering artefacts. Reuse the
     // clean blue fish with a colour shift until a clean source export exists.
@@ -64,50 +34,10 @@ const creatures: CreaturePreset[] = [
     opacity: 0.84,
     filter: "hue-rotate(54deg) saturate(1.12)",
   },
-  {
-    id: "seahorse",
-    src: "/images/ocean-creatures/seahorse.webp",
-    kind: "seahorse",
-    top: "55%",
-    size: "clamp(70px, 5.6vw, 112px)",
-    duration: "34s",
-    delay: "-21s",
-    direction: "rtl",
-    opacity: 0.9,
-  },
-  {
-    id: "puffer",
-    src: "/images/ocean-creatures/puffer.webp",
-    kind: "puffer",
-    top: "78%",
-    size: "clamp(82px, 7vw, 130px)",
-    duration: "27s",
-    delay: "-11s",
-    direction: "ltr",
-    opacity: 0.9,
-  },
-  {
-    id: "jelly-blue",
-    src: "/images/ocean-creatures/jelly-blue.webp",
-    kind: "jelly",
-    top: "14%",
-    size: "clamp(82px, 6.5vw, 126px)",
-    duration: "38s",
-    delay: "-28s",
-    direction: "ltr",
-    opacity: 0.76,
-  },
-  {
-    id: "jelly-pink",
-    src: "/images/ocean-creatures/jelly-pink.webp",
-    kind: "jelly",
-    top: "62%",
-    size: "clamp(76px, 6vw, 118px)",
-    duration: "41s",
-    delay: "-6s",
-    direction: "rtl",
-    opacity: 0.72,
-  },
+  { id: "seahorse", src: "/images/ocean-creatures/seahorse.webp", kind: "seahorse", top: "55%", size: "clamp(70px, 5.6vw, 112px)", duration: "34s", delay: "-21s", direction: "rtl", opacity: 0.9 },
+  { id: "puffer", src: "/images/ocean-creatures/puffer.webp", kind: "puffer", top: "78%", size: "clamp(82px, 7vw, 130px)", duration: "27s", delay: "-11s", direction: "ltr", opacity: 0.9 },
+  { id: "jelly-blue", src: "/images/ocean-creatures/jelly-blue.webp", kind: "jelly", top: "14%", size: "clamp(82px, 6.5vw, 126px)", duration: "38s", delay: "-28s", direction: "ltr", opacity: 0.76 },
+  { id: "jelly-pink", src: "/images/ocean-creatures/jelly-pink.webp", kind: "jelly", top: "62%", size: "clamp(76px, 6vw, 118px)", duration: "41s", delay: "-6s", direction: "rtl", opacity: 0.72 },
 ];
 
 const swimmerElements = new Map<string, HTMLElement>();
@@ -116,7 +46,7 @@ let pointerY = -10_000;
 let reactionRaf = 0;
 let reducedMotion: MediaQueryList | null = null;
 
-function bindSwimmer(id: string, element: Element | null) {
+function bindSwimmer(id: string, element: unknown) {
   if (element instanceof HTMLElement) swimmerElements.set(id, element);
   else swimmerElements.delete(id);
 }
@@ -226,7 +156,7 @@ onBeforeUnmount(() => {
     <div
       v-for="creature in creatures"
       :key="creature.id"
-      :ref="(element) => bindSwimmer(creature.id, element as Element | null)"
+      :ref="(element) => bindSwimmer(creature.id, element)"
       class="underwater-2d__swimmer"
       :class="[
         `underwater-2d__swimmer_${creature.direction}`,
@@ -337,8 +267,8 @@ onBeforeUnmount(() => {
   filter: var(--creature-filter);
 }
 
-/* Remove the detached auxiliary pieces that were baked into two generated
-   sheets. This crops a single intact sprite; it does not duplicate the image. */
+/* Remove detached auxiliary pieces baked into two generated sheets. This crops
+   a single intact sprite; the image is never duplicated into fake body parts. */
 .underwater-2d__swimmer_shark .underwater-2d__crop {
   clip-path: inset(0 7% 0 0 round 2px);
 }
@@ -348,7 +278,7 @@ onBeforeUnmount(() => {
 }
 
 .underwater-2d__creature_fish {
-  animation: ocean-fish-swim 0.92s ease-in-out infinite alternate;
+  animation: ocean-fish-swim .92s ease-in-out infinite alternate;
 }
 
 .underwater-2d__creature_shark {
