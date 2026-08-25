@@ -1,0 +1,68 @@
+name: Remove final consumer skill matcher
+
+on:
+  push:
+    branches:
+      - cleanup/final-hiring-fields
+    paths:
+      - '.github/workflows/final-contextual-skill-cleanup.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Delegate contextual skills to lexicon
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          path = Path('server/utils/enrich.ts')
+          text = path.read_text()
+          start = text.find('// Most skills use literal Unicode-aware aliases from shared/jobSkills.')
+          end = text.find('// ---- "Will be a plus" (nice to have) ----', start)
+          if start < 0 or end < 0:
+              raise SystemExit('contextual skill block markers missing')
+          text = text[:start] + text[end:]
+          old = '  const allSkillDetails = matchSkillDetails(text)\n'
+          new = '  const allSkillDetails = extractSkillDetails(text)\n'
+          if text.count(old) != 1:
+              raise SystemExit(f'matchSkillDetails call count {text.count(old)}')
+          path.write_text(text.replace(old, new, 1))
+          PY
+
+      - name: Refresh dependency lock
+        run: npm install --ignore-scripts
+
+      - name: Run full tests
+        run: npm test
+
+      - name: Build site
+        run: npm run build
+
+      - name: Verify final boundary
+        shell: bash
+        run: |
+          grep -q 'a9a41500223d03636d6ee642cab47baa5efe0089' package-lock.json
+          ! grep -q 'contextualSkillNames' server/utils/enrich.ts
+          ! grep -q 'matchSkillDetails' server/utils/enrich.ts
+          ! grep -q 'onboarding funnel' server/utils/enrich.ts
+          ! grep -q 'cross[- ]function' server/utils/enrich.ts
+
+      - name: Commit and remove temporary workflow
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git rm .github/workflows/final-contextual-skill-cleanup.yml
+          git add package-lock.json server/utils/enrich.ts
+          git commit -m "refactor: delegate contextual skill matching"
+          git push
