@@ -1,6 +1,7 @@
-import { CITIES as PARSING_CITIES, aliasesOf } from '@whiteslove/parsing-lexicon'
+import { GEOGRAPHY_CITIES, aliasesOf, canonicalAnyCity } from '@whiteslove/parsing-lexicon'
 import { HIRING_COUNTRIES } from './hiring/hiringMarkets'
 
+// Presentation labels only. Parser aliases live exclusively in @whiteslove/parsing-lexicon.
 export const CITY_LABELS_RU: Record<string, string> = {
   Tashkent: 'Ташкент', Samarkand: 'Самарканд', Bukhara: 'Бухара', Namangan: 'Наманган',
   Andijan: 'Андижан', Fergana: 'Фергана', Nukus: 'Нукус', Navoi: 'Навои', Navoiy: 'Навои', Jizzakh: 'Джизак',
@@ -9,64 +10,47 @@ export const CITY_LABELS_RU: Record<string, string> = {
   Surkhandarya: 'Сурхандарья', Syrdarya: 'Сырдарья', Khorezm: 'Хорезм',
   Almaty: 'Алматы', Astana: 'Астана', Shymkent: 'Шымкент', Karaganda: 'Караганда',
   Aktobe: 'Актобе', Atyrau: 'Атырау', Oral: 'Уральск', Taraz: 'Тараз', Pavlodar: 'Павлодар',
-  Semey: 'Семей', Kostanay: 'Костанай', Kyzylorda: 'Кызылорда', Aktau: 'Актау',
+  Semey: 'Семей', Kostanay: 'Костанай', Kyzylorda: 'Кызылорда', Aktau: 'Актау', Oskemen: 'Усть-Каменогорск',
   Kyiv: 'Киев', Lviv: 'Львов', Odesa: 'Одесса', Kharkiv: 'Харьков', Dnipro: 'Днепр',
   Vinnytsia: 'Винница', 'Ivano-Frankivsk': 'Ивано-Франковск', Lutsk: 'Луцк', Chernivtsi: 'Черновцы',
   Zaporizhzhia: 'Запорожье', Poltava: 'Полтава', Rivne: 'Ровно', Ternopil: 'Тернополь',
   Uzhhorod: 'Ужгород', Khmelnytskyi: 'Хмельницкий', Zhytomyr: 'Житомир', Cherkasy: 'Черкассы',
   Chernihiv: 'Чернигов', Sumy: 'Сумы', Mykolaiv: 'Николаев', Kropyvnytskyi: 'Кропивницкий',
   Bucharest: 'Бухарест', 'Cluj-Napoca': 'Клуж-Напока', Timisoara: 'Тимишоара',
-  Iasi: 'Яссы', Brasov: 'Брашов', Constanta: 'Констанца', Oradea: 'Орадя',
+  Iasi: 'Яссы', Brasov: 'Брашов', Constanta: 'Констанца', Oradea: 'Орадя', Sibiu: 'Сибиу',
 }
 
-const SHARED_CITY_ALIASES: Record<string, string[]> = Object.fromEntries(
-  PARSING_CITIES.map((city) => [normalizeCityValue(city.canonical), aliasesOf(city)]),
+export function normalizeCityValue(value: string): string {
+  return value.trim().toLocaleLowerCase('ru').replace(/ё/g, 'е')
+}
+
+const PARSING_CITY_BY_KEY = new Map(
+  GEOGRAPHY_CITIES.map((city) => [normalizeCityValue(city.canonical), city] as const),
 )
-
-const CITY_ALIASES: Record<string, string[]> = {
-  kyiv: ['kyiv', 'kiev', 'киев', 'київ'],
-  lviv: ['lviv', 'львов', 'львів'],
-  odesa: ['odesa', 'odessa', 'одесса', 'одеса'],
-  kharkiv: ['kharkiv', 'kharkov', 'харьков', 'харків'],
-  dnipro: ['dnipro', 'днепр', 'дніпро'],
-  vinnytsia: ['vinnytsia', 'vinnitsa', 'винница', 'вінниця'],
-  zaporizhzhia: ['zaporizhzhia', 'zaporozhye', 'запорожье', 'запоріжжя'],
-  bishkek: ['bishkek', 'бишкек'],
-  osh: ['osh', 'ош'],
-  karakol: ['karakol', 'каракол'],
-  bucharest: ['bucharest', 'bucuresti', 'bucurești', 'бухарест'],
-  'cluj-napoca': ['cluj-napoca', 'cluj napoca', 'cluj', 'клуж-напока', 'клуж'],
-  iasi: ['iasi', 'iași', 'яссы'],
-  timisoara: ['timisoara', 'timișoara', 'тимишоара'],
-  brasov: ['brasov', 'brașov', 'брашов'],
-  ...SHARED_CITY_ALIASES,
-}
-
 const CITY_LABELS = new Map(
-  [...Object.keys(CITY_LABELS_RU), ...HIRING_COUNTRIES.flatMap((country) => country.cities || [])]
+  [...Object.keys(CITY_LABELS_RU), ...HIRING_COUNTRIES.flatMap((country) => country.cities || []), ...GEOGRAPHY_CITIES.map((city) => city.canonical)]
     .map((city) => [normalizeCityValue(city), city] as const),
 )
 const LOCALIZED_CITY_KEYS = new Map(
   Object.entries(CITY_LABELS_RU).map(([city, label]) => [normalizeCityValue(label), normalizeCityValue(city)]),
 )
 
-export function normalizeCityValue(value: string): string {
-  return value.trim().toLocaleLowerCase('ru').replace(/ё/g, 'е')
-}
-
 export function canonicalCityKey(value: string): string {
+  const shared = canonicalAnyCity(value)
+  if (shared) return normalizeCityValue(shared)
   const normalized = normalizeCityValue(value)
-  for (const [canonical, aliases] of Object.entries(CITY_ALIASES)) {
-    if (aliases.some((alias) => normalizeCityValue(alias) === normalized)) return canonical
-  }
   return LOCALIZED_CITY_KEYS.get(normalized) || normalized
 }
 
 export function cityAliases(value: string): string[] {
-  return CITY_ALIASES[canonicalCityKey(value)] || [value]
+  const key = canonicalCityKey(value)
+  const entity = PARSING_CITY_BY_KEY.get(key)
+  return entity ? [...new Set([entity.canonical, ...aliasesOf(entity)])] : [value]
 }
 
 export function canonicalCityValue(value: string): string {
+  const shared = canonicalAnyCity(value)
+  if (shared) return shared
   const canonical = canonicalCityKey(value)
   return CITY_LABELS.get(canonical) || value.trim()
 }
