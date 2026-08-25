@@ -199,7 +199,7 @@ function openCard() {
       <p v-if="profile.name && profile.role" class="hiring-card__role">{{ profile.role }}</p>
     </header>
 
-    <div v-if="salaryAmounts.length" class="hiring-card__salary" :title="salaryAmounts.map((item) => item.label).join(' · ')">
+    <div v-if="salaryAmounts.length" class="hiring-card__salary" :title="salaryAmounts.map((item) => item.label).join(' ')">
       <span v-for="item in salaryAmounts" :key="item.currency || item.label" class="hiring-card__salary-item">
         {{ item.label }}
       </span>
@@ -376,11 +376,6 @@ function openCard() {
   min-width: 0;
   max-width: 100%;
   overflow-wrap: anywhere;
-}
-.hiring-card__salary-item + .hiring-card__salary-item::before {
-  content: '·';
-  margin-right: 6px;
-  color: rgba(241, 166, 198, 0.56);
 }
 .hiring-card__metadata {
   display: flex;
