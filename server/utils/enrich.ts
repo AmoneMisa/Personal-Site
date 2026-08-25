@@ -15,6 +15,7 @@ import type {
   WorkMode,
 } from './jobTypes'
 import { toUsd } from './currency'
+import { parseHiringSalary } from './hiringLexicon'
 import {
   extractSkillDetails,
   extractSkillNames,
@@ -77,7 +78,7 @@ export function cleanText(raw: string | undefined): string {
 // stats/sort compare like-for-like. PER_YEAR is the multiplier that turns an
 // amount at the given period into a yearly amount (160 work hours/month assumed).
 export const HOURS_PER_MONTH = 160
-export const PER_YEAR: Record<SalaryPeriod, number> = {
+export const PER_YEAR: Partial<Record<SalaryPeriod, number>> = {
   hour: 12 * HOURS_PER_MONTH, // 1920
   month: 12,
   year: 1,
@@ -88,103 +89,21 @@ type ExtractedSalary = Pick<
   'salaryMin' | 'salaryMax' | 'salaryCurrency' | 'salaryPeriod'
 >
 
-const SALARY_CONTEXT_RE =
-  /salary|compensation|pay range|base pay|remuneration|зарплат|оплат[аы]|оклад|доход|вилка|ставка|maosh|маош/i
-const MONEY_RE =
-  /([$€£₴])?\s*(\d{1,3}(?:[,\s.]\d{3})+(?:[.,]\d+)?|\d+(?:[.,]\d+)?\s*[kк]|\d{4,9})(?:\s*(USD|EUR|GBP|UAH|UZS|KZT|KGS|TJS|TMT|PLN|RON|MDL|GEL|AMD|AZN|TRY|CAD|CHF))?/gi
-
-function salaryCurrency(text: string): string | undefined {
-  const aliases: [RegExp, string][] = [
-    [/\bUSD\b|\$|доллар/i, 'USD'],
-    [/\bEUR\b|€/i, 'EUR'],
-    [/\bGBP\b|£/i, 'GBP'],
-    [/\bUAH\b|₴|грн/i, 'UAH'],
-    [/\bUZS\b|с[уў]м|so['’]?m/i, 'UZS'],
-    [/\bKZT\b|тенге/i, 'KZT'],
-    [/\bKGS\b|киргизск\w*\s+сом/i, 'KGS'],
-    [/\bTJS\b|сомон/i, 'TJS'],
-    [/\bTMT\b|манат/i, 'TMT'],
-    [/\bPLN\b|zł/i, 'PLN'],
-    [/\bRON\b|\blei\b/i, 'RON'],
-  ]
-  return aliases.find(([pattern]) => pattern.test(text))?.[1]
-}
-
-function salaryAmount(raw: string): number | undefined {
-  const compact = raw.replace(/\s+/g, '').toLowerCase()
-  const thousands = /[kк]$/.test(compact)
-  const numeric = compact.replace(/[kк]$/, '')
-  let parsed: number
-  if (thousands) {
-    parsed = Number.parseFloat(numeric.replace(',', '.')) * 1000
-  } else if (/^\d{1,3}([,.])\d{3}(?:\1\d{3})*(?:[,.]\d+)?$/.test(numeric)) {
-    parsed = Number(numeric.replace(/[,.]/g, ''))
-  } else {
-    parsed = Number(numeric.replace(',', '.'))
-  }
-  return Number.isFinite(parsed) && parsed > 0 ? Math.round(parsed) : undefined
-}
-
 function explicitSalaryPeriod(text: string): SalaryPeriod | undefined {
-  if (/per hour|\/\s?h(ou)?r\b|hourly|\bp\/h\b|в час|за час|годину|годин\b/i.test(text)) return 'hour'
-  if (/per month|monthly|\/\s?mo(nth)?\b|в месяц|на месяц|в мес\b|у місяць/i.test(text)) return 'month'
-  if (/per year|yearly|annual(ly)?|per annum|\bp\.?a\.?\b|\/\s?y(ea)?r\b|в год|на год|у рік|за рік/i.test(text)) {
-    return 'year'
-  }
-  return undefined
+  return parseHiringSalary(text)?.period || undefined
 }
 
-/** Infer a salary range from salary/compensation sentences in a description. */
+/** Infer a salary range from free text using the shared multilingual money parser. */
 export function extractSalaryFromText(raw: string | undefined): ExtractedSalary {
   if (!raw) return {}
-  const text = cleanText(raw)
-  const segments = text.split(/(?<=[.!?])\s+/).filter((segment) => SALARY_CONTEXT_RE.test(segment))
-
-  for (const segment of segments) {
-    const currency = salaryCurrency(segment)
-    if (!currency) continue
-    const amounts = [...segment.matchAll(MONEY_RE)]
-      .map((match) => salaryAmount(match[2] || ''))
-      .filter((amount): amount is number => amount !== undefined)
-    if (!amounts.length) continue
-
-    const first = amounts[0]!
-    const second = amounts[1]
-    const period = explicitSalaryPeriod(segment)
-    if (second !== undefined) {
-      return {
-        salaryMin: Math.min(first, second),
-        salaryMax: Math.max(first, second),
-        salaryCurrency: currency,
-        salaryPeriod: period,
-      }
-    }
-    if (/up to|maximum|max\.?|до\s/i.test(segment)) {
-      return { salaryMax: first, salaryCurrency: currency, salaryPeriod: period }
-    }
-    return { salaryMin: first, salaryCurrency: currency, salaryPeriod: period }
+  const parsed = parseHiringSalary(cleanText(raw))
+  if (!parsed || (parsed.min == null && parsed.max == null)) return {}
+  return {
+    salaryMin: parsed.min ?? undefined,
+    salaryMax: parsed.max ?? undefined,
+    salaryCurrency: parsed.currency ?? undefined,
+    salaryPeriod: parsed.period ?? undefined,
   }
-
-  // Fallback: an explicit currency range like "$155,600 - $306,800" is almost
-  // always pay even without a salary keyword nearby. Require two grouped/4+ digit
-  // amounts sharing a currency symbol so ordinary money mentions don't match.
-  const range = text.match(
-    /([$€£])\s?(\d{1,3}(?:,\d{3})+|\d{4,})(?:\.\d+)?\s*(?:[-–—]|to)\s*\$?\s?(\d{1,3}(?:,\d{3})+|\d{4,})(?:\.\d+)?/,
-  )
-  if (range) {
-    const currency = range[1] === '$' ? 'USD' : range[1] === '€' ? 'EUR' : 'GBP'
-    const lo = salaryAmount(range[2]!)
-    const hi = salaryAmount(range[3]!)
-    if (lo && hi) {
-      return {
-        salaryMin: Math.min(lo, hi),
-        salaryMax: Math.max(lo, hi),
-        salaryCurrency: currency,
-        salaryPeriod: explicitSalaryPeriod(text),
-      }
-    }
-  }
-  return {}
 }
 
 // Sources that quote monthly salaries by convention (CIS boards) when text gives
@@ -210,8 +129,9 @@ function salaryUsd(job: Job, period: SalaryPeriod): number | undefined {
   const lo = toUsd(job.salaryMin, job.salaryCurrency)
   const hi = toUsd(job.salaryMax, job.salaryCurrency)
   const mid = lo && hi ? (lo + hi) / 2 : lo || hi
-  if (!mid) return undefined
-  return Math.round(mid * PER_YEAR[period])
+  const factor = PER_YEAR[period]
+  if (!mid || !factor) return undefined
+  return Math.round(mid * factor)
 }
 
 // ---- Country detection from location text ----
