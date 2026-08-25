@@ -1,9 +1,11 @@
 // Source adapters. Each fetches from a job API/feed and normalizes to Job[].
 // Failures in one source never break the others (handled by the route).
 
+import { parseHiringSourceSalary } from '@whiteslove/parsing-lexicon/hiring-source-semantics'
 import { XMLParser } from 'fast-xml-parser'
 import type { Job } from './jobTypes'
 import { extractSalaryFromText } from './enrich'
+import { detectWorkModes } from './hiringLexicon'
 
 const UA = 'jobFinder/1.0 (job aggregator; contact: admin@whiteslove.me)'
 
@@ -131,7 +133,7 @@ export async function fetchTheMuse(q: string): Promise<Job[]> {
         location: locations.join(', ') || 'Unknown',
         url: j.refs?.landing_page || '',
         source: 'themuse',
-        remote: locations.some((l: string) => /remote|flexible/i.test(l)),
+        remote: locations.some((l: string) => detectWorkModes(l).includes('remote')),
         tags: (j.categories || []).map((c: any) => c.name).slice(0, 6),
         postedAt: new Date(j.publication_date).toISOString(),
         employmentType: j.type,
@@ -185,7 +187,7 @@ export async function fetchAdzuna(q: string): Promise<Job[]> {
     location: j.location?.display_name || 'Unknown',
     url: j.redirect_url,
     source: 'adzuna' as const,
-    remote: /remote/i.test(j.title + ' ' + (j.location?.display_name || '')),
+    remote: detectWorkModes(j.title + ' ' + (j.location?.display_name || '')).includes('remote'),
     tags: j.category?.label ? [j.category.label] : [],
     postedAt: new Date(j.created).toISOString(),
     employmentType: j.contract_time,
@@ -209,60 +211,15 @@ const JOOBLE_DEFAULT_LOCATIONS = [
   'Ukraine',
 ]
 
-// Parse one money token + optional multiplier suffix into an absolute number.
-// CIS salary posts quote whole amounts, so "." "," and spaces are THOUSANDS
-// separators ("6,000,000" / "6 000 000" -> 6000000). "к"/"k"/"тыс" = x1e3,
-// "кк"/"kk"/"млн" = x1e6 ("6кк" -> 6000000). "1,5 млн" is treated as decimal.
-function parseAmountLoose(numStr: string, suffix?: string): number | undefined {
-  const s = (suffix ?? '').toLowerCase()
-  const mult = /^(кк|kk|млн|mln)$/.test(s) ? 1_000_000 : /^(к|k|тыс|ming)$/.test(s) ? 1_000 : 1
-  const digits = numStr.replace(/\s/g, '')
-  let base: number
-  if (/^\d{1,3}([.,])\d{3}(?:\1\d{3})*$/.test(digits)) {
-    base = Number(digits.replace(/[.,]/g, '')) // grouped thousands
-  } else if (mult > 1 && /^\d+[.,]\d{1,2}$/.test(digits)) {
-    base = Number(digits.replace(',', '.')) // "1,5 млн" -> 1.5
-  } else {
-    base = Number(digits.replace(/[.,]/g, ''))
-  }
-  const n = Math.round(base * mult)
-  return Number.isFinite(n) && n > 0 ? n : undefined
-}
-
-// Currency-anchored salary extraction. A number counts as pay only when it sits
-// next to a currency symbol/word, so stray numbers (phone numbers, "1 year
-// experience", URL ids) are never mistaken for salary. Handles "$60,000 USD",
-// "6 000 000 сум", "від 6кк до 10кк сум", "6 000 - 10 000 KGS", etc.
-const SYMBOL_CUR: Record<string, string> = { '$': 'USD', '€': 'EUR', '£': 'GBP', '₴': 'UAH', '₸': 'KZT' }
-const WORD_CUR: [RegExp, string][] = [
-  [/^(USD|доллар\w*|у\.?е\.?)$/i, 'USD'], [/^(EUR|евро)$/i, 'EUR'], [/^GBP$/i, 'GBP'],
-  [/^(UAH|грн\w*|гривн\w*)$/i, 'UAH'], [/^(UZS|сум\w*|so['’]?m)$/i, 'UZS'],
-  [/^(KZT|тенге|тг\.?)$/i, 'KZT'], [/^(KGS|сом)$/i, 'KGS'], [/^(TJS|сомони)$/i, 'TJS'],
-  [/^(TMT|манат\w*)$/i, 'TMT'], [/^(PLN|zł|злот\w*)$/i, 'PLN'], [/^(RON|lei)$/i, 'RON'],
-]
-// Resolve a matched currency token (symbol or word) to its ISO code.
-function curOf(token: string | undefined): string | undefined {
-  if (!token) return undefined
-  if (SYMBOL_CUR[token]) return SYMBOL_CUR[token]
-  for (const [re, code] of WORD_CUR) if (re.test(token)) return code
-  return undefined
-}
-// symbol? num [suffix] [ (-|—|до|to) num [suffix] ] currency-word?
-const SALARY_MONEY_RE =
-  /(?:([$€£₴₸])\s*)?(\d[\d\s.,]*\d|\d)(?:\s*(кк|kk|млн|mln|к|k|тыс|ming)(?![A-Za-z]))?(?:\s*(?:[-–—…]{1,3}|до|to)\s*(\d[\d\s.,]*\d|\d)(?:\s*(кк|kk|млн|mln|к|k|тыс|ming)(?![A-Za-z]))?)?\s*(USD|EUR|GBP|UAH|UZS|KZT|KGS|TJS|TMT|PLN|RON|сум\w*|so['’]?m|тенге|тг\.?|сомони|сом|манат\w*|грн\w*|гривн\w*|zł|злот\w*|lei|евро|доллар\w*|у\.?е\.?|[$€£₴₸])?/gi
-
+// Jooble has its own response field, but money semantics are shared.
 function parseJoobleSalary(value: unknown): Pick<Job, 'salaryMin' | 'salaryMax' | 'salaryCurrency'> {
-  if (typeof value !== 'string' || !value.trim()) return {}
-  const text = value.replace(/\u00a0/g, ' ')
-  for (const m of text.matchAll(SALARY_MONEY_RE)) {
-    const currency = curOf(m[1] || m[6])
-    if (!currency) continue // a number with no currency anchor is not a salary
-    const lo = parseAmountLoose(m[2]!, m[3])
-    const hi = m[4] ? parseAmountLoose(m[4], m[5]) : undefined
-    if (lo === undefined && hi === undefined) continue
-    return { salaryMin: lo, salaryMax: hi, salaryCurrency: currency }
+  const parsed = parseHiringSourceSalary(value)
+  if (!parsed || (parsed.min == null && parsed.max == null) || !parsed.currency) return {}
+  return {
+    salaryMin: parsed.min ?? undefined,
+    salaryMax: parsed.max ?? undefined,
+    salaryCurrency: parsed.currency,
   }
-  return {}
 }
 
 export async function fetchJooble(q: string): Promise<Job[]> {
@@ -305,7 +262,7 @@ export async function fetchJooble(q: string): Promise<Job[]> {
       location: j.location || 'Unknown',
       url: j.link,
       source: 'jooble',
-      remote: /remote|удал[её]н|дистанцион/i.test(`${j.title} ${j.location || ''} ${description}`),
+      remote: detectWorkModes(`${j.title} ${j.location || ''} ${description}`).includes('remote'),
       tags: [j.type, j.source].filter(Boolean).slice(0, 6),
       postedAt: j.updated ? new Date(j.updated).toISOString() : new Date().toISOString(),
       employmentType: j.type || undefined,

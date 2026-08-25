@@ -3,6 +3,14 @@
 // from title + description + tags (EN/RU/UK/UZ keywords). Results are approximate
 // and meant to power filtering and statistics, not to be authoritative.
 
+import {
+  detectRecruitmentAgency,
+  extractNiceToHaveContext,
+} from '@whiteslove/parsing-lexicon/hiring-source-semantics'
+import {
+  isHiringNonCityLocation,
+  isHiringRemoteLocationScope,
+} from '@whiteslove/parsing-lexicon/hiring-location-fields'
 import { extractHiringDeadline } from '@whiteslove/parsing-lexicon/hiring-temporal'
 import {
   detectApplicationLanguage as detectSharedApplicationLanguage,
@@ -162,7 +170,7 @@ export function resolveCountry(text: string): string | undefined {
 
 function detectCountry(job: Job): string {
   const loc = (job.location || '').trim()
-  if (/worldwide|anywhere|global|remote/i.test(loc) && !/[,]/.test(loc)) return 'REMOTE'
+  if (isHiringRemoteLocationScope(loc) || detectWorkModes(loc).includes('remote')) return 'REMOTE'
   // Prefer the location field; but many boards (notably DOU.ua) leave it as a
   // placeholder like "See listing" and only name the city/country in the title,
   // so fall back to the title + tags before giving up.
@@ -179,7 +187,7 @@ function detectCountry(job: Job): string {
 function detectCity(job: Job, country: string): string | undefined {
   const first = cleanText(job.location).split(/[,|·]/)[0]?.trim()
   if (!first || first.length > 80) return undefined
-  if (/^(remote|worldwide|anywhere|global|other|see listing)$/i.test(first)) return undefined
+  if (isHiringNonCityLocation(first) || detectWorkModes(first).includes('remote') || /^(?:other|see listing)$/i.test(first)) return undefined
   const knownCity = detectLexiconCity(first, country)
   if (resolveCountry(first) === country && !knownCity) return undefined
   return knownCity || first
@@ -314,7 +322,7 @@ const BOARD_SOURCES = new Set<Job['source']>([
 function detectEmployerType(job: Job, text: string): EmployerType {
   if (job.source === 'telegram') return 'telegram'
   const agencyText = `${job.company} ${text.slice(0, 600)}`
-  if (/recruit(?:ment|ing) agency|staffing agency|talent agency|кадров(?:ое|е) агентство|рекрут(?:ингов|инг)\w* агентство|агентство по подбору/i.test(agencyText)) return 'agency'
+  if (detectRecruitmentAgency(agencyText)) return 'agency'
   if (BOARD_SOURCES.has(job.source)) return 'board'
   return 'direct'
 }
@@ -334,17 +342,9 @@ function detectLanguages(text: string): LanguageReq[] {
 }
 
 // ---- "Will be a plus" (nice to have) ----
-const PLUS_MARKERS =
-  /(will be a plus|is a plus|as a plus|nice to have|would be a plus|plus:|плюсом|будет плюсом|буде плюсом|перевагою|преимуществом|will be an advantage)/i
-
 function detectNiceToHave(text: string): string[] {
-  const m = PLUS_MARKERS.exec(text)
-  if (!m) return []
-  // Take a window after the marker and match skills within it.
-  const seg = text.slice(m.index, m.index + 220)
-  const inSeg = extractSkillNames(seg)
-  // Only skills that appear in the plus-segment (nice-to-have, not core).
-  return inSeg
+  const segment = extractNiceToHaveContext(text, 220)
+  return segment ? extractSkillNames(segment) : []
 }
 
 const TOOL_SUBCATEGORIES = /Databases|DevOps|Productivity|Spreadsheets|UI & UX|CRM|Accounting Software|CAD|Retail, POS|Low Code|Analytics & AI|QA & Security/i

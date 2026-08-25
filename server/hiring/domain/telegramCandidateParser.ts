@@ -1,3 +1,4 @@
+import { extractCandidateStructuredField } from '@whiteslove/parsing-lexicon/hiring-source-semantics'
 import type { CvProfile } from '../../../shared/contracts/hiring'
 import type { HiringTelegramChannelDescriptor } from '../../../shared/hiring/sources/telegramChannels'
 import { extractCandidateName } from '../../utils/hiringCandidateFields'
@@ -115,7 +116,7 @@ function parseRole(text: string): string {
 }
 
 function parseSkills(text: string): string[] {
-  const skillsLine = field(text, "skills|навыки|навички|умею|стек|stack|technologies|texnologiyalar|ko['’]nikmalar")
+  const skillsLine = extractCandidateStructuredField(text, 'skills', 500)
   if (!skillsLine) return []
   return [...new Set(skillsLine.split(/[,;/|•·]+/).map((item) => item.trim()).filter((item) => item.length >= 2 && item.length <= 60))].slice(0, 20)
 }
@@ -133,7 +134,7 @@ function parseLanguages(text: string): string[] {
       return level ? `${item.name} — ${level}` : item.name
     })
   }
-  const raw = field(text, 'languages|языки|мови|til(?:lar)?|language skills') || blockAfter(text, 'languages|языки|мови|til(?:lar)?')
+  const raw = extractCandidateStructuredField(text, 'languages', 500) || blockAfter(text, 'languages|языки|мови|til(?:lar)?')
   return raw ? raw.split(/[,;/|•·]+/).map((item) => item.trim()).filter(Boolean).slice(0, 8) : []
 }
 
@@ -181,16 +182,21 @@ export function telegramMessageToProfile(
   const skills = parseSkills(text)
   if (needle && !`${name} ${role} ${text} ${skills.join(' ')}`.toLocaleLowerCase('ru').includes(needle)) return null
 
-  const explicitLocation = field(text, 'location|city|локация|локація|город|місто|shahar|yashash (?:manzili|joyi)|hozirgi manzil|manzil|hudud')
+  const explicitLocation = extractCandidateStructuredField(text, 'city', 220)
+    || extractCandidateStructuredField(text, 'address', 220)
   const explicitCity = explicitLocation ? detectCity(explicitLocation, channel.country) || explicitLocation : null
   const city = localToChannel
     ? explicitCity || detectCity(text, channel.country) || fallbackChannelCity(channel)
     : explicitCity || null
   const district = detectDistrict(text, city)
-  const contact = field(text, 'contact|контакт|telegram|phone|телефон|tel|telefon|boglanish|aloqa|murojaat')
+  const contact = extractCandidateStructuredField(text, 'contact', 220) || undefined
   const employmentType = detectEmploymentTypes(text)[0]
-    || field(text, 'employment|format|занятость|зайнятість|график|графік|ish vaqti|bandlik')
-  const education = field(text, "education|образование|освіта|o['’]qish|ta['’]lim|ma['’]lumoti|diplom") || blockAfter(text, "education|образование|освіта|o['’]qish|ta['’]lim|ma['’]lumoti|diplom") || null
+    || extractCandidateStructuredField(text, 'employmentType', 120)
+    || extractCandidateStructuredField(text, 'schedule', 120)
+    || undefined
+  const education = extractCandidateStructuredField(text, 'education', 500)
+    || blockAfter(text, "education|образование|освіта|o['’]qish|ta['’]lim|ma['’]lumoti|diplom")
+    || null
   const hashtags = [...text.matchAll(/(?:^|\s)#([\p{L}\p{N}_-]{2,40})/gu)].map((match) => match[1]!)
   const salary = parseSalary(text, channel.country)
 

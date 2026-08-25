@@ -1,4 +1,6 @@
+import { detectCityFromText, detectCountryCodeFromText } from '@whiteslove/parsing-lexicon/geography-detection'
 import type { Job } from './jobTypes'
+import { detectWorkModes } from './hiringLexicon'
 
 const UA =
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ' +
@@ -100,9 +102,7 @@ function makeJob(input: {
     location: stripHtml(input.location || 'See listing').slice(0, 240),
     url: input.url,
     source: 'companies',
-    remote: /\bremote\b|удал[её]н|дистанцион|la distanță/iu.test(
-      `${input.title} ${input.location} ${description}`,
-    ),
+    remote: detectWorkModes(`${input.title} ${input.location} ${description}`).includes('remote'),
     tags: [...new Set([input.label, 'Aviation', ...(input.tags || [])])].slice(0, 8),
     postedAt: input.postedAt || new Date().toISOString(),
     employmentType: input.employmentType,
@@ -147,7 +147,7 @@ async function fetchAirAstana(): Promise<Job[]> {
     const start = match.index || 0
     const block = html.slice(Math.max(0, start - 900), Math.min(html.length, start + 2_500))
     const text = htmlLines(block).join('\n')
-    const location = text.split('\n').find((line) => /Kazakhstan|Казахстан|Алматы|Almaty|Астана|Astana|Шымкент|Shymkent|Кызылорда|Kyzylorda/iu.test(line)) || 'Kazakhstan'
+    const location = text.split('\n').find((line) => detectCountryCodeFromText(line) === 'KZ' || Boolean(detectCityFromText(line, 'KZ'))) || 'Kazakhstan'
     out.set(url, makeJob({
       label: 'Air Astana / FlyArystan',
       title,
@@ -171,7 +171,7 @@ async function fetchAirAstana(): Promise<Job[]> {
         const specialization = lines[i + 1] || ''
         const location = lines[i + 2] || 'Kazakhstan'
         if (title.length < 4 || title.length > 220) continue
-        if (!/Kazakhstan|Казахстан|Алматы|Almaty|Астана|Astana/iu.test(`${location} ${lines[i + 3] || ''}`)) continue
+        if (detectCountryCodeFromText(`${location} ${lines[i + 3] || ''}`) !== 'KZ') continue
         const url = `${root}#${encodeURIComponent(title.toLowerCase().replace(/\s+/g, '-'))}`
         out.set(url, makeJob({
           label: 'Air Astana / FlyArystan',
@@ -279,9 +279,7 @@ function parseGenericCareerAnchors(
     const start = match.index || 0
     const block = html.slice(Math.max(0, start - 1_000), Math.min(html.length, start + 3_500))
     const text = htmlLines(block).join('\n')
-    const location = text.split('\n').find((line) =>
-      /Bucharest|Bucure|Romania|Iași|Iasi|Cluj|Kazakhstan|Almaty|Astana|Uzbekistan|Tashkent|Kyrgyzstan|Bishkek|Ukraine|Kyiv/iu.test(line),
-    ) || locationFallback
+    const location = text.split('\n').find((line) => Boolean(detectCityFromText(line)) || Boolean(detectCountryCodeFromText(line))) || locationFallback
     byUrl.set(url, makeJob({ label, title, company: label, location, url, description: text, tags }))
   }
   return [...byUrl.values()]
