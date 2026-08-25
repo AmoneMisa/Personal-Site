@@ -1,4 +1,4 @@
-import { ref } from "vue";
+import { nextTick, ref } from "vue";
 import type { FlatFeedResult, FlatListing, FlatStatistics } from "~/types/flats";
 import { safeFetch } from "~/utils/safeFetch";
 import { useLatestRequest } from "~/composables/search/useLatestRequest";
@@ -19,6 +19,24 @@ export function useFlatFeed(options: { onAvailabilityChecked?: (keys: string[]) 
   let statisticsRequestId = 0;
   let warmTimer: ReturnType<typeof setTimeout> | undefined;
   let warmParams: Record<string, string> | null = null;
+
+  async function setStatisticsWithoutViewportJump(value: FlatStatistics) {
+    if (!import.meta.client) {
+      statistics.value = value;
+      return;
+    }
+    const top = window.scrollY;
+    const left = window.scrollX;
+    statistics.value = value;
+    await nextTick();
+    requestAnimationFrame(() => {
+      // The analytics panel is inserted above the map/results. Preserve the exact
+      // viewport so its late arrival cannot push the user's current cards away.
+      if (Math.abs(window.scrollY - top) > 1 || Math.abs(window.scrollX - left) > 1) {
+        window.scrollTo({ top, left, behavior: "auto" });
+      }
+    });
+  }
 
   function scheduleWarmPoll() {
     if (warmTimer) clearTimeout(warmTimer);
@@ -43,7 +61,7 @@ export function useFlatFeed(options: { onAvailabilityChecked?: (keys: string[]) 
     try {
       const { data, error } = await safeFetch<FlatFeedResult>("/flats-feed", { params: statsParams });
       if (requestId !== statisticsRequestId || error || !data || data.error) return;
-      if (data.statistics) statistics.value = data.statistics;
+      if (data.statistics) await setStatisticsWithoutViewportJump(data.statistics);
     } finally {
       if (requestId === statisticsRequestId) statisticsLoading.value = false;
     }
@@ -87,7 +105,7 @@ export function useFlatFeed(options: { onAvailabilityChecked?: (keys: string[]) 
     if (background) {
       if (!append) total.value = data.count ?? total.value;
       sourceErrors.value = data.sourceErrors || [];
-      if (data.statistics) statistics.value = data.statistics;
+      if (data.statistics) void setStatisticsWithoutViewportJump(data.statistics);
       warming.value = !!data.warming;
       if (wantsStatistics) void loadStatistics(params, currentStatisticsRequestId);
       scheduleWarmPoll();
@@ -112,7 +130,7 @@ export function useFlatFeed(options: { onAvailabilityChecked?: (keys: string[]) 
     // A page request deliberately omits includeStats, so it must not clear the
     // previous analytics snapshot while the independent statistics request is
     // still running. Replace statistics only when a response actually has them.
-    if (!append && data.statistics) statistics.value = data.statistics;
+    if (!append && data.statistics) void setStatisticsWithoutViewportJump(data.statistics);
     sourceErrors.value = data.sourceErrors || [];
     warming.value = !!data.warming;
     loading.value = false;
