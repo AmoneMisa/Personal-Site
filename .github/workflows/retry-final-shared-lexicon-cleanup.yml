@@ -55,18 +55,12 @@ jobs:
           import json
           from pathlib import Path
 
-          # Python triple-quoted replacements in the original migration script
-          # interpreted \n inside TypeScript single-quoted literals. Restore the
-          # intended escaped newline characters.
           path = Path('server/utils/hiringQuality.ts')
           text = path.read_text()
           text = text.replace("text.split('\n')", r"text.split('\n')")
           text = text.replace(".join('\n')", r".join('\n')")
           path.write_text(text)
 
-          # Two normalizeCandidate call-sites still referenced the local regexes
-          # after their declarations were removed. Route them through the shared
-          # semantic helpers as well.
           path = Path('server/utils/hiringNormalize.ts')
           text = path.read_text()
           old = '  const flexibleRole = FLEXIBLE_ROLE_RE.test(rawEffectiveRole)\n  const effectiveRole = flexibleRole ? \'Any Role\' : NON_ROLE_RE.test(rawEffectiveRole) ? \'\' : rawEffectiveRole\n'
@@ -75,10 +69,9 @@ jobs:
               raise SystemExit(f'normalizeCandidate role call-sites: expected one block, got {text.count(old)}')
           path.write_text(text.replace(old, new, 1))
 
-          # Pin the package commit that also covers Principal Software Engineer.
           path = Path('package.json')
           data = json.loads(path.read_text())
-          data['dependencies']['@whiteslove/parsing-lexicon'] = 'https://github.com/AmoneMisa/parsing-lexicon/archive/b0cb0bae968fbe0b6647fbb141a213793dc68e75.tar.gz'
+          data['dependencies']['@whiteslove/parsing-lexicon'] = 'https://github.com/AmoneMisa/parsing-lexicon/archive/0d6dd1e0df0349cfd3f5dd72b0c4be039dcc5e10.tar.gz'
           path.write_text(json.dumps(data, ensure_ascii=False, indent=2) + '\n')
           PY
 
@@ -91,7 +84,7 @@ jobs:
       - name: Verify final lexicon boundary
         shell: bash
         run: |
-          grep -q 'b0cb0bae968fbe0b6647fbb141a213793dc68e75' package-lock.json
+          grep -q '0d6dd1e0df0349cfd3f5dd72b0c4be039dcc5e10' package-lock.json
           test "$(wc -l < shared/jobSkills.ts)" -lt 30
           ! grep -q 'const SPECIAL_PROFESSIONS' server/utils/hiringQuality.ts
           ! grep -q 'const COUNTRY_ALIASES' server/utils/hiringQuality.ts
