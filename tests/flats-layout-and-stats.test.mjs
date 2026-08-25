@@ -49,7 +49,7 @@ test('flat card context badge follows ownership and geography filters', () => {
 })
 
 test('good price badge consumes the database market comparison and stays pinned to the photo corner', () => {
-  assert.match(feed, /const listings = ref<FlatListing\[]>\(\[\]\)/u)
+  assert.ok(feed.includes('const listings = ref<FlatListing[]>([])'))
   assert.doesNotMatch(feed, /flat-finder:listings/u)
   assert.match(presentation, /listing\.marketComparison\?\.goodPrice === true/u)
   assert.match(presentation, /listing\.marketComparison\?\.medianUsd \?\? null/u)
