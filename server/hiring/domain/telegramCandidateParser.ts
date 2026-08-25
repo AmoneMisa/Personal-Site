@@ -1,4 +1,9 @@
-import { extractCandidateStructuredField } from '@whiteslove/parsing-lexicon/hiring-source-semantics'
+import {
+  defaultHiringCurrency,
+  detectCandidatePostSignals,
+  extractCandidateStructuredBlock,
+  extractCandidateStructuredField,
+} from '@whiteslove/parsing-lexicon/hiring-source-semantics'
 import type { CvProfile } from '../../../shared/contracts/hiring'
 import type { HiringTelegramChannelDescriptor } from '../../../shared/hiring/sources/telegramChannels'
 import { extractCandidateName } from '../../utils/hiringCandidateFields'
@@ -28,21 +33,6 @@ export interface TelegramMessageOutcome {
 const MAX_CANDIDATE_AGE_MONTHS = 3
 const FUTURE_DATE_TOLERANCE_MS = 48 * 60 * 60 * 1000
 
-const CANDIDATE_FORM_RE =
-  /(?:^|\n)\s*[^\p{L}\p{N}\n]{0,8}(?:ism(?:i|im)?(?:\s*[-–—]\s*(?:familya|familiya))?|familya|familiya|f\.?i\.?o\.?|фио|имя|yoshi|yoshim|tug(?:['’‘])ilgan\s+yili|возраст|qidirayotgan\s+kasb|so(?:['’‘])ralgan\s+ish\s+(?:joyi|turi)|yashash\s+manzili|ma(?:['’‘])lumoti|ожидаемая\s+работа|желаемая\s+(?:должность|работа)|tajribasi?|опыт\s+работы)\s*[:—-]/imu
-
-const CV_MARKER_RE = /(?:резюме|resume|\bcv\b|curriculum vitae|анкета|профиль кандидата|профіль кандидата|кандидат(?:ка)?|candidate profile|mening\s+(?:cv|rezume)|my\s+cv)/iu
-const FIRST_PERSON_RE = /(?:^|\n)\s*[^\p{L}\p{N}\n]{0,6}(?:я[\s—,-]|я\s+(?:ищу|шукаю)(?![\p{L}\p{N}_])|(?:ищу|шукаю)(?![\p{L}\p{N}_])|men[\s,]|mening[\s,]|my name is|i am a|i'm a|ismim\b)/iu
-const PERSONAL_PROFILE_RE = /(?:^|[^\p{L}\p{N}_])(?:(?:1[6-9]|[2-6]\d)\s*(?:лет|года?|рок(?:и|ів)?|years?\s+old)|(?:студент(?:ка|ом|кой)?|student))(?![\p{L}\p{N}_])/iu
-const CONTACT_RE = /(?:\+?\d[\d\s()\-]{7,}|@[a-z0-9_]{4,}|(?:telegram|телефон|phone|tel|aloqa|murojaat|bog(?:'|’)lanish)\s*[:—-])/iu
-const SECTION_PATTERNS = {
-  experience: /(?:опыт|досвід|experience|staj|tajriba|ish\s+tajribasi)/iu,
-  skills: /(?:skills|навыки|навички|умею|стек|stack|technologies|texnologiyalar|ko(?:'|’)nikmalar)/iu,
-  education: /(?:education|образован|освіт|o(?:'|’)qish|ta(?:'|’)lim|университет|університет|university|college|institut)/iu,
-  languages: /(?:languages|языки|мови|til(?:lar)?|language skills)/iu,
-  contact: /(?:contact|контакт|telegram|телефон|phone|tel|bog(?:'|’)lanish|aloqa)/iu,
-}
-
 function candidateCutoff(): number {
   const cutoff = new Date()
   cutoff.setUTCMonth(cutoff.getUTCMonth() - MAX_CANDIDATE_AGE_MONTHS)
@@ -58,20 +48,6 @@ function recentCandidateDate(dateIso: string | null | undefined): string | null 
   return date.toISOString()
 }
 
-function field(text: string, names: string): string | undefined {
-  const match = text.match(new RegExp(`(?:^|\\n)[^\\p{L}\\p{N}\\n]{0,8}(?:${names})\\s*[:—-]\\s*([^\\n]{2,220})`, 'iu'))
-  return match?.[1]?.trim()
-}
-
-function blockAfter(text: string, names: string): string | undefined {
-  const match = text.match(new RegExp(`(?:^|\\n)[^\\p{L}\\p{N}\\n]{0,8}(?:${names})\\s*[:—-]?\\s*\\n([\\s\\S]{10,800}?)(?=\\n[^\\p{L}\\p{N}\\n]{0,8}(?:experience|опыт|досвід|skills|навыки|навички|education|образован|освіта|languages|языки|мови|contact|контакт|телефон)\\s*[:—-]|$)`, 'iu'))
-  return match?.[1]?.replace(/\s+/g, ' ').trim()
-}
-
-function cvSectionCount(text: string): number {
-  return Object.values(SECTION_PATTERNS).filter((pattern) => pattern.test(text)).length
-}
-
 export function isLikelyCvPost(text: string, cvFeed = false): boolean {
   const value = text.split('\n').map((line) => line.replace(/\s+/g, ' ').trim()).filter(Boolean).join('\n').trim()
   const compact = value.replace(/\s+/g, ' ')
@@ -81,15 +57,16 @@ export function isLikelyCvPost(text: string, cvFeed = false): boolean {
   const kind = classifySharedHiringMessage(value)
   if (['vacancy', 'vacancy_digest', 'recruitment_ad', 'course', 'job_service', 'closed_vacancy', 'spam'].includes(kind)) return false
   const explicitIntent = kind === 'candidate' || detectHiringIntent(value).intent === 'candidate'
-  const candidateForm = CANDIDATE_FORM_RE.test(value)
+  const candidateSignals = detectCandidatePostSignals(value)
+  const candidateForm = candidateSignals.candidateForm
   if (!explicitIntent && !candidateForm && isLikelyTelegramVacancy(compact)) return false
 
-  const hasCvMarker = CV_MARKER_RE.test(value)
-  const firstPerson = FIRST_PERSON_RE.test(value)
-  const hasPersonalProfile = PERSONAL_PROFILE_RE.test(value)
+  const hasCvMarker = candidateSignals.cvMarker
+  const firstPerson = candidateSignals.firstPerson
+  const hasPersonalProfile = candidateSignals.personalProfile
   const hasRole = detectProfessionMatches(value, 1).length > 0
-  const hasContact = CONTACT_RE.test(value)
-  const sections = cvSectionCount(value)
+  const hasContact = candidateSignals.contact
+  const sections = candidateSignals.sectionCount
   const parsedExperience = parseHiringExperience(value)
   const hasExperience = parsedExperience?.minYears != null || parsedExperience?.maxYears != null
 
@@ -134,7 +111,8 @@ function parseLanguages(text: string): string[] {
       return level ? `${item.name} — ${level}` : item.name
     })
   }
-  const raw = extractCandidateStructuredField(text, 'languages', 500) || blockAfter(text, 'languages|языки|мови|til(?:lar)?')
+  const raw = extractCandidateStructuredField(text, 'languages', 500)
+    || extractCandidateStructuredBlock(text, 'languages', 500)
   return raw ? raw.split(/[,;/|•·]+/).map((item) => item.trim()).filter(Boolean).slice(0, 8) : []
 }
 
@@ -147,15 +125,14 @@ function fallbackChannelCity(channel: TelegramCandidateChannel): string | null {
 }
 
 export function detectDistrict(text: string, city: string | null): string | null {
-  const explicit = field(text, 'район|р-н|district|туман|tumani')
+  const explicit = extractCandidateStructuredField(text, 'district', 220)
   return detectLexiconDistrict(explicit || text, city) || explicit || null
 }
 
 function parseSalary(text: string, country: string): Pick<CvProfile, 'salaryMin' | 'salaryMax' | 'currency'> {
   const parsed = parseHiringSalary(text)
   if (!parsed || (parsed.min == null && parsed.max == null)) return {}
-  const currency = parsed.currency
-    || ({ UZ: 'UZS', UA: 'UAH', KZ: 'KZT', KG: 'KGS' } as Record<string, string>)[country]
+  const currency = parsed.currency || defaultHiringCurrency(country) || undefined
   return {
     salaryMin: parsed.min ?? parsed.max ?? undefined,
     salaryMax: parsed.max ?? parsed.min ?? undefined,
@@ -195,7 +172,7 @@ export function telegramMessageToProfile(
     || extractCandidateStructuredField(text, 'schedule', 120)
     || undefined
   const education = extractCandidateStructuredField(text, 'education', 500)
-    || blockAfter(text, "education|образование|освіта|o['’]qish|ta['’]lim|ma['’]lumoti|diplom")
+    || extractCandidateStructuredBlock(text, 'education', 800)
     || null
   const hashtags = [...text.matchAll(/(?:^|\s)#([\p{L}\p{N}_-]{2,40})/gu)].map((match) => match[1]!)
   const salary = parseSalary(text, channel.country)
