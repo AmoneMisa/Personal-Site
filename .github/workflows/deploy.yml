@@ -20,61 +20,151 @@ env:
   SUBSCRIPTION_BOT_IMAGE: ghcr.io/amonemisa/personal-site-subscription-bot
 
 jobs:
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.detect.outputs.matrix }}
+      has_builds: ${{ steps.detect.outputs.has_builds }}
+      frontend: ${{ steps.detect.outputs.frontend }}
+      node_verify: ${{ steps.detect.outputs.node_verify }}
+      deploy: ${{ steps.detect.outputs.deploy }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Detect affected services
+        id: detect
+        shell: bash
+        env:
+          BEFORE_SHA: ${{ github.event.before }}
+          CURRENT_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+
+          if [[ -z "$BEFORE_SHA" || "$BEFORE_SHA" =~ ^0+$ ]]; then
+            changed_files="__FULL_BUILD__"
+          else
+            changed_files="$(git diff --name-only "$BEFORE_SHA" "$CURRENT_SHA")"
+          fi
+
+          printf 'Changed files:\n%s\n' "$changed_files"
+
+          matches() {
+            local pattern="$1"
+            [[ "$changed_files" == "__FULL_BUILD__" ]] || grep -Eq "$pattern" <<<"$changed_files"
+          }
+
+          frontend=false
+          backend=false
+          jobs_worker=false
+          job_browser_fetcher=false
+          subscription_bot=false
+
+          if matches '^(Dockerfile|\.dockerignore|package(-lock)?\.json|nuxt\.config\.ts|tsconfig[^/]*\.json|app/|server/|shared/|i18n/|public/|internal/)'; then
+            frontend=true
+          fi
+
+          if matches '^(jobs-worker/|package(-lock)?\.json|server/|shared/|internal/)'; then
+            jobs_worker=true
+          fi
+
+          if matches '^backend/'; then
+            backend=true
+          fi
+
+          if matches '^job-browser-fetcher/'; then
+            job_browser_fetcher=true
+          fi
+
+          if matches '^subscription-bot/'; then
+            subscription_bot=true
+          fi
+
+          matrix='[]'
+          add_service() {
+            local enabled="$1" name="$2" context="$3" dockerfile="$4" image="$5"
+            if [[ "$enabled" == true ]]; then
+              matrix="$(jq -c \
+                --arg name "$name" \
+                --arg context "$context" \
+                --arg file "$dockerfile" \
+                --arg image "$image" \
+                '. + [{name:$name,context:$context,file:$file,image:$image}]' <<<"$matrix")"
+            fi
+          }
+
+          add_service "$frontend" frontend . ./Dockerfile "$FRONTEND_IMAGE"
+          add_service "$backend" backend ./backend ./backend/Dockerfile "$BACKEND_IMAGE"
+          add_service "$jobs_worker" jobs-worker . ./jobs-worker/Dockerfile "$JOBS_WORKER_IMAGE"
+          add_service "$job_browser_fetcher" job-browser-fetcher ./job-browser-fetcher ./job-browser-fetcher/Dockerfile "$JOB_BROWSER_FETCHER_IMAGE"
+          add_service "$subscription_bot" subscription-bot ./subscription-bot ./subscription-bot/Dockerfile "$SUBSCRIPTION_BOT_IMAGE"
+
+          has_builds=false
+          [[ "$matrix" != '[]' ]] && has_builds=true
+
+          node_verify=false
+          if matches '^(package(-lock)?\.json|app/|server/|shared/|i18n/|public/|internal/|jobs-worker/|tests/|nuxt\.config\.ts|tsconfig[^/]*\.json)'; then
+            node_verify=true
+          fi
+
+          deploy=false
+          if [[ "$has_builds" == true ]] || matches '^(docker-compose\.yml|deploy\.sh)$'; then
+            deploy=true
+          fi
+
+          echo "matrix={\"include\":$matrix}" >> "$GITHUB_OUTPUT"
+          echo "has_builds=$has_builds" >> "$GITHUB_OUTPUT"
+          echo "frontend=$frontend" >> "$GITHUB_OUTPUT"
+          echo "node_verify=$node_verify" >> "$GITHUB_OUTPUT"
+          echo "deploy=$deploy" >> "$GITHUB_OUTPUT"
+
   verify:
+    needs: changes
+    if: needs.changes.outputs.node_verify == 'true' || needs.changes.outputs.deploy == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
       - uses: actions/setup-node@v4
+        if: needs.changes.outputs.node_verify == 'true'
         with:
           node-version: 24
           cache: npm
 
       - name: Install dependencies
+        if: needs.changes.outputs.node_verify == 'true'
         run: npm ci
 
-      - name: Verify worker and Compose syntax
+      - name: Verify worker syntax
+        if: needs.changes.outputs.node_verify == 'true'
         run: |
           node --experimental-transform-types --check jobs-worker/worker.ts
           node --check jobs-worker/alias-loader.mjs
+
+      - name: Verify Compose syntax
+        if: needs.changes.outputs.deploy == 'true'
+        run: |
           touch db.env
           docker compose config >/dev/null
 
       - name: Run application tests
+        if: needs.changes.outputs.node_verify == 'true'
         run: npm test
 
       - name: Build Nuxt application
+        if: needs.changes.outputs.frontend == 'true'
         run: npm run build
 
-  # All runtime images are built in CI. Production only pulls immutable build
-  # outputs; it never compiles Nuxt or installs dependencies during deployment.
+  # Only affected runtime images are built. Shared Node/Nuxt paths conservatively
+  # rebuild both the frontend and jobs worker because both consume those files.
   build:
-    needs: verify
+    needs: [changes, verify]
+    if: needs.changes.outputs.has_builds == 'true' && needs.verify.result == 'success'
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
-      matrix:
-        include:
-          - name: frontend
-            context: .
-            file: ./Dockerfile
-            image: ghcr.io/amonemisa/personal-site
-          - name: backend
-            context: ./backend
-            file: ./backend/Dockerfile
-            image: ghcr.io/amonemisa/personal-site-backend
-          - name: jobs-worker
-            context: .
-            file: ./jobs-worker/Dockerfile
-            image: ghcr.io/amonemisa/personal-site-jobs-worker
-          - name: job-browser-fetcher
-            context: ./job-browser-fetcher
-            file: ./job-browser-fetcher/Dockerfile
-            image: ghcr.io/amonemisa/personal-site-job-browser-fetcher
-          - name: subscription-bot
-            context: ./subscription-bot
-            file: ./subscription-bot/Dockerfile
-            image: ghcr.io/amonemisa/personal-site-subscription-bot
+      matrix: ${{ fromJSON(needs.changes.outputs.matrix) }}
     steps:
       - uses: actions/checkout@v4
 
@@ -101,7 +191,12 @@ jobs:
           cache-to: type=gha,mode=max,scope=${{ matrix.name }}
 
   deploy:
-    needs: build
+    needs: [changes, verify, build]
+    if: >-
+      always() &&
+      needs.changes.outputs.deploy == 'true' &&
+      needs.verify.result == 'success' &&
+      (needs.build.result == 'success' || needs.build.result == 'skipped')
     environment: Production
     runs-on: ubuntu-latest
     steps:
