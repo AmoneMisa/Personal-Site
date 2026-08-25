@@ -11,6 +11,8 @@ import { parseSalary as parseWebSalary } from './hiringWebFields'
 import {
   detectCandidateFeatureCodes,
   detectCandidateRelocationPreference,
+  detectCandidateRemotePreference,
+  detectEmploymentTypes,
   detectProfessionMatches,
   detectSharedSeniority,
   extractCandidateContactHours,
@@ -19,7 +21,9 @@ import {
   extractCandidateSkillField,
   extractCandidateTargetContext,
   extractCandidateWorkHistory,
+  isCandidateNonRoleValue,
   isCandidateNonTargetContext,
+  isFlexibleCandidateRole,
   resolveSharedProfessionContext,
 } from './hiringLexicon'
 
@@ -120,8 +124,8 @@ function extractGoalRole(text: string): string {
 
 export function normalizeProfessions(rawRole: string | undefined, text: string): string[] {
   const target = cleanRole(rawRole)
-  if (FLEXIBLE_ROLE_RE.test(target)) return ['Any Role']
-  if (NON_ROLE_RE.test(target)) return []
+  if (isFlexibleCandidateRole(target)) return ['Any Role']
+  if (isCandidateNonRoleValue(target)) return []
 
   const resolved = resolveSharedProfessionContext(text, { mode: 'candidate', title: target }) as {
     desiredProfession?: { canonical?: string } | null
@@ -242,19 +246,13 @@ export function detectRelocationReady(text: string): boolean | null {
   return detectCandidateRelocationPreference(text)
 }
 
-const REMOTE_POSITIVE_RE = /\bremote\b|удал[её]н\p{L}*|віддален|дистанцион|masofaviy|(?<!\p{L})onlayn(?!\p{L})|online\s+(?:work|job)|онлайн\s+работ/iu
-const REMOTE_NEGATIVE_RE = /только\s+офис|офисн(?:ый|ая)\s+формат|офлайн|удал[её]нк\p{L}*\s+не\s+рассматрива|remote\s+(?:not|no)|faqat\s+ofis|ofisda\s+ishlash/iu
-
 export function normalizeRemotePreference(
   raw: boolean | null | undefined,
   text: string,
   origin: CvProfile['origin'],
 ): boolean | null {
-  if (REMOTE_NEGATIVE_RE.test(text)) return false
-  if (REMOTE_POSITIVE_RE.test(text)) return true
-  // Legacy Telegram parsing used RegExp.test(), so every post without a remote
-  // marker was persisted as false. Treat that false as unknown; web adapters
-  // can still preserve an explicit structured false from their source.
+  const shared = detectCandidateRemotePreference(text)
+  if (shared != null) return shared
   if ((origin ?? 'telegram') === 'telegram' && raw === false) return null
   return raw ?? null
 }
@@ -305,11 +303,8 @@ export function normalizeRelevantExperience(
 }
 
 export function normalizeEmploymentTypes(text: string, raw?: string | null): CandidateEmploymentType[] {
-  const source = `${raw || ''}\n${text}`
-  const out = new Set<CandidateEmploymentType>()
-  if (/full[-\s]?time|(?<!\p{L})полный\s+(?:рабочий\s+)?день|(?<!\p{L})полная\s+занятость|(?<!\p{L})повн(?:ий|а)\s+(?:робочий\s+)?день|(?<!\p{L})повна\s+зайнятість|to(?:'|’)liq\s+(?:ish|stavka)/iu.test(source)) out.add('full_time')
-  if (/part[-\s]?time|неполный\s+(?:рабочий\s+)?день|неполная\s+занятость|частичная\s+занятость|подработк|неповн(?:ий|а)\s+(?:робочий\s+)?день|часткова\s+зайнятість|підробіт|yarim\s+stavka/iu.test(source)) out.add('part_time')
-  return [...out]
+  return detectEmploymentTypes(`${raw || ''}
+${text}`)
 }
 
 /** Removes text ligatures emitted by icon fonts from older stored web cards. */
@@ -416,9 +411,6 @@ function normalizedCandidateSkills(profile: CvProfile, text: string): string[] {
 
 const HIDDEN_NAME_RE = /^(?:(?:фио|піб|name)?\s*(?:скрыт\p{L}*|прихован\p{L}*|hidden|yashiril\p{L}*|ascuns)|onlayn|online|resume|резюме|[?？�\uFFFD]{2,})$/iu
 const EMPLOYMENT_AS_EDUCATION_RE = /занятост|зайнятіст|удал[её]нн|дистанцион|remote|full[- ]?time|part[- ]?time|график\s+работ|bandlik/iu
-const FLEXIBLE_ROLE_RE = /^(?:нет|без)\s+разницы(?:\s+.*)?$|^не\s*важно(?:\s+.*)?$|^farqi\s+yo['’ʻʼ‘`]?q$|^любая\s+(?:работа|занятость)(?:\s+.*)?$/iu
-const NON_ROLE_RE = /^(?:удал[её]нно|работа\s+на\s+удал[её]н\p{L}*\s+основе|remote|onlayn|online|farqi\s+yo['’ʻʼ‘`]?q|bilmaym\p{L}*|ish\s+ker(?:e|a)\s+onlayn|любая\s+(?:работа|занятость)|немає|нет|не\s+указано|not\s+specified)$/iu
-
 function normalizeCandidateEducation(profile: CvProfile, text: string): string | null | undefined {
   const raw = profile.education?.trim() || ''
   const withoutPreviewBoilerplate = raw.replace(/\s*[·|]\s*Location:\s*[\s\S]*$/iu, '').trim()
@@ -470,8 +462,8 @@ export function normalizeCandidate(profile: CvProfile): CvProfile {
   const roleDuplicatesName = Boolean(comparableRoleText(rawEffectiveRoleCandidate))
     && comparableRoleText(rawEffectiveRoleCandidate) === comparableRoleText(profile.name)
   const rawEffectiveRole = roleDuplicatesName ? '' : rawEffectiveRoleCandidate
-  const flexibleRole = FLEXIBLE_ROLE_RE.test(rawEffectiveRole)
-  const effectiveRole = flexibleRole ? 'Any Role' : NON_ROLE_RE.test(rawEffectiveRole) ? '' : rawEffectiveRole
+  const flexibleRole = isFlexibleCandidateRole(rawEffectiveRole)
+  const effectiveRole = flexibleRole ? 'Any Role' : isCandidateNonRoleValue(rawEffectiveRole) ? '' : rawEffectiveRole
   // Repair already-stored rows where a loose adapter saved the whole labelled
   // line ("familya: ...") as the name. New parses and old data then converge.
   const rawName = profile.name?.trim() || ''

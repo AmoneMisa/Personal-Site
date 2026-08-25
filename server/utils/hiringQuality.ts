@@ -8,65 +8,19 @@
 
 import type { CvProfile } from './hiringTypes'
 import { detectMentionedProfessions } from './hiringNormalize'
-
-const STATUS_ONLY_RE = /^(?:talaba|student|студент(?:ка)?|студент(?:ка)?ка|o(?:'|’)quvchi|учащ(?:ийся|аяся))$/iu
-
-const SPECIAL_PROFESSIONS: Array<{ name: string; re: RegExp }> = [
-  {
-    name: 'HR / Recruiter',
-    re: /#(?:hr|hrd|hrbp|hrgeneralist|peopleops)\b|\b(?:hr\s+lead|head\s+of\s+hr|people\s+partner|talent\s+operations|кадров\p{L}*\s+аудит)\b/iu,
-  },
-  {
-    name: 'Sales Manager',
-    re: /(?:sotuv|savdo)\s+(?:menejer|menejr|menedjer|manager)|\bsales\s+manager\b|менеджер\s+(?:по\s+)?продаж|менеджер\s+з\s+продаж/iu,
-  },
-  {
-    name: 'Backend Developer',
-    re: /\bbackend\s+(?:developer|engineer)\b|\bback[- ]?end\s+(?:developer|engineer)\b|backend\s+dasturchi|серверн(?:ый|ий)\s+разработчик/iu,
-  },
-  {
-    name: 'Frontend Developer',
-    re: /\bfrontend\s+(?:developer|engineer)\b|\bfront[- ]?end\s+(?:developer|engineer)\b|frontend\s+dasturchi/iu,
-  },
-  {
-    name: 'AI / ML Engineer',
-    re: /\b(?:ai|artificial\s+intelligence|machine\s+learning|ml)\s*(?:\/\s*(?:ai|ml))?\s*(?:engineer|developer)\b|\b(?:engineer|developer)\s+(?:ai|ml|machine\s+learning)\b/iu,
-  },
-  {
-    name: 'Penetration Tester',
-    re: /\b(?:penetration\s+tester|penetration\s+testing|pentest(?:er|ing)?)\b|пентест(?:ер|инг)?/iu,
-  },
-  {
-    name: 'Network Administrator',
-    re: /\b(?:network\s+administrator|network\s+admin)\b|(?:tarmoq|тармоқ)[^\n]{0,70}(?:administrator|admin(?:strator)?i?|администратор)/iu,
-  },
-  {
-    name: 'System Administrator',
-    re: /\b(?:system\s+administrator|system\s+admin|sysadmin)\b|(?:tizim|тизим)[^\n]{0,50}(?:administrator|admin(?:strator)?i?|администратор)|системн(?:ый|ий)\s+администратор/iu,
-  },
-  {
-    name: 'Cybersecurity Specialist',
-    re: /\b(?:cybersecurity|cyber\s+security|information\s+security)\b|кибербезопасност|кібербезпек|информационн(?:ая|ой)\s+безопасност|інформаційн(?:а|ої)\s+безпек|axborot\s+xavfsizligi/iu,
-  },
-  {
-    name: 'Data Scientist',
-    re: /\bdata\s+scientist\b|\bdata\s+science\b|дата\s+саентист/iu,
-  },
-  {
-    name: 'Data Engineer',
-    re: /\bdata\s+engineer\b|инженер\s+данных|інженер\s+даних/iu,
-  },
-]
-
-const COUNTRY_ALIASES: Array<{ code: string; name: string; re: RegExp }> = [
-  { code: 'CA', name: 'Canada', re: /(?<![\p{L}\p{N}])(?:canada|канада)(?![\p{L}\p{N}])/iu },
-  { code: 'US', name: 'United States', re: /(?<![\p{L}\p{N}])(?:usa|u\.?s\.?a\.?|united\s+states|сша)(?![\p{L}\p{N}])/iu },
-  { code: 'RO', name: 'Romania', re: /(?<![\p{L}\p{N}])(?:romania|румыния|румунія|românia)(?![\p{L}\p{N}])/iu },
-  { code: 'UA', name: 'Ukraine', re: /(?<![\p{L}\p{N}])(?:ukraine|украина|україна)(?![\p{L}\p{N}])/iu },
-  { code: 'UZ', name: 'Uzbekistan', re: /(?<![\p{L}\p{N}])(?:uzbekistan|узбекистан|o(?:'|’)zbekiston)(?![\p{L}\p{N}])/iu },
-  { code: 'KZ', name: 'Kazakhstan', re: /(?<![\p{L}\p{N}])(?:kazakhstan|казахстан|қазақстан)(?![\p{L}\p{N}])/iu },
-  { code: 'KG', name: 'Kyrgyzstan', re: /(?<![\p{L}\p{N}])(?:kyrgyzstan|киргизия|кыргызстан)(?![\p{L}\p{N}])/iu },
-]
+import {
+  detectCandidateProfessionLabels,
+  detectCandidateRemotePreference,
+  detectLexiconCity,
+  extractCandidateGoalField,
+  extractCandidateLocationField,
+  extractCandidateRoleField,
+  extractCandidateSkillField,
+  extractCandidateTargetContext,
+  isCandidateStatusOnly,
+  normalizeHiringCountry,
+  resolveSharedCountryFromText,
+} from './hiringLexicon'
 
 function field(text: string, names: string): string | null {
   const match = text.match(new RegExp(`(?:^|\\n)[^\\p{L}\\p{N}\\n]{0,8}(?:${names})\\s*[:：—-]\\s*([^\\n]{1,220})`, 'iu'))
@@ -81,54 +35,29 @@ function unique(values: string[]): string[] {
   return [...new Set(values.map((value) => value.trim()).filter(Boolean))]
 }
 
-function intentLines(text: string): string {
-  return text
-    .split('\n')
-    .map((line) => line.trim())
-    .filter((line) => /(?:maqsad|мақсад|goal|цель|мета|ish\s+topish|ищу\s+работ|шукаю\s+робот|looking\s+for\s+(?:a\s+)?job)/iu.test(line))
-    .slice(0, 4)
-    .join('\n')
-}
-
 function candidateTargetContext(profile: CvProfile, text: string): string {
-  const roleFieldRaw = field(
-    text,
-    "желаемая (?:работа|должность)|бажана (?:робота|посада)|target role|desired (?:role|position)|position|role|должность|посада|lavozim|kasbi|kasb|qidirayotgan kasb|so(?:'|’)ralgan ish turi",
-  )
-  const roleField = roleFieldRaw && !STATUS_ONLY_RE.test(cleanToken(roleFieldRaw)) ? roleFieldRaw : ''
-  const goal = field(text, 'maqsad|мақсад|goal|цель|мета') || ''
+  const roleFieldRaw = extractCandidateRoleField(text)
+  const roleField = roleFieldRaw && !isCandidateStatusOnly(cleanToken(roleFieldRaw)) ? roleFieldRaw : ''
+  const goal = extractCandidateGoalField(text) || ''
+  const target = extractCandidateTargetContext(text)
   const headline = text.split('\n').map((line) => line.trim()).filter(Boolean).slice(0, 4).join('\n')
-
-  // Technology/stack is deliberately NOT part of target context. JavaScript or
-  // PostgreSQL are skills, not desired professions. A profession must come from
-  // an explicit role/goal/headline or from AI semantic extraction.
-  return [profile.role || '', ...(profile.professions || []), roleField, goal, intentLines(text), headline].join('\n')
+  return [profile.role || '', ...(profile.professions || []), roleField, goal, target, headline].join('\n')
 }
 
 function repairProfessions(profile: CvProfile, text: string): string[] {
   const current = unique(profile.professions?.length ? profile.professions : [profile.role || ''])
   const target = candidateTargetContext(profile, text)
-  const specific = SPECIAL_PROFESSIONS.filter((rule) => rule.re.test(target)).map((rule) => rule.name)
-  if (!specific.length && !current.length) {
-    const technologies = field(text, 'texnologiya|technologies|technology|stack') || ''
-    const technicalProfile = `${technologies} ${(profile.skills || []).join(' ')}`
-    if (/\bflutter\b|\bdart\b/iu.test(technicalProfile)) return ['Mobile Developer']
-    const sysadminBase = /\bcisco\b/iu.test(technicalProfile)
-      && /\b(?:linux|windows\s+server|active\s+directory|network(?:ing)?)\b/iu.test(technicalProfile)
-    const specializedTools = /\b(?:devops|sre|docker|kubernetes|k8s|terraform|ansible|jenkins|gitlab\s+ci|github\s+actions|ci\/?cd|aws|azure|gcp|ai|ml|mlops|artificial\s+intelligence|machine\s+learning|deep\s+learning|data\s+scien(?:ce|tist)|tensorflow|pytorch|scikit[- ]?learn|llm|langchain|developer|software\s+engineer|programmer|разработчик|программист|react|angular|vue(?:\.js)?|next(?:\.js)?|node(?:\.js)?|django|laravel|spring\s+boot|asp\.net)\b/iu.test(technicalProfile)
-    if (sysadminBase && !specializedTools) {
-      return ['System Administrator']
-    }
-    const strongDeveloperSkill = /\b(?:react|vue\.?\s*js|angular|node\.?\s*js|next\.?\s*js|django|laravel|fastapi|flask|spring|asp\.?net|ruby\s+on\s+rails)\b/iu.test(technicalProfile)
-    const softwareSignals = (technicalProfile.match(/\b(?:python|java(?:script)?|typescript|php|react|vue\.?\s*js|angular|node\.?\s*js|next\.?\s*js|django|laravel|fastapi|flask|spring|asp\.?net|sql|html|css|c\+\+|c#|golang)\b/giu) || []).length
-    if (strongDeveloperSkill || softwareSignals >= 2) return ['Software Developer']
+  const semantic = [...detectCandidateProfessionLabels(target)]
+  if (semantic.length) return unique(semantic)
+  if (!current.length) {
+    const technologies = extractCandidateSkillField(text) || ''
+    const inferred = [...detectCandidateProfessionLabels('', `${technologies} ${(profile.skills || []).join(' ')}`)]
+    if (inferred.length) return unique(inferred)
     const headline = text.split('\n').map((line) => line.trim()).filter(Boolean).slice(0, 8).join('\n')
     const headlineProfessions = detectMentionedProfessions(headline)
     if (headlineProfessions.length) return headlineProfessions
   }
-  if (!specific.length) return current
-
-  return unique(specific)
+  return current
 }
 
 function structuredName(text: string): string | null {
@@ -148,37 +77,25 @@ function structuredName(text: string): string | null {
 }
 
 function explicitLocation(text: string): string | null {
-  const labelled = field(text, 'location|локация|локація|country|страна|країна')
-  if (labelled) return labelled
-
-  // Candidate feeds frequently use compact headlines such as
-  // `Локація #Canada` without punctuation between label and value.
-  const compact = text.match(/(?:^|\n)[^\p{L}\p{N}\n]{0,8}(?:location|локация|локація|country|страна|країна)\s+(#?[\p{L}][^\n]{0,120})/iu)
-  return compact?.[1]?.trim() || null
+  return extractCandidateLocationField(text)
 }
 
 function countryFromLocation(value: string | null): { code: string; name: string } | null {
   if (!value) return null
-  const match = COUNTRY_ALIASES.find((country) => country.re.test(value))
-  return match ? { code: match.code, name: match.name } : null
+  const code = resolveSharedCountryFromText(value)
+  return code ? { code, name: cleanToken(value) } : null
 }
 
 function cityFromLocation(value: string | null, country: { code: string; name: string } | null): string | null {
   if (!value || !country) return null
   const cleaned = cleanToken(value)
   if (!cleaned) return null
-  if (COUNTRY_ALIASES.some((item) => item.re.test(cleaned) && cleaned.replace(item.re, '').replace(/[,#\s-]+/g, '') === '')) return null
-
+  const known = detectLexiconCity(cleaned, country.code)
+  if (known) return known
   const first = cleanToken(cleaned.split(',')[0] || '')
-  if (!first || COUNTRY_ALIASES.some((item) => item.re.test(first))) return null
+  if (!first || normalizeHiringCountry(first)) return null
   if (/^(?:europe|europa|європа|европа|штати|states)$/iu.test(first)) return null
   return first.slice(0, 80)
-}
-
-function explicitRemote(text: string): boolean | null {
-  if (/(?:onsite|on-site|office\s+only|тільки\s+офіс|только\s+офис|без\s+удал[её]нк|не\s+рассматрива\p{L}*\s+удал[её]н|ofisda\s+ish)/iu.test(text)) return false
-  if (/(?:\bremote\b|\bremotely\b|удал[её]н(?:но|ка|ный|ная)?|віддален(?:о|а|ий)?|дистанц(?:ионно|ійно)|masofaviy|онлайн\s+работ|online\s+work)/iu.test(text)) return true
-  return null
 }
 
 function approximateExperience(text: string): number | null {
@@ -248,7 +165,7 @@ export function repairCandidateProfile(profile: CvProfile): CvProfile {
   const location = explicitLocation(text)
   const detectedCountry = countryFromLocation(location)
   const detectedCity = cityFromLocation(location, detectedCountry)
-  const remoteSignal = explicitRemote(text)
+  const remoteSignal = detectCandidateRemotePreference(text)
   const experience = profile.experienceYears ?? approximateExperience(text)
   const salary = profile.salaryMin == null && profile.salaryMax == null ? uzSalary(text) : null
 
@@ -258,7 +175,7 @@ export function repairCandidateProfile(profile: CvProfile): CvProfile {
     // the channel's country (UA) in place. Country-only location values must not
     // survive as a fake city.
     const currentCity = cleanToken(city || '')
-    if (!detectedCity && COUNTRY_ALIASES.some((item) => item.re.test(currentCity))) city = null
+    if (!detectedCity && normalizeHiringCountry(currentCity)) city = null
     else if (detectedCity) city = detectedCity
   }
 

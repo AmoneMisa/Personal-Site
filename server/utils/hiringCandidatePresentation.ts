@@ -1,5 +1,6 @@
 import type { CvProfile } from './hiringTypes'
 import { parseExtendedLanguageContext } from '@whiteslove/parsing-lexicon/hiring-language-extensions'
+import { normalizeSourceRole } from '@whiteslove/parsing-lexicon/hiring-source-aliases'
 import {
   publicCandidateGender,
   publicCandidateName,
@@ -17,10 +18,8 @@ export {
 }
 export type { HiringCandidateLocale }
 
-const STANDALONE_REMOTE_ROLE_RE = /^(?:онлайн|onlayn|online)$/iu
-
 export function publicCandidateProfessionKeys(profile: CvProfile): string[] {
-  if (STANDALONE_REMOTE_ROLE_RE.test(String(profile.role || '').trim())) return ['Any Role']
+  if (normalizeSourceRole(profile.role)?.label === 'Any Role') return ['Any Role']
   return coreProfessionKeys(profile)
 }
 
