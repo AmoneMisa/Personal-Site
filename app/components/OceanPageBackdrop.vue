@@ -11,7 +11,9 @@ withDefaults(defineProps<{
     class="ocean-page-backdrop"
     :class="`ocean-page-backdrop_${variant}`"
     aria-hidden="true"
-  />
+  >
+    <underwater-ambient />
+  </div>
 </template>
 
 <style scoped>
@@ -19,6 +21,7 @@ withDefaults(defineProps<{
   position: fixed;
   inset: 0;
   z-index: -1;
+  isolation: isolate;
   pointer-events: none;
   background-color: #05091d;
   background-image:
@@ -56,6 +59,7 @@ withDefaults(defineProps<{
 .ocean-page-backdrop_ambient::after {
   content: "";
   position: absolute;
+  z-index: -1;
   border: 1px solid rgba(75, 145, 255, 0.22);
   border-radius: 999px;
 }
