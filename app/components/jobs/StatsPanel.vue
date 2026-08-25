@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import type { Job, JobProfessionGeographyStat, JobSalaryTrendPoint, JobStats } from "~/types/jobs";
-import SearchSourceTabs from "~/components/search/SearchSourceTabs.vue";
 import { locationLabel } from "~/utils/locationLabels";
 import { canonicalCityValue } from "~~/shared/locationCatalog";
 
@@ -19,6 +18,15 @@ const activeTab = ref<"overview" | "trends">("overview");
 const trendDays = ref<1 | 3 | 7 | 60>(7);
 const trendScope = ref<"world" | "country" | "city" | "position" | "positions">("world");
 const colors = ["#e0679a", "#45c8ff", "#a78bfa", "#34d399"];
+
+const compactDisplayPeriodLabel = computed(() => {
+  const label = props.displayPeriodLabel.trim();
+  if (!String(locale.value).toLowerCase().startsWith("ru")) return label;
+  const normalized = label.toLocaleLowerCase("ru-RU");
+  if (normalized === "год") return "г.";
+  if (normalized === "месяц") return "м.";
+  return label;
+});
 
 const countryStats = computed(() => Object.entries(props.stats.byCountry ?? {}).sort((a, b) => b[1].count - a[1].count));
 const sourceStats = computed(() => Object.entries(props.stats.bySource ?? {}).sort((a, b) => b[1].count - a[1].count));
@@ -88,7 +96,10 @@ const chart = computed(() => {
       const index = Math.min(bucketCount - 1, Math.max(0, Math.floor((point.at - start) / bucketMs)));
       buckets[index].push(point.salary);
     }
-    return { group, values: buckets.map((bucket) => bucket.length ? bucket.sort((a, b) => a - b)[Math.floor(bucket.length / 2)] : null) };
+    return {
+      group,
+      values: buckets.map((bucket) => bucket.length ? bucket.sort((a, b) => a - b)[Math.floor(bucket.length / 2)] : null),
+    };
   });
   const lines = raw.map((line, lineIndex) => ({
     label: trendScope.value === "country"
@@ -117,8 +128,10 @@ const periodOptions = computed(() => [
   { value: "60", label: t("trendTwoMonths") },
 ]);
 const scopeOptions = computed(() => [
-  { value: "world", label: t("trendWorld") }, { value: "country", label: t("trendCountries") },
-  { value: "city", label: t("trendCities") }, { value: "position", label: t("trendPositions") },
+  { value: "world", label: t("trendWorld") },
+  { value: "country", label: t("trendCountries") },
+  { value: "city", label: t("trendCities") },
+  { value: "position", label: t("trendPositions") },
   { value: "positions", label: t("trendPositionSet") },
 ]);
 
@@ -139,7 +152,7 @@ function selectTrendScope(value: string) {
 <template>
   <UiAnalyticsPanel class="stats" :title="t('statsTitle')" :collapse-label="t('statsCollapse')" :expand-label="t('statsExpand')">
     <template #controls>
-      <SearchSourceTabs
+      <UiAnalyticsTabs
         class="stats__switch"
         :model-value="activeTab"
         :items="tabOptions"
@@ -150,7 +163,7 @@ function selectTrendScope(value: string) {
 
     <div v-if="activeTab === 'overview'" class="stats__grid">
       <article class="stats__card stats__card_salary">
-        <div class="stats__label">{{ t("statsSalary") }} ({{ displayCurrency }}/{{ displayPeriodLabel }})</div>
+        <div class="stats__label">{{ t("statsSalary") }} ({{ displayCurrency }}/{{ compactDisplayPeriodLabel }})</div>
         <template v-if="stats.salary.count">
           <div class="stats__big">{{ money(stats.salary.medianUsd) }}</div>
           <div class="stats__sub">{{ t("statAvg") }} {{ money(stats.salary.avgUsd) }} · {{ t("statRange") }} {{ money(stats.salary.minUsd) }}–{{ money(stats.salary.maxUsd) }}</div>
@@ -229,22 +242,32 @@ function selectTrendScope(value: string) {
     <div v-else class="trends">
       <article class="stats__card stats__card_wide trends__card">
         <div class="trends__filters">
-          <SearchSourceTabs
+          <UiAnalyticsTabs
             class="stats__switch"
             :model-value="String(trendDays)"
             :items="periodOptions"
+            compact
+            :aria-label="t('period')"
             @update:model-value="selectTrendDays"
           />
-          <SearchSourceTabs
+          <UiAnalyticsTabs
             class="stats__switch stats__switch_scope"
             :model-value="trendScope"
             :items="scopeOptions"
+            compact
+            :aria-label="t('statsTrends')"
             @update:model-value="selectTrendScope"
           />
         </div>
         <div v-if="chart.sampleCount && chart.lines.some((line) => line.values.some((value) => value != null))" class="trends__chart-wrap">
-          <UiAnalyticsLine :series="chart.lines" :labels="chart.labels" :format="money" />
-          <p class="trends__samples">{{ t("trendSamples", { n: chart.sampleCount }) }}</p>
+          <div class="trends__chart-head">
+            <div>
+              <div class="stats__label trends__chart-label">{{ t("trendChartLabel") }}</div>
+              <div class="trends__chart-unit">{{ displayCurrency }}/{{ compactDisplayPeriodLabel }}</div>
+            </div>
+            <span class="trends__sample-pill">{{ t("trendSamples", { n: chart.sampleCount }) }}</span>
+          </div>
+          <UiAnalyticsLine surface :series="chart.lines" :labels="chart.labels" :format="money" />
         </div>
         <div v-else class="trends__empty"><u-icon name="i-lucide-chart-spline" /><span>{{ t("trendNotEnough") }}</span></div>
       </article>
@@ -253,10 +276,50 @@ function selectTrendScope(value: string) {
 </template>
 
 <style scoped>
-.stats__grid { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 12px; }.stats__card { min-width: 0; padding: 14px; border: 1px solid rgba(85,111,174,.3); border-radius: 11px; background: rgba(12,18,48,.9); }.stats__card_wide { grid-column: 1/-1; }
-.stats__label { margin-bottom: 9px; color: var(--ui-text-muted); font-size: 11px; font-weight: 750; letter-spacing: .05em; text-transform: uppercase; }.stats__big { color: #f08ab8; font-size: 28px; font-weight: 750; overflow-wrap: anywhere; }.stats__sub { margin-top: 4px; color: var(--ui-text-muted); font-size: 12px; }.stats__sub_lead { margin: -2px 0 6px; }.stats__row { display: flex; justify-content: space-between; gap: 12px; padding: 3px 0; font-size: 13px; }.stats__row span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }.stats__row strong { flex: 0 0 auto; }.stats__row em,.stats__profession em,.stats__chips em { color: var(--ui-text-muted); font-size: 11px; font-style: normal; }.stats__row_divider { margin-top: 5px; padding-top: 7px; border-top: 1px solid var(--line); }.stats__chips { display: flex; flex-wrap: wrap; gap: 6px; }.stats__chips span { padding: 3px 9px; border: 1px solid rgba(85,111,174,.34); border-radius: 999px; color: var(--ui-text-muted); font-size: 12px; }.stats__chips_accent span { border-color: rgba(224,103,154,.38); color: #ee9bc0; }
-.stats__professions { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 10px; }.stats__profession { min-width: 0; padding: 10px; border: 1px solid rgba(85,111,174,.2); border-radius: 9px; background: rgba(5,10,31,.32); }.stats__profession-head { display: flex; min-width: 0; align-items: baseline; justify-content: space-between; gap: 10px; font-size: 13px; }.stats__profession-head > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }.stats__profession-head strong { flex: 0 0 auto; color: #f08ab8; }.stats__chips_geo { margin-top: 7px; }.stats__chips_geo span { padding: 2px 7px; font-size: 11px; }
-.trends__card { padding: 12px; }.trends__filters { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; margin-bottom: 12px; }.stats__switch_scope { justify-content: flex-end; }.trends__chart-wrap { min-width: 0; }.trends__samples { margin: 4px 0 0; text-align: right; color: var(--ui-text-muted); font-size: 11px; }.trends__empty { min-height: 220px; display: grid; place-content: center; justify-items: center; gap: 10px; color: var(--ui-text-muted); text-align: center; }.trends__empty :deep(svg) { font-size: 35px; color: rgba(224,103,154,.7); }
-@media(max-width:900px){.stats__grid{grid-template-columns:repeat(2,minmax(0,1fr))}.stats__card_wide{grid-column:1/-1}.stats__professions{grid-template-columns:1fr}.trends__filters{flex-direction:column}.stats__switch_scope{justify-content:flex-start}}
-@media(max-width:620px){.stats__switch{width:100%}.stats__grid{grid-template-columns:1fr}.stats__card_wide{grid-column:auto}}
+.stats__grid { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 12px; }
+.stats__card { min-width: 0; padding: 14px; border: 1px solid rgba(85,111,174,.3); border-radius: 11px; background: rgba(12,18,48,.9); }
+.stats__card_wide { grid-column: 1/-1; }
+.stats__label { margin-bottom: 9px; color: var(--ui-text-muted); font-size: 11px; font-weight: 750; letter-spacing: .05em; text-transform: uppercase; }
+.stats__big { color: #f08ab8; font-size: 28px; font-weight: 750; overflow-wrap: anywhere; }
+.stats__sub { margin-top: 4px; color: var(--ui-text-muted); font-size: 12px; }
+.stats__sub_lead { margin: -2px 0 6px; }
+.stats__row { display: flex; justify-content: space-between; gap: 12px; padding: 3px 0; font-size: 13px; }
+.stats__row span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.stats__row strong { flex: 0 0 auto; }
+.stats__row em,.stats__profession em,.stats__chips em { color: var(--ui-text-muted); font-size: 11px; font-style: normal; }
+.stats__row_divider { margin-top: 5px; padding-top: 7px; border-top: 1px solid var(--line); }
+.stats__chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.stats__chips span { padding: 3px 9px; border: 1px solid rgba(85,111,174,.34); border-radius: 999px; color: var(--ui-text-muted); font-size: 12px; }
+.stats__chips_accent span { border-color: rgba(224,103,154,.38); color: #ee9bc0; }
+.stats__professions { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 10px; }
+.stats__profession { min-width: 0; padding: 10px; border: 1px solid rgba(85,111,174,.2); border-radius: 9px; background: rgba(5,10,31,.32); }
+.stats__profession-head { display: flex; min-width: 0; align-items: baseline; justify-content: space-between; gap: 10px; font-size: 13px; }
+.stats__profession-head > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.stats__profession-head strong { flex: 0 0 auto; color: #f08ab8; }
+.stats__chips_geo { margin-top: 7px; }
+.stats__chips_geo span { padding: 2px 7px; font-size: 11px; }
+.trends__card { padding: 14px; background: rgba(8, 13, 39, 0.82); }
+.trends__filters { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; margin-bottom: 14px; padding-bottom: 12px; border-bottom: 1px solid rgba(85,111,174,.2); }
+.stats__switch_scope { justify-content: flex-end; }
+.trends__chart-wrap { min-width: 0; display: grid; gap: 10px; }
+.trends__chart-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; padding: 0 2px; }
+.trends__chart-label { margin-bottom: 3px; }
+.trends__chart-unit { color: var(--text-primary); font-size: 12px; font-weight: 700; }
+.trends__sample-pill { flex: 0 0 auto; padding: 5px 9px; border: 1px solid rgba(85,111,174,.3); border-radius: 999px; background: rgba(5,10,31,.48); color: var(--ui-text-muted); font-size: 10.5px; line-height: 1.2; }
+.trends__empty { min-height: 248px; display: grid; place-content: center; justify-items: center; gap: 10px; color: var(--ui-text-muted); text-align: center; }
+.trends__empty :deep(svg) { font-size: 35px; color: rgba(224,103,154,.7); }
+@media(max-width:900px){
+  .stats__grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .stats__card_wide{grid-column:1/-1}
+  .stats__professions{grid-template-columns:1fr}
+  .trends__filters{flex-direction:column}
+  .stats__switch_scope{justify-content:flex-start}
+}
+@media(max-width:620px){
+  .stats__switch{width:100%}
+  .stats__grid{grid-template-columns:1fr}
+  .stats__card_wide{grid-column:auto}
+  .trends__chart-head{align-items:flex-start;flex-direction:column}
+  .trends__sample-pill{align-self:flex-start}
+}
 </style>
