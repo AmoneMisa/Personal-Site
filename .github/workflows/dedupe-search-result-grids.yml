@@ -25,11 +25,13 @@ jobs:
           mkdir -p node_modules/@whiteslove/parsing-lexicon
           curl -fsSL https://github.com/AmoneMisa/parsing-lexicon/archive/2aaafbbc8a064c3d5041f1185eb00f0615891ae2.tar.gz | tar -xz --strip-components=1 -C node_modules/@whiteslove/parsing-lexicon
       - name: Apply result grid deduplication
-        run: node .github/scripts/dedupe_search_result_grids.mjs
+        run: |
+          node .github/scripts/dedupe_search_result_grids.mjs
+          node .github/scripts/update_result_grid_tests.mjs
       - name: Run focused regression tests
         run: node --experimental-strip-types --import ./tests/setup.mjs --test tests/search-component-dedup.test.mjs tests/flats-layout-and-stats.test.mjs tests/hiring-statistics.test.mjs tests/jobs-statistics.test.mjs
       - name: Remove one-off migration files
-        run: rm .github/scripts/dedupe_search_result_grids.mjs .github/workflows/dedupe-search-result-grids.yml
+        run: rm .github/scripts/dedupe_search_result_grids.mjs .github/scripts/update_result_grid_tests.mjs .github/workflows/dedupe-search-result-grids.yml
       - name: Commit refactor
         run: |
           git config user.name "github-actions[bot]"
