@@ -80,8 +80,8 @@ async function atomicWrite(key: string, entry: Entry): Promise<void> {
   await rename(tmp, path)
 }
 
-function parseSetOptions(options: SetOption[]): { expiresAt: number | null; nx: boolean } {
-  let expiresAt: number | null = null
+function parseSetOptions(options: SetOption[]): { ttlMs: number | null; nx: boolean } {
+  let ttlMs: number | null = null
   let nx = false
 
   for (let i = 0; i < options.length; i += 1) {
@@ -93,13 +93,13 @@ function parseSetOptions(options: SetOption[]): { expiresAt: number | null; nx: 
     if (token === 'EX' || token === 'PX') {
       const amount = Number(options[i + 1])
       if (Number.isFinite(amount) && amount > 0) {
-        expiresAt = Date.now() + (token === 'EX' ? amount * 1000 : amount)
+        ttlMs = token === 'EX' ? amount * 1000 : amount
       }
       i += 1
     }
   }
 
-  return { expiresAt, nx }
+  return { ttlMs, nx }
 }
 
 export class PersistentStateStore {
@@ -111,9 +111,10 @@ export class PersistentStateStore {
     const parsed = parseSetOptions(options)
     return serializeKey(key, async () => {
       if (parsed.nx && await readEntry(key)) return null
+      const expiresAt = parsed.ttlMs == null ? null : Date.now() + parsed.ttlMs
       await atomicWrite(key, {
         value: String(value),
-        expiresAt: parsed.expiresAt,
+        expiresAt,
       })
       return 'OK'
     })
