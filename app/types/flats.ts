@@ -49,6 +49,9 @@ export interface FlatListing {
   airConditioner?: boolean | null;
   gas?: boolean | null;
   newBuilding?: boolean | null;
+  cadastral?: boolean | null;
+  firstRental?: boolean | null;
+  potentiallyUnsafe?: boolean;
   communalSeparated?: boolean | null;
   kvartal?: string | null;
   area?: string | null;
