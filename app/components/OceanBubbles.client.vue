@@ -16,6 +16,15 @@ type Bubble = {
   depth: number;
 };
 
+type Burst = {
+  x: number;
+  y: number;
+  age: number;
+  ttl: number;
+  radius: number;
+  seed: number;
+};
+
 let ctx: CanvasRenderingContext2D | null = null;
 let width = 0;
 let height = 0;
@@ -25,6 +34,7 @@ let last = 0;
 let running = false;
 let reducedMotion: MediaQueryList | null = null;
 let bubbles: Bubble[] = [];
+let bursts: Burst[] = [];
 
 const random = (min: number, max: number) => min + Math.random() * (max - min);
 
@@ -55,6 +65,22 @@ function resetBubble(bubble: Bubble) {
   Object.assign(bubble, makeBubble(false));
 }
 
+function bubbleX(bubble: Bubble, now: number) {
+  return bubble.x + Math.sin(now * 0.00072 + bubble.phase) * bubble.drift;
+}
+
+function popBubble(bubble: Bubble, now: number) {
+  bursts.push({
+    x: bubbleX(bubble, now),
+    y: bubble.y,
+    age: 0,
+    ttl: random(0.34, 0.48),
+    radius: bubble.radius,
+    seed: Math.random() * TAU,
+  });
+  resetBubble(bubble);
+}
+
 function configureCanvas() {
   const canvas = canvasRef.value;
   if (!canvas) return;
@@ -79,8 +105,7 @@ function configureCanvas() {
 function drawBubble(bubble: Bubble, now: number) {
   if (!ctx) return;
 
-  const wobble = Math.sin(now * 0.00072 + bubble.phase) * bubble.drift;
-  const x = bubble.x + wobble;
+  const x = bubbleX(bubble, now);
   const r = bubble.radius;
   const alpha = 0.16 + bubble.depth * 0.24;
 
@@ -111,6 +136,32 @@ function drawBubble(bubble: Bubble, now: number) {
   ctx.restore();
 }
 
+function drawBurst(burst: Burst) {
+  if (!ctx) return;
+  const progress = Math.min(1, burst.age / burst.ttl);
+  const alpha = 1 - progress;
+  const spread = burst.radius * (1.15 + progress * 2.4);
+
+  ctx.save();
+  ctx.translate(burst.x, burst.y);
+  ctx.strokeStyle = `rgba(224,248,255,${0.8 * alpha})`;
+  ctx.lineWidth = Math.max(0.7, burst.radius * 0.1 * alpha);
+  ctx.beginPath();
+  ctx.arc(0, 0, spread, 0, TAU);
+  ctx.stroke();
+
+  ctx.fillStyle = `rgba(235,250,255,${0.78 * alpha})`;
+  for (let i = 0; i < 7; i += 1) {
+    const angle = burst.seed + (i / 7) * TAU;
+    const distance = spread * (0.55 + (i % 3) * 0.16);
+    const particleRadius = Math.max(0.7, burst.radius * (0.16 - progress * 0.08));
+    ctx.beginPath();
+    ctx.arc(Math.cos(angle) * distance, Math.sin(angle) * distance, particleRadius, 0, TAU);
+    ctx.fill();
+  }
+  ctx.restore();
+}
+
 function frame(now: number) {
   if (!running || !ctx) return;
 
@@ -125,7 +176,37 @@ function frame(now: number) {
     drawBubble(bubble, now);
   }
 
+  for (let i = bursts.length - 1; i >= 0; i -= 1) {
+    const burst = bursts[i]!;
+    burst.age += dt;
+    if (burst.age >= burst.ttl) {
+      bursts.splice(i, 1);
+      continue;
+    }
+    drawBurst(burst);
+  }
+
   raf = requestAnimationFrame(frame);
+}
+
+function handlePointerDown(event: PointerEvent) {
+  if (reducedMotion?.matches) return;
+  const now = performance.now();
+  let best: Bubble | null = null;
+  let bestDistance = Number.POSITIVE_INFINITY;
+
+  for (const bubble of bubbles) {
+    const dx = bubbleX(bubble, now) - event.clientX;
+    const dy = bubble.y - event.clientY;
+    const distance = Math.hypot(dx, dy);
+    const hitRadius = Math.max(13, bubble.radius + 8);
+    if (distance <= hitRadius && distance < bestDistance) {
+      best = bubble;
+      bestDistance = distance;
+    }
+  }
+
+  if (best) popBubble(best, now);
 }
 
 function start() {
@@ -156,6 +237,7 @@ onMounted(() => {
   reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
   reducedMotion.addEventListener("change", syncState);
   window.addEventListener("resize", handleResize, { passive: true });
+  window.addEventListener("pointerdown", handlePointerDown, { passive: true });
   document.addEventListener("visibilitychange", syncState);
   configureCanvas();
   syncState();
@@ -165,8 +247,10 @@ onBeforeUnmount(() => {
   stop(true);
   reducedMotion?.removeEventListener("change", syncState);
   window.removeEventListener("resize", handleResize);
+  window.removeEventListener("pointerdown", handlePointerDown);
   document.removeEventListener("visibilitychange", syncState);
   bubbles = [];
+  bursts = [];
   ctx = null;
 });
 </script>
