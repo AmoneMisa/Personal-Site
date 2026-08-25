@@ -3,21 +3,29 @@ import assert from 'node:assert/strict'
 import { readFile } from 'node:fs/promises'
 
 const panel = await readFile(new URL('../app/components/jobs/StatsPanel.vue', import.meta.url), 'utf8')
-const chart = await readFile(new URL('../app/components/ui/AnalyticsLine.vue', import.meta.url), 'utf8')
+const line = await readFile(new URL('../app/components/ui/AnalyticsLine.vue', import.meta.url), 'utf8')
+const bars = await readFile(new URL('../app/components/ui/AnalyticsBars.vue', import.meta.url), 'utf8')
+const donut = await readFile(new URL('../app/components/ui/AnalyticsDonut.vue', import.meta.url), 'utf8')
 const tabs = await readFile(new URL('../app/components/ui/AnalyticsTabs.vue', import.meta.url), 'utf8')
 const shell = await readFile(new URL('../app/components/ui/AnalyticsPanel.vue', import.meta.url), 'utf8')
+const checkbox = await readFile(new URL('../app/components/common/CustomCheckbox.vue', import.meta.url), 'utf8')
+const filterControl = await readFile(new URL('../app/components/search/SearchFilterControl.vue', import.meta.url), 'utf8')
 
-test('vacancy trends render through the shared Chart.js line component', () => {
-  assert.match(chart, /from "chart\.js"/u)
-  assert.match(chart, /from "vue-chartjs"/u)
+test('vacancy graph view is a list of the same shared Chart.js visualizations as other analytics', () => {
+  assert.match(line, /from "chart\.js"/u)
+  assert.match(line, /from "vue-chartjs"/u)
+  assert.match(bars, /from "chart\.js"/u)
+  assert.match(bars, /from "vue-chartjs"/u)
+  assert.match(donut, /from "chart\.js"/u)
+  assert.match(donut, /from "vue-chartjs"/u)
   assert.match(panel, /<UiAnalyticsLine surface/u)
-  assert.match(chart, /analytics-line_surface/u)
+  assert.match(panel, /<UiAnalyticsBars/u)
+  assert.match(panel, /<UiAnalyticsDonut/u)
+  assert.doesNotMatch(panel, /<USelectMenu/u)
 })
 
-test('vacancy analytics has one designed data-versus-graphs tab switch', () => {
+test('vacancy analytics has exactly one designed data-versus-graphs tab switch', () => {
   assert.equal((panel.match(/<UiAnalyticsTabs/gu) || []).length, 1)
-  assert.match(panel, /<USelectMenu[\s\S]*:model-value="String\(trendDays\)"/u)
-  assert.match(panel, /<USelectMenu[\s\S]*:model-value="trendScope"/u)
   assert.match(tabs, /role="tablist"/u)
   assert.doesNotMatch(tabs, /compact/u)
   assert.match(tabs, /linear-gradient\(135deg, rgba\(224, 103, 154/u)
@@ -28,6 +36,15 @@ test('analytics panel header is clickable outside its nested controls', () => {
   assert.match(shell, /@click="toggleExpanded"/u)
   assert.match(shell, /:aria-label="expanded \? collapseLabel : expandLabel"/u)
   assert.match(shell, /@click\.stop="toggleExpanded"/u)
+})
+
+test('boolean search controls use toggle switches without changing ordinary checkboxes elsewhere', () => {
+  assert.match(filterControl, /variant="switch"/u)
+  assert.match(checkbox, /variant\?: "checkbox" \| "switch"/u)
+  assert.match(checkbox, /:role="variant === 'switch' \? 'switch' : undefined"/u)
+  assert.match(checkbox, /class="cb__switch"/u)
+  assert.match(checkbox, /class="cb__box"/u)
+  assert.match(checkbox, /translateX\(14px\)/u)
 })
 
 test('Russian salary period labels are compact in vacancy statistics', () => {

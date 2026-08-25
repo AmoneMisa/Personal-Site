@@ -5,6 +5,7 @@ import { readFile } from 'node:fs/promises'
 const card = await readFile(new URL('../app/components/flats/FlatCard.vue', import.meta.url), 'utf8')
 const grid = await readFile(new URL('../app/components/flats/FlatGrid.vue', import.meta.url), 'utf8')
 const stats = await readFile(new URL('../app/components/flats/StatsPanel.vue', import.meta.url), 'utf8')
+const feed = await readFile(new URL('../app/composables/flats/useFlatFeed.ts', import.meta.url), 'utf8')
 const page = await readFile(new URL('../app/pages/flat-finder/index.vue', import.meta.url), 'utf8')
 
 test('flat cards share one row height and compact title/media geometry', () => {
@@ -16,10 +17,17 @@ test('flat cards share one row height and compact title/media geometry', () => {
   assert.doesNotMatch(card, /\.flat-card__meta \{[^}]*border-top/u)
 })
 
-test('flat geography statistics can be scoped independently by deal kind', () => {
+test('flat geography statistics stay populated when a scoped country slice is empty', () => {
   assert.match(stats, /geographiesByDeal\?\.\[dealScope\.value\]/u)
+  assert.match(stats, /scoped\?\.length \? scoped : \(props\.statistics\.geographies\[geoDimension\.value\]/u)
   for (const kind of ['sale', 'longRent', 'shortRent', 'roomRent']) assert.match(stats, new RegExp(`"${kind}"`, 'u'))
   assert.match(stats, /<SearchSourceTabs v-model="dealScope"/u)
+})
+
+test('flat statistics are not cleared while a country refresh waits for the background aggregate', () => {
+  assert.match(feed, /if \(!append && data\.statistics\) statistics\.value = data\.statistics/u)
+  assert.doesNotMatch(feed, /statistics\.value = data\.statistics \|\| null/u)
+  assert.match(feed, /const statisticsLoading = ref\(false\)/u)
 })
 
 test('room rent remains a deal type but is not duplicated in quick filters', () => {

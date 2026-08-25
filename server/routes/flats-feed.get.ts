@@ -18,6 +18,11 @@ const EMPTY_STALE_MS = 60_000
 // The flat API answers an uncached query in ~6s and slower under load; 15s left
 // legitimate searches failing as if nothing matched.
 const UPSTREAM_TIMEOUT_MS = 25_000
+// Full statistics aggregate the complete filtered result and can legitimately
+// take longer than a page lookup. They are loaded off the critical rendering
+// path, so give only stats-only requests a larger budget instead of slowing the
+// listings feed itself.
+const STATS_UPSTREAM_TIMEOUT_MS = 55_000
 // A direct single-offer lookup should be faster than a country refresh. Keep it
 // below the main proxy budget so a broken OLX detail endpoint cannot hold the
 // share-link request open for the full feed timeout.
@@ -206,7 +211,8 @@ function staleWindow(entry: { data: any } | undefined): number {
 function refreshFeed(key: string, url: string): Promise<any> {
   const current = feedRefreshes.get(key)
   if (current) return current
-  const request = $fetch<any>(url, { timeout: UPSTREAM_TIMEOUT_MS })
+  const statsOnly = /(?:[?&])statsOnly=(?:1|true)(?:&|$)/u.test(url)
+  const request = $fetch<any>(url, { timeout: statsOnly ? STATS_UPSTREAM_TIMEOUT_MS : UPSTREAM_TIMEOUT_MS })
     .then((data) => {
       const at = data?.warming ? Date.now() - FEED_FRESH_MS : Date.now()
       feedCache.set(key, { at, data })
