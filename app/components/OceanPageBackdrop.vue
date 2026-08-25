@@ -51,43 +51,48 @@ withDefaults(defineProps<{
   --ocean-page-mobile-position: 70% top;
 }
 
+/* Underwater light: broad refracted shafts and thin caustic streaks.
+   No radial/repeating circles — this should read as light coming through
+   the surface above the viewer, not as ripples painted on the screen. */
 .ocean-page-backdrop_has-life::before,
 .ocean-page-backdrop_has-life::after {
   content: "";
   position: absolute;
-  inset: -12%;
+  inset: -16%;
   z-index: 0;
   pointer-events: none;
   transform: translate3d(0, 0, 0);
+  mix-blend-mode: screen;
 }
 
 .ocean-page-backdrop_has-life::before {
-  opacity: 0.28;
+  opacity: .34;
   background:
-    repeating-radial-gradient(
-      ellipse at 50% -22%,
-      rgba(114, 205, 255, 0.16) 0 2px,
-      rgba(79, 166, 235, 0.055) 3px 10px,
-      transparent 12px 34px
-    );
-  filter: blur(2.5px);
-  animation: ocean-water-caustics 16s ease-in-out infinite alternate;
+    linear-gradient(104deg, transparent 0 8%, rgba(123, 210, 255, .10) 12%, transparent 18% 27%, rgba(100, 193, 246, .075) 32%, transparent 39% 51%, rgba(122, 211, 255, .085) 57%, transparent 64% 75%, rgba(95, 183, 239, .065) 80%, transparent 87%),
+    linear-gradient(78deg, transparent 0 14%, rgba(159, 225, 255, .035) 20%, transparent 29% 52%, rgba(139, 215, 255, .035) 59%, transparent 69%);
+  filter: blur(18px);
+  transform-origin: 50% -10%;
+  animation: ocean-underwater-shafts 18s ease-in-out infinite alternate;
+  -webkit-mask-image: linear-gradient(to bottom, #000 0%, rgba(0,0,0,.82) 52%, transparent 92%);
+  mask-image: linear-gradient(to bottom, #000 0%, rgba(0,0,0,.82) 52%, transparent 92%);
 }
 
 .ocean-page-backdrop_has-life::after {
-  opacity: 0.2;
+  opacity: .24;
   background:
-    radial-gradient(ellipse at 18% 12%, rgba(114, 204, 255, 0.13), transparent 24%),
-    radial-gradient(ellipse at 72% 18%, rgba(71, 158, 231, 0.11), transparent 28%),
     repeating-linear-gradient(
-      104deg,
-      transparent 0 52px,
-      rgba(109, 201, 255, 0.055) 58px 61px,
-      transparent 67px 120px
+      112deg,
+      transparent 0 76px,
+      rgba(151, 226, 255, .07) 84px 87px,
+      transparent 96px 154px,
+      rgba(102, 195, 244, .04) 162px 164px,
+      transparent 172px 238px
     );
-  filter: blur(7px);
-  mix-blend-mode: screen;
-  animation: ocean-water-drift 22s ease-in-out infinite alternate;
+  filter: blur(5px);
+  transform: skewX(-5deg) scale(1.12);
+  animation: ocean-underwater-caustics 13s ease-in-out infinite alternate;
+  -webkit-mask-image: linear-gradient(to bottom, #000 0%, rgba(0,0,0,.65) 42%, transparent 76%);
+  mask-image: linear-gradient(to bottom, #000 0%, rgba(0,0,0,.65) 42%, transparent 76%);
 }
 
 .ocean-page-backdrop_has-life :deep(.underwater-ambient) {
@@ -113,27 +118,27 @@ withDefaults(defineProps<{
 .ocean-page-backdrop_ambient::before { width: 10px; height: 10px; left: 7%; top: 34%; box-shadow: 32px 42px 0 3px rgba(67,119,221,.09),105px 420px 0 5px rgba(66,172,255,.08); }
 .ocean-page-backdrop_ambient::after { width: 8px; height: 8px; right: 8%; top: 26%; box-shadow: -42px 54px 0 2px rgba(64,157,255,.08),16px 190px 0 4px rgba(118,83,226,.08); }
 
-@keyframes ocean-water-caustics {
+@keyframes ocean-underwater-shafts {
   0% {
-    transform: translate3d(-1.6%, -1%, 0) scale(1.01, 0.99) rotate(-0.25deg);
+    transform: translate3d(-2.2%, -1.4%, 0) rotate(-1.1deg) scale(1.03, 1.01);
   }
-  48% {
-    transform: translate3d(0.8%, 1.2%, 0) scale(1.025, 1.01) rotate(0.2deg);
+  52% {
+    transform: translate3d(.7%, .6%, 0) rotate(.35deg) scale(1.06, 1.025);
   }
   100% {
-    transform: translate3d(1.8%, -0.3%, 0) scale(1.01, 1.025) rotate(-0.08deg);
+    transform: translate3d(2.4%, -0.4%, 0) rotate(-.25deg) scale(1.025, 1.055);
   }
 }
 
-@keyframes ocean-water-drift {
+@keyframes ocean-underwater-caustics {
   0% {
-    transform: translate3d(1.5%, -1%, 0) scale(1.02);
+    transform: translate3d(-2.5%, -1.2%, 0) skewX(-7deg) scale(1.12, 1.02);
   }
-  55% {
-    transform: translate3d(-0.7%, 0.7%, 0) scale(1.035, 1.01);
+  48% {
+    transform: translate3d(.9%, .7%, 0) skewX(-3deg) scale(1.16, 1.035);
   }
   100% {
-    transform: translate3d(-1.8%, 1.2%, 0) scale(1.015, 1.035);
+    transform: translate3d(2.8%, -.2%, 0) skewX(-6deg) scale(1.11, 1.06);
   }
 }
 
