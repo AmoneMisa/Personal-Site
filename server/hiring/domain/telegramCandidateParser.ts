@@ -32,6 +32,7 @@ const CANDIDATE_FORM_RE =
 
 const CV_MARKER_RE = /(?:резюме|resume|\bcv\b|curriculum vitae|анкета|профиль кандидата|профіль кандидата|кандидат(?:ка)?|candidate profile|mening\s+(?:cv|rezume)|my\s+cv)/iu
 const FIRST_PERSON_RE = /(?:^|\n)\s*[^\p{L}\p{N}\n]{0,6}(?:я[\s—,-]|я\s+(?:ищу|шукаю)|(?:ищу|шукаю)\b|men[\s,]|mening[\s,]|my name is|i am a|i'm a|ismim\b)/iu
+const PERSONAL_PROFILE_RE = /(?:\b(?:1[6-9]|[2-6]\d)\s*(?:лет|года?|рок(?:и|ів)?|years?\s+old)\b|\b(?:студент(?:ка|ом|кой)?|student)\b)/iu
 const CONTACT_RE = /(?:\+?\d[\d\s()\-]{7,}|@[a-z0-9_]{4,}|(?:telegram|телефон|phone|tel|aloqa|murojaat|bog(?:'|’)lanish)\s*[:—-])/iu
 const SECTION_PATTERNS = {
   experience: /(?:опыт|досвід|experience|staj|tajriba|ish\s+tajribasi)/iu,
@@ -84,6 +85,7 @@ export function isLikelyCvPost(text: string, cvFeed = false): boolean {
 
   const hasCvMarker = CV_MARKER_RE.test(value)
   const firstPerson = FIRST_PERSON_RE.test(value)
+  const hasPersonalProfile = PERSONAL_PROFILE_RE.test(value)
   const hasRole = detectProfessionMatches(value, 1).length > 0
   const hasContact = CONTACT_RE.test(value)
   const sections = cvSectionCount(value)
@@ -93,7 +95,7 @@ export function isLikelyCvPost(text: string, cvFeed = false): boolean {
   if (explicitIntent && (firstPerson || candidateForm || hasRole || hasContact || sections >= 1)) return true
   if (hasCvMarker && (candidateForm || hasRole || sections >= 1 || hasContact)) return true
   if (cvFeed && (firstPerson || hasCvMarker || candidateForm) && (hasRole || sections >= 1 || hasExperience || hasContact)) return true
-  if (firstPerson && hasRole && (candidateForm || sections >= 1 || hasExperience || hasContact)) return true
+  if (firstPerson && hasRole && (candidateForm || hasPersonalProfile || sections >= 1 || hasExperience || hasContact)) return true
   return false
 }
 
