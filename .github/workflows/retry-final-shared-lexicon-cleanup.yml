@@ -1,0 +1,92 @@
+name: Retry final shared hiring lexicon cleanup
+
+on:
+  push:
+    paths:
+      - '.github/workflows/retry-final-shared-lexicon-cleanup.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Reuse validated migration transform
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          wf = Path('.github/workflows/final-shared-lexicon-cleanup.yml').read_text()
+          start_marker = '      - name: Replace remaining consumer lexicons\n'
+          end_marker = '      - name: Refresh dependency lock\n'
+          start = wf.find(start_marker)
+          end = wf.find(end_marker, start)
+          if start < 0 or end < 0:
+              raise SystemExit('migration transform markers not found')
+          section = wf[start:end]
+          run_marker = '        run: |\n'
+          pos = section.find(run_marker)
+          if pos < 0:
+              raise SystemExit('migration run block not found')
+          block = section[pos + len(run_marker):]
+          lines = []
+          for line in block.splitlines():
+              if line.startswith('          '):
+                  lines.append(line[10:])
+              elif line.strip():
+                  raise SystemExit(f'unexpected indentation: {line!r}')
+              else:
+                  lines.append('')
+          Path('/tmp/shared-lexicon-migrate.sh').write_text('\n'.join(lines) + '\n')
+          PY
+          bash /tmp/shared-lexicon-migrate.sh
+
+      - name: Repair generated literal newline escapes
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          path = Path('server/utils/hiringQuality.ts')
+          text = path.read_text()
+          text = text.replace("text.split('\n')", r"text.split('\n')")
+          text = text.replace(".join('\n')", r".join('\n')")
+          path.write_text(text)
+          PY
+
+      - name: Refresh dependency lock
+        run: npm install --ignore-scripts
+
+      - name: Run full test suite
+        run: npm test
+
+      - name: Verify final lexicon boundary
+        shell: bash
+        run: |
+          grep -q 'e18bc9abe2cb5ad6d199e5a7281d2bcf52f79da2' package-lock.json
+          test "$(wc -l < shared/jobSkills.ts)" -lt 30
+          ! grep -q 'const SPECIAL_PROFESSIONS' server/utils/hiringQuality.ts
+          ! grep -q 'const COUNTRY_ALIASES' server/utils/hiringQuality.ts
+          ! grep -q 'const RAW_PROFESSION_LABELS' shared/hiringProfessionLabels.ts
+          ! grep -q 'const STANDALONE_REMOTE_ROLE_RE' server/utils/hiringCandidatePresentation.ts
+          ! grep -q 'const REMOTE_POSITIVE_RE' server/utils/hiringNormalize.ts
+          ! grep -q 'const REMOTE_NEGATIVE_RE' server/utils/hiringNormalize.ts
+          ! grep -q 'const FLEXIBLE_ROLE_RE' server/utils/hiringNormalize.ts
+          ! grep -q 'const NON_ROLE_RE' server/utils/hiringNormalize.ts
+          ! grep -q '\\bprincipal\\b' shared/jobs/jobSeniority.ts
+
+      - name: Commit validated cleanup and remove migration workflows
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git rm .github/workflows/final-shared-lexicon-cleanup.yml .github/workflows/retry-final-shared-lexicon-cleanup.yml
+          git add package.json package-lock.json shared/jobSkills.ts shared/jobs/jobSeniority.ts shared/hiringProfessionLabels.ts server/utils/hiringLexicon.ts server/utils/hiringNormalize.ts server/utils/hiringQuality.ts server/utils/hiringCandidatePresentation.ts
+          git commit -m "refactor: centralize remaining hiring lexicons"
+          git push
