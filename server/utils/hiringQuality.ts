@@ -6,6 +6,7 @@
 // remote status, location, or a profession from a person's name. Semantic AI
 // enrichment remains authoritative for ambiguous free-form text.
 
+import { isHiringNonCityLocation } from '@whiteslove/parsing-lexicon/hiring-location-fields'
 import {
   extractCandidateDisplayName,
   extractCandidateExperienceMentions,
@@ -78,13 +79,13 @@ function cityFromLocation(value: string | null, country: { code: string; name: s
   if (known) return known
   const first = cleanToken(cleaned.split(',')[0] || '')
   if (!first || normalizeHiringCountry(first)) return null
-  if (/^(?:europe|europa|європа|европа|штати|states)$/iu.test(first)) return null
+  if (isHiringNonCityLocation(first)) return null
   return first.slice(0, 80)
 }
 
 function approximateExperience(text: string): number | null {
   const mentions = extractCandidateExperienceMentions(text)
-  return mentions.find((item) => /(?:yaqin|atrofida)/iu.test(item.context))?.years ?? null
+  return mentions.find((item) => item.approximate)?.years ?? null
 }
 
 function candidateSalary(text: string, country: string): Pick<CvProfile, 'salaryMin' | 'salaryMax' | 'currency'> | null {

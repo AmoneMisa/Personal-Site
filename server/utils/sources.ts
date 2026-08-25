@@ -5,6 +5,7 @@ import { parseHiringSourceSalary } from '@whiteslove/parsing-lexicon/hiring-sour
 import { XMLParser } from 'fast-xml-parser'
 import type { Job } from './jobTypes'
 import { extractSalaryFromText } from './enrich'
+import { detectWorkModes } from './hiringLexicon'
 
 const UA = 'jobFinder/1.0 (job aggregator; contact: admin@whiteslove.me)'
 
@@ -132,7 +133,7 @@ export async function fetchTheMuse(q: string): Promise<Job[]> {
         location: locations.join(', ') || 'Unknown',
         url: j.refs?.landing_page || '',
         source: 'themuse',
-        remote: locations.some((l: string) => /remote|flexible/i.test(l)),
+        remote: locations.some((l: string) => detectWorkModes(l).includes('remote')),
         tags: (j.categories || []).map((c: any) => c.name).slice(0, 6),
         postedAt: new Date(j.publication_date).toISOString(),
         employmentType: j.type,
@@ -186,7 +187,7 @@ export async function fetchAdzuna(q: string): Promise<Job[]> {
     location: j.location?.display_name || 'Unknown',
     url: j.redirect_url,
     source: 'adzuna' as const,
-    remote: /remote/i.test(j.title + ' ' + (j.location?.display_name || '')),
+    remote: detectWorkModes(j.title + ' ' + (j.location?.display_name || '')).includes('remote'),
     tags: j.category?.label ? [j.category.label] : [],
     postedAt: new Date(j.created).toISOString(),
     employmentType: j.contract_time,
@@ -261,7 +262,7 @@ export async function fetchJooble(q: string): Promise<Job[]> {
       location: j.location || 'Unknown',
       url: j.link,
       source: 'jooble',
-      remote: /remote|удал[её]н|дистанцион/i.test(`${j.title} ${j.location || ''} ${description}`),
+      remote: detectWorkModes(`${j.title} ${j.location || ''} ${description}`).includes('remote'),
       tags: [j.type, j.source].filter(Boolean).slice(0, 6),
       postedAt: j.updated ? new Date(j.updated).toISOString() : new Date().toISOString(),
       employmentType: j.type || undefined,
