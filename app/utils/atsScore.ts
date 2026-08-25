@@ -5,6 +5,7 @@ import {
 } from '../../shared/hiring/ats/scoreCore'
 import { isNoSponsorshipRequirement } from '@whiteslove/parsing-lexicon/hiring-requirements'
 
+// Linguistic evidence comes from parsing-lexicon; this adapter only applies site-specific ATS policy.
 export { buildCvProfile }
 export type { CvProfile }
 
