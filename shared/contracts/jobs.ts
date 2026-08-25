@@ -234,6 +234,7 @@ export interface JobSalaryTrendPoint {
   city?: string
   title: string
   profession?: string
+  experienceYears?: number
 }
 
 export interface JobStats {

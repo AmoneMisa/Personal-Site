@@ -308,6 +308,7 @@ function computeStats(jobs: Job[]): JobStats {
         ...(job.city ? { city: job.city } : {}),
         title: job.title,
         profession,
+        ...(requiredExperience !== undefined ? { experienceYears: requiredExperience } : {}),
       })
     }
 

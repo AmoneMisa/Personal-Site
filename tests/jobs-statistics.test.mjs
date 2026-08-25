@@ -124,6 +124,14 @@ test('job statistics cover platform, relocation, work mode, employment, language
     { kind: 'country', key: 'US', count: 2, salaryCount: 2, medianUsd: 110_000 },
   )
   assert.ok(stats.salaryTrend.every((point) => point.profession))
+  assert.deepEqual(
+    stats.salaryTrend.map((point) => [point.title, point.experienceYears]).sort(),
+    [
+      ['Frontend Developer', 1],
+      ['Junior Backend Developer', 0],
+      ['Senior Frontend Engineer - Commerce', 3],
+    ].sort(),
+  )
 })
 
 test('salary card text compacts large amounts and Russian period labels without changing the full source string', () => {
@@ -155,7 +163,7 @@ test('listing cards expose only save/hide actions while detail views keep source
   assert.match(jobCard, /job-card__bottom/u)
   assert.match(jobGrid, /align-items:\s*stretch/u)
   assert.match(jobGrid, /job-card__salary-separator[^}]*display:\s*none/su)
-  assert.match(statsPanel, /nonProfessionLabels[^\n]*soft skills/u)
+  assert.match(statsPanel, /nonProfessionLabels[^\n]*soft skills[^\n]*databases/u)
   assert.ok(statsPanel.indexOf('stats__card_skills') < statsPanel.indexOf('stats__card_languages'))
   assert.match(jobsPage, /shareActiveJob/u)
   assert.match(jobsPage, /t\("openSource"\)/u)
