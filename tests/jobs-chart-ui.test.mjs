@@ -9,6 +9,7 @@ const donut = await readFile(new URL('../app/components/ui/AnalyticsDonut.vue', 
 const tabs = await readFile(new URL('../app/components/ui/AnalyticsTabs.vue', import.meta.url), 'utf8')
 const shell = await readFile(new URL('../app/components/ui/AnalyticsPanel.vue', import.meta.url), 'utf8')
 const checkbox = await readFile(new URL('../app/components/common/CustomCheckbox.vue', import.meta.url), 'utf8')
+const filterControl = await readFile(new URL('../app/components/search/SearchFilterControl.vue', import.meta.url), 'utf8')
 
 test('vacancy graph view is a list of the same shared Chart.js visualizations as other analytics', () => {
   assert.match(line, /from "chart\.js"/u)
@@ -37,12 +38,13 @@ test('analytics panel header is clickable outside its nested controls', () => {
   assert.match(shell, /@click\.stop="toggleExpanded"/u)
 })
 
-test('boolean search controls use the restored toggle switch presentation', () => {
-  assert.match(checkbox, /role="switch"/u)
+test('boolean search controls use toggle switches without changing ordinary checkboxes elsewhere', () => {
+  assert.match(filterControl, /variant="switch"/u)
+  assert.match(checkbox, /variant\?: "checkbox" \| "switch"/u)
+  assert.match(checkbox, /:role="variant === 'switch' \? 'switch' : undefined"/u)
   assert.match(checkbox, /class="cb__switch"/u)
-  assert.match(checkbox, /class="cb__knob"/u)
+  assert.match(checkbox, /class="cb__box"/u)
   assert.match(checkbox, /translateX\(14px\)/u)
-  assert.doesNotMatch(checkbox, /class="cb__box"/u)
 })
 
 test('Russian salary period labels are compact in vacancy statistics', () => {
