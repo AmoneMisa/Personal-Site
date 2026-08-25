@@ -55,6 +55,7 @@ function updateAndCommit(value: SearchFilterValue) {
 
     <CustomCheckbox
       v-else-if="field.control === 'checkbox'"
+      variant="switch"
       :model-value="Boolean(field.value)"
       :label="field.label"
       :disabled="field.disabled"
