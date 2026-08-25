@@ -1,13 +1,17 @@
 <script setup lang="ts">
 import CustomButton from "~/components/common/CustomButton.vue";
 import PdfEditorControls from "~/components/pdfEditor/PdfEditorControls.vue";
-import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from "vue";
-import { BaseFabricObject, Canvas, Ellipse, FabricObject, PencilBrush, Rect, Textbox } from "fabric";
+import { computed, reactive, ref } from "vue";
+import type { Canvas } from "fabric";
 import {usePdfDraft} from "~/composables/pdfEditor/usePdfDraft";
 import {usePdfAlignmentGuides} from "~/composables/pdfEditor/usePdfAlignmentGuides";
+import {usePdfCanvasController} from "~/composables/pdfEditor/usePdfCanvasController";
 import {usePdfCanvasHistory} from "~/composables/pdfEditor/usePdfCanvasHistory";
+import {usePdfDocumentNavigation} from "~/composables/pdfEditor/usePdfDocumentNavigation";
+import {usePdfEditorSession} from "~/composables/pdfEditor/usePdfEditorSession";
 import {usePdfExportTools} from "~/composables/pdfEditor/usePdfExportTools";
 import {usePdfImageTools} from "~/composables/pdfEditor/usePdfImageTools";
+import {usePdfLinkHotspots} from "~/composables/pdfEditor/usePdfLinkHotspots";
 import {usePdfSelectionInspector} from "~/composables/pdfEditor/usePdfSelectionInspector";
 import {usePdfTextLayer} from "~/composables/pdfEditor/usePdfTextLayer";
 import type {
@@ -21,15 +25,10 @@ import type {
   PdfTextAlign as TextAlign,
 } from "~/types/pdfEditor";
 import {
+  createDeferredPdfAction,
   PDF_FONT_FAMILIES as FONT_FAMILIES,
   PDF_SERIALIZED_PROPERTIES,
-  clampInt,
-  rgbaFromHex,
-  setFabricObjectByTopLeft as setByTopLeft,
 } from "~/utils/pdfEditor/core";
-
-(BaseFabricObject as any).ownDefaults.originX = "center";
-(BaseFabricObject as any).ownDefaults.originY = "center";
 
 const config = useRuntimeConfig();
 const { t } = useI18n();
@@ -68,7 +67,6 @@ const dpi = ref<number>(144);
 const isBusy = ref(false);
 const errorMsg = ref<string | null>(null);
 
-const stageRef = ref<HTMLDivElement | null>(null);
 const previewImgRef = ref<HTMLImageElement | null>(null);
 const overlayCanvasRef = ref<HTMLCanvasElement | null>(null);
 
@@ -77,10 +75,15 @@ const bgColor = ref<string | null>(null);
 // --- clickable links (auto-detected URLs / e-mails + source annotations)
 // per-page link regions in rendered-PNG pixel space at `dpi`
 const pageLinks = reactive<Record<number, LinkRegion[]>>({});
-// display px per PNG px (previewWidth / naturalWidth); kept in sync on resize
-const displayScale = ref(1);
-// true while Ctrl/Cmd is held -> link hotspots become clickable
-const linkArmed = ref(false);
+
+const {
+  clearLinkArmed,
+  displayScale,
+  linkArmed,
+  linkHotspots,
+  onModifierKey,
+  openLink,
+} = usePdfLinkHotspots({ page, pageLinks });
 // pages whose editable text was already auto-loaded on open
 const autoLoaded = reactive<Record<number, boolean>>({});
 
@@ -157,10 +160,6 @@ const previewUrl = computed(() => {
   return `${config.public.apiBase}/pdf/${kind}/${docId.value}/${page.value}?dpi=${dpi.value}`;
 });
 
-watch(dpi, () => {
-  dpi.value = clampInt(dpi.value, 72, 220);
-});
-
 // --- API helpers
 function api(path: string) {
   return `${config.public.apiBase}${path}`;
@@ -204,7 +203,10 @@ const {
   scheduleSave: scheduleSaveDraft,
 });
 
-let refreshSelectedImageClip = (_object: any) => {};
+const applyModeAction = createDeferredPdfAction<[]>();
+const loadCanvasAction = createDeferredPdfAction<[number]>();
+const resizeCanvasAction = createDeferredPdfAction<[]>();
+const refreshImageClipAction = createDeferredPdfAction<[any]>();
 
 const {
   activeObj,
@@ -220,7 +222,7 @@ const {
   selected,
   getCanvas: () => c,
   pushHistory,
-  refreshImageClip: (object) => refreshSelectedImageClip(object),
+  refreshImageClip: refreshImageClipAction.invoke,
 });
 
 const {
@@ -243,13 +245,29 @@ const {
   photoFrames,
   pageJson,
   getCanvas: () => c,
-  applyMode,
+  applyMode: applyModeAction.invoke,
   pushHistory,
   scheduleSave: scheduleSaveDraft,
   syncSelected: syncSelectedFromObject,
 });
 
-refreshSelectedImageClip = refreshImageClip;
+refreshImageClipAction.resolve(refreshImageClip);
+
+const { addDesignPage, refreshInfo, setPage } = usePdfDocumentNavigation({
+  docId,
+  pages,
+  page,
+  pageW,
+  pageH,
+  isBusy,
+  errorMsg,
+  pageJson,
+  getCanvas: () => c,
+  api,
+  loadCanvasForPage: loadCanvasAction.invoke,
+  scheduleSave: scheduleSaveDraft,
+  translate: t,
+});
 
 const { calcMultiplier, saveDocument } = usePdfExportTools({
   docId,
@@ -268,7 +286,7 @@ const { calcMultiplier, saveDocument } = usePdfExportTools({
   apiBase: config.public.apiBase,
   getCanvas: () => c,
   api,
-  resizeToPreview,
+  resizeToPreview: resizeCanvasAction.invoke,
   refreshInfo,
 });
 
@@ -293,266 +311,79 @@ const {
   backgroundUrl,
   calcMultiplier,
   refreshImageClip,
-  applyMode,
+  applyMode: applyModeAction.invoke,
   pushHistory,
   translate: t,
 });
 
-// =========================
-// PDF info
-// =========================
-async function refreshInfo() {
-  if (!docId.value) return;
-
-  const info = await $fetch<{ pages: number; pageW: number; pageH: number }>(api(`/pdf/page-info/${docId.value}`));
-  pages.value = info.pages;
-  pageW.value = info.pageW;
-  pageH.value = info.pageH;
-
-  if (page.value > pages.value) page.value = pages.value;
-  if (page.value < 1) page.value = 1;
-}
-
-// =========================
-// Fabric helpers
-// =========================
-function ensureFabric() {
-  if (!overlayCanvasRef.value) return;
-
-  if (c) {
-    c.dispose();
-    c = null;
-  }
-
-  c = new Canvas(overlayCanvasRef.value, {
-    selection: true,
-    preserveObjectStacking: true,
-    stopContextMenu: true,
-  });
-
-  // Ensure brush exists (Fabric v7 may not create it until needed)
-  if (!c.freeDrawingBrush) c.freeDrawingBrush = new PencilBrush(c);
-
-  FabricObject.prototype.transparentCorners = false;
-  FabricObject.prototype.cornerStyle = "circle";
-
-  c.on("path:created", pushHistory);
-  c.on("object:modified", pushHistory);
-  c.on("object:removed", pushHistory);
-
-  // keep the inspector panel in sync with the active selection
-  const syncActive = () => syncSelectedFromObject(c?.getActiveObject() ?? null);
-  c.on("selection:created", syncActive);
-  c.on("selection:updated", syncActive);
-  c.on("selection:cleared", () => {
-    selected.exists = false;
-  });
-  c.on("object:modified", syncActive);
-  c.on("object:moving", syncActive);
-  c.on("object:scaling", syncActive);
-  c.on("object:rotating", syncActive);
-
-  // alignment guides: snap while moving, clear once the drag/gesture ends
-  c.on("object:moving", onObjectMoving);
-  c.on("object:modified", clearGuides);
-  c.on("mouse:up", clearGuides);
-  c.on("selection:cleared", clearGuides);
-
-  // toggle the circular photo-frame clip as an image enters/leaves the circle
-  // while dragging; on drop, fill+clip a photo that landed inside the circle.
-  const clipOnMove = (e: any) => refreshImageClip(e?.target);
-  c.on("object:moving", clipOnMove);
-  c.on("object:scaling", clipOnMove);
-  c.on("object:modified", (e: any) => onImageDrop(e?.target));
-
-  // right-click a photo to swap it out (context menu -> file picker)
-  c.on("mouse:down", onCanvasMouseDown);
-  c.upperCanvasEl?.addEventListener("contextmenu", (ev) => ev.preventDefault());
-
-  applyMode();
-}
-
-function resizeToPreview() {
-  if (!c || !previewImgRef.value) return;
-
-  const r = previewImgRef.value.getBoundingClientRect();
-  const w = Math.max(1, r.width);
-  const h = Math.max(1, r.height);
-
-  // Fabric handles retina scaling internally
-  c.setDimensions({ width: w, height: h });
-  c.calcOffset();
-  c.requestRenderAll();
-
-  // keep link hotspots aligned with the displayed preview size
-  displayScale.value = 1 / (calcMultiplier() || 1);
-}
-
-function loadCanvasForPage(p: number) {
-  if (!c) return;
-
-  history.lock = true;
-  c.clear();
-  clearGuides();
-
-  resizeToPreview();
-
-  const json = pageJson[p];
-  if (json) {
-    c.loadFromJSON(json, () => {
-      history.lock = false;
-      history.stack = [c!.toJSON(PDF_SERIALIZED_PROPERTIES)];
-      history.idx = 0;
-      recoverPhotoFrame(p);
-      c!.requestRenderAll();
-      // A draft saved before the width fix may hold boxes measured against the
-      // fallback font; grow them once the real webfonts resolve so restored text
-      // doesn't wrap into the block below.
-      const fonts = (typeof document !== "undefined" ? (document as any).fonts : null);
-      if (fonts?.ready) fonts.ready.then(() => refitPdfTextWidths()).catch(() => {});
-      else refitPdfTextWidths();
-    });
-  } else {
-    history.lock = false;
-    history.stack = [c.toJSON(PDF_SERIALIZED_PROPERTIES)];
-    history.idx = 0;
-    c.requestRenderAll();
-  }
-}
-
-function applyMode() {
-  if (!c) return;
-
-  const isMove = editor.mode === "move";
-  const isDraw = editor.mode === "pen" || editor.mode === "highlighter" || editor.mode === "signature";
-
-  c.selection = isMove;
-  c.forEachObject((o) => {
-    o.selectable = isMove;
-    o.evented = true;
-  });
-
-  c.isDrawingMode = !isMove && isDraw;
-
-  if (c.isDrawingMode) {
-    if (!c.freeDrawingBrush) c.freeDrawingBrush = new PencilBrush(c);
-
-    const alpha = editor.opacity / 100;
-    c.freeDrawingBrush.color =
-        editor.mode === "highlighter" ? rgbaFromHex(editor.color, alpha * 0.35) : rgbaFromHex(editor.color, alpha);
-
-    c.freeDrawingBrush.width = Math.max(1, editor.mode === "signature" ? editor.signatureSize : editor.size);
-  }
-
-  c.defaultCursor = isMove ? "default" : "crosshair";
-  c.hoverCursor = isMove ? "move" : "crosshair";
-  c.requestRenderAll();
-}
-
-// =========================
-// Tools actions (add objects)
-// =========================
-function addRect() {
-  if (!c) return;
-
-  const alpha = editor.opacity / 100;
-  const fill = rgbaFromHex(editor.color, alpha * 0.25);
-  const stroke = rgbaFromHex(editor.color, alpha);
-
-  const rect = new Rect({
-    width: 260,
-    height: 140,
-    fill,
-    stroke,
-    strokeWidth: 2,
-    rx: editor.brushShape === "round" ? 14 : 0,
-    ry: editor.brushShape === "round" ? 14 : 0,
-  });
-
-  setByTopLeft(rect, 80, 80);
-  c.add(rect);
-  c.setActiveObject(rect);
-  c.requestRenderAll();
-
-  editor.mode = "move";
-  applyMode();
-}
-
-function addCircle() {
-  if (!c) return;
-
-  const alpha = editor.opacity / 100;
-  const fill = rgbaFromHex(editor.color, alpha * 0.25);
-  const stroke = rgbaFromHex(editor.color, alpha);
-
-  const circle = new Ellipse({
-    rx: 120,
-    ry: 80,
-    fill,
-    stroke,
-    strokeWidth: 2,
-  });
-
-  setByTopLeft(circle, 90, 90);
-  c.add(circle);
-  c.setActiveObject(circle);
-  c.requestRenderAll();
-
-  editor.mode = "move";
-  applyMode();
-}
-
-function addTextBox() {
-  if (!c) return;
-
-  const alpha = editor.opacity / 100;
-
-  const txt = new Textbox(editor.textValue || "Text", {
-    width: 320,
-    fill: rgbaFromHex(editor.color, alpha),
-    fontFamily: editor.textFont || "Helvetica",
-    fontSize: clampInt(editor.textSize, 8, 120),
-    fontWeight: editor.textBold ? "bold" : "normal",
-    fontStyle: editor.textItalic ? "italic" : "normal",
-    underline: editor.textUnderline,
-  });
-
-  setByTopLeft(txt, 80, 80);
-  c.add(txt);
-  c.setActiveObject(txt);
-  c.requestRenderAll();
-
-  editor.mode = "move";
-  applyMode();
-}
-
-// Open a link region (Ctrl/Cmd-click) in a new tab.
-function openLink(uri: string) {
-  if (!uri) return;
-  window.open(uri, "_blank", "noopener,noreferrer");
-}
-
-// Link hotspots for the current page, in displayed-preview pixels.
-const linkHotspots = computed(() => {
-  const arr = pageLinks[page.value] || [];
-  const s = displayScale.value || 1;
-  return arr.map((l, i) => ({
-    key: `${page.value}_${i}`,
-    uri: l.uri,
-    left: l.x * s,
-    top: l.y * s,
-    width: Math.max(6, l.w * s),
-    height: Math.max(6, l.h * s),
-  }));
+const {
+  addCircle,
+  addRect,
+  addTextBox,
+  applyMode,
+  disposeCanvas,
+  ensureFabric,
+  loadCanvasForPage,
+  resizeToPreview,
+} = usePdfCanvasController({
+  page,
+  editor,
+  selected,
+  previewImg: previewImgRef,
+  overlayCanvas: overlayCanvasRef,
+  displayScale,
+  pageJson,
+  history,
+  getCanvas: () => c,
+  setCanvas: (canvas) => {
+    c = canvas;
+  },
+  calcMultiplier,
+  pushHistory,
+  syncSelected: syncSelectedFromObject,
+  onObjectMoving,
+  clearGuides,
+  refreshImageClip,
+  onImageDrop,
+  onCanvasMouseDown,
+  recoverPhotoFrame,
+  refitPdfTextWidths,
 });
 
-// Track Ctrl/Cmd so hotspots only intercept clicks while a modifier is held.
-function onModKey(e: KeyboardEvent) {
-  linkArmed.value = e.ctrlKey || e.metaKey;
-}
-function clearArmed() {
-  linkArmed.value = false;
-}
+applyModeAction.resolve(applyMode);
+loadCanvasAction.resolve(loadCanvasForPage);
+resizeCanvasAction.resolve(resizeToPreview);
+
+usePdfEditorSession({
+  docId,
+  page,
+  dpi,
+  isBusy,
+  errorMsg,
+  previewImg: previewImgRef,
+  editor,
+  pageJson,
+  pageLinks,
+  autoLoaded,
+  deletedImages,
+  getCanvas: () => c,
+  refreshInfo,
+  loadDraft,
+  ensureFabric,
+  resizeToPreview,
+  loadCanvasForPage,
+  maybeAutoLoadText,
+  applyMode,
+  removeSelected,
+  undo,
+  redo,
+  onModifierKey,
+  clearLinkArmed,
+  resetHistory,
+  disposeDraft,
+  saveDraftNow,
+  disposeCanvas,
+});
 
 function toggleFullMode() {
   editor.fullMode = !editor.fullMode;
@@ -562,49 +393,6 @@ function toggleFullMode() {
     syncSelectedFromObject(activeObj());
   }
 }
-
-// =========================
-// Page switching
-// =========================
-async function setPage(p: number) {
-  if (!docId.value || !c) return;
-
-  const nextP = clampInt(p, 1, pages.value);
-  if (nextP === page.value) return;
-
-  pageJson[page.value] = c.toJSON(PDF_SERIALIZED_PROPERTIES);
-  page.value = nextP;
-
-  await nextTick();
-  loadCanvasForPage(page.value);
-  scheduleSaveDraft();
-}
-
-// Append an empty themed page (same coloured columns as page 1, no avatar) and
-// jump to it. The backend edits source.pdf in place; existing pages are kept.
-async function addDesignPage() {
-  if (!docId.value || !c || isBusy.value) return;
-  isBusy.value = true;
-  errorMsg.value = null;
-  try {
-    const res = await $fetch<{ pages: number; page: number }>(
-      api(`/pdf/add-design-page/${docId.value}`),
-      { method: "POST" },
-    );
-    pages.value = res.pages;
-    await setPage(res.page);
-  } catch (e: any) {
-    errorMsg.value =
-      e?.data?.detail?.message || e?.data?.detail || e?.message || t("services.pdfEditor.addPageFailed");
-  } finally {
-    isBusy.value = false;
-  }
-}
-
-watch(page, () => {
-  if (page.value < 1) page.value = 1;
-  if (page.value > pages.value) page.value = pages.value;
-});
 
 // =========================
 // Other actions
@@ -618,128 +406,6 @@ function downloadSource() {
   window.open(`${config.public.apiBase}/pdf/download/${docId.value}`, "_blank");
 }
 
-// =========================
-// Keyboard shortcuts
-// =========================
-function isTypingTarget(el: EventTarget | null) {
-  const t = el as HTMLElement | null;
-  if (!t) return false;
-  const tag = (t.tagName || "").toLowerCase();
-  if (tag === "input" || tag === "textarea") return true;
-  return t.isContentEditable;
-}
-
-function onKeyDown(e: KeyboardEvent) {
-  if (isBusy.value) return;
-  if (isTypingTarget(e.target)) return;
-
-  if ((e.key === "Delete" || e.key === "Backspace") && c?.getActiveObject()) {
-    e.preventDefault();
-    removeSelected();
-    return;
-  }
-
-  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "z") {
-    e.preventDefault();
-    undo();
-    return;
-  }
-  if ((e.ctrlKey || e.metaKey) && (e.key.toLowerCase() === "y" || (e.shiftKey && e.key.toLowerCase() === "z"))) {
-    e.preventDefault();
-    redo();
-    return;
-  }
-}
-
-watch(
-    () => [editor.mode, editor.color, editor.opacity, editor.size, editor.signatureSize, editor.brushShape],
-    () => applyMode(),
-);
-
-// =========================
-// Lifecycle
-// =========================
-let onResize: any = null;
-let onPreviewLoad: any = null;
-
-async function boot() {
-  if (!docId.value) return;
-  isBusy.value = true;
-  errorMsg.value = null;
-
-  try {
-    await refreshInfo();
-    await loadDraft();
-
-    await nextTick();
-    ensureFabric();
-
-    // initial resize even if image already cached
-    resizeToPreview();
-
-    await nextTick();
-    loadCanvasForPage(page.value);
-
-    onResize = () => resizeToPreview();
-    window.addEventListener("resize", onResize);
-
-    // when the preview raster loads: resize, then auto-load editable text
-    onPreviewLoad = () => {
-      resizeToPreview();
-      maybeAutoLoadText();
-    };
-
-    const img = previewImgRef.value;
-    if (img) {
-      img.addEventListener("load", onPreviewLoad, { passive: true });
-      if (img.complete) onPreviewLoad();
-    }
-
-    window.addEventListener("keydown", onKeyDown);
-    window.addEventListener("keydown", onModKey);
-    window.addEventListener("keyup", onModKey);
-    window.addEventListener("blur", clearArmed);
-  } catch (e: any) {
-    errorMsg.value = e?.data?.detail?.message || e?.message || "Init failed";
-  } finally {
-    isBusy.value = false;
-  }
-}
-
-watch(docId, async () => {
-  page.value = 1;
-  Object.keys(pageJson).forEach((k) => delete pageJson[Number(k)]);
-  Object.keys(pageLinks).forEach((k) => delete pageLinks[Number(k)]);
-  Object.keys(autoLoaded).forEach((k) => delete autoLoaded[Number(k)]);
-  Object.keys(deletedImages).forEach((k) => delete deletedImages[Number(k)]);
-  resetHistory();
-  errorMsg.value = null;
-
-  await nextTick();
-  await boot();
-});
-
-onMounted(boot);
-
-onBeforeUnmount(() => {
-  disposeDraft();
-
-  window.removeEventListener("keydown", onKeyDown);
-  window.removeEventListener("keydown", onModKey);
-  window.removeEventListener("keyup", onModKey);
-  window.removeEventListener("blur", clearArmed);
-  if (onResize) window.removeEventListener("resize", onResize);
-
-  const img = previewImgRef.value;
-  if (img && onPreviewLoad) img.removeEventListener("load", onPreviewLoad as any);
-
-  if (c) {
-    pageJson[page.value] = c.toJSON(PDF_SERIALIZED_PROPERTIES);
-    saveDraftNow();
-    c.dispose();
-    c = null;
-  }
-});
 </script>
 
 <template>
@@ -869,7 +535,6 @@ onBeforeUnmount(() => {
 
           <div class="pdf__canvas-wrap">
             <div
-                ref="stageRef"
                 class="pdf__stage"
                 :class="{ pdf__stage_white: bgColor === 'white', pdf__stage_black: bgColor === 'black' }"
             >

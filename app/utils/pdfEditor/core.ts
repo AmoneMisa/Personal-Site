@@ -2,6 +2,16 @@ import type {PdfOriginalBlockMeta} from "~/types/pdfEditor";
 
 export const PDF_SERIALIZED_PROPERTIES = ["id", "tool", "opacityPct", "orig", "name"];
 
+export function createDeferredPdfAction<TArgs extends any[]>() {
+  let action: ((...args: TArgs) => void) | null = null;
+  return {
+    invoke: (...args: TArgs) => action?.(...args),
+    resolve: (next: (...args: TArgs) => void) => {
+      action = next;
+    },
+  };
+}
+
 export const PDF_FONT_FAMILIES = [
   "Helvetica",
   "Arial",
