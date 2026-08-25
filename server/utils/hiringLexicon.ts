@@ -6,6 +6,7 @@ import {
   HIRING_INTENT,
   PROBATION_TERMS,
   SCHEDULE_TERMS,
+  UA_CITY_CATALOG,
   WORK_MODES,
   aliasesOf,
   aliasesToRegex,
@@ -23,7 +24,11 @@ export function candidateFieldRegex(key: keyof typeof CANDIDATE_FIELD_TERMS): Re
   return matcher(CANDIDATE_FIELD_TERMS[key])
 }
 
-const CITY_MATCHERS = GEOGRAPHY_CITIES.map((city) => ({
+const HIRING_CITIES = [
+  ...GEOGRAPHY_CITIES.filter((city) => city.country !== 'UA'),
+  ...UA_CITY_CATALOG,
+]
+const CITY_MATCHERS = HIRING_CITIES.map((city) => ({
   city,
   re: aliasesToRegex([city.canonical, ...aliasesOf(city)]),
 }))
