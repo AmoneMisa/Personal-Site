@@ -17,6 +17,54 @@ const hasUnderwaterLife = computed(() => props.variant === "reef" || props.varia
     ]"
     aria-hidden="true"
   >
+    <template v-if="hasUnderwaterLife">
+      <svg class="ocean-page-backdrop__filter-defs" width="0" height="0" focusable="false" aria-hidden="true">
+        <defs>
+          <filter
+            id="ocean-underwater-refraction"
+            x="-8%"
+            y="-8%"
+            width="116%"
+            height="116%"
+            color-interpolation-filters="sRGB"
+          >
+            <feTurbulence
+              type="fractalNoise"
+              baseFrequency="0.004 0.012"
+              numOctaves="2"
+              seed="17"
+              stitchTiles="stitch"
+              result="waterNoise"
+            >
+              <animate
+                attributeName="baseFrequency"
+                dur="22s"
+                values="0.004 0.012;0.0052 0.014;0.0036 0.0108;0.004 0.012"
+                repeatCount="indefinite"
+              />
+            </feTurbulence>
+            <feGaussianBlur in="waterNoise" stdDeviation="0.55" result="softNoise" />
+            <feDisplacementMap
+              in="SourceGraphic"
+              in2="softNoise"
+              scale="3.2"
+              xChannelSelector="R"
+              yChannelSelector="B"
+            >
+              <animate
+                attributeName="scale"
+                dur="17s"
+                values="2.4;4.4;3.1;2.4"
+                repeatCount="indefinite"
+              />
+            </feDisplacementMap>
+          </filter>
+        </defs>
+      </svg>
+
+      <div class="ocean-page-backdrop__refracted-image" />
+    </template>
+
     <underwater-ambient v-if="hasUnderwaterLife" />
   </div>
 </template>
@@ -53,52 +101,76 @@ const hasUnderwaterLife = computed(() => props.variant === "reef" || props.varia
   --ocean-page-mobile-position: 70% top;
 }
 
-/* Underwater light: broad refracted shafts and thin caustic streaks.
-   No radial/repeating circles — this should read as light coming through
-   the surface above the viewer, not as ripples painted on the screen. */
+.ocean-page-backdrop__filter-defs {
+  position: absolute;
+  width: 0;
+  height: 0;
+  overflow: hidden;
+}
+
+/* The original image remains on the parent as a stable fallback. This nearly
+   opaque duplicate is displaced by low-frequency animated noise, so only the
+   scenery appears to bend through water; page content above it never moves. */
+.ocean-page-backdrop__refracted-image {
+  position: absolute;
+  inset: -2.5%;
+  z-index: 0;
+  pointer-events: none;
+  opacity: .96;
+  background-color: #05091d;
+  background-image:
+    linear-gradient(180deg, rgba(4, 8, 28, 0.38) 0%, rgba(4, 8, 28, 0.54) 54%, rgba(4, 8, 28, 0.76) 100%),
+    var(--ocean-page-image);
+  background-position: center top;
+  background-repeat: no-repeat;
+  background-size: cover;
+  filter: url("#ocean-underwater-refraction");
+  transform: scale(1.018);
+  transform-origin: 50% 22%;
+  will-change: filter, transform;
+  animation: ocean-refraction-drift 19s ease-in-out infinite alternate;
+}
+
+/* Light is deliberately secondary to the refraction: broad, diffuse patches
+   imitate moving surface caustics without drawing obvious stripes or circles. */
 .ocean-page-backdrop_has-life::before,
 .ocean-page-backdrop_has-life::after {
   content: "";
   position: absolute;
-  inset: -16%;
-  z-index: 0;
+  inset: -12%;
+  z-index: 1;
   pointer-events: none;
-  transform: translate3d(0, 0, 0);
   mix-blend-mode: screen;
+  transform: translate3d(0, 0, 0);
 }
 
 .ocean-page-backdrop_has-life::before {
-  opacity: .34;
+  opacity: .14;
   background:
-    linear-gradient(104deg, transparent 0 8%, rgba(123, 210, 255, .10) 12%, transparent 18% 27%, rgba(100, 193, 246, .075) 32%, transparent 39% 51%, rgba(122, 211, 255, .085) 57%, transparent 64% 75%, rgba(95, 183, 239, .065) 80%, transparent 87%),
-    linear-gradient(78deg, transparent 0 14%, rgba(159, 225, 255, .035) 20%, transparent 29% 52%, rgba(139, 215, 255, .035) 59%, transparent 69%);
-  filter: blur(18px);
-  transform-origin: 50% -10%;
-  animation: ocean-underwater-shafts 18s ease-in-out infinite alternate;
-  -webkit-mask-image: linear-gradient(to bottom, #000 0%, rgba(0,0,0,.82) 52%, transparent 92%);
-  mask-image: linear-gradient(to bottom, #000 0%, rgba(0,0,0,.82) 52%, transparent 92%);
+    radial-gradient(ellipse 28% 48% at 12% -4%, rgba(142, 222, 255, .17), transparent 72%),
+    radial-gradient(ellipse 22% 52% at 39% -9%, rgba(110, 205, 250, .13), transparent 72%),
+    radial-gradient(ellipse 29% 50% at 68% -6%, rgba(140, 221, 255, .14), transparent 72%),
+    radial-gradient(ellipse 24% 45% at 92% 0%, rgba(100, 195, 245, .11), transparent 72%);
+  filter: blur(24px);
+  -webkit-mask-image: linear-gradient(to bottom, #000 0%, rgba(0,0,0,.62) 52%, transparent 91%);
+  mask-image: linear-gradient(to bottom, #000 0%, rgba(0,0,0,.62) 52%, transparent 91%);
+  animation: ocean-caustic-light-a 17s ease-in-out infinite alternate;
 }
 
 .ocean-page-backdrop_has-life::after {
-  opacity: .24;
+  opacity: .095;
   background:
-    repeating-linear-gradient(
-      112deg,
-      transparent 0 76px,
-      rgba(151, 226, 255, .07) 84px 87px,
-      transparent 96px 154px,
-      rgba(102, 195, 244, .04) 162px 164px,
-      transparent 172px 238px
-    );
-  filter: blur(5px);
-  transform: skewX(-5deg) scale(1.12);
-  animation: ocean-underwater-caustics 13s ease-in-out infinite alternate;
-  -webkit-mask-image: linear-gradient(to bottom, #000 0%, rgba(0,0,0,.65) 42%, transparent 76%);
-  mask-image: linear-gradient(to bottom, #000 0%, rgba(0,0,0,.65) 42%, transparent 76%);
+    radial-gradient(ellipse 18% 32% at 24% 12%, rgba(160, 230, 255, .15), transparent 74%),
+    radial-gradient(ellipse 24% 36% at 55% 8%, rgba(112, 207, 252, .14), transparent 74%),
+    radial-gradient(ellipse 20% 34% at 82% 16%, rgba(151, 225, 255, .12), transparent 75%);
+  filter: blur(31px);
+  -webkit-mask-image: linear-gradient(to bottom, #000 0%, rgba(0,0,0,.5) 48%, transparent 82%);
+  mask-image: linear-gradient(to bottom, #000 0%, rgba(0,0,0,.5) 48%, transparent 82%);
+  animation: ocean-caustic-light-b 23s ease-in-out infinite alternate;
 }
 
 .ocean-page-backdrop_has-life :deep(.underwater-ambient) {
-  z-index: 1;
+  z-index: 2;
 }
 
 .ocean-page-backdrop_ambient {
@@ -117,40 +189,86 @@ const hasUnderwaterLife = computed(() => props.variant === "reef" || props.varia
   border: 1px solid rgba(75, 145, 255, 0.22);
   border-radius: 999px;
 }
-.ocean-page-backdrop_ambient::before { width: 10px; height: 10px; left: 7%; top: 34%; box-shadow: 32px 42px 0 3px rgba(67,119,221,.09),105px 420px 0 5px rgba(66,172,255,.08); }
-.ocean-page-backdrop_ambient::after { width: 8px; height: 8px; right: 8%; top: 26%; box-shadow: -42px 54px 0 2px rgba(64,157,255,.08),16px 190px 0 4px rgba(118,83,226,.08); }
 
-@keyframes ocean-underwater-shafts {
+.ocean-page-backdrop_ambient::before {
+  width: 10px;
+  height: 10px;
+  left: 7%;
+  top: 34%;
+  box-shadow: 32px 42px 0 3px rgba(67,119,221,.09),105px 420px 0 5px rgba(66,172,255,.08);
+}
+
+.ocean-page-backdrop_ambient::after {
+  width: 8px;
+  height: 8px;
+  right: 8%;
+  top: 26%;
+  box-shadow: -42px 54px 0 2px rgba(64,157,255,.08),16px 190px 0 4px rgba(118,83,226,.08);
+}
+
+@keyframes ocean-refraction-drift {
   0% {
-    transform: translate3d(-2.2%, -1.4%, 0) rotate(-1.1deg) scale(1.03, 1.01);
+    transform: translate3d(-.35%, -.18%, 0) scale(1.018, 1.012);
   }
-  52% {
-    transform: translate3d(.7%, .6%, 0) rotate(.35deg) scale(1.06, 1.025);
+  46% {
+    transform: translate3d(.22%, .25%, 0) scale(1.022, 1.018);
   }
   100% {
-    transform: translate3d(2.4%, -0.4%, 0) rotate(-.25deg) scale(1.025, 1.055);
+    transform: translate3d(.42%, -.08%, 0) scale(1.016, 1.024);
   }
 }
 
-@keyframes ocean-underwater-caustics {
+@keyframes ocean-caustic-light-a {
   0% {
-    transform: translate3d(-2.5%, -1.2%, 0) skewX(-7deg) scale(1.12, 1.02);
+    transform: translate3d(-2%, -1%, 0) rotate(-.45deg) scale(1.02);
   }
-  48% {
-    transform: translate3d(.9%, .7%, 0) skewX(-3deg) scale(1.16, 1.035);
+  52% {
+    transform: translate3d(.7%, .8%, 0) rotate(.2deg) scale(1.055, 1.025);
   }
   100% {
-    transform: translate3d(2.8%, -.2%, 0) skewX(-6deg) scale(1.11, 1.06);
+    transform: translate3d(2%, -.4%, 0) rotate(-.12deg) scale(1.025, 1.06);
+  }
+}
+
+@keyframes ocean-caustic-light-b {
+  0% {
+    transform: translate3d(1.8%, -.8%, 0) scale(1.03, 1.015);
+  }
+  48% {
+    transform: translate3d(-.6%, .55%, 0) scale(1.065, 1.025);
+  }
+  100% {
+    transform: translate3d(-2.2%, .9%, 0) scale(1.025, 1.06);
+  }
+}
+
+@media (max-width: 1199px) {
+  .ocean-page-backdrop__refracted-image {
+    filter: none;
+    transform: none;
+    animation: none;
+  }
+
+  .ocean-page-backdrop_has-life::before,
+  .ocean-page-backdrop_has-life::after {
+    display: none;
   }
 }
 
 @media (max-width: 720px) {
-  .ocean-page-backdrop {
+  .ocean-page-backdrop,
+  .ocean-page-backdrop__refracted-image {
     background-position: var(--ocean-page-mobile-position, 66% top);
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .ocean-page-backdrop__refracted-image {
+    filter: none;
+    transform: none;
+    animation: none;
+  }
+
   .ocean-page-backdrop_has-life::before,
   .ocean-page-backdrop_has-life::after {
     animation: none;
