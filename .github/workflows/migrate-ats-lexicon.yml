@@ -1,0 +1,99 @@
+name: Migrate ATS linguistic parsing
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - .github/workflows/migrate-ats-lexicon.yml
+
+permissions:
+  contents: write
+
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: master
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - name: Move ATS linguistic matchers to parsing-lexicon API
+        shell: python
+        run: |
+          from pathlib import Path
+          import re
+
+          core_path = Path('shared/hiring/ats/scoreCore.ts')
+          text = core_path.read_text()
+
+          old_import = "import { canonicalSkillName, extractSkillNames } from '~~/shared/jobSkills'\n"
+          new_import = old_import + "import {\n  SENIORITY_RANK,\n  bucketVacancyText,\n  detectDegreeFields,\n  detectDegreeLevel,\n  detectHiringSeniority,\n  extractRequiredExperienceYears,\n  isNoSponsorshipRequirement,\n  requiresUsSponsorship as detectRequiresUsSponsorship,\n  type DegreeLevel,\n  type HiringSeniority as Seniority,\n} from '@whiteslove/parsing-lexicon/hiring-requirements'\n"
+          if old_import not in text:
+              raise SystemExit('jobSkills import anchor not found')
+          text = text.replace(old_import, new_import, 1)
+
+          def sub_once(pattern, replacement, label):
+              global text
+              text, count = re.subn(pattern, replacement, text, count=1, flags=re.S)
+              if count != 1:
+                  raise SystemExit(f'{label}: expected 1 replacement, got {count}')
+
+          sub_once(r"// Headings/phrases that usually introduce qualifications\..*?(?=const TERM_STOP_WORDS)", "", 'vacancy bucketing block')
+          text = text.replace("type Seniority = 'intern' | 'junior' | 'middle' | 'senior' | 'staff' | 'lead' | 'principal' | 'manager' | 'director'\n", '')
+          text = text.replace("type DegreeLevel = 'secondary' | 'bachelor' | 'master' | 'doctorate'\n", '')
+          sub_once(r"function detectSeniority\(text: string\): Seniority \| undefined \{.*?(?=export interface CvProfile)", "", 'candidate linguistic helpers')
+
+          old_profile = """    seniority: detectSeniority(cvText),\n    degreeLevel: degreeLevel(cvText),\n    degreeFields: degreeFields(cvText),\n    requiresUsSponsorship: requiresUsSponsorship(cvText),"""
+          new_profile = """    seniority: detectHiringSeniority(cvText) || undefined,\n    degreeLevel: detectDegreeLevel(cvText) || undefined,\n    degreeFields: new Set(detectDegreeFields(cvText)),\n    requiresUsSponsorship: detectRequiresUsSponsorship(cvText) ?? undefined,"""
+          if old_profile not in text:
+              raise SystemExit('CV profile linguistic fields anchor not found')
+          text = text.replace(old_profile, new_profile, 1)
+
+          sub_once(r"function detectRequiredExperience\(text: string\): number \| undefined \{.*?(?=const SENIORITY_RANK)", "", 'experience parser')
+          sub_once(r"const SENIORITY_RANK: Record<Seniority, number> = \{.*?\}\n\n", "", 'seniority rank')
+          sub_once(r"const NO_SPONSORSHIP_RE = .*?\n\n(?=function isUsRole)", "", 'sponsorship matcher')
+
+          text = text.replace('const buckets = bucketJobText(description)', 'const buckets = bucketVacancyText(description)', 1)
+          text = text.replace("job.experienceMinYears ?? detectRequiredExperience(`${buckets.required} ${description}`)", "job.experienceMinYears ?? extractRequiredExperienceYears(`${buckets.required} ${description}`) ?? undefined", 1)
+          text = text.replace("detectSeniority(titleText) || (job.seniority ? detectSeniority(job.seniority) : undefined)", "detectHiringSeniority(titleText) || (job.seniority ? detectHiringSeniority(job.seniority) : null) || undefined", 1)
+          text = text.replace('NO_SPONSORSHIP_RE.test(sponsorshipText)', 'isNoSponsorshipRequirement(sponsorshipText)', 1)
+          core_path.write_text(text)
+
+          app_path = Path('app/utils/atsScore.ts')
+          app = app_path.read_text()
+          import_anchor = "} from '../../shared/hiring/ats/scoreCore'\n"
+          if import_anchor not in app:
+              raise SystemExit('ATS adapter import anchor not found')
+          app = app.replace(import_anchor, import_anchor + "import { isNoSponsorshipRequirement } from '@whiteslove/parsing-lexicon/hiring-requirements'\n", 1)
+          app, count = re.subn(r"\nconst LONG_FORM_NO_SPONSORSHIP_RE = .*?\n\n(?=function isUsRole)", "\n", app, count=1, flags=re.S)
+          if count != 1:
+              raise SystemExit(f'long sponsorship matcher: expected 1 replacement, got {count}')
+          app = app.replace("LONG_FORM_NO_SPONSORSHIP_RE.test(`${job.description || ''} ${(job.tags || []).join(' ')}`)", "isNoSponsorshipRequirement(`${job.description || ''} ${(job.tags || []).join(' ')}`)", 1)
+          app_path.write_text(app)
+
+          package_path = Path('package.json')
+          package = package_path.read_text()
+          package, count = re.subn(
+              r'https://github\.com/AmoneMisa/parsing-lexicon/archive/[0-9a-f]{40}\.tar\.gz',
+              'https://github.com/AmoneMisa/parsing-lexicon/archive/77d55154024a1ac9b061df88722149f7b274c10e.tar.gz',
+              package,
+              count=1,
+          )
+          if count != 1:
+              raise SystemExit(f'package pin: expected 1 replacement, got {count}')
+          package_path.write_text(package)
+      - name: Refresh lockfile
+        run: npm install --package-lock-only --ignore-scripts
+      - name: Commit migration and remove temporary workflow
+        run: |
+          rm .github/workflows/migrate-ats-lexicon.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add package.json package-lock.json shared/hiring/ats/scoreCore.ts app/utils/atsScore.ts .github/workflows/migrate-ats-lexicon.yml
+          git commit -m "refactor: centralize ATS linguistic parsing"
+          git pull --rebase origin master
+          git push origin HEAD:master
