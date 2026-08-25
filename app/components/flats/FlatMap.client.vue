@@ -13,6 +13,14 @@ interface FlatPoint {
   country?: string;
 }
 
+interface MapFocusDetail {
+  id: string;
+  source?: string;
+  country?: string;
+  lat: number;
+  lng: number;
+}
+
 const props = defineProps<{
   points: FlatPoint[];
   drawLabel?: string;
@@ -36,6 +44,7 @@ const CLUSTER_PX = 38;
 const ZOOM_CLUSTER_THRESHOLD = 24;
 const SPREAD_PX = 50;
 const RADIAL_PAGE_SIZE = 9;
+const FOCUS_ZOOM = 18;
 const DETAIL_QUERY_KEYS = new Set(["flat", "flatSource", "flatCountry", "shared"]);
 
 const el = ref<HTMLElement | null>(null);
@@ -45,6 +54,7 @@ const area = ref<Array<{ lat: number; lng: number }>>([]);
 const radial = ref<{ x: number; y: number; items: FlatPoint[]; page: number } | null>(null);
 const expanded = ref(false);
 const remotePoints = ref<FlatPoint[]>([]);
+const focusedPoint = ref<MapFocusDetail | null>(null);
 let mapFeedSequence = 0;
 let lastMapFeedKey = "";
 
@@ -133,6 +143,7 @@ const radialPageLabel = computed(() => {
 let map: any = null;
 let layer: any = null;
 let areaLayer: any = null;
+let focusLayer: any = null;
 let lastFitSig = "";
 
 async function setExpanded(value: boolean) {
@@ -250,6 +261,50 @@ function renderMarkers() {
   }
 }
 
+function renderFocusedPoint() {
+  const L = (window as any).L;
+  if (!focusLayer || !L) return;
+  focusLayer.clearLayers();
+  const point = focusedPoint.value;
+  if (!point) return;
+  L.circleMarker([point.lat, point.lng], {
+    radius: 12,
+    color: "#ffffff",
+    weight: 3,
+    fillColor: "#e0679a",
+    fillOpacity: 0.95,
+  }).addTo(focusLayer);
+  L.circleMarker([point.lat, point.lng], {
+    radius: 20,
+    color: "#e0679a",
+    weight: 2,
+    opacity: 0.58,
+    fillOpacity: 0,
+  }).addTo(focusLayer);
+}
+
+function focusOnPoint(detail: MapFocusDetail) {
+  const lat = Number(detail?.lat);
+  const lng = Number(detail?.lng);
+  if (!Number.isFinite(lat) || !Number.isFinite(lng) || Math.abs(lat) > 90 || Math.abs(lng) > 180) return;
+  focusedPoint.value = { ...detail, lat, lng };
+  renderFocusedPoint();
+
+  const shell = el.value?.closest(".flat-map-shell") as HTMLElement | null;
+  shell?.scrollIntoView({ behavior: "smooth", block: "center" });
+  if (!map) return;
+  window.setTimeout(() => {
+    map?.invalidateSize?.();
+    map?.flyTo?.([lat, lng], FOCUS_ZOOM, { animate: true, duration: 0.75 });
+    renderFocusedPoint();
+  }, 180);
+}
+
+function onMapFocus(event: Event) {
+  const detail = (event as CustomEvent<MapFocusDetail>).detail;
+  if (detail) focusOnPoint(detail);
+}
+
 function clusterSpreadPx(c: Cluster) {
   let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
   for (const p of c.items) {
@@ -330,6 +385,7 @@ function slotStyle(i: number, n: number) {
 }
 
 function fitToPoints() {
+  if (focusedPoint.value) return;
   const bounds: [number, number][] = [];
   for (const p of renderedPoints.value) {
     if (Number.isFinite(p.lat) && Number.isFinite(p.lng)) bounds.push([p.lat, p.lng]);
@@ -371,6 +427,7 @@ function clearArea() {
 onMounted(async () => {
   window.addEventListener("keydown", onKeydown);
   window.addEventListener("scroll", closeRadial, { passive: true });
+  window.addEventListener("flat-map-focus", onMapFocus as EventListener);
   void loadFullMapFeed();
   if (!el.value) return;
   let L: any;
@@ -381,13 +438,16 @@ onMounted(async () => {
     return;
   }
   if (!el.value) return;
-  map = L.map(el.value, { scrollWheelZoom: false }).setView([41.31, 69.24], 5);
+  map = L.map(el.value, { scrollWheelZoom: false, zoomSnap: 0.5 }).setView([41.31, 69.24], 5);
   L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
     attribution: "&copy; OpenStreetMap contributors",
+    maxNativeZoom: 19,
     maxZoom: 19,
+    detectRetina: true,
   }).addTo(map);
   layer = L.layerGroup().addTo(map);
   areaLayer = L.layerGroup().addTo(map);
+  focusLayer = L.layerGroup().addTo(map);
   map.on("click", (event: any) => {
     if (!drawing.value) {
       closeRadial();
@@ -401,6 +461,7 @@ onMounted(async () => {
   map.on("movestart", closeRadial);
   map.on("zoomstart", closeRadial);
   renderMarkers();
+  renderFocusedPoint();
   fitToPoints();
 });
 
@@ -411,11 +472,13 @@ onBeforeUnmount(() => {
   mapFeedSequence += 1;
   window.removeEventListener("keydown", onKeydown);
   window.removeEventListener("scroll", closeRadial);
+  window.removeEventListener("flat-map-focus", onMapFocus as EventListener);
   document.body.style.overflow = "";
   map?.remove?.();
   map = null;
   layer = null;
   areaLayer = null;
+  focusLayer = null;
 });
 </script>
 
@@ -488,7 +551,7 @@ onBeforeUnmount(() => {
 </template>
 
 <style scoped>
-.flat-map-shell { position: relative; z-index: 0; isolation: isolate; }
+.flat-map-shell { position: relative; z-index: 0; isolation: isolate; scroll-margin-block: 24px; }
 .flat-map-shell_full {
   position: fixed;
   inset: 0;
