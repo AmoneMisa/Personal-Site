@@ -96,6 +96,9 @@ withDefaults(defineProps<{
   position: relative;
   z-index: 1;
 }
+.search-advanced-filters__panel > :deep(.search-filter-blocks) {
+  grid-column: 1 / -1;
+}
 @media (min-width: 700px) {
   .search-advanced-filters__panel { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
