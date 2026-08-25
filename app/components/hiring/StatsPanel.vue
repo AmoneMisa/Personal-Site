@@ -32,10 +32,12 @@ const ageBars = computed(() => currentStatistics.value.ages.filter((item) => ite
 const sectorBars = computed(() => currentStatistics.value.sectors.slice(0, 8).map((item, index) => ({ label: hiringStatisticGroupLabel(item.label, professionLocale.value), value: item.value, color: palette[index % palette.length] })));
 const professionBars = computed(() => currentStatistics.value.professions.slice(0, 8).map((item, index) => ({ label: hiringProfessionLabel(item.label, professionLocale.value), value: item.value, color: palette[index % palette.length] })));
 
-const experienceSalary = computed(() => {
+const experienceSalaryBars = computed(() => {
   const labels = ["0–1", "2–3", "4–6", "7–10", "10+"];
-  const values = currentStatistics.value.salaryByExperience;
-  return { labels, series: [{ label: t("statsDesiredSalary"), color: "#e0679a", values }] };
+  return currentStatistics.value.salaryByExperience.flatMap((value, index) => {
+    if (value == null || !Number.isFinite(value)) return [];
+    return [{ label: labels[index] || String(index + 1), value, color: "#e0679a" }];
+  });
 });
 
 const activity = computed(() => {
@@ -58,7 +60,7 @@ const salarySamples = computed(() => currentStatistics.value.salarySamples);
       <article class="analytics-card"><h3>{{ t("statsAge") }}</h3><UiAnalyticsBars :items="ageBars" /></article>
       <article class="analytics-card"><h3>{{ t("statsSectors") }}</h3><UiAnalyticsBars :items="sectorBars" /></article>
       <article class="analytics-card"><h3>{{ t("statsProfessions") }}</h3><UiAnalyticsBars :items="professionBars" /></article>
-      <article class="analytics-card analytics-card_salary"><div class="analytics-card__head"><h3>{{ t("statsSalaryExperience") }}</h3><small>{{ t("statsSalarySamples",{n:salarySamples}) }}</small></div><UiAnalyticsLine v-if="salarySamples" :series="experienceSalary.series" :labels="experienceSalary.labels" :format="(value)=>`$${Math.round(value).toLocaleString()}`" /><p v-else class="analytics-card__empty">{{ t("statsNoSalaryData") }}</p></article>
+      <article class="analytics-card analytics-card_salary"><div class="analytics-card__head"><h3>{{ t("statsSalaryExperience") }}</h3><small>{{ t("statsSalarySamples",{n:salarySamples}) }}</small></div><UiAnalyticsBars v-if="experienceSalaryBars.length" :items="experienceSalaryBars" :format="(value)=>`$${Math.round(value).toLocaleString()}`" /><p v-else class="analytics-card__empty">{{ t("statsNoSalaryData") }}</p></article>
     </div>
   </UiAnalyticsPanel>
 </template>
