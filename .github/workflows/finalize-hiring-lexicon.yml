@@ -1,0 +1,57 @@
+name: Finalize hiring lexicon migration
+
+on:
+  push:
+    paths:
+      - '.github/workflows/finalize-hiring-lexicon.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  finalize:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Clean migration residue
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          path = Path('server/utils/enrich.ts')
+          text = path.read_text()
+          duplicate = '// ---- Shared vacancy context ----\n// ---- Shared vacancy context ----\n'
+          if text.count(duplicate) != 1:
+              raise SystemExit(f'expected one duplicate section comment, got {text.count(duplicate)}')
+          path.write_text(text.replace(duplicate, '// ---- Shared vacancy context ----\n', 1))
+          PY
+
+      - name: Refresh verified lexicon lock
+        run: npm install --ignore-scripts
+
+      - name: Run full test suite
+        run: npm test
+
+      - name: Verify final migration boundary
+        run: |
+          grep -q 'c9405434ad7bbb848a6612db68763a16656ccf94' package-lock.json
+          ! grep -q 'const COUNTRY_PATTERNS' server/utils/enrich.ts
+          ! grep -q 'const TARGET_CONTEXT_RE' server/utils/hiringNormalize.ts
+          ! grep -q 'const NON_TARGET_CONTEXT_RE' server/utils/hiringNormalize.ts
+          ! grep -q 'const FEATURE_RULES' server/utils/hiringNormalize.ts
+          ! grep -q 'const CONTACT_HOURS_RE' server/utils/hiringNormalize.ts
+          ! grep -q 'const SCOPE_SIGNALS' shared/hiring/ats/scoreCore.ts
+          grep -q 'const TERM_STOP_WORDS' shared/hiring/ats/scoreCore.ts
+
+      - name: Commit final state and remove migration workflows
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git rm .github/workflows/cleanup-hiring-lexicon.yml .github/workflows/finalize-hiring-lexicon.yml
+          git add package-lock.json server/utils/enrich.ts
+          git commit -m "chore: finalize hiring lexicon migration"
+          git push
