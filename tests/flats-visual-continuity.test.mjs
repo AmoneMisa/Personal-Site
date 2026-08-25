@@ -11,7 +11,7 @@ test('primary flat filters keep breathing room below the divider', () => {
 
 test('flat photos blend into the card instead of ending on a hard edge', () => {
   assert.match(card, /\.flat-card__photo \{[^}]*overflow: visible/u)
-  assert.match(card, /bottom: -30px; height: 58%/u)
+  assert.match(card, /bottom: -28px; height: 48%/u)
   assert.match(card, /backdrop-filter: blur\(6px\)/u)
   assert.match(card, /rgba\(11,16,42,\.68\)[\s\S]*?var\(--bg-panel\) 100%/u)
   assert.match(card, /@media \(max-width: 760px\)[\s\S]*?overflow: visible/u)
