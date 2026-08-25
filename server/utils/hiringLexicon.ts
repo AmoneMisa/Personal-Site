@@ -151,8 +151,7 @@ export function detectExperienceRequirement(text: string): 'noExperience' | 'exp
 }
 
 function hasExtendedCandidateIntent(text: string): boolean {
-  return Boolean(findCanonical(text, [HIRING_INTENT_EXTENSIONS.candidate], { partial: true }))
-    || matchesSourceCandidateIntent(text)
+  return SHARED_CANDIDATE_INTENT_RE.test(text) || matchesSourceCandidateIntent(text)
 }
 
 export function detectHiringIntent(text: string) {
