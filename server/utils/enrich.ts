@@ -333,32 +333,6 @@ function detectLanguages(text: string): LanguageReq[] {
   }))
 }
 
-// Most skills use literal Unicode-aware aliases from shared/jobSkills. A small
-// contextual layer handles grammatical phrases where important words are not
-// adjacent (for example, "analyse onboarding funnel data").
-function contextualSkillNames(text: string): string[] {
-  const patterns: [string, RegExp][] = [
-    ['Corporate Governance', /\b(?:group|company|corporate) governance\b/i],
-    ['Data Analysis', /\banalys(?:e|is|ing)\b[^.;\n]{0,60}\b(?:data|metrics?|funnels?)\b|\b(?:data|metrics?|funnels?)\b[^.;\n]{0,60}\banalys(?:e|is|ing)\b/i],
-    ['Conversion Funnel', /\b(?:conversion|onboarding|registration)[- ](?:to[- ]\w+\s+)?funnel\b|\bonboarding funnel\b/i],
-    ['Cross-functional Collaboration', /\bcross[- ]function(?:al|ally)\b/i],
-  ]
-  return patterns.filter(([, pattern]) => pattern.test(text)).map(([name]) => name)
-}
-
-function matchSkillDetails(text: string): SkillDetail[] {
-  const details = extractSkillDetails(text)
-  const names = new Set(details.map(({ name }) => name))
-  for (const name of contextualSkillNames(text)) {
-    if (names.has(name)) continue
-    const meta = getSkillMeta(name)
-    if (!meta) continue
-    details.push({ name, ...meta })
-    names.add(name)
-  }
-  return details
-}
-
 // ---- "Will be a plus" (nice to have) ----
 const PLUS_MARKERS =
   /(will be a plus|is a plus|as a plus|nice to have|would be a plus|plus:|плюсом|будет плюсом|буде плюсом|перевагою|преимуществом|will be an advantage)/i
@@ -396,7 +370,7 @@ export function enrichJob(job: Job): Job {
   }
   const text = `${title} \n ${job.tags.join(' ')} \n ${description}`
   const hiringContext = sharedHiringContext(text, title)
-  const allSkillDetails = matchSkillDetails(text)
+  const allSkillDetails = extractSkillDetails(text)
   const skills = allSkillDetails.map(({ name }) => name)
   const niceToHave = detectNiceToHave(text)
   const coreDetails = allSkillDetails.filter(({ name }) => !niceToHave.includes(name))
