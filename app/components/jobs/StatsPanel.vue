@@ -15,6 +15,11 @@ const props = defineProps<{
 const { t: translate, locale } = useI18n();
 const t = (key: string, params: Record<string, unknown> = {}) => translate(`jobs.${key}`, params);
 const activeTab = ref<"overview" | "trends">("overview");
+// The graph view has no secondary period control. This internal window keeps
+// the line chart on a stable recent period while the rest of the view is a
+// fixed list of categorical charts.
+const trendDays = ref<1 | 3 | 7 | 60>(7);
+type TrendScope = "world" | "country" | "city" | "position" | "positions";
 const palette = ["#e0679a", "#24a7d6", "#10b981", "#d99a0b", "#8b5cf6", "#f97316", "#64748b"];
 
 const compactDisplayPeriodLabel = computed(() => {
@@ -63,6 +68,13 @@ function geographyLabel(geo: JobProfessionGeographyStat): string {
     : locationLabel(canonicalCityValue(geo.key), locale.value, "city");
 }
 
+function trendScopeLabel(scope: TrendScope): string {
+  if (scope === "country") return t("trendCountries");
+  if (scope === "city") return t("trendCities");
+  if (scope === "position" || scope === "positions") return t("trendPositions");
+  return t("trendWorld");
+}
+
 const tabOptions = computed(() => [
   { value: "overview", label: t("statsOverview") },
   { value: "trends", label: t("statsTrends") },
@@ -73,7 +85,7 @@ function selectTab(value: string) {
 }
 
 const salaryTrend = computed(() => {
-  const days = 14;
+  const days = trendDays.value;
   const end = new Date();
   end.setHours(0, 0, 0, 0);
   const dates = Array.from({ length: days }, (_, index) => {
@@ -239,12 +251,12 @@ const relocationDonut = computed(() => relocationStats.value.map((item, index) =
       <article v-if="workModeDonut.length" class="analytics-card"><h3>{{ t("workMode") }}</h3><UiAnalyticsDonut :items="workModeDonut" /></article>
       <article v-if="relocationDonut.length" class="analytics-card"><h3>{{ t("relocation") }}</h3><UiAnalyticsDonut :items="relocationDonut" /></article>
       <article v-if="sourceBars.length" class="analytics-card"><h3>{{ t("statBySource") }}</h3><UiAnalyticsBars :items="sourceBars" /></article>
-      <article v-if="countryBars.length" class="analytics-card"><h3>{{ t("statByCountry") }}</h3><UiAnalyticsBars :items="countryBars" /></article>
+      <article v-if="countryBars.length" class="analytics-card"><h3>{{ trendScopeLabel("country") }}</h3><UiAnalyticsBars :items="countryBars" /></article>
       <article v-if="experienceBars.length" class="analytics-card"><h3>{{ t("vExperience") }}</h3><UiAnalyticsBars :items="experienceBars" /></article>
       <article v-if="employmentBars.length" class="analytics-card"><h3>{{ t("employment") }}</h3><UiAnalyticsBars :items="employmentBars" /></article>
       <article v-if="languageBars.length" class="analytics-card"><h3>{{ t("statLanguages") }}</h3><UiAnalyticsBars :items="languageBars" /></article>
-      <article v-if="professionCountBars.length" class="analytics-card"><h3>{{ t("trendPositions") }}</h3><UiAnalyticsBars :items="professionCountBars" /></article>
-      <article v-if="professionSalaryBars.length" class="analytics-card analytics-card_wide"><h3>{{ t("trendPositions") }} · {{ t("statsSalary") }}</h3><UiAnalyticsBars :items="professionSalaryBars" :format="money" /></article>
+      <article v-if="professionCountBars.length" class="analytics-card"><h3>{{ trendScopeLabel("position") }}</h3><UiAnalyticsBars :items="professionCountBars" /></article>
+      <article v-if="professionSalaryBars.length" class="analytics-card analytics-card_wide"><h3>{{ trendScopeLabel("positions") }} · {{ t("statsSalary") }}</h3><UiAnalyticsBars :items="professionSalaryBars" :format="money" /></article>
     </div>
   </UiAnalyticsPanel>
 </template>
