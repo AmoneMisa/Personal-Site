@@ -73,7 +73,13 @@ const skillPills = computed(() => [
   ...pills(props.job.skills, "job-card__tag job-card__tag_skill"),
   ...pills(props.job.niceToHave, "job-card__tag job-card__tag_plus", "+"),
 ]);
-const tagPills = computed(() => pills(props.job.tags, "job-card__tag"));
+function pillKey(value: string): string {
+  return value.normalize("NFKC").replace(/[^\p{L}\p{N}+#.]+/gu, " ").trim().toLocaleLowerCase("en");
+}
+const tagPills = computed(() => {
+  const company = pillKey(props.job.company || "");
+  return pills((props.job.tags || []).filter((tag) => pillKey(tag) !== company), "job-card__tag");
+});
 function openCard() { emit("open", props.job); }
 </script>
 
@@ -144,7 +150,7 @@ function openCard() { emit("open", props.job); }
       <div v-else-if="job.skills?.length" class="job-card__tags">
         <UiDraggablePills :items="skillPills" :visible-hint-count="3" />
       </div>
-      <div v-else-if="job.tags.length" class="job-card__tags">
+      <div v-else-if="tagPills.length" class="job-card__tags">
         <UiDraggablePills :items="tagPills" :visible-hint-count="3" />
       </div>
       <div class="job-card__bottom">
@@ -220,6 +226,14 @@ function openCard() { emit("open", props.job); }
 .job-card_seen:hover { opacity: 1; }
 .job-card_favorite { border-color: rgba(224,103,154,.48); }
 .job-card_hidden { opacity: .62; border-style: dashed; }
+
+/* Salary is shown once in the modal specification table. The legacy summary
+   badge/value row is kept out of view while the page markup is shared with
+   older cached bundles; "negotiable" remains visible because it is distinct. */
+:global(.job-modal__badges > .job-card__salary) { display: none; }
+:global(.job-modal__badges > .job-card__badge_salary:has(+ .job-card__salary)),
+:global(.job-modal__badges > .job-card__badge_salary:has(+ .job-card__badge_salary)) { display: none; }
+
 @media (max-width: 480px) {
   .job-card { padding: 15px; }
   .job-card__head { gap: 8px; }
