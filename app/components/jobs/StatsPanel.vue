@@ -1,7 +1,5 @@
 <script setup lang="ts">
-import type { Job, JobProfessionGeographyStat, JobStats } from "~/types/jobs";
-import { locationLabel } from "~/utils/locationLabels";
-import { canonicalCityValue } from "~~/shared/locationCatalog";
+import type { Job, JobStats } from "~/types/jobs";
 
 const props = defineProps<{
   jobs?: Job[];
@@ -16,7 +14,7 @@ const { t: translate, locale } = useI18n();
 const t = (key: string, params: Record<string, unknown> = {}) => translate(`jobs.${key}`, params);
 const activeTab = ref<"overview" | "trends">("overview");
 type TrendScope = "world" | "country" | "city" | "position" | "positions";
-const palette = ["#e0679a", "#24a7d6", "#10b981", "#d99a0b", "#8b5cf6", "#f97316", "#64748b"];
+const palette = ["#e0679a", "#24a7d6", "#10b981", "#d99a0b", "#8b5cf6", "#f97316", "#64748b", "#14b8a6"];
 
 // The old first chart was a sparse day-by-day salary line. It duplicated the
 // profession salary visualization below and has been removed. Historical source
@@ -36,7 +34,7 @@ const compactDisplayPeriodLabel = computed(() => {
 const countryStats = computed(() => Object.entries(props.stats.byCountry ?? {}).sort((a, b) => b[1].count - a[1].count));
 const sourceStats = computed(() => Object.entries(props.stats.bySource ?? {}).sort((a, b) => b[1].count - a[1].count));
 const languageStats = computed(() => Object.entries(props.stats.byLanguage ?? {}).sort((a, b) => b[1] - a[1]).slice(0, 10));
-const nonProfessionLabels = new Set(["soft skill", "soft skills"]);
+const nonProfessionLabels = new Set(["soft skill", "soft skills", "databases"]);
 const professionStats = computed(() => (props.stats.byProfession ?? []).filter(
   (item) => !nonProfessionLabels.has(item.profession.trim().toLocaleLowerCase("en")),
 ));
@@ -66,12 +64,6 @@ const experienceStats = computed(() => [
   { key: "five-plus", label: "5+", n: props.stats.experience?.fivePlus ?? 0 },
   { key: "unknown", label: t("notSpecified"), n: props.stats.experience?.unknown ?? 0 },
 ].filter((item) => item.n > 0));
-
-function geographyLabel(geo: JobProfessionGeographyStat): string {
-  return geo.kind === "country"
-    ? props.countryLabel(geo.key)
-    : locationLabel(canonicalCityValue(geo.key), locale.value, "city");
-}
 
 function trendScopeLabel(scope: TrendScope): string {
   if (scope === "country") return t("trendCountries");
@@ -134,6 +126,61 @@ const relocationDonut = computed(() => relocationStats.value.map((item, index) =
   value: item.n,
   color: palette[index % palette.length]!,
 })));
+
+const countrySalaryExperienceSeries = computed(() => {
+  const eligible = (props.stats.salaryTrend ?? []).filter(
+    (point) => point.country && point.experienceYears != null && Number.isFinite(point.experienceYears),
+  );
+  const totals = new Map<string, number>();
+  for (const point of eligible) {
+    const country = point.country!;
+    totals.set(country, (totals.get(country) || 0) + 1);
+  }
+  const topCountries = new Set(
+    [...totals.entries()]
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 8)
+      .map(([country]) => country),
+  );
+
+  const groups = new Map<string, {
+    country: string;
+    salaryTotal: number;
+    experienceTotal: number;
+    count: number;
+  }>();
+  for (const point of eligible) {
+    const country = point.country!;
+    if (!topCountries.has(country)) continue;
+    const experience = point.experienceYears!;
+    const salaryBand = Math.round(point.salaryUsd / 10_000);
+    const experienceBand = Math.round(experience * 2);
+    const key = `${country}:${salaryBand}:${experienceBand}`;
+    const group = groups.get(key) || { country, salaryTotal: 0, experienceTotal: 0, count: 0 };
+    group.salaryTotal += point.salaryUsd;
+    group.experienceTotal += experience;
+    group.count += 1;
+    groups.set(key, group);
+  }
+
+  return [...topCountries].map((country, index) => ({
+    label: props.countryLabel(country),
+    color: palette[index % palette.length]!,
+    points: [...groups.values()]
+      .filter((group) => group.country === country)
+      .map((group) => ({
+        x: Math.round(group.salaryTotal / group.count),
+        y: Math.round((group.experienceTotal / group.count) * 10) / 10,
+        count: group.count,
+      })),
+  })).filter((series) => series.points.length > 0);
+});
+
+const marketBubbleTitle = computed(() => String(locale.value).toLowerCase().startsWith("ru")
+  ? "Вакансии · страна · зарплата · опыт"
+  : "Vacancies · country · salary · experience");
+const vacancyCountLabel = computed(() => String(locale.value).toLowerCase().startsWith("ru") ? "Вакансий" : "Vacancies");
+const formatExperience = (value: number) => t("experienceYears", { n: value });
 </script>
 
 <template>
@@ -185,23 +232,6 @@ const relocationDonut = computed(() => relocationStats.value.map((item, index) =
         <div v-for="item in employmentStats" :key="item.key" class="stats__row"><span>{{ item.label }}</span><strong>{{ item.n }}</strong></div>
       </article>
 
-      <article v-if="experienceStats.length" class="stats__card">
-        <div class="stats__label">{{ t("vExperience") }}</div>
-        <div v-if="stats.experience?.medianYears != null" class="stats__sub stats__sub_lead">{{ t("vExperience") }}: {{ t("experienceYears", { n: stats.experience.medianYears }) }}</div>
-        <div v-for="item in experienceStats" :key="item.key" class="stats__row"><span>{{ item.label }}</span><strong>{{ item.n }}</strong></div>
-      </article>
-
-      <article v-if="professionStats.length" class="stats__card stats__card_positions">
-        <div class="stats__label">{{ t("trendPositions") }} · {{ t("vExperience") }}</div>
-        <div class="stats__professions">
-          <div v-for="profession in professionStats.slice(0, 12)" :key="profession.profession" class="stats__profession">
-            <div class="stats__profession-head"><span>{{ profession.profession }}</span><strong>{{ profession.count }}</strong></div>
-            <div v-if="profession.medianExperienceYears != null" class="stats__sub">{{ t("vExperience") }}: {{ t("experienceYears", { n: profession.medianExperienceYears }) }}</div>
-            <div v-if="profession.geographies.length" class="stats__chips stats__chips_geo"><span v-for="geo in profession.geographies" :key="`${geo.kind}:${geo.key}`">{{ geographyLabel(geo) }} · {{ geo.count }}</span></div>
-          </div>
-        </div>
-      </article>
-
       <article v-if="stats.topSkills.length" class="stats__card stats__card_skills">
         <div class="stats__label">{{ t("statTopSkills") }}</div>
         <div class="stats__chips stats__chips_accent"><span v-for="skill in stats.topSkills" :key="skill.skill">{{ skill.skill }} · {{ skill.count }}</span></div>
@@ -214,6 +244,17 @@ const relocationDonut = computed(() => relocationStats.value.map((item, index) =
     </div>
 
     <div v-else class="charts-grid">
+      <article v-if="countrySalaryExperienceSeries.length" class="analytics-card analytics-card_full">
+        <h3>{{ marketBubbleTitle }}</h3>
+        <UiAnalyticsBubble
+          :series="countrySalaryExperienceSeries"
+          :format-x="money"
+          :format-y="formatExperience"
+          :x-label="t('statsSalary')"
+          :y-label="t('vExperience')"
+          :count-label="vacancyCountLabel"
+        />
+      </article>
       <article v-if="workModeDonut.length" class="analytics-card"><h3>{{ t("workMode") }}</h3><UiAnalyticsDonut :items="workModeDonut" /></article>
       <article v-if="relocationDonut.length" class="analytics-card"><h3>{{ t("relocation") }}</h3><UiAnalyticsDonut :items="relocationDonut" /></article>
       <article v-if="sourceBars.length" class="analytics-card"><h3>{{ t("statBySource") }}</h3><UiAnalyticsBars :items="sourceBars" /></article>
@@ -228,7 +269,7 @@ const relocationDonut = computed(() => relocationStats.value.map((item, index) =
 </template>
 
 <style scoped>
-.stats__grid,.charts-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}.stats__card,.analytics-card{min-width:0;padding:14px;border:1px solid rgba(85,111,174,.3);border-radius:11px;background:rgba(12,18,48,.9)}.stats__card_wide,.analytics-card_wide{grid-column:span 2}.stats__card_positions{grid-column:1/-1}.stats__card_skills{grid-column:span 2}.stats__label,.analytics-card h3{margin:0 0 9px;color:var(--ui-text-muted);font-size:11px;font-weight:750;letter-spacing:.05em;text-transform:uppercase}.stats__big{color:#f08ab8;font-size:28px;font-weight:750;overflow-wrap:anywhere}.stats__sub{margin-top:4px;color:var(--ui-text-muted);font-size:12px}.stats__sub_lead{margin:-2px 0 6px}.stats__row{display:flex;justify-content:space-between;gap:12px;padding:3px 0;font-size:13px}.stats__row span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.stats__row strong{flex:0 0 auto}.stats__row em,.stats__profession em,.stats__chips em{color:var(--ui-text-muted);font-size:11px;font-style:normal}.stats__row_divider{margin-top:5px;padding-top:7px;border-top:1px solid var(--line)}.stats__chips{display:flex;flex-wrap:wrap;gap:6px}.stats__chips span{padding:3px 9px;border:1px solid rgba(85,111,174,.34);border-radius:999px;color:var(--ui-text-muted);font-size:12px}.stats__chips_accent span{border-color:rgba(224,103,154,.38);color:#ee9bc0}.stats__professions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.stats__profession{min-width:0;padding:10px;border:1px solid rgba(85,111,174,.2);border-radius:9px;background:rgba(5,10,31,.32)}.stats__profession-head{display:flex;min-width:0;align-items:baseline;justify-content:space-between;gap:10px;font-size:13px}.stats__profession-head>span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.stats__profession-head strong{flex:0 0 auto;color:var(--ui-text-muted);font-size:12px}.stats__chips_geo{margin-top:7px}.stats__chips_geo span{padding:2px 7px;font-size:11px}
-@media(max-width:1000px){.stats__grid,.charts-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.stats__card_wide,.analytics-card_wide,.stats__card_positions{grid-column:1/-1}.stats__card_skills{grid-column:span 1}.stats__professions{grid-template-columns:1fr}}
-@media(max-width:650px){.stats__switch{width:100%}.stats__grid,.charts-grid{grid-template-columns:1fr}.stats__card_wide,.analytics-card_wide,.stats__card_positions,.stats__card_skills{grid-column:auto}}
+.stats__grid,.charts-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}.stats__card,.analytics-card{min-width:0;padding:14px;border:1px solid rgba(85,111,174,.3);border-radius:11px;background:rgba(12,18,48,.9)}.stats__card_wide,.analytics-card_wide{grid-column:span 2}.analytics-card_full{grid-column:1/-1}.stats__card_skills{grid-column:span 2}.stats__label,.analytics-card h3{margin:0 0 9px;color:var(--ui-text-muted);font-size:11px;font-weight:750;letter-spacing:.05em;text-transform:uppercase}.stats__big{color:#f08ab8;font-size:28px;font-weight:750;overflow-wrap:anywhere}.stats__sub{margin-top:4px;color:var(--ui-text-muted);font-size:12px}.stats__row{display:flex;justify-content:space-between;gap:12px;padding:3px 0;font-size:13px}.stats__row span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.stats__row strong{flex:0 0 auto}.stats__row em,.stats__chips em{color:var(--ui-text-muted);font-size:11px;font-style:normal}.stats__row_divider{margin-top:5px;padding-top:7px;border-top:1px solid var(--line)}.stats__chips{display:flex;flex-wrap:wrap;gap:6px}.stats__chips span{padding:3px 9px;border:1px solid rgba(85,111,174,.34);border-radius:999px;color:var(--ui-text-muted);font-size:12px}.stats__chips_accent span{border-color:rgba(224,103,154,.38);color:#ee9bc0}
+@media(max-width:1000px){.stats__grid,.charts-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.stats__card_wide,.analytics-card_wide,.analytics-card_full{grid-column:1/-1}.stats__card_skills{grid-column:span 1}}
+@media(max-width:650px){.stats__switch{width:100%}.stats__grid,.charts-grid{grid-template-columns:1fr}.stats__card_wide,.analytics-card_wide,.analytics-card_full,.stats__card_skills{grid-column:auto}}
 </style>
