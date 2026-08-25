@@ -1,6 +1,5 @@
 <template>
   <u-app class="site-app">
-    <underwater-ambient />
     <header-nav class="site-app__header" />
     <u-main class="site-app__main" as="main">
       <NuxtPage />
@@ -13,7 +12,6 @@
 import HeaderNav from "~/components/redesign/HeaderNav.vue";
 import SiteFooter from "~/components/redesign/SiteFooter.vue";
 import TelegramSubscriptionButton from "~/components/TelegramSubscriptionButton.client.vue";
-import UnderwaterAmbient from "~/components/UnderwaterAmbient.client.vue";
 
 const SITE_URL = "https://whiteslove.me";
 const DEFAULT_OG_IMAGE = `${SITE_URL}/share-og.png?kind=site`;
@@ -118,18 +116,10 @@ useHead({
 </script>
 <style lang="scss">
 .site-app {
-  position: relative;
   min-height: 100vh;
   min-height: 100dvh;
   display: flex;
   flex-direction: column;
-}
-
-.site-app__header,
-.site-app__main,
-.site-app__footer {
-  position: relative;
-  z-index: 1;
 }
 
 .site-app__main {
