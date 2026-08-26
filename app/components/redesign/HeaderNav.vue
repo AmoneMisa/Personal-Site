@@ -332,7 +332,7 @@ const mobileOpen = ref(false);
   margin-top: 10px;
 }
 
-@media (max-width: 960px) {
+@media (max-width: 1024px) {
   .site-header__nav,
   .site-header__actions {
     display: none;
