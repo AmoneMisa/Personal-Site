@@ -1,7 +1,7 @@
 import { ref, watch } from "vue";
 import type { FlatSort } from "~/types/flats";
 
-const SOCIAL_LISTING_SOURCES = ["facebook", "threads"];
+const SOCIAL_LISTING_SOURCES = ["facebook", "threads", "custom"];
 
 export function useFlatFilters() {
   const countries = ref<string[]>([]);
