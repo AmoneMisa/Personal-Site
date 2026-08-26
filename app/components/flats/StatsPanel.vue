@@ -90,8 +90,8 @@ const priceBandTitle = computed(() => String(locale.value).toLowerCase().startsW
   ? "Распределение цен относительно медианы"
   : "Price distribution vs median");
 const priceBandHint = computed(() => String(locale.value).toLowerCase().startsWith("ru")
-  ? "По загруженным объявлениям текущей фильтрованной выборки"
-  : "Loaded listings in the current filtered result");
+  ? "По всей текущей фильтрованной выборке PostgreSQL"
+  : "Entire current filtered PostgreSQL result set");
 const priceBandBars = computed(() => {
   const rows = props.statistics.priceBandsByDeal?.[dealScope.value] || [];
   const byKey = new Map(rows.map((row) => [row.key, row.count]));
