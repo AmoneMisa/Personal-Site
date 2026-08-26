@@ -69,10 +69,11 @@ test('flat geography statistics stay populated when a scoped country slice is em
   assert.match(stats, /<SearchSourceTabs v-model="dealScope"/u)
 })
 
-test('country geography is a supported display kind instead of crashing the analytics render', () => {
+test('country geography delegates display rendering to the shared geography package', () => {
   assert.match(locations, /LocationKind = 'country' \| 'city' \| 'district' \| 'metro' \| 'any'/u)
-  assert.match(locations, /if \(kind === 'country'\) return countryDisplayLabel\(value, locale\)/u)
-  assert.match(locations, /new Intl\.DisplayNames\(\[locale \|\| 'en'\], \{ type: 'region' \}\)/u)
+  assert.match(locations, /@whiteslove\/parsing-lexicon\/geography-display/u)
+  assert.match(locations, /return geographyDisplayName\(value, locale, kind\)/u)
+  assert.doesNotMatch(locations, /countryDisplayLabel|DISTRICT_RU|METRO_RU|METRO_ALIAS_RU/u)
 })
 
 test('flat statistics are not cleared while a country refresh waits for the background aggregate', () => {
