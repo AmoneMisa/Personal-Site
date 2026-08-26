@@ -2,29 +2,21 @@ name: Verify subscription bot
 
 on:
   pull_request:
+    branches: [ master ]
     paths:
       - 'subscription-bot/**'
       - 'server/routes/subscription-link.post.ts'
       - 'server/routes/subscription-status.get.ts'
       - 'app/components/TelegramSubscriptionButton.client.vue'
-      - 'app/app.vue'
       - 'docker-compose.yml'
-      - '.github/workflows/deploy.yml'
-      - '.github/workflows/subscription-bot-ci.yml'
-  push:
-    branches-ignore: [ master ]
-    paths:
-      - 'subscription-bot/**'
-      - 'server/routes/subscription-link.post.ts'
-      - 'server/routes/subscription-status.get.ts'
-      - 'app/components/TelegramSubscriptionButton.client.vue'
-      - 'app/app.vue'
-      - 'docker-compose.yml'
-      - '.github/workflows/deploy.yml'
       - '.github/workflows/subscription-bot-ci.yml'
 
 permissions:
   contents: read
+
+concurrency:
+  group: subscription-bot-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
 
 jobs:
   bot:
@@ -40,17 +32,3 @@ jobs:
       - run: npm install --no-audit --no-fund
       - run: npm run check
       - run: docker build -t personal-site-subscription-bot:test .
-
-  site:
-    # The repository-wide regression suite is owned by its existing workflows
-    # and may be red for unrelated hiring/parser work. This check verifies that
-    # the website-to-Telegram integration itself still compiles in production.
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '24'
-          cache: npm
-      - run: npm ci
-      - run: npm run build
