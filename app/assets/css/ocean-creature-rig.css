@@ -38,6 +38,32 @@
     z-index: 3;
   }
 
+  /* Move the old whole-sprite deformation one level up so every articulated
+     layer receives exactly the same breathing/body phase. The masked image then
+     stays neutral while child bones add only their local secondary motion. */
+  .underwater-2d__swimmer_shark .underwater-2d__creature_shark,
+  .underwater-2d__swimmer_puffer .underwater-2d__creature_puffer,
+  .underwater-2d__swimmer_seahorse .underwater-2d__creature_seahorse,
+  .underwater-2d__swimmer_jelly .underwater-2d__creature_jelly {
+    animation: none !important;
+  }
+
+  .underwater-2d__swimmer_shark .underwater-2d__reaction {
+    animation: ocean-rig-shark-body var(--body-duration, 1.8s) ease-in-out infinite alternate;
+  }
+
+  .underwater-2d__swimmer_puffer .underwater-2d__reaction {
+    animation: ocean-rig-puffer-body var(--body-duration, 2.4s) ease-in-out infinite;
+  }
+
+  .underwater-2d__swimmer_seahorse .underwater-2d__reaction {
+    animation: ocean-rig-seahorse-body var(--body-duration, 2.2s) ease-in-out infinite alternate;
+  }
+
+  .underwater-2d__swimmer_jelly .underwater-2d__reaction {
+    animation: ocean-rig-jelly-body var(--body-duration, 2.2s) ease-in-out infinite;
+  }
+
   /* Shark: three-part spine. The source sprite faces right; the existing facing
      wrapper mirrors the complete rig for RTL travel, so pivots stay stable. */
   .underwater-2d__swimmer_shark .underwater-2d__creature_shark {
@@ -60,7 +86,7 @@
     -webkit-mask-image: linear-gradient(to right, #000 0 32%, transparent 37% 100%);
     mask-image: linear-gradient(to right, #000 0 32%, transparent 37% 100%);
     transform-origin: 30% 52%;
-    animation: ocean-rig-shark-tail var(--body-duration, 1.8s) ease-in-out infinite;
+    animation: ocean-rig-shark-tail var(--body-duration, 1.8s) ease-in-out infinite alternate;
   }
 
   /* Puffer: only the tail is detached. Keeping the round body intact prevents
@@ -131,37 +157,60 @@
   }
 }
 
+@keyframes ocean-rig-shark-body {
+  0% { transform: skewY(-1.2deg) scaleX(.982) scaleY(1.008) rotate(-.55deg); }
+  100% { transform: skewY(1.2deg) scaleX(1.012) scaleY(.994) rotate(.55deg); }
+}
+
+@keyframes ocean-rig-puffer-body {
+  0%, 100% { transform: scale(var(--fear-scale, 1)) rotate(-.4deg); }
+  48% { transform: scale(var(--fear-scale, 1)) scale(1.035, 1.05) rotate(.45deg); }
+}
+
+@keyframes ocean-rig-seahorse-body {
+  0% { transform: rotate(-2.4deg) translateY(-2px); }
+  100% { transform: rotate(2.4deg) translateY(2px); }
+}
+
+@keyframes ocean-rig-jelly-body {
+  0%, 100% { transform: translateY(1px) scale(1.02, .91); }
+  44% { transform: translateY(-5px) scale(.96, 1.09); }
+  68% { transform: translateY(2px) scale(1.035, .94); }
+}
+
 @keyframes ocean-rig-shark-spine {
-  0% { transform: rotate(-1.25deg) translateY(-0.4%); }
-  100% { transform: rotate(1.25deg) translateY(0.4%); }
+  0% { transform: rotate(-1.05deg) translateY(-0.25%); }
+  100% { transform: rotate(1.05deg) translateY(0.25%); }
 }
 
 @keyframes ocean-rig-shark-tail {
-  0%, 100% { transform: rotate(-4deg); }
-  25% { transform: rotate(4.5deg); }
-  50% { transform: rotate(-3.5deg); }
-  75% { transform: rotate(4deg); }
+  0% { transform: rotate(-3.6deg); }
+  25% { transform: rotate(4.1deg); }
+  50% { transform: rotate(-3.2deg); }
+  75% { transform: rotate(3.8deg); }
+  100% { transform: rotate(-3deg); }
 }
 
 @keyframes ocean-rig-puffer-tail {
-  0%, 100% { transform: rotate(-4.2deg); }
-  25% { transform: rotate(3.4deg); }
-  50% { transform: rotate(-3.2deg); }
-  75% { transform: rotate(4deg); }
+  0%, 100% { transform: rotate(-3.6deg); }
+  24% { transform: rotate(3.1deg); }
+  48% { transform: rotate(-2.8deg); }
+  72% { transform: rotate(3.5deg); }
 }
 
 @keyframes ocean-rig-seahorse-tail {
-  0% { transform: rotate(-2.2deg) translateX(-0.4%); }
-  100% { transform: rotate(2.4deg) translateX(0.4%); }
+  0% { transform: rotate(-1.6deg) translateX(-0.3%); }
+  100% { transform: rotate(1.8deg) translateX(0.3%); }
 }
 
 @keyframes ocean-rig-jelly-tentacles {
-  0%, 100% { transform: translate3d(-1.2%, 0.8%, 0) rotate(-1deg) scaleY(0.98); }
-  45% { transform: translate3d(1.4%, -0.7%, 0) rotate(1.2deg) scaleY(1.025); }
-  72% { transform: translate3d(-0.4%, 0.3%, 0) rotate(-0.35deg) scaleY(1.005); }
+  0%, 100% { transform: translate3d(-0.8%, 0.45%, 0) rotate(-.7deg) scaleY(.99); }
+  44% { transform: translate3d(1%, -0.5%, 0) rotate(.85deg) scaleY(1.018); }
+  68% { transform: translate3d(-0.3%, 0.2%, 0) rotate(-.25deg) scaleY(1.006); }
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .underwater-2d__reaction,
   .underwater-2d__facing::before,
   .underwater-2d__facing::after {
     animation: none !important;
