@@ -5,6 +5,7 @@ import { queryBoolean, queryString } from "~/utils/queryParams";
 import { useSearchRouteState } from "../search/useSearchRouteState";
 
 const FLAT_SORTS: FlatSort[] = ["newest", "oldest", "priceAsc", "priceDesc", "titleAsc", "titleDesc"];
+const SOCIAL_FLAT_SOURCES = ["facebook", "threads"];
 
 export function useFlatRouteState(options: {
   router: Router;
@@ -89,7 +90,8 @@ export function useFlatRouteState(options: {
     filters.nearbyKind.value = queryString(params.nearbyKind);
     filters.query.value = queryString(params.query);
     const sourceParam = queryString(params.sources);
-    filters.source.value = options.sources.includes(sourceParam) ? sourceParam : "";
+    const allowedSources = new Set([...options.sources, ...SOCIAL_FLAT_SOURCES]);
+    filters.source.value = allowedSources.has(sourceParam) ? sourceParam : "";
   }
 
   const routeState = useSearchRouteState({
