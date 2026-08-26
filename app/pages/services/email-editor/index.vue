@@ -8,7 +8,7 @@ useServiceSeo("emailEditor");
 
 <template>
   <u-container class="email-editor">
-    <ServicePageHeader
+    <service-page-header
         backdrop="home"
         title="services.emailEditor.title"
         description="services.emailEditor.subtitle"
