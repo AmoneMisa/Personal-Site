@@ -14,7 +14,7 @@ withDefaults(defineProps<{
 
 <template>
   <ocean-page-backdrop :variant="backdrop" />
-  <div class="service-page-header background-hero text-center space-y-3">
+  <div class="service-page-header text-center space-y-3">
     <page-header
         :title="title"
         :headline="headline"
