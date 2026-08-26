@@ -6,7 +6,9 @@ ChartJS.register(CategoryScale, LinearScale, BarElement, Tooltip, Legend);
 
 interface BarItem {
   label: string;
-  value: number;
+  value?: number;
+  min?: number;
+  max?: number;
   color?: string;
 }
 
@@ -17,10 +19,15 @@ const props = withDefaults(defineProps<{
   format: (value: number) => Math.round(value).toLocaleString(),
 });
 
+const hasRanges = computed(() => props.items.some((item) => Number.isFinite(item.min) && Number.isFinite(item.max)));
+
 const data = computed(() => ({
   labels: props.items.map((item) => item.label),
   datasets: [{
-    data: props.items.map((item) => item.value),
+    data: props.items.map((item) => {
+      if (Number.isFinite(item.min) && Number.isFinite(item.max)) return [Number(item.min), Number(item.max)];
+      return Number(item.value || 0);
+    }),
     backgroundColor: props.items.map((item) => item.color || "#24a7d6"),
     borderRadius: 5,
     borderSkipped: false,
@@ -39,13 +46,17 @@ const options = computed<ChartOptions<"bar">>(() => ({
       borderColor: "rgba(85,111,174,.55)",
       borderWidth: 1,
       callbacks: {
-        label: (context) => `${context.label}: ${props.format(Number(context.parsed.x || 0))}`,
+        label: (context) => {
+          const raw = context.raw as number | [number, number];
+          if (Array.isArray(raw)) return `${context.label}: ${props.format(Number(raw[0]))} — ${props.format(Number(raw[1]))}`;
+          return `${context.label}: ${props.format(Number(context.parsed.x || 0))}`;
+        },
       },
     },
   },
   scales: {
     x: {
-      beginAtZero: true,
+      beginAtZero: !hasRanges.value,
       grid: { color: "rgba(128,149,208,.1)" },
       border: { display: false },
       ticks: {
