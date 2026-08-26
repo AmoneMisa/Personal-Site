@@ -1,3 +1,5 @@
+import { extractCandidateContacts } from '@whiteslove/parsing-lexicon/hiring-candidate-fields'
+import { parseHiringSourceSalary } from '@whiteslove/parsing-lexicon/hiring-source-semantics'
 import type { CvProfile } from '../../../../shared/contracts/hiring'
 import { cityFrom, parseAge } from '../../../../shared/hiring/webFields'
 import { normalizeCandidate } from '../../../utils/hiringNormalize'
@@ -12,57 +14,29 @@ function parseExperience(text: string): number | null {
 }
 
 function parseSalary(text: string, fallback: string): Pick<CvProfile, 'salaryMin' | 'salaryMax' | 'currency'> {
-  const match = text.match(
-    /(?:от|від|de la)?\s*(\d[\d\s.,]{2,})(?:\s*(?:-|–|—|до|to|până la)\s*(\d[\d\s.,]{2,}))?\s*(грн|UAH|KZT|₸|тенге|USD|\$|EUR|€|RON|lei|руб\.?|₽)/iu,
-  )
-  if (!match) return {}
-  const number = (raw: string) => Number(raw.replace(/[\s.,]/g, ''))
-  const first = number(match[1]!)
-  const second = match[2] ? number(match[2]) : undefined
-  if (!Number.isFinite(first) || first <= 0) return {}
-  const token = match[3]!.toUpperCase()
-  const currency = /ГРН|UAH/.test(token) ? 'UAH'
-    : /KZT|₸|ТЕНГЕ/.test(token) ? 'KZT'
-      : /USD|\$/.test(token) ? 'USD'
-        : /EUR|€/.test(token) ? 'EUR'
-          : /RON|LEI/.test(token) ? 'RON'
-            : /РУБ|₽/.test(token) ? 'RUB'
-              : fallback
+  const parsed = parseHiringSourceSalary(text)
+  if (!parsed || (parsed.min == null && parsed.max == null)) return {}
+  const first = parsed.min ?? parsed.max
+  const second = parsed.max ?? parsed.min
+  if (first == null || !Number.isFinite(first) || first <= 0) return {}
+  const upper = second != null && Number.isFinite(second) ? second : first
+  const currency = parsed.currency || fallback
+  if (!currency) return {}
   return {
-    salaryMin: second && Number.isFinite(second) ? Math.min(first, second) : first,
-    salaryMax: second && Number.isFinite(second) ? Math.max(first, second) : undefined,
+    salaryMin: Math.min(first, upper),
+    salaryMax: Math.max(first, upper),
     currency,
   }
 }
 
-function contacts(text: string): CvProfile['contacts'] {
-  const email = text.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/iu)?.[0]
-  const telegram = text.match(/@[A-Za-z0-9_]{5,}/)?.[0]
-  const phone = text.match(/(?:\+?\d{1,3}[\s().-]*)?(?:\d[\s().-]*){8,12}/)?.[0]
-  return {
-    ...(phone ? { phone: phone.replace(/\s+/g, ' ').trim() } : {}),
-    ...(email ? { email } : {}),
-    ...(telegram ? { telegram } : {}),
-  }
+function contacts(text: string, country: string): CvProfile['contacts'] {
+  return { ...extractCandidateContacts(text, country) }
 }
 
 export function parseSecondaryChipSalary(
   chip: string,
 ): Pick<CvProfile, 'salaryMin' | 'salaryMax' | 'currency'> {
-  const amounts = [...chip.matchAll(/\d[\d\s]*/g)]
-    .map((match) => Number(match[0].replace(/\s+/g, '')))
-    .filter((value) => Number.isFinite(value) && value > 0)
-  if (!amounts.length) return {}
-  const currency = /\$|usd/iu.test(chip) ? 'USD'
-    : /руб|rub|₽/iu.test(chip) ? 'RUB'
-      : /€|eur/iu.test(chip) ? 'EUR'
-        : /₸|тенге|kzt/iu.test(chip) ? 'KZT'
-          : /грн|uah|₴/iu.test(chip) ? 'UAH'
-            : /lei|ron/iu.test(chip) ? 'RON'
-              : ''
-  return currency
-    ? { salaryMin: Math.min(...amounts), salaryMax: Math.max(...amounts), currency }
-    : {}
+  return parseSalary(chip, '')
 }
 
 export function buildSecondaryProfile(input: {
@@ -81,7 +55,7 @@ export function buildSecondaryProfile(input: {
   salary?: Pick<CvProfile, 'salaryMin' | 'salaryMax' | 'currency'>
   contactType?: 'direct' | 'platform'
 }): CvProfile {
-  const publicContacts = contacts(input.text)
+  const publicContacts = contacts(input.text, input.country)
   const hasDirect = Boolean(publicContacts.phone || publicContacts.email || publicContacts.telegram)
   const age = input.age ?? parseAge(input.text)
   return normalizeCandidate({
