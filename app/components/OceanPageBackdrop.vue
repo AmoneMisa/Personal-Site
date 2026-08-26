@@ -168,19 +168,21 @@ const hasUnderwaterLife = computed(() => props.variant === "reef" || props.varia
 
 @media (max-width: 720px) {
   .ocean-page-backdrop__image {
-    inset: -1%;
+    inset: 0;
     background-position: var(--ocean-page-mobile-position, 66% top);
-    animation-duration: 30s;
+    transform: none;
+    animation: none;
+    will-change: auto;
   }
 
   .ocean-page-backdrop__water,
-  .ocean-page-backdrop__caustics_primary {
-    opacity: .11;
-    filter: blur(14px);
+  .ocean-page-backdrop__caustics,
+  :deep(.ocean-bubbles) {
+    display: none !important;
   }
 
-  .ocean-page-backdrop__caustics_secondary {
-    display: none;
+  .ocean-page-backdrop_has-life :deep(.underwater-2d__swimmer:not(.underwater-2d__swimmer_shark)) {
+    display: none !important;
   }
 }
 
