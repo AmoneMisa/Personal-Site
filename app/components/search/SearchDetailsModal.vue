@@ -8,15 +8,28 @@ const props = withDefaults(defineProps<{
 });
 
 const open = defineModel<boolean>("open", { required: true });
+const route = useRoute();
+const isFlatFinder = computed(() => route.path.endsWith("/flat-finder"));
 
 // Detail dialogs must sit above page-level fullscreen surfaces (the Flat Finder
 // map uses z-index 3000, and its cluster browser uses 9000). Keep this ownership
 // in the shared modal instead of adding page-specific z-index overrides.
-const modalUi = computed(() => ({
-  ...props.ui,
-  overlay: ["z-[12000]", props.ui?.overlay].filter(Boolean).join(" "),
-  content: ["z-[12001]", props.ui?.content].filter(Boolean).join(" "),
-}));
+const modalUi = computed(() => {
+  const requestedContent = String(props.ui?.content || "");
+  const content = isFlatFinder.value
+    ? requestedContent.replace(/\bmax-w-[^\s]+/g, "").trim()
+    : requestedContent;
+
+  return {
+    ...props.ui,
+    overlay: ["z-[12000]", props.ui?.overlay].filter(Boolean).join(" "),
+    content: [
+      "z-[12001]",
+      content,
+      isFlatFinder.value ? "flat-finder-details w-[calc(100vw-24px)] max-w-[800px]" : "",
+    ].filter(Boolean).join(" "),
+  };
+});
 </script>
 
 <template>
@@ -37,3 +50,26 @@ const modalUi = computed(() => ({
     </template>
   </u-modal>
 </template>
+
+<style>
+/* Flat Finder deliberately keeps every fact in one place: the specification
+   grid. Deal/room badges beside the price and generated tag chips duplicated
+   the same data, so the compact dialog does not render them visually. */
+.flat-finder-details .flat-modal__deal,
+.flat-finder-details .flat-modal__tags {
+  display: none !important;
+}
+
+.flat-finder-details [data-slot="header"] {
+  padding-bottom: 10px;
+}
+
+.flat-finder-details [data-slot="body"] {
+  padding-top: 8px;
+  padding-bottom: 10px;
+}
+
+.flat-finder-details [data-slot="footer"] {
+  padding-top: 10px;
+}
+</style>

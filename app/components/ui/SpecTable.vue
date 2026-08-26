@@ -24,6 +24,7 @@ const props = withDefaults(defineProps<{
 const hideEmpty = ref(props.hideEmptyDefault);
 const route = useRoute();
 const { t, locale } = useI18n();
+const isFlatFinder = computed(() => route.path.endsWith("/flat-finder"));
 
 function queryString(value: unknown): string {
   return Array.isArray(value) ? String(value[0] || "") : String(value || "");
@@ -280,15 +281,95 @@ const visibleRows = computed(() => {
     !row.empty && row.value.trim().toLocaleLowerCase() !== empty
   ));
 });
+
+const flatSpecIconByLabel = computed(() => new Map<string, string>([
+  [t("flats.specDeal"), "i-lucide-tag"],
+  [t("flats.specType"), "i-lucide-house"],
+  [t("flats.specListedBy"), "i-lucide-user-round"],
+  [t("flats.specSource"), "i-lucide-external-link"],
+  [t("flats.specRooms"), "i-lucide-door-open"],
+  [t("flats.specBedrooms"), "i-lucide-bed-double"],
+  [t("flats.specBathrooms"), "i-lucide-bath"],
+  [t("flats.specArea"), "i-lucide-scan"],
+  [t("flats.specFloor"), "i-lucide-stairs"],
+  [t("flats.specYear"), "i-lucide-calendar-days"],
+  [t("flats.specNewBuilding"), "i-lucide-building-2"],
+  [t("flats.specCondition"), "i-lucide-paint-roller"],
+  [t("flats.specComplex"), "i-lucide-building"],
+  [t("flats.specCity"), "i-lucide-map"],
+  [t("flats.specDistrict"), "i-lucide-map-pinned"],
+  [t("flats.specKvartal"), "i-lucide-blocks"],
+  [t("flats.specMetro"), "i-lucide-circle-m"],
+  [t("flats.specAddress"), "i-lucide-map-pin"],
+  [t("flats.specParking"), "i-lucide-square-parking"],
+  [t("flats.specElevator"), "i-lucide-arrow-up-down"],
+  [t("flats.specFurnished"), "i-lucide-armchair"],
+  [t("flats.specBalcony"), "i-lucide-panel-top"],
+  [t("flats.specAC"), "i-lucide-snowflake"],
+  [t("flats.specGas"), "i-lucide-flame"],
+  [t("flats.specHeating"), "i-lucide-radiator"],
+  [t("flats.specHotWater"), "i-lucide-waves"],
+  [t("flats.specInternet"), "i-lucide-wifi"],
+  [t("flats.specPets"), "i-lucide-paw-print"],
+  [t("flats.specChildren"), "i-lucide-baby"],
+  [t("flats.specSmoking"), "i-lucide-cigarette"],
+  [t("flats.specAudience"), "i-lucide-users-round"],
+  [t("flats.specRoomShare"), "i-lucide-user-plus"],
+  [t("flats.specNegotiable"), "i-lucide-hand-coins"],
+  [t("flats.specDeposit"), "i-lucide-shield-check"],
+  [t("flats.specCommission"), "i-lucide-percent"],
+  [t("flats.specCommunal"), "i-lucide-receipt-text"],
+  [t("flats.specUtilAmount"), "i-lucide-wallet-cards"],
+  [t("flats.specMinLease"), "i-lucide-calendar-range"],
+  [t("flats.specAvailable"), "i-lucide-calendar-check"],
+  [t("flats.specShops"), "i-lucide-shopping-bag"],
+  [t("flats.specNearby"), "i-lucide-navigation"],
+  [t("flats.specAmenities"), "i-lucide-sparkles"],
+]));
+
+function iconForRow(row: SpecRow): string {
+  if (row.tone === "warning") return "i-lucide-triangle-alert";
+  if (/кадастр|cadastral/i.test(row.label)) return "i-lucide-file-check-2";
+  if (/первая сдача|first rental/i.test(row.label)) return "i-lucide-key-round";
+  return flatSpecIconByLabel.value.get(row.label) || "i-lucide-info";
+}
 </script>
 
 <template>
-  <div class="spec-table">
+  <div class="spec-table" :class="{ 'spec-table_flat': isFlatFinder }">
     <label v-if="hideEmptyLabel" class="spec-table__toggle">
       <u-switch v-model="hideEmpty" :aria-label="hideEmptyLabel" />
       <span>{{ hideEmptyLabel }}</span>
     </label>
-    <table class="spec-table__table">
+
+    <div v-if="isFlatFinder" class="spec-table__grid" role="list">
+      <div
+        v-for="row in visibleRows"
+        :key="row.label"
+        class="spec-table__item"
+        :class="{ 'spec-table__row_warning': row.tone === 'warning' }"
+        role="listitem"
+      >
+        <span
+          class="spec-table__icon"
+          :data-tooltip="row.label"
+          :aria-label="row.label"
+          tabindex="0"
+        >
+          <u-icon :name="iconForRow(row)" />
+        </span>
+        <span class="spec-table__value">{{ row.value }}</span>
+        <span
+          v-if="aiHintForRow(row)"
+          class="spec-table__ai-hint spec-table__ai-hint_grid"
+          :title="aiHintForRow(row) || undefined"
+          :aria-label="aiHintForRow(row) || undefined"
+          tabindex="0"
+        >AI</span>
+      </div>
+    </div>
+
+    <table v-else class="spec-table__table">
       <tbody>
         <tr v-for="row in visibleRows" :key="row.label" :class="{ 'spec-table__row_warning': row.tone === 'warning' }">
           <th>
@@ -322,7 +403,72 @@ const visibleRows = computed(() => {
   cursor: pointer;
   user-select: none;
 }
+.spec-table_flat .spec-table__toggle { align-self: flex-end; }
 .spec-table__toggle :deep(.u-switch) { vertical-align: middle; }
+
+.spec-table__grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  border-top: 1px solid var(--line, #252a4a);
+}
+.spec-table__item {
+  position: relative;
+  display: grid;
+  grid-template-columns: 24px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  min-height: 46px;
+  padding: 8px 10px;
+  border-right: 1px solid var(--line, #252a4a);
+  border-bottom: 1px solid var(--line, #252a4a);
+}
+.spec-table__item:nth-child(4n) { border-right: 0; }
+.spec-table__icon {
+  position: relative;
+  display: inline-grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  color: var(--accent-pink, #e0679a);
+  cursor: help;
+  outline: none;
+}
+.spec-table__icon :deep(svg) { width: 17px; height: 17px; }
+.spec-table__icon::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  z-index: 20;
+  left: 50%;
+  bottom: calc(100% + 7px);
+  width: max-content;
+  max-width: 220px;
+  padding: 5px 7px;
+  border: 1px solid var(--line, #343a62);
+  border-radius: 6px;
+  background: var(--bg-panel, #10152c);
+  color: var(--text-primary, #e4e5f0);
+  box-shadow: 0 8px 22px rgba(0, 0, 0, .3);
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.2;
+  white-space: normal;
+  pointer-events: none;
+  opacity: 0;
+  transform: translate(-50%, 4px);
+  transition: opacity 120ms ease, transform 120ms ease;
+}
+.spec-table__icon:hover::after,
+.spec-table__icon:focus-visible::after { opacity: 1; transform: translate(-50%, 0); }
+.spec-table__icon:focus-visible { border-radius: 5px; box-shadow: 0 0 0 1px currentColor; }
+.spec-table__value {
+  min-width: 0;
+  color: var(--text-primary, #e4e5f0);
+  font-size: 12.5px;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+}
+.spec-table__ai-hint_grid { margin-left: 0 !important; font-size: 9px !important; }
 
 .spec-table__table { width: 100%; border-collapse: collapse; font-size: 13px; }
 .spec-table__table tr { border-bottom: 1px solid var(--line, #252a4a); }
@@ -338,6 +484,9 @@ const visibleRows = computed(() => {
   vertical-align: top;
 }
 .spec-table__table td { padding: 7px 0; vertical-align: top; overflow-wrap: anywhere; }
+.spec-table__row_warning,
+.spec-table__row_warning .spec-table__value,
+.spec-table__row_warning .spec-table__icon,
 .spec-table__row_warning th,
 .spec-table__row_warning td { color: #f2b86b; opacity: 1; font-weight: 700; }
 .spec-table__ai-hint {
@@ -355,7 +504,19 @@ const visibleRows = computed(() => {
   border-radius: 2px;
 }
 
+@media (max-width: 720px) {
+  .spec-table__grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .spec-table__item:nth-child(4n) { border-right: 1px solid var(--line, #252a4a); }
+  .spec-table__item:nth-child(2n) { border-right: 0; }
+}
 @media (max-width: 640px) {
   .spec-table__table th { white-space: normal; width: 42%; padding-right: 12px; }
+}
+@media (max-width: 430px) {
+  .spec-table__grid { grid-template-columns: 1fr; }
+  .spec-table__item,
+  .spec-table__item:nth-child(2n),
+  .spec-table__item:nth-child(4n) { border-right: 0; }
+  .spec-table_flat .spec-table__toggle { align-self: flex-start; }
 }
 </style>
