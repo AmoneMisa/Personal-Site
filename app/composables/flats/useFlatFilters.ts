@@ -1,4 +1,4 @@
-import { ref } from "vue";
+import { ref, watch } from "vue";
 import type { FlatSort } from "~/types/flats";
 
 export function useFlatFilters() {
@@ -48,6 +48,20 @@ export function useFlatFilters() {
   const query = ref("");
   const source = ref("");
   const showAdvanced = ref(false);
+
+  watch(dealType, (value) => {
+    if (value === "sale") {
+      audience.value = "any";
+      petFriendly.value = false;
+      childrenRequired.value = false;
+      roomOnlyFilter.value = false;
+      return;
+    }
+    if (value === "longRent" || value === "shortRent" || value === "roomRent") {
+      pricePerSqmMin.value = undefined;
+      pricePerSqmMax.value = undefined;
+    }
+  });
 
   function buildFeedParams(options: {
     limit: number;
