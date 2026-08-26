@@ -308,6 +308,19 @@ test('every service page imports the nested SEO composable explicitly', () => {
   }
 })
 
+test('underwater ambience uses the original cleaned mascots and visible bubbles', () => {
+  const creatures = readFileSync(new URL('../app/components/UnderwaterAmbient2d.client.vue', import.meta.url), 'utf8')
+  const bubbles = readFileSync(new URL('../app/components/OceanBubbles.client.vue', import.meta.url), 'utf8')
+  assert.match(creatures, /shark-clean\.webp/u)
+  assert.match(creatures, /seahorse-clean\.webp/u)
+  assert.match(creatures, /puffer-clean\.webp/u)
+  assert.match(creatures, /ocean-creature-fade/u)
+  assert.doesNotMatch(creatures, /underwater-creatures\.svg|underwater-2d__crop|clip-path/u)
+  assert.match(bubbles, /return 42/u)
+  assert.match(bubbles, /opacity: 0\.92/u)
+  assert.doesNotMatch(bubbles, /mix-blend-mode: screen/u)
+})
+
 test('vacancy cards open from the card surface and compact overflowing pills', () => {
   const card = readFileSync(new URL('../app/components/jobs/JobCard.vue', import.meta.url), 'utf8')
   const pills = readFileSync(new URL('../app/components/ui/DraggablePills.vue', import.meta.url), 'utf8')

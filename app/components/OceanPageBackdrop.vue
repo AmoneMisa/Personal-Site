@@ -141,13 +141,6 @@ const hasUnderwaterLife = computed(() => props.variant === "reef" || props.varia
   z-index: 1;
 }
 
-/* The generated puffer sheet contains a few detached decorative fragments on
-   its right/bottom edge. Crop those baked leftovers at the backdrop boundary
-   instead of duplicating or masking the fish itself. */
-.ocean-page-backdrop_has-life :deep(.underwater-2d__swimmer_puffer .underwater-2d__crop) {
-  clip-path: inset(0 11% 7% 0 round 2px);
-}
-
 @keyframes ocean-water-breathe {
   0% { transform: translate3d(-.16%, -.08%, 0) scale(1.02); filter: saturate(1) brightness(1); }
   46% { transform: translate3d(.2%, .12%, 0) scale(1.024); filter: saturate(1.025) brightness(1.015); }

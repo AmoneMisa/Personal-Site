@@ -39,23 +39,23 @@ let bursts: Burst[] = [];
 const random = (min: number, max: number) => min + Math.random() * (max - min);
 
 function bubbleCount() {
-  if (width < 640) return 12;
-  if (width < 1024) return 18;
-  return 28;
+  if (width < 640) return 18;
+  if (width < 1024) return 28;
+  return 42;
 }
 
 function makeBubble(anywhere = false): Bubble {
   const depth = Math.random();
-  const streams = width < 720 ? [0.12, 0.84] : [0.07, 0.2, 0.48, 0.79, 0.93];
+  const streams = width < 720 ? [0.1, 0.34, 0.68, 0.9] : [0.05, 0.16, 0.31, 0.49, 0.67, 0.82, 0.95];
   const stream = streams[Math.floor(Math.random() * streams.length)] ?? 0.5;
-  const radius = random(2.8, 8.5) * (0.72 + depth * 0.58);
+  const radius = random(3.4, 10.5) * (0.72 + depth * 0.58);
 
   return {
     x: Math.max(radius + 2, Math.min(width - radius - 2, stream * width + random(-46, 46))),
     y: anywhere ? random(-20, height + 20) : height + random(12, Math.max(80, height * 0.22)),
     radius,
-    speed: random(13, 30) * (0.72 + depth * 0.58),
-    drift: random(5, 15),
+    speed: random(15, 34) * (0.72 + depth * 0.58),
+    drift: random(7, 19),
     phase: random(0, TAU),
     depth,
   };
@@ -85,8 +85,9 @@ function configureCanvas() {
   const canvas = canvasRef.value;
   if (!canvas) return;
 
-  width = window.innerWidth;
-  height = window.innerHeight;
+  const bounds = canvas.getBoundingClientRect();
+  width = Math.max(1, Math.round(bounds.width || window.innerWidth));
+  height = Math.max(1, Math.round(bounds.height || window.innerHeight));
   dpr = Math.min(window.devicePixelRatio || 1, MAX_DPR);
   canvas.width = Math.max(1, Math.round(width * dpr));
   canvas.height = Math.max(1, Math.round(height * dpr));
@@ -107,7 +108,7 @@ function drawBubble(bubble: Bubble, now: number) {
 
   const x = bubbleX(bubble, now);
   const r = bubble.radius;
-  const alpha = 0.16 + bubble.depth * 0.24;
+  const alpha = 0.28 + bubble.depth * 0.34;
 
   ctx.save();
   ctx.translate(x, bubble.y);
@@ -268,13 +269,12 @@ onBeforeUnmount(() => {
   width: 100%;
   height: 100%;
   pointer-events: none;
-  opacity: 0.78;
-  mix-blend-mode: screen;
+  opacity: 0.92;
 }
 
 @media (max-width: 720px) {
   .ocean-bubbles {
-    opacity: 0.58;
+    opacity: 0.8;
   }
 }
 
