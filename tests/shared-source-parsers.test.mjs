@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
+import { readFile } from 'node:fs/promises'
 
 import { buildSecondaryProfile, parseSecondaryChipSalary } from '../server/hiring/sources/secondary/profile.ts'
 import { contacts } from '../shared/hiring/webFields.ts'
@@ -34,4 +35,12 @@ test('secondary sources use the shared salary and contact parsers', () => {
   assert.equal(profile.currency, 'CAD')
   assert.equal(profile.salaryMin, 1200)
   assert.equal(profile.salaryMax, 1200)
+})
+
+test('social hiring sources delegate contact parsing to the shared package', async () => {
+  const source = await readFile(new URL('../server/hiring/sources/socialRefresh.ts', import.meta.url), 'utf8')
+  assert.match(source, /extractCandidateContacts\(text, country\)/u)
+  assert.match(source, /contacts\(text, target\.country\)/u)
+  assert.doesNotMatch(source, /const phone = text\.match/u)
+  assert.doesNotMatch(source, /const telegram = text\.match/u)
 })
