@@ -23,9 +23,12 @@ export function useFlatFilterBlocks(options: {
     metroMaxM, nearbyMaxM, roomsMin, roomsMax, bedroomsMin, bedroomsMax,
     areaMin, areaMax, pricePerSqmMin, pricePerSqmMax, floorMin, floorMax,
     totalFloorsMin, totalFloorsMax, yearMin, yearMax, audience, propertyType, maxAgeDays,
+    dealType,
   } = options.filters;
   const update = <T>(target: Model<T>) => (value: SearchFilterValue) => { target.value = value as T; };
   const commit = () => options.scheduleLoad();
+  const saleOnlyHidden = () => dealType.value !== "any" && dealType.value !== "sale";
+  const rentOnlyHidden = () => dealType.value === "sale";
 
   return computed<SearchFilterBlock[]>(() => [
     {
@@ -51,8 +54,8 @@ export function useFlatFilterBlocks(options: {
         { id: "bedrooms-max", control: "number", label: `${options.t("rangeBedrooms")} · ${options.t("rangeTo")}`, value: bedroomsMax.value, min: 0, onUpdate: update(bedroomsMax), onCommit: commit },
         { id: "area-min", control: "number", label: `${options.t("rangeArea")} · ${options.t("rangeFrom")}`, value: areaMin.value, min: 0, onUpdate: update(areaMin), onCommit: commit },
         { id: "area-max", control: "number", label: `${options.t("rangeArea")} · ${options.t("rangeTo")}`, value: areaMax.value, min: 0, onUpdate: update(areaMax), onCommit: commit },
-        { id: "sqm-min", control: "number", label: `${options.t("rangePricePerSqm")} · ${options.t("rangeFrom")}`, value: pricePerSqmMin.value, min: 0, inputmode: "numeric", onUpdate: update(pricePerSqmMin), onCommit: commit },
-        { id: "sqm-max", control: "number", label: `${options.t("rangePricePerSqm")} · ${options.t("rangeTo")}`, value: pricePerSqmMax.value, min: 0, inputmode: "numeric", onUpdate: update(pricePerSqmMax), onCommit: commit },
+        { id: "sqm-min", control: "number", label: `${options.t("rangePricePerSqm")} · ${options.t("rangeFrom")}`, value: pricePerSqmMin.value, min: 0, inputmode: "numeric", hidden: saleOnlyHidden(), onUpdate: update(pricePerSqmMin), onCommit: commit },
+        { id: "sqm-max", control: "number", label: `${options.t("rangePricePerSqm")} · ${options.t("rangeTo")}`, value: pricePerSqmMax.value, min: 0, inputmode: "numeric", hidden: saleOnlyHidden(), onUpdate: update(pricePerSqmMax), onCommit: commit },
       ],
     },
     {
@@ -69,7 +72,7 @@ export function useFlatFilterBlocks(options: {
     {
       id: "listing", title: options.t("groupListing"), icon: "i-lucide-megaphone", gridClass: "flat-filter-grid_single",
       fields: [
-        { id: "audience", control: "select", label: options.t("audience"), value: audience.value, options: options.audienceItems.value, searchable: false, onUpdate: update(audience), onCommit: commit },
+        { id: "audience", control: "select", label: options.t("audience"), value: audience.value, options: options.audienceItems.value, searchable: false, hidden: rentOnlyHidden(), onUpdate: update(audience), onCommit: commit },
         { id: "property-type", control: "select", label: options.t("propertyType"), value: propertyType.value, options: options.propertyTypeItems.value, searchable: false, onUpdate: update(propertyType), onCommit: commit },
         { id: "fresh-days", control: "number", label: options.t("freshDays"), value: maxAgeDays.value, min: 1, max: 21, onUpdate: update(maxAgeDays), onCommit: commit },
       ],
