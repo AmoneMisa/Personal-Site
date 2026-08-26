@@ -85,7 +85,9 @@ jobs:
           path.write_text(text)
           PY
       - name: Pin shared parser revision
-        run: npm install '@whiteslove/parsing-lexicon=https://github.com/AmoneMisa/parsing-lexicon/archive/d71a2f277f9cf7208da3cba6fbc30748b02749d7.tar.gz' --save-exact
+        run: |
+          npm pkg set 'dependencies.@whiteslove/parsing-lexicon=https://github.com/AmoneMisa/parsing-lexicon/archive/d71a2f277f9cf7208da3cba6fbc30748b02749d7.tar.gz'
+          npm install --package-lock-only --ignore-scripts --no-audit --no-fund
       - name: Remove one-shot workflow and commit
         run: |
           rm .github/workflows/refactor-shared-work-semantics-once.yml
