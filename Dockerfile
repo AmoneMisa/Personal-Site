@@ -3,7 +3,9 @@ FROM node:24-bookworm-slim AS deps
 WORKDIR /app
 
 COPY package.json package-lock.json ./
-RUN npm ci
+# parsing-lexicon intentionally tracks #master. Ignore the lock while installing
+# so each build resolves the current branch head instead of a stale tarball/hash.
+RUN npm install --package-lock=false
 
 FROM node:24-bookworm-slim AS build
 
