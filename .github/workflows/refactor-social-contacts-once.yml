@@ -1,0 +1,70 @@
+name: Refactor social contacts once
+
+on:
+  push:
+    branches: [refactor/shared-social-contacts]
+
+permissions:
+  contents: write
+
+jobs:
+  refactor:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: refactor/shared-social-contacts
+      - name: Replace local social contact regexes
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import re
+
+          p = Path('server/hiring/sources/socialRefresh.ts')
+          s = p.read_text()
+          marker = "import type { CvProfile } from '../../utils/hiringTypes'\n"
+          shared_import = "import { extractCandidateContacts } from '@whiteslove/parsing-lexicon/hiring-candidate-fields'\n"
+          if shared_import not in s:
+              s = s.replace(marker, marker + shared_import, 1)
+          s, n = re.subn(
+              r"function contacts\(text: string\): DirectContacts \{.*?\n\}\n",
+              "function contacts(text: string, country: SocialTarget['country']): DirectContacts {\n  return { ...extractCandidateContacts(text, country) }\n}\n",
+              s,
+              count=1,
+              flags=re.S,
+          )
+          if n != 1:
+              raise SystemExit('social contacts block not found')
+          old = 'const publicContacts = contacts(text)'
+          if old not in s:
+              raise SystemExit('social contacts call not found')
+          s = s.replace(old, 'const publicContacts = contacts(text, target.country)', 1)
+          p.write_text(s)
+
+          t = Path('tests/shared-source-parsers.test.mjs')
+          tests = t.read_text()
+          if "from 'node:fs/promises'" not in tests:
+              tests = tests.replace("import test from 'node:test'\n", "import test from 'node:test'\nimport { readFile } from 'node:fs/promises'\n", 1)
+          block = """
+
+test('social hiring sources delegate contact parsing to the shared package', async () => {
+  const source = await readFile(new URL('../server/hiring/sources/socialRefresh.ts', import.meta.url), 'utf8')
+  assert.match(source, /extractCandidateContacts\(text, country\)/u)
+  assert.match(source, /contacts\(text, target\.country\)/u)
+  assert.doesNotMatch(source, /const phone = text\.match/u)
+  assert.doesNotMatch(source, /const telegram = text\.match/u)
+})
+"""
+          if "social hiring sources delegate contact parsing" not in tests:
+              tests += block
+          t.write_text(tests)
+          PY
+      - name: Remove one-shot workflow and commit
+        run: |
+          rm .github/workflows/refactor-social-contacts-once.yml
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add server/hiring/sources/socialRefresh.ts tests/shared-source-parsers.test.mjs .github/workflows/refactor-social-contacts-once.yml
+          git commit -m "Use shared contact parser for social candidates"
+          git push origin HEAD:refactor/shared-social-contacts
