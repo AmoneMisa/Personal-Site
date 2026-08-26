@@ -39,37 +39,32 @@ const previewItems = computed(() => [
   { label: t("services.emailEditor.preview.yandex"), value: "yandex" },
   { label: t("services.emailEditor.preview.outlook"), value: "outlook" },
 ]);
-
-const selectUi = {
-  base: "w-full min-h-[44px] rounded-lg border border-[var(--line)] bg-[var(--bg-panel-2)] px-3 shadow-none ring-0",
-};
 </script>
 
 <template>
   <div class="email-editor-toolbar">
     <div class="email-editor-toolbar__left">
       <u-select
-          class="email-editor-toolbar__select ui-locale"
+          class="email-editor-toolbar__select"
           :items="templateItems"
           option-attribute="label"
           value-attribute="value"
-          :ui="selectUi"
           :model-value="props.templateEngine"
           @update:model-value="emit('update:template-engine', $event as any)"
       />
 
       <u-select
-          class="email-editor-toolbar__select ui-locale"
+          class="email-editor-toolbar__select"
           :items="previewItems"
           option-attribute="label"
           value-attribute="value"
-          :ui="selectUi"
           :model-value="props.previewClient"
           @update:model-value="emit('update:preview-client', $event as any)"
       />
 
       <div class="email-editor-toolbar__fake" :class="{ 'email-editor-toolbar__fake_disabled': !fakeDataAvailable }">
         <custom-checkbox
+            variant="switch"
             :model-value="props.fakeDataEnabled"
             :label="t('services.emailEditor.fakeData.toggle')"
             :disabled="props.isBusy || !fakeDataAvailable"
@@ -156,8 +151,8 @@ const selectUi = {
 }
 
 .email-editor-toolbar__button {
-  min-height: 44px;
-  height: 44px;
+  min-height: var(--ui-control-h-lg, 44px);
+  height: var(--ui-control-h-lg, 44px);
   white-space: nowrap;
 }
 
