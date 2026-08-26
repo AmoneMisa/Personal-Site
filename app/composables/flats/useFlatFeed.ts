@@ -1,51 +1,7 @@
 import { nextTick, ref } from "vue";
-import type { FlatFeedResult, FlatListing, FlatPriceBandKey, FlatStatistics, FlatStatsDealKey } from "~/types/flats";
+import type { FlatFeedResult, FlatListing, FlatStatistics } from "~/types/flats";
 import { safeFetch } from "~/utils/safeFetch";
 import { useLatestRequest } from "~/composables/search/useLatestRequest";
-
-const PRICE_BAND_ORDER: FlatPriceBandKey[] = ["green", "blue", "pink", "orange", "yellow", "red"];
-
-function listingDealKey(listing: FlatListing): FlatStatsDealKey {
-  if (listing.roomOnly) return "roomRent";
-  return listing.dealType || "unknown";
-}
-
-function priceBandForRatio(ratio: number): FlatPriceBandKey {
-  if (ratio < 0.70) return "green";
-  if (ratio < 0.85) return "blue";
-  if (ratio <= 1.15) return "pink";
-  if (ratio < 1.31) return "orange";
-  if (ratio < 1.45) return "yellow";
-  return "red";
-}
-
-function withLoadedPriceBands(statistics: FlatStatistics, listings: FlatListing[]): FlatStatistics {
-  const counts = new Map<FlatStatsDealKey, Map<FlatPriceBandKey, number>>();
-  const samples = new Map<FlatStatsDealKey, number>();
-
-  for (const listing of listings) {
-    const ratio = listing.marketComparison?.priceRatio;
-    if (ratio == null || !Number.isFinite(ratio) || ratio <= 0) continue;
-    const deal = listingDealKey(listing);
-    const band = priceBandForRatio(ratio);
-    const dealCounts = counts.get(deal) || new Map<FlatPriceBandKey, number>();
-    dealCounts.set(band, (dealCounts.get(band) || 0) + 1);
-    counts.set(deal, dealCounts);
-    samples.set(deal, (samples.get(deal) || 0) + 1);
-  }
-
-  const priceBandsByDeal: FlatStatistics["priceBandsByDeal"] = {};
-  const priceBandSamplesByDeal: FlatStatistics["priceBandSamplesByDeal"] = {};
-  for (const deal of ["sale", "longRent", "shortRent", "roomRent", "unknown"] as FlatStatsDealKey[]) {
-    const dealCounts = counts.get(deal);
-    const sampleCount = samples.get(deal) || 0;
-    if (!dealCounts || sampleCount === 0) continue;
-    priceBandsByDeal[deal] = PRICE_BAND_ORDER.map((key) => ({ key, count: dealCounts.get(key) || 0 }));
-    priceBandSamplesByDeal[deal] = sampleCount;
-  }
-
-  return { ...statistics, priceBandsByDeal, priceBandSamplesByDeal };
-}
 
 export function useFlatFeed(options: { onAvailabilityChecked?: (keys: string[]) => void } = {}) {
   const listings = ref<FlatListing[]>([]);
@@ -65,27 +21,19 @@ export function useFlatFeed(options: { onAvailabilityChecked?: (keys: string[]) 
   let warmParams: Record<string, string> | null = null;
 
   async function setStatisticsWithoutViewportJump(value: FlatStatistics) {
-    const enriched = withLoadedPriceBands(value, listings.value);
     if (!import.meta.client) {
-      statistics.value = enriched;
+      statistics.value = value;
       return;
     }
     const top = window.scrollY;
     const left = window.scrollX;
-    statistics.value = enriched;
+    statistics.value = value;
     await nextTick();
     requestAnimationFrame(() => {
-      // The analytics panel is inserted above the map/results. Preserve the exact
-      // viewport so its late arrival cannot push the user's current cards away.
       if (Math.abs(window.scrollY - top) > 1 || Math.abs(window.scrollX - left) > 1) {
         window.scrollTo({ top, left, behavior: "auto" });
       }
     });
-  }
-
-  function refreshLoadedPriceBands() {
-    if (!statistics.value) return;
-    statistics.value = withLoadedPriceBands(statistics.value, listings.value);
   }
 
   function scheduleWarmPoll() {
@@ -131,10 +79,8 @@ export function useFlatFeed(options: { onAvailabilityChecked?: (keys: string[]) 
       failed.value = false;
     }
 
-    // Statistics are substantially more expensive than the first page because
-    // the backend has to deduplicate the complete result set and aggregate
-    // percentiles/geographies. Do not make the user wait for that work before
-    // the first cards can render; request it independently after the page is in.
+    // Keep the first page fast: PostgreSQL statistics are requested separately,
+    // but they are always calculated over the complete filtered result set.
     const feedParams = { ...params };
     if (wantsStatistics) delete feedParams.includeStats;
 
@@ -176,11 +122,7 @@ export function useFlatFeed(options: { onAvailabilityChecked?: (keys: string[]) 
     } else {
       listings.value = nextListings;
     }
-    refreshLoadedPriceBands();
     if (!append) total.value = data.count ?? listings.value.length;
-    // A page request deliberately omits includeStats, so it must not clear the
-    // previous analytics snapshot while the independent statistics request is
-    // still running. Replace statistics only when a response actually has them.
     if (!append && data.statistics) void setStatisticsWithoutViewportJump(data.statistics);
     sourceErrors.value = data.sourceErrors || [];
     warming.value = !!data.warming;
