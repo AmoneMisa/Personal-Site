@@ -96,7 +96,7 @@ jobs:
           add_service "$frontend" frontend . ./Dockerfile "$FRONTEND_IMAGE"
           add_service "$backend" backend ./backend ./backend/Dockerfile "$BACKEND_IMAGE"
           add_service "$jobs_worker" jobs-worker . ./jobs-worker/Dockerfile "$JOBS_WORKER_IMAGE"
-          add_service "$job_browser_fetcher" job-browser-fetcher ./job-browser-fetcher ./Dockerfile "$JOB_BROWSER_FETCHER_IMAGE"
+          add_service "$job_browser_fetcher" job-browser-fetcher ./job-browser-fetcher ./job-browser-fetcher/Dockerfile "$JOB_BROWSER_FETCHER_IMAGE"
           add_service "$subscription_bot" subscription-bot ./subscription-bot ./subscription-bot/Dockerfile "$SUBSCRIPTION_BOT_IMAGE"
 
           has_builds=false
