@@ -184,8 +184,11 @@ export function extractContactHours(text: string): string | null {
   return extractCandidateContactHours(text)
 }
 
-export function extractContacts(text: string): { telegram?: string; email?: string; phone?: string } {
-  return { ...extractCandidateContacts(text) }
+export function extractContacts(
+  text: string,
+  country = '',
+): { telegram?: string; email?: string; phone?: string } {
+  return { ...extractCandidateContacts(text, country) }
 }
 
 export function extractAge(text: string): number | null {
@@ -420,7 +423,7 @@ export function normalizeCandidate(profile: CvProfile): CvProfile {
     .trim()
     .slice(0, 100)
   const text = `${name}\n${effectiveRole || ''}\n${originalText}`
-  const extractedContacts = extractContacts(text)
+  const extractedContacts = extractContacts(text, profile.country || profile.sourceCountry || '')
   const contacts = {
     ...(extractedContacts.telegram ? { telegram: extractedContacts.telegram } : {}),
     ...(extractedContacts.email ? { email: extractedContacts.email } : {}),
