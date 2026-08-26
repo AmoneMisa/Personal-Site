@@ -79,7 +79,7 @@ export function buildWebProfile(
   activity: string,
   partial: Partial<CvProfile>,
 ): CvProfile {
-  const publicContacts = contacts(block.text)
+  const publicContacts = contacts(block.text, source.country)
   const hasDirect = Boolean(publicContacts.phone || publicContacts.email || publicContacts.telegram)
   const idToken = block.href
     .replace(/^https?:\/\//, '')

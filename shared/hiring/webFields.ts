@@ -137,6 +137,6 @@ export function employment(text: string): CvProfile['employmentTypes'] {
   return [...out]
 }
 
-export function contacts(text: string): CvProfile['contacts'] {
-  return { ...extractCandidateContacts(text) }
+export function contacts(text: string, country = ''): CvProfile['contacts'] {
+  return { ...extractCandidateContacts(text, country) }
 }
