@@ -5,6 +5,19 @@ set -euo pipefail
 
 cd "$(dirname "$0")"
 
+STATE_DIR="${DEPLOY_STATE_DIR:-/var/lib/personal-site-deploy}"
+DEPLOY_SHA="${DEPLOY_SHA:-$(git rev-parse HEAD 2>/dev/null || echo unknown)}"
+DEPLOY_SOURCE="${DEPLOY_SOURCE:-manual}"
+SKIP_PULL="${SKIP_PULL:-0}"
+FORCE_DEPLOY="${FORCE_DEPLOY:-0}"
+mkdir -p "$STATE_DIR"
+
+if [[ "$FORCE_DEPLOY" != "1" && -f "$STATE_DIR/deployed.sha" ]] &&
+   [[ "$(cat "$STATE_DIR/deployed.sha")" == "$DEPLOY_SHA" ]]; then
+  echo "Commit $DEPLOY_SHA is already deployed; skipping duplicate rollout."
+  exit 0
+fi
+
 if [ ! -f db.env ]; then
   echo "Missing $(pwd)/db.env (copy .env.example and fill server secrets first)." >&2
   exit 1
@@ -22,10 +35,8 @@ if [ -d .git ]; then
   git pull --ff-only
 fi
 
-# Production only pulls prebuilt images, so unused image layers and builder cache
-# are safe to remove. This prevents containerd/overlayfs from filling the host
-# between deployments. Volumes and images referenced by existing containers are
-# deliberately left untouched.
+# Production normally pulls prebuilt images. Local fallback sets SKIP_PULL=1
+# after building the exact same image tags directly on the production host.
 prune_unused_docker_data() {
   echo "Docker storage before cleanup:"
   docker system df || true
@@ -35,8 +46,6 @@ prune_unused_docker_data() {
   docker system df || true
 }
 
-# Reclaim space before pulling the next image set. This is especially important
-# when the previous deploy already left the root filesystem close to full.
 prune_unused_docker_data
 
 docker network inspect ai-net >/dev/null 2>&1 || docker network create ai-net
@@ -44,25 +53,33 @@ docker network inspect ai-net >/dev/null 2>&1 || docker network create ai-net
 compose=(docker compose --env-file db.env)
 target="${1:-all}"
 
+pull_if_needed() {
+  if [[ "$SKIP_PULL" == "1" ]]; then
+    echo "Using locally built images; registry pull skipped."
+    return 0
+  fi
+  "${compose[@]}" pull "$@"
+}
+
 case "$target" in
   all)
-    "${compose[@]}" pull
-    # Remove retired jobs-backend / jobs-api / Python queue containers automatically.
+    if [[ "$SKIP_PULL" == "1" ]]; then
+      echo "Using locally built images; registry pull skipped."
+    else
+      "${compose[@]}" pull
+    fi
     "${compose[@]}" up -d --no-build --remove-orphans
     ;;
   frontend)
-    # Nuxt serves both the UI/SSR and lightweight jobs/hiring API routes.
-    "${compose[@]}" pull frontend
+    pull_if_needed frontend
     "${compose[@]}" up -d --no-build frontend
     ;;
   jobs)
-    # API changes are part of the Nuxt image; execution is the separate worker.
-    "${compose[@]}" pull frontend jobs-worker job-browser-fetcher
+    pull_if_needed frontend jobs-worker job-browser-fetcher
     "${compose[@]}" up -d --no-build job-browser-fetcher frontend jobs-worker
     ;;
   backend)
-    # Existing auxiliary FastAPI service; unrelated to jobs/hiring ingestion.
-    "${compose[@]}" pull backend
+    pull_if_needed backend
     "${compose[@]}" up -d --no-build backend
     ;;
   *)
@@ -83,7 +100,12 @@ if [ "$target" = "all" ] || [ "$target" = "frontend" ] || [ "$target" = "jobs" ]
   echo "Personal Site Nuxt runtime is healthy."
 fi
 
-# After a healthy rollout, the previous image generation is no longer referenced
-# by running containers. Remove it immediately instead of letting layers pile up
-# until the next deployment.
+# Only mark the SHA after the rollout and health checks have succeeded.
+printf '%s\n' "$DEPLOY_SHA" > "$STATE_DIR/deployed.sha.tmp"
+mv "$STATE_DIR/deployed.sha.tmp" "$STATE_DIR/deployed.sha"
+printf 'SHA=%s\nSOURCE=%s\nTIME=%s\n' \
+  "$DEPLOY_SHA" "$DEPLOY_SOURCE" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > "$STATE_DIR/deployed.meta"
+
+echo "Recorded successful deployment: $DEPLOY_SHA ($DEPLOY_SOURCE)"
+
 prune_unused_docker_data
