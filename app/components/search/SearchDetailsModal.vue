@@ -53,8 +53,10 @@ const modalUi = computed(() => {
 
 <style>
 /* Flat Finder deliberately keeps every fact in one place: the specification
-   grid. Deal/room badges beside the price were duplicates of those rows. */
-.flat-finder-details .flat-modal__deal {
+   grid. Deal/room badges beside the price and generated tag chips duplicated
+   the same data, so the compact dialog does not render them visually. */
+.flat-finder-details .flat-modal__deal,
+.flat-finder-details .flat-modal__tags {
   display: none !important;
 }
 
