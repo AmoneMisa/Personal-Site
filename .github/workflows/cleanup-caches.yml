@@ -1,0 +1,74 @@
+name: Cleanup GitHub Actions caches
+
+on:
+  workflow_run:
+    workflows:
+      - Build and deploy Personal Site
+    types:
+      - completed
+
+permissions:
+  actions: write
+  contents: read
+
+jobs:
+  cleanup:
+    if: >-
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.head_branch == 'master'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Keep current and previous cache entries
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          # Fetch cache entries for master, newest first.
+          caches="$(gh api --paginate \
+            -H 'Accept: application/vnd.github+json' \
+            -H 'X-GitHub-Api-Version: 2022-11-28' \
+            "/repos/${GH_REPO}/actions/caches?ref=refs/heads/master&per_page=100" \
+            --jq '.actions_caches[] | [.id, .key, .last_accessed_at] | @tsv')"
+
+          if [[ -z "$caches" ]]; then
+            echo 'No Actions caches found for master.'
+            exit 0
+          fi
+
+          printf '%s\n' "$caches" | sort -t $'\t' -k3,3r > /tmp/caches.tsv
+
+          # BuildKit may expose internal buildkit-blob-* objects referenced by
+          # the newest index entries. Do not delete those directly.
+          # Logical BuildKit indexes are grouped by their scope prefix.
+          awk -F $'\t' '
+            function group(key) {
+              if (key ~ /^buildkit-blob-/) return "__KEEP_BLOB__";
+              if (key ~ /^index-/) {
+                sub(/-[0-9a-f]{16,}$/, "", key);
+                return key;
+              }
+              # setup-node npm keys contain runner/arch/node/package-lock hash;
+              # retain the two most recently used npm cache entries as a family.
+              if (key ~ /^node-cache-/ || key ~ /npm/) return "__NPM__";
+              return key;
+            }
+            {
+              g = group($2);
+              if (g == "__KEEP_BLOB__") next;
+              seen[g]++;
+              if (seen[g] > 2) print $1 "\t" $2 "\t" g;
+            }
+          ' /tmp/caches.tsv > /tmp/delete.tsv
+
+          if [[ ! -s /tmp/delete.tsv ]]; then
+            echo 'Nothing to prune; every logical cache family has at most two entries.'
+            exit 0
+          fi
+
+          while IFS=$'\t' read -r id key group; do
+            echo "Deleting cache id=$id key=$key group=$group"
+            gh cache delete "$id" --repo "$GH_REPO"
+          done < /tmp/delete.tsv
