@@ -24,6 +24,13 @@ export interface HiringStatisticsItem {
   value: number
 }
 
+export interface HiringProfessionSalaryRange {
+  profession: string
+  count: number
+  minUsd: number
+  maxUsd: number
+}
+
 export interface HiringStatistics {
   genders: Record<CandidateGender, number>
   ages: HiringStatisticsItem[]
@@ -33,6 +40,7 @@ export interface HiringStatistics {
   professions: HiringStatisticsItem[]
   activity: Array<{ date: string; value: number }>
   salaryByExperience: Array<number | null>
+  salaryByProfession: HiringProfessionSalaryRange[]
   salarySamples: number
 }
 
