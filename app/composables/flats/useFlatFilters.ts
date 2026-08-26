@@ -58,6 +58,8 @@ export function useFlatFilters() {
   }): Record<string, string> {
     const params: Record<string, string> = { limit: String(options.limit) };
     const cursorSort = sort.value === "newest" || sort.value === "oldest";
+    const saleOnly = dealType.value === "sale";
+    const rentOnly = dealType.value === "longRent" || dealType.value === "shortRent" || dealType.value === "roomRent";
     if (options.append && cursorSort && options.nextCursor) params.cursor = options.nextCursor;
     else params.offset = String(options.append ? options.loadedCount : 0);
     if (countries.value.length) params.countries = countries.value.join(",");
@@ -75,8 +77,8 @@ export function useFlatFilters() {
     if (bedroomsMax.value != null) params.bedroomsMax = String(bedroomsMax.value);
     if (areaMin.value != null) params.areaMin = String(areaMin.value);
     if (areaMax.value != null) params.areaMax = String(areaMax.value);
-    if (pricePerSqmMin.value != null) params.pricePerSqmMin = String(pricePerSqmMin.value);
-    if (pricePerSqmMax.value != null) params.pricePerSqmMax = String(pricePerSqmMax.value);
+    if (!rentOnly && pricePerSqmMin.value != null) params.pricePerSqmMin = String(pricePerSqmMin.value);
+    if (!rentOnly && pricePerSqmMax.value != null) params.pricePerSqmMax = String(pricePerSqmMax.value);
     if (metroMaxM.value != null) params.metroMaxM = String(metroMaxM.value);
     if (nearbyKind.value) params.nearbyKind = nearbyKind.value;
     if (nearbyMaxM.value != null) params.nearbyMaxM = String(nearbyMaxM.value);
@@ -88,11 +90,11 @@ export function useFlatFilters() {
     if (yearMax.value != null) params.yearMax = String(yearMax.value);
     if (maxAgeDays.value != null) params.maxAgeDays = String(maxAgeDays.value);
     if (metro.value) params.metro = metro.value;
-    if (audience.value !== "any") params.audience = audience.value;
-    if (petFriendly.value) params.pets = "1";
-    if (roomOnlyFilter.value || dealType.value === "roomRent") params.roomOnly = "1";
+    if (!saleOnly && audience.value !== "any") params.audience = audience.value;
+    if (!saleOnly && petFriendly.value) params.pets = "1";
+    if (!saleOnly && (roomOnlyFilter.value || dealType.value === "roomRent")) params.roomOnly = "1";
     if (onlyWithPhotos.value) params.withPhotos = "1";
-    if (childrenRequired.value) params.children = "1";
+    if (!saleOnly && childrenRequired.value) params.children = "1";
     if (newBuildingOnly.value) params.newBuilding = "1";
     if (dishwasherOnly.value) params.dishwasher = "1";
     if (airConditionerOnly.value) params.airConditioner = "1";
