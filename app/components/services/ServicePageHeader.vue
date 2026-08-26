@@ -25,11 +25,8 @@ withDefaults(defineProps<{
 </template>
 
 <style>
-/*
- * All service tools are intentionally allowed to keep their own internal UI,
- * but they share one outer grid. This prevents the service pages from jumping
- * between narrow, full-width and differently-spaced layouts.
- */
+/* Shared outer rhythm for every tool page. Internal editors keep their own
+ * layouts, while control metrics and direct tool surfaces come from one system. */
 .service-page-header {
   width: min(100%, 1440px);
   margin: 0 auto;
@@ -44,14 +41,32 @@ withDefaults(defineProps<{
   box-sizing: border-box;
 }
 
-/* Direct tool surfaces get the same visual frame without touching nested
- * editors/previews, which all have service-specific behavior. */
 .service-page-header + section,
 .service-page-header + .tabs-row {
   border: 1px solid var(--color-border, var(--line));
   border-radius: 14px;
   background: var(--secondary-bg-gradient, rgba(255, 255, 255, 0.025));
   box-shadow: var(--shadow-light, inset 0 1px 0 rgba(255, 255, 255, 0.04));
+}
+
+/* Service controls use one 44px metric. This catches direct UInput/USelectMenu
+ * usage as well as the existing CustomInput/CustomButton wrappers, without
+ * changing compact controls elsewhere on the site. */
+.service-page-header ~ * .ui-control,
+.service-page-header ~ * .u-select-menu__trigger,
+.service-page-header ~ * .btn,
+.service-page-header ~ * .u-button {
+  min-height: var(--ui-control-h-lg, 44px);
+}
+
+.service-page-header ~ * .btn,
+.service-page-header ~ * .u-button {
+  height: var(--ui-control-h-lg, 44px);
+}
+
+.service-page-header ~ * .ui-control,
+.service-page-header ~ * .u-select-menu__trigger {
+  border-radius: var(--ui-control-radius, 8px);
 }
 
 @media (max-width: 767px) {
