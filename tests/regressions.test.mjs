@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { readFileSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import test from 'node:test'
 import { hiringEducationLabel } from '../shared/hiringEducationLabels.ts'
 import { hiringProfessionLabel } from '../shared/hiringProfessionLabels.ts'
@@ -309,18 +309,48 @@ test('every service page imports the nested SEO composable explicitly', () => {
 })
 
 test('underwater ambience uses the original cleaned mascots and visible bubbles', () => {
-  const creatures = readFileSync(new URL('../app/components/UnderwaterAmbient2d.client.vue', import.meta.url), 'utf8')
+  const ambient = readFileSync(new URL('../app/components/UnderwaterAmbient2d.client.vue', import.meta.url), 'utf8')
+  const sprite = readFileSync(new URL('../app/components/AquariumPetSprite.vue', import.meta.url), 'utf8')
+  const config = readFileSync(new URL('../app/utils/aquariumCreatures.ts', import.meta.url), 'utf8')
+  const creatures = `${ambient}\n${sprite}\n${config}`
   const bubbles = readFileSync(new URL('../app/components/OceanBubbles.client.vue', import.meta.url), 'utf8')
-  assert.match(creatures, /shark-clean\.webp/u)
-  assert.match(creatures, /seahorse-clean\.webp/u)
-  assert.match(creatures, /puffer-clean\.webp/u)
+  assert.match(creatures, /shark-clean-animated\.webp/u)
+  assert.match(creatures, /seahorse-clean-animated\.webp/u)
+  assert.match(creatures, /puffer-clean-animated\.webp/u)
   assert.match(creatures, /edgeVisibility/u)
   assert.match(creatures, /await nextTick\(\)/u)
-  assert.match(creatures, /puffer-normal\.webp/u)
-  assert.match(creatures, /puffer-form_ball/u)
-  assert.match(creatures, /ocean-tentacle-wave/u)
+  assert.match(creatures, /puffer-normal-animated\.webp/u)
+  assert.match(creatures, /aquarium-pet-sprite__puffer_ball/u)
+  assert.match(creatures, /shark-hunt\.webp/u)
+  assert.match(creatures, /seahorse-heart-animated\.webp/u)
+  assert.match(creatures, /seahorse-tired-animated\.webp/u)
+  assert.match(creatures, /blue-fish-animated\.webp/u)
+  assert.match(creatures, /clownfish-v2-animated\.webp/u)
+  assert.match(sprite, /fishExpressionSrc/u)
+  assert.match(sprite, /jellyMoodSrc/u)
+  for (const asset of [
+    'jelly-blue-sleep-animated.webp',
+    'jelly-blue-play-animated.webp',
+    'jelly-blue-angry-animated.webp',
+    'blue-fish-interest-animated.webp',
+    'blue-fish-panic-animated.webp',
+    'clownfish-interest-animated.webp',
+    'clownfish-panic-animated.webp',
+    'jelly-pink-sleep-animated.webp',
+    'jelly-pink-play-animated.webp',
+    'jelly-pink-angry-animated.webp',
+  ]) {
+    assert.ok(existsSync(new URL(`../public/images/ocean-creatures/${asset}`, import.meta.url)), `${asset} should exist`)
+  }
   assert.match(creatures, /inflatedExit/u)
   assert.match(creatures, /huntTargetId/u)
+  assert.match(creatures, /MAX_VISIBLE_PETS = 4/u)
+  assert.match(creatures, /state\.preset\.id === "shark" \|\| initialGuests\.includes/u)
+  assert.match(creatures, /rotatePetSlot/u)
+  assert.match(ambient, /<aquarium-pet-sprite/u)
+  assert.match(creatures, /shark-curious\.webp/u)
+  assert.match(creatures, /shark-annoyed\.webp/u)
+  assert.match(creatures, /state\.preset\.kind === "jelly"/u)
   assert.doesNotMatch(creatures, /fear-scale/u)
   assert.doesNotMatch(creatures, /underwater-creatures\.svg|underwater-2d__crop|creatureLayerSrc/u)
   const nuxtConfig = readFileSync(new URL('../nuxt.config.ts', import.meta.url), 'utf8')
@@ -328,6 +358,13 @@ test('underwater ambience uses the original cleaned mascots and visible bubbles'
   assert.match(bubbles, /return 42/u)
   assert.match(bubbles, /opacity: 0\.92/u)
   assert.doesNotMatch(bubbles, /mix-blend-mode: screen/u)
+  const backdrop = readFileSync(new URL('../app/components/OceanPageBackdrop.vue', import.meta.url), 'utf8')
+  const crab = readFileSync(new URL('../app/components/HeaderCrab.client.vue', import.meta.url), 'utf8')
+  assert.match(backdrop, /<header-crab/u)
+  assert.match(crab, /header-crab\.webp/u)
+  assert.match(crab, /header-crab-scamper/u)
+  assert.match(crab, /header-crab-surprised\.webp/u)
+  assert.match(crab, /header-crab-flee-left/u)
 })
 
 test('vacancy cards open from the card surface and compact overflowing pills', () => {

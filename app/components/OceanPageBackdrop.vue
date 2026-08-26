@@ -23,6 +23,7 @@ const hasUnderwaterLife = computed(() => props.variant === "reef" || props.varia
     <div v-if="hasUnderwaterLife" class="ocean-page-backdrop__caustics ocean-page-backdrop__caustics_secondary" />
     <ocean-bubbles v-if="hasUnderwaterLife" />
     <underwater-ambient2d v-if="hasUnderwaterLife" />
+    <header-crab v-if="hasUnderwaterLife" />
   </div>
 </template>
 

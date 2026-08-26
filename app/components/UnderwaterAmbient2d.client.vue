@@ -1,39 +1,15 @@
 <script setup lang="ts">
 import { nextTick, onBeforeUnmount, onMounted } from "vue";
-
-type CreatureKind = "shark" | "seahorse" | "puffer" | "jelly";
-type SwimDirection = "ltr" | "rtl";
+import {
+  aquariumCreatures as creatures,
+  bodyAnimationBase,
+  MAX_VISIBLE_PETS,
+  steeringProfiles,
+  type CreaturePreset,
+  type SwimDirection,
+} from "~/utils/aquariumCreatures";
 type PointerMode = "none" | "interest" | "threat" | "panic";
-
-type CreaturePreset = {
-  id: string;
-  src: string;
-  kind: CreatureKind;
-  top: string;
-  size: string;
-  duration: string;
-  delay: string;
-  direction: SwimDirection;
-  opacity: number;
-};
-
-type SteeringProfile = {
-  cruiseSpeed: number;
-  maxSpeed: number;
-  steering: number;
-  verticalSpeed: number;
-  wanderFrequency: number;
-  cursorRadius: number;
-  evadeVertical: number;
-  evadeForward: number;
-  fearBoost: number;
-  curiosity: number;
-  interestRadius: number;
-  interestDistance: number;
-  turnChance: number;
-  decisionMin: number;
-  decisionMax: number;
-};
+import type { SteeringProfile } from "~/utils/aquariumCreatures";
 
 type CreatureState = {
   preset: CreaturePreset;
@@ -60,6 +36,12 @@ type CreatureState = {
   inflateStartedAt: number;
   inflatedExit: boolean;
   hiddenUntil: number;
+  mood: "sleep" | "play" | "angry" | "none";
+  moodUntil: number;
+  nextMoodAt: number;
+  active: boolean;
+  jellyExit: boolean;
+  pointerMode: PointerMode;
 };
 
 type PointerSteering = {
@@ -68,92 +50,6 @@ type PointerSteering = {
   fear: number;
   interest: number;
   mode: PointerMode;
-};
-
-const creatures: CreaturePreset[] = [
-  { id: "shark", src: "/images/ocean-creatures/shark-clean.webp", kind: "shark", top: "18%", size: "clamp(190px, 18vw, 330px)", duration: "34s", delay: "-9s", direction: "rtl", opacity: 0.88 },
-  { id: "puffer", src: "/images/ocean-creatures/puffer-normal.webp", kind: "puffer", top: "43%", size: "clamp(94px, 9vw, 158px)", duration: "25s", delay: "-3s", direction: "ltr", opacity: 0.9 },
-  { id: "seahorse", src: "/images/ocean-creatures/seahorse-clean.webp", kind: "seahorse", top: "61%", size: "clamp(70px, 5.7vw, 112px)", duration: "39s", delay: "-21s", direction: "rtl", opacity: 0.88 },
-  { id: "jelly-blue", src: "/images/ocean-creatures/jelly-blue.webp", kind: "jelly", top: "29%", size: "clamp(82px, 6.5vw, 126px)", duration: "43s", delay: "-28s", direction: "ltr", opacity: 0.7 },
-  { id: "jelly-pink", src: "/images/ocean-creatures/jelly-pink.webp", kind: "jelly", top: "72%", size: "clamp(76px, 6vw, 118px)", duration: "47s", delay: "-6s", direction: "rtl", opacity: 0.68 },
-];
-
-const steeringProfiles: Record<CreatureKind, SteeringProfile> = {
-  shark: {
-    cruiseSpeed: 48,
-    maxSpeed: 94,
-    steering: 1.35,
-    verticalSpeed: 13,
-    wanderFrequency: 0.62,
-    cursorRadius: 300,
-    evadeVertical: 118,
-    evadeForward: 38,
-    fearBoost: 0.5,
-    curiosity: 0.36,
-    interestRadius: 470,
-    interestDistance: 170,
-    turnChance: 0.18,
-    decisionMin: 10,
-    decisionMax: 20,
-  },
-  puffer: {
-    cruiseSpeed: 31,
-    maxSpeed: 68,
-    steering: 2.1,
-    verticalSpeed: 18,
-    wanderFrequency: 0.74,
-    cursorRadius: 250,
-    evadeVertical: 132,
-    evadeForward: 30,
-    fearBoost: 0.62,
-    curiosity: 0.72,
-    interestRadius: 410,
-    interestDistance: 115,
-    turnChance: 0.34,
-    decisionMin: 7,
-    decisionMax: 14,
-  },
-  seahorse: {
-    cruiseSpeed: 22,
-    maxSpeed: 50,
-    steering: 1.65,
-    verticalSpeed: 22,
-    wanderFrequency: 0.5,
-    cursorRadius: 220,
-    evadeVertical: 102,
-    evadeForward: 20,
-    fearBoost: 0.36,
-    curiosity: 0.56,
-    interestRadius: 350,
-    interestDistance: 105,
-    turnChance: 0.16,
-    decisionMin: 11,
-    decisionMax: 21,
-  },
-  jelly: {
-    cruiseSpeed: 18,
-    maxSpeed: 38,
-    steering: 1.05,
-    verticalSpeed: 25,
-    wanderFrequency: 0.39,
-    cursorRadius: 190,
-    evadeVertical: 54,
-    evadeForward: 10,
-    fearBoost: 0.12,
-    curiosity: 0.18,
-    interestRadius: 280,
-    interestDistance: 120,
-    turnChance: 0.08,
-    decisionMin: 15,
-    decisionMax: 28,
-  },
-};
-
-const bodyAnimationBase: Record<CreatureKind, number> = {
-  shark: 1.8,
-  puffer: 2.4,
-  seahorse: 2.2,
-  jelly: 2.2,
 };
 
 const swimmerElements = new Map<string, HTMLElement>();
@@ -255,6 +151,12 @@ function makeState(preset: CreaturePreset, element: HTMLElement, index: number):
     inflateStartedAt: 0,
     inflatedExit: false,
     hiddenUntil: 0,
+    mood: "none",
+    moodUntil: 0,
+    nextMoodAt: performance.now() + randomBetween(9000, 18_000),
+    active: false,
+    jellyExit: false,
+    pointerMode: "none",
   };
 }
 
@@ -283,8 +185,16 @@ function initializeStates() {
     if (!element) return;
     const state = makeState(preset, element, index);
     creatureStates.set(preset.id, state);
-    renderState(state);
   });
+
+  const initialGuests = creatures
+    .filter((preset) => preset.id !== "shark")
+    .slice(0, MAX_VISIBLE_PETS - 1)
+    .map((preset) => preset.id);
+  for (const state of creatureStates.values()) {
+    state.active = state.preset.id === "shark" || initialGuests.includes(state.preset.id);
+    renderState(state);
+  }
 }
 
 function smoothstep(value: number) {
@@ -322,6 +232,20 @@ function pointerSteering(state: CreatureState, profile: SteeringProfile, now: nu
   const dyAway = cy - pointerY;
   const distance = Math.hypot(dxAway, dyAway);
   if (!Number.isFinite(distance)) return { x: 0, y: 0, fear: 0, interest: 0, mode: "none" };
+
+  // The shark is confident: merely entering its personal space makes it look
+  // at the pointer with a question, rather than treating a moving cursor as a threat.
+  if (state.preset.id === "shark" && distance < profile.interestRadius) {
+    const normal = Math.max(1, distance);
+    const interest = clamp(1 - distance / profile.interestRadius, 0.35, 1);
+    return {
+      x: (-dxAway / normal) * profile.cruiseSpeed * 0.35,
+      y: (-dyAway / normal) * profile.verticalSpeed * 0.5,
+      fear: 0,
+      interest,
+      mode: "interest",
+    };
+  }
 
   const pointerAge = now - pointerLastMoveAt;
   const movingThreat = pointerAge < 240 && pointerSpeed > 90;
@@ -399,10 +323,11 @@ function renderState(state: CreatureState, now = performance.now()) {
   state.element.style.transform = `translate3d(${state.x.toFixed(2)}px, ${state.y.toFixed(2)}px, 0) rotate(${turnAngle.toFixed(2)}deg)`;
   // Do not expose a sprite while the viewport is cutting through it. Once the
   // complete mascot is inside, blend it in over a short distance from the edge.
-  state.element.style.opacity = String(state.hiddenUntil > now ? 0 : state.preset.opacity * edgeVisibility);
+  state.element.style.opacity = String(!state.active || state.hiddenUntil > now ? 0 : state.preset.opacity * edgeVisibility);
   state.element.style.setProperty("--facing-scale", String(state.facing));
   state.element.style.setProperty("--body-duration", `${bodyAnimationBase[state.preset.kind]}s`);
   state.element.style.setProperty("--inflation", inflation.toFixed(3));
+  state.element.dataset.mood = state.mood;
   state.element.dataset.behavior = state.preset.kind === "jelly"
     ? "cruise"
     : state.inflatedExit
@@ -411,6 +336,8 @@ function renderState(state: CreatureState, now = performance.now()) {
       ? "hidden"
       : state.panicUntil > now || state.fear > 0.42
         ? "panic"
+      : state.preset.id === "shark" && state.pointerMode === "interest"
+        ? "interest"
       : state.preset.id === "shark" && huntTargetId
         ? "hunt"
         : state.preset.id === huntTargetId
@@ -418,6 +345,43 @@ function renderState(state: CreatureState, now = performance.now()) {
           : state.interest > 0.2
             ? "interest"
             : "cruise";
+}
+
+function rotatePetSlot(leaving: CreatureState, now: number) {
+  if (leaving.preset.id === "shark") return false;
+  const candidates = [...creatureStates.values()].filter((state) => (
+    !state.active && state.preset.id !== "shark"
+  ));
+  if (!candidates.length) return false;
+
+  const next = candidates[Math.floor(Math.random() * candidates.length)]!;
+  leaving.active = false;
+  leaving.element.style.opacity = "0";
+  if (huntTargetId === leaving.preset.id) huntTargetId = null;
+
+  const margin = Math.max(90, next.width * 0.55);
+  const profile = steeringProfiles[next.preset.kind];
+  next.active = true;
+  next.hiddenUntil = 0;
+  next.x = next.direction > 0 ? -next.width - margin : viewportWidth + margin;
+  next.y = next.homeY;
+  next.vx = next.direction * profile.cruiseSpeed;
+  next.vy = 0;
+  next.nextDecisionAt = now + randomBetween(profile.decisionMin, profile.decisionMax) * 1000;
+  renderState(next, now);
+  return true;
+}
+
+function updateJellyMood(state: CreatureState, now: number) {
+  if (state.preset.kind !== "jelly") return;
+  if (state.jellyExit) return;
+  if (state.mood !== "none" && now >= state.moodUntil) {
+    state.mood = "none";
+    state.nextMoodAt = now + randomBetween(8000, 16_000);
+  } else if (state.mood === "none" && now >= state.nextMoodAt) {
+    state.mood = Math.random() > 0.48 ? "sleep" : "play";
+    state.moodUntil = now + randomBetween(2800, 5200);
+  }
 }
 
 function wrapState(state: CreatureState, now: number) {
@@ -433,6 +397,8 @@ function wrapState(state: CreatureState, now: number) {
     state.vy = 0;
     return;
   }
+
+  if ((leftViewport || rightViewport) && rotatePetSlot(state, now)) return;
 
   if (rightViewport) {
     const bounds = verticalBounds(state.height);
@@ -452,9 +418,15 @@ function updateHunt(now: number) {
   if (huntTargetId || now < nextHuntAt) return;
 
   const shark = creatureStates.get("shark");
-  const candidates = [creatureStates.get("puffer"), creatureStates.get("seahorse")]
+  const candidates = [
+    creatureStates.get("puffer"),
+    creatureStates.get("seahorse"),
+    creatureStates.get("blue-fish"),
+    creatureStates.get("clownfish"),
+  ]
     .filter((state): state is CreatureState => Boolean(
       state
+      && state.active
       && !state.inflatedExit
       && state.hiddenUntil <= now
       && state.x >= 0
@@ -533,6 +505,12 @@ function maybeChooseNewDirection(
 
 function updateState(state: CreatureState, now: number, dt: number) {
   const profile = steeringProfiles[state.preset.kind];
+  if (!state.active) {
+    state.element.style.opacity = "0";
+    state.element.dataset.behavior = "hidden";
+    return;
+  }
+  updateJellyMood(state, now);
   if (state.hiddenUntil > now) {
     renderState(state, now);
     return;
@@ -546,7 +524,27 @@ function updateState(state: CreatureState, now: number, dt: number) {
     state.vy = 0;
   }
 
+  if (state.jellyExit) {
+    state.vx += (0 - state.vx) * Math.min(1, dt * 3.5);
+    state.vy += (-145 - state.vy) * Math.min(1, dt * 4.2);
+    state.x += state.vx * dt;
+    state.y += state.vy * dt;
+    if (state.y + state.height < -36) {
+      const margin = Math.max(90, state.width * 0.55);
+      state.jellyExit = false;
+      state.mood = "none";
+      state.hiddenUntil = now + randomBetween(3200, 5200);
+      state.x = state.direction > 0 ? -state.width - margin : viewportWidth + margin;
+      state.y = state.homeY;
+      state.vx = 0;
+      state.vy = 0;
+    }
+    renderState(state, now);
+    return;
+  }
+
   const pointer = pointerSteering(state, profile, now);
+  state.pointerMode = pointer.mode;
   const social = relationshipSteering(state, profile);
 
   if (pointer.mode === "interest" && now >= state.turnLockUntil) {
@@ -672,18 +670,12 @@ function handlePointerMove(event: PointerEvent) {
   pointerActive = true;
 }
 
-function isInteractiveTarget(target: EventTarget | null) {
-  return target instanceof Element
-    && Boolean(target.closest("a, button, input, textarea, select, summary, [role='button'], [contenteditable='true']"));
-}
-
 function handlePointerDown(event: PointerEvent) {
   if (reducedMotion?.matches) return;
 
   const now = performance.now();
-  const interactiveTarget = isInteractiveTarget(event.target);
   for (const state of creatureStates.values()) {
-    if (state.preset.kind === "jelly") continue;
+    if (!state.active) continue;
     const cx = state.x + state.width * 0.5;
     const cy = state.y + state.height * 0.5;
     const radiusX = Math.max(28, state.width * (state.preset.kind === "puffer" ? 0.62 : 0.48));
@@ -692,7 +684,16 @@ function handlePointerDown(event: PointerEvent) {
     const ny = (event.clientY - cy) / radiusY;
 
     if (nx * nx + ny * ny > 1) continue;
-    if (interactiveTarget && state.preset.kind !== "puffer") continue;
+
+    if (state.preset.kind === "jelly") {
+      if (state.mood === "sleep") {
+        state.mood = "angry";
+        state.jellyExit = true;
+        state.vx = 0;
+        state.vy = -22;
+      }
+      continue;
+    }
 
     state.panicX = event.clientX;
     state.panicY = event.clientY;
@@ -803,61 +804,10 @@ onBeforeUnmount(() => {
       <div class="underwater-2d__reaction">
         <div class="underwater-2d__bob">
           <div class="underwater-2d__facing">
-            <div class="underwater-2d__stage" :class="`underwater-2d__stage_${creature.kind}`">
-              <template v-if="creature.kind === 'puffer'">
-                <img
-                  class="underwater-2d__creature underwater-2d__puffer-form underwater-2d__puffer-form_normal"
-                  :src="creature.src"
-                  alt=""
-                  draggable="false"
-                  @load="refreshCreatureSize(creature.id)"
-                >
-                <img
-                  class="underwater-2d__creature underwater-2d__puffer-form underwater-2d__puffer-form_ball"
-                  src="/images/ocean-creatures/puffer-clean.webp"
-                  alt=""
-                  draggable="false"
-                >
-              </template>
-              <template v-else-if="creature.kind === 'shark'">
-                <img
-                  class="underwater-2d__creature underwater-2d__expression underwater-2d__expression_default"
-                  :src="creature.src"
-                  alt=""
-                  draggable="false"
-                  @load="refreshCreatureSize(creature.id)"
-                >
-                <img
-                  class="underwater-2d__creature underwater-2d__expression underwater-2d__expression_hunt"
-                  src="/images/ocean-creatures/shark-hunt.webp"
-                  alt=""
-                  draggable="false"
-                >
-              </template>
-              <img
-                v-else-if="creature.kind !== 'jelly'"
-                class="underwater-2d__creature"
-                :src="creature.src"
-                alt=""
-                draggable="false"
-                @load="refreshCreatureSize(creature.id)"
-              >
-              <template v-else>
-                <img
-                  class="underwater-2d__creature underwater-2d__jelly-bell"
-                  :src="creature.src"
-                  alt=""
-                  draggable="false"
-                  @load="refreshCreatureSize(creature.id)"
-                >
-                <img
-                  class="underwater-2d__creature underwater-2d__jelly-tentacles"
-                  :src="creature.src"
-                  alt=""
-                  draggable="false"
-                >
-              </template>
-            </div>
+            <aquarium-pet-sprite
+              :creature="creature"
+              @loaded="refreshCreatureSize(creature.id)"
+            />
           </div>
         </div>
       </div>
@@ -909,83 +859,9 @@ onBeforeUnmount(() => {
   transform-origin: center;
 }
 
-.underwater-2d__stage {
-  position: relative;
-  width: 100%;
-  transform-origin: 50% 50%;
-  will-change: transform;
-}
-
-.underwater-2d__stage_shark { aspect-ratio: 320 / 198; }
-.underwater-2d__stage_puffer { aspect-ratio: 240 / 148; }
-.underwater-2d__stage_seahorse { aspect-ratio: 140 / 240; }
-.underwater-2d__swimmer_jelly-blue .underwater-2d__stage { aspect-ratio: 105 / 120; }
-.underwater-2d__swimmer_jelly-pink .underwater-2d__stage { aspect-ratio: 120 / 109; }
-
-.underwater-2d__stage_shark {
-  animation: ocean-shark-swim var(--body-duration) cubic-bezier(.45,.05,.55,.95) infinite;
-}
-
-.underwater-2d__stage_puffer {
-  animation: ocean-puffer-breathe var(--body-duration) ease-in-out infinite;
-}
-
-.underwater-2d__stage_seahorse {
-  transform-origin: 52% 46%;
-  animation: ocean-seahorse-drift var(--body-duration) cubic-bezier(.45,.05,.55,.95) infinite;
-}
-
-.underwater-2d__stage_jelly {
-  transform-origin: 50% 30%;
-  animation: ocean-jelly-body var(--body-duration) ease-in-out infinite;
-}
-
-.underwater-2d__creature {
-  position: absolute;
-  inset: 0;
-  display: block;
-  width: 100%;
-  height: 100%;
-  object-fit: contain;
-  user-select: none;
-  -webkit-user-drag: none;
-  pointer-events: none;
-}
-
-.underwater-2d__puffer-form {
-  transition: opacity 180ms ease;
-}
-
-.underwater-2d__puffer-form_normal { opacity: calc(1 - var(--inflation)); }
-.underwater-2d__puffer-form_ball { opacity: var(--inflation); }
-
-.underwater-2d__expression {
-  transition: opacity 180ms ease;
-}
-
-.underwater-2d__expression_default { opacity: 1; }
-.underwater-2d__expression_hunt { opacity: 0; }
-.underwater-2d__swimmer_shark[data-behavior="hunt"] .underwater-2d__expression_default { opacity: 0; }
-.underwater-2d__swimmer_shark[data-behavior="hunt"] .underwater-2d__expression_hunt { opacity: 1; }
-
 .underwater-2d__swimmer[data-behavior="panic"] .underwater-2d__reaction,
 .underwater-2d__swimmer[data-behavior="flee"] .underwater-2d__reaction {
   animation: ocean-startled .34s ease-in-out 2;
-}
-
-.underwater-2d__jelly-bell {
-  clip-path: polygon(0 0, 100% 0, 100% 43%, 0 43%);
-}
-
-.underwater-2d__jelly-tentacles {
-  clip-path: polygon(0 43%, 100% 43%, 100% 100%, 0 100%);
-  transform-origin: 50% 43%;
-  animation: ocean-tentacle-wave 1.6s cubic-bezier(.45,.05,.55,.95) infinite;
-}
-
-@keyframes ocean-tentacle-wave {
-  0%, 100% { transform: skewX(-1.5deg) scale(.99, .96); }
-  50% { transform: skewX(1.5deg) scale(1.01, 1.04); }
 }
 
 @keyframes ocean-startled {
@@ -994,39 +870,16 @@ onBeforeUnmount(() => {
   65% { transform: translateY(3px) rotate(2deg); }
 }
 
-@keyframes ocean-shark-swim {
-  0%, 100% { transform: translateY(-2px) rotate(-.7deg); }
-  50% { transform: translateY(2px) rotate(.7deg); }
-}
-
-@keyframes ocean-puffer-breathe {
-  0%, 100% { transform: translateY(-2px) skewY(-1.4deg) scale(1) rotate(-1deg); }
-  48% { transform: translateY(2px) skewY(1.4deg) scale(1.035, 1.05) rotate(1deg); }
-}
-
-@keyframes ocean-seahorse-drift {
-  0%, 100% { transform: rotate(-5deg) skewX(-1.8deg) translateY(-4px) scaleY(.985); }
-  25% { transform: rotate(0) skewX(0) translateY(0) scaleY(1); }
-  50% { transform: rotate(5deg) skewX(1.8deg) translateY(4px) scaleY(1.02); }
-  75% { transform: rotate(0) skewX(0) translateY(0) scaleY(1); }
-}
-
-@keyframes ocean-jelly-body {
-  0%, 100% { transform: translateY(1px) rotate(-.7deg); }
-  50% { transform: translateY(-3px) rotate(.7deg); }
-}
-
 @media (max-width: 900px) {
   .underwater-2d__swimmer_shark { width: clamp(150px, 28vw, 240px); }
   .underwater-2d__swimmer_puffer { width: clamp(78px, 16vw, 124px); }
+  .underwater-2d__swimmer_fish { width: clamp(68px, 14vw, 112px); }
   .underwater-2d__swimmer_seahorse { width: clamp(60px, 12vw, 92px); }
   .underwater-2d__swimmer_jelly { width: clamp(62px, 12vw, 102px); }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .underwater-2d__swimmer,
-  .underwater-2d__stage,
-  .underwater-2d__part {
+  .underwater-2d__swimmer {
     animation: none !important;
   }
 
