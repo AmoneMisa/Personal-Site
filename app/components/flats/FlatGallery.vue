@@ -14,6 +14,7 @@ const emit = defineEmits<{
 
 const lightboxOpen = defineModel<boolean>("lightboxOpen", { default: false });
 const currentIndex = ref<number | null>(null);
+const zoomed = ref(false);
 const currentPhoto = computed(() => currentIndex.value == null ? null : props.photos[currentIndex.value] || null);
 const position = computed(() => (currentIndex.value ?? 0) + 1);
 const previewPhotos = computed(() => props.photos.slice(0, 5));
@@ -21,15 +22,18 @@ const hiddenPhotoCount = computed(() => Math.max(0, props.photos.length - previe
 
 function open(index: number) {
   if (!props.photos.length) return;
+  zoomed.value = false;
   currentIndex.value = Math.max(0, Math.min(index, props.photos.length - 1));
 }
 
 function close() {
+  zoomed.value = false;
   currentIndex.value = null;
 }
 
 function move(direction: -1 | 1) {
   if (!props.photos.length || currentIndex.value == null) return;
+  zoomed.value = false;
   currentIndex.value = (currentIndex.value + direction + props.photos.length) % props.photos.length;
 }
 
@@ -45,7 +49,7 @@ const SWIPE_MIN_PX = 50;
 let swipeStart: { x: number; y: number; id: number } | null = null;
 
 function onPointerDown(event: PointerEvent) {
-  if (props.photos.length < 2) return;
+  if (props.photos.length < 2 || zoomed.value) return;
   swipeStart = { x: event.clientX, y: event.clientY, id: event.pointerId };
 }
 
@@ -71,20 +75,23 @@ function onKeydown(event: KeyboardEvent) {
   event.preventDefault();
 }
 
-function updateZoom(event: MouseEvent) {
+function toggleZoom(event: MouseEvent) {
   const image = event.currentTarget as HTMLImageElement;
+  if (zoomed.value) {
+    zoomed.value = false;
+    image.style.setProperty("--zoom-x", "50%");
+    image.style.setProperty("--zoom-y", "50%");
+    return;
+  }
+
   const rect = image.getBoundingClientRect();
   image.style.setProperty("--zoom-x", `${((event.clientX - rect.left) / rect.width) * 100}%`);
   image.style.setProperty("--zoom-y", `${((event.clientY - rect.top) / rect.height) * 100}%`);
-}
-
-function resetZoom(event: MouseEvent) {
-  const image = event.currentTarget as HTMLImageElement;
-  image.style.setProperty("--zoom-x", "50%");
-  image.style.setProperty("--zoom-y", "50%");
+  zoomed.value = true;
 }
 
 watch(currentIndex, (index) => {
+  zoomed.value = false;
   lightboxOpen.value = index !== null;
 });
 watch(lightboxOpen, (open) => {
@@ -127,7 +134,15 @@ onBeforeUnmount(() => window.removeEventListener("keydown", onKeydown));
   <teleport to="body">
     <div v-if="currentPhoto" class="flat-lightbox" role="dialog" aria-modal="true" :aria-label="viewerLabel" @click="close">
       <div class="flat-lightbox__stage" @click.stop @pointerdown="onPointerDown" @pointerup="onPointerUp" @pointercancel="onPointerCancel">
-        <img :src="currentPhoto" :alt="`${title} (${position}/${photos.length})`" referrerpolicy="no-referrer" draggable="false" @error="handlePhotoError" @mousemove="updateZoom" @mouseleave="resetZoom">
+        <img
+          :src="currentPhoto"
+          :alt="`${title} (${position}/${photos.length})`"
+          referrerpolicy="no-referrer"
+          draggable="false"
+          :class="{ 'flat-lightbox__image_zoomed': zoomed }"
+          @error="handlePhotoError"
+          @click.stop="toggleZoom"
+        >
       </div>
       <button v-if="photos.length > 1" type="button" class="flat-lightbox__nav flat-lightbox__nav_left" :aria-label="previousLabel" @click.stop="move(-1)"><u-icon name="i-lucide-chevron-left" /></button>
       <button v-if="photos.length > 1" type="button" class="flat-lightbox__nav flat-lightbox__nav_right" :aria-label="nextLabel" @click.stop="move(1)"><u-icon name="i-lucide-chevron-right" /></button>
@@ -197,8 +212,8 @@ onBeforeUnmount(() => window.removeEventListener("keydown", onKeydown));
 
 .flat-lightbox { position: fixed; inset: 0; z-index: 5000; display: grid; place-items: center; isolation: isolate; background: #080b1a; padding: clamp(12px, 2vw, 28px); cursor: zoom-out; pointer-events: auto; }
 .flat-lightbox__stage { width: min(82vw, 1200px); height: min(76dvh, 720px); display: flex; align-items: center; justify-content: center; cursor: default; pointer-events: auto; touch-action: pan-y pinch-zoom; user-select: none; -webkit-user-select: none; }
-.flat-lightbox__stage img { -webkit-user-drag: none; display: block; width: auto; height: auto; max-width: 100%; max-height: 100%; object-fit: contain; border-radius: 8px; transform-origin: var(--zoom-x, 50%) var(--zoom-y, 50%); transition: transform 180ms ease; }
-@media (hover: hover) and (pointer: fine) { .flat-lightbox__stage img { cursor: zoom-in; } .flat-lightbox__stage img:hover { transform: scale(1.7); cursor: zoom-out; } }
+.flat-lightbox__stage img { -webkit-user-drag: none; display: block; width: auto; height: auto; max-width: 100%; max-height: 100%; object-fit: contain; border-radius: 8px; transform-origin: var(--zoom-x, 50%) var(--zoom-y, 50%); transition: transform 180ms ease; cursor: zoom-in; }
+.flat-lightbox__stage img.flat-lightbox__image_zoomed { transform: scale(1.7); cursor: zoom-out; }
 .flat-lightbox__nav, .flat-lightbox__close { position: fixed; z-index: 1; display: grid; place-items: center; border: 1px solid #343a62; border-radius: 8px; background: #131730; color: #fff; cursor: pointer; pointer-events: auto; }
 .flat-lightbox__nav { top: 50%; width: 52px; height: 72px; transform: translateY(-50%); font-size: 28px; }
 .flat-lightbox__nav:hover, .flat-lightbox__nav:focus-visible, .flat-lightbox__close:hover, .flat-lightbox__close:focus-visible { border-color: var(--accent-pink); color: var(--accent-pink); }
