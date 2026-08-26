@@ -1,10 +1,9 @@
 import {
   geographyDisplayName,
   geographyMetroLabelWithAlias,
-  type GeographyDisplayKind,
 } from '@whiteslove/parsing-lexicon/geography-display'
 
-export type LocationKind = GeographyDisplayKind
+export type LocationKind = 'country' | 'city' | 'district' | 'metro' | 'any'
 
 export function locationLabel(
   value: string | null | undefined,
