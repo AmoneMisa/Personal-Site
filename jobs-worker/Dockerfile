@@ -8,7 +8,7 @@ ENV JOBS_RUNTIME_ROLE=worker
 COPY package.json package-lock.json ./
 # parsing-lexicon intentionally tracks #master. Resolve the live branch instead
 # of enforcing stale package-lock integrity from a previous branch snapshot.
-RUN npm install --omit=dev --package-lock=false
+RUN npm install --omit=dev --package-lock=false --legacy-peer-deps
 
 COPY . .
 
