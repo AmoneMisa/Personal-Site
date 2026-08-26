@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import CustomButton from "~/components/common/CustomButton.vue";
 import CustomCheckbox from "~/components/common/CustomCheckbox.vue";
 import type { PreviewClient, TemplateEngine } from "~/utils/emailEditor/preview/clientProfiles";
 
@@ -25,7 +26,6 @@ const emit = defineEmits<{
 
 const { t } = useI18n();
 
-// Fake data only substitutes variables for template engines (not clean HTML).
 const fakeDataAvailable = computed(() => props.templateEngine !== "clean_html");
 
 const templateItems = computed(() => [
@@ -39,25 +39,31 @@ const previewItems = computed(() => [
   { label: t("services.emailEditor.preview.yandex"), value: "yandex" },
   { label: t("services.emailEditor.preview.outlook"), value: "outlook" },
 ]);
+
+const selectUi = {
+  base: "w-full min-h-[44px] rounded-lg border border-[var(--line)] bg-[var(--bg-panel-2)] px-3 shadow-none ring-0",
+};
 </script>
 
 <template>
   <div class="email-editor-toolbar">
     <div class="email-editor-toolbar__left">
       <u-select
-          class="email-editor-toolbar__select"
+          class="email-editor-toolbar__select ui-locale"
           :items="templateItems"
           option-attribute="label"
           value-attribute="value"
+          :ui="selectUi"
           :model-value="props.templateEngine"
           @update:model-value="emit('update:template-engine', $event as any)"
       />
 
       <u-select
-          class="email-editor-toolbar__select"
+          class="email-editor-toolbar__select ui-locale"
           :items="previewItems"
           option-attribute="label"
           value-attribute="value"
+          :ui="selectUi"
           :model-value="props.previewClient"
           @update:model-value="emit('update:preview-client', $event as any)"
       />
@@ -70,69 +76,59 @@ const previewItems = computed(() => [
             @update:model-value="emit('update:fake-data-enabled', $event)"
         />
 
-        <button
+        <custom-button
             v-if="props.fakeDataEnabled && fakeDataAvailable"
-            type="button"
-            class="ui-pill-btn email-editor-toolbar__button"
+            variant="secondary"
+            :_class="'email-editor-toolbar__button'"
             :disabled="props.isBusy"
             @click="emit('action', 'openFakeData')"
         >
-          <span class="ui-pill-btn__inner">
-            <u-icon name="i-lucide-database" />
-            {{ t("services.emailEditor.fakeData.edit") }}
-          </span>
-        </button>
+          <u-icon name="i-lucide-database" />
+          {{ t("services.emailEditor.fakeData.edit") }}
+        </custom-button>
       </div>
     </div>
 
     <div class="email-editor-toolbar__right">
-      <button
-          type="button"
-          class="ui-pill-btn ui-pill-btn_animated email-editor-toolbar__button"
+      <custom-button
+          variant="secondary"
+          :_class="'email-editor-toolbar__button'"
           :disabled="props.isBusy"
           @click="emit('action', 'moveInlineStylesToStyleTag')"
       >
-        <span class="ui-pill-btn__inner">
-          <u-icon name="i-lucide-wand-2" />
-          {{ t("services.emailEditor.actions.moveInlineStylesToStyle") }}
-        </span>
-      </button>
+        <u-icon name="i-lucide-wand-2" />
+        {{ t("services.emailEditor.actions.moveInlineStylesToStyle") }}
+      </custom-button>
 
-      <button
-          type="button"
-          class="ui-pill-btn email-editor-toolbar__button"
+      <custom-button
+          variant="secondary"
+          :_class="'email-editor-toolbar__button'"
           :disabled="props.isBusy"
           @click="emit('action', 'openInsertImage')"
       >
-        <span class="ui-pill-btn__inner">
-          <u-icon name="i-lucide-image-plus" />
-          {{ t("services.emailEditor.actions.insertImage") }}
-        </span>
-      </button>
+        <u-icon name="i-lucide-image-plus" />
+        {{ t("services.emailEditor.actions.insertImage") }}
+      </custom-button>
 
-      <button
-          type="button"
-          class="ui-pill-btn email-editor-toolbar__button"
+      <custom-button
+          variant="secondary"
+          :_class="'email-editor-toolbar__button'"
           :disabled="props.isBusy"
           @click="emit('action', 'openInsertLink')"
       >
-        <span class="ui-pill-btn__inner">
-          <u-icon name="i-lucide-link" />
-          {{ t("services.emailEditor.actions.insertLink") }}
-        </span>
-      </button>
+        <u-icon name="i-lucide-link" />
+        {{ t("services.emailEditor.actions.insertLink") }}
+      </custom-button>
 
-      <button
-          type="button"
-          class="ui-pill-btn email-editor-toolbar__button"
+      <custom-button
+          variant="secondary"
+          :_class="'email-editor-toolbar__button'"
           :disabled="props.isBusy"
           @click="emit('action', 'openInsertTemplate')"
       >
-        <span class="ui-pill-btn__inner">
-          <u-icon name="i-lucide-braces" />
-          {{ t("services.emailEditor.actions.insertTemplate") }}
-        </span>
-      </button>
+        <u-icon name="i-lucide-braces" />
+        {{ t("services.emailEditor.actions.insertTemplate") }}
+      </custom-button>
     </div>
   </div>
 </template>
@@ -160,6 +156,8 @@ const previewItems = computed(() => [
 }
 
 .email-editor-toolbar__button {
+  min-height: 44px;
+  height: 44px;
   white-space: nowrap;
 }
 
@@ -171,5 +169,20 @@ const previewItems = computed(() => [
 
 .email-editor-toolbar__fake_disabled {
   opacity: 0.7;
+}
+
+@media (max-width: 768px) {
+  .email-editor-toolbar__left,
+  .email-editor-toolbar__right {
+    width: 100%;
+  }
+
+  .email-editor-toolbar__select {
+    flex: 1 1 180px;
+  }
+
+  .email-editor-toolbar__right > * {
+    flex: 1 1 auto;
+  }
 }
 </style>
