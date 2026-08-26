@@ -56,7 +56,6 @@ const mobileOpen = ref(false);
           </div>
         </div>
 
-        <a class="site-header__link" :href="resolveHref('#tools')">{{ nav.tools }}</a>
         <a class="site-header__link" :href="resolveHref('/cv')">{{ nav.cv }}</a>
         <a class="site-header__link site-header__link_highlight" :href="resolveHref('/about')">{{ nav.aboutMe }}</a>
       </nav>
@@ -106,7 +105,6 @@ const mobileOpen = ref(false);
             @click="mobileOpen = false"
         >{{ it.label }}</a>
       </div>
-      <a class="site-header__mobile-link" :href="resolveHref('#tools')" @click="mobileOpen = false">{{ nav.tools }}</a>
       <a class="site-header__mobile-link" :href="resolveHref('/cv')" @click="mobileOpen = false">{{ nav.cv }}</a>
       <a class="site-header__mobile-link site-header__mobile-link_highlight" :href="resolveHref('/about')" @click="mobileOpen = false">{{ nav.aboutMe }}</a>
       <div class="site-header__mobile-actions">
