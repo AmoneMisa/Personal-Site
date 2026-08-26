@@ -25,3 +25,20 @@
 .filter-primary-grid {
   margin-top: 14px;
 }
+
+/* Four spec columns are too narrow inside the max-4xl listing modal before the
+   mobile two-column breakpoint kicks in. Use three tracks for the 721–960px
+   viewport range while preserving the component's existing <=720px layout. */
+@media (min-width: 721px) and (max-width: 960px) {
+  .spec-table__grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+  }
+
+  .spec-table__item:nth-child(4n) {
+    border-right: 1px solid var(--line, #252a4a) !important;
+  }
+
+  .spec-table__item:nth-child(3n) {
+    border-right: 0 !important;
+  }
+}
