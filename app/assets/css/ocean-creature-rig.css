@@ -1,0 +1,169 @@
+/*
+ * Lightweight 2D bone rig for the flattened ocean mascot sprites.
+ *
+ * The original WebP remains in the DOM and owns intrinsic sizing. When CSS masks
+ * are supported, safe silhouette regions are re-used as small articulated bones:
+ * shark rear spine + tail, puffer tail, seahorse lower tail, jelly tentacles.
+ * If masks are unavailable the intact sprite is left untouched as a fallback.
+ *
+ * Keep the angles deliberately small: these are flattened illustrations, so the
+ * rig should read as soft secondary motion rather than visible paper cut-outs.
+ */
+
+@supports ((mask-image: linear-gradient(#000, #000)) or (-webkit-mask-image: linear-gradient(#000, #000))) {
+  .underwater-2d__facing {
+    position: relative;
+    isolation: isolate;
+  }
+
+  .underwater-2d__facing::before,
+  .underwater-2d__facing::after {
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    display: block;
+    width: 100%;
+    height: 100%;
+    content: "";
+    pointer-events: none;
+    background-repeat: no-repeat;
+    background-position: center;
+    background-size: 100% 100%;
+    backface-visibility: hidden;
+    will-change: transform;
+  }
+
+  .underwater-2d__creature {
+    position: relative;
+    z-index: 3;
+  }
+
+  /* Shark: three-part spine. The source sprite faces right; the existing facing
+     wrapper mirrors the complete rig for RTL travel, so pivots stay stable. */
+  .underwater-2d__swimmer_shark .underwater-2d__creature_shark {
+    -webkit-mask-image: linear-gradient(to right, transparent 0 52%, #000 56% 100%);
+    mask-image: linear-gradient(to right, transparent 0 52%, #000 56% 100%);
+  }
+
+  .underwater-2d__swimmer_shark .underwater-2d__facing::before {
+    z-index: 2;
+    background-image: url('/images/ocean-creatures/shark-clean.webp');
+    -webkit-mask-image: linear-gradient(to right, transparent 0 23%, #000 27% 66%, transparent 70% 100%);
+    mask-image: linear-gradient(to right, transparent 0 23%, #000 27% 66%, transparent 70% 100%);
+    transform-origin: 62% 52%;
+    animation: ocean-rig-shark-spine var(--body-duration, 1.8s) ease-in-out infinite alternate;
+  }
+
+  .underwater-2d__swimmer_shark .underwater-2d__facing::after {
+    z-index: 1;
+    background-image: url('/images/ocean-creatures/shark-clean.webp');
+    -webkit-mask-image: linear-gradient(to right, #000 0 32%, transparent 37% 100%);
+    mask-image: linear-gradient(to right, #000 0 32%, transparent 37% 100%);
+    transform-origin: 30% 52%;
+    animation: ocean-rig-shark-tail var(--body-duration, 1.8s) ease-in-out infinite;
+  }
+
+  /* Puffer: only the tail is detached. Keeping the round body intact prevents
+     the breathing/fear scale from exposing a seam through the torso. */
+  .underwater-2d__swimmer_puffer .underwater-2d__creature_puffer {
+    -webkit-mask-image: linear-gradient(to right, transparent 0 18%, #000 24% 100%);
+    mask-image: linear-gradient(to right, transparent 0 18%, #000 24% 100%);
+  }
+
+  .underwater-2d__swimmer_puffer .underwater-2d__facing::before {
+    z-index: 2;
+    background-image: url('/images/ocean-creatures/puffer-clean.webp');
+    -webkit-mask-image: linear-gradient(to right, #000 0 28%, transparent 35% 100%);
+    mask-image: linear-gradient(to right, #000 0 28%, transparent 35% 100%);
+    transform-origin: 27% 51%;
+    animation: ocean-rig-puffer-tail var(--body-duration, 2.4s) ease-in-out infinite;
+  }
+
+  .underwater-2d__swimmer_puffer .underwater-2d__facing::after {
+    display: none;
+  }
+
+  /* Seahorse: the lower curl gets a slow pendulum bone while head/torso keep the
+     existing drift animation. The broad overlap hides the pivot in the abdomen. */
+  .underwater-2d__swimmer_seahorse .underwater-2d__creature_seahorse {
+    -webkit-mask-image: linear-gradient(to bottom, #000 0 63%, transparent 72% 100%);
+    mask-image: linear-gradient(to bottom, #000 0 63%, transparent 72% 100%);
+  }
+
+  .underwater-2d__swimmer_seahorse .underwater-2d__facing::before {
+    z-index: 2;
+    background-image: url('/images/ocean-creatures/seahorse-clean.webp');
+    -webkit-mask-image: linear-gradient(to bottom, transparent 0 50%, #000 58% 100%);
+    mask-image: linear-gradient(to bottom, transparent 0 50%, #000 58% 100%);
+    transform-origin: 52% 57%;
+    animation: ocean-rig-seahorse-tail var(--body-duration, 2.2s) ease-in-out infinite alternate;
+  }
+
+  .underwater-2d__swimmer_seahorse .underwater-2d__facing::after {
+    display: none;
+  }
+
+  /* Jellyfish are not articulated like fish, but separating bell/tentacles gives
+     the same rig contract: propulsion pulse above, delayed soft tissue below. */
+  .underwater-2d__swimmer_jelly .underwater-2d__creature_jelly {
+    -webkit-mask-image: linear-gradient(to bottom, #000 0 57%, transparent 66% 100%);
+    mask-image: linear-gradient(to bottom, #000 0 57%, transparent 66% 100%);
+  }
+
+  .underwater-2d__swimmer_jelly-blue .underwater-2d__facing::before {
+    background-image: url('/images/ocean-creatures/jelly-blue.webp');
+  }
+
+  .underwater-2d__swimmer_jelly-pink .underwater-2d__facing::before {
+    background-image: url('/images/ocean-creatures/jelly-pink.webp');
+  }
+
+  .underwater-2d__swimmer_jelly .underwater-2d__facing::before {
+    z-index: 2;
+    -webkit-mask-image: linear-gradient(to bottom, transparent 0 43%, #000 52% 100%);
+    mask-image: linear-gradient(to bottom, transparent 0 43%, #000 52% 100%);
+    transform-origin: 50% 45%;
+    animation: ocean-rig-jelly-tentacles var(--body-duration, 2.2s) ease-in-out infinite;
+  }
+
+  .underwater-2d__swimmer_jelly .underwater-2d__facing::after {
+    display: none;
+  }
+}
+
+@keyframes ocean-rig-shark-spine {
+  0% { transform: rotate(-1.25deg) translateY(-0.4%); }
+  100% { transform: rotate(1.25deg) translateY(0.4%); }
+}
+
+@keyframes ocean-rig-shark-tail {
+  0%, 100% { transform: rotate(-4deg); }
+  25% { transform: rotate(4.5deg); }
+  50% { transform: rotate(-3.5deg); }
+  75% { transform: rotate(4deg); }
+}
+
+@keyframes ocean-rig-puffer-tail {
+  0%, 100% { transform: rotate(-4.2deg); }
+  25% { transform: rotate(3.4deg); }
+  50% { transform: rotate(-3.2deg); }
+  75% { transform: rotate(4deg); }
+}
+
+@keyframes ocean-rig-seahorse-tail {
+  0% { transform: rotate(-2.2deg) translateX(-0.4%); }
+  100% { transform: rotate(2.4deg) translateX(0.4%); }
+}
+
+@keyframes ocean-rig-jelly-tentacles {
+  0%, 100% { transform: translate3d(-1.2%, 0.8%, 0) rotate(-1deg) scaleY(0.98); }
+  45% { transform: translate3d(1.4%, -0.7%, 0) rotate(1.2deg) scaleY(1.025); }
+  72% { transform: translate3d(-0.4%, 0.3%, 0) rotate(-0.35deg) scaleY(1.005); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .underwater-2d__facing::before,
+  .underwater-2d__facing::after {
+    animation: none !important;
+  }
+}
