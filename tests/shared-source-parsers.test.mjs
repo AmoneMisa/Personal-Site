@@ -59,4 +59,5 @@ test('IshBor meta salary delegates amount, multiplier and currency parsing to th
   const source = await readFile(new URL('../shared/hiring/ishBorProfile.ts', import.meta.url), 'utf8')
   assert.doesNotMatch(source, /const usd =/u)
   assert.doesNotMatch(source, /const millions =/u)
+  assert.match(source, /sourceSalary\(`salary \$\{raw\}`\)/u)
 })
