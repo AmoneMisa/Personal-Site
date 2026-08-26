@@ -39,6 +39,18 @@ const experienceSalaryBars = computed(() => {
     return [{ label: labels[index] || String(index + 1), value, color: "#e0679a" }];
   });
 });
+const professionSalaryRangeBars = computed(() => {
+  const rows = currentStatistics.value.salaryByProfession ?? localStatistics.value.salaryByProfession;
+  return (rows || []).slice(0, 8).map((item) => ({
+    label: hiringProfessionLabel(item.profession, professionLocale.value),
+    min: item.minUsd,
+    max: item.maxUsd,
+    color: "#e0679a",
+  }));
+});
+const professionSalaryRangeTitle = computed(() => String(locale.value).toLowerCase().startsWith("ru")
+  ? "Желаемая зарплата по профессиям · мин / макс"
+  : "Desired salary by profession · min / max");
 
 const activity = computed(() => {
   const count = activityDays.value === 7 ? 7 : activityDays.value === 30 ? 10 : 12;
@@ -61,11 +73,12 @@ const salarySamples = computed(() => currentStatistics.value.salarySamples);
       <article class="analytics-card"><h3>{{ t("statsSectors") }}</h3><UiAnalyticsBars :items="sectorBars" /></article>
       <article class="analytics-card"><h3>{{ t("statsProfessions") }}</h3><UiAnalyticsBars :items="professionBars" /></article>
       <article class="analytics-card analytics-card_salary"><div class="analytics-card__head"><h3>{{ t("statsSalaryExperience") }}</h3><small>{{ t("statsSalarySamples",{n:salarySamples}) }}</small></div><UiAnalyticsBars v-if="experienceSalaryBars.length" :items="experienceSalaryBars" :format="(value)=>`$${Math.round(value).toLocaleString()}`" /><p v-else class="analytics-card__empty">{{ t("statsNoSalaryData") }}</p></article>
+      <article v-if="professionSalaryRangeBars.length" class="analytics-card analytics-card_salary-range"><h3>{{ professionSalaryRangeTitle }}</h3><UiAnalyticsBars :items="professionSalaryRangeBars" :format="(value)=>`$${Math.round(value).toLocaleString()}`" /></article>
     </div>
   </UiAnalyticsPanel>
 </template>
 
 <style scoped>
-.hiring-stats__grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}.analytics-card{min-width:0;padding:14px;border:1px solid rgba(85,111,174,.3);border-radius:11px;background:rgba(12,18,48,.9)}.analytics-card_wide{grid-column:span 2}.analytics-card_salary{grid-column:span 2}.analytics-card h3{margin:0 0 12px;color:var(--ui-text-muted);font-size:11px;font-weight:750;letter-spacing:.05em;text-transform:uppercase}.analytics-card__head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px}.analytics-card__head small{color:var(--ui-text-muted)}.analytics-card__empty{display:grid;min-height:190px;margin:0;place-items:center;color:var(--ui-text-muted);font-size:13px;text-align:center}.segments{display:flex;gap:4px;padding:3px;border:1px solid rgba(85,111,174,.3);border-radius:8px}.segments button{padding:4px 8px;border:0;border-radius:6px;background:transparent;color:var(--ui-text-muted);font-size:10px;cursor:pointer}.segments button.active{background:rgba(224,103,154,.18);color:#f2a2c5}
-@media(max-width:1000px){.hiring-stats__grid{grid-template-columns:repeat(2,minmax(0,1fr))}.analytics-card_wide,.analytics-card_salary{grid-column:1/-1}}@media(max-width:650px){.hiring-stats__grid{grid-template-columns:1fr;padding-inline:12px}.analytics-card_wide,.analytics-card_salary{grid-column:auto}.hiring-stats__toggle{font-size:0!important}.analytics-card__head{flex-direction:column}.segments{width:100%}.segments button{flex:1}}
+.hiring-stats__grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}.analytics-card{min-width:0;padding:14px;border:1px solid rgba(85,111,174,.3);border-radius:11px;background:rgba(12,18,48,.9)}.analytics-card_wide{grid-column:span 2}.analytics-card_salary,.analytics-card_salary-range{grid-column:span 2}.analytics-card h3{margin:0 0 12px;color:var(--ui-text-muted);font-size:11px;font-weight:750;letter-spacing:.05em;text-transform:uppercase}.analytics-card__head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px}.analytics-card__head small{color:var(--ui-text-muted)}.analytics-card__empty{display:grid;min-height:190px;margin:0;place-items:center;color:var(--ui-text-muted);font-size:13px;text-align:center}.segments{display:flex;gap:4px;padding:3px;border:1px solid rgba(85,111,174,.3);border-radius:8px}.segments button{padding:4px 8px;border:0;border-radius:6px;background:transparent;color:var(--ui-text-muted);font-size:10px;cursor:pointer}.segments button.active{background:rgba(224,103,154,.18);color:#f2a2c5}
+@media(max-width:1000px){.hiring-stats__grid{grid-template-columns:repeat(2,minmax(0,1fr))}.analytics-card_wide,.analytics-card_salary,.analytics-card_salary-range{grid-column:1/-1}}@media(max-width:650px){.hiring-stats__grid{grid-template-columns:1fr;padding-inline:12px}.analytics-card_wide,.analytics-card_salary,.analytics-card_salary-range{grid-column:auto}.hiring-stats__toggle{font-size:0!important}.analytics-card__head{flex-direction:column}.segments{width:100%}.segments button{flex:1}}
 </style>
