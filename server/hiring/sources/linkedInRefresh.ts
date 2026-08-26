@@ -1,3 +1,4 @@
+import { extractCandidateContacts } from '@whiteslove/parsing-lexicon/hiring-candidate-fields'
 import { recordWebDiagnostic, type WebSourceDiagnostic } from '../../utils/hiringDiagnostics'
 import { normalizeCandidate } from '../../utils/hiringNormalize'
 import { detectCity } from '../../utils/hiringSources'
@@ -69,11 +70,8 @@ export function listHiringLinkedInSources(): Array<{ key: string; label: string;
   return configuredTargets().map((target) => ({ key: target.key, label: target.label, country: target.country, origin: 'linkedin' }))
 }
 
-function contacts(text: string): DirectContacts {
-  const email = text.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/iu)?.[0]
-  const telegram = text.match(/(?<![\w.])@[A-Za-z0-9_]{5,}/)?.[0]
-  const phone = text.match(/(?:\+?\d{1,3}[\s().-]*)?(?:\d[\s().-]*){8,12}/)?.[0]?.replace(/\s+/g, ' ').trim()
-  return { ...(phone ? { phone } : {}), ...(email ? { email } : {}), ...(telegram ? { telegram } : {}) }
+function contacts(text: string, country: LinkedInCountry): DirectContacts {
+  return { ...extractCandidateContacts(text, country) }
 }
 
 function roleFrom(item: LinkedInItem): string {
@@ -92,7 +90,7 @@ function itemToProfile(item: LinkedInItem, target: LinkedInTarget, checkedAt: st
   if (!text || !url || !/^https?:\/\/(?:www\.)?linkedin\.com\/(?:in|posts)\//i.test(url)) return null
   if (!CANDIDATE_INTENT_RE.test(text) || VACANCY_INTENT_RE.test(text)) return null
 
-  const publicContacts = contacts(text)
+  const publicContacts = contacts(text, target.country)
   const direct = publicContacts.telegram || publicContacts.email || publicContacts.phone || null
   const role = roleFrom(item)
   const author = String(item.author || '').trim()
@@ -123,7 +121,7 @@ async function fetchTarget(target: LinkedInTarget): Promise<{ profiles: CvProfil
     body: JSON.stringify({ source: 'linkedin', mode: 'candidates', query: target.query, scope: target.scope || 'both', limit: target.limit || DEFAULT_LIMIT }),
     signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
   })
-  const body = await response.json().catch(() => ({})) as LinkedInResponse
+  const body = (await response.json().catch(() => ({}))) as LinkedInResponse
   if (!response.ok || body.ok === false) throw new Error(body.error || `LinkedIn candidate fetcher -> HTTP ${response.status}`)
 
   const checkedAt = new Date().toISOString()
