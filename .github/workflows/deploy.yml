@@ -133,7 +133,7 @@ jobs:
       - name: Install dependencies
         # parsing-lexicon intentionally tracks #master, so a frozen lock would
         # eventually point at an older branch head. Resolve the live ref here.
-        run: npm install --package-lock=false
+        run: npm install --package-lock=false --legacy-peer-deps
 
       - name: Verify worker syntax
         if: needs.changes.outputs.node_verify == 'true'
