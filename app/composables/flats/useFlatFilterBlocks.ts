@@ -23,7 +23,7 @@ export function useFlatFilterBlocks(options: {
     metroMaxM, nearbyMaxM, roomsMin, roomsMax, bedroomsMin, bedroomsMax,
     areaMin, areaMax, pricePerSqmMin, pricePerSqmMax, floorMin, floorMax,
     totalFloorsMin, totalFloorsMax, yearMin, yearMax, audience, propertyType, maxAgeDays,
-    dealType,
+    dealType, petFriendly, childrenRequired, onlyWithPhotos, newBuildingOnly,
   } = options.filters;
   const update = <T>(target: Model<T>) => (value: SearchFilterValue) => { target.value = value as T; };
   const commit = () => options.scheduleLoad();
@@ -33,7 +33,12 @@ export function useFlatFilterBlocks(options: {
   return computed<SearchFilterBlock[]>(() => [
     {
       id: "quick", title: options.t("quickOptions"), icon: "i-lucide-sliders-horizontal", gridClass: "flat-filter-grid_single",
-      fields: [{ id: "quick-options", control: "custom" }],
+      fields: [
+        { id: "pets", control: "checkbox", label: options.t("pets"), value: petFriendly.value, hidden: rentOnlyHidden(), onUpdate: update(petFriendly), onCommit: commit },
+        { id: "children", control: "checkbox", label: options.t("children"), value: childrenRequired.value, hidden: rentOnlyHidden(), onUpdate: update(childrenRequired), onCommit: commit },
+        { id: "photos", control: "checkbox", label: options.t("onlyWithPhotos"), value: onlyWithPhotos.value, onUpdate: update(onlyWithPhotos), onCommit: commit },
+        { id: "new-building", control: "checkbox", label: options.t("newBuilding"), value: newBuildingOnly.value, onUpdate: update(newBuildingOnly), onCommit: commit },
+      ],
     },
     {
       id: "location", title: options.t("groupLocation"), icon: "i-lucide-map-pin", gridClass: "flat-filter-grid_single",
