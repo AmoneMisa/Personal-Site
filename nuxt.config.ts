@@ -43,7 +43,6 @@ export default defineNuxtConfig({
         '~/assets/css/main.css',
         '~/assets/css/flat-placeholder.css',
         '~/assets/css/jobs-card-redesign.css',
-        '~/assets/css/ocean-creature-rig.css',
     ],
     sourcemap: {
         client: false,

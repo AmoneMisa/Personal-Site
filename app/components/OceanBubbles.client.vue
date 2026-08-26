@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onBeforeUnmount, onMounted, ref } from "vue";
+import { nextTick, onBeforeUnmount, onMounted, ref } from "vue";
 
 const canvasRef = ref<HTMLCanvasElement | null>(null);
 
@@ -30,6 +30,7 @@ let width = 0;
 let height = 0;
 let dpr = 1;
 let raf = 0;
+let mountRaf = 0;
 let last = 0;
 let running = false;
 let reducedMotion: MediaQueryList | null = null;
@@ -234,17 +235,22 @@ function handleResize() {
   if (!reducedMotion?.matches && !document.hidden) start();
 }
 
-onMounted(() => {
+onMounted(async () => {
   reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
   reducedMotion.addEventListener("change", syncState);
   window.addEventListener("resize", handleResize, { passive: true });
   window.addEventListener("pointerdown", handlePointerDown, { passive: true });
   document.addEventListener("visibilitychange", syncState);
-  configureCanvas();
-  syncState();
+  await nextTick();
+  mountRaf = requestAnimationFrame(() => {
+    mountRaf = 0;
+    configureCanvas();
+    syncState();
+  });
 });
 
 onBeforeUnmount(() => {
+  if (mountRaf) cancelAnimationFrame(mountRaf);
   stop(true);
   reducedMotion?.removeEventListener("change", syncState);
   window.removeEventListener("resize", handleResize);

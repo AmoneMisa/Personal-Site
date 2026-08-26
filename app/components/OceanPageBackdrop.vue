@@ -68,16 +68,17 @@ const hasUnderwaterLife = computed(() => props.variant === "reef" || props.varia
 .ocean-page-backdrop__water {
   z-index: 0;
   inset: -12% -8%;
-  opacity: .22;
+  opacity: .34;
   mix-blend-mode: screen;
   background:
     radial-gradient(ellipse 46% 8% at 20% 10%, rgba(194, 239, 255, .2) 0 12%, transparent 58%),
     radial-gradient(ellipse 40% 7% at 69% 16%, rgba(135, 211, 255, .16) 0 10%, transparent 61%),
     radial-gradient(ellipse 32% 6% at 43% 28%, rgba(91, 183, 255, .12) 0 9%, transparent 64%),
     radial-gradient(ellipse 30% 6% at 89% 36%, rgba(179, 232, 255, .1) 0 8%, transparent 62%);
-  filter: blur(18px);
+  background-size: 138% 128%, 146% 136%, 132% 142%, 152% 134%;
+  filter: blur(13px);
   transform-origin: 50% 0;
-  animation: ocean-water-flow 17s ease-in-out infinite alternate;
+  animation: ocean-water-flow 11s ease-in-out infinite alternate;
 }
 
 .ocean-page-backdrop__caustics {
@@ -89,18 +90,18 @@ const hasUnderwaterLife = computed(() => props.variant === "reef" || props.varia
 
 .ocean-page-backdrop__caustics_primary {
   inset: -5% -6% 34%;
-  opacity: .18;
+  opacity: .28;
   background:
     repeating-radial-gradient(ellipse at 14% -8%, transparent 0 26px, rgba(184, 235, 255, .055) 31px 34px, transparent 40px 62px),
     repeating-radial-gradient(ellipse at 72% -12%, transparent 0 31px, rgba(121, 205, 255, .045) 38px 41px, transparent 48px 78px);
   filter: blur(7px);
   mask-image: linear-gradient(to bottom, #000 0%, rgba(0, 0, 0, .82) 48%, transparent 100%);
-  animation: ocean-caustic-drift 13s ease-in-out infinite alternate;
+  animation: ocean-caustic-drift 9s ease-in-out infinite alternate;
 }
 
 .ocean-page-backdrop__caustics_secondary {
   inset: -9% -8% 45%;
-  opacity: .12;
+  opacity: .2;
   background:
     radial-gradient(52% 20% at 17% 7%, rgba(175, 232, 255, .25), transparent 74%),
     radial-gradient(38% 16% at 78% 10%, rgba(142, 219, 255, .2), transparent 76%),
@@ -148,15 +149,15 @@ const hasUnderwaterLife = computed(() => props.variant === "reef" || props.varia
 }
 
 @keyframes ocean-water-flow {
-  0% { transform: translate3d(-2.2%, -1%, 0) skewX(-1.2deg) scale(1.02, .96); opacity: .16; }
-  48% { transform: translate3d(1.1%, 1.2%, 0) skewX(.8deg) scale(1.05, 1.03); opacity: .25; }
-  100% { transform: translate3d(2.4%, -.4%, 0) skewX(-.4deg) scale(1.01, 1.05); opacity: .19; }
+  0% { transform: translate3d(-4.8%, -1.8%, 0) skewX(-2deg) scale(1.04, .94); opacity: .24; filter: blur(13px) hue-rotate(-3deg); }
+  48% { transform: translate3d(1.8%, 2.2%, 0) skewX(1.4deg) scale(1.08, 1.05); opacity: .39; filter: blur(10px) hue-rotate(3deg); }
+  100% { transform: translate3d(4.6%, -.8%, 0) skewX(-.8deg) scale(1.02, 1.08); opacity: .28; filter: blur(14px) hue-rotate(-1deg); }
 }
 
 @keyframes ocean-caustic-drift {
-  0% { transform: translate3d(-1.6%, -.8%, 0) rotate(-.25deg) scale(1.03, .96); opacity: .13; }
-  52% { transform: translate3d(.4%, .5%, 0) rotate(.2deg) scale(1.055, 1.03); opacity: .2; }
-  100% { transform: translate3d(1.5%, -.2%, 0) rotate(-.1deg) scale(1.025, 1.06); opacity: .15; }
+  0% { transform: translate3d(-3.2%, -1.4%, 0) rotate(-.5deg) scale(1.05, .93); opacity: .18; }
+  52% { transform: translate3d(.8%, 1%, 0) rotate(.4deg) scale(1.1, 1.05); opacity: .34; }
+  100% { transform: translate3d(3%, -.4%, 0) rotate(-.2deg) scale(1.04, 1.1); opacity: .22; }
 }
 
 @keyframes ocean-caustic-swell {

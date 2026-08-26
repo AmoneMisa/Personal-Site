@@ -264,7 +264,7 @@ function activeCvQuery(profile: CvProfile): Record<string, string> {
   };
 }
 
-const { schedule: scheduleQuerySync } = hiringRouteState;
+const { schedule: scheduleQuerySync, sync: syncQueryParams } = hiringRouteState;
 
 async function syncActiveCvQuery(profile: CvProfile | null) {
   await router.replace({
