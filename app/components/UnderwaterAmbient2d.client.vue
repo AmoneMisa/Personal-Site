@@ -260,12 +260,14 @@ function wrapState(state: CreatureState) {
   const margin = Math.max(90, state.width * 0.55);
 
   if (state.direction > 0 && state.x > viewportWidth + margin) {
+    const bounds = verticalBounds(state.height);
     state.x = -state.width - margin;
-    state.y = clamp(state.homeY + Math.sin(state.phase) * 34, ...Object.values(verticalBounds(state.height)) as [number, number]);
+    state.y = clamp(state.homeY + Math.sin(state.phase) * 34, bounds.min, bounds.max);
     state.phase += 1.17;
   } else if (state.direction < 0 && state.x + state.width < -margin) {
+    const bounds = verticalBounds(state.height);
     state.x = viewportWidth + margin;
-    state.y = clamp(state.homeY + Math.sin(state.phase) * 34, ...Object.values(verticalBounds(state.height)) as [number, number]);
+    state.y = clamp(state.homeY + Math.sin(state.phase) * 34, bounds.min, bounds.max);
     state.phase += 1.17;
   }
 }
