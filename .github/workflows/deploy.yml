@@ -228,4 +228,5 @@ jobs:
               git pull --ff-only
             fi
 
-            flock -w 1800 /tmp/personal-site-deploy.lock bash ./deploy.sh
+            DEPLOY_SHA="${{ github.sha }}" DEPLOY_SOURCE=github \
+              flock -w 1800 /tmp/personal-site-deploy.lock bash ./deploy.sh
