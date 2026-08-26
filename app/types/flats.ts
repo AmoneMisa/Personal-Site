@@ -15,6 +15,8 @@ export interface FlatMarketComparison {
   goodPrice: boolean;
   medianUsd: number | null;
   comparableCount: number;
+  priceUsd?: number | null;
+  priceRatio?: number | null;
 }
 
 export type FlatAudience = "women" | "men" | "family";
@@ -118,6 +120,12 @@ export interface FlatMapFeedResult {
 }
 
 export type FlatStatsDealKey = "sale" | "longRent" | "shortRent" | "roomRent" | "unknown";
+export type FlatPriceBandKey = "green" | "blue" | "pink" | "orange" | "yellow" | "red";
+
+export interface FlatStatsPriceBand {
+  key: FlatPriceBandKey;
+  count: number;
+}
 
 export interface FlatStatsPriceGroup {
   key: FlatStatsDealKey;
@@ -147,6 +155,8 @@ export interface FlatStatistics {
   dealTypes: FlatStatsPriceGroup[];
   geographies: Partial<Record<FlatStatsGeoDimension, FlatStatsGeoRow[]>>;
   geographiesByDeal?: Partial<Record<FlatStatsDealKey, Partial<Record<FlatStatsGeoDimension, FlatStatsGeoRow[]>>>>;
+  priceBandsByDeal?: Partial<Record<FlatStatsDealKey, FlatStatsPriceBand[]>>;
+  priceBandSamplesByDeal?: Partial<Record<FlatStatsDealKey, number>>;
   ownership: {
     owners: number;
     agencies: number;
