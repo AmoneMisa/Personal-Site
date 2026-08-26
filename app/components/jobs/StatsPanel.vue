@@ -116,6 +116,28 @@ const professionSalaryBars = computed(() => professionStats.value.filter((item) 
   value: item.medianUsd,
   color: palette[index % palette.length],
 })));
+const professionSalaryRangeBars = computed(() => {
+  const groups = new Map<string, { count: number; min: number; max: number }>();
+  for (const point of props.stats.salaryTrend ?? []) {
+    const profession = String(point.profession || "").trim();
+    const salary = Number(point.salaryUsd);
+    if (!profession || nonProfessionLabels.has(profession.toLocaleLowerCase("en")) || !Number.isFinite(salary) || salary <= 0) continue;
+    const current = groups.get(profession);
+    if (!current) groups.set(profession, { count: 1, min: salary, max: salary });
+    else {
+      current.count += 1;
+      current.min = Math.min(current.min, salary);
+      current.max = Math.max(current.max, salary);
+    }
+  }
+  return [...groups.entries()]
+    .sort((a, b) => b[1].count - a[1].count || b[1].max - a[1].max)
+    .slice(0, 8)
+    .map(([label, range], index) => ({ label, min: range.min, max: range.max, color: palette[index % palette.length] }));
+});
+const professionSalaryRangeTitle = computed(() => String(locale.value).toLowerCase().startsWith("ru")
+  ? "Зарплата по профессиям · мин / макс"
+  : "Salary by profession · min / max");
 const workModeDonut = computed(() => workModeStats.value.map((item, index) => ({
   label: item.key === "unknown" ? t("notSpecified") : t("wm" + item.key.charAt(0).toUpperCase() + item.key.slice(1)),
   value: item.n,
@@ -264,6 +286,7 @@ const formatExperience = (value: number) => t("experienceYears", { n: value });
       <article v-if="languageBars.length" class="analytics-card"><h3>{{ t("statLanguages") }}</h3><UiAnalyticsBars :items="languageBars" /></article>
       <article v-if="professionCountBars.length" class="analytics-card"><h3>{{ trendScopeLabel("position") }}</h3><UiAnalyticsBars :items="professionCountBars" /></article>
       <article v-if="professionSalaryBars.length" class="analytics-card analytics-card_wide"><h3>{{ trendScopeLabel("positions") }} · {{ t("statsSalary") }}</h3><UiAnalyticsBars :items="professionSalaryBars" :format="money" /></article>
+      <article v-if="professionSalaryRangeBars.length" class="analytics-card analytics-card_wide"><h3>{{ professionSalaryRangeTitle }}</h3><UiAnalyticsBars :items="professionSalaryRangeBars" :format="money" /></article>
     </div>
   </UiAnalyticsPanel>
 </template>
