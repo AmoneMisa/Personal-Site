@@ -141,9 +141,13 @@ const floated = computed(() => floating.value && (focused.value || hasValue.valu
   font-family: inherit;
   font-size: var(--ui-control-font);
   line-height: 1.2;
+  text-align: left;
   padding: 0;
 }
-.u-input__field::placeholder { color: var(--ui-control-placeholder); }
+.u-input__field::placeholder {
+  color: var(--ui-control-placeholder);
+  text-align: left;
+}
 /* Number inputs keep their own alignment but lose the spinners, which look
    broken against a transparent field. */
 .u-input__field[type="number"] { appearance: textfield; -moz-appearance: textfield; }

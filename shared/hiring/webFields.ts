@@ -17,16 +17,9 @@ import {
 import { detectHiringLocationName } from '@whiteslove/parsing-lexicon/hiring-location-fields'
 import {
   AGO_SUFFIX,
-  DAYS_AGO_RE,
   HIRING_MONTHS,
-  HOURS_AGO_RE,
-  MONTHS_AGO_RE,
-  TODAY_RE,
   UNICODE_LEFT_BOUNDARY,
   UNICODE_RIGHT_BOUNDARY,
-  WEEKS_AGO_RE,
-  YEARS_AGO_RE,
-  YESTERDAY_RE,
   parseHiringActivityDate,
   parseHiringDayMonthDate,
 } from '@whiteslove/parsing-lexicon/hiring-temporal'
@@ -40,7 +33,15 @@ export const MONTHS = HIRING_MONTHS
 export const B = UNICODE_LEFT_BOUNDARY
 export const E = UNICODE_RIGHT_BOUNDARY
 export const AGO = AGO_SUFFIX
-export { TODAY_RE, YESTERDAY_RE, HOURS_AGO_RE, DAYS_AGO_RE, WEEKS_AGO_RE, MONTHS_AGO_RE, YEARS_AGO_RE }
+export {
+  TODAY_RE,
+  YESTERDAY_RE,
+  HOURS_AGO_RE,
+  DAYS_AGO_RE,
+  WEEKS_AGO_RE,
+  MONTHS_AGO_RE,
+  YEARS_AGO_RE,
+} from '@whiteslove/parsing-lexicon/hiring-temporal'
 
 export function decodeEntities(value: string): string {
   const named: Record<string, string> = {

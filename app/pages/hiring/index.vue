@@ -528,7 +528,7 @@ onBeforeUnmount(() => {
         />
       </div>
 
-      <SearchAdvancedFilters v-model="showAdvanced" :label="t('advanced')">
+      <SearchAdvancedFilters v-model="showAdvanced" :label="t('advanced')" :hide-label="t('hideFilters')">
         <UiSearchPresets
           :presets="presets"
           :label="t('presets')"

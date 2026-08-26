@@ -15,6 +15,8 @@ const [
   flatMap,
   detailsModal,
   translateGet,
+  jobsPage,
+  ruLocale,
 ] = await Promise.all([
   read('../server/hiring/application/candidateSnapshotWriter.ts'),
   read('../server/utils/jobsSourceRefresh.ts'),
@@ -26,6 +28,8 @@ const [
   read('../app/components/flats/FlatMap.client.vue'),
   read('../app/components/search/SearchDetailsModal.vue'),
   read('../server/routes/flats-translate.get.ts'),
+  read('../app/pages/jobs/index.vue'),
+  read('../i18n/locales/ru.json'),
 ])
 
 test('candidate snapshot rejects workshop/event promos instead of turning speakers into CVs', () => {
@@ -52,6 +56,14 @@ test('all draggable pills capitalize their visible first character', () => {
 test('vacancy modal no longer visually duplicates disclosed salary above the spec table', () => {
   assert.match(jobCard, /job-modal__badges > \.job-card__salary/u)
   assert.match(jobCard, /display: none/u)
+})
+
+test('vacancy modal localizes company sources, styles skill pills, and keeps apply last', () => {
+  const ru = JSON.parse(ruLocale)
+  assert.equal(ru.jobs.sourceCompanies, 'Сайт компании')
+  assert.match(jobsPage, /jobSourceLabel\(j\.source\)/u)
+  assert.match(jobsPage, /class="job-modal__tag job-modal__tag_skill"/u)
+  assert.ok(jobsPage.indexOf('shareActiveJob') < jobsPage.lastIndexOf('class="modal-footer__primary"'))
 })
 
 test('flat cards surface AI vision provenance and stay compact on phones', () => {

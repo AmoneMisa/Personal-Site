@@ -8,7 +8,7 @@ export const JOB_SOURCE_OPTIONS = [
   { value: "remoteok", label: "RemoteOK" },
   { value: "arbeitnow", label: "Arbeitnow" },
   { value: "adzuna", label: "Adzuna" },
-  { value: "companies", label: "Companies" },
+  { value: "companies", labelKey: "sourceCompanies" },
   { value: "devkg", label: "DevKG (Kyrgyzstan)" },
   { value: "itjobsuz", label: "IT-Jobs.uz" },
   { value: "ishgo", label: "ishGO.uz" },

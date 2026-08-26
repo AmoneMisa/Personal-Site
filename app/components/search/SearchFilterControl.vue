@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import CustomCheckbox from "~/components/common/CustomCheckbox.vue";
 import UInput from "~/components/U/Input.vue";
 import USelectMenu from "~/components/U/SelectMenu.vue";
 import type { SearchFilterField, SearchFilterValue } from "~/types/search";
@@ -53,15 +52,19 @@ function updateAndCommit(value: SearchFilterValue) {
       @update:model-value="updateAndCommit($event as SearchFilterValue)"
     />
 
-    <CustomCheckbox
+    <label
       v-else-if="field.control === 'checkbox'"
-      variant="switch"
-      :model-value="Boolean(field.value)"
-      :label="field.label"
-      :disabled="field.disabled"
+      class="search-filter-control__switch"
       :title="field.title"
-      @update:model-value="updateAndCommit"
-    />
+    >
+      <u-switch
+        :model-value="Boolean(field.value)"
+        :disabled="field.disabled"
+        :aria-label="field.label"
+        @update:model-value="updateAndCommit"
+      />
+      <span>{{ field.label }}</span>
+    </label>
 
     <slot v-else :field="field" />
   </div>
@@ -69,4 +72,17 @@ function updateAndCommit(value: SearchFilterValue) {
 
 <style scoped>
 .search-filter-control { min-width: 0; }
+.search-filter-control__switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-height: var(--ui-control-h-md);
+  color: var(--ui-text-muted);
+  font-size: var(--ui-control-font);
+  font-weight: 700;
+  cursor: pointer;
+  user-select: none;
+}
+.search-filter-control__switch:has(input:checked) { color: var(--ui-text); }
+.search-filter-control__switch:has(input:disabled) { opacity: 0.6; cursor: not-allowed; }
 </style>

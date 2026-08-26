@@ -42,9 +42,9 @@ export function useJobFilterBlocks(options: {
       ],
     },
     {
-      id: "salary", title: options.t("filterSalary"), icon: "i-lucide-banknote",
+      id: "salary", title: options.t("filterSalary"), icon: "i-lucide-circle-dollar-sign",
       fields: [
-        { id: "salary-min", control: "number", label: `${options.t("salaryMin")} (${displayCurrency.value}/${options.periodLabel(displayPeriod.value)})`, value: salaryMin.value, min: 0, icon: "i-lucide-banknote", onUpdate: update(salaryMin), onCommit: commit },
+        { id: "salary-min", control: "number", label: `${options.t("salaryMin")} (${displayCurrency.value}/${options.periodLabel(displayPeriod.value)})`, value: salaryMin.value, min: 0, icon: "i-lucide-circle-dollar-sign", onUpdate: update(salaryMin), onCommit: commit },
         { id: "currency", control: "select", label: options.t("currency"), value: displayCurrency.value, options: options.currencyItems.value, onUpdate: update(displayCurrency), onCommit: () => { if (salaryMin.value) options.scheduleLoad(); } },
         { id: "period", control: "select", label: options.t("period"), value: displayPeriod.value, options: options.periodItems.value, searchable: false, onUpdate: update(displayPeriod), onCommit: () => { if (salaryMin.value) options.scheduleLoad(); } },
         { id: "has-salary", control: "checkbox", label: options.t("hasSalary"), value: hasSalary.value, onUpdate: update(hasSalary), onCommit: commit },
@@ -71,7 +71,7 @@ export function useJobFilterBlocks(options: {
       ],
     },
     {
-      id: "coverage", title: options.t("filterCoverage"), icon: "i-lucide-shield-check",
+      id: "coverage", title: options.t("filterCoverage"), icon: "i-lucide-shield-alert",
       fields: [
         { id: "hide-risky", control: "checkbox", label: options.t("hideRisky"), title: options.t("hideRiskyHint"), value: hideRisky.value, onUpdate: update(hideRisky), onCommit: commit },
         { id: "include-ru", control: "checkbox", label: options.t("includeRu"), value: includeRu.value, onUpdate: update(includeRu), onCommit: commit },

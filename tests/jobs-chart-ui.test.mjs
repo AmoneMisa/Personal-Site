@@ -11,6 +11,7 @@ const tabs = await readFile(new URL('../app/components/ui/AnalyticsTabs.vue', im
 const shell = await readFile(new URL('../app/components/ui/AnalyticsPanel.vue', import.meta.url), 'utf8')
 const checkbox = await readFile(new URL('../app/components/common/CustomCheckbox.vue', import.meta.url), 'utf8')
 const filterControl = await readFile(new URL('../app/components/search/SearchFilterControl.vue', import.meta.url), 'utf8')
+const nuxtConfig = await readFile(new URL('../nuxt.config.ts', import.meta.url), 'utf8')
 
 test('vacancy graph view uses shared Chart.js visualizations and adds salary-country-experience bubbles', () => {
   assert.match(line, /from "chart\.js"/u)
@@ -53,12 +54,17 @@ test('analytics panel header is clickable outside its nested controls', () => {
 })
 
 test('boolean search controls use toggle switches without changing ordinary checkboxes elsewhere', () => {
-  assert.match(filterControl, /variant="switch"/u)
+  assert.match(filterControl, /<u-switch/u)
   assert.match(checkbox, /variant\?: "checkbox" \| "switch"/u)
   assert.match(checkbox, /:role="variant === 'switch' \? 'switch' : undefined"/u)
   assert.match(checkbox, /class="cb__switch"/u)
   assert.match(checkbox, /class="cb__box"/u)
   assert.match(checkbox, /translateX\(14px\)/u)
+})
+
+test('metadata-driven vacancy filter icons are included in the offline icon bundle', () => {
+  assert.match(nuxtConfig, /'lucide:circle-dollar-sign'/u)
+  assert.match(nuxtConfig, /'lucide:shield-alert'/u)
 })
 
 test('Russian salary period labels are compact in vacancy statistics', () => {

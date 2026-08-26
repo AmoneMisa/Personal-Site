@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import CustomButton from "~/components/common/CustomButton.vue";
+import { useServiceSeo } from "~/composables/services/useServiceSeo";
 import type {TabsItem} from "#ui/components/Tabs.vue";
 import {nextTick, onMounted} from "vue";
 import Modal from "~/components/common/Modal.vue";

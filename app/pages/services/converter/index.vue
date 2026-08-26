@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import CustomButton from "~/components/common/CustomButton.vue";
+import { useServiceSeo } from "~/composables/services/useServiceSeo";
 import {formatFileSize} from "~/utils/files";
 import {useConverterState} from "~/composables/converter/useConverterState";
 

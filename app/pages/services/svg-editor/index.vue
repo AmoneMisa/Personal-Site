@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import SvgEditorShell from "~/components/svgEditor/SvgEditorShell.vue";
+import { useServiceSeo } from "~/composables/services/useServiceSeo";
 
 useServiceSeo("svgEditor");
 </script>

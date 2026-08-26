@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import AddKeyModal from "~/components/mergeJson/AddKeyModal.vue";
+import { useServiceSeo } from "~/composables/services/useServiceSeo";
 import MergeJsonPane from "~/components/mergeJson/MergeJsonPane.vue";
 import MergeJsonToolbar from "~/components/mergeJson/MergeJsonToolbar.vue";
 import {useMergeJsonState} from "~/composables/mergeJson/useMergeJsonState";

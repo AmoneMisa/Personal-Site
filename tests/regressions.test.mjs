@@ -105,6 +105,7 @@ test('board pages share filter primitives and flat finder starts from a regional
   }
   assert.match(blocks, /<UiFilterSection/u)
   assert.match(control, /field\.control === 'checkbox'/u)
+  assert.match(control, /<u-switch/u)
   assert.match(jobs, /useJobFilterBlocks/u)
   assert.match(jobFilterBlocks, /control:\s*"checkbox"/u)
   assert.match(checkbox, /const id = useId\(\)/u)
@@ -278,6 +279,7 @@ test('listing photos dissolve into cards and job salaries use a simple accent', 
 test('job score frames share the same fading top-left accent and the app keeps its footer at the viewport bottom', () => {
   const cards = readFileSync(new URL('../app/assets/css/jobs-card-redesign.css', import.meta.url), 'utf8')
   const app = readFileSync(new URL('../app/app.vue', import.meta.url), 'utf8')
+  const uApp = readFileSync(new URL('../app/components/U/App.vue', import.meta.url), 'utf8')
   assert.match(cards, /job-card:has\(\.job-card__ats\)::before/u)
   assert.match(cards, /linear-gradient\(135deg, var\(--job-match-accent\)/u)
   assert.match(cards, /border: 1px solid rgba\(86, 96, 135, 0\.34\)/u)
@@ -285,6 +287,25 @@ test('job score frames share the same fading top-left accent and the app keeps i
   assert.match(app, /\.site-app \{[^}]*min-height: 100dvh[^}]*display: flex/u)
   assert.match(app, /\.site-app__main \{[^}]*flex: 1 0 auto/u)
   assert.match(app, /\.site-app__footer \{[^}]*margin-top: auto/u)
+  assert.doesNotMatch(uApp, /display: contents/u)
+})
+
+test('every service page imports the nested SEO composable explicitly', () => {
+  const pages = [
+    '../app/pages/services/index.vue',
+    '../app/pages/services/svg-editor/index.vue',
+    '../app/pages/services/pdf-editor/index.vue',
+    '../app/pages/services/pdf-editor/[docId].vue',
+    '../app/pages/services/converter/index.vue',
+    '../app/pages/services/dockerhub/index.vue',
+    '../app/pages/services/email-editor/index.vue',
+    '../app/pages/services/merge-json/index.vue',
+    '../app/pages/services/markdown-editor/index.vue',
+  ]
+  for (const page of pages) {
+    const source = readFileSync(new URL(page, import.meta.url), 'utf8')
+    assert.match(source, /import \{ useServiceSeo \} from "~\/composables\/services\/useServiceSeo";/u)
+  }
 })
 
 test('vacancy cards open from the card surface and compact overflowing pills', () => {

@@ -44,6 +44,14 @@ useSeoMeta({
 });
 
 const { sourceOptions, countryOptions, languageOptions, levelOptions } = useJobMeta();
+const localizedSourceLabels = computed(() => new Map(sourceOptions.map((item) => [
+  item.value,
+  "label" in item ? item.label : t(item.labelKey),
+])));
+
+function jobSourceLabel(value?: string): string {
+  return value ? localizedSourceLabels.value.get(value) || value : t("notSpecified");
+}
 
 // Rates are supplied by /jobs-feed from the shared server FX cache. Keep USD as
 // the cold/error fallback; the first successful response expands this to every
@@ -427,7 +435,7 @@ const vacRows = computed<Array<{ label: string; value: string }>>(() => {
     { label: t("vLocation"), value: vStr(j.location) },
     { label: t("vCountry"), value: j.country && !["OTHER", "REMOTE"].includes(j.country) ? countryLabel(j.country) : t("notSpecified") },
     { label: t("vCity"), value: vStr(j.city) },
-    { label: t("vSource"), value: vStr(j.source) },
+    { label: t("vSource"), value: jobSourceLabel(j.source) },
     { label: t("vPublished"), value: timeAgo(j.postedAt) },
     { label: t("vDeadline"), value: vStr(j.deadline) },
     { label: t("vSalary"), value: formatSalary(j) || t("notSpecified") },
@@ -591,7 +599,7 @@ onBeforeUnmount(() => {
         </u-button>
       </div>
 
-      <SearchAdvancedFilters v-model="showAdvanced" :label="t('advanced')">
+      <SearchAdvancedFilters v-model="showAdvanced" :label="t('advanced')" :hide-label="t('hideFilters')">
         <SearchFilterBlocks :blocks="jobFilterBlocks" class="jobs__filter-blocks" />
         <UiFilterFooter class="jobs-filter-actions" :reset-label="t('reset')" @reset="resetFilters" />
       </SearchAdvancedFilters>
@@ -696,9 +704,9 @@ onBeforeUnmount(() => {
           <UiSpecTable :rows="vacRows" :hide-empty-label="t('hideEmpty')" :empty-value="t('notSpecified')" />
           <p v-if="activeJob.description" class="job-modal__desc">{{ activeJob.description }}</p>
           <p v-else class="text-muted">{{ t("noDescription") }}</p>
-          <div v-if="activeJob.skills && activeJob.skills.length" class="job-card__tags job-modal__tags">
-            <span v-for="s in activeJob.skills" :key="s" class="job-card__tag job-card__tag_skill">{{ s }}</span>
-            <span v-for="s in (activeJob.niceToHave || [])" :key="'plus-' + s" class="job-card__tag job-card__tag_plus">+{{ s }}</span>
+          <div v-if="activeJob.skills?.length || activeJob.niceToHave?.length" class="job-modal__tags">
+            <span v-for="s in activeJob.skills" :key="s" class="job-modal__tag job-modal__tag_skill">{{ s }}</span>
+            <span v-for="s in (activeJob.niceToHave || [])" :key="'plus-' + s" class="job-modal__tag job-modal__tag_plus">+{{ s }}</span>
           </div>
         </div>
       </template>
@@ -719,14 +727,6 @@ onBeforeUnmount(() => {
             @click="toggleHidden(activeJob)"
         >{{ isHidden(activeJob.id) ? t("restoreVacancy") : t("hideVacancy") }}</u-button>
         <a
-            v-if="activeJob"
-            class="modal-footer__primary"
-            :href="activeJob.applyUrl || activeJob.url"
-            target="_blank"
-            rel="noopener noreferrer"
-            @click="markSeen(activeJob)"
-        >{{ t("apply") }} →</a>
-        <a
             v-if="activeJob?.applyUrl && activeJob.applyUrl !== activeJob.url"
             class="modal-footer__secondary"
             :href="activeJob.url"
@@ -740,6 +740,14 @@ onBeforeUnmount(() => {
             :icon="shareCopied ? 'i-lucide-check' : 'i-lucide-share-2'"
             @click="shareActiveJob"
         >{{ shareCopied ? t("shareCopied") : t("share") }}</u-button>
+        <a
+            v-if="activeJob"
+            class="modal-footer__primary"
+            :href="activeJob.applyUrl || activeJob.url"
+            target="_blank"
+            rel="noopener noreferrer"
+            @click="markSeen(activeJob)"
+        >{{ t("apply") }} →</a>
         </UiModalFooter>
       </template>
     </SearchDetailsModal>
@@ -806,5 +814,24 @@ onBeforeUnmount(() => {
   font-size: 13.5px; line-height: 1.55; white-space: pre-wrap;
   color: var(--text-soft, inherit); max-height: 52vh; overflow-y: auto;
 }
-.job-modal__tags { margin-top: 4px; }
+.job-modal__tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 4px;
+}
+.job-modal__tag {
+  display: inline-flex;
+  align-items: center;
+  max-width: 100%;
+  padding: 3px 8px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  color: var(--ui-text-muted);
+  font-size: 11px;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+.job-modal__tag_skill { border-color: rgba(224, 103, 154, 0.3); color: #e79ec0; }
+.job-modal__tag_plus { border-color: rgba(52, 211, 153, 0.35); color: #6ee7b7; }
 </style>

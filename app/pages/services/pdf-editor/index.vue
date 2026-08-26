@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import CustomButton from "~/components/common/CustomButton.vue";
+import { useServiceSeo } from "~/composables/services/useServiceSeo";
 import { computed, ref } from "vue";
 import {formatFileSize} from "~/utils/files";
 import {useFileCollection} from "~/composables/ui/useFileCollection";

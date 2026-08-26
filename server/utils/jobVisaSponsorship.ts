@@ -1,10 +1,9 @@
 import {
   detectVisaSponsorshipWording,
-  TEMPORARY_WORK_AUTH_RE,
 } from '@whiteslove/parsing-lexicon/hiring-source-semantics'
 import type { Job, SponsorshipConfidence } from './jobTypes'
 
-export { TEMPORARY_WORK_AUTH_RE }
+export { TEMPORARY_WORK_AUTH_RE } from '@whiteslove/parsing-lexicon/hiring-source-semantics'
 
 export type VisaSponsorshipStatus =
   | 'explicit'

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import EmailEditorShell from "~/components/emailEditor/EmailEditorShell.vue";
+import { useServiceSeo } from "~/composables/services/useServiceSeo";
 
 useServiceSeo("emailEditor");
 </script>

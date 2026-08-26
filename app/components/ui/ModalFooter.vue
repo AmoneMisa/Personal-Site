@@ -31,6 +31,7 @@
   padding: 0;
   gap: 0 !important;
   display: inline-grid !important;
+  grid-template: 1fr / 1fr;
   place-items: center !important;
   line-height: 0;
   font-size: 0;
@@ -38,11 +39,21 @@
   overflow-wrap: normal;
 }
 
-.modal-footer :deep(> button > span),
 .modal-footer :deep(> button svg),
 .modal-footer :deep(> button [class*="icon"]) {
+  grid-area: 1 / 1;
   justify-self: center;
   align-self: center;
+}
+
+.modal-footer :deep(> button > .u-button__label) {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
 }
 
 .modal-footer :deep(> button svg),
@@ -77,6 +88,7 @@
   text-align: center;
   text-decoration: none;
   white-space: normal;
+  margin-left: auto;
 }
 .modal-footer :deep(.modal-footer__primary:hover) { filter: brightness(1.06); }
 
@@ -144,6 +156,7 @@
     padding-inline: 8px;
     font-size: 12px;
     white-space: nowrap;
+    margin-left: 0;
   }
 
   .modal-footer :deep(> .modal-footer__secondary) {

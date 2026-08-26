@@ -7,7 +7,3 @@
 <template>
   <div class="u-app"><slot /></div>
 </template>
-
-<style scoped>
-.u-app { display: contents; }
-</style>

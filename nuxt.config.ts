@@ -133,6 +133,18 @@ export default defineNuxtConfig({
                 'lucide:tree-pine',
                 'lucide:sliders-horizontal',
                 'lucide:rotate-ccw',
+                // Icons referenced through filter metadata/composables are not
+                // visible to the template scanner, so keep them explicit.
+                'lucide:banknote',
+                'lucide:circle-dollar-sign',
+                'lucide:github',
+                'lucide:linkedin',
+                'lucide:map-pinned',
+                'lucide:megaphone',
+                'lucide:message-circle',
+                'lucide:send',
+                'lucide:shield-alert',
+                'lucide:wrench',
             ],
         },
     }

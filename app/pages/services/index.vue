@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { useServiceSeo } from "~/composables/services/useServiceSeo";
+
 const { t } = useI18n();
 const localePath = useLocalePath();
 

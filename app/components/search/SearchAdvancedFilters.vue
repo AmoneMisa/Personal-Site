@@ -18,8 +18,8 @@ withDefaults(defineProps<{
         :aria-expanded="open"
         @click="open = !open"
       >
-        <u-icon :name="open ? 'i-lucide-chevron-down' : 'i-lucide-chevron-right'" />
-        {{ open && hideLabel ? hideLabel : label }}
+        <u-icon :name="open ? 'i-lucide-chevron-up' : 'i-lucide-chevron-right'" />
+        {{ open ? (hideLabel || label) : label }}
       </button>
     </div>
 

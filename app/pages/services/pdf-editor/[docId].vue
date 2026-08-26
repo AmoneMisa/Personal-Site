@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import CustomButton from "~/components/common/CustomButton.vue";
+import { useServiceSeo } from "~/composables/services/useServiceSeo";
 import PdfEditorControls from "~/components/pdfEditor/PdfEditorControls.vue";
 import { computed, reactive, ref } from "vue";
 import type { Canvas } from "fabric";
