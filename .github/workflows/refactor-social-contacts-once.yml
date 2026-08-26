@@ -46,16 +46,17 @@ jobs:
           tests = t.read_text()
           if "from 'node:fs/promises'" not in tests:
               tests = tests.replace("import test from 'node:test'\n", "import test from 'node:test'\nimport { readFile } from 'node:fs/promises'\n", 1)
-          block = """
-
-test('social hiring sources delegate contact parsing to the shared package', async () => {
-  const source = await readFile(new URL('../server/hiring/sources/socialRefresh.ts', import.meta.url), 'utf8')
-  assert.match(source, /extractCandidateContacts\(text, country\)/u)
-  assert.match(source, /contacts\(text, target\.country\)/u)
-  assert.doesNotMatch(source, /const phone = text\.match/u)
-  assert.doesNotMatch(source, /const telegram = text\.match/u)
-})
-"""
+          block = '\n'.join([
+              '',
+              "test('social hiring sources delegate contact parsing to the shared package', async () => {",
+              "  const source = await readFile(new URL('../server/hiring/sources/socialRefresh.ts', import.meta.url), 'utf8')",
+              "  assert.match(source, /extractCandidateContacts\\(text, country\\)/u)",
+              "  assert.match(source, /contacts\\(text, target\\.country\\)/u)",
+              "  assert.doesNotMatch(source, /const phone = text\\.match/u)",
+              "  assert.doesNotMatch(source, /const telegram = text\\.match/u)",
+              '})',
+              '',
+          ])
           if "social hiring sources delegate contact parsing" not in tests:
               tests += block
           t.write_text(tests)
