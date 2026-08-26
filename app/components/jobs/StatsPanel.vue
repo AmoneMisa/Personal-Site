@@ -34,7 +34,7 @@ const compactDisplayPeriodLabel = computed(() => {
 const countryStats = computed(() => Object.entries(props.stats.byCountry ?? {}).sort((a, b) => b[1].count - a[1].count));
 const sourceStats = computed(() => Object.entries(props.stats.bySource ?? {}).sort((a, b) => b[1].count - a[1].count));
 const languageStats = computed(() => Object.entries(props.stats.byLanguage ?? {}).sort((a, b) => b[1] - a[1]).slice(0, 10));
-const nonProfessionLabels = new Set(["soft skill", "soft skills", "databases"]);
+const nonProfessionLabels = new Set(["soft skill", "soft skills", "database", "databases"]);
 const professionStats = computed(() => (props.stats.byProfession ?? []).filter(
   (item) => !nonProfessionLabels.has(item.profession.trim().toLocaleLowerCase("en")),
 ));
