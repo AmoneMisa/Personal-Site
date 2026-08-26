@@ -4,16 +4,20 @@ const open = defineModel<boolean>('open', {default: false})
 const props = defineProps<{
   maxWidthClass?: string
 }>()
+
+function closeModal() {
+  open.value = false
+}
 </script>
 
 <template>
   <UModal
       v-model:open="open"
       :ui="{
-      content: props.maxWidthClass || 'sm:max-w-2xl'
-    }"
+        content: props.maxWidthClass || 'sm:max-w-2xl'
+      }"
   >
-    <template #content="{ close }">
+    <template #content>
       <UCard
           class="app-modal"
           :ui="{ root: 'ring-0 bg-transparent' }"
@@ -24,7 +28,7 @@ const props = defineProps<{
               <slot name="title"/>
             </div>
 
-            <button type="button" class="app-modal__close" @click="close()" :aria-label="$t('common.close')">
+            <button type="button" class="app-modal__close" @click="closeModal" :aria-label="$t('common.close')">
               <UIcon name="i-lucide-x"/>
             </button>
           </div>
@@ -34,7 +38,7 @@ const props = defineProps<{
           </div>
 
           <div class="app-modal__actions">
-            <slot name="actions" :close="close"/>
+            <slot name="actions" :close="closeModal"/>
           </div>
         </div>
       </UCard>
@@ -44,52 +48,84 @@ const props = defineProps<{
 
 <style scoped lang="scss">
 .app-modal {
-  border-radius: 20px;
-  border: 1px solid var(--ui-border);
-  background: rgba(14, 12, 21, 0.92);
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  overflow: hidden;
+  border-radius: 16px;
+  border: 1px solid var(--color-border, var(--ui-border));
+  background: rgba(14, 16, 39, 0.98);
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.48), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+
+.app-modal__inner {
+  padding: 22px 24px 24px;
 }
 
 .app-modal__header {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
-  gap: 12px;
-  margin-bottom: 14px;
+  gap: 16px;
+  padding-bottom: 16px;
+  margin-bottom: 18px;
+  border-bottom: 1px solid var(--color-border, var(--ui-border));
 }
 
 .app-modal__title {
-  font-weight: 900;
-  font-size: 16px;
-  line-height: 1.2;
+  min-width: 0;
+  font-weight: 800;
+  font-size: 20px;
+  line-height: 1.25;
+}
+
+.app-modal__body {
+  min-width: 0;
 }
 
 .app-modal__actions {
-  margin-top: 16px;
+  margin-top: 22px;
+  padding-top: 18px;
+  border-top: 1px solid var(--color-border, var(--ui-border));
   display: flex;
   justify-content: flex-end;
+  align-items: center;
   gap: 10px;
   flex-wrap: wrap;
 }
 
 .app-modal__close {
+  flex: 0 0 auto;
   height: 36px;
   width: 36px;
-  border-radius: 12px;
-  border: 1px solid rgba(239, 68, 68, 0.35);
-  background: rgba(239, 68, 68, 0.18);
+  border-radius: 10px;
+  border: 1px solid var(--color-border, var(--ui-border));
+  background: rgba(255, 255, 255, 0.035);
+  color: rgba(255, 255, 255, 0.78);
   display: grid;
   place-items: center;
   cursor: pointer;
-  transition: filter 160ms ease, transform 140ms ease;
+  transition: background 160ms ease, border-color 160ms ease, color 160ms ease, transform 140ms ease;
 }
 
 .app-modal__close:hover {
-  filter: brightness(1.06);
+  color: #fff;
+  border-color: rgba(224, 103, 154, 0.55);
+  background: rgba(224, 103, 154, 0.12);
 }
 
 .app-modal__close:active {
   transform: translateY(1px);
 }
 
+@media (max-width: 639px) {
+  .app-modal__inner {
+    padding: 18px;
+  }
+
+  .app-modal__title {
+    font-size: 18px;
+  }
+
+  .app-modal__actions :deep(button) {
+    flex: 1 1 140px;
+  }
+}
 </style>
