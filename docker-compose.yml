@@ -46,6 +46,7 @@ services:
     environment:
       SITE_STATE_DIR: /var/app/state/site
       JOBS_RUNTIME_ROLE: frontend
+      AI_WORKER_URL: ${AI_WORKER_URL:-http://ai-worker:4030}
       ELASTICSEARCH_URL: http://flat-finder-elasticsearch:9200
       JOBS_ELASTICSEARCH_INDEX: job-listings-v1
       HIRING_DATABASE_URL: ${HIRING_DATABASE_URL:-}
