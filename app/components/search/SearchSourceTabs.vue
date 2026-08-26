@@ -5,8 +5,21 @@ export interface SearchSourceOption {
   labelKey?: string;
 }
 
-defineProps<{ modelValue: string; items: readonly SearchSourceOption[] }>();
+const props = defineProps<{ modelValue: string; items: readonly SearchSourceOption[] }>();
 defineEmits<{ "update:modelValue": [value: string] }>();
+
+const route = useRoute();
+const items = computed<SearchSourceOption[]>(() => {
+  const values = [...props.items];
+  if (!route.path.endsWith("/flat-finder")) return values;
+
+  const seen = new Set(values.map((item) => item.value));
+  for (const value of ["facebook", "threads"]) {
+    if (seen.has(value)) continue;
+    values.push({ value, label: value });
+  }
+  return values;
+});
 </script>
 
 <template>
