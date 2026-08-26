@@ -1,0 +1,134 @@
+name: Ocean rig visual check
+
+on:
+  pull_request:
+    branches: [ master ]
+    paths:
+      - 'app/assets/css/ocean-creature-rig.css'
+      - 'public/images/ocean-creatures/**'
+      - 'nuxt.config.ts'
+      - '.github/workflows/ocean-rig-visual-check.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  screenshot:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Install Chromium screenshot runner
+        run: npx --yes playwright@1.55.0 install --with-deps chromium
+
+      - name: Build isolated rig preview
+        run: |
+          mkdir -p /tmp/ocean-rig/images
+          cp -R public/images/ocean-creatures /tmp/ocean-rig/images/
+          cp app/assets/css/ocean-creature-rig.css /tmp/ocean-rig/rig.css
+          cat > /tmp/ocean-rig/index.html <<'HTML'
+          <!doctype html>
+          <html lang="en">
+          <head>
+            <meta charset="utf-8">
+            <meta name="viewport" content="width=device-width,initial-scale=1">
+            <link rel="stylesheet" href="/rig.css">
+            <style>
+              * { box-sizing: border-box; }
+              body {
+                margin: 0;
+                min-height: 100vh;
+                padding: 48px;
+                background: radial-gradient(circle at 50% 0%, #16406f, #071528 58%, #040a14);
+                color: #dbeafe;
+                font: 15px/1.4 system-ui, sans-serif;
+              }
+              h1 { margin: 0 0 28px; font-size: 22px; }
+              .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 36px; }
+              .card {
+                min-height: 310px;
+                display: grid;
+                place-items: center;
+                position: relative;
+                overflow: hidden;
+                border: 1px solid rgba(255,255,255,.13);
+                border-radius: 28px;
+                background: rgba(5, 18, 38, .52);
+              }
+              .label { position: absolute; left: 18px; top: 14px; opacity: .72; }
+              .underwater-2d__swimmer { --body-duration: 1.8s; position: relative; width: 330px; opacity: 1; }
+              .underwater-2d__swimmer_puffer { --body-duration: 2.4s; width: 180px; }
+              .underwater-2d__swimmer_seahorse { --body-duration: 2.2s; width: 140px; }
+              .underwater-2d__swimmer_jelly { --body-duration: 2.2s; width: 150px; }
+              .underwater-2d__facing { width: 100%; }
+              .underwater-2d__creature { display: block; width: 100%; height: auto; object-fit: contain; }
+              .underwater-2d__creature_shark { animation: base-shark var(--body-duration) ease-in-out infinite alternate; }
+              .underwater-2d__creature_puffer { animation: base-puffer var(--body-duration) ease-in-out infinite; }
+              .underwater-2d__creature_seahorse { animation: base-seahorse var(--body-duration) ease-in-out infinite alternate; }
+              .underwater-2d__creature_jelly { animation: base-jelly var(--body-duration) ease-in-out infinite; }
+              @keyframes base-shark { from { transform: rotate(-.45deg); } to { transform: rotate(.45deg); } }
+              @keyframes base-puffer { 0%,100% { transform: scale(1); } 48% { transform: scale(1.035,1.05); } }
+              @keyframes base-seahorse { from { transform: rotate(-2deg); } to { transform: rotate(2deg); } }
+              @keyframes base-jelly { 0%,100% { transform: scale(1.02,.91); } 44% { transform: scale(.96,1.09); } }
+            </style>
+          </head>
+          <body>
+            <h1>Ocean creature runtime rig — isolated visual check</h1>
+            <div class="grid">
+              <div class="card">
+                <span class="label">shark</span>
+                <div class="underwater-2d__swimmer underwater-2d__swimmer_shark">
+                  <div class="underwater-2d__facing">
+                    <img class="underwater-2d__creature underwater-2d__creature_shark" src="/images/ocean-creatures/shark-clean.webp" alt="">
+                  </div>
+                </div>
+              </div>
+              <div class="card">
+                <span class="label">puffer</span>
+                <div class="underwater-2d__swimmer underwater-2d__swimmer_puffer">
+                  <div class="underwater-2d__facing">
+                    <img class="underwater-2d__creature underwater-2d__creature_puffer" src="/images/ocean-creatures/puffer-clean.webp" alt="">
+                  </div>
+                </div>
+              </div>
+              <div class="card">
+                <span class="label">seahorse</span>
+                <div class="underwater-2d__swimmer underwater-2d__swimmer_seahorse">
+                  <div class="underwater-2d__facing">
+                    <img class="underwater-2d__creature underwater-2d__creature_seahorse" src="/images/ocean-creatures/seahorse-clean.webp" alt="">
+                  </div>
+                </div>
+              </div>
+              <div class="card">
+                <span class="label">jelly blue / pink use same mask geometry</span>
+                <div class="underwater-2d__swimmer underwater-2d__swimmer_jelly underwater-2d__swimmer_jelly-blue">
+                  <div class="underwater-2d__facing">
+                    <img class="underwater-2d__creature underwater-2d__creature_jelly" src="/images/ocean-creatures/jelly-blue.webp" alt="">
+                  </div>
+                </div>
+              </div>
+            </div>
+          </body>
+          </html>
+          HTML
+
+      - name: Capture two animation phases
+        run: |
+          cd /tmp/ocean-rig
+          python3 -m http.server 4173 >/tmp/ocean-rig-server.log 2>&1 &
+          sleep 1
+          npx --yes playwright@1.55.0 screenshot --browser=chromium --viewport-size="1280,900" --wait-for-timeout=150 http://127.0.0.1:4173 /tmp/ocean-rig-phase-a.png
+          npx --yes playwright@1.55.0 screenshot --browser=chromium --viewport-size="1280,900" --wait-for-timeout=850 http://127.0.0.1:4173 /tmp/ocean-rig-phase-b.png
+
+      - name: Upload visual check
+        uses: actions/upload-artifact@v4
+        with:
+          name: ocean-rig-visual-check
+          path: |
+            /tmp/ocean-rig-phase-a.png
+            /tmp/ocean-rig-phase-b.png
+          retention-days: 1
