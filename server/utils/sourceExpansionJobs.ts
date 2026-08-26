@@ -1,3 +1,5 @@
+import { detectCountryCodeFromText } from '@whiteslove/parsing-lexicon/geography-detection'
+import { geographyDisplayName } from '@whiteslove/parsing-lexicon/geography-display'
 import { detectHiringLocationName } from '@whiteslove/parsing-lexicon/hiring-location-fields'
 import { parseHiringSourceSalary } from '@whiteslove/parsing-lexicon/hiring-source-semantics'
 import { parseHiringActivityDate } from '@whiteslove/parsing-lexicon/hiring-temporal'
@@ -311,32 +313,26 @@ async function fetchIshPlus(): Promise<Job[]> {
   return pages.flatMap((result) => result.status === 'fulfilled' ? result.value : [])
 }
 
-const MUK_COUNTRIES: Array<[RegExp, string, string]> = [
-  [/^Узбекистан\s+/iu, 'Uzbekistan', 'UZ'],
-  [/^Казахстан\s+/iu, 'Kazakhstan', 'KZ'],
-  [/^Кыргызстан\s+/iu, 'Kyrgyzstan', 'KG'],
-  [/^Украина\s+/iu, 'Ukraine', 'UA'],
-  [/^Румыния\s+/iu, 'Romania', 'RO'],
-]
-
 async function fetchMuk(): Promise<Job[]> {
   const url = 'https://muk.group/ru/vacancies/'
   const html = await fetchHtml(url)
   const out: Job[] = []
   for (const match of html.matchAll(/<a\b[^>]*href=["']([^"']*\/ru\/vacancies\/\d+\/?)["'][^>]*>([\s\S]*?)<\/a>/gi)) {
     const raw = stripHtml(match[2])
-    const country = MUK_COUNTRIES.find(([re]) => re.test(raw))
-    if (!country) continue
-    const title = raw.replace(country[0], '').trim()
+    const countryCode = detectCountryCodeFromText(raw)
+    if (!countryCode) continue
+    // MUK prefixes each card title with one country label; the label semantics
+    // come from parsing-lexicon, while removing the source-specific first field stays local.
+    const title = raw.replace(/^\S+\s+/u, '').trim()
     if (title.length < 3) continue
     out.push(makeJob({
       label: 'MUK',
       title,
       company: 'MUK',
-      location: country[1],
+      location: geographyDisplayName(countryCode, 'en', 'country'),
       url: absoluteUrl(match[1]!, url),
       description: raw,
-      tags: [country[2]],
+      tags: [countryCode],
       employerType: 'direct',
     }))
   }
