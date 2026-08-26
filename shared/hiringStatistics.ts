@@ -1,4 +1,4 @@
-import type { CandidateGender, HiringStatistics, HiringStatisticsItem } from './contracts/hiring'
+import type { CandidateGender, HiringProfessionSalaryRange, HiringStatistics, HiringStatisticsItem } from './contracts/hiring'
 import { canonicalCityValue } from './locationCatalog'
 import { hiringStatisticGroupsForProfessions } from './hiringStatisticGroups'
 
@@ -58,6 +58,7 @@ export function buildHiringStatistics<T extends HiringStatisticsProfile>(
   const activity = new Map<string, number>()
   const professionValues: string[] = []
   const sectorValues: string[] = []
+  const professionSalary = new Map<string, { count: number; minUsd: number; maxUsd: number }>()
   const now = options.now ?? Date.now()
   const start = now - 60 * DAY_MS
   let salarySamples = 0
@@ -83,20 +84,43 @@ export function buildHiringStatistics<T extends HiringStatisticsProfile>(
       activity.set(date, (activity.get(date) || 0) + 1)
     }
 
-    const salaryValues = [profile.salaryMin, profile.salaryMax]
-      .filter((value): value is number => value != null && Number.isFinite(value) && value > 0)
-    const years = profile.experienceYears
     const currency = String(profile.currency || 'USD').trim().toUpperCase()
-    if (salaryValues.length && years != null && Number.isFinite(years)) {
-      const average = salaryValues.reduce((sum, value) => sum + value, 0) / salaryValues.length
-      const usd = options.toUsd(average, currency)
+    const salaryMin = profile.salaryMin != null && Number.isFinite(profile.salaryMin) && profile.salaryMin > 0
+      ? options.toUsd(profile.salaryMin, currency)
+      : undefined
+    const salaryMax = profile.salaryMax != null && Number.isFinite(profile.salaryMax) && profile.salaryMax > 0
+      ? options.toUsd(profile.salaryMax, currency)
+      : undefined
+    const validSalaryValues = [salaryMin, salaryMax].filter((value): value is number => value != null && Number.isFinite(value) && value > 0)
+
+    if (validSalaryValues.length) {
+      const profileMin = Math.min(...validSalaryValues)
+      const profileMax = Math.max(...validSalaryValues)
+      for (const profession of professions) {
+        const current = professionSalary.get(profession)
+        if (!current) professionSalary.set(profession, { count: 1, minUsd: profileMin, maxUsd: profileMax })
+        else {
+          current.count += 1
+          current.minUsd = Math.min(current.minUsd, profileMin)
+          current.maxUsd = Math.max(current.maxUsd, profileMax)
+        }
+      }
+    }
+
+    const years = profile.experienceYears
+    if (validSalaryValues.length && years != null && Number.isFinite(years)) {
+      const average = validSalaryValues.reduce((sum, value) => sum + value, 0) / validSalaryValues.length
       const bracket = EXPERIENCE_BRACKETS.findIndex((item) => years >= item.from && years < item.to)
-      if (usd != null && bracket >= 0) {
-        salaryByExperience[bracket]!.push(usd)
+      if (bracket >= 0) {
+        salaryByExperience[bracket]!.push(average)
         salarySamples += 1
       }
     }
   }
+
+  const salaryByProfession: HiringProfessionSalaryRange[] = [...professionSalary.entries()]
+    .map(([profession, value]) => ({ profession, ...value }))
+    .sort((a, b) => b.count - a.count || b.maxUsd - a.maxUsd || a.profession.localeCompare(b.profession))
 
   return {
     genders,
@@ -111,6 +135,7 @@ export function buildHiringStatistics<T extends HiringStatisticsProfile>(
     professions: rankedItems(professionValues),
     activity: [...activity.entries()].sort((a, b) => a[0].localeCompare(b[0])).map(([date, value]) => ({ date, value })),
     salaryByExperience: salaryByExperience.map(median),
+    salaryByProfession,
     salarySamples,
   }
 }
