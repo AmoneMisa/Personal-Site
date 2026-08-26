@@ -88,6 +88,7 @@ function isExternal(href: string) {
 
 <style scoped lang="scss">
 .site-footer {
+  --section-title-gap: 12px;
   position: relative;
   z-index: 1;
   border-top: 1px solid var(--line);
@@ -127,13 +128,14 @@ function isExternal(href: string) {
   min-width: 0;
 }
 
-.site-footer__nav {
+.site-footer__nav,
+.site-footer__contacts {
   min-width: 0;
 }
 
 .site-footer__nav-grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   column-gap: 36px;
   row-gap: 9px;
 }
@@ -141,7 +143,7 @@ function isExternal(href: string) {
 .site-footer__column-title {
   font-size: 11px;
   color: var(--text-muted);
-  margin-bottom: 12px;
+  margin: 0 0 var(--section-title-gap);
   font-weight: 400;
 }
 
@@ -160,21 +162,18 @@ function isExternal(href: string) {
   color: var(--text-primary);
 }
 
-.site-footer__contacts {
-  min-width: 0;
-}
-
 .site-footer__contacts-row {
-  display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
-  gap: 16px;
+  display: flex;
   align-items: center;
+  justify-content: space-between;
+  gap: 24px;
 }
 
 .site-footer__contact-link {
   display: inline-flex;
   align-items: center;
   gap: 7px;
+  flex: 0 0 auto;
   min-width: 0;
   white-space: nowrap;
 }
@@ -210,15 +209,18 @@ function isExternal(href: string) {
     grid-template-columns: 1fr;
   }
 
+  .site-footer__nav-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .site-footer__contacts-row {
-    grid-template-columns: repeat(5, max-content);
-    justify-content: space-between;
+    justify-content: flex-start;
+    flex-wrap: wrap;
   }
 }
 
 @media (max-width: 700px) {
   .site-footer__contacts-row {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 12px 20px;
   }
 }
