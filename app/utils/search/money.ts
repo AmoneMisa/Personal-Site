@@ -1,8 +1,7 @@
-export const CURRENCY_SYMBOLS: Readonly<Record<string, string>> = {
-  USD: "$",
-  EUR: "€",
-  GBP: "£",
-};
+import {
+  CURRENCY_TERMS,
+  currencySymbol as sharedCurrencySymbol,
+} from "@whiteslove/parsing-lexicon/currency";
 
 export type SalaryPeriod = "hour" | "month" | "year";
 
@@ -13,9 +12,13 @@ const PERIODS_PER_YEAR: Readonly<Record<SalaryPeriod, number>> = {
   year: 1,
 };
 
-export function currencySymbol(currency: string): string {
+const CURRENCY_CODES = Object.freeze(
+  [...new Set(CURRENCY_TERMS.map((entry) => entry.canonical.toUpperCase()))],
+);
+
+export function currencySymbol(currency: string, locale = "en"): string {
   const normalized = currency.toUpperCase();
-  return CURRENCY_SYMBOLS[normalized] || normalized;
+  return sharedCurrencySymbol(normalized, locale) || normalized;
 }
 
 export function convertCurrency(
@@ -35,7 +38,7 @@ export function convertCurrency(
 
 export function formatMoney(amount: number, currency: string, locale?: string): string {
   const normalized = currency.toUpperCase();
-  const symbol = currencySymbol(normalized);
+  const symbol = currencySymbol(normalized, locale);
   const value = Math.round(amount).toLocaleString(locale);
   return symbol === normalized ? `${value} ${symbol}` : `${symbol}${value}`;
 }
@@ -68,7 +71,7 @@ export function compactSalaryText(value: string): string {
     .replace(/месяц/giu, "м.")
     .replace(/год/giu, "г.");
 
-  const currencyCodes = Object.keys(CURRENCY_SYMBOLS).join("|");
+  const currencyCodes = CURRENCY_CODES.join("|");
   const amountBeforeCurrency = new RegExp(
     `([+-]?\\d[\\d.,]*(?:K|M|B)?(?:\\s*[–—-]\\s*[+-]?\\d[\\d.,]*(?:K|M|B)?)?)\\s+(${currencyCodes})\\b`,
     "gi",
@@ -78,7 +81,7 @@ export function compactSalaryText(value: string): string {
   return compactPeriods
     .replace(amountBeforeCurrency, (_match, amount: string, code: string) => `${currencySymbol(code)}${amount}`)
     .replace(currencyCode, (code) => currencySymbol(code))
-    .replace(/([$€£])\s+(?=\d)/g, (symbol) => symbol);
+    .replace(/([$€£₴₽₺₾₩₹₼֏¥￥])\s+(?=\d)/g, (symbol) => symbol);
 }
 
 export function convertSalaryPeriod(amount: number, from: SalaryPeriod, to: SalaryPeriod): number {

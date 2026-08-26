@@ -76,7 +76,7 @@ test('country geography is a supported display kind instead of crashing the anal
 })
 
 test('flat statistics are not cleared while a country refresh waits for the background aggregate', () => {
-  assert.match(feed, /if \(!append && data\.statistics\) statistics\.value = data\.statistics/u)
+  assert.match(feed, /if \(!append && data\.statistics\) void setStatisticsWithoutViewportJump\(data\.statistics\)/u)
   assert.doesNotMatch(feed, /statistics\.value = data\.statistics \|\| null/u)
   assert.match(feed, /const statisticsLoading = ref\(false\)/u)
 })
