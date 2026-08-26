@@ -1,8 +1,8 @@
 import { extractCandidateContacts } from '@whiteslove/parsing-lexicon/hiring-candidate-fields'
 import { recordWebDiagnostic, type WebSourceDiagnostic } from '../../utils/hiringDiagnostics'
 import { normalizeCandidate } from '../../utils/hiringNormalize'
-import { detectCity } from '../../utils/hiringSources'
 import type { CvProfile } from '../../utils/hiringTypes'
+import { detectCity } from '../domain/telegramCandidateParser'
 import { persistWebProfiles } from '../webProfilePersistence'
 
 const REQUEST_TIMEOUT_MS = 180_000
