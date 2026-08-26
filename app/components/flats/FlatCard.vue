@@ -38,7 +38,7 @@ const goodPriceTitle = computed(() => {
 });
 const visionLabels = computed(() => new Set(props.presentation.visionBadgeLabels || []));
 
-type PriceTone = "low" | "below" | "average" | "high" | "very-high";
+type PriceTone = "green" | "blue" | "pink" | "orange" | "yellow" | "red";
 
 function displayedUsdPrice(): number | null {
   if (props.listing.price != null && String(props.listing.currency || "").toUpperCase() === "USD") {
@@ -55,11 +55,12 @@ const priceTone = computed<PriceTone | null>(() => {
   const priceUsd = displayedUsdPrice();
   if (median == null || median <= 0 || priceUsd == null || priceUsd <= 0) return null;
   const ratio = priceUsd / median;
-  if (ratio <= 0.75) return "low";
-  if (ratio <= 0.9) return "below";
-  if (ratio < 1.1) return "average";
-  if (ratio < 1.25) return "high";
-  return "very-high";
+  if (ratio >= 1.45) return "red";
+  if (ratio >= 1.31) return "yellow";
+  if (ratio >= 1.16) return "orange";
+  if (ratio >= 0.85) return "pink";
+  if (ratio >= 0.70) return "blue";
+  return "green";
 });
 
 function suspiciousRoomShare(listing: FlatListing): boolean {
@@ -175,7 +176,7 @@ const emit = defineEmits<{
 .flat-card__body { position: relative; z-index: 2; min-height: 0; flex: 1 1 auto; margin-top: -1px; padding: 11px 13px 12px; display: flex; flex-direction: column; gap: 4px; background: var(--bg-panel); }
 .flat-card__price-row { min-width: 0; min-height: 22px; display: flex; align-items: baseline; gap: 8px; white-space: nowrap; overflow: hidden; }
 .flat-card__price { min-width: 0; font-weight: 750; font-size: 18px; line-height: 1.2; color: var(--text-white, inherit); font-variant-numeric: tabular-nums; overflow: hidden; text-overflow: ellipsis; }
-.flat-card__price_low { color: #4ade80; }.flat-card__price_below { color: #67e8f9; }.flat-card__price_average { color: var(--text-white, inherit); }.flat-card__price_high { color: #fbbf24; }.flat-card__price_very-high { color: #fb7a45; }
+.flat-card__price_green { color: #4ade80; }.flat-card__price_blue { color: #67e8f9; }.flat-card__price_pink { color: #e0679a; }.flat-card__price_orange { color: #fb923c; }.flat-card__price_yellow { color: #facc15; }.flat-card__price_red { color: #ef4444; }
 .flat-card__price-conv { flex: 0 1 auto; min-width: 0; font-size: 12px; font-weight: 500; line-height: 1.35; overflow: hidden; text-overflow: ellipsis; }
 .flat-card__title { min-height: 19px; margin-top: 2px; font-size: 14px; font-weight: 650; line-height: 1.36; display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical; overflow: hidden; text-overflow: ellipsis; white-space: normal; overflow-wrap: anywhere; }.flat-card__spec { min-height: 16px; font-size: 12px; line-height: 1.35; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .flat-card__badges { min-height: 27px; margin-top: 5px; }.flat-card__badges :deep(.flat-card__badge) { border-radius: 999px; padding: 4px 7px; font-size: 10.5px; font-weight: 600; line-height: 1.15; background: rgba(255,255,255,0.05); color: var(--text-primary); }.flat-card__badges :deep(.flat-card__badge_vision) { border-color: rgba(56,189,248,.36); color: #8bdcf7; background: rgba(56,189,248,.08); }.flat-card__badges :deep(.flat-card__badge_warning) { border-color: rgba(242,184,107,.52); color: #f2b86b; background: rgba(242,184,107,.1); }
