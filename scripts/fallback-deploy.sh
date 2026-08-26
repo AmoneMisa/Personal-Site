@@ -9,6 +9,7 @@ cd "$(git rev-parse --show-toplevel)"
 REPO="AmoneMisa/Personal-Site"
 WORKFLOW_PATH=".github/workflows/deploy.yml"
 THRESHOLD_SECONDS="${FALLBACK_THRESHOLD_SECONDS:-180}"
+RETRY_COOLDOWN_SECONDS="${FALLBACK_RETRY_COOLDOWN_SECONDS:-900}"
 STATE_DIR="${DEPLOY_STATE_DIR:-/var/lib/personal-site-deploy}"
 LOCK_FILE="/tmp/personal-site-deploy.lock"
 FORCE=0
@@ -25,6 +26,22 @@ refresh_remote() {
 
 already_deployed() {
   [[ -f "$STATE_DIR/deployed.sha" ]] && [[ "$(cat "$STATE_DIR/deployed.sha")" == "$REMOTE_SHA" ]]
+}
+
+recent_failed_attempt() {
+  local failed_sha failed_at now elapsed
+  [[ -f "$STATE_DIR/fallback-failed.sha" && -f "$STATE_DIR/fallback-failed.at" ]] || return 1
+  failed_sha="$(cat "$STATE_DIR/fallback-failed.sha")"
+  [[ "$failed_sha" == "$REMOTE_SHA" ]] || return 1
+  failed_at="$(cat "$STATE_DIR/fallback-failed.at")"
+  [[ "$failed_at" =~ ^[0-9]+$ ]] || return 1
+  now="$(date +%s)"
+  elapsed=$(( now - failed_at ))
+  if (( elapsed < RETRY_COOLDOWN_SECONDS )); then
+    log "Previous fallback attempt for $REMOTE_SHA failed ${elapsed}s ago; retry cooldown is ${RETRY_COOLDOWN_SECONDS}s."
+    return 0
+  fi
+  return 1
 }
 
 runner_state() {
@@ -75,6 +92,10 @@ should_fallback() {
     return 0
   fi
 
+  if recent_failed_attempt; then
+    return 1
+  fi
+
   read -r status conclusion age <<<"$(runner_state)"
   log "GitHub workflow state for $REMOTE_SHA: status=$status conclusion=$conclusion age=${age}s"
 
@@ -122,6 +143,16 @@ fi
 refresh_remote
 SHA="$REMOTE_SHA"
 
+# Mark the automatic attempt before doing expensive work. If it fails, the same
+# SHA is not hammered every timer tick. A new master SHA is eligible immediately,
+# and --force intentionally bypasses this cooldown.
+if [[ "$FORCE" != "1" ]]; then
+  printf '%s\n' "$SHA" > "$STATE_DIR/fallback-failed.sha.tmp"
+  mv "$STATE_DIR/fallback-failed.sha.tmp" "$STATE_DIR/fallback-failed.sha"
+  printf '%s\n' "$(date +%s)" > "$STATE_DIR/fallback-failed.at.tmp"
+  mv "$STATE_DIR/fallback-failed.at.tmp" "$STATE_DIR/fallback-failed.at"
+fi
+
 worktree="$(mktemp -d /tmp/personal-site-fallback.XXXXXX)"
 cleanup() {
   git worktree remove --force "$worktree" >/dev/null 2>&1 || true
@@ -131,12 +162,9 @@ trap cleanup EXIT
 
 git worktree add --quiet --detach "$worktree" "$SHA"
 
-# The mutable parsing-lexicon tarball can change while its URL stays identical.
-# Generate a completely fresh lock only inside the disposable worktree so stale
-# integrity data cannot leak into the emergency build. The existing Nuxt graph
-# currently needs legacy peer handling, so npm ci must use the same mode as the
-# lock generator. Patch only the disposable Dockerfiles; master remains on the
-# normal npm-ci path used by GitHub Actions.
+# Generate a completely fresh lock only inside the disposable worktree. This
+# keeps the emergency build isolated from stale integrity/peer-resolution data
+# in the production checkout.
 log "Generating a fresh temporary lockfile for the local fallback build."
 rm -f "$worktree/package-lock.json"
 docker run --rm \
@@ -167,4 +195,5 @@ log "Deploying locally built images for $SHA."
 DEPLOY_SHA="$SHA" DEPLOY_SOURCE="local-fallback" SKIP_PULL=1 \
   bash ./deploy.sh all
 
+rm -f "$STATE_DIR/fallback-failed.sha" "$STATE_DIR/fallback-failed.at"
 log "Fallback deployment completed for $SHA."
