@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { useId } from "vue"
+import { computed, useId } from "vue"
 
 type Props = {
   modelValue?: boolean
@@ -28,24 +28,51 @@ const emit = defineEmits<{
 }>()
 
 const id = useId()
+
+// Country-fit still uses the old CustomCheckbox API. Render those two boolean
+// controls through the same USwitch used by search filters instead of keeping a
+// second checkbox visual language on that page. Other CustomCheckbox consumers
+// remain unchanged until they explicitly opt into variant="switch".
+const usesUiSwitch = computed(() =>
+  props.variant === "switch" ||
+  props.labelKey === "quizzes.countryFit.constraints.isShowUSA.label" ||
+  props.labelKey === "quizzes.countryFit.constraints.isShowCountries.label"
+)
 </script>
 
 <template>
-  <div class="cb" :class="[{ cb_error: !!error, cb_disabled: disabled }, `cb_${variant}`]">
-    <label class="cb__row" :for="id">
+  <div
+    class="cb"
+    :class="[
+      { cb_error: !!error, cb_disabled: disabled, cb_ui_switch: usesUiSwitch },
+      `cb_${variant}`,
+    ]"
+  >
+    <label v-if="usesUiSwitch" class="cb__ui-switch" :for="id">
+      <u-switch
+        :id="id"
+        :model-value="modelValue"
+        :disabled="disabled"
+        :aria-label="labelKey ? $t(labelKey) : label"
+        @update:model-value="emit('update:modelValue', Boolean($event))"
+      />
+      <span class="cb__label cb__label_ui-switch">
+        <span v-if="labelKey">{{ $t(labelKey) }}</span>
+        <span v-else>{{ label }}</span>
+      </span>
+    </label>
+
+    <label v-else class="cb__row" :for="id">
       <input
         :id="id"
         class="cb__native"
         type="checkbox"
-        :role="variant === 'switch' ? 'switch' : undefined"
         :checked="modelValue"
-        :aria-checked="variant === 'switch' ? modelValue : undefined"
         :disabled="disabled"
         @change="emit('update:modelValue', ($event.target as HTMLInputElement).checked)"
       />
 
-      <span v-if="variant === 'switch'" class="cb__switch" aria-hidden="true"><span class="cb__knob" /></span>
-      <span v-else class="cb__box" aria-hidden="true"><u-icon name="i-lucide-check" class="cb__tick" /></span>
+      <span class="cb__box" aria-hidden="true"><u-icon name="i-lucide-check" class="cb__tick" /></span>
 
       <span class="cb__label">
         <span v-if="labelKey">{{ $t(labelKey) }}</span>
@@ -68,6 +95,25 @@ const id = useId()
   flex-direction: column;
   gap: 6px;
   align-items: flex-start;
+}
+
+.cb__ui-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-height: var(--ui-control-h-md, 38px);
+  color: var(--ui-text-muted);
+  cursor: pointer;
+  user-select: none;
+}
+
+.cb__ui-switch:has(input:checked) .cb__label_ui-switch {
+  color: var(--ui-text);
+}
+
+.cb__ui-switch:has(input:focus-visible) {
+  border-radius: var(--ui-control-radius, 8px);
+  box-shadow: var(--ui-focus-ring, 0 0 0 3px rgba(224, 103, 154, 0.2));
 }
 
 .cb__row {
@@ -122,42 +168,6 @@ const id = useId()
   box-shadow: 0 0 0 3px rgba(224, 103, 154, 0.13);
 }
 
-.cb__switch {
-  position: relative;
-  width: 34px;
-  height: 20px;
-  flex: 0 0 34px;
-  border: 1px solid var(--ui-border);
-  border-radius: 999px;
-  background: rgba(4, 8, 27, 0.62);
-  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.28);
-  transition: border-color var(--ui-transition, 150ms ease), background var(--ui-transition, 150ms ease), box-shadow var(--ui-transition, 150ms ease);
-}
-.cb__knob {
-  position: absolute;
-  top: 3px;
-  left: 3px;
-  width: 12px;
-  height: 12px;
-  border-radius: 50%;
-  background: #9aa6c7;
-  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.38);
-  transition: transform 160ms ease, background-color 160ms ease;
-}
-.cb_switch .cb__row:has(input:checked) {
-  border-color: rgba(224, 103, 154, 0.36);
-  background: rgba(224, 103, 154, 0.055);
-}
-.cb_switch .cb__row:has(input:checked) .cb__switch {
-  border-color: rgba(224, 103, 154, 0.72);
-  background: linear-gradient(135deg, rgba(224, 103, 154, 0.92), rgba(168, 85, 247, 0.88));
-  box-shadow: 0 0 0 3px rgba(224, 103, 154, 0.11);
-}
-.cb_switch .cb__row:has(input:checked) .cb__knob {
-  transform: translateX(14px);
-  background: #fff;
-}
-
 .cb__row:has(input:focus-visible) {
   border-color: var(--accent-pink, #e0679a);
   box-shadow: var(--ui-focus-ring, 0 0 0 3px rgba(224, 103, 154, 0.2));
@@ -167,9 +177,12 @@ const id = useId()
   font-weight: 700;
   color: var(--ui-text-muted);
 }
-.cb_switch .cb__row:has(input:checked) .cb__label { color: var(--ui-text); }
+.cb__label_ui-switch {
+  font-size: var(--ui-control-font, 12px);
+}
 .cb__hint { font-size: 11px; color: var(--ui-text-muted); opacity: 0.9; }
 .cb__error { font-size: 12px; font-weight: 900; color: var(--color-error, #ef4444); }
 .cb_error .cb__row { border-color: rgba(239, 68, 68, 0.35); background: rgba(239, 68, 68, 0.06); }
-.cb_disabled .cb__row { opacity: 0.6; cursor: not-allowed; }
+.cb_disabled .cb__row,
+.cb_disabled .cb__ui-switch { opacity: 0.6; cursor: not-allowed; }
 </style>
