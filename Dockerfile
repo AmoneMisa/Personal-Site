@@ -5,7 +5,9 @@ WORKDIR /app
 COPY package.json package-lock.json ./
 # parsing-lexicon intentionally tracks #master. Ignore the lock while installing
 # so each build resolves the current branch head instead of a stale tarball/hash.
-RUN npm install --package-lock=false
+# legacy-peer-deps preserves the already-working Nuxt/Vite graph instead of
+# failing on optional peer ranges while resolving the live git dependency.
+RUN npm install --package-lock=false --legacy-peer-deps
 
 FROM node:24-bookworm-slim AS build
 
