@@ -1,6 +1,8 @@
 import { ref, watch } from "vue";
 import type { FlatSort } from "~/types/flats";
 
+const SOCIAL_LISTING_SOURCES = ["facebook", "threads"];
+
 export function useFlatFilters() {
   const countries = ref<string[]>([]);
   const city = ref("");
@@ -120,7 +122,8 @@ export function useFlatFilters() {
     if (privateYardOnly.value) params.privateYard = "1";
     params.sort = sort.value;
     if (query.value.trim()) params.query = query.value.trim();
-    params.sources = source.value || options.sources.join(",");
+    const defaultSources = [...new Set([...options.sources, ...SOCIAL_LISTING_SOURCES])];
+    params.sources = source.value || defaultSources.join(",");
     if (!options.append) params.includeStats = "1";
     return params;
   }
