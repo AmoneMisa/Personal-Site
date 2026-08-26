@@ -28,13 +28,13 @@ EOF
 
 cat > "$TIMER_FILE" <<EOF
 [Unit]
-Description=Check Personal Site GitHub runner every minute
+Description=Check Personal Site GitHub runner every 30 seconds
 
 [Timer]
-OnBootSec=2min
-OnUnitActiveSec=1min
+OnBootSec=30s
+OnUnitInactiveSec=30s
 AccuracySec=5s
-RandomizedDelaySec=10s
+RandomizedDelaySec=0
 Persistent=true
 Unit=${SERVICE_NAME}.service
 
@@ -44,9 +44,11 @@ EOF
 
 chmod +x "${REPO_DIR}/scripts/fallback-deploy.sh"
 systemctl daemon-reload
-systemctl enable --now "${SERVICE_NAME}.timer"
+systemctl enable "${SERVICE_NAME}.timer"
+systemctl restart "${SERVICE_NAME}.timer"
 
 echo "Installed ${SERVICE_NAME}.timer"
 systemctl status "${SERVICE_NAME}.timer" --no-pager || true
+systemctl list-timers --all "${SERVICE_NAME}.timer" --no-pager || true
 echo
 echo "Manual fallback: bash ${REPO_DIR}/scripts/fallback-deploy.sh --force"
