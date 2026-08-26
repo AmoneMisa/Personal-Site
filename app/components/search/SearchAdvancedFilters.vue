@@ -19,7 +19,7 @@ withDefaults(defineProps<{
         @click="open = !open"
       >
         <u-icon :name="open ? 'i-lucide-chevron-up' : 'i-lucide-chevron-right'" />
-        {{ open ? (hideLabel || label) : label }}
+        <span>{{ open ? (hideLabel || label) : label }}</span>
       </button>
     </div>
 
@@ -33,24 +33,28 @@ withDefaults(defineProps<{
 .search-advanced-filters {
   grid-column: 1 / -1;
   display: grid;
+  width: 100%;
   min-width: 0;
   gap: 8px;
 }
 .search-advanced-filters__toggle {
   display: flex;
   align-items: center;
+  width: 100%;
   min-width: 0;
 }
 .search-advanced-filters__button {
   display: inline-flex;
   align-items: center;
   gap: 6px;
+  min-width: 0;
   padding: 0;
   border: 0;
   background: transparent;
   color: var(--ui-text-muted);
   font-size: 13px;
   font-weight: 650;
+  line-height: 1.25;
   cursor: pointer;
 }
 .search-advanced-filters__button:hover { color: var(--text-white); }
@@ -99,6 +103,23 @@ withDefaults(defineProps<{
 .search-advanced-filters__panel > :deep(.search-filter-blocks) {
   grid-column: 1 / -1;
 }
+
+@media (max-width: 699px) {
+  .search-advanced-filters__toggle {
+    margin-top: 2px;
+    padding-top: 12px;
+    border-top: 1px solid var(--line);
+  }
+
+  .search-advanced-filters__button {
+    width: 100%;
+    min-height: 44px;
+    padding: 0 2px;
+    justify-content: flex-start;
+    font-size: 14px;
+  }
+}
+
 @media (min-width: 700px) {
   .search-advanced-filters__panel { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
