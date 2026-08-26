@@ -12,10 +12,10 @@ import {
   parseExperience,
   parseHiringContext,
   parseLanguageContext,
-  parseSalary,
   resolveProfessionContext,
 } from '@whiteslove/parsing-lexicon'
 import { detectCityFromText } from '@whiteslove/parsing-lexicon/geography-detection'
+import { parseHiringSalaryWithContext } from '@whiteslove/parsing-lexicon/hiring-salary-context'
 import {
   matchExtendedProfessions,
   matchesSourceCandidateIntent,
@@ -148,7 +148,7 @@ export function parseHiringExperience(text: string) {
 }
 
 export function parseHiringSalary(text: string) {
-  return parseSalary(text)
+  return parseHiringSalaryWithContext(text, { currencyFallback: 'language' })
 }
 
 export function parseSharedLanguageContext(text: string, mode: 'vacancy' | 'candidate' | null = null) {
