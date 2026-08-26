@@ -42,13 +42,14 @@ function onDownload() {
     <div class="merge__controlbar">
       <u-select
           v-model="ui.viewMode"
-          class="merge__select ui-locale"
+          class="merge__select"
           :items="viewModeItems"
           :title="t('services.mergeJson.titles.viewMode')"
       />
 
       <custom-checkbox
           v-model="ui.minify"
+          variant="switch"
           :label-key="'services.mergeJson.controls.minify'"
           :title="t('services.mergeJson.titles.minify')"
           @update:modelValue="ui.onMinifyToggle"
@@ -56,6 +57,7 @@ function onDownload() {
 
       <custom-checkbox
           v-model="ui.onlyDiff"
+          variant="switch"
           :label-key="'services.mergeJson.controls.onlyDiff'"
           :title="t('services.mergeJson.titles.onlyDiff')"
       />
@@ -235,7 +237,8 @@ function onDownload() {
 
 .merge__btn,
 .merge__chip {
-  height: 38px;
+  min-height: var(--ui-control-h-lg, 44px);
+  height: var(--ui-control-h-lg, 44px);
 }
 
 .merge__btn_ghost {
