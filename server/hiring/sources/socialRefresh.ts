@@ -2,6 +2,7 @@ import { recordWebDiagnostic, type WebSourceDiagnostic } from '../../utils/hirin
 import { normalizeCandidate, trimThreadsProfileText } from '../../utils/hiringNormalize'
 import { detectCity, isLikelyCvPost } from '../domain/telegramCandidateParser'
 import type { CvProfile } from '../../utils/hiringTypes'
+import { extractCandidateContacts } from '@whiteslove/parsing-lexicon/hiring-candidate-fields'
 import { persistWebProfiles } from '../webProfilePersistence'
 
 const REQUEST_TIMEOUT_MS = 180_000
@@ -89,11 +90,8 @@ function recentIso(value: string | null | undefined): string | null {
   return new Date(time).toISOString()
 }
 
-function contacts(text: string): DirectContacts {
-  const email = text.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/iu)?.[0]
-  const telegram = text.match(/(?<![\w.])@[A-Za-z0-9_]{5,}/)?.[0]
-  const phone = text.match(/(?:\+?\d{1,3}[\s().-]*)?(?:\d[\s().-]*){8,12}/)?.[0]?.replace(/\s+/g, ' ').trim()
-  return { ...(phone ? { phone } : {}), ...(email ? { email } : {}), ...(telegram ? { telegram } : {}) }
+function contacts(text: string, country: SocialTarget['country']): DirectContacts {
+  return { ...extractCandidateContacts(text, country) }
 }
 
 const INTENT_PREFIX_RE = /(?:^|\n)\s*[^\p{L}\p{N}\n]{0,8}(?:я\s+)?(?:ищу|шукаю)\s+(?:себе\s+)?(?:работу|подработку|роботу|підробіток)\s*[:—-]?\s*/iu
@@ -119,7 +117,7 @@ function itemToProfile(item: SocialItem, target: SocialTarget): CvProfile | null
   const createdAt = recentIso(item.createdAt)
   const candidateIntent = isLikelyCvPost(text, true) || LOCAL_CANDIDATE_INTENT_RE.test(text)
   if (!createdAt || !item.url || !text || !candidateIntent) return null
-  const publicContacts = contacts(text)
+  const publicContacts = contacts(text, target.country)
   const direct = publicContacts.telegram || publicContacts.email || publicContacts.phone || null
   const role = roleFrom(text)
   const id = String(item.id || item.url).replace(/[^a-zA-Z0-9_-]+/g, '-').slice(-180)
