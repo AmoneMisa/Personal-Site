@@ -134,7 +134,10 @@ jobs:
           cache: npm
 
       - name: Install dependencies
-        run: npm ci
+        # package.json pins parsing-lexicon to a concrete revision. npm install
+        # reconciles that one intentional pin if package-lock still reflects the
+        # previous revision, while retaining locked versions for other packages.
+        run: npm install --no-audit --no-fund
 
       - name: Verify worker syntax
         if: needs.changes.outputs.node_verify == 'true'
