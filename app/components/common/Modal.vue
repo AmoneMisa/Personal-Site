@@ -80,6 +80,20 @@ function closeModal() {
   min-width: 0;
 }
 
+/* Dialog forms share the same 44px control metric as service toolbars. Modals
+ * are teleported to <body>, so they cannot inherit the service-page rule. */
+.app-modal :deep(.ui-control),
+.app-modal :deep(.u-select-menu__trigger),
+.app-modal :deep(.btn),
+.app-modal :deep(.u-button) {
+  min-height: var(--ui-control-h-lg, 44px);
+}
+
+.app-modal :deep(.btn),
+.app-modal :deep(.u-button) {
+  height: var(--ui-control-h-lg, 44px);
+}
+
 .app-modal__actions {
   margin-top: 22px;
   padding-top: 18px;
