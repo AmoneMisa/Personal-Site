@@ -5,6 +5,11 @@ WORKDIR /app
 ENV NODE_ENV=production
 ENV JOBS_RUNTIME_ROLE=worker
 
+# Git is required because parsing-lexicon intentionally tracks github:#master.
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends git \
+  && rm -rf /var/lib/apt/lists/*
+
 COPY package.json package-lock.json ./
 # parsing-lexicon intentionally tracks #master. Resolve the live branch instead
 # of enforcing stale package-lock integrity from a previous branch snapshot.
