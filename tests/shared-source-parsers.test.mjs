@@ -33,4 +33,5 @@ test('secondary sources use the shared salary and contact parsers', () => {
   assert.equal(profile.contacts?.phone, '+380950820103')
   assert.equal(profile.currency, 'CAD')
   assert.equal(profile.salaryMin, 1200)
+  assert.equal(profile.salaryMax, 1200)
 })
