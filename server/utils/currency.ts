@@ -101,8 +101,8 @@ export function getRates(): Record<string, number> {
 
 /** Convert an amount in `currency` to whole USD, or undefined if unknown/invalid. */
 export function toUsd(amount: number | undefined, currency: string | undefined): number | undefined {
-  if (!amount || amount <= 0) return undefined
-  const rate = memRates[(currency || 'USD').toUpperCase()]
+  if (!amount || amount <= 0 || !currency) return undefined
+  const rate = memRates[currency.toUpperCase()]
   if (!rate) return undefined
   return Math.round(amount * rate)
 }

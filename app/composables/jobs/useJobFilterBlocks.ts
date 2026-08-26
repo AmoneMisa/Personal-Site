@@ -38,13 +38,13 @@ export function useJobFilterBlocks(options: {
       id: "location", title: options.t("filterLocation"), icon: "i-lucide-map-pin",
       fields: [
         { id: "countries", control: "multi-select", label: options.t("country"), value: countries.value, options: options.countryItems.value, placeholder: options.t("countryPlaceholder"), onUpdate: update(countries), onCommit: commit },
-        { id: "cities", control: "text", class: "jobs__field_wide", label: options.t("cities"), value: cities.value, placeholder: options.t("citiesPlaceholder"), icon: "i-lucide-map-pin", onUpdate: update(cities), onCommit: commit, onEnter: options.submit },
+        { id: "cities", control: "text", class: "jobs__field_wide", label: options.t("cities"), value: cities.value, placeholder: options.t("citiesPlaceholder"), onUpdate: update(cities), onCommit: commit, onEnter: options.submit },
       ],
     },
     {
       id: "salary", title: options.t("filterSalary"), icon: "i-lucide-circle-dollar-sign",
       fields: [
-        { id: "salary-min", control: "number", label: `${options.t("salaryMin")} (${displayCurrency.value}/${options.periodLabel(displayPeriod.value)})`, value: salaryMin.value, min: 0, icon: "i-lucide-circle-dollar-sign", onUpdate: update(salaryMin), onCommit: commit },
+        { id: "salary-min", control: "number", label: `${options.t("salaryMin")} (${displayCurrency.value}/${options.periodLabel(displayPeriod.value)})`, value: salaryMin.value, min: 0, onUpdate: update(salaryMin), onCommit: commit },
         { id: "currency", control: "select", label: options.t("currency"), value: displayCurrency.value, options: options.currencyItems.value, onUpdate: update(displayCurrency), onCommit: () => { if (salaryMin.value) options.scheduleLoad(); } },
         { id: "period", control: "select", label: options.t("period"), value: displayPeriod.value, options: options.periodItems.value, searchable: false, onUpdate: update(displayPeriod), onCommit: () => { if (salaryMin.value) options.scheduleLoad(); } },
         { id: "has-salary", control: "checkbox", label: options.t("hasSalary"), value: hasSalary.value, onUpdate: update(hasSalary), onCommit: commit },
@@ -56,7 +56,7 @@ export function useJobFilterBlocks(options: {
         { id: "work-mode", control: "select", label: options.t("workMode"), value: options.workModeSelect.value, options: options.workModeItems.value, searchable: false, onUpdate: update(options.workModeSelect), onCommit: commit },
         { id: "relocation", control: "select", label: options.t("relocation"), value: options.relocationSelect.value, options: options.relocationItems.value, searchable: false, onUpdate: update(options.relocationSelect), onCommit: commit },
         { id: "employment", control: "select", label: options.t("employment"), value: options.employmentKindSelect.value, options: options.employmentKindItems.value, searchable: false, onUpdate: update(options.employmentKindSelect), onCommit: commit },
-        { id: "max-experience", control: "number", label: options.t("experienceMax"), value: maxExperience.value, placeholder: options.t("experienceMaxPlaceholder"), min: 0, max: 40, icon: "i-lucide-briefcase", onUpdate: update(maxExperience), onCommit: commit, onEnter: options.submit },
+        { id: "max-experience", control: "number", label: options.t("experienceMax"), value: maxExperience.value, placeholder: options.t("experienceMaxPlaceholder"), min: 0, max: 40, onUpdate: update(maxExperience), onCommit: commit, onEnter: options.submit },
         { id: "no-experience", control: "checkbox", label: options.t("noExperience"), value: noExperience.value, onUpdate: update(noExperience), onCommit: commit },
         { id: "foreigner", control: "checkbox", label: options.t("foreigner"), value: foreignerOnly.value, onUpdate: update(foreignerOnly), onCommit: commit },
       ],
@@ -67,7 +67,7 @@ export function useJobFilterBlocks(options: {
         { id: "language", control: "select", label: options.t("language"), value: options.languageSelect.value, options: options.languageItems.value, onUpdate: update(options.languageSelect), onCommit: commit },
         { id: "language-level", control: "select", label: options.t("languageLevel"), value: options.languageLevelSelect.value, options: options.levelItems.value, searchable: false, disabled: !language.value, onUpdate: update(options.languageLevelSelect), onCommit: commit },
         { id: "exclude-language", control: "multi-select", label: options.t("excludeLanguage"), value: excludeLanguages.value, options: options.excludeLanguageItems.value, placeholder: options.t("excludeLangPlaceholder"), onUpdate: update(excludeLanguages), onCommit: commit },
-        { id: "skills-query", control: "text", class: "jobs__field_wide", label: options.t("skills"), value: skills.value, placeholder: options.t("skillsPlaceholder"), icon: "i-lucide-wrench", onUpdate: update(skills), onEnter: options.submit },
+        { id: "skills-query", control: "text", class: "jobs__field_wide", label: options.t("skills"), value: skills.value, placeholder: options.t("skillsPlaceholder"), onUpdate: update(skills), onEnter: options.submit },
       ],
     },
     {
