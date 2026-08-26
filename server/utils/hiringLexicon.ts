@@ -1,20 +1,13 @@
 import {
   CANDIDATE_FIELD_TERMS,
-  EMPLOYMENT_TYPES,
-  EXPERIENCE_REQUIREMENTS,
   HIRING_INTENT,
   HIRING_INTENT_EXTENSIONS,
-  PROBATION_TERMS,
-  SCHEDULE_TERMS,
-  WORK_MODES,
-  WORK_SCHEDULE_EXTENSIONS,
   aliasesOf,
   aliasesToRegex,
   canonicalCountryCode,
   canonicalTashkentDistrict,
   classifyHiringIntent,
   classifyHiringMessage,
-  findCanonical,
   matchSeniority,
   parseExperience,
   parseHiringContext,
@@ -27,6 +20,15 @@ import {
   matchExtendedProfessions,
   matchesSourceCandidateIntent,
 } from '@whiteslove/parsing-lexicon/hiring-source-aliases'
+import {
+  detectEmploymentTypes as detectSharedEmploymentTypes,
+  detectExperienceRequirement as detectSharedExperienceRequirement,
+  detectProbation as detectSharedProbation,
+  detectWorkModes as detectSharedWorkModes,
+  detectWorkSchedules as detectSharedWorkSchedules,
+  type HiringProbationKind,
+  type HiringWorkSchedule,
+} from '@whiteslove/parsing-lexicon/hiring-work-semantics'
 import type { CandidateEmploymentType, CandidateWorkMode } from '../../shared/contracts/hiring'
 
 export {
@@ -82,65 +84,26 @@ export function normalizeHiringCountry(value: string | null | undefined): string
   return value ? canonicalCountryCode(value) : null
 }
 
-const EMPLOYMENT_VALUE: Record<string, CandidateEmploymentType> = {
-  fullTime: 'full_time',
-  partTime: 'part_time',
-  contract: 'contract',
-  project: 'project',
-  freelance: 'freelance',
-  temporary: 'temporary',
-  internship: 'internship',
-  volunteer: 'volunteer',
-  seasonal: 'seasonal',
-}
-
 export function detectEmploymentTypes(text: string): CandidateEmploymentType[] {
-  const normalized = new Set<CandidateEmploymentType>()
-  for (const entry of EMPLOYMENT_TYPES) {
-    if (findCanonical(text, [entry], { partial: true })) {
-      const value = EMPLOYMENT_VALUE[entry.canonical]
-      if (value) normalized.add(value)
-    }
-  }
-  return [...normalized]
+  return [...detectSharedEmploymentTypes(text)] as CandidateEmploymentType[]
 }
 
 export function detectWorkModes(text: string): CandidateWorkMode[] {
-  const values = new Set<CandidateWorkMode>()
-  for (const entry of WORK_MODES) {
-    if (findCanonical(text, [entry], { partial: true })) values.add(entry.canonical as CandidateWorkMode)
-  }
-  return [...values]
+  return [...detectSharedWorkModes(text)] as CandidateWorkMode[]
 }
 
-export type WorkSchedule =
-  | 'fiveTwo' | 'twoTwo' | 'sixOne' | 'threeThree' | 'oneThree' | 'twentyFourFortyEight'
-  | 'shift' | 'flexible' | 'day' | 'night' | 'rotational'
-
+export type WorkSchedule = HiringWorkSchedule
 export function detectWorkSchedules(text: string): WorkSchedule[] {
-  const values = new Set<WorkSchedule>()
-  for (const entry of [...SCHEDULE_TERMS, ...WORK_SCHEDULE_EXTENSIONS]) {
-    if (findCanonical(text, [entry], { partial: true })) values.add(entry.canonical as WorkSchedule)
-  }
-  return [...values]
+  return [...detectSharedWorkSchedules(text)]
 }
 
-export type ProbationKind = 'probation' | 'noProbation' | 'paidProbation' | 'unpaidProbation'
+export type ProbationKind = HiringProbationKind
 export function detectProbation(text: string): ProbationKind | null {
-  for (const entry of Object.values(PROBATION_TERMS)) {
-    if (findCanonical(text, [entry], { partial: true })) return entry.canonical as ProbationKind
-  }
-  return null
+  return detectSharedProbation(text)
 }
 
 export function detectExperienceRequirement(text: string): 'noExperience' | 'experienceRequired' | null {
-  const parsed = parseExperience(text)
-  if (parsed?.requirement === 'none') return 'noExperience'
-  if (parsed?.requirement === 'required') return 'experienceRequired'
-  for (const entry of Object.values(EXPERIENCE_REQUIREMENTS)) {
-    if (findCanonical(text, [entry], { partial: true })) return entry.canonical as 'noExperience' | 'experienceRequired'
-  }
-  return null
+  return detectSharedExperienceRequirement(text)
 }
 
 function hasExtendedCandidateIntent(text: string): boolean {
