@@ -128,3 +128,305 @@
 }
 ::-webkit-scrollbar-thumb:hover { background: var(--text-muted, #9ea4c1); background-clip: content-box; }
 ::-webkit-scrollbar-corner { background: transparent; }
+
+/* -------------------------------------------------------------------------
+   Service pages
+   -------------------------------------------------------------------------
+   The service tools were built at different moments and had four different
+   ideas of spacing, control height and panel treatment. Keep their own feature
+   markup, but normalize those existing classes to the shared design tokens. */
+
+.merge,
+.email-editor,
+.svg-editor,
+.pdf,
+.docker-search {
+    padding-top: 24px !important;
+    padding-bottom: 80px !important;
+}
+
+.merge__card,
+.markdown-editor__card,
+.email-editor__inner,
+.pdf__card,
+.docker-search .tabs-head,
+.converter .panel {
+    border: 1px solid var(--line) !important;
+    border-radius: 10px !important;
+    background: var(--bg-panel) !important;
+    box-shadow: none !important;
+}
+
+/* Email editor: one compact control rail and two equal work surfaces. */
+.email-editor__inner {
+    padding: 16px !important;
+}
+
+.email-editor-toolbar {
+    gap: 10px !important;
+    margin-bottom: 16px !important;
+    padding-bottom: 16px !important;
+    border-bottom: 1px solid var(--line);
+}
+
+.email-editor-toolbar__left,
+.email-editor-toolbar__right {
+    gap: 8px !important;
+}
+
+.email-editor-toolbar__select > button,
+.email-editor-toolbar__select [data-slot="base"] {
+    min-height: var(--ui-control-h-lg) !important;
+    border: 1px solid var(--line) !important;
+    border-radius: 8px !important;
+    background: var(--bg-panel-2) !important;
+    box-shadow: none !important;
+}
+
+.email-editor-layout {
+    gap: 14px !important;
+}
+
+.email-editor-layout__panel,
+.email-editor-diagnostics {
+    border-radius: 10px !important;
+}
+
+.email-editor-layout__panel-inner,
+.email-editor-diagnostics__inner {
+    padding: 12px !important;
+    background: transparent !important;
+}
+
+/* Merge JSON: make the toolbar read as a tool bar, not scattered islands. */
+.merge__card {
+    margin-top: 16px !important;
+    padding: 16px !important;
+}
+
+.merge__toolbar {
+    align-items: center !important;
+    gap: 8px !important;
+}
+
+.merge__toolbar-row {
+    gap: 12px !important;
+}
+
+.merge__group {
+    min-height: 58px;
+    padding: 8px 10px !important;
+    border: 1px solid var(--line) !important;
+    background: var(--bg-panel-2) !important;
+    box-shadow: none !important;
+}
+
+.merge__chip,
+.merge__btn {
+    min-height: var(--ui-control-h-md) !important;
+    height: var(--ui-control-h-md) !important;
+    border-radius: 8px !important;
+}
+
+.merge__select > button,
+.merge__select [data-slot="base"] {
+    min-height: var(--ui-control-h-md) !important;
+    border: 1px solid var(--line) !important;
+    border-radius: 8px !important;
+    background: var(--bg-panel-2) !important;
+    box-shadow: none !important;
+}
+
+.merge__triple {
+    gap: 12px !important;
+}
+
+/* Converter: same surface and control scale as the editors. */
+.mode-grid {
+    gap: 12px !important;
+}
+
+.mode-card {
+    min-height: 132px;
+    padding: 18px !important;
+    border: 1px solid var(--line) !important;
+    border-radius: 10px !important;
+    background: var(--bg-panel) !important;
+    box-shadow: none !important;
+    transform: none !important;
+}
+
+.mode-card.is-active,
+.mode-card:hover {
+    border-color: rgba(224, 103, 154, 0.68) !important;
+}
+
+.converter .panel {
+    padding: 16px !important;
+}
+
+.converter .panel__header {
+    gap: 16px !important;
+    margin-bottom: 16px !important;
+}
+
+.converter .panel__controls {
+    gap: 10px !important;
+}
+
+.converter .ui-pill-btn {
+    padding: 0 !important;
+    border: 0 !important;
+    border-radius: 8px !important;
+    background: transparent !important;
+    animation: none !important;
+}
+
+.converter .ui-pill-btn__inner {
+    min-height: var(--ui-control-h-lg) !important;
+    height: var(--ui-control-h-lg) !important;
+    padding: 0 12px !important;
+    border: 1px solid var(--line) !important;
+    border-radius: 8px !important;
+    background: var(--bg-panel-2) !important;
+    box-shadow: none !important;
+    backdrop-filter: none !important;
+}
+
+.converter .dropzone {
+    border-radius: 10px !important;
+    background: rgba(224, 103, 154, 0.05) !important;
+}
+
+.converter .tips {
+    gap: 10px !important;
+}
+
+.converter .tip {
+    border: 1px solid var(--line) !important;
+    border-radius: 8px !important;
+    background: rgba(255, 255, 255, 0.02) !important;
+}
+
+/* Docker tag finder: compact the large empty desktop layout and use the same
+   flat select/button treatment as the rest of the services. */
+.docker-search .tabs-row {
+    margin-top: 16px !important;
+}
+
+.docker-search .tabs-head {
+    padding: 16px !important;
+}
+
+.docker-search__controls {
+    margin: 16px 0 !important;
+    padding: 0 !important;
+    gap: 12px !important;
+}
+
+.docker-search__field {
+    gap: 6px !important;
+}
+
+.docker-search__field.ui-pill-btn {
+    padding: 0 !important;
+    border: 0 !important;
+    border-radius: 8px !important;
+    background: transparent !important;
+    animation: none !important;
+}
+
+.docker-search__field .ui-pill-btn__inner {
+    width: 100%;
+    min-height: var(--ui-control-h-lg) !important;
+    height: var(--ui-control-h-lg) !important;
+    padding: 0 12px !important;
+    justify-content: flex-start !important;
+    border: 1px solid var(--line) !important;
+    border-radius: 8px !important;
+    background: var(--bg-panel-2) !important;
+    box-shadow: none !important;
+    backdrop-filter: none !important;
+}
+
+.docker-search__btn {
+    min-height: var(--ui-control-h-lg) !important;
+    height: var(--ui-control-h-lg) !important;
+    padding: 0 16px !important;
+    border: 1px solid var(--line) !important;
+    border-radius: 8px !important;
+    background: var(--bg-panel-2) !important;
+    box-shadow: none !important;
+}
+
+.docker-search__btn:not(.docker-search__btn_ghost):not(:disabled):hover {
+    border-color: var(--accent-pink) !important;
+}
+
+.docker-search__how {
+    margin-top: 36px !important;
+}
+
+.docker-search__h2 {
+    margin-bottom: 18px !important;
+}
+
+.how-card,
+.docker-search__panel,
+.docker-search__best {
+    border: 1px solid var(--line) !important;
+    border-radius: 10px !important;
+    background: var(--bg-panel) !important;
+    box-shadow: none !important;
+}
+
+@media (min-width: 900px) {
+    .docker-search__controls_simple {
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto !important;
+        grid-template-areas: "repo query actions" !important;
+        align-items: end !important;
+    }
+
+    .docker-search__controls_simple .docker-search__field:nth-child(1) { grid-area: repo !important; }
+    .docker-search__controls_simple .docker-search__field:nth-child(2) { grid-area: query !important; }
+    .docker-search__controls_simple .docker-search__actions { grid-area: actions !important; }
+
+    .docker-search__controls_advanced {
+        grid-template-columns: minmax(0, 1fr) 150px 220px auto !important;
+        grid-template-areas: "repo major variant actions" !important;
+        align-items: end !important;
+    }
+
+    .docker-search__controls_advanced .docker-search__field:nth-child(1) { grid-area: repo !important; }
+    .docker-search__controls_advanced .docker-search__field:nth-child(2) { grid-area: major !important; }
+    .docker-search__controls_advanced .docker-search__field:nth-child(3) { grid-area: variant !important; max-width: none !important; }
+    .docker-search__controls_advanced .docker-search__actions { grid-area: actions !important; }
+}
+
+@media (max-width: 768px) {
+    .merge__card,
+    .markdown-editor__card,
+    .email-editor__inner,
+    .pdf__card,
+    .docker-search .tabs-head,
+    .converter .panel {
+        padding: 12px !important;
+    }
+
+    .email-editor-toolbar__left,
+    .email-editor-toolbar__right,
+    .email-editor-toolbar__select,
+    .merge__search-wrap,
+    .merge__search {
+        width: 100% !important;
+        min-width: 0 !important;
+    }
+
+    .docker-search__actions {
+        justify-content: stretch !important;
+    }
+
+    .docker-search__actions > * {
+        flex: 1 1 auto;
+    }
+}
