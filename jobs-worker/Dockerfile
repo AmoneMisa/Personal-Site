@@ -6,7 +6,9 @@ ENV NODE_ENV=production
 ENV JOBS_RUNTIME_ROLE=worker
 
 COPY package.json package-lock.json ./
-RUN npm ci --omit=dev
+# parsing-lexicon intentionally tracks #master. Resolve the live branch instead
+# of enforcing stale package-lock integrity from a previous branch snapshot.
+RUN npm install --omit=dev --package-lock=false
 
 COPY . .
 
