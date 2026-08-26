@@ -131,12 +131,22 @@ trap cleanup EXIT
 
 git worktree add --quiet --detach "$worktree" "$SHA"
 
-log "Refreshing only the temporary lockfile so mutable parsing-lexicon master can be installed."
+# The mutable parsing-lexicon tarball can change while its URL stays identical.
+# Generate a completely fresh lock only inside the disposable worktree so stale
+# integrity data cannot leak into the emergency build. The existing Nuxt graph
+# currently needs legacy peer handling, so npm ci must use the same mode as the
+# lock generator. Patch only the disposable Dockerfiles; master remains on the
+# normal npm-ci path used by GitHub Actions.
+log "Generating a fresh temporary lockfile for the local fallback build."
+rm -f "$worktree/package-lock.json"
 docker run --rm \
   -v "$worktree:/app" \
   -w /app \
   node:24-bookworm-slim \
   npm install --package-lock-only --ignore-scripts --legacy-peer-deps >/dev/null
+
+sed -i 's/^RUN npm ci$/RUN npm ci --legacy-peer-deps/' "$worktree/Dockerfile"
+sed -i 's/^RUN npm ci --omit=dev$/RUN npm ci --omit=dev --legacy-peer-deps/' "$worktree/jobs-worker/Dockerfile"
 
 log "Building production images locally for $SHA."
 docker build -f "$worktree/Dockerfile" \
