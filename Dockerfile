@@ -2,18 +2,8 @@ FROM node:24-bookworm-slim AS deps
 
 WORKDIR /app
 
-# Git is required because parsing-lexicon intentionally tracks github:#master.
-# Keep it in the dependency stage only so the runtime image stays minimal.
-RUN apt-get update \
-  && apt-get install -y --no-install-recommends git \
-  && rm -rf /var/lib/apt/lists/*
-
 COPY package.json package-lock.json ./
-# parsing-lexicon intentionally tracks #master. Ignore the lock while installing
-# so each build resolves the current branch head instead of a stale tarball/hash.
-# legacy-peer-deps preserves the already-working Nuxt/Vite graph instead of
-# failing on optional peer ranges while resolving the live git dependency.
-RUN npm install --package-lock=false --legacy-peer-deps
+RUN npm ci
 
 FROM node:24-bookworm-slim AS build
 
