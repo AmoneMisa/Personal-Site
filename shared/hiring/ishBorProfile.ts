@@ -103,7 +103,7 @@ function iconField(html: string, icon: string): string | null {
 
 export function parseIshBorMetaSalary(html: string): Pick<CvProfile, 'salaryMin' | 'salaryMax' | 'currency'> {
   const raw = html.match(/name="description"\s+content="[^"]*?💵:\s*([^."]{1,80})/i)?.[1]?.trim()
-  return raw ? sourceSalary(raw) : {}
+  return raw ? sourceSalary(`salary ${raw}`) : {}
 }
 
 function iconExperience(html: string): number | null {
