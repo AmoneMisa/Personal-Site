@@ -4,6 +4,7 @@ import { readFile } from 'node:fs/promises'
 
 import { buildSecondaryProfile, parseSecondaryChipSalary } from '../server/hiring/sources/secondary/profile.ts'
 import { contacts } from '../shared/hiring/webFields.ts'
+import { parseIshBorMetaSalary } from '../shared/hiring/ishBorProfile.ts'
 
 test('web source contacts normalize local phones with source country context', () => {
   assert.deepEqual(
@@ -43,4 +44,20 @@ test('social hiring sources delegate contact parsing to the shared package', asy
   assert.match(source, /contacts\(text, target\.country\)/u)
   assert.doesNotMatch(source, /const phone = text\.match/u)
   assert.doesNotMatch(source, /const telegram = text\.match/u)
+})
+
+test('IshBor meta salary delegates amount, multiplier and currency parsing to the shared parser', async () => {
+  assert.deepEqual(
+    parseIshBorMetaSalary('<meta name="description" content="Frontend developer 💵: 12 mln so\'m. Tashkent">'),
+    { salaryMin: 12_000_000, salaryMax: 12_000_000, currency: 'UZS' },
+  )
+  assert.deepEqual(
+    parseIshBorMetaSalary('<meta name="description" content="Frontend developer 💵: $1,500. Tashkent">'),
+    { salaryMin: 1500, salaryMax: 1500, currency: 'USD' },
+  )
+
+  const source = await readFile(new URL('../shared/hiring/ishBorProfile.ts', import.meta.url), 'utf8')
+  assert.doesNotMatch(source, /const usd =/u)
+  assert.doesNotMatch(source, /const millions =/u)
+  assert.match(source, /sourceSalary\(`salary \$\{raw\}`\)/u)
 })

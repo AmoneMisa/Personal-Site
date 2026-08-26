@@ -101,18 +101,9 @@ function iconField(html: string, icon: string): string | null {
   return match ? htmlText(match[1]!).trim() || null : null
 }
 
-function metaSalary(html: string): Pick<CvProfile, 'salaryMin' | 'salaryMax' | 'currency'> {
-  const raw = html.match(/name="description"\s+content="[^"]*?💵:\s*([^."]{1,40})/i)?.[1]
-  if (!raw) return {}
-  const usd = /\$|usd|доллар/iu.test(raw)
-  const millions = /(?:mln|mil|million|milliyon|млн|миллион)/iu.test(raw)
-  const values = [...raw.matchAll(/\d[\d\s]*/g)]
-    .map((match) => Number(match[0].replace(/\s+/g, '')))
-    .filter((value) => Number.isFinite(value) && value > 0)
-    .map((value) => (millions && value < 1_000 ? value * 1_000_000 : value))
-    .filter((value) => (usd ? value >= 50 && value <= 100_000 : value >= 100_000 && value <= 500_000_000))
-  if (!values.length) return {}
-  return { salaryMin: Math.min(...values), salaryMax: Math.max(...values), currency: usd ? 'USD' : 'UZS' }
+export function parseIshBorMetaSalary(html: string): Pick<CvProfile, 'salaryMin' | 'salaryMax' | 'currency'> {
+  const raw = html.match(/name="description"\s+content="[^"]*?💵:\s*([^."]{1,80})/i)?.[1]?.trim()
+  return raw ? sourceSalary(`salary ${raw}`) : {}
 }
 
 function iconExperience(html: string): number | null {
@@ -185,6 +176,6 @@ export function parseIshBorProfile(
     contact: publicContacts.telegram || publicContacts.email || publicContacts.phone || summary.url,
     contactType: hasDirect ? 'direct' : 'platform',
     ...sourceSalary(combined),
-    ...metaSalary(detailHtml),
+    ...parseIshBorMetaSalary(detailHtml),
   })
 }
