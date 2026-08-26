@@ -125,6 +125,8 @@ export interface FlatStatsPriceGroup {
   priceCount: number;
   medianUsd: number | null;
   averageUsd: number | null;
+  minUsd?: number | null;
+  maxUsd?: number | null;
 }
 
 export interface FlatStatsGeoRow {
@@ -132,6 +134,8 @@ export interface FlatStatsGeoRow {
   count: number;
   priceCount: number;
   medianUsd: number | null;
+  minUsd?: number | null;
+  maxUsd?: number | null;
 }
 
 export type FlatStatsGeoDimension = "country" | "city" | "district" | "microdistrict" | "metro";
