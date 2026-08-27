@@ -14,26 +14,42 @@ const emit = defineEmits<{
 
 const lightboxOpen = defineModel<boolean>("lightboxOpen", { default: false });
 const currentIndex = ref<number | null>(null);
-const zoomed = ref(false);
+const zoom = ref(1);
 const currentPhoto = computed(() => currentIndex.value == null ? null : props.photos[currentIndex.value] || null);
 const position = computed(() => (currentIndex.value ?? 0) + 1);
 const previewPhotos = computed(() => props.photos.slice(0, 5));
 const hiddenPhotoCount = computed(() => Math.max(0, props.photos.length - previewPhotos.value.length));
 
+const MIN_ZOOM = 1;
+const MAX_ZOOM = 3;
+const ZOOM_STEP = 0.25;
+
+function resetZoom() {
+  zoom.value = MIN_ZOOM;
+}
+
+function setZoom(value: number) {
+  zoom.value = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, Math.round(value * 100) / 100));
+}
+
+function changeZoom(delta: number) {
+  setZoom(zoom.value + delta);
+}
+
 function open(index: number) {
   if (!props.photos.length) return;
-  zoomed.value = false;
+  resetZoom();
   currentIndex.value = Math.max(0, Math.min(index, props.photos.length - 1));
 }
 
 function close() {
-  zoomed.value = false;
+  resetZoom();
   currentIndex.value = null;
 }
 
 function move(direction: -1 | 1) {
   if (!props.photos.length || currentIndex.value == null) return;
-  zoomed.value = false;
+  resetZoom();
   currentIndex.value = (currentIndex.value + direction + props.photos.length) % props.photos.length;
 }
 
@@ -49,7 +65,7 @@ const SWIPE_MIN_PX = 50;
 let swipeStart: { x: number; y: number; id: number } | null = null;
 
 function onPointerDown(event: PointerEvent) {
-  if (props.photos.length < 2 || zoomed.value) return;
+  if (props.photos.length < 2 || zoom.value > MIN_ZOOM) return;
   swipeStart = { x: event.clientX, y: event.clientY, id: event.pointerId };
 }
 
@@ -71,14 +87,17 @@ function onKeydown(event: KeyboardEvent) {
   if (event.key === "Escape") close();
   else if (event.key === "ArrowLeft") move(-1);
   else if (event.key === "ArrowRight") move(1);
+  else if (event.key === "+" || event.key === "=") changeZoom(ZOOM_STEP);
+  else if (event.key === "-") changeZoom(-ZOOM_STEP);
+  else if (event.key === "0") resetZoom();
   else return;
   event.preventDefault();
 }
 
 function toggleZoom(event: MouseEvent) {
   const image = event.currentTarget as HTMLImageElement;
-  if (zoomed.value) {
-    zoomed.value = false;
+  if (zoom.value > MIN_ZOOM) {
+    resetZoom();
     image.style.setProperty("--zoom-x", "50%");
     image.style.setProperty("--zoom-y", "50%");
     return;
@@ -87,11 +106,15 @@ function toggleZoom(event: MouseEvent) {
   const rect = image.getBoundingClientRect();
   image.style.setProperty("--zoom-x", `${((event.clientX - rect.left) / rect.width) * 100}%`);
   image.style.setProperty("--zoom-y", `${((event.clientY - rect.top) / rect.height) * 100}%`);
-  zoomed.value = true;
+  setZoom(1.75);
+}
+
+function onWheel(event: WheelEvent) {
+  changeZoom(event.deltaY < 0 ? ZOOM_STEP : -ZOOM_STEP);
 }
 
 watch(currentIndex, (index) => {
-  zoomed.value = false;
+  resetZoom();
   lightboxOpen.value = index !== null;
 });
 watch(lightboxOpen, (open) => {
@@ -133,16 +156,23 @@ onBeforeUnmount(() => window.removeEventListener("keydown", onKeydown));
 
   <teleport to="body">
     <div v-if="currentPhoto" class="flat-lightbox" role="dialog" aria-modal="true" :aria-label="viewerLabel" @click="close">
-      <div class="flat-lightbox__stage" @click.stop @pointerdown="onPointerDown" @pointerup="onPointerUp" @pointercancel="onPointerCancel">
+      <div class="flat-lightbox__stage" @click.stop @pointerdown="onPointerDown" @pointerup="onPointerUp" @pointercancel="onPointerCancel" @wheel.prevent.stop="onWheel">
         <img
           :src="currentPhoto"
           :alt="`${title} (${position}/${photos.length})`"
           referrerpolicy="no-referrer"
           draggable="false"
-          :class="{ 'flat-lightbox__image_zoomed': zoomed }"
+          :class="{ 'flat-lightbox__image_zoomed': zoom > MIN_ZOOM }"
+          :style="{ transform: `scale(${zoom})` }"
           @error="handlePhotoError"
           @click.stop="toggleZoom"
         >
+      </div>
+      <div class="flat-lightbox__zoom" @click.stop>
+        <button type="button" :disabled="zoom <= MIN_ZOOM" aria-label="Zoom out" @click="changeZoom(-ZOOM_STEP)">−</button>
+        <span>{{ Math.round(zoom * 100) }}%</span>
+        <button type="button" :disabled="zoom >= MAX_ZOOM" aria-label="Zoom in" @click="changeZoom(ZOOM_STEP)">+</button>
+        <button type="button" :disabled="zoom === MIN_ZOOM" aria-label="Reset zoom" @click="resetZoom">1:1</button>
       </div>
       <button v-if="photos.length > 1" type="button" class="flat-lightbox__nav flat-lightbox__nav_left" :aria-label="previousLabel" @click.stop="move(-1)"><u-icon name="i-lucide-chevron-left" /></button>
       <button v-if="photos.length > 1" type="button" class="flat-lightbox__nav flat-lightbox__nav_right" :aria-label="nextLabel" @click.stop="move(1)"><u-icon name="i-lucide-chevron-right" /></button>
@@ -211,9 +241,14 @@ onBeforeUnmount(() => window.removeEventListener("keydown", onKeydown));
 .flat-gallery_count-4 .flat-gallery__item:nth-child(4) { grid-column: 2 / -1; }
 
 .flat-lightbox { position: fixed; inset: 0; z-index: 5000; display: grid; place-items: center; isolation: isolate; background: #080b1a; padding: clamp(12px, 2vw, 28px); cursor: zoom-out; pointer-events: auto; }
-.flat-lightbox__stage { width: min(82vw, 1200px); height: min(76dvh, 720px); display: flex; align-items: center; justify-content: center; cursor: default; pointer-events: auto; touch-action: pan-y pinch-zoom; user-select: none; -webkit-user-select: none; }
-.flat-lightbox__stage img { -webkit-user-drag: none; display: block; width: auto; height: auto; max-width: 100%; max-height: 100%; object-fit: contain; border-radius: 8px; transform-origin: var(--zoom-x, 50%) var(--zoom-y, 50%); transition: transform 180ms ease; cursor: zoom-in; }
-.flat-lightbox__stage img.flat-lightbox__image_zoomed { transform: scale(1.7); cursor: zoom-out; }
+.flat-lightbox__stage { width: min(82vw, 1200px); height: min(76dvh, 720px); display: flex; align-items: center; justify-content: center; cursor: default; pointer-events: auto; touch-action: pan-y pinch-zoom; user-select: none; -webkit-user-select: none; overflow: hidden; }
+.flat-lightbox__stage img { -webkit-user-drag: none; display: block; width: auto; height: auto; max-width: 100%; max-height: 100%; object-fit: contain; border-radius: 8px; transform-origin: var(--zoom-x, 50%) var(--zoom-y, 50%); transition: transform 120ms ease; cursor: zoom-in; }
+.flat-lightbox__stage img.flat-lightbox__image_zoomed { cursor: zoom-out; }
+.flat-lightbox__zoom { position: fixed; z-index: 2; left: 50%; top: 16px; transform: translateX(-50%); display: inline-flex; align-items: center; gap: 6px; padding: 5px; border: 1px solid #343a62; border-radius: 8px; background: #131730; color: #fff; }
+.flat-lightbox__zoom button { min-width: 34px; height: 32px; padding: 0 8px; border: 0; border-radius: 6px; background: rgba(255,255,255,.05); color: inherit; font-weight: 700; cursor: pointer; }
+.flat-lightbox__zoom button:hover:not(:disabled), .flat-lightbox__zoom button:focus-visible { color: var(--accent-pink); background: rgba(224,103,154,.12); }
+.flat-lightbox__zoom button:disabled { opacity: .35; cursor: default; }
+.flat-lightbox__zoom span { min-width: 48px; text-align: center; font: 600 12px/1.2 "JetBrains Mono", monospace; }
 .flat-lightbox__nav, .flat-lightbox__close { position: fixed; z-index: 1; display: grid; place-items: center; border: 1px solid #343a62; border-radius: 8px; background: #131730; color: #fff; cursor: pointer; pointer-events: auto; }
 .flat-lightbox__nav { top: 50%; width: 52px; height: 72px; transform: translateY(-50%); font-size: 28px; }
 .flat-lightbox__nav:hover, .flat-lightbox__nav:focus-visible, .flat-lightbox__close:hover, .flat-lightbox__close:focus-visible { border-color: var(--accent-pink); color: var(--accent-pink); }
@@ -234,6 +269,7 @@ onBeforeUnmount(() => window.removeEventListener("keydown", onKeydown));
   .flat-gallery_count-3, .flat-gallery_count-4 { grid-template-columns: 1.55fr .7fr; }
   .flat-gallery_count-4 .flat-gallery__item:nth-child(4) { grid-column: auto; }
   .flat-lightbox__stage { width: 92vw; height: 76vh; }
+  .flat-lightbox__zoom { top: 10px; }
   .flat-lightbox__nav { width: 42px; height: 56px; font-size: 22px; }
   .flat-lightbox__nav_left { left: 8px; }
   .flat-lightbox__nav_right { right: 8px; }
