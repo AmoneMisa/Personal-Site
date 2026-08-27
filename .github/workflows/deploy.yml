@@ -224,12 +224,21 @@ jobs:
 
             cd ~/opt/myproject
 
-            # docker-compose.yml is deployment-managed by Git. Heal the dirty
-            # file left by the retired SCP workflow before updating the checkout.
+            # Production is a deployment checkout, not a development branch.
+            # Always use the exact commit that this workflow built, even if the
+            # server checkout accumulated local/divergent history.
             if [ -d .git ]; then
-              git restore --source=HEAD --staged --worktree -- docker-compose.yml
-              git pull --ff-only
+              git fetch origin master
+              git reset --hard "${{ github.sha }}"
             fi
 
+            FRONTEND_IMAGE_TAG="${{ github.sha }}" \
             DEPLOY_SHA="${{ github.sha }}" DEPLOY_SOURCE=github \
               flock -w 1800 /tmp/personal-site-deploy.lock bash ./deploy.sh
+
+            container_id="$(FRONTEND_IMAGE_TAG="${{ github.sha }}" docker compose --env-file db.env ps -q frontend)"
+            expected_image="$(docker image inspect "${FRONTEND_IMAGE}:${{ github.sha }}" --format='{{.Id}}')"
+            actual_image="$(docker inspect "$container_id" --format='{{.Image}}')"
+            test -n "$container_id"
+            test "$actual_image" = "$expected_image"
+            echo "Verified frontend image for ${{ github.sha }}: $actual_image"
