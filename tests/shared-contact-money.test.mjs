@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 
 import { compactSalaryText, convertSalaryPeriod, currencySymbol } from '../app/utils/search/money.ts'
-import { parseHiringSalary } from '../server/utils/hiringLexicon.ts'
+import { parseHiringSalary, parseSharedHiringContext } from '../server/utils/hiringLexicon.ts'
 import { extractContacts } from '../server/utils/hiringNormalize.ts'
 
 test('frontend currency formatting uses the shared currency catalog', () => {
@@ -27,6 +27,21 @@ test('salary periods from source/i18n constructions remain structured', () => {
   assert.equal(hourly?.currency, 'USD')
   assert.equal(hourly?.min, 55)
   assert.equal(hourly?.max, 65)
+
+  const annual = parseHiringSalary('Annual Salary: $405,000 — $485,000 USD')
+  assert.equal(annual?.period, 'year')
+  assert.equal(annual?.currency, 'USD')
+  assert.equal(annual?.min, 405_000)
+  assert.equal(annual?.max, 485_000)
+})
+
+test('explicit positive visa sponsorship copy is preserved despite conditional wording', () => {
+  const parsed = parseSharedHiringContext(
+    "Visa sponsorship: We do sponsor visas! However, we aren't able to successfully sponsor visas for every role and every candidate.",
+    { mode: 'vacancy' },
+  )
+  assert.ok(parsed.workAuthorization.includes('sponsorshipOffered'))
+  assert.ok(!parsed.workAuthorization.includes('noSponsorship'))
 })
 
 test('salary conversion provides monthly estimates only for time-based periods', () => {
