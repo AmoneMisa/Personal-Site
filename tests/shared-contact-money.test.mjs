@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
+import { jobLanguageTranslationKey, localizeJobLanguageList } from '../app/utils/jobs/languageLabel.ts'
 import { compactSalaryText, convertSalaryPeriod, currencySymbol } from '../app/utils/search/money.ts'
 import { parseHiringSalary, parseSharedHiringContext } from '../server/utils/hiringLexicon.ts'
 import { extractContacts } from '../server/utils/hiringNormalize.ts'
@@ -9,6 +10,34 @@ test('frontend currency formatting uses the shared currency catalog', () => {
   assert.equal(currencySymbol('UAH'), '₴')
   assert.equal(currencySymbol('JPY'), '¥')
   assert.equal(compactSalaryText('10 000 UAH/месяц'), '₴10K/м.')
+})
+
+test('vacancy language localization covers common source language names', () => {
+  const cases = {
+    Polish: 'languagePolish',
+    Georgian: 'languageGeorgian',
+    German: 'languageGerman',
+    French: 'languageFrench',
+    Spanish: 'languageSpanish',
+    Chinese: 'languageChinese',
+    Japanese: 'languageJapanese',
+    Belarusian: 'languageBelarusian',
+    Portuguese: 'languagePortuguese',
+    Italian: 'languageItalian',
+    Korean: 'languageKorean',
+    Turkish: 'languageTurkish',
+    Arabic: 'languageArabic',
+  }
+  for (const [language, key] of Object.entries(cases)) {
+    assert.equal(jobLanguageTranslationKey(language), key, language)
+  }
+  assert.equal(jobLanguageTranslationKey('Mandarin Chinese'), 'languageChinese')
+  assert.equal(jobLanguageTranslationKey('Belorussian'), 'languageBelarusian')
+  assert.equal(jobLanguageTranslationKey('pl'), 'languagePolish')
+  assert.equal(
+    localizeJobLanguageList('Polish (B2), Japanese (preferred)', (key) => `<${key}>`),
+    '<languagePolish> (B2), <languageJapanese> (preferred)',
+  )
 })
 
 test('salary periods from source/i18n constructions remain structured', () => {
