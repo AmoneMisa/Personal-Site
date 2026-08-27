@@ -10,19 +10,18 @@ withDefaults(defineProps<{
 </script>
 
 <template>
-  <div class="search-advanced-filters">
+  <div
+    class="search-advanced-filters"
+    :class="{ 'search-advanced-filters_open': open }"
+  >
     <div class="search-advanced-filters__toggle">
       <button
         type="button"
         class="search-advanced-filters__button"
-        :class="{ 'search-advanced-filters__button_open': open }"
         :aria-expanded="open"
         @click="open = !open"
       >
-        <u-icon
-          class="search-advanced-filters__icon"
-          :name="open ? 'i-lucide-chevron-up' : 'i-lucide-chevron-right'"
-        />
+        <u-icon :name="open ? 'i-lucide-chevron-up' : 'i-lucide-chevron-right'" />
         <span>{{ open ? (hideLabel || label) : label }}</span>
       </button>
     </div>
@@ -35,11 +34,22 @@ withDefaults(defineProps<{
 
 <style scoped>
 .search-advanced-filters {
-  grid-column: 1 / -1;
+  position: relative;
+  z-index: 3;
   display: grid;
-  width: 100%;
+  width: max-content;
+  max-width: calc(100% - 32px);
   min-width: 0;
   gap: 8px;
+  /* The toggle is rendered after .filter-card, while Reset lives in the card's
+     footer. Lift only the collapsed trigger onto that footer row. When opened,
+     the component returns to normal flow so the panel can expand naturally. */
+  margin: -54px 0 16px 16px;
+}
+.search-advanced-filters_open {
+  width: 100%;
+  max-width: none;
+  margin: 0;
 }
 .search-advanced-filters__toggle {
   display: flex;
@@ -50,46 +60,18 @@ withDefaults(defineProps<{
 .search-advanced-filters__button {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   min-width: 0;
-  min-height: 38px;
-  padding: 0 10px;
-  border: 1px solid transparent;
-  border-radius: 8px;
+  padding: 0;
+  border: 0;
   background: transparent;
-  color: rgba(230, 233, 248, 0.82);
+  color: var(--ui-text-muted);
   font-size: 13px;
-  font-weight: 700;
+  font-weight: 650;
   line-height: 1.25;
   cursor: pointer;
-  transition:
-    color 160ms ease,
-    background-color 160ms ease,
-    border-color 160ms ease;
 }
-.search-advanced-filters__icon {
-  flex: 0 0 auto;
-  color: rgba(205, 211, 239, 0.82);
-  font-size: 16px;
-  transition: color 160ms ease;
-}
-.search-advanced-filters__button:hover {
-  color: var(--text-white, #fff);
-  border-color: rgba(132, 119, 220, 0.28);
-  background: rgba(255, 255, 255, 0.045);
-}
-.search-advanced-filters__button:hover .search-advanced-filters__icon,
-.search-advanced-filters__button_open .search-advanced-filters__icon {
-  color: rgba(224, 191, 255, 0.96);
-}
-.search-advanced-filters__button_open {
-  color: var(--text-white, #fff);
-  background: rgba(128, 90, 245, 0.08);
-}
-.search-advanced-filters__button:focus-visible {
-  outline: 2px solid rgba(205, 153, 255, 0.72);
-  outline-offset: 2px;
-}
+.search-advanced-filters__button:hover { color: var(--text-white); }
 .search-advanced-filters__panel {
   position: relative;
   isolation: isolate;
@@ -137,16 +119,23 @@ withDefaults(defineProps<{
 }
 
 @media (max-width: 699px) {
+  .search-advanced-filters,
+  .search-advanced-filters_open {
+    width: 100%;
+    max-width: none;
+    margin: 0;
+  }
+
   .search-advanced-filters__toggle {
     margin-top: 2px;
-    padding-top: 12px;
+    padding: 12px 12px 0;
     border-top: 1px solid var(--line);
   }
 
   .search-advanced-filters__button {
     width: 100%;
     min-height: 44px;
-    padding: 0 8px;
+    padding: 0 2px;
     justify-content: flex-start;
     font-size: 14px;
   }
