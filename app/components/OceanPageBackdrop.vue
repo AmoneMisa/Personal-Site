@@ -49,7 +49,6 @@ const hasUnderwaterLife = computed(() => (
     <div class="ocean-page-backdrop__refract">
       <div class="ocean-page-backdrop__image" />
     </div>
-    <div v-if="hasUnderwaterLife" class="ocean-page-backdrop__stream" />
     <div v-if="hasUnderwaterLife" class="ocean-page-backdrop__water" />
     <div v-if="hasUnderwaterLife" class="ocean-page-backdrop__caustics ocean-page-backdrop__caustics_primary" />
     <div v-if="hasUnderwaterLife" class="ocean-page-backdrop__caustics ocean-page-backdrop__caustics_secondary" />
@@ -80,7 +79,6 @@ const hasUnderwaterLife = computed(() => (
 .ocean-page-backdrop__image,
 .ocean-page-backdrop__water,
 .ocean-page-backdrop__caustics,
-.ocean-page-backdrop__stream,
 .ocean-page-backdrop__vignette {
   position: absolute;
   inset: 0;
@@ -105,32 +103,6 @@ const hasUnderwaterLife = computed(() => (
 
 .ocean-page-backdrop_has-life .ocean-page-backdrop__refract {
   filter: url("#ocean-refraction");
-}
-
-/* The current itself: broad slow bands of brighter water sliding across the
-   scene, so the stream reads as moving even where the refraction is subtle. */
-.ocean-page-backdrop__stream {
-  z-index: 1;
-  opacity: .5;
-  mix-blend-mode: screen;
-  background:
-    repeating-linear-gradient(
-      104deg,
-      transparent 0 90px,
-      rgba(168, 224, 255, .05) 128px 168px,
-      transparent 210px 320px
-    ),
-    repeating-linear-gradient(
-      96deg,
-      transparent 0 150px,
-      rgba(206, 240, 255, .035) 190px 224px,
-      transparent 280px 430px
-    );
-  filter: blur(16px);
-  mask-image: linear-gradient(to bottom, #000 0%, rgba(0, 0, 0, .7) 62%, transparent 100%);
-  -webkit-mask-image: linear-gradient(to bottom, #000 0%, rgba(0, 0, 0, .7) 62%, transparent 100%);
-  animation: ocean-stream-flow 26s linear infinite;
-  will-change: transform;
 }
 
 /* The darkening and cold cast of being under the surface. Cheap, and it does
@@ -252,11 +224,6 @@ const hasUnderwaterLife = computed(() => (
   100% { transform: translate3d(3%, -.4%, 0) rotate(-.2deg) scale(1.04, 1.1); opacity: .22; }
 }
 
-@keyframes ocean-stream-flow {
-  0% { transform: translate3d(-14%, -4%, 0); }
-  100% { transform: translate3d(14%, 4%, 0); }
-}
-
 @keyframes ocean-lens-breathe {
   0% { opacity: .88; }
   100% { opacity: 1; }
@@ -284,14 +251,10 @@ const hasUnderwaterLife = computed(() => (
   }
 
   /* An animated SVG displacement over the whole viewport is too expensive to
-     justify on phones, and the drifting stream bands go with it. The vignette
-     stays, since it gives most of the underwater read for free. */
+     justify on phones. The vignette stays, since it gives most of the
+     underwater read for free. */
   .ocean-page-backdrop_has-life .ocean-page-backdrop__refract {
     filter: none;
-  }
-
-  .ocean-page-backdrop__stream {
-    display: none !important;
   }
 
   .ocean-page-backdrop__vignette {
@@ -307,7 +270,6 @@ const hasUnderwaterLife = computed(() => (
   .ocean-page-backdrop__image,
   .ocean-page-backdrop__water,
   .ocean-page-backdrop__caustics,
-  .ocean-page-backdrop__stream,
   .ocean-page-backdrop__vignette {
     animation: none;
   }
