@@ -15,21 +15,17 @@ test('shared OLX lookup opens from PostgreSQL and reserves source waits for expl
 
   assert.match(route, /if \(verifyLive && exactListingId && exactSource === 'olx' && exactCountryCode\)/)
   assert.match(route, /upstreamParams\.delete\('verifyLive'\)/)
+  assert.match(route, /EXACT_LOOKUP_TIMEOUT_MS = 8_000/)
   assert.match(route, /exactListingFallback:\s*'source-unavailable'/)
   assert.match(safeFetch, /timeout:\s*15000/)
 })
 
-test('cached feed filters OLX rows already persisted as inactive', () => {
-  assert.match(route, /\/api\/listings\/verify/)
-  assert.match(route, /result\?\.status !== 'active' && result\?\.status !== 'inactive'/)
-  assert.match(route, /filterPersistedInactiveOlx/)
-  assert.match(route, /availabilityFiltered:\s*removed/)
-  assert.match(route, /ACTIVE_AVAILABILITY_FRESH_MS = 60 \* 60_000/)
-  assert.match(route, /cached\?\.status === 'active'/)
-  assert.match(route, /availabilityCache\.delete\(key\)/)
-  assert.match(route, /Date\.parse\(String\(result\.checkedAt/)
-  assert.match(route, /availabilityChecked/)
-  assert.match(route, /const finalize = async \(raw: any\) => filterPersistedInactiveOlx/)
+test('main feed trusts persisted availability without a second blocking OLX batch', () => {
+  assert.doesNotMatch(route, /\/api\/listings\/verify/)
+  assert.doesNotMatch(route, /filterPersistedInactiveOlx/)
+  assert.doesNotMatch(route, /AVAILABILITY_TIMEOUT_MS/)
+  assert.match(route, /PostgreSQL already excludes rows persisted with `active = FALSE`/)
+  assert.match(route, /const finalize = async \(raw: any\) => withExactListingFallback/)
 })
 
 test('client opens OLX immediately and performs explicit live verification in the background', () => {

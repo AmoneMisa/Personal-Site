@@ -24,15 +24,12 @@ const UPSTREAM_TIMEOUT_MS = 25_000
 // path, so give only stats-only requests a larger budget instead of slowing the
 // listings feed itself.
 const STATS_UPSTREAM_TIMEOUT_MS = 55_000
-// A direct single-offer lookup should be faster than a country refresh. Keep it
-// below the main proxy budget so a broken OLX detail endpoint cannot hold the
-// share-link request open for the full feed timeout.
-const EXACT_LOOKUP_TIMEOUT_MS = 12_000
-const AVAILABILITY_TIMEOUT_MS = 5_000
-const ACTIVE_AVAILABILITY_FRESH_MS = 60 * 60_000
+// Live source verification is background-only and sits behind gateways with a
+// roughly ten-second request ceiling. Return an inconclusive result before that
+// ceiling instead of letting a slow OLX response turn into a user-visible 504.
+const EXACT_LOOKUP_TIMEOUT_MS = 8_000
 const feedCache = new Map<string, { at: number; data: any }>()
 const feedRefreshes = new Map<string, Promise<any>>()
-const availabilityCache = new Map<string, { at: number; status: 'active' }>()
 const ALL_FEED_SOURCES = ['olx', 'telegram', 'facebook', 'threads'] as const
 const SOCIAL_FEED_SOURCES = new Set(['telegram', 'facebook', 'threads'])
 
@@ -136,80 +133,6 @@ function shapeResponse(raw: any, requestedSources: string[]): any {
   return data
 }
 
-function availabilityKey(value: any): string {
-  return `${String(value?.source || '').toLowerCase()}:${String(value?.country || '').toUpperCase()}:${String(value?.id ?? '')}`
-}
-
-async function filterPersistedInactiveOlx(response: any): Promise<any> {
-  const listings = Array.isArray(response?.listings) ? response.listings : []
-  const unique = new Map<string, { source: string; country: string; id: string }>()
-
-  for (const listing of listings) {
-    const source = String(listing?.source || '').toLowerCase()
-    const country = String(listing?.country || '').toUpperCase()
-    const id = String(listing?.id ?? '').trim()
-    if (source !== 'olx' || !/^[A-Z]{2}$/.test(country) || !id) continue
-    unique.set(`${source}:${country}:${id}`, { source, country, id })
-  }
-
-  if (!unique.size) return response
-
-  const now = Date.now()
-  const statuses = new Map<string, 'active' | 'inactive'>()
-  const pending: Array<{ source: string; country: string; id: string }> = []
-  for (const [key, item] of unique) {
-    const cached = availabilityCache.get(key)
-    if (cached?.status === 'active' && now - cached.at < ACTIVE_AVAILABILITY_FRESH_MS) statuses.set(key, cached.status)
-    else pending.push(item)
-  }
-
-  const applyStatuses = () => {
-    const inactive = new Set([...statuses].filter(([, status]) => status === 'inactive').map(([key]) => key))
-    const availabilityChecked = [...statuses].filter(([, status]) => status === 'active').map(([key]) => key)
-    const filtered = listings.filter((listing: any) => !inactive.has(availabilityKey(listing)))
-    const removed = listings.length - filtered.length
-    const count = Number(response?.count)
-    return {
-      ...response,
-      listings: filtered,
-      count: Number.isFinite(count) ? Math.max(0, count - removed) : filtered.length,
-      ...(availabilityChecked.length ? { availabilityChecked } : {}),
-      ...(removed ? { availabilityFiltered: removed } : {}),
-    }
-  }
-
-  try {
-    if (pending.length) {
-      const verification = await $fetch<any>(`${FLAT_API_URL}/api/listings/verify`, {
-        method: 'POST',
-        body: { items: pending },
-        timeout: AVAILABILITY_TIMEOUT_MS,
-      })
-      for (const result of Array.isArray(verification?.results) ? verification.results : []) {
-        if (result?.status !== 'active' && result?.status !== 'inactive') continue
-        const key = availabilityKey(result)
-        statuses.set(key, result.status)
-        if (result.status === 'active') {
-          const checkedAt = Date.parse(String(result.checkedAt || ''))
-          availabilityCache.set(key, {
-            at: Number.isFinite(checkedAt) ? checkedAt : now,
-            status: 'active',
-          })
-        } else {
-          availabilityCache.delete(key)
-        }
-      }
-    }
-
-    return applyStatuses()
-  } catch {
-    // Availability reads are a safety filter, not a reason to take the feed down.
-    // Still apply fresh cached answers; the direct lookup below remains the
-    // fallback for a shared OLX link that has not been checked yet.
-    return applyStatuses()
-  }
-}
-
 /** How long a cached answer may still be served: empty ones expire quickly. */
 function staleWindow(entry: { data: any } | undefined): number {
   const listings = entry?.data?.listings
@@ -297,11 +220,6 @@ export default defineEventHandler(async (event) => {
         { timeout: EXACT_LOOKUP_TIMEOUT_MS },
       )
       if (exact?.listing && String(exact.listing.id ?? '') === exactListingId) {
-        const checkedAt = Date.parse(String(exact.availability?.checkedAt || ''))
-        availabilityCache.set(availabilityKey(exact.listing), {
-          at: Number.isFinite(checkedAt) ? checkedAt : Date.now(),
-          status: 'active',
-        })
         return {
           count: 1,
           listings: [shapeListing(exact.listing)],
@@ -312,7 +230,6 @@ export default defineEventHandler(async (event) => {
     } catch (error: any) {
       const status = Number(error?.statusCode || error?.response?.status || 0)
       if (status === 404) {
-        availabilityCache.delete(`olx:${exactCountryCode}:${exactListingId}`)
         return { count: 0, listings: [], exactListingFallback: 'source-inactive' }
       }
       // A timeout or temporary source failure is inconclusive. The client may
@@ -372,8 +289,13 @@ export default defineEventHandler(async (event) => {
     return response
   }
 
-  const finalize = async (raw: any) => filterPersistedInactiveOlx(
-    await withExactListingFallback(await shapeWithCombinedFallback(raw)),
+  // PostgreSQL already excludes rows persisted with `active = FALSE`. Waiting
+  // for another source-verification batch here added up to five seconds after
+  // every cold database query and pushed otherwise successful feeds past the
+  // gateway timeout. The backend availability sweep owns persisted state; an
+  // explicit background `verifyLive` request still checks an opened OLX advert.
+  const finalize = async (raw: any) => withExactListingFallback(
+    await shapeWithCombinedFallback(raw),
   )
 
   const cached = feedCache.get(key)
