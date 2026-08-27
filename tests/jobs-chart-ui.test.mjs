@@ -56,10 +56,13 @@ test('analytics panel header is clickable outside its nested controls', () => {
 test('boolean search controls use toggle switches without changing ordinary checkboxes elsewhere', () => {
   assert.match(filterControl, /<u-switch/u)
   assert.match(checkbox, /variant\?: "checkbox" \| "switch"/u)
-  assert.match(checkbox, /:role="variant === 'switch' \? 'switch' : undefined"/u)
-  assert.match(checkbox, /class="cb__switch"/u)
+  // The switch variant renders through USwitch rather than a hand-rolled track,
+  // so the switch role and thumb animation come from Nuxt UI, not from here.
+  assert.match(checkbox, /<u-switch/u)
+  assert.match(checkbox, /class="cb__ui-switch"/u)
+  // Anything that has not opted in still gets the plain checkbox visual.
+  assert.match(checkbox, /variant: "checkbox",/u)
   assert.match(checkbox, /class="cb__box"/u)
-  assert.match(checkbox, /translateX\(14px\)/u)
 })
 
 test('metadata-driven vacancy filter icons are included in the offline icon bundle', () => {
