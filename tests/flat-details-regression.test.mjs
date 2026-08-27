@@ -47,8 +47,13 @@ test("full-screen photo zoom is click-driven", async () => {
   assert.match(source, /function toggleZoom\(event: MouseEvent\)/);
 });
 
-test("frontend has an internal AI worker route for translation", async () => {
+test("flat description translation remains wired to the AI worker", async () => {
   const compose = await read("docker-compose.yml");
+  const translation = await read("app/composables/flats/useFlatTranslation.ts");
+  const route = await read("server/routes/flats-translate.post.ts");
   assert.match(compose, /AI_WORKER_URL: \$\{AI_WORKER_URL:-http:\/\/ai-worker:4030\}/);
   assert.match(compose, /- ai-net/);
+  assert.match(translation, /safeFetch<FlatTranslationResult>\("\/flats-translate"/);
+  assert.match(route, /requestAiWorker<TranslationResponse>\('\/ai\/extract'/);
+  assert.match(route, /kind: 'translation'/);
 });
