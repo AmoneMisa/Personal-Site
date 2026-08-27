@@ -31,6 +31,7 @@ const EXACT_LOOKUP_TIMEOUT_MS = 8_000
 const feedCache = new Map<string, { at: number; data: any }>()
 const feedRefreshes = new Map<string, Promise<any>>()
 const ALL_FEED_SOURCES = ['olx', 'telegram', 'facebook', 'threads'] as const
+const CURRENT_ALL_SOURCE_TOKENS = [...ALL_FEED_SOURCES, 'custom'] as const
 const SOCIAL_FEED_SOURCES = new Set(['telegram', 'facebook', 'threads'])
 
 function rewritePhoto(p: unknown): unknown {
@@ -184,9 +185,11 @@ function findCachedExactListing(listingId: string, source: string, country: stri
 
 export default defineEventHandler(async (event) => {
   const incoming = getRequestURL(event)
-  const rawRequestedSources = (incoming.searchParams.get('sources') || '')
+  const requestedSourceTokens = (incoming.searchParams.get('sources') || '')
     .split(',')
     .map((source) => source.trim().toLowerCase())
+    .filter(Boolean)
+  const rawRequestedSources = requestedSourceTokens
     .filter((source) => ALL_FEED_SOURCES.includes(source as typeof ALL_FEED_SOURCES[number]))
 
   // The current web UI historically sent `olx,telegram` to mean "all" because
@@ -196,10 +199,15 @@ export default defineEventHandler(async (event) => {
   const legacyAllSources = rawRequestedSources.length === 2
     && rawRequestedSources.includes('olx')
     && rawRequestedSources.includes('telegram')
-  const requestedSources = legacyAllSources ? [] : rawRequestedSources
+  const currentAllSources = CURRENT_ALL_SOURCE_TOKENS.every((source) => requestedSourceTokens.includes(source))
+  const allSourcesRequest = legacyAllSources || currentAllSources
+  const requestedSources = allSourcesRequest ? [] : rawRequestedSources
 
   const upstreamParams = new URLSearchParams(incoming.searchParams)
-  if (legacyAllSources) upstreamParams.delete('sources')
+  // An explicit list containing every UI source is semantically identical to
+  // no source filter. Removing it lets PostgreSQL use its optimized default-feed
+  // query instead of applying a redundant five-value filter on every row.
+  if (allSourcesRequest) upstreamParams.delete('sources')
   const metro = upstreamParams.get('metro')
   if (metro) upstreamParams.set('metro', canonicalMetroValue(metro))
 
