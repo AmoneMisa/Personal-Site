@@ -3,6 +3,7 @@
 // Flat Finder parsing belongs to @whiteslove/parsing-lexicon/backend ingestion;
 // this component only presents normalized listing fields.
 import { computed, ref } from "vue";
+import { localizeJobLanguageList } from "~/utils/jobs/languageLabel";
 
 export interface SpecRow {
   label: string;
@@ -130,6 +131,10 @@ function displayLabel(row: SpecRow): string {
 function displayValue(row: SpecRow): string {
   if (!isJobs.value) return row.value;
 
+  if (row.label === t("jobs.vLanguages") || row.label === t("jobs.vApplicationLanguage")) {
+    return localizeJobLanguageList(row.value, (key) => t(`jobs.${key}`));
+  }
+
   // Older enriched vacancies persisted human-readable English labels instead of
   // enum codes. Localize those legacy values at render time so saved/cache data
   // is fixed immediately without requiring a full jobs re-ingestion.
@@ -147,12 +152,6 @@ function displayValue(row: SpecRow): string {
     [/\bpreferred\b/gi, t("jobs.requirementPreferred")],
     [/\bnot required\b|\bnotRequired\b/gi, t("jobs.requirementNotRequired")],
     [/\bPrototyping\b/gi, t("jobs.skillPrototyping")],
-    [/\bEnglish\b/gi, t("jobs.languageEnglish")],
-    [/\bRussian\b/gi, t("jobs.languageRussian")],
-    [/\bUkrainian\b/gi, t("jobs.languageUkrainian")],
-    [/\bRomanian\b/gi, t("jobs.languageRomanian")],
-    [/\bUzbek\b/gi, t("jobs.languageUzbek")],
-    [/\bKazakh\b/gi, t("jobs.languageKazakh")],
   ];
 
   return replacements.reduce((value, [pattern, replacement]) => value.replace(pattern, replacement), row.value);
