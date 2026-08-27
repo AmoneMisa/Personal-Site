@@ -3,10 +3,7 @@ FROM node:24-bookworm-slim AS deps
 WORKDIR /app
 
 COPY package.json package-lock.json ./
-# package-lock can lag the intentionally pinned parsing-lexicon revision.
-# npm install preserves the existing lock for unchanged dependencies while
-# reconciling that explicit package.json pin before the build.
-RUN npm install --no-audit --no-fund
+RUN npm ci --no-audit --no-fund
 
 FROM node:24-bookworm-slim AS build
 
