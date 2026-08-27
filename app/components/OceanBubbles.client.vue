@@ -1,5 +1,11 @@
 <script setup lang="ts">
 import { nextTick, onBeforeUnmount, onMounted, ref } from "vue";
+import {
+  publishBubbleField,
+  registerBubblePopper,
+  resetBubbleField,
+  type BubbleProbe,
+} from "~/composables/useOceanBubbleField";
 
 const canvasRef = ref<HTMLCanvasElement | null>(null);
 
@@ -36,6 +42,9 @@ let running = false;
 let reducedMotion: MediaQueryList | null = null;
 let bubbles: Bubble[] = [];
 let bursts: Burst[] = [];
+// Resolved on-screen positions handed to the swimmers each frame. Kept separate
+// from `bubbles` because the drawn x includes the drift wobble.
+let probes: BubbleProbe[] = [];
 
 const random = (min: number, max: number) => min + Math.random() * (max - min);
 
@@ -171,12 +180,23 @@ function frame(now: number) {
   last = now;
   ctx.clearRect(0, 0, width, height);
 
-  for (const bubble of bubbles) {
+  if (probes.length !== bubbles.length) probes = bubbles.map(() => ({ x: 0, y: 0, radius: 0 }));
+
+  for (let i = 0; i < bubbles.length; i += 1) {
+    const bubble = bubbles[i]!;
     bubble.y -= bubble.speed * dt;
     bubble.x += Math.sin(now * 0.00018 + bubble.phase) * 0.7 * dt;
     if (bubble.y < -bubble.radius * 3) resetBubble(bubble);
     drawBubble(bubble, now);
+
+    const probe = probes[i]!;
+    probe.x = bubbleX(bubble, now);
+    probe.y = bubble.y;
+    probe.radius = bubble.radius;
   }
+
+  // Let the mascots see where the bubbles ended up this frame.
+  publishBubbleField(probes);
 
   for (let i = bursts.length - 1; i >= 0; i -= 1) {
     const burst = bursts[i]!;
@@ -191,24 +211,34 @@ function frame(now: number) {
   raf = requestAnimationFrame(frame);
 }
 
-function handlePointerDown(event: PointerEvent) {
-  if (reducedMotion?.matches) return;
+/**
+ * Burst the bubble nearest a point. `slack` widens the hit radius, which is how
+ * a mascot swallowing a bubble reaches it without having to land on it exactly.
+ */
+function popNearest(x: number, y: number, slack: number) {
+  if (reducedMotion?.matches) return false;
   const now = performance.now();
   let best: Bubble | null = null;
   let bestDistance = Number.POSITIVE_INFINITY;
 
   for (const bubble of bubbles) {
-    const dx = bubbleX(bubble, now) - event.clientX;
-    const dy = bubble.y - event.clientY;
+    const dx = bubbleX(bubble, now) - x;
+    const dy = bubble.y - y;
     const distance = Math.hypot(dx, dy);
-    const hitRadius = Math.max(13, bubble.radius + 8);
+    const hitRadius = Math.max(13, bubble.radius + slack);
     if (distance <= hitRadius && distance < bestDistance) {
       best = bubble;
       bestDistance = distance;
     }
   }
 
-  if (best) popBubble(best, now);
+  if (!best) return false;
+  popBubble(best, now);
+  return true;
+}
+
+function handlePointerDown(event: PointerEvent) {
+  popNearest(event.clientX, event.clientY, 8);
 }
 
 function start() {
@@ -223,6 +253,9 @@ function stop(clear = false) {
   if (raf) cancelAnimationFrame(raf);
   raf = 0;
   if (clear) ctx?.clearRect(0, 0, width, height);
+  // Nothing is publishing positions while stopped, so drop the field rather
+  // than leave the mascots steering toward bubbles that are no longer drawn.
+  publishBubbleField([]);
 }
 
 function syncState() {
@@ -241,6 +274,7 @@ onMounted(async () => {
   window.addEventListener("resize", handleResize, { passive: true });
   window.addEventListener("pointerdown", handlePointerDown, { passive: true });
   document.addEventListener("visibilitychange", syncState);
+  registerBubblePopper(popNearest);
   await nextTick();
   mountRaf = requestAnimationFrame(() => {
     mountRaf = 0;
@@ -258,6 +292,8 @@ onBeforeUnmount(() => {
   document.removeEventListener("visibilitychange", syncState);
   bubbles = [];
   bursts = [];
+  probes = [];
+  resetBubbleField();
   ctx = null;
 });
 </script>

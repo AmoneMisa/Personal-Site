@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { nextTick, onBeforeUnmount, onMounted } from "vue";
+import { nextTick, onBeforeUnmount, onMounted, ref } from "vue";
+import { nearestBubble, popBubbleAt } from "~/composables/useOceanBubbleField";
 import {
   aquariumCreatures as creatures,
   bodyAnimationBase,
@@ -42,6 +43,17 @@ type CreatureState = {
   active: boolean;
   jellyExit: boolean;
   pointerMode: PointerMode;
+  /** Rises when a bubble is chased or dodged, decays back to 0. Drives the tell. */
+  bubbleFocus: number;
+  nextBubblePopAt: number;
+  trail: TrailPoint[];
+};
+
+type TrailPoint = {
+  x: number;
+  y: number;
+  /** 1 when laid down, fades to 0; the point is dropped when it reaches 0. */
+  life: number;
 };
 
 type PointerSteering = {
@@ -75,6 +87,105 @@ let nextHuntAt = 0;
 
 const clamp = (value: number, min: number, max: number) => Math.max(min, Math.min(max, value));
 const randomBetween = (min: number, max: number) => min + Math.random() * (max - min);
+
+// ---------------------------------------------------------------- light trails
+
+const trailCanvas = ref<HTMLCanvasElement | null>(null);
+let trailCtx: CanvasRenderingContext2D | null = null;
+let trailDpr = 1;
+
+const TRAIL_MAX_POINTS = 26;
+// Seconds a point stays visible. Short, so the wake reads as disturbed water
+// rather than a drawn line following the mascot around.
+const TRAIL_LIFETIME = 0.72;
+// Below this speed a mascot is hovering, and a wake would look wrong.
+const TRAIL_MIN_SPEED = 26;
+
+// Per-kind tint, matching each mascot's own palette so the wake reads as light
+// coming off that animal rather than a generic glow.
+const trailTints: Record<string, [number, number, number]> = {
+  shark: [122, 196, 255],
+  puffer: [255, 226, 132],
+  fish: [128, 214, 255],
+  seahorse: [186, 150, 255],
+  jelly: [255, 158, 224],
+};
+
+function configureTrailCanvas() {
+  const canvas = trailCanvas.value;
+  if (!canvas) return;
+  trailDpr = Math.min(window.devicePixelRatio || 1, 1.5);
+  canvas.width = Math.max(1, Math.round(viewportWidth * trailDpr));
+  canvas.height = Math.max(1, Math.round(viewportHeight * trailDpr));
+  canvas.style.width = `${viewportWidth}px`;
+  canvas.style.height = `${viewportHeight}px`;
+  trailCtx = canvas.getContext("2d", { alpha: true });
+  trailCtx?.setTransform(trailDpr, 0, 0, trailDpr, 0, 0);
+}
+
+function recordTrail(state: CreatureState, now: number, dt: number) {
+  const points = state.trail;
+
+  for (let i = points.length - 1; i >= 0; i -= 1) {
+    const point = points[i]!;
+    point.life -= dt / TRAIL_LIFETIME;
+    if (point.life <= 0) points.splice(i, 1);
+  }
+
+  const visible = state.active && state.hiddenUntil <= now && !state.jellyExit;
+  if (!visible) return;
+  if (Math.hypot(state.vx, state.vy) < TRAIL_MIN_SPEED) return;
+
+  // Trail from just behind the body, so it emerges from the tail rather than
+  // the centre of the sprite.
+  const x = state.x + state.width * (0.5 - state.facing * 0.3);
+  const y = state.y + state.height * 0.52;
+  const head = points[points.length - 1];
+  // One point per ~7px of travel keeps the stroke smooth without hoarding
+  // points when a mascot is sprinting.
+  if (head && Math.hypot(x - head.x, y - head.y) < 7) return;
+
+  points.push({ x, y, life: 1 });
+  if (points.length > TRAIL_MAX_POINTS) points.shift();
+}
+
+function drawTrails() {
+  const ctx = trailCtx;
+  if (!ctx) return;
+
+  ctx.clearRect(0, 0, viewportWidth, viewportHeight);
+  ctx.globalCompositeOperation = "lighter";
+  ctx.lineCap = "round";
+  ctx.lineJoin = "round";
+
+  for (const state of creatureStates.values()) {
+    const points = state.trail;
+    if (points.length < 2) continue;
+    const tint = trailTints[state.preset.kind] ?? trailTints.fish!;
+    const [r, g, b] = tint;
+    const width = Math.max(3, state.height * 0.13);
+
+    // Segment by segment, because both the alpha and the width taper along the
+    // wake and a single stroked path cannot do that.
+    for (let i = 1; i < points.length; i += 1) {
+      const from = points[i - 1]!;
+      const to = points[i]!;
+      // Older points are both fainter and thinner.
+      const life = (from.life + to.life) * 0.5;
+      const along = i / points.length;
+      const alpha = life * life * 0.3 * state.preset.opacity;
+      if (alpha < 0.004) continue;
+      ctx.strokeStyle = `rgba(${r},${g},${b},${alpha.toFixed(4)})`;
+      ctx.lineWidth = width * (0.25 + along * 0.75) * life;
+      ctx.beginPath();
+      ctx.moveTo(from.x, from.y);
+      ctx.lineTo(to.x, to.y);
+      ctx.stroke();
+    }
+  }
+
+  ctx.globalCompositeOperation = "source-over";
+}
 
 function bindSwimmer(id: string, element: unknown) {
   if (element instanceof HTMLElement) swimmerElements.set(id, element);
@@ -157,6 +268,9 @@ function makeState(preset: CreaturePreset, element: HTMLElement, index: number):
     active: false,
     jellyExit: false,
     pointerMode: "none",
+    bubbleFocus: 0,
+    nextBubblePopAt: 0,
+    trail: [],
   };
 }
 
@@ -327,6 +441,7 @@ function renderState(state: CreatureState, now = performance.now()) {
   state.element.style.setProperty("--facing-scale", String(state.facing));
   state.element.style.setProperty("--body-duration", `${bodyAnimationBase[state.preset.kind]}s`);
   state.element.style.setProperty("--inflation", inflation.toFixed(3));
+  state.element.style.setProperty("--bubble-focus", state.bubbleFocus.toFixed(3));
   state.element.dataset.mood = state.mood;
   state.element.dataset.behavior = state.preset.kind === "jelly"
     ? "cruise"
@@ -478,6 +593,56 @@ function relationshipSteering(state: CreatureState, profile: SteeringProfile): P
   };
 }
 
+/**
+ * Steering toward (or away from) the nearest rising bubble.
+ *
+ * This is deliberately weaker than pointer and hunt steering: bubbles are
+ * scenery, and a mascot that abandoned everything to chase one would read as
+ * broken rather than playful. Fish and seahorses drift over and burst them,
+ * the puffer flinches away, the shark barely notices, and jellyfish ignore
+ * bubbles entirely.
+ */
+function bubbleSteering(state: CreatureState, profile: SteeringProfile, now: number): PointerSteering {
+  const idle = { x: 0, y: 0, fear: 0, interest: 0, mode: "none" as PointerMode };
+  if (!profile.bubbleInterest || state.inflatedExit || state.jellyExit) return idle;
+  // A mascot already fleeing the cursor or a shark has bigger problems.
+  if (state.fear > 0.35 || state.pointerMode === "panic") return idle;
+
+  const cx = state.x + state.width * 0.5;
+  const cy = state.y + state.height * 0.5;
+  const bubble = nearestBubble(cx, cy, profile.bubbleRadius);
+  if (!bubble) return idle;
+
+  const dx = bubble.x - cx;
+  const dy = bubble.y - cy;
+  const distance = Math.max(1, Math.hypot(dx, dy));
+  // Closer bubbles pull harder, so a mascot commits as it arrives instead of
+  // being tugged equally by everything in range.
+  const proximity = 1 - distance / profile.bubbleRadius;
+  const sign = Math.sign(profile.bubbleInterest);
+  const strength = Math.abs(profile.bubbleInterest) * proximity;
+
+  if (sign > 0) {
+    // Close enough to swallow it. The cooldown stops a mascot sitting inside a
+    // bubble stream and clearing the whole screen.
+    const reach = Math.max(18, state.width * 0.28);
+    if (distance < reach && now >= state.nextBubblePopAt && popBubbleAt(bubble.x, bubble.y, reach)) {
+      state.nextBubblePopAt = now + randomBetween(900, 2100);
+      state.bubbleFocus = 1;
+    }
+  }
+
+  state.bubbleFocus = Math.max(state.bubbleFocus, strength * (sign > 0 ? 0.85 : 1));
+
+  return {
+    x: (dx / distance) * profile.cruiseSpeed * 0.55 * strength * sign,
+    y: (dy / distance) * profile.verticalSpeed * 1.15 * strength * sign,
+    fear: 0,
+    interest: sign > 0 ? Math.min(0.5, strength) : 0,
+    mode: "none",
+  };
+}
+
 function maybeChooseNewDirection(
   state: CreatureState,
   profile: SteeringProfile,
@@ -546,6 +711,11 @@ function updateState(state: CreatureState, now: number, dt: number) {
   const pointer = pointerSteering(state, profile, now);
   state.pointerMode = pointer.mode;
   const social = relationshipSteering(state, profile);
+  // Bubbles only get a say when nothing more urgent is steering the mascot.
+  const bubble = social.mode === "none" && pointer.mode === "none"
+    ? bubbleSteering(state, profile, now)
+    : { x: 0, y: 0, fear: 0, interest: 0, mode: "none" as PointerMode };
+  state.bubbleFocus = Math.max(0, state.bubbleFocus - dt * 1.1);
 
   if (pointer.mode === "interest" && now >= state.turnLockUntil) {
     const cx = state.x + state.width * 0.5;
@@ -563,7 +733,7 @@ function updateState(state: CreatureState, now: number, dt: number) {
   maybeChooseNewDirection(state, profile, now, pointer);
 
   const combinedFear = Math.max(pointer.fear, social.fear);
-  const combinedInterest = Math.max(pointer.interest, social.interest);
+  const combinedInterest = Math.max(pointer.interest, social.interest, bubble.interest);
   const fearResponse = combinedFear > state.fear ? 6.2 : 1.6;
   const interestResponse = combinedInterest > state.interest ? 1.6 : 2.2;
   state.fear += (combinedFear - state.fear) * Math.min(1, dt * fearResponse);
@@ -578,8 +748,8 @@ function updateState(state: CreatureState, now: number, dt: number) {
   const boostedCruise = profile.cruiseSpeed * (1 + state.fear * profile.fearBoost);
   const interestedCruise = boostedCruise * (1 - state.interest * 0.56);
 
-  let desiredVx = state.direction * interestedCruise + pointer.x + social.x;
-  let desiredVy = wander * (1 - state.interest * 0.35) + homePull + pointer.y + social.y;
+  let desiredVx = state.direction * interestedCruise + pointer.x + social.x + bubble.x;
+  let desiredVy = wander * (1 - state.interest * 0.35) + homePull + pointer.y + social.y + bubble.y;
 
   if (state.inflatedExit) {
     desiredVx = state.direction * profile.maxSpeed * 1.45;
@@ -633,7 +803,11 @@ function animate(now: number) {
   }
 
   updateHunt(now);
-  for (const state of creatureStates.values()) updateState(state, now, dt);
+  for (const state of creatureStates.values()) {
+    updateState(state, now, dt);
+    recordTrail(state, now, dt);
+  }
+  drawTrails();
   animationRaf = requestAnimationFrame(animate);
 }
 
@@ -647,6 +821,8 @@ function stopAnimation() {
   if (animationRaf) cancelAnimationFrame(animationRaf);
   animationRaf = 0;
   lastFrameTime = 0;
+  for (const state of creatureStates.values()) state.trail.length = 0;
+  trailCtx?.clearRect(0, 0, viewportWidth, viewportHeight);
 }
 
 function handlePointerMove(event: PointerEvent) {
@@ -733,8 +909,11 @@ function handleResize() {
 
   for (const state of creatureStates.values()) {
     state.x *= widthRatio;
+    state.trail.length = 0;
     refreshCreatureSize(state.preset.id);
   }
+
+  configureTrailCanvas();
 }
 
 function handleMotionPreference() {
@@ -766,6 +945,7 @@ onMounted(async () => {
   await nextTick();
   mountRaf = requestAnimationFrame(() => {
     mountRaf = 0;
+    configureTrailCanvas();
     initializeStates();
     startAnimation();
   });
@@ -782,11 +962,13 @@ onBeforeUnmount(() => {
   reducedMotion?.removeEventListener?.("change", handleMotionPreference);
   swimmerElements.clear();
   creatureStates.clear();
+  trailCtx = null;
 });
 </script>
 
 <template>
   <div class="underwater-2d" aria-hidden="true">
+    <canvas ref="trailCanvas" class="underwater-2d__trails" />
     <div
       v-for="creature in creatures"
       :key="creature.id"
@@ -824,10 +1006,25 @@ onBeforeUnmount(() => {
   contain: strict;
 }
 
+.underwater-2d__trails {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  /* Screen keeps the wake reading as light in the water rather than paint on
+     top of it, so it disappears against the darker parts of the backdrop. */
+  mix-blend-mode: screen;
+  opacity: 0.85;
+}
+
 .underwater-2d__swimmer {
   --inflation: 0;
   --facing-scale: 1;
   --body-duration: 2.2s;
+  --bubble-focus: 0;
   position: absolute;
   top: 0;
   left: 0;
@@ -841,6 +1038,11 @@ onBeforeUnmount(() => {
   width: 100%;
   transform-origin: center;
   will-change: transform;
+  /* A mascot that has noticed a bubble catches a little more light and leans
+     in. Driven from JS via --bubble-focus, which decays back to 0. */
+  transform: scale(calc(1 + var(--bubble-focus) * 0.045));
+  filter: brightness(calc(1 + var(--bubble-focus) * 0.16))
+    drop-shadow(0 0 calc(var(--bubble-focus) * 12px) rgba(186, 235, 255, calc(var(--bubble-focus) * 0.5)));
 }
 
 .underwater-2d__swimmer {

@@ -29,6 +29,14 @@ export type SteeringProfile = {
   turnChance: number;
   decisionMin: number;
   decisionMax: number;
+  /**
+   * How the mascot feels about a rising bubble. Positive chases it (and bursts
+   * it on contact), negative shies away, zero ignores bubbles entirely. The
+   * magnitude scales the steering force, so it doubles as the strength.
+   */
+  bubbleInterest: number;
+  /** How close a bubble has to be, in px, before it is noticed at all. */
+  bubbleRadius: number;
 };
 
 export const MAX_VISIBLE_PETS = 4;
@@ -44,11 +52,11 @@ export const aquariumCreatures: CreaturePreset[] = [
 ];
 
 export const steeringProfiles: Record<CreatureKind, SteeringProfile> = {
-  shark: { cruiseSpeed: 48, maxSpeed: 94, steering: 1.35, verticalSpeed: 13, wanderFrequency: 0.62, cursorRadius: 300, evadeVertical: 118, evadeForward: 38, fearBoost: 0.5, curiosity: 0.36, interestRadius: 470, interestDistance: 170, turnChance: 0.18, decisionMin: 10, decisionMax: 20 },
-  puffer: { cruiseSpeed: 31, maxSpeed: 68, steering: 2.1, verticalSpeed: 18, wanderFrequency: 0.74, cursorRadius: 250, evadeVertical: 132, evadeForward: 30, fearBoost: 0.62, curiosity: 0.72, interestRadius: 410, interestDistance: 115, turnChance: 0.34, decisionMin: 7, decisionMax: 14 },
-  fish: { cruiseSpeed: 36, maxSpeed: 78, steering: 2.25, verticalSpeed: 20, wanderFrequency: 0.82, cursorRadius: 255, evadeVertical: 138, evadeForward: 34, fearBoost: 0.7, curiosity: 0.7, interestRadius: 420, interestDistance: 110, turnChance: 0.28, decisionMin: 7, decisionMax: 15 },
-  seahorse: { cruiseSpeed: 22, maxSpeed: 50, steering: 1.65, verticalSpeed: 22, wanderFrequency: 0.5, cursorRadius: 220, evadeVertical: 102, evadeForward: 20, fearBoost: 0.36, curiosity: 0.56, interestRadius: 350, interestDistance: 105, turnChance: 0.16, decisionMin: 11, decisionMax: 21 },
-  jelly: { cruiseSpeed: 18, maxSpeed: 38, steering: 1.05, verticalSpeed: 25, wanderFrequency: 0.39, cursorRadius: 190, evadeVertical: 54, evadeForward: 10, fearBoost: 0.12, curiosity: 0.18, interestRadius: 280, interestDistance: 120, turnChance: 0.08, decisionMin: 15, decisionMax: 28 },
+  shark: { cruiseSpeed: 48, maxSpeed: 94, steering: 1.35, verticalSpeed: 13, wanderFrequency: 0.62, cursorRadius: 300, evadeVertical: 118, evadeForward: 38, fearBoost: 0.5, curiosity: 0.36, interestRadius: 470, interestDistance: 170, turnChance: 0.18, decisionMin: 10, decisionMax: 20, bubbleInterest: 0.25, bubbleRadius: 190 },
+  puffer: { cruiseSpeed: 31, maxSpeed: 68, steering: 2.1, verticalSpeed: 18, wanderFrequency: 0.74, cursorRadius: 250, evadeVertical: 132, evadeForward: 30, fearBoost: 0.62, curiosity: 0.72, interestRadius: 410, interestDistance: 115, turnChance: 0.34, decisionMin: 7, decisionMax: 14, bubbleInterest: -0.85, bubbleRadius: 210 },
+  fish: { cruiseSpeed: 36, maxSpeed: 78, steering: 2.25, verticalSpeed: 20, wanderFrequency: 0.82, cursorRadius: 255, evadeVertical: 138, evadeForward: 34, fearBoost: 0.7, curiosity: 0.7, interestRadius: 420, interestDistance: 110, turnChance: 0.28, decisionMin: 7, decisionMax: 15, bubbleInterest: 1, bubbleRadius: 260 },
+  seahorse: { cruiseSpeed: 22, maxSpeed: 50, steering: 1.65, verticalSpeed: 22, wanderFrequency: 0.5, cursorRadius: 220, evadeVertical: 102, evadeForward: 20, fearBoost: 0.36, curiosity: 0.56, interestRadius: 350, interestDistance: 105, turnChance: 0.16, decisionMin: 11, decisionMax: 21, bubbleInterest: 0.55, bubbleRadius: 200 },
+  jelly: { cruiseSpeed: 18, maxSpeed: 38, steering: 1.05, verticalSpeed: 25, wanderFrequency: 0.39, cursorRadius: 190, evadeVertical: 54, evadeForward: 10, fearBoost: 0.12, curiosity: 0.18, interestRadius: 280, interestDistance: 120, turnChance: 0.08, decisionMin: 15, decisionMax: 28, bubbleInterest: 0, bubbleRadius: 0 },
 };
 
 export const bodyAnimationBase: Record<CreatureKind, number> = {

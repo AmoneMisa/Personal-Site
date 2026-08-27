@@ -374,11 +374,31 @@ test('underwater ambience uses the original cleaned mascots and visible bubbles'
   assert.doesNotMatch(creatures, /underwater-creatures\.svg|underwater-2d__crop|creatureLayerSrc/u)
   const nuxtConfig = readFileSync(new URL('../nuxt.config.ts', import.meta.url), 'utf8')
   assert.doesNotMatch(nuxtConfig, /ocean-creature-rig/u)
+  // The bubble layer publishes where its bubbles are, and the mascots steer on
+  // that. Losing either half leaves the reaction silently dead.
+  assert.match(bubbles, /publishBubbleField/u)
+  assert.match(bubbles, /registerBubblePopper/u)
+  assert.match(ambient, /nearestBubble/u)
+  assert.match(ambient, /popBubbleAt/u)
+  assert.match(ambient, /bubbleSteering/u)
+  assert.match(config, /bubbleInterest/u)
+  // Jellyfish ignore bubbles; the puffer flinches away rather than chasing.
+  assert.match(config, /jelly: \{[^}]*bubbleInterest: 0,/u)
+  assert.match(config, /puffer: \{[^}]*bubbleInterest: -/u)
+  // Light trails behind the swimmers.
+  assert.match(ambient, /underwater-2d__trails/u)
+  assert.match(ambient, /drawTrails/u)
+  assert.match(ambient, /mix-blend-mode: screen/u)
   assert.match(bubbles, /return 42/u)
   assert.match(bubbles, /opacity: 0\.92/u)
   assert.doesNotMatch(bubbles, /mix-blend-mode: screen/u)
   const backdrop = readFileSync(new URL('../app/components/OceanPageBackdrop.vue', import.meta.url), 'utf8')
   const crab = readFileSync(new URL('../app/components/HeaderCrab.client.vue', import.meta.url), 'utf8')
+  // Underwater stream: the scene refracts, and the current drifts across it.
+  assert.match(backdrop, /ocean-refraction/u)
+  assert.match(backdrop, /feTurbulence/u)
+  assert.match(backdrop, /feDisplacementMap/u)
+  assert.match(backdrop, /ocean-page-backdrop__stream/u)
   assert.match(backdrop, /<header-crab/u)
   assert.match(crab, /header-crab-animated\.webp/u)
   assert.match(crab, /header-crab-scamper/u)

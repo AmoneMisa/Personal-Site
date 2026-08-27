@@ -17,13 +17,42 @@ const hasUnderwaterLife = computed(() => props.variant === "reef" || props.varia
     ]"
     aria-hidden="true"
   >
-    <div class="ocean-page-backdrop__image" />
+    <!-- Looking through moving water: a turbulence displacement warps the scene
+         itself, so the reef bends and settles the way it does when you open
+         your eyes underwater. Only the backdrop is warped — the mascots stay
+         crisp, both because they are the subject and because filtering them
+         would fight their own animation. -->
+    <svg v-if="hasUnderwaterLife" class="ocean-page-backdrop__filter-defs" aria-hidden="true" focusable="false">
+      <defs>
+        <filter id="ocean-refraction" x="-8%" y="-8%" width="116%" height="116%" color-interpolation-filters="sRGB">
+          <!-- Generated once and reused; only the displacement scale animates,
+               which is far cheaper than regenerating the noise every frame. -->
+          <feTurbulence
+            type="fractalNoise"
+            base-frequency="0.008 0.017"
+            num-octaves="2"
+            seed="7"
+            stitch-tiles="stitch"
+            result="stream"
+          />
+          <feDisplacementMap in="SourceGraphic" in2="stream" x-channel-selector="R" y-channel-selector="G" scale="14">
+            <animate attributeName="scale" values="9;20;9" dur="15s" repeatCount="indefinite" calcMode="spline" key-times="0;0.5;1" key-splines="0.4 0 0.6 1; 0.4 0 0.6 1" />
+          </feDisplacementMap>
+        </filter>
+      </defs>
+    </svg>
+
+    <div class="ocean-page-backdrop__refract">
+      <div class="ocean-page-backdrop__image" />
+    </div>
+    <div v-if="hasUnderwaterLife" class="ocean-page-backdrop__stream" />
     <div v-if="hasUnderwaterLife" class="ocean-page-backdrop__water" />
     <div v-if="hasUnderwaterLife" class="ocean-page-backdrop__caustics ocean-page-backdrop__caustics_primary" />
     <div v-if="hasUnderwaterLife" class="ocean-page-backdrop__caustics ocean-page-backdrop__caustics_secondary" />
     <ocean-bubbles v-if="hasUnderwaterLife" />
     <underwater-ambient2d v-if="hasUnderwaterLife" />
     <header-crab v-if="hasUnderwaterLife" />
+    <div v-if="hasUnderwaterLife" class="ocean-page-backdrop__vignette" />
   </div>
 </template>
 
@@ -46,10 +75,68 @@ const hasUnderwaterLife = computed(() => props.variant === "reef" || props.varia
 
 .ocean-page-backdrop__image,
 .ocean-page-backdrop__water,
-.ocean-page-backdrop__caustics {
+.ocean-page-backdrop__caustics,
+.ocean-page-backdrop__stream,
+.ocean-page-backdrop__vignette {
   position: absolute;
   inset: 0;
   pointer-events: none;
+}
+
+.ocean-page-backdrop__filter-defs {
+  position: absolute;
+  width: 0;
+  height: 0;
+  pointer-events: none;
+}
+
+/* Carries the refraction. Kept as a wrapper rather than putting the filter on
+   __image, because that element already animates `filter` for its saturate and
+   brightness breathing and the two would overwrite each other. */
+.ocean-page-backdrop__refract {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.ocean-page-backdrop_has-life .ocean-page-backdrop__refract {
+  filter: url("#ocean-refraction");
+}
+
+/* The current itself: broad slow bands of brighter water sliding across the
+   scene, so the stream reads as moving even where the refraction is subtle. */
+.ocean-page-backdrop__stream {
+  z-index: 1;
+  opacity: .5;
+  mix-blend-mode: screen;
+  background:
+    repeating-linear-gradient(
+      104deg,
+      transparent 0 90px,
+      rgba(168, 224, 255, .05) 128px 168px,
+      transparent 210px 320px
+    ),
+    repeating-linear-gradient(
+      96deg,
+      transparent 0 150px,
+      rgba(206, 240, 255, .035) 190px 224px,
+      transparent 280px 430px
+    );
+  filter: blur(16px);
+  mask-image: linear-gradient(to bottom, #000 0%, rgba(0, 0, 0, .7) 62%, transparent 100%);
+  -webkit-mask-image: linear-gradient(to bottom, #000 0%, rgba(0, 0, 0, .7) 62%, transparent 100%);
+  animation: ocean-stream-flow 26s linear infinite;
+  will-change: transform;
+}
+
+/* The darkening and cold cast of being under the surface. Cheap, and it does
+   most of the work of selling the depth. */
+.ocean-page-backdrop__vignette {
+  z-index: 4;
+  background:
+    radial-gradient(ellipse 78% 70% at 50% 44%, transparent 46%, rgba(3, 12, 38, .34) 82%, rgba(2, 7, 24, .62) 100%),
+    radial-gradient(ellipse 120% 60% at 50% 0%, rgba(126, 206, 255, .07), transparent 58%);
+  animation: ocean-lens-breathe 13s ease-in-out infinite alternate;
 }
 
 .ocean-page-backdrop__image {
@@ -161,6 +248,16 @@ const hasUnderwaterLife = computed(() => props.variant === "reef" || props.varia
   100% { transform: translate3d(3%, -.4%, 0) rotate(-.2deg) scale(1.04, 1.1); opacity: .22; }
 }
 
+@keyframes ocean-stream-flow {
+  0% { transform: translate3d(-14%, -4%, 0); }
+  100% { transform: translate3d(14%, 4%, 0); }
+}
+
+@keyframes ocean-lens-breathe {
+  0% { opacity: .88; }
+  100% { opacity: 1; }
+}
+
 @keyframes ocean-caustic-swell {
   0% { transform: translate3d(-.9%, -.4%, 0) scale(1.02); opacity: .08; }
   55% { transform: translate3d(.3%, .6%, 0) scale(1.065, .96); opacity: .14; }
@@ -182,6 +279,21 @@ const hasUnderwaterLife = computed(() => props.variant === "reef" || props.varia
     display: none !important;
   }
 
+  /* An animated SVG displacement over the whole viewport is too expensive to
+     justify on phones, and the drifting stream bands go with it. The vignette
+     stays, since it gives most of the underwater read for free. */
+  .ocean-page-backdrop_has-life .ocean-page-backdrop__refract {
+    filter: none;
+  }
+
+  .ocean-page-backdrop__stream {
+    display: none !important;
+  }
+
+  .ocean-page-backdrop__vignette {
+    animation: none;
+  }
+
   .ocean-page-backdrop_has-life :deep(.underwater-2d__swimmer:not(.underwater-2d__swimmer_shark)) {
     display: none !important;
   }
@@ -190,10 +302,15 @@ const hasUnderwaterLife = computed(() => props.variant === "reef" || props.varia
 @media (prefers-reduced-motion: reduce) {
   .ocean-page-backdrop__image,
   .ocean-page-backdrop__water,
-  .ocean-page-backdrop__caustics {
+  .ocean-page-backdrop__caustics,
+  .ocean-page-backdrop__stream,
+  .ocean-page-backdrop__vignette {
     animation: none;
   }
 
   .ocean-page-backdrop__image { transform: none; }
+
+  /* Holds the refraction at a fixed offset instead of pulsing it. */
+  .ocean-page-backdrop_has-life .ocean-page-backdrop__refract { filter: none; }
 }
 </style>
