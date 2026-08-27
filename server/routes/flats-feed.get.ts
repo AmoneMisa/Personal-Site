@@ -272,6 +272,42 @@ export default defineEventHandler(async (event) => {
   const metro = upstreamParams.get('metro')
   if (metro) upstreamParams.set('metro', canonicalMetroValue(metro))
 
+  const exactListingId = String(upstreamParams.get('listingId') || '').trim()
+  const exactSource = requestedSources.length === 1 ? requestedSources[0]! : ''
+  const exactCountryCode = exactCountry(upstreamParams)
+
+  // Exact OLX verification is the whole purpose of this request. Running the
+  // general feed query first could consume its 25s budget before this bounded
+  // 12s source probe even began, while the browser was waiting to open a card.
+  if (exactListingId && exactSource === 'olx' && exactCountryCode) {
+    setResponseHeader(event, 'Cache-Control', 'no-store')
+    try {
+      const exact = await $fetch<any>(
+        `${FLAT_API_URL}/api/listing/olx/${encodeURIComponent(exactListingId)}?country=${encodeURIComponent(exactCountryCode)}`,
+        { timeout: EXACT_LOOKUP_TIMEOUT_MS },
+      )
+      if (exact?.listing && String(exact.listing.id ?? '') === exactListingId) {
+        availabilityCache.set(availabilityKey(exact.listing), { at: Date.now(), status: 'active' })
+        return {
+          count: 1,
+          listings: [shapeListing(exact.listing)],
+          exactListingFallback: 'source',
+        }
+      }
+      return { count: 0, listings: [], exactListingFallback: 'source-unavailable' }
+    } catch (error: any) {
+      const status = Number(error?.statusCode || error?.response?.status || 0)
+      if (status === 404) {
+        availabilityCache.set(`olx:${exactCountryCode}:${exactListingId}`, { at: Date.now(), status: 'inactive' })
+        return { count: 0, listings: [], exactListingFallback: 'source-inactive' }
+      }
+      // A timeout or temporary source failure is inconclusive. The client may
+      // still open the card already present in its feed, but must not mark it
+      // active or remove it as unavailable.
+      return { count: 0, listings: [], exactListingFallback: 'source-unavailable' }
+    }
+  }
+
   const url = `${FLAT_API_URL}/api/listings?${upstreamParams}`
   const key = upstreamParams.toString()
   const requestedOffset = Math.max(0, Number(upstreamParams.get('offset')) || 0)
@@ -306,42 +342,6 @@ export default defineEventHandler(async (event) => {
 
     const source = requestedSources.length === 1 ? requestedSources[0]! : ''
     const country = exactCountry(upstreamParams)
-
-    // OLX exact links must never be resurrected from the site cache. The direct
-    // backend endpoint performs the forced live availability check and persists
-    // inactive state before returning 404.
-    if (source === 'olx' && country) {
-      try {
-        const exact = await $fetch<any>(
-          `${FLAT_API_URL}/api/listing/olx/${encodeURIComponent(listingId)}?country=${encodeURIComponent(country)}`,
-          { timeout: EXACT_LOOKUP_TIMEOUT_MS },
-        )
-        if (exact?.listing && String(exact.listing.id ?? '') === listingId) {
-          availabilityCache.set(availabilityKey(exact.listing), { at: Date.now(), status: 'active' })
-          return {
-            ...response,
-            count: 1,
-            listings: [shapeListing(exact.listing)],
-            exactListingFallback: 'source',
-          }
-        }
-      } catch (error: any) {
-        const status = Number(error?.statusCode || error?.response?.status || 0)
-        if (status === 404) {
-          availabilityCache.set(`olx:${country}:${listingId}`, { at: Date.now(), status: 'inactive' })
-          return {
-            ...response,
-            count: 0,
-            listings: [],
-            exactListingFallback: 'source-inactive',
-          }
-        }
-        // A transient source-check failure should not take the whole page down.
-        // Persisted inactive state is still filtered before the response leaves.
-        return response
-      }
-      return response
-    }
 
     if (Array.isArray(response?.listings) && response.listings.length) return response
 

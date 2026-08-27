@@ -9,7 +9,7 @@ export async function safeFetch<T>(url: string, opts: any = {}): Promise<{ data:
             && String(opts?.params?.sources || "").toLowerCase() === "olx"
             && String(opts?.params?.limit || "") === "1";
         const requestOptions = isBlockingFlatAvailabilityCheck && opts?.timeout == null
-            ? { ...opts, timeout: 7000 }
+            ? { ...opts, timeout: 15000 }
             : opts;
 
         const data = await $fetch<T>(url, requestOptions);

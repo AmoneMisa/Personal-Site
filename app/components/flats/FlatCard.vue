@@ -50,10 +50,10 @@ function displayedUsdPrice(): number | null {
   return numeric ? Number(numeric) : null;
 }
 
-const priceTone = computed<PriceTone | null>(() => {
+const priceTone = computed<PriceTone>(() => {
   const median = props.presentation.goodPriceMedianUsd;
   const priceUsd = displayedUsdPrice();
-  if (median == null || median <= 0 || priceUsd == null || priceUsd <= 0) return null;
+  if (median == null || median <= 0 || priceUsd == null || priceUsd <= 0) return "pink";
   const ratio = priceUsd / median;
   if (ratio >= 1.45) return "red";
   if (ratio >= 1.31) return "yellow";
@@ -125,7 +125,7 @@ const emit = defineEmits<{
     </div>
     <div class="flat-card__body">
       <div class="flat-card__price-row">
-        <div class="flat-card__price" :class="priceTone ? `flat-card__price_${priceTone}` : undefined">{{ presentation.price }}</div>
+        <div class="flat-card__price" :class="`flat-card__price_${priceTone}`">{{ presentation.price }}</div>
         <div v-if="presentation.convertedPrice" class="flat-card__price-conv text-muted">{{ presentation.convertedPrice }}</div>
       </div>
       <h3 class="flat-card__title" :title="presentation.title">{{ presentation.title }}</h3>

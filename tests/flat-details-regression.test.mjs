@@ -6,9 +6,12 @@ const read = (path) => readFile(new URL(`../${path}`, import.meta.url), "utf8");
 
 test("flat details modal keeps public ID title and 960px width", async () => {
   const source = await read("app/components/search/SearchDetailsModal.vue");
+  const modal = await read("app/components/U/Modal.vue");
   assert.match(source, /#\{\{ flatPublicId \}\}/);
   assert.match(source, /flatPriceTone/);
-  assert.match(source, /max-w-\[960px\]/);
+  assert.match(source, /:max-width="isFlatFinder \? '960px' : undefined"/);
+  assert.match(modal, /<slot v-if="\$slots\.title" name="title" \/>/);
+  assert.doesNotMatch(source, /max-w-\[960px\]/);
 });
 
 test("flat spec table does not parse listing description on the client", async () => {
@@ -21,9 +24,9 @@ test("flat spec table does not parse listing description on the client", async (
 });
 
 test("flat spec grid uses three columns through 960px", async () => {
-  const source = await read("app/assets/css/flat-placeholder.css");
-  assert.match(source, /@media \(min-width: 721px\) and \(max-width: 960px\)/);
+  const source = await read("app/components/ui/SpecTable.vue");
   assert.match(source, /grid-template-columns: repeat\(3, minmax\(0, 1fr\)\)/);
+  assert.doesNotMatch(source, /grid-template-columns: repeat\(4, minmax\(0, 1fr\)\)/);
 });
 
 test("dynamic flat spec icons are bundled without Iconify runtime", async () => {
@@ -45,6 +48,19 @@ test("full-screen photo zoom is click-driven", async () => {
   assert.match(source, /@click\.stop="toggleZoom"/);
   assert.match(source, /flat-lightbox__image_zoomed/);
   assert.match(source, /function toggleZoom\(event: MouseEvent\)/);
+  assert.match(source, /@pointermove="onPointerMove"/);
+  assert.match(source, /setPointerCapture\(event\.pointerId\)/);
+  assert.match(source, /function clampPan\(\)/);
+  assert.match(source, /translate3d\(\$\{pan\.x\}px, \$\{pan\.y\}px, 0\) scale\(\$\{zoom\}\)/);
+});
+
+test("flat price and empty-field toggle share the specification header row", async () => {
+  const page = await read("app/pages/flat-finder/index.vue");
+  const specs = await read("app/components/ui/SpecTable.vue");
+  assert.match(page, /<UiSpecTable[^>]*><template #header><div class="flat-modal__price">/);
+  assert.match(specs, /class="spec-table__head"/);
+  assert.match(specs, /<slot name="header" \/>/);
+  assert.match(specs, /class="spec-table__toggle"/);
 });
 
 test("flat description translation remains wired to the AI worker", async () => {

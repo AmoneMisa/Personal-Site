@@ -4,17 +4,21 @@ import test from 'node:test'
 
 const route = await readFile(new URL('../server/routes/flats-feed.get.ts', import.meta.url), 'utf8')
 const page = await readFile(new URL('../app/pages/flat-finder/index.vue', import.meta.url), 'utf8')
+const safeFetch = await readFile(new URL('../app/utils/safeFetch.ts', import.meta.url), 'utf8')
 
 test('shared OLX lookup verifies the live source before any cached fallback', () => {
   assert.match(route, /upstreamParams\.get\('listingId'\)/)
-  assert.match(route, /\/api\/listing\/olx\/\$\{encodeURIComponent\(listingId\)\}/)
+  assert.match(route, /\/api\/listing\/olx\/\$\{encodeURIComponent\(exactListingId\)\}/)
   assert.match(route, /exactListingFallback:\s*'source'/)
   assert.match(route, /exactListingFallback:\s*'source-inactive'/)
 
-  const directLookup = route.indexOf('/api/listing/olx/${encodeURIComponent(listingId)}')
+  const directLookup = route.indexOf('/api/listing/olx/${encodeURIComponent(exactListingId)}')
   const cachedLookup = route.indexOf('findCachedExactListing(listingId, source, country)')
   assert.ok(directLookup >= 0)
   assert.ok(cachedLookup > directLookup)
+  assert.ok(directLookup < route.indexOf('refreshFeed(key, url)'))
+  assert.match(route, /exactListingFallback:\s*'source-unavailable'/)
+  assert.match(safeFetch, /timeout:\s*15000/)
 })
 
 test('cached feed filters OLX rows already persisted as inactive', () => {

@@ -12,6 +12,8 @@ const props = withDefaults(defineProps<{
   title?: string;
   description?: string;
   dismissible?: boolean;
+  maxWidth?: string;
+  zIndex?: number;
   // Nuxt UI style-override object. `content` is honoured because call sites use
   // it to widen the panel (max-w-2xl / 3xl / 4xl); ignoring it made every modal
   // fall back to the default width.
@@ -30,6 +32,7 @@ const CONTENT_WIDTHS: Record<string, string> = {
   "max-w-5xl": "64rem", "max-w-6xl": "72rem",
 };
 const panelStyle = computed(() => {
+  if (props.maxWidth) return { maxWidth: props.maxWidth };
   for (const token of (props.ui?.content || "").split(/\s+/)) {
     if (CONTENT_WIDTHS[token]) return { maxWidth: CONTENT_WIDTHS[token] };
   }
@@ -88,14 +91,15 @@ onBeforeUnmount(() => {
 <template>
   <slot />
   <Teleport v-if="open" to="body">
-    <div class="u-modal" role="dialog" aria-modal="true" :aria-label="title || undefined">
+    <div class="u-modal" role="dialog" aria-modal="true" :aria-label="title || undefined" :style="props.zIndex != null ? { zIndex: props.zIndex } : undefined">
       <div class="u-modal__backdrop" @click="close" />
       <div class="u-modal__panel" :class="[props.ui?.content, $attrs.class]" :style="panelStyle">
         <!-- #content replaces the whole panel, matching Nuxt UI. -->
         <slot v-if="$slots.content" name="content" />
         <template v-else>
-          <header v-if="title || dismissible" class="u-modal__header">
-            <h2 v-if="title" class="u-modal__title">{{ title }}</h2>
+          <header v-if="$slots.title || title || dismissible" class="u-modal__header">
+            <slot v-if="$slots.title" name="title" />
+            <h2 v-else-if="title" class="u-modal__title">{{ title }}</h2>
             <button v-if="dismissible" type="button" class="u-modal__close ui-focusable" aria-label="Close" @click="close">
               <UIcon name="i-lucide-x" />
             </button>

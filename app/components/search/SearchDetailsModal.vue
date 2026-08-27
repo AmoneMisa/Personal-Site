@@ -18,8 +18,8 @@ const latestFlatListing = useState<FlatListing | null>("flats:latest-recent:v1",
 
 type PriceTone = "green" | "blue" | "pink" | "orange" | "yellow" | "red";
 
-function flatPriceTone(listing: FlatListing | null): PriceTone | null {
-  if (!listing) return null;
+function flatPriceTone(listing: FlatListing | null): PriceTone {
+  if (!listing) return "pink";
   const comparison = listing.marketComparison;
   let ratio = Number(comparison?.priceRatio);
   if (!Number.isFinite(ratio) || ratio <= 0) {
@@ -32,7 +32,7 @@ function flatPriceTone(listing: FlatListing | null): PriceTone | null {
       ? priceUsd / median
       : NaN;
   }
-  if (!Number.isFinite(ratio) || ratio <= 0) return null;
+  if (!Number.isFinite(ratio) || ratio <= 0) return "pink";
   if (ratio >= 1.45) return "red";
   if (ratio >= 1.31) return "yellow";
   if (ratio >= 1.16) return "orange";
@@ -76,11 +76,9 @@ const modalUi = computed(() => {
 
   return {
     ...props.ui,
-    overlay: ["z-[12000]", props.ui?.overlay].filter(Boolean).join(" "),
     content: [
-      "z-[12001]",
       content,
-      isFlatFinder.value ? "flat-finder-details w-[calc(100vw-24px)] max-w-[960px]" : "",
+      isFlatFinder.value ? "flat-finder-details" : "",
     ].filter(Boolean).join(" "),
   };
 });
@@ -92,12 +90,14 @@ const modalUi = computed(() => {
     :title="effectiveTitle"
     :ui="modalUi"
     :dismissible="dismissible"
+    :max-width="isFlatFinder ? '960px' : undefined"
+    :z-index="isFlatFinder ? 12000 : undefined"
   >
     <template #title>
       <h2 v-if="flatPublicTitle" class="flat-details-public-title">
         <span
           class="flat-details-public-title__id"
-          :class="flatTone ? `flat-details-public-title__id_${flatTone}` : undefined"
+          :class="`flat-details-public-title__id_${flatTone}`"
         >#{{ flatPublicId }}</span>
         <span class="flat-details-public-title__text">{{ [flatDealLabel, flatCityLabel].filter(Boolean).join(", ") }}</span>
       </h2>

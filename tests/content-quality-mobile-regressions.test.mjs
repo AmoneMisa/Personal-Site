@@ -81,8 +81,8 @@ test('map cluster browser clamps into the viewport and detail modal wins the z-i
   assert.match(flatMap, /window\.innerWidth/u)
   assert.match(flatMap, /window\.innerHeight/u)
   assert.match(flatMap, /if \(mobile\) return count <= 4 \? 72 : 94/u)
-  assert.match(detailsModal, /z-\[12000\]/u)
-  assert.match(detailsModal, /z-\[12001\]/u)
+  assert.match(detailsModal, /:z-index="isFlatFinder \? 12000 : undefined"/u)
+  assert.doesNotMatch(detailsModal, /z-\[1200[01]\]/u)
 })
 
 test('translation pending jobs have a GET proxy to the AI worker result endpoint', () => {

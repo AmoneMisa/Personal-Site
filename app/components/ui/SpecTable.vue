@@ -238,10 +238,13 @@ function iconForRow(row: SpecRow): string {
 
 <template>
   <div class="spec-table" :class="{ 'spec-table_flat': isFlatFinder }">
-    <label v-if="hideEmptyLabel" class="spec-table__toggle">
-      <u-switch v-model="hideEmpty" :aria-label="hideEmptyLabel" />
-      <span>{{ hideEmptyLabel }}</span>
-    </label>
+    <div v-if="$slots.header || hideEmptyLabel" class="spec-table__head">
+      <slot name="header" />
+      <label v-if="hideEmptyLabel" class="spec-table__toggle">
+        <u-switch v-model="hideEmpty" :aria-label="hideEmptyLabel" />
+        <span>{{ hideEmptyLabel }}</span>
+      </label>
+    </div>
 
     <div v-if="isFlatFinder" class="spec-table__grid" role="list">
       <div
@@ -292,6 +295,7 @@ function iconForRow(row: SpecRow): string {
 
 <style scoped>
 .spec-table { display: flex; flex-direction: column; gap: 8px; }
+.spec-table__head { display: flex; align-items: center; justify-content: space-between; gap: 12px 20px; min-width: 0; }
 
 .spec-table__toggle {
   display: inline-flex;
@@ -304,12 +308,12 @@ function iconForRow(row: SpecRow): string {
   cursor: pointer;
   user-select: none;
 }
-.spec-table_flat .spec-table__toggle { align-self: flex-end; }
+.spec-table_flat .spec-table__toggle { flex: 0 0 auto; margin-left: auto; }
 .spec-table__toggle :deep(.u-switch) { vertical-align: middle; }
 
 .spec-table__grid {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   border-top: 1px solid var(--line, #252a4a);
 }
 .spec-table__item {
@@ -324,7 +328,7 @@ function iconForRow(row: SpecRow): string {
   border-right: 1px solid var(--line, #252a4a);
   border-bottom: 1px solid var(--line, #252a4a);
 }
-.spec-table__item:nth-child(4n) { border-right: 0; }
+.spec-table__item:nth-child(3n) { border-right: 0; }
 .spec-table__icon {
   position: relative;
   display: inline-grid;
@@ -407,7 +411,7 @@ function iconForRow(row: SpecRow): string {
 
 @media (max-width: 720px) {
   .spec-table__grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .spec-table__item:nth-child(4n) { border-right: 1px solid var(--line, #252a4a); }
+  .spec-table__item:nth-child(3n) { border-right: 1px solid var(--line, #252a4a); }
   .spec-table__item:nth-child(2n) { border-right: 0; }
 }
 @media (max-width: 640px) {
@@ -417,7 +421,7 @@ function iconForRow(row: SpecRow): string {
   .spec-table__grid { grid-template-columns: 1fr; }
   .spec-table__item,
   .spec-table__item:nth-child(2n),
-  .spec-table__item:nth-child(4n) { border-right: 0; }
-  .spec-table_flat .spec-table__toggle { align-self: flex-start; }
+  .spec-table__item:nth-child(3n) { border-right: 0; }
+  .spec-table__head { align-items: flex-start; gap: 8px 12px; }
 }
 </style>
