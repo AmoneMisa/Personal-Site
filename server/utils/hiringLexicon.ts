@@ -30,6 +30,7 @@ import {
   type HiringWorkSchedule,
 } from '@whiteslove/parsing-lexicon/hiring-work-semantics'
 import type { CandidateEmploymentType, CandidateWorkMode } from '../../shared/contracts/hiring'
+import type { SalaryPeriod } from '../../shared/contracts/jobs'
 
 export {
   detectCountryCodeFromText as resolveSharedCountryFromText,
@@ -147,8 +148,20 @@ export function parseHiringExperience(text: string) {
   return parseExperience(text)
 }
 
+const JOBS_I18N_PERIOD_RE = /\bjobs\.per(hour|day|shift|week|month|year|project|piece)\b/i
+
+function leakedJobsSalaryPeriod(text: string): SalaryPeriod | undefined {
+  const raw = text.match(JOBS_I18N_PERIOD_RE)?.[1]?.toLowerCase()
+  if (!raw) return undefined
+  return raw as SalaryPeriod
+}
+
 export function parseHiringSalary(text: string) {
-  return parseHiringSalaryWithContext(text, { currencyFallback: 'language' })
+  const parsed = parseHiringSalaryWithContext(text, { currencyFallback: 'language' })
+  if (!parsed) return parsed
+  const leakedPeriod = leakedJobsSalaryPeriod(text)
+  if (!leakedPeriod || parsed.period === leakedPeriod) return parsed
+  return Object.freeze({ ...parsed, period: leakedPeriod })
 }
 
 export function parseSharedLanguageContext(text: string, mode: 'vacancy' | 'candidate' | null = null) {
