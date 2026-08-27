@@ -5,7 +5,11 @@ const props = withDefaults(defineProps<{
   variant: "reef",
 });
 
-const hasUnderwaterLife = computed(() => props.variant === "reef" || props.variant === "treasure");
+const hasUnderwaterLife = computed(() => (
+  props.variant === "reef"
+  || props.variant === "treasure"
+  || props.variant === "home"
+));
 </script>
 
 <template>

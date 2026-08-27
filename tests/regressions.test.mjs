@@ -394,7 +394,14 @@ test('underwater ambience uses the original cleaned mascots and visible bubbles'
   assert.match(bubbles, /opacity: 0\.92/u)
   assert.doesNotMatch(bubbles, /mix-blend-mode: screen/u)
   const backdrop = readFileSync(new URL('../app/components/OceanPageBackdrop.vue', import.meta.url), 'utf8')
+  const flatFinder = readFileSync(new URL('../app/pages/flat-finder/index.vue', import.meta.url), 'utf8')
   const crab = readFileSync(new URL('../app/components/HeaderCrab.client.vue', import.meta.url), 'utf8')
+  // Flat Finder uses the home artwork, which must retain the same animated
+  // fish and bubble layers as the reef and treasure variants.
+  assert.match(flatFinder, /ocean-page-backdrop variant="home"/u)
+  assert.match(backdrop, /props\.variant === "home"/u)
+  assert.match(backdrop, /<ocean-bubbles v-if="hasUnderwaterLife"/u)
+  assert.match(backdrop, /<underwater-ambient2d v-if="hasUnderwaterLife"/u)
   // Underwater stream: the scene refracts, and the current drifts across it.
   assert.match(backdrop, /ocean-refraction/u)
   assert.match(backdrop, /feTurbulence/u)
