@@ -113,6 +113,15 @@ function aiHintForRow(row: SpecRow): string | null {
   return field && fields.has(field) ? aiVisionTitle.value : null;
 }
 
+function displayLabel(row: SpecRow): string {
+  if (!isFlatFinder.value) return row.label;
+  const english = String(locale.value).toLowerCase().startsWith("en");
+  if (row.label === t("flats.specRooms")) return english ? "Number of rooms" : "Количество комнат";
+  if (row.label === t("flats.specBedrooms")) return english ? "Number of bedrooms" : "Количество спален";
+  if (row.label === t("flats.specBathrooms")) return english ? "Number of bathrooms" : "Количество с/у";
+  return row.label;
+}
+
 const contextualRows = computed<SpecRow[]>(() => {
   const listing = currentFlatListing.value;
   if (!listing) return props.rows;
@@ -244,8 +253,8 @@ function iconForRow(row: SpecRow): string {
       >
         <span
           class="spec-table__icon"
-          :data-tooltip="row.label"
-          :aria-label="row.label"
+          :data-tooltip="displayLabel(row)"
+          :aria-label="displayLabel(row)"
           tabindex="0"
         >
           <u-icon :name="iconForRow(row)" />
@@ -265,7 +274,7 @@ function iconForRow(row: SpecRow): string {
       <tbody>
         <tr v-for="row in visibleRows" :key="row.label" :class="{ 'spec-table__row_warning': row.tone === 'warning' }">
           <th>
-            <span>{{ row.label }}</span>
+            <span>{{ displayLabel(row) }}</span>
             <span
               v-if="aiHintForRow(row)"
               class="spec-table__ai-hint"
