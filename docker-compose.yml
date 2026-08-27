@@ -39,7 +39,7 @@ services:
     # One Nuxt/Nitro runtime owns UI, SSR and lightweight read-only jobs/hiring
     # API routes. It also creates short-lived website -> Telegram subscription
     # handoffs; the bot is still the only service that owns Telegram user state.
-    image: ghcr.io/amonemisa/personal-site:latest
+    image: ghcr.io/amonemisa/personal-site:${FRONTEND_IMAGE_TAG:-latest}
     restart: unless-stopped
     env_file:
       - ${SITE_ENV_FILE:-./db.env}
