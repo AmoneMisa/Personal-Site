@@ -31,6 +31,12 @@ export default defineNuxtPlugin((nuxtApp) => {
       requirementPreferred: 'Preferred',
       requirementNotRequired: 'Not required',
       skillPrototyping: 'Prototyping',
+      languageEnglish: 'English',
+      languageRussian: 'Russian',
+      languageUkrainian: 'Ukrainian',
+      languageRomanian: 'Romanian',
+      languageUzbek: 'Uzbek',
+      languageKazakh: 'Kazakh',
     },
   })
   merge('ru', {
@@ -60,6 +66,12 @@ export default defineNuxtPlugin((nuxtApp) => {
       requirementPreferred: 'Желательно',
       requirementNotRequired: 'Не обязательно',
       skillPrototyping: 'Прототипирование',
+      languageEnglish: 'Английский',
+      languageRussian: 'Русский',
+      languageUkrainian: 'Украинский',
+      languageRomanian: 'Румынский',
+      languageUzbek: 'Узбекский',
+      languageKazakh: 'Казахский',
     },
   })
 })
