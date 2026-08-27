@@ -80,7 +80,7 @@ const modalUi = computed(() => {
     content: [
       "z-[12001]",
       content,
-      isFlatFinder.value ? "flat-finder-details w-[calc(100vw-24px)] max-w-[800px]" : "",
+      isFlatFinder.value ? "flat-finder-details w-[calc(100vw-24px)] max-w-[960px]" : "",
     ].filter(Boolean).join(" "),
   };
 });
