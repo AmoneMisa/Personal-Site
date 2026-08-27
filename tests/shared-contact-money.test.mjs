@@ -33,6 +33,11 @@ test('salary periods from source/i18n constructions remain structured', () => {
   assert.equal(annual?.currency, 'USD')
   assert.equal(annual?.min, 405_000)
   assert.equal(annual?.max, 485_000)
+
+  const vercel = parseHiringSalary('The San Francisco, CA base pay range for this role is $137,000.00 - $207,000.00. This salary range is an estimate. Actual salary will be based on job related skills, experience and location.')
+  assert.equal(vercel?.currency, 'USD')
+  assert.equal(vercel?.min, 137_000)
+  assert.equal(vercel?.max, 207_000)
 })
 
 test('explicit positive visa sponsorship copy is preserved despite conditional wording', () => {
