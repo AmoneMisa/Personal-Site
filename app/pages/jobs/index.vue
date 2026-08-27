@@ -85,13 +85,14 @@ function convertCurrency(amount: number, from: string, to: string): number | und
   return converted == null ? undefined : Math.round(converted);
 }
 
-// Pay-period conversion. PER_YEAR turns an amount at a period into a yearly amount
-// (must match server enrich.ts: 160 work hours/month). To convert an amount from
-// period A to B: multiply by PER_YEAR[A] / PER_YEAR[B].
+// Pay-period conversion. PERIODS_PER_YEAR turns an amount at a period into a
+// yearly amount (using the site's established 160 work hours/month convention).
 type Period = (typeof JOB_SALARY_PERIODS)[number];
+type SourcePeriod = NonNullable<Job["salaryPeriod"]>;
 
-function convertPeriod(amount: number, from: Period, to: Period): number {
-  return Math.round(convertSalaryPeriod(amount, from, to));
+function convertPeriod(amount: number, from: SourcePeriod | Period, to: Period): number | undefined {
+  const converted = convertSalaryPeriod(amount, from, to);
+  return converted === undefined ? undefined : Math.round(converted);
 }
 
 const jobFilters = useJobFilters();
@@ -197,7 +198,6 @@ function openJob(job: Job) {
   markSeen(job);
   persistState();
 }
-
 // Fetch a single vacancy by id and open it — used by shared links and the
 // recently-viewed strip, which must open a posting outside the current results.
 async function openSharedJob(id: string) {
@@ -354,11 +354,23 @@ function formatSalary(job: Job): string | null {
   return `${fmt(job.salaryMin || job.salaryMax)} ${cur}${period}`.trim();
 }
 
-const periodLabel = (p: Period) => t("per" + p.charAt(0).toUpperCase() + p.slice(1));
+const EXTRA_PERIOD_LABELS = {
+  en: { day: "day", shift: "shift", week: "week", project: "project", piece: "piece" },
+  ru: { day: "день", shift: "смена", week: "неделя", project: "проект", piece: "шт." },
+} as const;
+
+function periodLabel(p: SourcePeriod | Period): string {
+  if (p === "hour" || p === "month" || p === "year") {
+    return t("per" + p.charAt(0).toUpperCase() + p.slice(1));
+  }
+  const language = String(locale.value).toLowerCase().startsWith("ru") ? "ru" : "en";
+  const labels = EXTRA_PERIOD_LABELS[language];
+  return labels[p as keyof typeof labels] || p;
+}
 
 // Convert one currency amount at the vacancy's detected period into the chosen
 // currency + chosen period (e.g. "5,000 UZS/mo" → "≈ $475/mo" or "≈ $5,700/yr").
-function toDisplayAmount(amount: number, from: string, srcPeriod: Period): number | undefined {
+function toDisplayAmount(amount: number, from: string, srcPeriod: SourcePeriod): number | undefined {
   const inCur = convertCurrency(amount, from, displayCurrency.value);
   if (inCur === undefined) return undefined;
   return convertPeriod(inCur, srcPeriod, displayPeriod.value);
@@ -368,8 +380,8 @@ function toDisplayAmount(amount: number, from: string, srcPeriod: Period): numbe
 // either the currency or the pay period differs from what the source provided.
 function convertedSalary(job: Job): string | null {
   const from = (job.salaryCurrency || "").toUpperCase();
-  const srcPeriod = (job.salaryPeriod || "month") as Period;
-  if (!from) return null;
+  const srcPeriod = job.salaryPeriod;
+  if (!from || !srcPeriod) return null;
   if (from === displayCurrency.value.toUpperCase() && srcPeriod === displayPeriod.value) return null;
   if (!job.salaryMin && !job.salaryMax) return null;
   const lo = job.salaryMin ? toDisplayAmount(job.salaryMin, from, srcPeriod) : undefined;
@@ -388,7 +400,8 @@ function convertedSalary(job: Job): string | null {
 function money(annualUsd: number): string {
   const converted = convertCurrency(annualUsd, "USD", displayCurrency.value);
   const cur = converted === undefined ? "USD" : displayCurrency.value;
-  const v = convertPeriod(converted ?? annualUsd, "year", displayPeriod.value);
+  const base = converted ?? annualUsd;
+  const v = convertPeriod(base, "year", displayPeriod.value) ?? base;
   return formatMoney(v, cur);
 }
 
