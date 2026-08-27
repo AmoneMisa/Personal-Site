@@ -1,6 +1,6 @@
 export const JOB_SOURCE_OPTIONS = [
   { value: "", labelKey: "all" },
-  { value: "rss", label: "DOU.ua" },
+  { value: "rss", label: "DOU.ua + We Work Remotely" },
   { value: "jooble", label: "Jooble" },
   { value: "themuse", label: "The Muse" },
   { value: "jobicy", label: "Jobicy" },

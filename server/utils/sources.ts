@@ -1007,11 +1007,36 @@ export async function fetchCompanies(q: string): Promise<Job[]> {
 }
 
 // ---------- Generic RSS (env: RSS_FEEDS = "label|url,label|url") ----------
-// Ships with a built-in Ukraine feed (DOU.ua) so UA vacancies work with no config.
-// Add more via RSS_FEEDS for niche boards (VueJobs, WeWorkRemotely, etc.), e.g.:
+// Ships with DOU.ua plus the non-programming We Work Remotely categories. WWR
+// explicitly publishes these feeds for reuse with attribution, and keeping the
+// categories separate avoids turning the default feed into another IT board.
+// Add more via RSS_FEEDS for niche boards (VueJobs, etc.), e.g.:
 //   RSS_FEEDS="vuejobs|https://vuejobs.com/feed"
 // Set RSS_DEFAULTS=off to disable the built-in feeds.
-const DEFAULT_RSS_FEEDS = 'dou.ua|https://jobs.dou.ua/vacancies/feeds/'
+const DEFAULT_RSS_FEEDS = [
+  'dou.ua|https://jobs.dou.ua/vacancies/feeds/',
+  'wwr-support|https://weworkremotely.com/categories/remote-customer-support-jobs.rss',
+  'wwr-sales-marketing|https://weworkremotely.com/categories/remote-sales-and-marketing-jobs.rss',
+  'wwr-management-finance|https://weworkremotely.com/categories/remote-management-and-finance-jobs.rss',
+  'wwr-other|https://weworkremotely.com/categories/all-other-remote-jobs.rss',
+].join(',')
+
+function rssText(value: unknown): string {
+  if (value == null) return ''
+  if (typeof value === 'object') {
+    const record = value as Record<string, unknown>
+    return String(record['#text'] || record['@_term'] || '')
+  }
+  return String(value)
+}
+
+function isRemoteOnlyRss(url: string): boolean {
+  try {
+    return /(^|\.)weworkremotely\.com$/i.test(new URL(url).hostname)
+  } catch {
+    return false
+  }
+}
 
 export async function fetchRss(q: string): Promise<Job[]> {
   const parts: string[] = []
@@ -1039,19 +1064,35 @@ export async function fetchRss(q: string): Promise<Job[]> {
       const list = Array.isArray(items) ? items : [items]
       for (const it of list) {
         const link = typeof it.link === 'object' ? it.link['@_href'] || it.link['#text'] : it.link
-        const title = typeof it.title === 'object' ? it.title['#text'] : it.title
+        const title = rssText(it.title)
         const dateStr = it.pubDate || it.published || it.updated
+        const description = stripHtml(rssText(it.description || it.summary || it.content))
+        const remoteOnly = isRemoteOnlyRss(feed.url)
+        const region = rssText(it.region || it.location || it['job:location'])
+        const categories = (Array.isArray(it.category) ? it.category : [it.category])
+          .map(rssText)
+          .filter(Boolean)
+        let jobTitle = title
+        let company = rssText(it['dc:creator']) || feed.label
+        if (remoteOnly) {
+          const separator = title.indexOf(': ')
+          if (separator > 0 && separator < title.length - 2) {
+            company = title.slice(0, separator).trim()
+            jobTitle = title.slice(separator + 2).trim()
+          }
+        }
         all.push({
-          id: `rss-${feed.label}-${it.guid?.['#text'] || it.guid || link || title}`,
-          title: String(title || 'Untitled'),
-          company: it['dc:creator'] || feed.label,
-          location: 'See listing',
+          id: `rss-${feed.label}-${rssText(it.guid) || link || title}`,
+          title: String(jobTitle || 'Untitled'),
+          company,
+          location: region || (remoteOnly ? 'Remote' : 'See listing'),
           url: String(link || ''),
           source: 'rss',
-          remote: /remote/i.test(String(title || '')),
-          tags: [feed.label],
+          remote: remoteOnly || detectWorkModes(`${title} ${description} ${region}`).includes('remote'),
+          workMode: remoteOnly ? 'remote' : undefined,
+          tags: [feed.label, ...categories].slice(0, 8),
           postedAt: dateStr ? new Date(dateStr).toISOString() : new Date().toISOString(),
-          description: stripHtml(it.description || it.summary || it.content).slice(0, DESC_MAX),
+          description: description.slice(0, DESC_MAX),
         })
       }
     } catch (err) {
