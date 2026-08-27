@@ -14,6 +14,7 @@ export default defineNuxtPlugin((nuxtApp) => {
     languagePolish: 'Polish', languageGeorgian: 'Georgian', languageGerman: 'German', languageFrench: 'French', languageSpanish: 'Spanish', languageChinese: 'Chinese', languageJapanese: 'Japanese', languageBelarusian: 'Belarusian',
     languagePortuguese: 'Portuguese', languageItalian: 'Italian', languageKorean: 'Korean', languageTurkish: 'Turkish', languageArabic: 'Arabic', languageDutch: 'Dutch', languageCzech: 'Czech', languageSlovak: 'Slovak', languageHungarian: 'Hungarian', languageBulgarian: 'Bulgarian', languageSerbian: 'Serbian', languageCroatian: 'Croatian', languageGreek: 'Greek', languageSwedish: 'Swedish', languageNorwegian: 'Norwegian', languageDanish: 'Danish', languageFinnish: 'Finnish', languageEstonian: 'Estonian', languageLatvian: 'Latvian', languageLithuanian: 'Lithuanian', languageArmenian: 'Armenian', languageAzerbaijani: 'Azerbaijani', languageKyrgyz: 'Kyrgyz', languageTajik: 'Tajik', languageHindi: 'Hindi', languageHebrew: 'Hebrew',
   } })
+
   merge('ru', { jobs: {
     seniorityIntern: 'Стажёр', seniorityStaff: 'Staff-инженер', seniorityPrincipal: 'Principal-инженер', seniorityHead: 'Руководитель направления', seniorityDirector: 'Директор', seniorityVp: 'Вице-президент', seniorityChief: 'Руководитель высшего уровня',
     empProject: 'Проектная работа', empFreelance: 'Фриланс', empVolunteer: 'Волонтёрство', empSeasonal: 'Сезонная работа',
