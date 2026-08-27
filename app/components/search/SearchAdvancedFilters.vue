@@ -35,7 +35,6 @@ withDefaults(defineProps<{
 <style scoped>
 .search-advanced-filters {
   position: relative;
-  z-index: 3;
   display: grid;
   width: max-content;
   max-width: calc(100% - 32px);
