@@ -3,9 +3,7 @@ FROM node:24-bookworm-slim AS deps
 WORKDIR /app
 
 COPY package.json package-lock.json ./
-# npm install reconciles package-lock while shared packages are consumed from
-# the public npm registry via normal semver dependencies.
-RUN npm install --no-audit --no-fund
+RUN npm ci --no-audit --no-fund
 
 FROM node:24-bookworm-slim AS build
 
