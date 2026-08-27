@@ -354,6 +354,10 @@ test('underwater ambience uses the original cleaned mascots and visible bubbles'
     'jelly-pink-sleep-animated.webp',
     'jelly-pink-play-animated.webp',
     'jelly-pink-angry-animated.webp',
+    'shark-curious-animated.webp',
+    'shark-annoyed-animated.webp',
+    'header-crab-animated.webp',
+    'header-crab-surprised-animated.webp',
   ]) {
     assert.ok(existsSync(new URL(`../public/images/ocean-creatures/${asset}`, import.meta.url)), `${asset} should exist`)
   }
@@ -363,8 +367,8 @@ test('underwater ambience uses the original cleaned mascots and visible bubbles'
   assert.match(creatures, /state\.preset\.id === "shark" \|\| initialGuests\.includes/u)
   assert.match(creatures, /rotatePetSlot/u)
   assert.match(ambient, /<aquarium-pet-sprite/u)
-  assert.match(creatures, /shark-curious\.webp/u)
-  assert.match(creatures, /shark-annoyed\.webp/u)
+  assert.match(creatures, /shark-curious-animated\.webp/u)
+  assert.match(creatures, /shark-annoyed-animated\.webp/u)
   assert.match(creatures, /state\.preset\.kind === "jelly"/u)
   assert.doesNotMatch(creatures, /fear-scale/u)
   assert.doesNotMatch(creatures, /underwater-creatures\.svg|underwater-2d__crop|creatureLayerSrc/u)
@@ -376,9 +380,11 @@ test('underwater ambience uses the original cleaned mascots and visible bubbles'
   const backdrop = readFileSync(new URL('../app/components/OceanPageBackdrop.vue', import.meta.url), 'utf8')
   const crab = readFileSync(new URL('../app/components/HeaderCrab.client.vue', import.meta.url), 'utf8')
   assert.match(backdrop, /<header-crab/u)
-  assert.match(crab, /header-crab\.webp/u)
+  assert.match(crab, /header-crab-animated\.webp/u)
   assert.match(crab, /header-crab-scamper/u)
-  assert.match(crab, /header-crab-surprised\.webp/u)
+  assert.match(crab, /header-crab-surprised-animated\.webp/u)
+  // The scuttle is baked into the sprite now, so the CSS wobble must stay gone.
+  assert.doesNotMatch(crab, /header-crab-scuttle/u)
   assert.match(crab, /header-crab-flee-left/u)
   assert.match(crab, /CRAB_FALL_CHANCE = 0\.08/u)
   assert.match(crab, /header-crab-fall/u)

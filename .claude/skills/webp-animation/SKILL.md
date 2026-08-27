@@ -53,7 +53,8 @@ detached part. If that happens, regenerate the art rather than editing the scrip
 node scripts/build-animated-pet.mjs <source> <target> <width> <height> [mode] [face options]
 ```
 
-`mode` is `fish` (default), `shark`, `jelly`, `seahorse`, or `puffer`. Pick it
+`mode` is `fish` (default), `shark`, `jelly`, `seahorse`, `puffer`, `crab`, or
+`crab-panic`. Pick it
 to match the creature's `kind`, not its look — the CSS rig in
 `app/assets/css/ocean-creature-rig.css` assumes the baked motion matches.
 
@@ -64,8 +65,16 @@ to match the creature's `kind`, not its look — the CSS rig in
 | `seahorse` | `seahorse` | upright sway, curled tail, fast dorsal fin | 28 / 85 ms |
 | `jelly` | `jelly` | bell contracts, tentacles trail a beat behind | 28 / 95 ms |
 | `puffer` | `puffer` | inflate/deflate around centre + tail beat | 28 / 90 ms |
+| `crab` | `crab` | metachronal leg wave, claws bob, shell held still | 24 / 64 ms |
+| `crab-panic` | `crab-panic` | same rig, ~1.55x throw and speed | 24 / 41 ms |
 
-Output is `loop: 0`, `quality: 86`, `alphaQuality: 100`.
+Output is `loop: 0`, `quality: 70`, `alphaQuality: 80`, `effort: 6`.
+
+That is deliberately cheap. The sprites are flat cartoon art with large areas of
+near-flat colour, so at q70 a head is indistinguishable from q86 at 2x zoom
+while costing ~40% fewer bytes — verified against both the 640x396 shark and the
+105x120 jelly. Every frame of every mood ships to the homepage, so bytes win.
+Do not raise this back to q86 without re-measuring the total.
 
 ### Rebuilding the whole cast
 
@@ -81,10 +90,23 @@ node scripts/regenerate-animated-pets.mjs shark-clean-hq     # one sprite
 Always stage into `--out` first and eyeball the frames before overwriting — the
 animated files are binary, so `git diff` tells you nothing.
 
-`shark-hunt.webp` is deliberately absent from the table: it ships only as an
-animated file with no static source, so it cannot be regenerated. If the rigs
-change enough to matter visually, it will drift out of style with the rest of
-the shark variants and needs new source art.
+**Prefer the `-animated` suffix; never overwrite a static source.** The plain
+name is the static source and the loop gets the `-animated` suffix — including
+expression overlays that never appear in `aquariumCreatures.ts`.
+
+`shark-hunt.webp` is the one exception: it ships animated under its plain name
+by request. That is why `shark-hunt-source.webp` exists — an 18 KB neutral
+resting frame, recovered from the animation after the original source was lost,
+that nothing renders and the regen table builds from via `src`/`out`. Feeding
+`shark-hunt.webp` back into the builder would read whichever frame happened to
+be first and compound its warp. If another sprite ever has to ship this way,
+give it a `-source` twin the same way.
+
+When a sprite gains a baked loop, check what the CSS was already doing to it.
+`HeaderCrab.client.vue` drove a `header-crab-scuttle` whole-sprite bob that
+became redundant once the legs actually moved, and was removed; the positional
+keyframes (scamper, flee, fall) stay, because those move the crab around the
+page rather than deforming it.
 
 ### How the motion is produced
 
@@ -102,10 +124,19 @@ parts of the body move independently and the character deforms.
   phase includes a `u` term, e.g. `sin(TAU * (2 * t + u * 0.55))`.
 - Frames are rendered on a canvas 1.35x the requested size, then all frames are
   cropped by a **single shared rectangle** (the union of every frame's content)
-  and resized into the target box. This means fin tips and tentacles cannot clip,
-  the character does not jitter from a per-frame crop, and it stays the same
-  apparent size as the static sprite. Do not add an extra inset here — the union
-  crop already reserves the headroom.
+  and resized into the target box. This keeps fin tips and tentacles from
+  clipping and stops the character jittering from a per-frame crop. Do not add
+  an extra inset here — the union crop already reserves the headroom.
+- **The source must be resized to the target box and then extended out to the
+  render canvas — never resized straight into the canvas.** `fit: 'contain'`
+  scales the artwork up to fill whatever box it is given, so resizing into the
+  padded canvas leaves zero headroom and every rig silently clips at the
+  extremes. That bug shipped once and cost the inflating puffer its tail, snout
+  and belly at peak; the union crop cannot recover it, because by then the
+  frames it measures are already clipped.
+- Audit for it by counting opaque pixels on the canvas border per frame. A
+  handful on the widest frame is correct — the union crop is scaled to fit
+  exactly. Tens of pixels, or contact on all four sides, means clipping.
 - Sampling is inverse-mapped and bilinear, on premultiplied alpha. Premultiplying
   is what keeps a dark fringe from appearing along the silhouette.
 
@@ -152,10 +183,15 @@ hand because detection gets them wrong:
 | sprite | face options |
 | --- | --- |
 | `shark-clean`, `shark-clean-hq` | `--eye 0.72,0.46,0.089 --mouth 0.72,0.63,0.12,0.07` |
+| `shark-hunt` | `--eye 0.72,0.44,0.065 --mouth 0.76,0.65,0.13,0.08` |
+| `shark-curious` | `--eye 0.725,0.405,0.077 --mouth 0.82,0.68,0.04,0.035` |
+| `shark-annoyed` | `--eye 0.70,0.475,0.055 --eye 0.82,0.47,0.050 --mouth 0.755,0.655,0.085,0.03` |
 | `blue-fish` | `--eye 0.80,0.51,0.09 --mouth 0.855,0.685,0.04,0.032` |
 | `jelly-pink`, `jelly-pink-hq` | `--eye 0.655,0.225,0.075 --eye 0.875,0.28,0.058 --mouth 0.735,0.335,0.055,0.042` |
 | `jelly-pink-play` | `--eye 0.65,0.25,0.07 --eye 0.79,0.30,0.06 --mouth 0.72,0.35,0.055,0.045` |
 | `jelly-pink-angry` | `--eye 0.63,0.30,0.07 --eye 0.79,0.33,0.06 --mouth 0.72,0.40,0.05,0.03` |
+| `header-crab` | `--eye 0.455,0.21,0.062 --eye 0.675,0.29,0.058 --mouth 0.51,0.51,0.075,0.055` |
+| `header-crab-surprised` | `--eye 0.465,0.21,0.065 --eye 0.655,0.28,0.055 --mouth 0.525,0.505,0.05,0.065` |
 
 Detection alone is correct for the rest of the cast — including the two-eyed
 `clownfish`, `puffer-normal`, `jelly-blue-play` and `seahorse-tired`, all of
@@ -166,9 +202,16 @@ Sleep and narrowed-eye variants (`jelly-*-sleep`, `jelly-blue-angry`) report
 `eyes=none`. That is correct, not a failure — closed eyes have no sclera, so
 no blink is applied.
 
-To measure a new character, crop its head, upscale it, and overlay gridlines at
-0.05 intervals of the bounding box — reading `u`/`v` off that is far faster and
-more reliable than guessing and re-rendering.
+To measure a new character, render a normalized grid over it and read `u`/`v`
+straight off the image — far faster and more reliable than guessing and
+re-rendering:
+
+```bash
+node scripts/face-grid.mjs public/images/ocean-creatures/shark-annoyed.webp /tmp/grid.png
+```
+
+The grid spans the content bounding box, which is the same box the rig
+normalizes against, so what you read is what you pass to `--eye`/`--mouth`.
 
 ### Tuning a rig
 
@@ -200,6 +243,10 @@ shows displacement peaking at the tail and decaying to near zero at the head.
 | jelly-blue | 105x120 | — |
 | jelly-pink | 120x109 | 360x327 |
 | header-crab | 220x160 | — |
+
+`header-crab` renders at `rotate(180deg)` — it hangs from the underside of the
+header — but the sprite itself is authored upright, so measure and rig it
+upright and let the CSS flip it.
 
 Keep the aspect ratio identical between a creature's normal and `-hq` box, and
 across all of its variants. The runtime cross-fades variants over the base

@@ -48,6 +48,32 @@ const ramp = (n, power) => clamp01(n) ** power
 // Bump that rises across [start, peak] and falls across [peak, end].
 const band = (n, start, peak, end) => ramp((n - start) / (peak - start), 1) * ramp((end - n) / (end - peak), 1)
 
+function crabRig(scuttle) {
+  return {
+    frames: 24,
+    delay: Math.round(64 / scuttle),
+    beats: 2,
+    displace(u, v, t, out) {
+      const side = Math.abs(u - 0.5) * 2
+      const outward = u < 0.5 ? -1 : 1
+      // Legs hang below the shell and reach furthest at the outer edges.
+      const legs = ramp((v - 0.50) / 0.50, 1.3) * ramp((side - 0.12) / 0.88, 0.8)
+      // Phase trails outward from the body, so the legs ripple in sequence.
+      const phase = TAU * (2 * t - side * 0.45)
+      // The two claws sit diagonally: raised at upper left, low at lower right.
+      const clawHigh = band(u, 0.00, 0.14, 0.36) * ramp((0.52 - v) / 0.52, 1.1)
+      const clawLow = band(u, 0.44, 0.62, 0.80) * ramp((v - 0.58) / 0.42, 1.1)
+      out[0] = 0.052 * scuttle * legs * Math.sin(phase) * outward
+        + 0.030 * scuttle * clawHigh * Math.sin(TAU * (2 * t + 0.35))
+        + 0.022 * scuttle * clawLow * Math.sin(TAU * (2 * t + 0.75))
+      out[1] = 0.046 * scuttle * legs * Math.cos(phase)
+        + 0.034 * scuttle * clawHigh * Math.sin(TAU * (2 * t + 0.10))
+        + 0.026 * scuttle * clawLow * Math.sin(TAU * (2 * t + 0.55))
+        + 0.012 * Math.sin(TAU * (2 * t))
+    },
+  }
+}
+
 // Every rig maps a point on the sprite to a displacement, so different parts of
 // the body move independently: a wave travels down a fish toward its tail, a
 // jellyfish bell contracts while the tentacles trail a beat behind. `u` runs 0
@@ -128,6 +154,16 @@ const rigs = {
         - 0.030 * Math.max(0, pulse)
     },
   },
+  // Walker, not a swimmer. Real crabs move their legs in a metachronal wave —
+  // each leg a little behind its neighbour — so the phase is driven by distance
+  // from the body centre rather than by a left/right split, which would look
+  // like two halves flapping. The shell barely moves; the legs and claw tips do
+  // nearly all of it.
+  //
+  // `scuttle` speeds the rig up and widens the leg throw for the panicked
+  // variant, which is on screen while the crab flees or falls.
+  crab: crabRig(1),
+  'crab-panic': crabRig(1.55),
   // Round body that swells and settles around its own centre, with a small
   // tail beat layered on top.
   puffer: {
@@ -159,9 +195,22 @@ const padding = 1.35
 const canvasWidth = Math.round(width * padding)
 const canvasHeight = Math.round(height * padding)
 
+// Fit the art to the *target* box first, then pad out to the render canvas.
+// Resizing straight into the canvas would scale the artwork up to fill it, so
+// the padding would exist in name only and any outward displacement would run
+// off the edge — which is exactly how the inflating puffer used to clip.
+const padX = Math.floor((canvasWidth - width) / 2)
+const padY = Math.floor((canvasHeight - height) / 2)
 const base = await sharp(resolve(source))
   .ensureAlpha()
-  .resize(canvasWidth, canvasHeight, { fit: 'contain', background: transparent })
+  .resize(width, height, { fit: 'contain', background: transparent })
+  .extend({
+    left: padX,
+    right: canvasWidth - width - padX,
+    top: padY,
+    bottom: canvasHeight - height - padY,
+    background: transparent,
+  })
   .raw()
   .toBuffer()
 
@@ -462,5 +511,10 @@ for (const frame of frames) {
 await sharp(Buffer.concat(rendered), {
   raw: { width, height: height * rig.frames, channels: 4, pageHeight: height },
 })
-  .webp({ quality: 86, alphaQuality: 100, loop: 0, delay: Array(rig.frames).fill(rig.delay) })
+  // These are flat cartoon sprites with large areas of near-flat colour, so they
+  // survive a much cheaper encode than photographic art would: at q70 the head
+  // is indistinguishable from q86 at 2x zoom, for roughly 40% of the bytes.
+  // `effort: 6` costs encode time only. Every frame of every mood ships to the
+  // homepage, so the bytes matter more than the last few percent of fidelity.
+  .webp({ quality: 70, alphaQuality: 80, effort: 6, loop: 0, delay: Array(rig.frames).fill(rig.delay) })
   .toFile(resolve(target))

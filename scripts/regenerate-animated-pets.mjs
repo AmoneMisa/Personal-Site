@@ -14,8 +14,7 @@ const builder = resolve(root, 'scripts/build-animated-pet.mjs')
 // detector run; sleeping and narrowed-eye variants correctly detect nothing and
 // simply skip the blink.
 //
-// shark-hunt.webp has no static source sprite — it exists only as an animated
-// file — so it cannot be regenerated and is deliberately absent.
+// `src`/`out` override the default `<id>.webp` -> `<id>-animated.webp` naming.
 const jellyPinkFace = [
   '--eye', '0.655,0.225,0.075',
   '--eye', '0.875,0.28,0.058',
@@ -47,6 +46,19 @@ const pets = [
   { id: 'seahorse-tired', w: 140, h: 240, mode: 'seahorse' },
   { id: 'shark-clean', w: 320, h: 198, mode: 'shark', face: ['--eye', '0.72,0.46,0.089', '--mouth', '0.72,0.63,0.12,0.07'] },
   { id: 'shark-clean-hq', w: 640, h: 396, mode: 'shark', face: ['--eye', '0.72,0.46,0.089', '--mouth', '0.72,0.63,0.12,0.07'] },
+  // Shark expression overlays. AquariumPetSprite cross-fades these over the
+  // resting sprite, so they run the same rig at the same box to stay in step.
+  // shark-hunt ships animated under its plain name, so it needs an explicit
+  // source: feeding the animation back into the builder would compound the
+  // warp of whatever frame happened to be read. shark-hunt-source.webp is the
+  // neutral resting frame and exists only to be rebuilt from.
+  { id: 'shark-hunt', w: 320, h: 198, mode: 'shark', src: 'shark-hunt-source', out: 'shark-hunt', face: ['--eye', '0.72,0.44,0.065', '--mouth', '0.76,0.65,0.13,0.08'] },
+  { id: 'shark-curious', w: 320, h: 198, mode: 'shark', face: ['--eye', '0.725,0.405,0.077', '--mouth', '0.82,0.68,0.04,0.035'] },
+  { id: 'shark-annoyed', w: 320, h: 198, mode: 'shark', face: ['--eye', '0.70,0.475,0.055', '--eye', '0.82,0.47,0.050', '--mouth', '0.755,0.655,0.085,0.03'] },
+  // The header crab walks rather than swims, and the panicked sprite is on
+  // screen only while it is fleeing or falling, so it scuttles harder.
+  { id: 'header-crab', w: 220, h: 160, mode: 'crab', face: ['--eye', '0.455,0.21,0.062', '--eye', '0.675,0.29,0.058', '--mouth', '0.51,0.51,0.075,0.055'] },
+  { id: 'header-crab-surprised', w: 220, h: 160, mode: 'crab-panic', face: ['--eye', '0.465,0.21,0.065', '--eye', '0.655,0.28,0.055', '--mouth', '0.525,0.505,0.05,0.065'] },
 ]
 
 const argv = process.argv.slice(2)
@@ -57,13 +69,14 @@ const only = argv.filter((arg, index) => !arg.startsWith('-') && index !== outIn
 let failed = 0
 for (const pet of pets) {
   if (only.length && !only.includes(pet.id)) continue
-  const source = resolve(sprites, `${pet.id}.webp`)
+  const source = resolve(sprites, `${pet.src ?? pet.id}.webp`)
   if (!existsSync(source)) {
-    console.error(`missing source: ${pet.id}.webp`)
+    console.error(`missing source: ${pet.src ?? pet.id}.webp`)
     failed += 1
     continue
   }
-  const args = [builder, source, resolve(outDir, `${pet.id}-animated.webp`), String(pet.w), String(pet.h), pet.mode, ...(pet.face ?? [])]
+  const target = resolve(outDir, `${pet.out ?? `${pet.id}-animated`}.webp`)
+  const args = [builder, source, target, String(pet.w), String(pet.h), pet.mode, ...(pet.face ?? [])]
   const run = spawnSync(process.execPath, args, { encoding: 'utf8' })
   if (run.status !== 0) {
     console.error(`${pet.id}: ${run.stderr.trim()}`)

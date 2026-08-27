@@ -29,8 +29,8 @@ function jellyMoodSrc(creature: CreaturePreset, mood: "sleep" | "play" | "angry"
     <template v-else-if="creature.kind === 'shark'">
       <img class="aquarium-pet-sprite__image aquarium-pet-sprite__expression aquarium-pet-sprite__expression_default" :src="creature.src" alt="" draggable="false" @load="$emit('loaded')">
       <img class="aquarium-pet-sprite__image aquarium-pet-sprite__expression aquarium-pet-sprite__expression_hunt" src="/images/ocean-creatures/shark-hunt.webp" alt="" draggable="false">
-      <img class="aquarium-pet-sprite__image aquarium-pet-sprite__expression aquarium-pet-sprite__expression_interest" src="/images/ocean-creatures/shark-curious.webp" alt="" draggable="false">
-      <img class="aquarium-pet-sprite__image aquarium-pet-sprite__expression aquarium-pet-sprite__expression_panic" src="/images/ocean-creatures/shark-annoyed.webp" alt="" draggable="false">
+      <img class="aquarium-pet-sprite__image aquarium-pet-sprite__expression aquarium-pet-sprite__expression_interest" src="/images/ocean-creatures/shark-curious-animated.webp" alt="" draggable="false">
+      <img class="aquarium-pet-sprite__image aquarium-pet-sprite__expression aquarium-pet-sprite__expression_panic" src="/images/ocean-creatures/shark-annoyed-animated.webp" alt="" draggable="false">
     </template>
 
     <template v-else-if="creature.kind === 'seahorse'">

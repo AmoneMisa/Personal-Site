@@ -51,7 +51,7 @@ onBeforeUnmount(() => {
   >
     <img
       class="header-crab__sprite"
-      :src="phase === 'fleeing' || phase === 'falling' ? '/images/ocean-creatures/header-crab-surprised.webp' : '/images/ocean-creatures/header-crab.webp'"
+      :src="phase === 'fleeing' || phase === 'falling' ? '/images/ocean-creatures/header-crab-surprised-animated.webp' : '/images/ocean-creatures/header-crab-animated.webp'"
       alt=""
       draggable="false"
     >
@@ -64,7 +64,7 @@ onBeforeUnmount(() => {
   z-index: 4;
   top: clamp(58px, 5.5vw, 78px);
   left: 0;
-  width: clamp(78px, 7vw, 120px);
+  width: clamp(83px, 7.4vw, 128px);
   aspect-ratio: 220 / 160;
   opacity: 0;
   pointer-events: none;
@@ -85,8 +85,9 @@ onBeforeUnmount(() => {
   width: 100%;
   height: 100%;
   object-fit: contain;
+  /* The scuttle is baked into the sprite as real leg motion, so there is no
+     whole-sprite wobble here to fight it. */
   filter: drop-shadow(0 8px 12px rgba(0, 7, 27, .32));
-  animation: header-crab-scuttle .2s ease-in-out infinite alternate;
 }
 
 @keyframes header-crab-scamper {
@@ -110,11 +111,6 @@ onBeforeUnmount(() => {
   42% { opacity: .98; transform: translate3d(calc(var(--crab-x) + 18px), calc(var(--crab-y) + 24vh), 0) rotate(302deg); }
   76% { opacity: .94; transform: translate3d(calc(var(--crab-x) - 12px), calc(var(--crab-y) + 68vh), 0) rotate(472deg); }
   100% { opacity: 0; transform: translate3d(calc(var(--crab-x) + 28px), calc(100vh + 170px), 0) rotate(620deg); }
-}
-
-@keyframes header-crab-scuttle {
-  from { transform: translateY(-1px) scaleX(.985); }
-  to { transform: translateY(1px) scaleX(1.015); }
 }
 
 @media (prefers-reduced-motion: reduce) {
