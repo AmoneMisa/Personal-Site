@@ -7,14 +7,31 @@ withDefaults(defineProps<{
 }>(), {
   hideLabel: "",
 });
+
+const route = useRoute();
+const mounted = ref(false);
+const useFlatFinderFooter = computed(() => mounted.value && route.path.endsWith("/flat-finder"));
+
+onMounted(() => {
+  mounted.value = true;
+});
 </script>
 
 <template>
-  <div
-    class="search-advanced-filters"
-    :class="{ 'search-advanced-filters_open': open }"
-  >
-    <div class="search-advanced-filters__toggle">
+  <div class="search-advanced-filters">
+    <teleport v-if="useFlatFinderFooter" to=".filter-actions-row">
+      <button
+        type="button"
+        class="search-advanced-filters__button search-advanced-filters__button_footer"
+        :aria-expanded="open"
+        @click="open = !open"
+      >
+        <u-icon :name="open ? 'i-lucide-chevron-up' : 'i-lucide-chevron-right'" />
+        <span>{{ open ? (hideLabel || label) : label }}</span>
+      </button>
+    </teleport>
+
+    <div v-else class="search-advanced-filters__toggle">
       <button
         type="button"
         class="search-advanced-filters__button"
@@ -34,21 +51,10 @@ withDefaults(defineProps<{
 
 <style scoped>
 .search-advanced-filters {
-  position: relative;
   display: grid;
-  width: max-content;
-  max-width: calc(100% - 32px);
+  width: 100%;
   min-width: 0;
   gap: 8px;
-  /* The toggle is rendered after .filter-card, while Reset lives in the card's
-     footer. Lift only the collapsed trigger onto that footer row. When opened,
-     the component returns to normal flow so the panel can expand naturally. */
-  margin: -54px 0 16px 16px;
-}
-.search-advanced-filters_open {
-  width: 100%;
-  max-width: none;
-  margin: 0;
 }
 .search-advanced-filters__toggle {
   display: flex;
@@ -71,6 +77,11 @@ withDefaults(defineProps<{
   cursor: pointer;
 }
 .search-advanced-filters__button:hover { color: var(--text-white); }
+.search-advanced-filters__button_footer {
+  order: -1;
+  flex: 0 0 auto;
+  min-height: 32px;
+}
 .search-advanced-filters__panel {
   position: relative;
   isolation: isolate;
@@ -118,13 +129,6 @@ withDefaults(defineProps<{
 }
 
 @media (max-width: 699px) {
-  .search-advanced-filters,
-  .search-advanced-filters_open {
-    width: 100%;
-    max-width: none;
-    margin: 0;
-  }
-
   .search-advanced-filters__toggle {
     margin-top: 2px;
     padding: 12px 12px 0;
@@ -137,6 +141,11 @@ withDefaults(defineProps<{
     padding: 0 2px;
     justify-content: flex-start;
     font-size: 14px;
+  }
+
+  .search-advanced-filters__button_footer {
+    width: auto;
+    min-height: 36px;
   }
 }
 
