@@ -30,6 +30,7 @@ export default defineNuxtPlugin((nuxtApp) => {
       requirementRequired: 'Required',
       requirementPreferred: 'Preferred',
       requirementNotRequired: 'Not required',
+      skillPrototyping: 'Prototyping',
     },
   })
   merge('ru', {
@@ -58,6 +59,7 @@ export default defineNuxtPlugin((nuxtApp) => {
       requirementRequired: 'Обязательно',
       requirementPreferred: 'Желательно',
       requirementNotRequired: 'Не обязательно',
+      skillPrototyping: 'Прототипирование',
     },
   })
 })
