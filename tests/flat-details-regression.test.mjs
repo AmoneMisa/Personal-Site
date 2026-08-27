@@ -25,8 +25,10 @@ test("flat spec table does not parse listing description on the client", async (
 
 test("flat spec grid uses three columns through 960px", async () => {
   const source = await read("app/components/ui/SpecTable.vue");
+  const fallback = await read("app/assets/css/flat-placeholder.css");
   assert.match(source, /grid-template-columns: repeat\(3, minmax\(0, 1fr\)\)/);
   assert.doesNotMatch(source, /grid-template-columns: repeat\(4, minmax\(0, 1fr\)\)/);
+  assert.match(fallback, /@media \(min-width: 721px\) and \(max-width: 960px\)/);
 });
 
 test("dynamic flat spec icons are bundled without Iconify runtime", async () => {

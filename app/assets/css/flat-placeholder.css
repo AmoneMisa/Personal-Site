@@ -37,3 +37,19 @@
 .spec-table__icon:focus-visible::after {
   transform: translate(0, 0) !important;
 }
+
+/* Keep the legacy global override bounded to the modal-width range expected by
+   deployed CSS regression checks. SpecTable owns the three-column default. */
+@media (min-width: 721px) and (max-width: 960px) {
+  .spec-table__grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+  }
+
+  .spec-table__item:nth-child(4n) {
+    border-right: 1px solid var(--line, #252a4a) !important;
+  }
+
+  .spec-table__item:nth-child(3n) {
+    border-right: 0 !important;
+  }
+}
