@@ -98,8 +98,10 @@ onBeforeUnmount(() => {
         <slot v-if="$slots.content" name="content" />
         <template v-else>
           <header v-if="$slots.title || title || dismissible" class="u-modal__header">
-            <slot v-if="$slots.title" name="title" />
-            <h2 v-else-if="title" class="u-modal__title">{{ title }}</h2>
+            <div v-if="$slots.title || title" class="u-modal__heading">
+              <slot v-if="$slots.title" name="title" />
+              <h2 v-else class="u-modal__title">{{ title }}</h2>
+            </div>
             <button v-if="dismissible" type="button" class="u-modal__close ui-focusable" aria-label="Close" @click="close">
               <UIcon name="i-lucide-x" />
             </button>
@@ -148,10 +150,12 @@ onBeforeUnmount(() => {
   padding: 18px 20px 14px;
   border-bottom: 1px solid var(--line);
 }
+.u-modal__heading { flex: 1 1 auto; min-width: 0; }
 .u-modal__title { flex: 1 1 auto; margin: 0; font-size: 17px; font-weight: 700; line-height: 1.3; overflow-wrap: anywhere; }
 
 .u-modal__close {
   flex: none;
+  margin-left: auto;
   display: inline-flex;
   align-items: center;
   justify-content: center;

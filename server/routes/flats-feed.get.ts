@@ -29,10 +29,10 @@ const STATS_UPSTREAM_TIMEOUT_MS = 55_000
 // share-link request open for the full feed timeout.
 const EXACT_LOOKUP_TIMEOUT_MS = 12_000
 const AVAILABILITY_TIMEOUT_MS = 5_000
-const AVAILABILITY_FRESH_MS = 15 * 60_000
+const ACTIVE_AVAILABILITY_FRESH_MS = 60 * 60_000
 const feedCache = new Map<string, { at: number; data: any }>()
 const feedRefreshes = new Map<string, Promise<any>>()
-const availabilityCache = new Map<string, { at: number; status: 'active' | 'inactive' }>()
+const availabilityCache = new Map<string, { at: number; status: 'active' }>()
 const ALL_FEED_SOURCES = ['olx', 'telegram', 'facebook', 'threads'] as const
 const SOCIAL_FEED_SOURCES = new Set(['telegram', 'facebook', 'threads'])
 
@@ -159,7 +159,7 @@ async function filterPersistedInactiveOlx(response: any): Promise<any> {
   const pending: Array<{ source: string; country: string; id: string }> = []
   for (const [key, item] of unique) {
     const cached = availabilityCache.get(key)
-    if (cached && now - cached.at < AVAILABILITY_FRESH_MS) statuses.set(key, cached.status)
+    if (cached?.status === 'active' && now - cached.at < ACTIVE_AVAILABILITY_FRESH_MS) statuses.set(key, cached.status)
     else pending.push(item)
   }
 
@@ -189,7 +189,15 @@ async function filterPersistedInactiveOlx(response: any): Promise<any> {
         if (result?.status !== 'active' && result?.status !== 'inactive') continue
         const key = availabilityKey(result)
         statuses.set(key, result.status)
-        availabilityCache.set(key, { at: now, status: result.status })
+        if (result.status === 'active') {
+          const checkedAt = Date.parse(String(result.checkedAt || ''))
+          availabilityCache.set(key, {
+            at: Number.isFinite(checkedAt) ? checkedAt : now,
+            status: 'active',
+          })
+        } else {
+          availabilityCache.delete(key)
+        }
       }
     }
 
@@ -275,11 +283,13 @@ export default defineEventHandler(async (event) => {
   const exactListingId = String(upstreamParams.get('listingId') || '').trim()
   const exactSource = requestedSources.length === 1 ? requestedSources[0]! : ''
   const exactCountryCode = exactCountry(upstreamParams)
+  const verifyLive = upstreamParams.get('verifyLive') === '1'
+  upstreamParams.delete('verifyLive')
 
-  // Exact OLX verification is the whole purpose of this request. Running the
-  // general feed query first could consume its 25s budget before this bounded
-  // 12s source probe even began, while the browser was waiting to open a card.
-  if (exactListingId && exactSource === 'olx' && exactCountryCode) {
+  // Ordinary exact lookups stay on PostgreSQL so cards and shared links open
+  // immediately. The client follows with an explicit live verification after
+  // opening; only that second request is allowed to wait on OLX.
+  if (verifyLive && exactListingId && exactSource === 'olx' && exactCountryCode) {
     setResponseHeader(event, 'Cache-Control', 'no-store')
     try {
       const exact = await $fetch<any>(
@@ -287,7 +297,11 @@ export default defineEventHandler(async (event) => {
         { timeout: EXACT_LOOKUP_TIMEOUT_MS },
       )
       if (exact?.listing && String(exact.listing.id ?? '') === exactListingId) {
-        availabilityCache.set(availabilityKey(exact.listing), { at: Date.now(), status: 'active' })
+        const checkedAt = Date.parse(String(exact.availability?.checkedAt || ''))
+        availabilityCache.set(availabilityKey(exact.listing), {
+          at: Number.isFinite(checkedAt) ? checkedAt : Date.now(),
+          status: 'active',
+        })
         return {
           count: 1,
           listings: [shapeListing(exact.listing)],
@@ -298,7 +312,7 @@ export default defineEventHandler(async (event) => {
     } catch (error: any) {
       const status = Number(error?.statusCode || error?.response?.status || 0)
       if (status === 404) {
-        availabilityCache.set(`olx:${exactCountryCode}:${exactListingId}`, { at: Date.now(), status: 'inactive' })
+        availabilityCache.delete(`olx:${exactCountryCode}:${exactListingId}`)
         return { count: 0, listings: [], exactListingFallback: 'source-inactive' }
       }
       // A timeout or temporary source failure is inconclusive. The client may

@@ -165,7 +165,8 @@ test('flat finder exposes photo-only and room-rent filters', () => {
   const en = JSON.parse(readFileSync(new URL('../i18n/locales/en.json', import.meta.url), 'utf8'))
   assert.match(filters, /const onlyWithPhotos = ref\(false\)/u)
   assert.match(flat, /value: "roomRent"/u)
-  assert.match(flat, /class="flat-verification"/u)
+  assert.match(flat, /class="flat-modal__verification"/u)
+  assert.doesNotMatch(flat, /class="flat-verification"/u)
   assert.ok(ru.flats.onlyWithPhotos && ru.flats.dtRoomRent)
   assert.ok(en.flats.onlyWithPhotos && en.flats.dtRoomRent)
 })
@@ -662,8 +663,8 @@ test('candidate detail table explicitly marks missing values for its hide toggle
   const hiringPage = readFileSync(new URL('../app/pages/hiring/index.vue', import.meta.url), 'utf8')
   assert.match(component, /empty\?: boolean/u)
   assert.match(component, /!row\.empty/u)
-  assert.match(hiringPage, /empty: profile\.remote == null/u)
-  assert.match(hiringPage, /empty: !profile\.languages\?\.length/u)
+  assert.match(hiringPage, /row\("preferences", t\("specRemote"\), fmtBool\(profile\.remote\), profile\.remote == null/u)
+  assert.match(hiringPage, /row\("qualifications", t\("specLanguages"\), listOr\(profile\.languages\), !profile\.languages\?\.length/u)
 })
 
 test('Careerist removes listing controls and rejects remote format as a profession', () => {

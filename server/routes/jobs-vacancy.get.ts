@@ -2,6 +2,7 @@
 // snapshot. Ingestion and enrichment happen in jobs-worker before persistence.
 
 import { getStoredJobsSnapshot } from '../utils/jobsSnapshot'
+import { publicEntityId } from '../../shared/publicEntityId'
 
 export default defineEventHandler(async (event) => {
   const id = String(getQuery(event).id ?? '').trim()
@@ -9,5 +10,9 @@ export default defineEventHandler(async (event) => {
 
   const jobs = await getStoredJobsSnapshot()
   const found = jobs.find((job) => job.id === id || job.url === id)
-  return { job: found || null }
+  return {
+    job: found
+      ? { ...found, publicId: publicEntityId('job', found.source, found.id) }
+      : null,
+  }
 })

@@ -25,6 +25,7 @@ import { useSavedCollections } from "~/composables/search/useSavedCollections";
 import { useInfiniteFeed } from "~/composables/search/useInfiniteFeed";
 import { ANY_SELECT_VALUE, useNullableSelect } from "~/composables/search/useNullableSelect";
 import { useShareLink } from "~/composables/search/useShareLink";
+import { publicEntityId } from "~~/shared/publicEntityId";
 
 // Job Finder service. Auto-routed at /jobs. Aggregates many boards, enforces a
 // 14-day freshness cap server-side, offers full sort + advanced filters, shows
@@ -35,6 +36,9 @@ const { t: translate, locale } = useI18n();
 const t = (key: string, params: Record<string, unknown> = {}) =>
   translate(`jobs.${key}`, params);
 const localePath = useLocalePath();
+const jobPublicId = (job: Job | null) => job
+  ? job.publicId ?? publicEntityId("job", job.source, job.id)
+  : null;
 
 useSeoMeta({
   title: () => t("seoTitle"), description: () => t("seoDescription"),
@@ -425,43 +429,72 @@ function salaryTypeValue(j: Job): string {
   if (j.salaryGross === false) return t("salaryNet");
   return t("notSpecified");
 }
-const vacRows = computed<Array<{ label: string; value: string }>>(() => {
+type VacancySpecGroup = "overview" | "location" | "compensation" | "conditions" | "requirements" | "match";
+type VacancySpecRow = {
+  label: string;
+  value: string;
+  group: VacancySpecGroup;
+  groupLabel: string;
+  column: 1 | 2 | 3;
+  icon: string;
+};
+const vacancySpecGroups: Record<VacancySpecGroup, { column: 1 | 2 | 3; key: string }> = {
+  overview: { column: 1, key: "specGroupOverview" },
+  location: { column: 1, key: "specGroupLocation" },
+  compensation: { column: 2, key: "specGroupCompensation" },
+  conditions: { column: 2, key: "specGroupConditions" },
+  requirements: { column: 3, key: "specGroupRequirements" },
+  match: { column: 3, key: "specGroupMatch" },
+};
+const vacRows = computed<VacancySpecRow[]>(() => {
   const j = activeJob.value;
   if (!j) return [];
   const ats = activeAts.value;
   const langs = (j.languages || []).map((l) => (l.level ? `${l.language} (${l.level})` : l.language)).join(", ");
+  const row = (group: VacancySpecGroup, label: string, value: string, icon: string): VacancySpecRow => ({
+    group,
+    groupLabel: t(vacancySpecGroups[group].key),
+    column: vacancySpecGroups[group].column,
+    label,
+    value,
+    icon,
+  });
   const rows = [
-    { label: t("vCompany"), value: vStr(j.company) },
-    { label: t("vLocation"), value: vStr(j.location) },
-    { label: t("vCountry"), value: j.country && !["OTHER", "REMOTE"].includes(j.country) ? countryLabel(j.country) : t("notSpecified") },
-    { label: t("vCity"), value: vStr(j.city) },
-    { label: t("vSource"), value: jobSourceLabel(j.source) },
-    { label: t("vPublished"), value: timeAgo(j.postedAt) },
-    { label: t("vDeadline"), value: vStr(j.deadline) },
-    { label: t("vSalary"), value: formatSalary(j) || t("notSpecified") },
-    { label: t("vSalaryMonthly"), value: convertedSalary(j) || t("notSpecified") },
-    { label: t("vSalaryType"), value: salaryTypeValue(j) },
-    { label: t("vSalaryNegotiable"), value: vBool(j.salaryNegotiable) },
-    { label: t("vWorkFormat"), value: modeLabel(j.workMode) || (j.remote ? t("remote") : t("notSpecified")) },
-    { label: t("vEmployment"), value: empLabel(j.employmentKind) || t("notSpecified") },
-    { label: t("vExperience"), value: experienceValue(j) },
-    { label: t("vSeniority"), value: seniorityLabel(j.seniority) || t("notSpecified") },
-    { label: t("vManagement"), value: vBool(j.managementRole) },
-    { label: t("vEducation"), value: vStr(j.education) },
-    { label: t("vSchedule"), value: vStr(j.schedule) },
-    { label: t("vContractType"), value: vStr(j.contractType) },
-    { label: t("vRelocation"), value: relocationValue(j) },
-    { label: t("vVisa"), value: vBool(j.foreignerFriendly) },
-    { label: t("vLanguages"), value: langs || t("notSpecified") },
-    { label: t("vSkills"), value: (j.skills && j.skills.length ? j.skills.join(", ") : t("notSpecified")) },
-    { label: t("vNiceToHave"), value: (j.niceToHave && j.niceToHave.length ? j.niceToHave.join(", ") : t("notSpecified")) },
-    { label: t("vTools"), value: (j.tools && j.tools.length ? j.tools.join(", ") : t("notSpecified")) },
-    { label: t("vApplicationLanguage"), value: vStr(j.applicationLanguage) },
+    row("overview", t("vCompany"), vStr(j.company), "i-lucide-building-2"),
+    row("overview", t("vSource"), jobSourceLabel(j.source), "i-lucide-external-link"),
+    row("overview", t("vPublished"), timeAgo(j.postedAt), "i-lucide-calendar-days"),
+    row("overview", t("vDeadline"), vStr(j.deadline), "i-lucide-calendar-clock"),
+
+    row("location", t("vLocation"), vStr(j.location), "i-lucide-map-pin"),
+    row("location", t("vCountry"), j.country && !["OTHER", "REMOTE"].includes(j.country) ? countryLabel(j.country) : t("notSpecified"), "i-lucide-map"),
+    row("location", t("vCity"), vStr(j.city), "i-lucide-map-pinned"),
+
+    row("compensation", t("vSalary"), formatSalary(j) || t("notSpecified"), "i-lucide-banknote"),
+    row("compensation", t("vSalaryMonthly"), convertedSalary(j) || t("notSpecified"), "i-lucide-wallet-cards"),
+    row("compensation", t("vSalaryType"), salaryTypeValue(j), "i-lucide-receipt-text"),
+    row("compensation", t("vSalaryNegotiable"), vBool(j.salaryNegotiable), "i-lucide-hand-coins"),
+
+    row("conditions", t("vWorkFormat"), modeLabel(j.workMode) || (j.remote ? t("remote") : t("notSpecified")), "i-lucide-laptop"),
+    row("conditions", t("vEmployment"), empLabel(j.employmentKind) || t("notSpecified"), "i-lucide-briefcase-business"),
+    row("conditions", t("vSchedule"), vStr(j.schedule), "i-lucide-clock-3"),
+    row("conditions", t("vContractType"), vStr(j.contractType), "i-lucide-file-text"),
+    row("conditions", t("vRelocation"), relocationValue(j), "i-lucide-plane"),
+    row("conditions", t("vVisa"), vBool(j.foreignerFriendly), "i-lucide-stamp"),
+
+    row("requirements", t("vExperience"), experienceValue(j), "i-lucide-history"),
+    row("requirements", t("vSeniority"), seniorityLabel(j.seniority) || t("notSpecified"), "i-lucide-chart-no-axes-column-increasing"),
+    row("requirements", t("vManagement"), vBool(j.managementRole), "i-lucide-users-round"),
+    row("requirements", t("vEducation"), vStr(j.education), "i-lucide-graduation-cap"),
+    row("requirements", t("vLanguages"), langs || t("notSpecified"), "i-lucide-languages"),
+    row("requirements", t("vSkills"), (j.skills && j.skills.length ? j.skills.join(", ") : t("notSpecified")), "i-lucide-wrench"),
+    row("requirements", t("vNiceToHave"), (j.niceToHave && j.niceToHave.length ? j.niceToHave.join(", ") : t("notSpecified")), "i-lucide-sparkles"),
+    row("requirements", t("vTools"), (j.tools && j.tools.length ? j.tools.join(", ") : t("notSpecified")), "i-lucide-hammer"),
+    row("requirements", t("vApplicationLanguage"), vStr(j.applicationLanguage), "i-lucide-message-square-text"),
   ];
   if (ats) {
-    rows.push({ label: t("vMatch"), value: `${ats.score}%` });
-    rows.push({ label: t("vMatched"), value: ats.matched.length ? ats.matched.join(", ") : t("notSpecified") });
-    rows.push({ label: t("vMissing"), value: ats.missing.length ? ats.missing.join(", ") : t("notSpecified") });
+    rows.push(row("match", t("vMatch"), `${ats.score}%`, "i-lucide-gauge"));
+    rows.push(row("match", t("vMatched"), ats.matched.length ? ats.matched.join(", ") : t("notSpecified"), "i-lucide-circle-check"));
+    rows.push(row("match", t("vMissing"), ats.missing.length ? ats.missing.join(", ") : t("notSpecified"), "i-lucide-circle-x"));
   }
   return rows;
 });
@@ -668,7 +701,7 @@ onBeforeUnmount(() => {
 
     </UiResultsLoader>
 
-    <SearchDetailsModal v-model:open="jobModalOpen" :title="activeJob?.title || ''" :ui="{ content: 'max-w-2xl' }">
+    <SearchDetailsModal v-model:open="jobModalOpen" :title="activeJob?.title || ''" :public-id="jobPublicId(activeJob)">
       <template #body>
         <div v-if="activeJob" class="job-modal">
           <div class="job-modal__meta text-muted">

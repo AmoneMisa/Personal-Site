@@ -17,6 +17,7 @@ import { getStoredJobsSnapshot } from '../utils/jobsSnapshot'
 import { getRates, loadRates } from '../utils/currency'
 import { jobSearchKey, searchJobMatches } from '../utils/jobsElastic'
 import { keepUsaForeignerCandidate } from '../utils/jobVisaSponsorship'
+import { publicEntityId } from '../../shared/publicEntityId'
 
 function isConfigured(source: JobSource): boolean {
   switch (source) {
@@ -200,6 +201,10 @@ export default defineEventHandler(async (event) => {
 
   return {
     ...result,
+    jobs: result.jobs.map((job) => ({
+      ...job,
+      publicId: publicEntityId('job', job.source, job.id),
+    })),
     rates: getRates(),
     warming: false,
     loadedSources: [...new Set(pool.map((job) => job.source))],

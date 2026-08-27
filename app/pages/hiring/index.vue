@@ -35,6 +35,7 @@ import { hiringProfessionLocale } from "~~/shared/hiringProfessionLabels";
 import {
   hiringProfessionFilterLabel,
 } from "~~/shared/hiringProfessionGroups";
+import { publicEntityId } from "~~/shared/publicEntityId";
 
 // Hiring board — CV/resume profiles from candidates looking for work.
 // Auto-routed at /hiring. UI follows /flat-finder; data from /hiring-feed.
@@ -51,6 +52,9 @@ const router = useRouter();
 const defaultCountry = ref("UA");
 const professionLocale = computed(() => hiringProfessionLocale(locale.value));
 const cityLabel = (value?: string | null) => locationLabel(value, String(locale.value), "city");
+const candidatePublicId = (profile: CvProfile | null) => profile
+  ? profile.publicId ?? publicEntityId("candidate", profile.sourceKey || profile.source, profile.country, profile.id)
+  : null;
 
 useSeoMeta({
   title: () => t("seoTitle"),
@@ -383,26 +387,62 @@ const employmentLabel = (value?: string | null) => value
     }).join(", ")
   : t("notSpecified");
 
-const specRows = computed(() => {
+type CandidateSpecGroup = "identity" | "location" | "preferences" | "qualifications" | "contact";
+type CandidateSpecRow = {
+  label: string;
+  value: string;
+  empty?: boolean;
+  group: CandidateSpecGroup;
+  groupLabel: string;
+  column: 1 | 2 | 3;
+  icon: string;
+};
+const candidateSpecGroups: Record<CandidateSpecGroup, { column: 1 | 2 | 3; key: string }> = {
+  identity: { column: 1, key: "specGroupIdentity" },
+  location: { column: 2, key: "specGroupLocation" },
+  preferences: { column: 2, key: "specGroupPreferences" },
+  qualifications: { column: 3, key: "specGroupQualifications" },
+  contact: { column: 3, key: "specGroupContact" },
+};
+const specRows = computed<CandidateSpecRow[]>(() => {
   const profile = active.value;
   if (!profile) return [];
+  const row = (
+    group: CandidateSpecGroup,
+    label: string,
+    value: string,
+    empty: boolean,
+    icon: string,
+  ): CandidateSpecRow => ({
+    group,
+    groupLabel: t(candidateSpecGroups[group].key),
+    column: candidateSpecGroups[group].column,
+    label,
+    value,
+    empty,
+    icon,
+  });
   return [
-    { label: t("specName"), value: strOr(profile.name), empty: !profile.name },
-    { label: t("specRole"), value: strOr(profile.role), empty: !profile.role },
-    { label: t("age"), value: profile.age != null ? String(profile.age) : t("notSpecified"), empty: profile.age == null },
-    { label: t("gender"), value: genderLabel(profile.gender), empty: !profile.gender },
-    { label: t("specExperience"), value: profile.experienceYears != null ? experienceLabel(profile.experienceYears) : t("notSpecified"), empty: profile.experienceYears == null },
-    { label: t("specSalary"), value: salaryLabel(profile) || t("notSpecified"), empty: profile.salaryMin == null && profile.salaryMax == null },
-    { label: t("specCity"), value: profile.city ? cityLabel(profile.city) : t("notSpecified"), empty: !profile.city },
-    { label: t("specCountry"), value: strOr(meta.value.find((c) => c.code === profile.country)?.name || profile.country) },
-    { label: t("specRemote"), value: fmtBool(profile.remote), empty: profile.remote == null },
-    { label: t("specContactHours"), value: strOr(profile.contactHours), empty: !profile.contactHours },
-    { label: t("specEmployment"), value: employmentLabel(profile.employmentType), empty: !profile.employmentType },
-    { label: t("specEducation"), value: strOr(profile.education), empty: !profile.education },
-    { label: t("specLanguages"), value: listOr(profile.languages), empty: !profile.languages?.length },
-    { label: t("specSkills"), value: listOr(profile.skills), empty: !profile.skills?.length },
-    { label: t("specContact"), value: strOr(profile.contact), empty: !profile.contact },
-    { label: t("specSource"), value: profile.sourceLabel || (profile.source === "telegram" ? "Telegram" : profile.source) },
+    row("identity", t("specName"), strOr(profile.name), !profile.name, "i-lucide-user-round"),
+    row("identity", t("specRole"), strOr(profile.role), !profile.role, "i-lucide-briefcase-business"),
+    row("identity", t("age"), profile.age != null ? String(profile.age) : t("notSpecified"), profile.age == null, "i-lucide-calendar-days"),
+    row("identity", t("gender"), genderLabel(profile.gender), !profile.gender, "i-lucide-users-round"),
+    row("identity", t("specExperience"), profile.experienceYears != null ? experienceLabel(profile.experienceYears) : t("notSpecified"), profile.experienceYears == null, "i-lucide-history"),
+
+    row("location", t("specCity"), profile.city ? cityLabel(profile.city) : t("notSpecified"), !profile.city, "i-lucide-map-pinned"),
+    row("location", t("specCountry"), strOr(meta.value.find((c) => c.code === profile.country)?.name || profile.country), !profile.country, "i-lucide-map"),
+
+    row("preferences", t("specSalary"), salaryLabel(profile) || t("notSpecified"), profile.salaryMin == null && profile.salaryMax == null, "i-lucide-banknote"),
+    row("preferences", t("specRemote"), fmtBool(profile.remote), profile.remote == null, "i-lucide-laptop"),
+    row("preferences", t("specEmployment"), employmentLabel(profile.employmentType), !profile.employmentType, "i-lucide-briefcase"),
+    row("preferences", t("specContactHours"), strOr(profile.contactHours), !profile.contactHours, "i-lucide-clock-3"),
+
+    row("qualifications", t("specEducation"), strOr(profile.education), !profile.education, "i-lucide-graduation-cap"),
+    row("qualifications", t("specLanguages"), listOr(profile.languages), !profile.languages?.length, "i-lucide-languages"),
+    row("qualifications", t("specSkills"), listOr(profile.skills), !profile.skills?.length, "i-lucide-wrench"),
+
+    row("contact", t("specContact"), strOr(profile.contact), !profile.contact, "i-lucide-message-circle"),
+    row("contact", t("specSource"), profile.sourceLabel || (profile.source === "telegram" ? "Telegram" : profile.source), false, "i-lucide-external-link"),
   ];
 });
 
@@ -598,7 +638,7 @@ onBeforeUnmount(() => {
 
     </UiResultsLoader>
 
-    <SearchDetailsModal v-model:open="modalOpen" :title="active?.name || active?.role || t('notSpecified')" :ui="{ content: 'max-w-3xl' }">
+    <SearchDetailsModal v-model:open="modalOpen" :title="active?.name || active?.role || t('notSpecified')" :public-id="candidatePublicId(active)">
       <template #title>
         <h2 class="hiring-modal__title">{{ active?.name || active?.role || t("notSpecified") }}</h2>
         <p v-if="active?.name && active?.role" class="hiring-modal__role">{{ active.role }}</p>

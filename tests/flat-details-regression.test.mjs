@@ -7,10 +7,22 @@ const read = (path) => readFile(new URL(`../${path}`, import.meta.url), "utf8");
 test("flat details modal keeps public ID title and 960px width", async () => {
   const source = await read("app/components/search/SearchDetailsModal.vue");
   const modal = await read("app/components/U/Modal.vue");
-  assert.match(source, /#\{\{ flatPublicId \}\}/);
-  assert.match(source, /flatPriceTone/);
-  assert.match(source, /:max-width="isFlatFinder \? '960px' : undefined"/);
-  assert.match(modal, /<slot v-if="\$slots\.title" name="title" \/>/);
+  const page = await read("app/pages/flat-finder/index.vue");
+  assert.match(source, /#\{\{ displayPublicId \}\}/);
+  assert.match(source, /activeFlatListing\.value\?\.publicId \?\? props\.publicId/);
+  assert.match(source, /flatListing\?: FlatListing \| null/);
+  assert.match(source, /props\.flatListing/);
+  assert.doesNotMatch(source, /flats:latest-recent:v1/);
+  assert.match(page, /:flat-listing="active"/);
+  assert.match(page, /publicId: verified\.publicId \?\? active\.value\.publicId/);
+  assert.match(source, /publicId\?: number \| string \| null/);
+  assert.match(source, /class="search-details-public-title__id"/);
+  assert.match(source, /\.search-details-public-title__id \{[\s\S]*?color: #fff/);
+  assert.doesNotMatch(source, /flatPriceTone|public-title__id_(?:green|blue|pink|orange|yellow|red)/);
+  assert.match(source, /:max-width="isSearchBoard \? '960px' : undefined"/);
+  assert.match(modal, /class="u-modal__heading"/);
+  assert.match(modal, /\.u-modal__heading \{ flex: 1 1 auto; min-width: 0; \}/);
+  assert.match(modal, /margin-left: auto/);
   assert.doesNotMatch(source, /max-w-\[960px\]/);
 });
 
@@ -23,10 +35,27 @@ test("flat spec table does not parse listing description on the client", async (
   assert.match(source, /listing\.potentiallyUnsafe/);
 });
 
-test("flat spec grid uses three columns through 960px", async () => {
+test("flat specs use three independent, logically grouped columns through 960px", async () => {
   const source = await read("app/components/ui/SpecTable.vue");
+  const page = await read("app/pages/flat-finder/index.vue");
   const fallback = await read("app/assets/css/flat-placeholder.css");
   assert.match(source, /grid-template-columns: repeat\(3, minmax\(0, 1fr\)\)/);
+  assert.match(source, /align-items: start/);
+  assert.match(source, /class="spec-table__column"/);
+  assert.match(source, /class="spec-table__section"/);
+  assert.match(source, /row\.group && row\.column/);
+  assert.match(source, /const columns: Array<Array</);
+  assert.match(page, /advert: 1/);
+  assert.match(page, /property: 1/);
+  assert.match(page, /location: 2/);
+  assert.match(page, /amenities: 2/);
+  assert.match(page, /terms: 3/);
+  assert.match(page, /costs: 3/);
+  assert.match(page, /row\("property", t\("specRooms"\)/);
+  assert.match(page, /row\("location", t\("specCity"\)/);
+  assert.match(page, /row\("amenities", t\("specParking"\)/);
+  assert.match(page, /row\("terms", t\("specPets"\)/);
+  assert.match(page, /row\("costs", t\("specDeposit"\)/);
   assert.doesNotMatch(source, /grid-template-columns: repeat\(4, minmax\(0, 1fr\)\)/);
   assert.match(fallback, /@media \(min-width: 721px\) and \(max-width: 960px\)/);
 });

@@ -9,6 +9,10 @@ export interface SpecRow {
   value: string;
   empty?: boolean;
   tone?: "warning";
+  group?: string;
+  groupLabel?: string;
+  column?: 1 | 2 | 3;
+  icon?: string;
 }
 
 const props = withDefaults(defineProps<{
@@ -152,14 +156,28 @@ const contextualRows = computed<SpecRow[]>(() => {
     const value = listing.cadastral;
     rows = [
       ...rows.slice(0, 4),
-      { label: english ? "Cadastral documents" : "Есть кадастр", value: boolValue(value), empty: value == null },
+      {
+        label: english ? "Cadastral documents" : "Есть кадастр",
+        value: boolValue(value),
+        empty: value == null,
+        group: "property",
+        groupLabel: t("flats.specGroupProperty"),
+        column: 1,
+      },
       ...rows.slice(4),
     ];
   } else {
     const value = listing.firstRental;
     rows = [
       ...rows.slice(0, 4),
-      { label: english ? "First rental" : "Первая сдача", value: boolValue(value), empty: value == null },
+      {
+        label: english ? "First rental" : "Первая сдача",
+        value: boolValue(value),
+        empty: value == null,
+        group: "property",
+        groupLabel: t("flats.specGroupProperty"),
+        column: 1,
+      },
       ...rows.slice(4),
     ];
   }
@@ -169,6 +187,9 @@ const contextualRows = computed<SpecRow[]>(() => {
       label: english ? "Safety" : "Безопасность",
       value: english ? "Potentially unsafe listing" : "Потенциально опасное объявление",
       tone: "warning",
+      group: "advert",
+      groupLabel: t("flats.specGroupAdvert"),
+      column: 1,
     });
   }
 
@@ -181,6 +202,23 @@ const visibleRows = computed(() => {
   return contextualRows.value.filter((row) => (
     !row.empty && row.value.trim().toLocaleLowerCase() !== empty
   ));
+});
+
+const usesGroupedColumns = computed(() => isFlatFinder.value || visibleRows.value.some((row) => row.group && row.column));
+
+const specColumns = computed(() => {
+  const columns: Array<Array<{ id: string; label: string; rows: SpecRow[] }>> = [[], [], []];
+  for (const row of visibleRows.value) {
+    const column = Math.min(3, Math.max(1, Number(row.column) || 1)) - 1;
+    const id = row.group || `column-${column + 1}`;
+    let section = columns[column]!.find((item) => item.id === id);
+    if (!section) {
+      section = { id, label: row.groupLabel || "", rows: [] };
+      columns[column]!.push(section);
+    }
+    section.rows.push(row);
+  }
+  return columns;
 });
 
 const flatSpecIconByLabel = computed(() => new Map<string, string>([
@@ -229,6 +267,7 @@ const flatSpecIconByLabel = computed(() => new Map<string, string>([
 ]));
 
 function iconForRow(row: SpecRow): string {
+  if (row.icon) return row.icon;
   if (row.tone === "warning") return "i-lucide-triangle-alert";
   if (/кадастр|cadastral/i.test(row.label)) return "i-lucide-file-check-2";
   if (/первая сдача|first rental/i.test(row.label)) return "i-lucide-key-round";
@@ -246,30 +285,35 @@ function iconForRow(row: SpecRow): string {
       </label>
     </div>
 
-    <div v-if="isFlatFinder" class="spec-table__grid" role="list">
-      <div
-        v-for="row in visibleRows"
-        :key="row.label"
-        class="spec-table__item"
-        :class="{ 'spec-table__row_warning': row.tone === 'warning' }"
-        role="listitem"
-      >
-        <span
-          class="spec-table__icon"
-          :data-tooltip="displayLabel(row)"
-          :aria-label="displayLabel(row)"
-          tabindex="0"
-        >
-          <u-icon :name="iconForRow(row)" />
-        </span>
-        <span class="spec-table__value">{{ row.value }}</span>
-        <span
-          v-if="aiHintForRow(row)"
-          class="spec-table__ai-hint spec-table__ai-hint_grid"
-          :title="aiHintForRow(row) || undefined"
-          :aria-label="aiHintForRow(row) || undefined"
-          tabindex="0"
-        >AI</span>
+    <div v-if="usesGroupedColumns" class="spec-table__grid" role="list">
+      <div v-for="(column, columnIndex) in specColumns" :key="columnIndex" class="spec-table__column">
+        <section v-for="section in column" :key="section.id" class="spec-table__section">
+          <h3 v-if="section.label" class="spec-table__section-title">{{ section.label }}</h3>
+          <div
+            v-for="row in section.rows"
+            :key="row.label"
+            class="spec-table__item"
+            :class="{ 'spec-table__row_warning': row.tone === 'warning' }"
+            role="listitem"
+          >
+            <span
+              class="spec-table__icon"
+              :data-tooltip="displayLabel(row)"
+              :aria-label="displayLabel(row)"
+              tabindex="0"
+            >
+              <u-icon :name="iconForRow(row)" />
+            </span>
+            <span class="spec-table__value">{{ row.value }}</span>
+            <span
+              v-if="aiHintForRow(row)"
+              class="spec-table__ai-hint spec-table__ai-hint_grid"
+              :title="aiHintForRow(row) || undefined"
+              :aria-label="aiHintForRow(row) || undefined"
+              tabindex="0"
+            >AI</span>
+          </div>
+        </section>
       </div>
     </div>
 
@@ -314,7 +358,27 @@ function iconForRow(row: SpecRow): string {
 .spec-table__grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
+  align-items: start;
   border-top: 1px solid var(--line, #252a4a);
+}
+.spec-table__column {
+  display: flex;
+  flex-direction: column;
+  align-self: start;
+  min-width: 0;
+}
+.spec-table__column + .spec-table__column { border-left: 1px solid var(--line, #252a4a); }
+.spec-table__section + .spec-table__section { border-top: 8px solid var(--bg-panel, #131730); }
+.spec-table__section-title {
+  margin: 0;
+  padding: 8px 10px 6px;
+  border-bottom: 1px solid var(--line, #252a4a);
+  color: var(--text-muted, #9ea4c1);
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1.2;
+  letter-spacing: .08em;
+  text-transform: uppercase;
 }
 .spec-table__item {
   position: relative;
@@ -325,10 +389,8 @@ function iconForRow(row: SpecRow): string {
   min-width: 0;
   min-height: 46px;
   padding: 8px 10px;
-  border-right: 1px solid var(--line, #252a4a);
   border-bottom: 1px solid var(--line, #252a4a);
 }
-.spec-table__item:nth-child(3n) { border-right: 0; }
 .spec-table__icon {
   position: relative;
   display: inline-grid;
@@ -411,17 +473,22 @@ function iconForRow(row: SpecRow): string {
 
 @media (max-width: 720px) {
   .spec-table__grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .spec-table__item:nth-child(3n) { border-right: 1px solid var(--line, #252a4a); }
-  .spec-table__item:nth-child(2n) { border-right: 0; }
+  .spec-table__column:nth-child(3) {
+    grid-column: 1 / -1;
+    border-top: 8px solid var(--bg-panel, #131730);
+    border-left: 0;
+  }
 }
 @media (max-width: 640px) {
   .spec-table__table th { white-space: normal; width: 42%; padding-right: 12px; }
 }
 @media (max-width: 430px) {
   .spec-table__grid { grid-template-columns: 1fr; }
-  .spec-table__item,
-  .spec-table__item:nth-child(2n),
-  .spec-table__item:nth-child(3n) { border-right: 0; }
+  .spec-table__column + .spec-table__column {
+    grid-column: auto;
+    border-top: 8px solid var(--bg-panel, #131730);
+    border-left: 0;
+  }
   .spec-table__head { align-items: flex-start; gap: 8px 12px; }
 }
 </style>

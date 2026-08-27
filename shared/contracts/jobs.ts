@@ -58,6 +58,7 @@ export interface JobSkillDetail {
 
 export interface Job {
   id: string
+  publicId?: number
   title: string
   company: string
   location: string

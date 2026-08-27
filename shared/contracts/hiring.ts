@@ -53,6 +53,7 @@ export const HIRING_SOURCES: HiringSource[] = ['telegram']
 
 export interface CvProfile {
   id: string
+  publicId?: number
   source: HiringSource
   origin?: CandidateOrigin
   sourceKey?: string

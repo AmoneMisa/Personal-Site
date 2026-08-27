@@ -3,6 +3,7 @@ export type { HiringStatistics } from "~~/shared/contracts/hiring";
 
 export interface HiringCvProfile {
   id: string
+  publicId?: number
   source: string
   origin?: string
   sourceKey?: string

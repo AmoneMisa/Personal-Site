@@ -408,7 +408,7 @@ function showListingUnavailableToast() {
   });
 }
 async function verifyOlxListing(l: Listing): Promise<Listing | null | undefined> {
-  const params: Record<string, string> = { listingId: l.id, limit: "1", offset: "0", sources: "olx" };
+  const params: Record<string, string> = { listingId: l.id, limit: "1", offset: "0", sources: "olx", verifyLive: "1" };
   if (/^[A-Za-z]{2}$/.test(l.country)) params.countries = l.country.toUpperCase();
   const { data, error } = await safeFetch<FeedResult>("/flats-feed", { params });
   if (error || !data) return undefined;
@@ -417,34 +417,40 @@ async function verifyOlxListing(l: Listing): Promise<Listing | null | undefined>
   if (data.exactListingFallback === "source-inactive") return null;
   return undefined;
 }
-async function openListing(l: Listing, olxAlreadyVerified = false) {
-  let listing = l;
-  const key = listingKey(l);
-  if (l.source === "olx" && !olxAlreadyVerified && !isAvailabilityFresh(key)) {
-    if (checkingListingKey.value) return;
-    checkingListingKey.value = key;
-    await nextTick();
-    try {
-      const verified = await verifyOlxListing(l);
-      if (verified === null) {
-        forgetAvailability(key);
-        removeUnavailableListing(l.id, l.source, l.country);
-        showListingUnavailableToast();
-        if (queryString(route.query.flat) === l.id) syncListingInUrl(null);
-        return;
-      }
-      if (verified) {
-        listing = verified;
-        markAvailabilityFresh(key);
-      }
-    } finally {
-      if (checkingListingKey.value === key) checkingListingKey.value = "";
+async function verifyOpenOlxListing(l: Listing, key: string) {
+  if (checkingListingKey.value === key) return;
+  checkingListingKey.value = key;
+  try {
+    const verified = await verifyOlxListing(l);
+    if (verified === null) {
+      forgetAvailability(key);
+      removeUnavailableListing(l.id, l.source, l.country);
+      showListingUnavailableToast();
+      if (queryString(route.query.flat) === l.id) syncListingInUrl(null);
+      return;
     }
+    if (verified) {
+      markAvailabilityFresh(key);
+      if (active.value && listingIdentityMatches(active.value, l.id, l.source, l.country)) {
+        const refreshed = {
+          ...verified,
+          publicId: verified.publicId ?? active.value.publicId,
+        };
+        active.value = refreshed;
+        prepareTranslation(refreshed);
+      }
+    }
+  } finally {
+    if (checkingListingKey.value === key) checkingListingKey.value = "";
   }
-  lightboxOpen.value = false; active.value = listing;
-  prepareTranslation(listing); modalOpen.value = true;
-  addRecent(listing);
-  syncListingInUrl(listing);
+}
+async function openListing(l: Listing) {
+  const key = listingKey(l);
+  lightboxOpen.value = false; active.value = l;
+  prepareTranslation(l); modalOpen.value = true;
+  addRecent(l);
+  syncListingInUrl(l);
+  if (l.source === "olx" && !isAvailabilityFresh(key)) void verifyOpenOlxListing(l, key);
 }
 function modalTitle(listing: Listing | null): string {
   if (!listing) return "";
@@ -476,12 +482,73 @@ function floorLabel(l: Listing) { if (l.floor != null && l.totalFloors != null) 
 function depositLabel(l: Listing) { if (l.depositAmount != null) return `${l.depositAmount.toLocaleString()} ${l.depositCurrency || l.currency}`; return fmtBool(l.deposit); }
 function commissionLabel(l: Listing) { if (l.commissionPercent != null) return `${l.commissionPercent}%`; return fmtBool(l.commission); }
 function communalLabel(l: Listing) { if (l.communalSeparated === true) return t("communalSeparate"); if (l.communalSeparated === false) return t("communalIncluded"); return t("notSpecified"); }
-const specRows = computed<Array<{ label: string; value: string }>>(() => {
+type FlatSpecGroup = "advert" | "property" | "location" | "amenities" | "terms" | "costs";
+type FlatSpecRow = { label: string; value: string; group: FlatSpecGroup; groupLabel: string; column: 1 | 2 | 3 };
+const specRows = computed<FlatSpecRow[]>(() => {
   const l = active.value; if (!l) return [];
+  const groupColumn: Record<FlatSpecGroup, 1 | 2 | 3> = {
+    advert: 1,
+    property: 1,
+    location: 2,
+    amenities: 2,
+    terms: 3,
+    costs: 3,
+  };
+  const row = (group: FlatSpecGroup, label: string, value: string): FlatSpecRow => ({
+    group,
+    groupLabel: t(`specGroup${group.charAt(0).toUpperCase()}${group.slice(1)}`),
+    column: groupColumn[group],
+    label,
+    value,
+  });
   return [
-    { label: t("specDeal"), value: dealLabel(l.dealType) || t("notSpecified") }, { label: t("specType"), value: ptLabel(l.propertyType) }, { label: t("specListedBy"), value: l.byAgency ? t("agAgency") : t("agOwner") }, { label: t("specSource"), value: sourceLabel(l.source) },
-    { label: t("specRooms"), value: numOr(l.rooms) }, { label: t("specBedrooms"), value: numOr(l.bedrooms) }, { label: t("specBathrooms"), value: numOr(l.bathrooms) }, { label: t("specArea"), value: l.areaSqm != null ? `${l.areaSqm} ${t("sqm")}` : t("notSpecified") }, { label: t("specFloor"), value: floorLabel(l) }, { label: t("specYear"), value: numOr(l.buildingYear) }, { label: t("specNewBuilding"), value: fmtBool(l.newBuilding) }, { label: t("specCondition"), value: conditionLabel(l.condition) }, { label: t("specComplex"), value: strOr(l.residenceComplex) }, { label: t("specCity"), value: strOr(locName(l.city, "city")) }, { label: t("specDistrict"), value: strOr(locName(l.district, "district")) }, { label: t("specKvartal"), value: strOr(l.area || l.kvartal) }, { label: t("specMetro"), value: strOr(metroLabelWithAlias(l.metro, locale.value)) }, { label: t("specAddress"), value: strOr(l.address) },
-    { label: t("specParking"), value: fmtBool(l.parking) }, { label: t("specElevator"), value: fmtBool(l.elevator) }, { label: t("specFurnished"), value: fmtBool(l.furnished) }, { label: t("specBalcony"), value: fmtBool(l.balcony) }, { label: t("specAC"), value: fmtBool(l.airConditioner) }, { label: t("specGas"), value: fmtBool(l.gas) }, { label: t("specHeating"), value: fmtBool(l.heating) }, { label: t("specHotWater"), value: fmtBool(l.hotWater) }, { label: t("specInternet"), value: fmtBool(l.internet) }, { label: t("specPets"), value: fmtBool(l.petsAllowed) }, { label: t("specChildren"), value: fmtBool(l.childrenAllowed) }, { label: t("specSmoking"), value: fmtBool(l.smokingAllowed) }, { label: t("specAudience"), value: audienceLabel(l.audience) }, { label: t("specRoomShare"), value: fmtBool(l.roomOnly) }, { label: t("specNegotiable"), value: fmtBool(l.negotiable) }, { label: t("specDeposit"), value: depositLabel(l) }, { label: t("specCommission"), value: commissionLabel(l) }, { label: t("specCommunal"), value: communalLabel(l) }, { label: t("specUtilAmount"), value: l.utilitiesAmount != null ? `${l.utilitiesAmount.toLocaleString()} ${l.currency}` : t("notSpecified") }, { label: t("specMinLease"), value: strOr(l.minLeaseTerm) }, { label: t("specAvailable"), value: strOr(l.availableFrom) }, { label: t("specShops"), value: listOr(l.nearbyShops) }, { label: t("specNearby"), value: nearbyListOr(l.nearby) }, { label: t("specAmenities"), value: amenitiesListOr(l.amenities) },
+    row("advert", t("specDeal"), dealLabel(l.dealType) || t("notSpecified")),
+    row("advert", t("specType"), ptLabel(l.propertyType)),
+    row("advert", t("specListedBy"), l.byAgency ? t("agAgency") : t("agOwner")),
+    row("advert", t("specSource"), sourceLabel(l.source)),
+
+    row("property", t("specRooms"), numOr(l.rooms)),
+    row("property", t("specBedrooms"), numOr(l.bedrooms)),
+    row("property", t("specBathrooms"), numOr(l.bathrooms)),
+    row("property", t("specArea"), l.areaSqm != null ? `${l.areaSqm} ${t("sqm")}` : t("notSpecified")),
+    row("property", t("specFloor"), floorLabel(l)),
+    row("property", t("specYear"), numOr(l.buildingYear)),
+    row("property", t("specNewBuilding"), fmtBool(l.newBuilding)),
+    row("property", t("specCondition"), conditionLabel(l.condition)),
+    row("property", t("specComplex"), strOr(l.residenceComplex)),
+
+    row("location", t("specCity"), strOr(locName(l.city, "city"))),
+    row("location", t("specDistrict"), strOr(locName(l.district, "district"))),
+    row("location", t("specKvartal"), strOr(l.area || l.kvartal)),
+    row("location", t("specMetro"), strOr(metroLabelWithAlias(l.metro, locale.value))),
+    row("location", t("specAddress"), strOr(l.address)),
+    row("location", t("specShops"), listOr(l.nearbyShops)),
+    row("location", t("specNearby"), nearbyListOr(l.nearby)),
+
+    row("amenities", t("specParking"), fmtBool(l.parking)),
+    row("amenities", t("specElevator"), fmtBool(l.elevator)),
+    row("amenities", t("specFurnished"), fmtBool(l.furnished)),
+    row("amenities", t("specBalcony"), fmtBool(l.balcony)),
+    row("amenities", t("specAC"), fmtBool(l.airConditioner)),
+    row("amenities", t("specGas"), fmtBool(l.gas)),
+    row("amenities", t("specHeating"), fmtBool(l.heating)),
+    row("amenities", t("specHotWater"), fmtBool(l.hotWater)),
+    row("amenities", t("specInternet"), fmtBool(l.internet)),
+    row("amenities", t("specAmenities"), amenitiesListOr(l.amenities)),
+
+    row("terms", t("specPets"), fmtBool(l.petsAllowed)),
+    row("terms", t("specChildren"), fmtBool(l.childrenAllowed)),
+    row("terms", t("specSmoking"), fmtBool(l.smokingAllowed)),
+    row("terms", t("specAudience"), audienceLabel(l.audience)),
+    row("terms", t("specRoomShare"), fmtBool(l.roomOnly)),
+    row("terms", t("specMinLease"), strOr(l.minLeaseTerm)),
+    row("terms", t("specAvailable"), strOr(l.availableFrom)),
+
+    row("costs", t("specNegotiable"), fmtBool(l.negotiable)),
+    row("costs", t("specDeposit"), depositLabel(l)),
+    row("costs", t("specCommission"), commissionLabel(l)),
+    row("costs", t("specCommunal"), communalLabel(l)),
+    row("costs", t("specUtilAmount"), l.utilitiesAmount != null ? `${l.utilitiesAmount.toLocaleString()} ${l.currency}` : t("notSpecified")),
   ];
 });
 const {
@@ -500,7 +567,7 @@ async function shareFlat(l: Listing) {
 async function openSharedListing(id: string, sourceName = "", countryCode = "", attempt = 0) {
   const local = listings.value.find((listing) => listing.id === id); if (local) { await openListing(local); return; }
   const params: Record<string, string> = { listingId: id, limit: "1", offset: "0" }; if (SOURCES.includes(sourceName)) params.sources = sourceName; if (/^[A-Za-z]{2}$/.test(countryCode)) params.countries = countryCode.toUpperCase();
-  const { data, error } = await safeFetch<FeedResult>("/flats-feed", { params }); const exact = data?.listings?.find((listing) => listing.id === id); if (exact) { await openListing(exact, sourceName === "olx" && exact.source === "olx"); return; }
+  const { data, error } = await safeFetch<FeedResult>("/flats-feed", { params }); const exact = data?.listings?.find((listing) => listing.id === id); if (exact) { await openListing(exact); return; }
   if (!error && sourceName === "olx" && data?.exactListingFallback === "source-inactive") {
     removeUnavailableListing(id, sourceName, countryCode);
     showListingUnavailableToast();
@@ -669,13 +736,11 @@ onBeforeUnmount(() => { modalOpen.value = false; lightboxOpen.value = false; rel
 
     </UiResultsLoader>
 
-    <SearchDetailsModal v-model:open="modalOpen" :title="modalTitle(active)" :ui="{ content: 'max-w-4xl' }" :dismissible="!lightboxOpen">
+    <SearchDetailsModal v-model:open="modalOpen" :title="modalTitle(active)" :flat-listing="active" :ui="{ content: 'max-w-4xl' }" :dismissible="!lightboxOpen">
       <template #title><h2 class="flat-modal__title">{{ modalTitle(active) }}</h2></template>
-      <template #body><div v-if="active" class="flat-modal"><FlatGallery v-model:lightbox-open="lightboxOpen" :photos="visiblePhotos(active)" :title="modalTitle(active)" :viewer-label="t('photoViewer')" :previous-label="t('previousPhoto')" :next-label="t('nextPhoto')" :close-label="t('closePhoto')" @photo-error="markPhotoFailedFromEvent" /><UiSpecTable :rows="specRows" :hide-empty-label="t('hideEmpty')" :empty-value="t('notSpecified')"><template #header><div class="flat-modal__price">{{ priceLabel(active) }}<span v-if="convertedLabel(active)" class="flat-modal__price-conv"> ({{ convertedLabel(active) }})</span><span v-if="dealLabel(active.dealType)" class="flat-modal__deal"> · {{ dealLabel(active.dealType) }}</span><span v-if="active.roomOnly" class="flat-modal__deal"> · {{ t("roomShare") }}</span></div></template></UiSpecTable><div v-if="active.description && descriptionNeedsTranslation" class="flat-modal__translation"><u-button type="button" variant="outline" color="neutral" size="sm" icon="i-lucide-languages" :loading="translatingDescription" @click="translateActiveDescription">{{ translatingDescription ? t("translatingDescription") : t("translateDescription") }}</u-button><span v-if="translationFailed" class="flat-modal__translation-error">{{ t("translationFailed") }}</span></div><section v-if="translatedDescription" class="flat-modal__translated"><h4 class="flat-modal__translated-title">{{ t("translatedDescription") }}</h4><p class="flat-modal__desc">{{ translatedDescription }}</p></section><details v-if="active.description" class="flat-modal__descbox"><summary>{{ t("origDescription") }}</summary><p class="flat-modal__desc">{{ active.description }}</p></details><div v-if="active.tags && active.tags.length" class="flat-modal__tags"><span v-for="tag in active.tags" :key="tag" class="flat-modal__tag">{{ nearbyItemLabel(tag) }}</span></div></div></template>
+      <template #body><div v-if="active" class="flat-modal"><FlatGallery v-model:lightbox-open="lightboxOpen" :photos="visiblePhotos(active)" :title="modalTitle(active)" :viewer-label="t('photoViewer')" :previous-label="t('previousPhoto')" :next-label="t('nextPhoto')" :close-label="t('closePhoto')" @photo-error="markPhotoFailedFromEvent" /><div v-if="checkingListingKey === listingKey(active)" class="flat-modal__verification" role="status" aria-live="polite"><u-icon name="i-lucide-loader-circle" class="flat-modal__verification-icon" /><span>{{ t("checkingListing") }}</span></div><UiSpecTable :rows="specRows" :hide-empty-label="t('hideEmpty')" :empty-value="t('notSpecified')"><template #header><div class="flat-modal__price">{{ priceLabel(active) }}<span v-if="convertedLabel(active)" class="flat-modal__price-conv"> ({{ convertedLabel(active) }})</span><span v-if="dealLabel(active.dealType)" class="flat-modal__deal"> · {{ dealLabel(active.dealType) }}</span><span v-if="active.roomOnly" class="flat-modal__deal"> · {{ t("roomShare") }}</span></div></template></UiSpecTable><div v-if="active.description && descriptionNeedsTranslation" class="flat-modal__translation"><u-button type="button" variant="outline" color="neutral" size="sm" icon="i-lucide-languages" :loading="translatingDescription" @click="translateActiveDescription">{{ translatingDescription ? t("translatingDescription") : t("translateDescription") }}</u-button><span v-if="translationFailed" class="flat-modal__translation-error">{{ t("translationFailed") }}</span></div><section v-if="translatedDescription" class="flat-modal__translated"><h4 class="flat-modal__translated-title">{{ t("translatedDescription") }}</h4><p class="flat-modal__desc">{{ translatedDescription }}</p></section><details v-if="active.description" class="flat-modal__descbox"><summary>{{ t("origDescription") }}</summary><p class="flat-modal__desc">{{ active.description }}</p></details><div v-if="active.tags && active.tags.length" class="flat-modal__tags"><span v-for="tag in active.tags" :key="tag" class="flat-modal__tag">{{ nearbyItemLabel(tag) }}</span></div></div></template>
       <template #footer><UiModalFooter v-if="active"><u-button variant="outline" color="neutral" icon="i-lucide-heart" @click="toggleFavorite(active)">{{ isFavorite(active.id) ? t("removeFavorite") : t("addFavorite") }}</u-button><u-button variant="outline" color="neutral" :icon="isHidden(active.id) ? 'i-lucide-eye' : 'i-lucide-eye-off'" @click="toggleHidden(active)">{{ isHidden(active.id) ? t("restoreListing") : t("hideListing") }}</u-button><u-button variant="outline" color="neutral" :icon="shareCopied ? 'i-lucide-check' : 'i-lucide-share-2'" @click="shareFlat(active)">{{ shareCopied ? t("shareCopied") : t("share") }}</u-button><a class="modal-footer__primary" :href="active.url" target="_blank" rel="noopener noreferrer">{{ t("open") }} →</a></UiModalFooter></template>
     </SearchDetailsModal>
-
-    <teleport to="body"><div v-if="checkingListingKey" class="flat-verification" role="status" aria-live="assertive"><div class="flat-verification__card"><u-icon name="i-lucide-loader-circle" class="flat-verification__icon" /><span>{{ t("checkingListing") }}</span></div></div></teleport>
 
     <SearchPresetDialog v-model:open="presetModalOpen" v-model:name="presetName" :title="t('savePreset')" :name-label="t('presetName')" :cancel-label="t('cancel')" :save-label="t('save')" @save="savePreset" />
     <SearchShareDialog v-model:open="shareModalOpen" :title="sharedLinkOpened ? t('sharedSearchApplied') : t('shareSearch')" :hint="sharedLinkOpened ? t('sharedSearchHint') : t('shareSearchHint')" :url="shareUrl" :copy-label="t('copyLink')" @copy="copyShareLink" />
@@ -717,9 +782,8 @@ onBeforeUnmount(() => { modalOpen.value = false; lightboxOpen.value = false; rel
 .flats__results-toolbar { display: flex; align-items: end; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
 .flats__sort { width: min(310px, 100%); }
 .flats__map-wrap { position: relative; z-index: 0; isolation: isolate; margin-bottom: 18px; scroll-margin-top: 90px; }
-.flat-verification { position: fixed; z-index: 10050; inset: 0; display: grid; place-items: center; padding: 20px; background: rgba(3,7,24,.64); backdrop-filter: blur(4px); }
-.flat-verification__card { display: flex; align-items: center; gap: 12px; max-width: min(420px,100%); padding: 18px 22px; border: 1px solid rgba(224,103,154,.42); border-radius: 14px; background: #0b1129; box-shadow: 0 18px 60px rgba(0,0,0,.45); color: var(--text-primary); font-weight: 700; text-align: center; }
-.flat-verification__icon { flex: 0 0 auto; width: 28px; height: 28px; color: var(--accent-pink); animation: flat-card-spin .8s linear infinite; }
+.flat-modal__verification { display: inline-flex; align-items: center; gap: 8px; align-self: flex-start; margin-top: -2px; padding: 6px 10px; border: 1px solid rgba(224,103,154,.36); border-radius: 999px; background: rgba(224,103,154,.1); color: var(--text-secondary); font-size: 13px; }
+.flat-modal__verification-icon { width: 16px; height: 16px; color: var(--accent-pink); animation: flat-card-spin .8s linear infinite; }
 @keyframes flat-card-spin { to { transform: rotate(360deg); } }
 .flats__sentinel { min-height: 44px; display: grid; place-items: center; }
 .flat-modal { display: flex; flex-direction: column; gap: 12px; }

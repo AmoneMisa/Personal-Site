@@ -32,6 +32,7 @@ import {
   type HiringProfessionLocale,
 } from '../../shared/hiringProfessionLabels'
 import { hiringEducationLabel } from '../../shared/hiringEducationLabels'
+import { publicEntityId } from '../../shared/publicEntityId'
 import {
   collapseHiringProfessionFilterValues,
   expandHiringProfessionFilters,
@@ -269,6 +270,7 @@ function repairPublicFacts(profile: CvProfile): CvProfile {
   const professions = publicCandidateProfessionKeys(profile)
   return {
     ...profile,
+    publicId: publicEntityId('candidate', profileSource(profile), profile.country, profile.id),
     ...publicCandidateSalary(profile),
     role: professions[0] || profile.role,
     professions: professions.length ? professions : profile.professions,
