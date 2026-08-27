@@ -1,5 +1,5 @@
 import { ref } from "vue";
-import type { SalaryPeriod } from "~/utils/search/money";
+import type { DisplaySalaryPeriod } from "~/utils/search/money";
 
 export const JOB_SALARY_PERIODS = ["hour", "month", "year"] as const;
 
@@ -8,7 +8,7 @@ export function useJobFilters() {
   const source = ref("");
   const salaryMin = ref<number>();
   const displayCurrency = ref("USD");
-  const displayPeriod = ref<SalaryPeriod>("month");
+  const displayPeriod = ref<DisplaySalaryPeriod>("month");
   const sort = ref("date");
   const countries = ref<string[]>([]);
   const cities = ref("");
@@ -33,7 +33,7 @@ export function useJobFilters() {
     pageSize: number;
     cvReady: boolean;
     convertCurrency: (amount: number, from: string, to: string) => number | undefined;
-    convertPeriod: (amount: number, from: SalaryPeriod, to: SalaryPeriod) => number;
+    convertPeriod: (amount: number, from: DisplaySalaryPeriod, to: DisplaySalaryPeriod) => number | undefined;
   }): Record<string, string> {
     const params: Record<string, string> = {
       page: String(options.page),
@@ -44,7 +44,10 @@ export function useJobFilters() {
     if (source.value) params.source = source.value;
     if (salaryMin.value) {
       const inUsd = options.convertCurrency(salaryMin.value, displayCurrency.value, "USD");
-      if (inUsd) params.salaryMin = String(options.convertPeriod(inUsd, displayPeriod.value, "year"));
+      if (inUsd) {
+        const annual = options.convertPeriod(inUsd, displayPeriod.value, "year");
+        if (annual !== undefined) params.salaryMin = String(annual);
+      }
     }
     if (countries.value.length) params.country = countries.value.join(",");
     if (cities.value.trim()) params.cities = cities.value.trim();
