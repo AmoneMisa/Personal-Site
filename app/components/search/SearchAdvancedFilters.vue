@@ -15,10 +15,14 @@ withDefaults(defineProps<{
       <button
         type="button"
         class="search-advanced-filters__button"
+        :class="{ 'search-advanced-filters__button_open': open }"
         :aria-expanded="open"
         @click="open = !open"
       >
-        <u-icon :name="open ? 'i-lucide-chevron-up' : 'i-lucide-chevron-right'" />
+        <u-icon
+          class="search-advanced-filters__icon"
+          :name="open ? 'i-lucide-chevron-up' : 'i-lucide-chevron-right'"
+        />
         <span>{{ open ? (hideLabel || label) : label }}</span>
       </button>
     </div>
@@ -46,18 +50,46 @@ withDefaults(defineProps<{
 .search-advanced-filters__button {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
   min-width: 0;
-  padding: 0;
-  border: 0;
+  min-height: 38px;
+  padding: 0 10px;
+  border: 1px solid transparent;
+  border-radius: 8px;
   background: transparent;
-  color: var(--ui-text-muted);
+  color: rgba(230, 233, 248, 0.82);
   font-size: 13px;
-  font-weight: 650;
+  font-weight: 700;
   line-height: 1.25;
   cursor: pointer;
+  transition:
+    color 160ms ease,
+    background-color 160ms ease,
+    border-color 160ms ease;
 }
-.search-advanced-filters__button:hover { color: var(--text-white); }
+.search-advanced-filters__icon {
+  flex: 0 0 auto;
+  color: rgba(205, 211, 239, 0.82);
+  font-size: 16px;
+  transition: color 160ms ease;
+}
+.search-advanced-filters__button:hover {
+  color: var(--text-white, #fff);
+  border-color: rgba(132, 119, 220, 0.28);
+  background: rgba(255, 255, 255, 0.045);
+}
+.search-advanced-filters__button:hover .search-advanced-filters__icon,
+.search-advanced-filters__button_open .search-advanced-filters__icon {
+  color: rgba(224, 191, 255, 0.96);
+}
+.search-advanced-filters__button_open {
+  color: var(--text-white, #fff);
+  background: rgba(128, 90, 245, 0.08);
+}
+.search-advanced-filters__button:focus-visible {
+  outline: 2px solid rgba(205, 153, 255, 0.72);
+  outline-offset: 2px;
+}
 .search-advanced-filters__panel {
   position: relative;
   isolation: isolate;
@@ -114,7 +146,7 @@ withDefaults(defineProps<{
   .search-advanced-filters__button {
     width: 100%;
     min-height: 44px;
-    padding: 0 2px;
+    padding: 0 8px;
     justify-content: flex-start;
     font-size: 14px;
   }
