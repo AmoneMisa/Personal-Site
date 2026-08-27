@@ -147,6 +147,12 @@ function displayValue(row: SpecRow): string {
     [/\bpreferred\b/gi, t("jobs.requirementPreferred")],
     [/\bnot required\b|\bnotRequired\b/gi, t("jobs.requirementNotRequired")],
     [/\bPrototyping\b/gi, t("jobs.skillPrototyping")],
+    [/\bEnglish\b/gi, t("jobs.languageEnglish")],
+    [/\bRussian\b/gi, t("jobs.languageRussian")],
+    [/\bUkrainian\b/gi, t("jobs.languageUkrainian")],
+    [/\bRomanian\b/gi, t("jobs.languageRomanian")],
+    [/\bUzbek\b/gi, t("jobs.languageUzbek")],
+    [/\bKazakh\b/gi, t("jobs.languageKazakh")],
   ];
 
   return replacements.reduce((value, [pattern, replacement]) => value.replace(pattern, replacement), row.value);
