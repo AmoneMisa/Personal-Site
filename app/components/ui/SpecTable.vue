@@ -442,7 +442,7 @@ function iconForRow(row: SpecRow): string {
   width: max-content;
   max-width: 220px;
   padding: 5px 7px;
-  border: 1px solid var(--line, #343a62);
+  border: 1px solid var(--line, #252a4a);
   border-radius: 6px;
   background: var(--bg-panel, #10152c);
   color: var(--text-primary, #e4e5f0);

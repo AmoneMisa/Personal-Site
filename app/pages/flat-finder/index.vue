@@ -432,7 +432,13 @@ async function verifyOpenOlxListing(l: Listing, key: string) {
     if (verified) {
       markAvailabilityFresh(key);
       if (active.value && listingIdentityMatches(active.value, l.id, l.source, l.country)) {
+        // The live-verification lookup is a lighter query than the bulk feed
+        // and omits fields the feed computes separately (marketComparison's
+        // median comparison, at least) — spreading the old listing first
+        // keeps that enrichment instead of silently losing it, while verified
+        // still overrides everything it does carry (price, availability, ...).
         const refreshed = {
+          ...active.value,
           ...verified,
           publicId: verified.publicId ?? active.value.publicId,
         };
@@ -469,6 +475,15 @@ function openById(id: string) { const found = displayedListings.value.find((l) =
 function convert(amount: number, from: string, to: string): number | undefined {
   return convertCurrency(amount, from || "USD", to || "USD", rates.value);
 }
+// SearchDetailsModal colors the popup ID by price-vs-median, the same signal
+// FlatCard colors the price with. It only has the listing itself (no rates),
+// so the USD figure is converted here and passed down rather than teaching
+// the modal currency conversion too.
+const activePriceUsd = computed(() => {
+  if (!active.value || active.value.price == null) return null;
+  const usd = convert(active.value.price, active.value.currency, "USD");
+  return usd ?? null;
+});
 const fmtBool = (v?: boolean | null) => (v === true ? t("yes") : v === false ? t("no") : t("notSpecified"));
 const numOr = (v?: number | null, unit = "") => (v != null ? `${v}${unit ? " " + unit : ""}` : t("notSpecified"));
 const strOr = (v?: string | null) => (v ? v : t("notSpecified"));
@@ -736,7 +751,7 @@ onBeforeUnmount(() => { modalOpen.value = false; lightboxOpen.value = false; rel
 
     </UiResultsLoader>
 
-    <SearchDetailsModal v-model:open="modalOpen" :title="modalTitle(active)" :flat-listing="active" :ui="{ content: 'max-w-4xl' }" :dismissible="!lightboxOpen">
+    <SearchDetailsModal v-model:open="modalOpen" :title="modalTitle(active)" :flat-listing="active" :flat-price-usd="activePriceUsd" :dismissible="!lightboxOpen">
       <template #title><h2 class="flat-modal__title">{{ modalTitle(active) }}</h2></template>
       <template #body><div v-if="active" class="flat-modal"><FlatGallery v-model:lightbox-open="lightboxOpen" :photos="visiblePhotos(active)" :title="modalTitle(active)" :viewer-label="t('photoViewer')" :previous-label="t('previousPhoto')" :next-label="t('nextPhoto')" :close-label="t('closePhoto')" @photo-error="markPhotoFailedFromEvent" /><div v-if="checkingListingKey === listingKey(active)" class="flat-modal__verification" role="status" aria-live="polite"><u-icon name="i-lucide-loader-circle" class="flat-modal__verification-icon" /><span>{{ t("checkingListing") }}</span></div><UiSpecTable :rows="specRows" :hide-empty-label="t('hideEmpty')" :empty-value="t('notSpecified')"><template #header><div class="flat-modal__price">{{ priceLabel(active) }}<span v-if="convertedLabel(active)" class="flat-modal__price-conv"> ({{ convertedLabel(active) }})</span><span v-if="dealLabel(active.dealType)" class="flat-modal__deal"> · {{ dealLabel(active.dealType) }}</span><span v-if="active.roomOnly" class="flat-modal__deal"> · {{ t("roomShare") }}</span></div></template></UiSpecTable><div v-if="active.description && descriptionNeedsTranslation" class="flat-modal__translation"><u-button type="button" variant="outline" color="neutral" size="sm" icon="i-lucide-languages" :loading="translatingDescription" @click="translateActiveDescription">{{ translatingDescription ? t("translatingDescription") : t("translateDescription") }}</u-button><span v-if="translationFailed" class="flat-modal__translation-error">{{ t("translationFailed") }}</span></div><section v-if="translatedDescription" class="flat-modal__translated"><h4 class="flat-modal__translated-title">{{ t("translatedDescription") }}</h4><p class="flat-modal__desc">{{ translatedDescription }}</p></section><details v-if="active.description" class="flat-modal__descbox"><summary>{{ t("origDescription") }}</summary><p class="flat-modal__desc">{{ active.description }}</p></details><div v-if="active.tags && active.tags.length" class="flat-modal__tags"><span v-for="tag in active.tags" :key="tag" class="flat-modal__tag">{{ nearbyItemLabel(tag) }}</span></div></div></template>
       <template #footer><UiModalFooter v-if="active"><u-button variant="outline" color="neutral" icon="i-lucide-heart" @click="toggleFavorite(active)">{{ isFavorite(active.id) ? t("removeFavorite") : t("addFavorite") }}</u-button><u-button variant="outline" color="neutral" :icon="isHidden(active.id) ? 'i-lucide-eye' : 'i-lucide-eye-off'" @click="toggleHidden(active)">{{ isHidden(active.id) ? t("restoreListing") : t("hideListing") }}</u-button><u-button variant="outline" color="neutral" :icon="shareCopied ? 'i-lucide-check' : 'i-lucide-share-2'" @click="shareFlat(active)">{{ shareCopied ? t("shareCopied") : t("share") }}</u-button><a class="modal-footer__primary" :href="active.url" target="_blank" rel="noopener noreferrer">{{ t("open") }} →</a></UiModalFooter></template>
@@ -784,7 +799,6 @@ onBeforeUnmount(() => { modalOpen.value = false; lightboxOpen.value = false; rel
 .flats__map-wrap { position: relative; z-index: 0; isolation: isolate; margin-bottom: 18px; scroll-margin-top: 90px; }
 .flat-modal__verification { display: inline-flex; align-items: center; gap: 8px; align-self: flex-start; margin-top: -2px; padding: 6px 10px; border: 1px solid rgba(224,103,154,.36); border-radius: 999px; background: rgba(224,103,154,.1); color: var(--text-secondary); font-size: 13px; }
 .flat-modal__verification-icon { width: 16px; height: 16px; color: var(--accent-pink); animation: flat-card-spin .8s linear infinite; }
-@keyframes flat-card-spin { to { transform: rotate(360deg); } }
 .flats__sentinel { min-height: 44px; display: grid; place-items: center; }
 .flat-modal { display: flex; flex-direction: column; gap: 12px; }
 .flat-modal__title { display: -webkit-box; overflow: hidden; margin: 0; padding-right: 36px; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow-wrap: anywhere; font-size: 18px; font-weight: 700; line-height: 1.35; }

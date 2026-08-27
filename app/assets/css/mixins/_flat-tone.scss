@@ -1,0 +1,30 @@
+// Six BEM-style color modifiers, generated from the shared --flat-tone-*
+// custom properties (defined once in main.css). Used wherever a price-vs-
+// median tone needs its own class rather than an inline style — currently
+// the listing card price and the popup title's ID.
+//
+// Usage: @include flat-tone-modifiers(".flat-card__price");
+// Generates .flat-card__price_green, ..._blue, ..._pink, ..._orange,
+// ..._yellow, ..._red, each setting `color` to the matching custom property.
+@use "sass:map";
+
+// Quoted: bare green/blue/pink/... are Sass color literals, and interpolating
+// a color value (rather than its name) is exactly the footgun Sass warns
+// about here.
+$flat-tones: "green", "blue", "pink", "orange", "yellow", "red";
+$flat-tone-fallbacks: (
+  "green": #4ade80,
+  "blue": #67e8f9,
+  "pink": #e0679a,
+  "orange": #fb923c,
+  "yellow": #facc15,
+  "red": #ef4444,
+);
+
+@mixin flat-tone-modifiers($selector-prefix) {
+  @each $tone in $flat-tones {
+    #{$selector-prefix}_#{$tone} {
+      color: var(--flat-tone-#{$tone}, #{map.get($flat-tone-fallbacks, $tone)});
+    }
+  }
+}

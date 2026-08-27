@@ -29,6 +29,23 @@
     font-display: swap;
 }
 
+/* Shared by every loading-spinner icon that just rotates 360° (Flat Finder's
+   verification spinner and card-checking spinner both used their own copy of
+   this exact keyframe — scoped <style> blocks don't namespace @keyframes, so
+   two components declaring the same name is a latent collision, not just
+   duplication). Respects prefers-reduced-motion the same way ResultsLoader.vue
+   already does for its own spinner: slow down rather than freeze, so motion-
+   sensitive users still get the "it's working" signal. */
+@keyframes flat-card-spin {
+    to { transform: rotate(360deg); }
+}
+@media (prefers-reduced-motion: reduce) {
+    .flat-card__checking-icon,
+    .flat-modal__verification-icon {
+        animation-duration: 1.4s;
+    }
+}
+
 @keyframes styles_moving-gradient {
     0% {
         background-position: 0 0;
@@ -142,6 +159,17 @@ h1, h2, h3, h4, h5, h6 {
     font-family: "Inter", "PT Root UI", sans-serif;
     --half-border: var(--accent-pink);
     --text-white: #FFFFFF;
+
+    /* Flat Finder's price-vs-median palette. Was three separate hardcoded
+       copies (the card price, and about to be a fourth in the popup ID) —
+       one shared source so the bands can't drift out of sync between where
+       they're shown. */
+    --flat-tone-green: #4ade80;
+    --flat-tone-blue: #67e8f9;
+    --flat-tone-pink: #e0679a;
+    --flat-tone-orange: #fb923c;
+    --flat-tone-yellow: #facc15;
+    --flat-tone-red: #ef4444;
 }
 
 /* The site is dark-only: tokens always resolve to the values above and the

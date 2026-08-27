@@ -1,10 +1,12 @@
 <script setup lang="ts">
 import type { FlatListing } from "~/types/flats";
-import { locationLabel } from "~/utils/locationLabels";
+import { useFlatDetailsTitle } from "~/composables/flats/useFlatDetailsTitle";
 
 const props = withDefaults(defineProps<{
   title: string;
   flatListing?: FlatListing | null;
+  /** USD-converted price of flatListing. The modal has no exchange rates of its own. */
+  flatPriceUsd?: number | null;
   publicId?: number | string | null;
   ui?: Record<string, string>;
   dismissible?: boolean;
@@ -14,30 +16,24 @@ const props = withDefaults(defineProps<{
 
 const open = defineModel<boolean>("open", { required: true });
 const route = useRoute();
-const { locale } = useI18n();
 const isFlatFinder = computed(() => route.path.endsWith("/flat-finder"));
 const isSearchBoard = computed(() => ["/flat-finder", "/jobs", "/hiring"].some((path) => route.path.endsWith(path)));
 
 const activeFlatListing = computed(() => isFlatFinder.value ? props.flatListing || null : null);
+const { text: flatTitleText, idTone: flatIdTone } = useFlatDetailsTitle({
+  listing: activeFlatListing,
+  priceUsd: computed(() => props.flatPriceUsd),
+});
+
+// "#12345 <text>" applies to any search-board detail (a job vacancy or
+// candidate carries its own publicId too), not just flats — flatTitleText
+// is simply empty outside Flat Finder, leaving props.title as the text.
 const displayPublicId = computed(() => {
   const raw = activeFlatListing.value?.publicId ?? props.publicId;
   const value = String(raw ?? "").trim();
   return value && value !== "0" ? value : "";
 });
-const flatDealLabel = computed(() => {
-  const listing = activeFlatListing.value;
-  if (!listing) return "";
-  const english = String(locale.value).toLowerCase().startsWith("en");
-  if (listing.roomOnly) return english ? "Room rent" : "Аренда комнаты";
-  if (listing.dealType === "sale") return english ? "Sale" : "Продажа";
-  if (listing.dealType === "shortRent") return english ? "Short-term rent" : "Краткосрочная аренда";
-  if (listing.dealType === "longRent") return english ? "Long-term rent" : "Долгосрочная аренда";
-  return english ? "Listing" : "Объявление";
-});
-const flatCityLabel = computed(() => locationLabel(activeFlatListing.value?.city, String(locale.value), "city"));
-const publicTitleText = computed(() => isFlatFinder.value
-  ? [flatDealLabel.value, flatCityLabel.value].filter(Boolean).join(", ")
-  : props.title);
+const publicTitleText = computed(() => isFlatFinder.value ? flatTitleText.value : props.title);
 const publicTitle = computed(() => {
   if (!displayPublicId.value) return "";
   return `#${displayPublicId.value}${publicTitleText.value ? ` ${publicTitleText.value}` : ""}`;
@@ -75,7 +71,7 @@ const modalUi = computed(() => {
   >
     <template #title>
       <div v-if="publicTitle" class="search-details-public-title">
-        <span class="search-details-public-title__id">#{{ displayPublicId }}</span>
+        <span class="search-details-public-title__id" :class="flatIdTone ? `search-details-public-title__id_${flatIdTone}` : ''">#{{ displayPublicId }}</span>
         <div class="search-details-public-title__content">
           <span v-if="isFlatFinder" class="search-details-public-title__text">{{ publicTitleText }}</span>
           <slot v-else-if="$slots.title" name="title" />
@@ -94,7 +90,9 @@ const modalUi = computed(() => {
   </u-modal>
 </template>
 
-<style>
+<style lang="scss">
+@use "../../assets/css/mixins/flat-tone" as *;
+
 /* Flat Finder deliberately keeps every fact in one place: the specification
    grid. Deal/room badges beside the price and generated tag chips duplicated
    the same data, so the compact dialog does not render them visually. */
@@ -133,6 +131,7 @@ const modalUi = computed(() => {
   color: #fff;
   font-variant-numeric: tabular-nums;
 }
+@include flat-tone-modifiers(".search-details-public-title__id");
 
 .search-details-public-title__content { min-width: 0; }
 

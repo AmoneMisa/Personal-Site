@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { FlatCardPresentation, FlatListing } from "~/types/flats";
 import type { DraggablePillItem } from "~/components/ui/DraggablePills.vue";
+import { flatPriceTone, type FlatPriceTone } from "~/utils/flats/priceTone";
 
 const props = defineProps<{
   listing: FlatListing;
@@ -38,8 +39,6 @@ const goodPriceTitle = computed(() => {
 });
 const visionLabels = computed(() => new Set(props.presentation.visionBadgeLabels || []));
 
-type PriceTone = "green" | "blue" | "pink" | "orange" | "yellow" | "red";
-
 function displayedUsdPrice(): number | null {
   if (props.listing.price != null && String(props.listing.currency || "").toUpperCase() === "USD") {
     return props.listing.price;
@@ -50,18 +49,9 @@ function displayedUsdPrice(): number | null {
   return numeric ? Number(numeric) : null;
 }
 
-const priceTone = computed<PriceTone>(() => {
-  const median = props.presentation.goodPriceMedianUsd;
-  const priceUsd = displayedUsdPrice();
-  if (median == null || median <= 0 || priceUsd == null || priceUsd <= 0) return "pink";
-  const ratio = priceUsd / median;
-  if (ratio >= 1.45) return "red";
-  if (ratio >= 1.31) return "yellow";
-  if (ratio >= 1.16) return "orange";
-  if (ratio >= 0.85) return "pink";
-  if (ratio >= 0.70) return "blue";
-  return "green";
-});
+const priceTone = computed<FlatPriceTone>(() => (
+  flatPriceTone(displayedUsdPrice(), props.presentation.goodPriceMedianUsd) ?? "pink"
+));
 
 // Room-share safety is decided server-side (server/utils/flatSafety.ts) from
 // @whiteslove/parsing-lexicon vocabulary. The card only renders the verdict.
@@ -140,14 +130,14 @@ const emit = defineEmits<{
   </article>
 </template>
 
-<style scoped>
+<style scoped lang="scss">
+@use "../../assets/css/mixins/flat-tone" as *;
 .flat-card { position: relative; min-width: 0; height: 100%; align-self: stretch; border: 1px solid var(--line); border-radius: 12px; overflow: hidden; background: var(--bg-panel); cursor: pointer; transition: transform 140ms ease, border-color 180ms ease, box-shadow 180ms ease; display: flex; flex-direction: column; }
 .flat-card:hover { transform: translateY(-2px); border-color: rgba(224,103,154,0.4); box-shadow: 0 12px 30px rgba(0,0,0,.16); }
 .flat-card_warning { border-color: rgba(242,184,107,.56); box-shadow: inset 0 0 0 1px rgba(242,184,107,.08); }
 .flat-card_checking { pointer-events: none; }
 .flat-card__checking { position: absolute; z-index: 5; inset: 0; display: grid; place-content: center; justify-items: center; gap: 9px; padding: 18px; background: rgba(7,12,34,.92); color: var(--text-primary); font-size: 12.5px; font-weight: 700; text-align: center; }
 .flat-card__checking-icon { width: 26px; height: 26px; color: var(--accent-pink); animation: flat-card-spin .8s linear infinite; }
-@keyframes flat-card-spin { to { transform: rotate(360deg); } }
 .flat-card__photo { position: relative; width: 100%; aspect-ratio: 1.5; flex: 0 0 auto; overflow: hidden; background: var(--bg-panel); }
 .flat-card__photo::before { content: ""; position: absolute; z-index: 1; left: 0; right: 0; bottom: 0; height: 64%; pointer-events: none; background: linear-gradient(180deg, rgba(11,16,42,0) 0%, rgba(11,16,42,.08) 24%, rgba(11,16,42,.38) 52%, rgba(11,16,42,.78) 78%, var(--bg-panel) 100%); }
 .flat-card__photo::after { content: ""; position: absolute; z-index: 1; left: 0; right: 0; bottom: 0; height: 40%; pointer-events: none; background: linear-gradient(180deg, rgba(11,16,42,0) 0%, rgba(11,16,42,.14) 34%, rgba(11,16,42,.55) 74%, var(--bg-panel) 100%); }
@@ -165,7 +155,7 @@ const emit = defineEmits<{
 .flat-card__body { position: relative; z-index: 2; min-height: 0; flex: 1 1 auto; margin-top: -1px; padding: 11px 13px 12px; display: flex; flex-direction: column; gap: 4px; background: var(--bg-panel); }
 .flat-card__price-row { min-width: 0; min-height: 22px; display: flex; align-items: baseline; gap: 8px; white-space: nowrap; overflow: hidden; }
 .flat-card__price { min-width: 0; font-weight: 750; font-size: 18px; line-height: 1.2; color: var(--text-white, inherit); font-variant-numeric: tabular-nums; overflow: hidden; text-overflow: ellipsis; }
-.flat-card__price_green { color: #4ade80; }.flat-card__price_blue { color: #67e8f9; }.flat-card__price_pink { color: #e0679a; }.flat-card__price_orange { color: #fb923c; }.flat-card__price_yellow { color: #facc15; }.flat-card__price_red { color: #ef4444; }
+@include flat-tone-modifiers(".flat-card__price");
 .flat-card__price-conv { flex: 0 1 auto; min-width: 0; font-size: 12px; font-weight: 500; line-height: 1.35; overflow: hidden; text-overflow: ellipsis; }
 .flat-card__title { min-height: 19px; margin-top: 2px; font-size: 14px; font-weight: 650; line-height: 1.36; display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical; overflow: hidden; text-overflow: ellipsis; white-space: normal; overflow-wrap: anywhere; }.flat-card__spec { min-height: 16px; font-size: 12px; line-height: 1.35; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .flat-card__badges { min-height: 27px; margin-top: 5px; }.flat-card__badges :deep(.flat-card__badge) { border-radius: 999px; padding: 4px 7px; font-size: 10.5px; font-weight: 600; line-height: 1.15; background: rgba(255,255,255,0.05); color: var(--text-primary); }.flat-card__badges :deep(.flat-card__badge_vision) { border-color: rgba(56,189,248,.36); color: #8bdcf7; background: rgba(56,189,248,.08); }.flat-card__badges :deep(.flat-card__badge_warning) { border-color: rgba(242,184,107,.52); color: #f2b86b; background: rgba(242,184,107,.1); }
