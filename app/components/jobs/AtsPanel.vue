@@ -27,7 +27,7 @@ const pasteModel = computed({ get: () => props.paste, set: (value: string) => em
 .ats__title { font-weight: 600; }
 .ats__intro { font-size: 13px; }
 .ats__body { display: grid; gap: 10px; margin-top: 12px; align-items: center; grid-template-columns: 1fr; }
-.ats__upload { display: inline-flex; align-items: center; gap: 8px; white-space: nowrap; height: 40px; padding: 0 14px; border-radius: 10px; cursor: pointer; border: 1px dashed rgba(224,103,154,.5); color: var(--text-white, inherit); font-weight: 700; font-size: 13px; }
+.ats__upload { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-width: 0; max-width: 100%; min-height: 40px; padding: 8px 14px; border-radius: 10px; cursor: pointer; border: 1px dashed rgba(224,103,154,.5); color: var(--text-white, inherit); font-weight: 700; font-size: 13px; line-height: 1.25; white-space: normal; text-align: center; }
 .ats__paste { width: 100%; }
 .ats__actions { display: flex; justify-content: flex-end; }
 .ats__status, .ats__error { margin-top: 10px; font-size: 13px; }

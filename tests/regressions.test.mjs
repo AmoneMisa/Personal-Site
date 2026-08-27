@@ -116,6 +116,20 @@ test('board pages share filter primitives and flat finder starts from a regional
   assert.match(flat, /countries\.value\s*=\s*\[defaultCountry\.value\]/u)
 })
 
+test('search boards solve narrow layouts without clipping the page', () => {
+  const shell = readFileSync(new URL('../app/components/search/SearchPageShell.vue', import.meta.url), 'utf8')
+  const advanced = readFileSync(new URL('../app/components/search/SearchAdvancedFilters.vue', import.meta.url), 'utf8')
+  const ats = readFileSync(new URL('../app/components/jobs/AtsPanel.vue', import.meta.url), 'utf8')
+  const container = readFileSync(new URL('../app/components/U/Container.vue', import.meta.url), 'utf8')
+
+  assert.doesNotMatch(shell, /overflow-x:\s*(?:hidden|clip)/u)
+  assert.doesNotMatch(shell, /max-width:\s*100%/u)
+  assert.match(shell, /\.search-page > \* \{[\s\S]*?min-width:\s*0/u)
+  assert.match(container, /max-width:\s*1280px/u)
+  assert.match(advanced, /\.search-advanced-filters__button \{[\s\S]*?min-width:\s*0/u)
+  assert.match(ats, /\.ats__upload \{[^}]*max-width:\s*100%[^}]*white-space:\s*normal/u)
+})
+
 test('all three listing boards share one accessible sort control', () => {
   const control = readFileSync(new URL('../app/components/ui/SortSelect.vue', import.meta.url), 'utf8')
   assert.match(control, /i-lucide-arrow-down-wide-narrow/u)

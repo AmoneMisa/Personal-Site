@@ -25,8 +25,6 @@ defineProps<{
 <style scoped>
 .search-page {
   min-width: 0;
-  max-width: 100%;
-  overflow-x: clip;
 }
 
 .search-page > * {
