@@ -149,6 +149,8 @@ export function parseHiringExperience(text: string) {
 }
 
 const JOBS_I18N_PERIOD_RE = /\bjobs\.per(hour|day|shift|week|month|year|project|piece)\b/i
+const DUPLICATED_RANGE_CURRENCY_RE = /([–—-])\s*([$€£₴₽₺₾₩₹₼֏¥￥])\s*(?=\d)/g
+const EXPLICIT_POSITIVE_VISA_SPONSORSHIP_RE = /\bwe\s+do\s+sponsor\s+visas?\b/i
 
 function leakedJobsSalaryPeriod(text: string): SalaryPeriod | undefined {
   const raw = text.match(JOBS_I18N_PERIOD_RE)?.[1]?.toLowerCase()
@@ -156,8 +158,16 @@ function leakedJobsSalaryPeriod(text: string): SalaryPeriod | undefined {
   return raw as SalaryPeriod
 }
 
+function normalizeSalaryRangeForInstalledLexicon(text: string): string {
+  // parsing-lexicon <= 0.2.7 can parse "$55 — 65" but a repeated symbol before
+  // the upper bound interrupts its numeric range matcher. Keep the first symbol
+  // for currency detection and remove only the redundant second symbol.
+  return text.replace(DUPLICATED_RANGE_CURRENCY_RE, '$1 ')
+}
+
 export function parseHiringSalary(text: string) {
-  const parsed = parseHiringSalaryWithContext(text, { currencyFallback: 'language' })
+  const normalized = normalizeSalaryRangeForInstalledLexicon(text)
+  const parsed = parseHiringSalaryWithContext(normalized, { currencyFallback: 'language' })
   if (!parsed) return parsed
   const leakedPeriod = leakedJobsSalaryPeriod(text)
   if (!leakedPeriod || parsed.period === leakedPeriod) return parsed
@@ -169,5 +179,10 @@ export function parseSharedLanguageContext(text: string, mode: 'vacancy' | 'cand
 }
 
 export function parseSharedHiringContext(text: string, options: { mode?: 'vacancy' | 'candidate' | null; title?: string } = {}) {
-  return parseHiringContext(text, options)
+  const parsed = parseHiringContext(text, options)
+  if (!EXPLICIT_POSITIVE_VISA_SPONSORSHIP_RE.test(text) || parsed.workAuthorization.includes('sponsorshipOffered')) return parsed
+  return Object.freeze({
+    ...parsed,
+    workAuthorization: Object.freeze([...parsed.workAuthorization, 'sponsorshipOffered']),
+  })
 }
