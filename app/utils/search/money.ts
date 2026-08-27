@@ -3,11 +3,20 @@ import {
   currencySymbol as sharedCurrencySymbol,
 } from "@whiteslove/parsing-lexicon/currency";
 
-export type SalaryPeriod = "hour" | "month" | "year";
+export type SalaryPeriod = "hour" | "day" | "shift" | "week" | "month" | "year" | "project" | "piece";
+export type DisplaySalaryPeriod = "hour" | "month" | "year";
 
+// Keep the site's established 160-hour work-month convention, but derive the
+// other convertible periods from the same model so hourly/day/weekly salaries
+// normalize consistently. Project/piece/shift rates intentionally have no
+// implicit monthly conversion because their frequency is unknown.
+const HOURS_PER_DAY = 8;
 const HOURS_PER_MONTH = 160;
-const PERIODS_PER_YEAR: Readonly<Record<SalaryPeriod, number>> = {
+const WORK_DAYS_PER_MONTH = HOURS_PER_MONTH / HOURS_PER_DAY;
+const PERIODS_PER_YEAR: Readonly<Partial<Record<SalaryPeriod, number>>> = {
   hour: 12 * HOURS_PER_MONTH,
+  day: 12 * WORK_DAYS_PER_MONTH,
+  week: 48,
   month: 12,
   year: 1,
 };
@@ -84,6 +93,13 @@ export function compactSalaryText(value: string): string {
     .replace(/([$€£₴₽₺₾₩₹₼֏¥￥])\s+(?=\d)/g, (symbol) => symbol);
 }
 
-export function convertSalaryPeriod(amount: number, from: SalaryPeriod, to: SalaryPeriod): number {
-  return amount * PERIODS_PER_YEAR[from] / PERIODS_PER_YEAR[to];
+export function convertSalaryPeriod(
+  amount: number,
+  from: SalaryPeriod,
+  to: DisplaySalaryPeriod,
+): number | undefined {
+  const sourcePeriods = PERIODS_PER_YEAR[from];
+  const targetPeriods = PERIODS_PER_YEAR[to];
+  if (!sourcePeriods || !targetPeriods) return undefined;
+  return amount * sourcePeriods / targetPeriods;
 }

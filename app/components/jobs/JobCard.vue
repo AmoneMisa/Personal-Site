@@ -3,6 +3,7 @@ import { scoreColor } from "~/utils/atsScore";
 import type { Job, JobAtsResult } from "~/types/jobs";
 import { formatRelativeDate } from "~/utils/search/relativeDate";
 import { compactSalaryText } from "~/utils/search/money";
+import { localizeJobLanguage } from "~/utils/jobs/languageLabel";
 import SearchMatchBadge from "~/components/search/SearchMatchBadge.vue";
 import type { DraggablePillItem } from "~/components/ui/DraggablePills.vue";
 
@@ -27,6 +28,7 @@ const emit = defineEmits<{
 
 const { t: translate } = useI18n();
 const t = (key: string, params: Record<string, unknown> = {}) => translate(`jobs.${key}`, params);
+const languageLabel = (value: string) => localizeJobLanguage(value, (key) => t(key));
 
 const empLabel = (kind?: string) => kind ? t("emp" + kind.charAt(0).toUpperCase() + kind.slice(1)) : "";
 const seniorityLabel = (value?: Job["seniority"]) => value ? t("seniority" + value.charAt(0).toUpperCase() + value.slice(1)) : "";
@@ -128,7 +130,7 @@ function openCard() { emit("open", props.job); }
     <div v-if="job.languages?.length" class="job-card__langs text-muted">
       <u-icon name="i-lucide-languages" class="job-card__lang-icon" />
       <span v-for="language in job.languages" :key="language.language" class="job-card__lang">
-        {{ language.language }}<template v-if="language.level"> ({{ language.level }})</template>
+        {{ languageLabel(language.language) }}<template v-if="language.level"> ({{ language.level }})</template>
       </span>
     </div>
     <p v-if="job.description" class="job-card__desc text-muted">{{ job.description }}</p>

@@ -3,6 +3,7 @@
 // Flat Finder parsing belongs to @whiteslove/parsing-lexicon/backend ingestion;
 // this component only presents normalized listing fields.
 import { computed, ref } from "vue";
+import { localizeJobLanguageList } from "~/utils/jobs/languageLabel";
 
 export interface SpecRow {
   label: string;
@@ -31,6 +32,7 @@ const hideEmpty = ref(props.hideEmptyDefault);
 const route = useRoute();
 const { t, locale } = useI18n();
 const isFlatFinder = computed(() => route.path.endsWith("/flat-finder"));
+const isJobs = computed(() => route.path.endsWith("/jobs"));
 
 function queryString(value: unknown): string {
   return Array.isArray(value) ? String(value[0] || "") : String(value || "");
@@ -124,6 +126,35 @@ function displayLabel(row: SpecRow): string {
   if (row.label === t("flats.specBedrooms")) return english ? "Number of bedrooms" : "Количество спален";
   if (row.label === t("flats.specBathrooms")) return english ? "Number of bathrooms" : "Количество с/у";
   return row.label;
+}
+
+function displayValue(row: SpecRow): string {
+  if (!isJobs.value) return row.value;
+
+  if (row.label === t("jobs.vLanguages") || row.label === t("jobs.vApplicationLanguage")) {
+    return localizeJobLanguageList(row.value, (key) => t(`jobs.${key}`));
+  }
+
+  // Older enriched vacancies persisted human-readable English labels instead of
+  // enum codes. Localize those legacy values at render time so saved/cache data
+  // is fixed immediately without requiring a full jobs re-ingestion.
+  const replacements: Array<[RegExp, string]> = [
+    [/\bShift work\b/gi, t("jobs.scheduleShift")],
+    [/\bFlexible(?: schedule)?\b/gi, t("jobs.scheduleFlexible")],
+    [/\bDay shift\b|\bDay\b/gi, t("jobs.scheduleDay")],
+    [/\bNight shift\b|\bNight\b/gi, t("jobs.scheduleNight")],
+    [/\bRotational(?: schedule)?\b/gi, t("jobs.scheduleRotational")],
+    [/\bEmployment contract\b/gi, t("jobs.contractEmployment")],
+    [/\bCivil contract\b/gi, t("jobs.contractCivil")],
+    [/\bContractor\b/gi, t("jobs.contractContractor")],
+    [/\bFreelance\b/gi, t("jobs.contractFreelance")],
+    [/\brequired\b/gi, t("jobs.requirementRequired")],
+    [/\bpreferred\b/gi, t("jobs.requirementPreferred")],
+    [/\bnot required\b|\bnotRequired\b/gi, t("jobs.requirementNotRequired")],
+    [/\bPrototyping\b/gi, t("jobs.skillPrototyping")],
+  ];
+
+  return replacements.reduce((value, [pattern, replacement]) => value.replace(pattern, replacement), row.value);
 }
 
 const contextualRows = computed<SpecRow[]>(() => {
@@ -304,7 +335,7 @@ function iconForRow(row: SpecRow): string {
             >
               <u-icon :name="iconForRow(row)" />
             </span>
-            <span class="spec-table__value">{{ row.value }}</span>
+            <span class="spec-table__value">{{ displayValue(row) }}</span>
             <span
               v-if="aiHintForRow(row)"
               class="spec-table__ai-hint spec-table__ai-hint_grid"
@@ -330,7 +361,7 @@ function iconForRow(row: SpecRow): string {
               tabindex="0"
             >(?)</span>
           </th>
-          <td>{{ row.value }}</td>
+          <td>{{ displayValue(row) }}</td>
         </tr>
       </tbody>
     </table>
