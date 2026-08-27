@@ -31,6 +31,18 @@ const t = (key: string, params: Record<string, unknown> = {}) => translate(`jobs
 const empLabel = (kind?: string) => kind ? t("emp" + kind.charAt(0).toUpperCase() + kind.slice(1)) : "";
 const seniorityLabel = (value?: Job["seniority"]) => value ? t("seniority" + value.charAt(0).toUpperCase() + value.slice(1)) : "";
 const employerTypeLabel = (value?: Job["employerType"]) => value ? t("employer" + value.charAt(0).toUpperCase() + value.slice(1)) : "";
+const languageKey: Record<string, string> = {
+  english: "languageEnglish",
+  russian: "languageRussian",
+  ukrainian: "languageUkrainian",
+  romanian: "languageRomanian",
+  uzbek: "languageUzbek",
+  kazakh: "languageKazakh",
+};
+function languageLabel(value: string): string {
+  const key = languageKey[value.trim().toLowerCase()];
+  return key ? t(key) : value;
+}
 function timeAgo(iso: string): string {
   return formatRelativeDate(iso, {
     today: () => t("today"),
@@ -128,7 +140,7 @@ function openCard() { emit("open", props.job); }
     <div v-if="job.languages?.length" class="job-card__langs text-muted">
       <u-icon name="i-lucide-languages" class="job-card__lang-icon" />
       <span v-for="language in job.languages" :key="language.language" class="job-card__lang">
-        {{ language.language }}<template v-if="language.level"> ({{ language.level }})</template>
+        {{ languageLabel(language.language) }}<template v-if="language.level"> ({{ language.level }})</template>
       </span>
     </div>
     <p v-if="job.description" class="job-card__desc text-muted">{{ job.description }}</p>
