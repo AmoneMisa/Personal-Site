@@ -1,7 +1,9 @@
 <script setup lang="ts">
 import { onBeforeUnmount, onMounted, ref } from "vue";
 
-type CrabPhase = "normal" | "fleeing" | "cooldown";
+type CrabPhase = "normal" | "fleeing" | "falling" | "cooldown";
+
+const CRAB_FALL_CHANCE = 0.08;
 
 const crab = ref<HTMLElement | null>(null);
 const phase = ref<CrabPhase>("normal");
@@ -26,8 +28,9 @@ function handlePointerDown(event: PointerEvent) {
   const matrix = new DOMMatrixReadOnly(getComputedStyle(element).transform);
   fleeOriginX.value = `${matrix.m41}px`;
   fleeOriginY.value = `${matrix.m42}px`;
-  phase.value = "fleeing";
-  setPhaseLater("cooldown", 820);
+  const falls = Math.random() < CRAB_FALL_CHANCE;
+  phase.value = falls ? "falling" : "fleeing";
+  setPhaseLater("cooldown", falls ? 1180 : 820);
 }
 
 onMounted(() => window.addEventListener("pointerdown", handlePointerDown, { passive: true }));
@@ -48,7 +51,7 @@ onBeforeUnmount(() => {
   >
     <img
       class="header-crab__sprite"
-      :src="phase === 'fleeing' ? '/images/ocean-creatures/header-crab-surprised.webp' : '/images/ocean-creatures/header-crab.webp'"
+      :src="phase === 'fleeing' || phase === 'falling' ? '/images/ocean-creatures/header-crab-surprised.webp' : '/images/ocean-creatures/header-crab.webp'"
       alt=""
       draggable="false"
     >
@@ -72,6 +75,7 @@ onBeforeUnmount(() => {
 
 .header-crab_normal { animation: header-crab-scamper 26s linear 3s infinite; }
 .header-crab_fleeing { animation: header-crab-flee-left .82s cubic-bezier(.55,.02,.9,.45) forwards; }
+.header-crab_falling { animation: header-crab-fall 1.18s cubic-bezier(.32,.02,.82,.42) forwards; }
 .header-crab_cooldown { opacity: 0; animation: none; }
 
 .header-crab__sprite {
@@ -98,6 +102,14 @@ onBeforeUnmount(() => {
   from { opacity: .98; transform: translate3d(var(--crab-x), var(--crab-y), 0) rotate(180deg); }
   18% { opacity: .98; transform: translate3d(calc(var(--crab-x) + 8px), calc(var(--crab-y) - 5px), 0) rotate(180deg); }
   to { opacity: 0; transform: translate3d(-145%, -42%, 0) rotate(180deg); }
+}
+
+@keyframes header-crab-fall {
+  0% { opacity: .98; transform: translate3d(var(--crab-x), var(--crab-y), 0) rotate(180deg); }
+  12% { opacity: .98; transform: translate3d(calc(var(--crab-x) - 7px), calc(var(--crab-y) - 12px), 0) rotate(164deg); }
+  42% { opacity: .98; transform: translate3d(calc(var(--crab-x) + 18px), calc(var(--crab-y) + 24vh), 0) rotate(302deg); }
+  76% { opacity: .94; transform: translate3d(calc(var(--crab-x) - 12px), calc(var(--crab-y) + 68vh), 0) rotate(472deg); }
+  100% { opacity: 0; transform: translate3d(calc(var(--crab-x) + 28px), calc(100vh + 170px), 0) rotate(620deg); }
 }
 
 @keyframes header-crab-scuttle {

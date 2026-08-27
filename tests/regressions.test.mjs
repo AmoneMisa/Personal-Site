@@ -365,6 +365,8 @@ test('underwater ambience uses the original cleaned mascots and visible bubbles'
   assert.match(crab, /header-crab-scamper/u)
   assert.match(crab, /header-crab-surprised\.webp/u)
   assert.match(crab, /header-crab-flee-left/u)
+  assert.match(crab, /CRAB_FALL_CHANCE = 0\.08/u)
+  assert.match(crab, /header-crab-fall/u)
 })
 
 test('vacancy cards open from the card surface and compact overflowing pills', () => {
