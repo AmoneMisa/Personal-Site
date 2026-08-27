@@ -40,6 +40,13 @@ test("dynamic flat spec icons are bundled without Iconify runtime", async () => 
   }
 });
 
+test("full-screen photo zoom is click-driven", async () => {
+  const source = await read("app/components/flats/FlatGallery.vue");
+  assert.match(source, /@click\.stop="toggleZoom"/);
+  assert.match(source, /flat-lightbox__image_zoomed/);
+  assert.match(source, /function toggleZoom\(event: MouseEvent\)/);
+});
+
 test("frontend has an internal AI worker route for translation", async () => {
   const compose = await read("docker-compose.yml");
   assert.match(compose, /AI_WORKER_URL: \$\{AI_WORKER_URL:-http:\/\/ai-worker:4030\}/);
