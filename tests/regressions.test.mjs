@@ -328,8 +328,8 @@ test('underwater ambience uses the original cleaned mascots and visible bubbles'
   const config = readFileSync(new URL('../app/utils/aquariumCreatures.ts', import.meta.url), 'utf8')
   const creatures = `${ambient}\n${sprite}\n${config}`
   const bubbles = readFileSync(new URL('../app/components/OceanBubbles.client.vue', import.meta.url), 'utf8')
-  assert.match(creatures, /shark-clean-animated\.webp/u)
-  assert.match(creatures, /seahorse-clean-animated\.webp/u)
+  assert.match(creatures, /shark-clean-hq-animated\.webp/u)
+  assert.match(creatures, /seahorse-clean-hq-animated\.webp/u)
   assert.match(creatures, /puffer-clean-animated\.webp/u)
   assert.match(creatures, /edgeVisibility/u)
   assert.match(creatures, /await nextTick\(\)/u)
@@ -340,6 +340,7 @@ test('underwater ambience uses the original cleaned mascots and visible bubbles'
   assert.match(creatures, /seahorse-tired-animated\.webp/u)
   assert.match(creatures, /blue-fish-animated\.webp/u)
   assert.match(creatures, /clownfish-v2-animated\.webp/u)
+  assert.match(creatures, /jelly-pink-hq-animated\.webp/u)
   assert.match(sprite, /fishExpressionSrc/u)
   assert.match(sprite, /jellyMoodSrc/u)
   for (const asset of [

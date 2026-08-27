@@ -34,13 +34,13 @@ export type SteeringProfile = {
 export const MAX_VISIBLE_PETS = 4;
 
 export const aquariumCreatures: CreaturePreset[] = [
-  { id: "shark", src: "/images/ocean-creatures/shark-clean-animated.webp", kind: "shark", top: "18%", size: "clamp(190px, 18vw, 330px)", duration: "34s", delay: "-9s", direction: "rtl", opacity: 0.88 },
+  { id: "shark", src: "/images/ocean-creatures/shark-clean-hq-animated.webp", kind: "shark", top: "18%", size: "clamp(190px, 18vw, 330px)", duration: "34s", delay: "-9s", direction: "rtl", opacity: 0.88 },
   { id: "puffer", src: "/images/ocean-creatures/puffer-normal-animated.webp", kind: "puffer", top: "43%", size: "clamp(94px, 9vw, 158px)", duration: "25s", delay: "-3s", direction: "ltr", opacity: 0.9 },
   { id: "blue-fish", src: "/images/ocean-creatures/blue-fish-animated.webp", kind: "fish", top: "36%", size: "clamp(88px, 7.5vw, 142px)", duration: "31s", delay: "-17s", direction: "rtl", opacity: 0.86 },
   { id: "clownfish", src: "/images/ocean-creatures/clownfish-v2-animated.webp", kind: "fish", top: "77%", size: "clamp(76px, 6.8vw, 128px)", duration: "29s", delay: "-11s", direction: "ltr", opacity: 0.88 },
-  { id: "seahorse", src: "/images/ocean-creatures/seahorse-clean-animated.webp", kind: "seahorse", top: "61%", size: "clamp(70px, 5.7vw, 112px)", duration: "39s", delay: "-21s", direction: "rtl", opacity: 0.88 },
+  { id: "seahorse", src: "/images/ocean-creatures/seahorse-clean-hq-animated.webp", kind: "seahorse", top: "61%", size: "clamp(70px, 5.7vw, 112px)", duration: "39s", delay: "-21s", direction: "rtl", opacity: 0.88 },
   { id: "jelly-blue", src: "/images/ocean-creatures/jelly-blue-animated.webp", kind: "jelly", top: "29%", size: "clamp(82px, 6.5vw, 126px)", duration: "43s", delay: "-28s", direction: "ltr", opacity: 0.7 },
-  { id: "jelly-pink", src: "/images/ocean-creatures/jelly-pink-animated.webp", kind: "jelly", top: "72%", size: "clamp(76px, 6vw, 118px)", duration: "47s", delay: "-6s", direction: "rtl", opacity: 0.68 },
+  { id: "jelly-pink", src: "/images/ocean-creatures/jelly-pink-hq-animated.webp", kind: "jelly", top: "72%", size: "clamp(76px, 6vw, 118px)", duration: "47s", delay: "-6s", direction: "rtl", opacity: 0.68 },
 ];
 
 export const steeringProfiles: Record<CreatureKind, SteeringProfile> = {
