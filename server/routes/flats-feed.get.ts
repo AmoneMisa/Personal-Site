@@ -1,5 +1,6 @@
 import { canonicalMetroValue } from '../utils/tashkentMetroLabels'
 import { normalizeFlatDealType, normalizeFlatPrice, normalizeFlatRoomOnly } from '../utils/flatDealType'
+import { isPotentiallyUnsafeFlat } from '../utils/flatSafety'
 import { canonicalCityValue } from '../../shared/locationCatalog'
 
 // GET /flats-feed — server-side proxy to the flat-finder backend's /api/listings.
@@ -51,6 +52,7 @@ function shapeListing(listing: any): any {
   return {
     ...normalizedListing,
     dealType: normalizeFlatDealType(normalizedListing),
+    potentiallyUnsafe: isPotentiallyUnsafeFlat(normalizedListing),
     photo: rewritePhoto(listing?.photo),
     photos: Array.isArray(listing?.photos) ? listing.photos.map(rewritePhoto) : [],
   }

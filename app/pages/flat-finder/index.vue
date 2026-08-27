@@ -286,7 +286,7 @@ function applyQueryParams(params: Record<string, unknown>) { flatRouteState.dese
 // a failed or still-running request left the URL describing filters that were no
 // longer applied: resetting did not clear it, and removing one of the chips
 // above the results did not take that filter out of the query string either.
-const { schedule: scheduleQuerySync } = flatRouteState;
+const { schedule: scheduleQuerySync, sync: syncQueryParams } = flatRouteState;
 const shareUrl = computed(() => {
   const resolved = router.resolve({ path: route.path, query: { ...currentFilterQuery(), shared: "1" } });
   return import.meta.client ? new URL(resolved.href, window.location.origin).toString() : resolved.href;

@@ -1,4 +1,3 @@
-import { onBeforeUnmount } from "vue";
 import type { LocationQuery, Router } from "vue-router";
 import type { useFlatFilters } from "~/composables/flats/useFlatFilters";
 import type { FlatSort } from "~/types/flats";
@@ -7,12 +6,6 @@ import { useSearchRouteState } from "../search/useSearchRouteState";
 
 const FLAT_SORTS: FlatSort[] = ["newest", "oldest", "priceAsc", "priceDesc", "titleAsc", "titleDesc"];
 const SOCIAL_FLAT_SOURCES = ["facebook", "threads"];
-
-let activeFlatRouteSync: (() => Promise<void>) | null = null;
-
-export async function syncActiveFlatRouteState() {
-  if (activeFlatRouteSync) await activeFlatRouteSync();
-}
 
 export function useFlatRouteState(options: {
   router: Router;
@@ -114,11 +107,6 @@ export function useFlatRouteState(options: {
       return preserved;
     },
     debounceMs: 200,
-  });
-
-  activeFlatRouteSync = routeState.sync;
-  onBeforeUnmount(() => {
-    if (activeFlatRouteSync === routeState.sync) activeFlatRouteSync = null;
   });
 
   return { ...routeState, serialize, deserialize };

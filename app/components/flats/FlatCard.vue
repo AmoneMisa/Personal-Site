@@ -63,20 +63,9 @@ const priceTone = computed<PriceTone | null>(() => {
   return "green";
 });
 
-function suspiciousRoomShare(listing: FlatListing): boolean {
-  if (listing.potentiallyUnsafe === true) return true;
-  const text = `${listing.title || ""}\n${listing.description || ""}`;
-  const roomOnly = listing.roomOnly === true || /(?:подселени|койко[-\s]?мест|место\s+в\s+(?:комнат|квартир)|одно\s+место|1\s+место|bed\s*space|roommate|flatmate|sherik(?:ka|lik)|шерик(?:ка|лик)|(?:bitta|1)\s+joy\s+(?:bor|mavjud)|(?:битта|1)\s+жой\s+(?:бор|мавжуд)|birga\s+yashash(?:ga)?[^\r\n.!?]{0,36}(?:\d+\s*ta?\s*)?(?:qiz|ayol)[^\r\n.!?]{0,20}(?:kerak|kere)|kvartira(?:ga|da)?[^\r\n.!?]{0,36}(?:1|bitta)\s*(?:ta\s*)?(?:qiz|ayol)[^\r\n.!?]{0,20}(?:ijarachi\s*)?(?:kerak|kere))/iu.test(text);
-  if (!roomOnly) return false;
-  const oneWoman = /(?:только|нужн[а-яё]*|ищ[еу][а-яё]*|подсел[а-яё]*)[^\r\n.!?]{0,24}(?:одн(?:а|ой|у)|1)\s+(?:девушк[а-яё]*|женщин[а-яё]*)|(?:faqat\s+)?(?:1|bitta)\s*(?:ta\s*)?(?:qiz|ayol)[^\r\n.!?]{0,18}(?:ijarachi\s*)?(?:kerak|kere|uchun)?/iu.test(text);
-  if (!oneWoman) return false;
-  const thresholds: Record<string, number> = { USD: 120, EUR: 110, UZS: 1_500_000, KZT: 55_000, UAH: 4_500, RON: 500 };
-  const limit = thresholds[String(listing.currency || "").toUpperCase()];
-  const price = Number(listing.price);
-  return limit != null && Number.isFinite(price) && price > 0 && price <= limit;
-}
-
-const unsafeListing = computed(() => suspiciousRoomShare(props.listing));
+// Room-share safety is decided server-side (server/utils/flatSafety.ts) from
+// @whiteslove/parsing-lexicon vocabulary. The card only renders the verdict.
+const unsafeListing = computed(() => props.listing.potentiallyUnsafe === true);
 const unsafeLabel = computed(() => isEnglish.value ? "Potentially unsafe" : "Потенциально опасное");
 const unsafeTitle = computed(() => isEnglish.value
   ? "Unusually low-price room share seeking one woman. Verify the landlord and terms before meeting or paying."

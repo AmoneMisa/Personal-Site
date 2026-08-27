@@ -1,5 +1,6 @@
 import { computed, ref, type Ref } from "vue";
 import type { FlatListing, FlatTranslationResult } from "~/types/flats";
+import { housingTextIsInLanguage } from "@whiteslove/parsing-lexicon/housing-language";
 import { safeFetch } from "~/utils/safeFetch";
 
 export function useFlatTranslation(active: Ref<FlatListing | null>, locale: Ref<string>) {
@@ -14,20 +15,9 @@ export function useFlatTranslation(active: Ref<FlatListing | null>, locale: Ref<
   const targetLanguage = () => locale.value.startsWith("en") ? "en" as const : "ru" as const;
   const cacheKey = (listing: FlatListing, target = targetLanguage()) => `${listing.id}:${target}`;
 
-  function descriptionMatchesTargetLanguage(text: string, target: "en" | "ru"): boolean {
-    const normalized = text.toLocaleLowerCase();
-    if (target === "ru") {
-      if (/[ўқғҳ]/iu.test(normalized)) return false;
-      const signals = normalized.match(/(?:квартир\p{L}*|комнат\p{L}*|этаж\p{L}*|дом\p{L}*|цен\p{L}*|сда[её]тся|прода[её]тся|аренд\p{L}*|рядом|метро|семейн\p{L}*|коммунальн\p{L}*)/giu) || [];
-      return signals.length >= 2;
-    }
-    const vocabulary = new Set(["apartment", "flat", "house", "room", "floor", "price", "rent", "sale", "family", "utilities", "near", "available", "bedroom"]);
-    return (normalized.match(/[a-z]+/g) || []).filter((word) => vocabulary.has(word)).length >= 3;
-  }
-
   const descriptionNeedsTranslation = computed(() => {
     const description = active.value?.description?.trim();
-    return !!description && !descriptionMatchesTargetLanguage(description, targetLanguage());
+    return !!description && !housingTextIsInLanguage(description, targetLanguage());
   });
 
   function stopPoll() {

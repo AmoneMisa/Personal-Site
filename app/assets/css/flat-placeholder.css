@@ -40,7 +40,7 @@
 
 /* Flat Finder uses three specification columns by default. The component keeps
    its existing two-column mobile layout at <=720px. */
-@media (min-width: 721px) {
+@media (min-width: 721px) and (max-width: 960px) {
   .spec-table__grid {
     grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
   }
