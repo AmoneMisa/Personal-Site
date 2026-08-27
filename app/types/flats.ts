@@ -23,6 +23,7 @@ export type FlatAudience = "women" | "men" | "family";
 
 export interface FlatListing {
   id: string;
+  publicId?: number | null;
   source: string;
   country: string;
   title: string;

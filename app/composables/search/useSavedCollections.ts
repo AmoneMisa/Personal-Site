@@ -17,6 +17,7 @@ export function useSavedCollections<T>(options: SavedCollectionOptions<T>) {
     hidden: `${options.namespace}:hidden:v${version}`,
     recent: `${options.namespace}:recent:v${version}`,
   };
+  const latestRecent = useState<T | null>(`${options.namespace}:latest-recent:v${version}`, () => null);
   const favoritesLimit = options.favoritesLimit ?? 200;
   const hiddenLimit = options.hiddenLimit ?? 200;
   const recentLimit = options.recentLimit ?? 30;
@@ -83,6 +84,7 @@ export function useSavedCollections<T>(options: SavedCollectionOptions<T>) {
 
   function addRecent(item: T) {
     recent.value = upsert(recent.value, item, recentLimit);
+    latestRecent.value = item;
     persistRecent();
   }
 
@@ -99,10 +101,11 @@ export function useSavedCollections<T>(options: SavedCollectionOptions<T>) {
     favorites,
     hidden,
     recent,
+    latestRecent,
     favoriteIds,
     hiddenIds,
-    isFavorite,
     isHidden,
+    isFavorite,
     toggleFavorite,
     toggleHidden,
     addRecent,
