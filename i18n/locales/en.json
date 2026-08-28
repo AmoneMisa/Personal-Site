@@ -122,8 +122,8 @@
     "areasLayer": "Areas",
     "drawHint": "Click points on the map to outline a search area.",
     "dtAny": "Any",
-      "dtLongRent": "Long rent",
-      "dtRoomRent": "Room rent",
+    "dtLongRent": "Long rent",
+    "dtRoomRent": "Room rent",
     "dtSale": "Sale",
     "dtShortRent": "Short rent",
     "empty": "No listings match your search.",
@@ -169,8 +169,8 @@
     "newBuilding": "New building ≤ 5 years",
     "nextPhoto": "Next photo",
     "no": "No",
-      "noPhoto": "No photo",
-      "onlyWithPhotos": "With photos only",
+    "noPhoto": "No photo",
+    "onlyWithPhotos": "With photos only",
     "notSpecified": "Not specified",
     "open": "Open listing",
     "origDescription": "Original description",
@@ -1124,6 +1124,10 @@
           "o2": "Forests, mountains, nature",
           "o3": "Urban environment"
         }
+      },
+      "explore": {
+        "jobs": "Jobs in {country}",
+        "flats": "Apartments in {country}"
       }
     },
     "empty": {
@@ -1242,6 +1246,14 @@
         "title": "SVG Editor",
         "twitterDescription": "Edit SVG: live preview, minify, replace colors, manage stroke.",
         "twitterTitle": "SVG Editor"
+      },
+      "workflowValidator": {
+        "title": "GitHub Actions workflow validator — lint your CI YAML online",
+        "description": "Paste a GitHub Actions workflow and check it for syntax errors, broken job dependencies, unpinned actions and leaked secrets.",
+        "ogTitle": "WhitesLove GitHub workflow validator",
+        "ogDescription": "Catch broken triggers, circular needs and supply-chain risks before you push.",
+        "twitterTitle": "GitHub workflow validator",
+        "twitterDescription": "Lint GitHub Actions YAML in your browser."
       }
     }
   },
@@ -2118,6 +2130,35 @@
         "dropTitle": "Drag a PDF here",
         "pick": "Choose PDF",
         "title": "Files"
+      }
+    },
+    "workflowValidator": {
+      "title": "Workflow validator",
+      "headline": "Check a GitHub Actions workflow before you push it",
+      "subtitle": "Paste or drop a workflow file. Everything runs in your browser — nothing is uploaded.",
+      "controls": {
+        "upload": "Upload file",
+        "sample": "Load example",
+        "clear": "Clear",
+        "filterAll": "All",
+        "filterErrors": "Errors",
+        "filterWarnings": "Warnings",
+        "filterInfo": "Notes"
+      },
+      "panel": {
+        "input": "Workflow YAML",
+        "results": "Results",
+        "placeholder": "Paste the contents of .github/workflows/your-workflow.yml here, or drop the file anywhere in this box."
+      },
+      "messages": {
+        "empty": "Paste a workflow to see results.",
+        "valid": "Looks good — {jobs} job(s), {steps} step(s), nothing to flag.",
+        "errors": "{n} error(s)",
+        "warnings": "{n} warning(s)",
+        "infos": "{n} note(s)",
+        "at": "line {line}, column {col}",
+        "tooLarge": "That file is too large to lint here. Workflows are normally a few kilobytes.",
+        "unreadable": "That file could not be read."
       }
     }
   },

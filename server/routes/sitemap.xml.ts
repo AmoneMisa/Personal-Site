@@ -37,6 +37,7 @@ const ROUTES: { path: string; changefreq: string; priority: number }[] = [
   { path: "/services/merge-json", changefreq: "monthly", priority: 0.7 },
   { path: "/services/pdf-editor", changefreq: "monthly", priority: 0.7 },
   { path: "/services/svg-editor", changefreq: "monthly", priority: 0.7 },
+  { path: "/services/workflow-validator", changefreq: "monthly", priority: 0.7 },
 ];
 
 // Build the absolute URL for a route in a given locale. The home path "/" must

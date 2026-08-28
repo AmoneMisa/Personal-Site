@@ -122,8 +122,8 @@
     "drawArea": "Выделить область",
     "drawHint": "Кликайте по карте, чтобы очертить область поиска.",
     "dtAny": "Любая",
-      "dtLongRent": "Долгосрочная аренда",
-      "dtRoomRent": "Аренда комнаты",
+    "dtLongRent": "Долгосрочная аренда",
+    "dtRoomRent": "Аренда комнаты",
     "dtSale": "Продажа",
     "dtShortRent": "Посуточно",
     "empty": "Ничего не найдено.",
@@ -169,8 +169,8 @@
     "newBuilding": "Новостройка ≤ 5 лет",
     "nextPhoto": "Следующее фото",
     "no": "Нет",
-      "noPhoto": "Без фото",
-      "onlyWithPhotos": "Только с фото",
+    "noPhoto": "Без фото",
+    "onlyWithPhotos": "Только с фото",
     "notSpecified": "Не указано",
     "open": "Открыть объявление",
     "origDescription": "Оригинальное описание",
@@ -1124,6 +1124,10 @@
         "remoteAwkward": "Удалённая работа может быть неудобна по условиям/инфре",
         "remoteFine": "Условия для удалёнки обычно ок",
         "localWorkHard": "Локальную работу без языка будет сложно найти"
+      },
+      "explore": {
+        "jobs": "Вакансии: {country}",
+        "flats": "Жильё: {country}"
       }
     },
     "empty": {
@@ -1242,6 +1246,14 @@
         "title": "Редактор SVG",
         "twitterDescription": "Редактируйте SVG: предпросмотр, минификация, замена цветов, управление stroke.",
         "twitterTitle": "Редактор SVG"
+      },
+      "workflowValidator": {
+        "title": "Валидатор GitHub Actions — проверка CI YAML онлайн",
+        "description": "Вставьте workflow GitHub Actions и проверьте его на синтаксические ошибки, битые зависимости задач, неприкреплённые экшены и утечки секретов.",
+        "ogTitle": "Валидатор GitHub workflow от WhitesLove",
+        "ogDescription": "Находите сломанные триггеры, циклические needs и риски цепочки поставок до пуша.",
+        "twitterTitle": "Валидатор GitHub workflow",
+        "twitterDescription": "Проверяйте YAML GitHub Actions прямо в браузере."
       }
     }
   },
@@ -2119,7 +2131,36 @@
         "replaceColors": "Заменить цвета fill/stroke (включая currentColor)"
       }
     },
-    "title": "Сервисы"
+    "title": "Сервисы",
+    "workflowValidator": {
+      "title": "Валидатор workflow",
+      "headline": "Проверьте GitHub Actions workflow перед пушем",
+      "subtitle": "Вставьте или перетащите файл workflow. Всё выполняется в браузере — ничего не загружается на сервер.",
+      "controls": {
+        "upload": "Загрузить файл",
+        "sample": "Пример",
+        "clear": "Очистить",
+        "filterAll": "Все",
+        "filterErrors": "Ошибки",
+        "filterWarnings": "Предупреждения",
+        "filterInfo": "Заметки"
+      },
+      "panel": {
+        "input": "YAML workflow",
+        "results": "Результаты",
+        "placeholder": "Вставьте сюда содержимое .github/workflows/ваш-workflow.yml или перетащите файл в эту область."
+      },
+      "messages": {
+        "empty": "Вставьте workflow, чтобы увидеть результаты.",
+        "valid": "Всё в порядке — задач: {jobs}, шагов: {steps}, замечаний нет.",
+        "errors": "Ошибок: {n}",
+        "warnings": "Предупреждений: {n}",
+        "infos": "Заметок: {n}",
+        "at": "строка {line}, столбец {col}",
+        "tooLarge": "Этот файл слишком большой для проверки здесь. Workflow обычно занимает несколько килобайт.",
+        "unreadable": "Не удалось прочитать файл."
+      }
+    }
   },
   "home": {
     "nav": {

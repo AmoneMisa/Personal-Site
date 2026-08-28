@@ -16,6 +16,7 @@ const TOOLS = [
   { titleKey: "seo.pages.markdownEditor.title", descKey: "seo.pages.markdownEditor.description", link: "/services/markdown-editor" },
   { titleKey: "seo.pages.converter.title", descKey: "seo.pages.converter.description", link: "/services/converter" },
   { titleKey: "seo.pages.dockerSearch.title", descKey: "seo.pages.dockerSearch.description", link: "/services/dockerhub" },
+  { titleKey: "seo.pages.workflowValidator.title", descKey: "seo.pages.workflowValidator.description", link: "/services/workflow-validator" },
 ];
 
 const query = ref("");
