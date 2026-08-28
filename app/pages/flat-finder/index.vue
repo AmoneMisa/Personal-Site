@@ -301,7 +301,7 @@ async function loadRates() { const { data } = await safeFetch<{ rates?: Record<s
 // "page" here is purely a URL bookmark of how many PAGE_SIZE batches are
 // loaded, so a shared link can restore roughly where the visitor left off.
 function currentPageNumber(): number { return Math.max(1, Math.ceil(listings.value.length / PAGE_SIZE)); }
-function syncPageInUrl(page: number) {
+async function syncPageInUrl(page: number) {
   if (import.meta.server) return;
   const query: Record<string, string> = {};
   for (const [key, value] of Object.entries(route.query)) {
@@ -310,7 +310,7 @@ function syncPageInUrl(page: number) {
   }
   if (page > 1) query.page = String(page);
   else delete query.page;
-  void router.replace({ query });
+  await router.replace({ query });
 }
 async function load(append = false, background = false) {
   const params = buildFeedParams({
@@ -323,11 +323,17 @@ async function load(append = false, background = false) {
   const data = await loadFeed(params, { append, background });
   if (!data || background) return;
   if (!append && import.meta.client) lastPaginationScrollY = window.scrollY;
-  if (!append) void syncQueryParams();
+  // Both syncs write route.query via router.replace. Firing them unawaited let
+  // whichever one's navigation committed last silently overwrite the other —
+  // in practice the page-bookmark write landed last and wiped out the filter
+  // change the load was actually for. Sequencing them (page first, filters
+  // last) makes the filter sync's preserve() see the just-written page value
+  // and be the one true final write, every time.
   // Skip while the mount sequence is still restoring a deep-linked `?page=n`:
   // the first (non-append) load only fills page 1, and syncing right then would
   // strip the requested page before restoreToPage gets a chance to catch up.
-  if (import.meta.client && !pageRestoring.value && view.value === "active") syncPageInUrl(currentPageNumber());
+  if (import.meta.client && !pageRestoring.value && view.value === "active") await syncPageInUrl(currentPageNumber());
+  if (!append) await syncQueryParams();
 }
 async function restoreToPage(targetPage: number) {
   let guard = 0;

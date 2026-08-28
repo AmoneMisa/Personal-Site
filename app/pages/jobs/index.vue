@@ -345,7 +345,7 @@ const countryLabel = (code: string) =>
 // offset/cursor feed), so the ?page= URL bookmark just mirrors page.value
 // directly instead of deriving it from loaded-item count.
 const pageRestoring = ref(true);
-function syncPageInUrl(pageNumber: number) {
+async function syncPageInUrl(pageNumber: number) {
   if (import.meta.server) return;
   const query: Record<string, string> = {};
   for (const [key, value] of Object.entries(route.query)) {
@@ -354,7 +354,7 @@ function syncPageInUrl(pageNumber: number) {
   }
   if (pageNumber > 1) query.page = String(pageNumber);
   else delete query.page;
-  void router.replace({ query });
+  await router.replace({ query });
 }
 async function load(
   toPage = 1,
@@ -370,13 +370,18 @@ async function load(
 
   const data = await loadFeed(params, options);
   if (!data) return;
-  // Persist the filters that produced this result (foreground loads only, so a
-  // background warm-poll or a "load more" page doesn't rewrite the URL).
-  if (!options.append && !options.background) persistState();
+  // Both syncs write route.query via router.replace. Firing them unawaited let
+  // whichever navigation committed last silently overwrite the other — in
+  // practice the page-bookmark write landed last and wiped the filter change
+  // (e.g. picking a source) straight out of the URL. Sequencing them (page
+  // first, filters last) makes the filter sync the one true final write.
   // Skip while the mount sequence is still restoring a deep-linked ?page=n:
   // the first (non-append) load only fills page 1, and syncing right then
   // would strip the requested page before restoreToPage catches up.
-  if (!options.background && !pageRestoring.value) syncPageInUrl(page.value);
+  if (!options.background && !pageRestoring.value) await syncPageInUrl(page.value);
+  // Persist the filters that produced this result (foreground loads only, so a
+  // background warm-poll or a "load more" page doesn't rewrite the URL).
+  if (!options.append && !options.background) await persistState();
 }
 async function restoreToPage(targetPage: number) {
   let guard = 0;

@@ -40,9 +40,13 @@ test('the job route state preserves adv/job/page across debounced filter syncs',
 
 test('a deep-linked ?page=n restores loaded pages before the URL is resynced', () => {
   assert.match(page, /const pageRestoring = ref\(true\)/)
-  assert.match(page, /function syncPageInUrl\(pageNumber: number\)/)
+  assert.match(page, /async function syncPageInUrl\(pageNumber: number\)/)
   assert.match(page, /async function restoreToPage\(targetPage: number\)/)
-  assert.match(page, /if \(!options\.background && !pageRestoring\.value\) syncPageInUrl\(page\.value\)/)
+  assert.match(page, /if \(!options\.background && !pageRestoring\.value\) await syncPageInUrl\(page\.value\)/)
+  // The page-bookmark write and persistState() both call router.replace;
+  // sequencing them (await, page before filters) prevents whichever fires
+  // second from racing the other and clobbering it.
+  assert.match(page, /await syncPageInUrl\(page\.value\);\s*\n[\s\S]*?if \(!options\.append && !options\.background\) await persistState\(\);/)
 
   const mountedStart = page.indexOf('onMounted(async () => {')
   const mountedEnd = page.indexOf('\nwatch(jobModalOpen', mountedStart)

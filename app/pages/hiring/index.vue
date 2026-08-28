@@ -295,7 +295,7 @@ function savePreset() {
 // shared ?page=n link restores roughly how far a visitor had scrolled.
 const pageRestoring = ref(true);
 function currentPageNumber(): number { return Math.max(1, Math.ceil(profiles.value.length / PAGE_SIZE)); }
-function syncPageInUrl(pageNumber: number) {
+async function syncPageInUrl(pageNumber: number) {
   if (import.meta.server) return;
   const query: Record<string, string> = {};
   for (const [key, value] of Object.entries(route.query)) {
@@ -304,7 +304,7 @@ function syncPageInUrl(pageNumber: number) {
   }
   if (pageNumber > 1) query.page = String(pageNumber);
   else delete query.page;
-  void router.replace({ query });
+  await router.replace({ query });
 }
 async function load(append = false, background = false) {
   const params = buildFeedParams({
@@ -314,10 +314,14 @@ async function load(append = false, background = false) {
   });
   const data = await loadFeed(params, { append, background });
   if (!data) return;
-  if (!background && !pageRestoring.value) syncPageInUrl(currentPageNumber());
+  // Both syncs write route.query via router.replace. Sequencing them (page
+  // first, filters last via syncQueryParams below) instead of firing both
+  // unawaited makes the filter sync the one true final write, rather than
+  // relying on Vue Router happening to settle them in call order.
+  if (!background && !pageRestoring.value) await syncPageInUrl(currentPageNumber());
   if (data.meta?.professions?.length) professionValues.value = data.meta.professions;
   if (data.meta?.sources?.length) availableSources.value = data.meta.sources;
-  if (!append && !background) void syncQueryParams();
+  if (!append && !background) await syncQueryParams();
 }
 async function restoreToPage(targetPage: number) {
   let guard = 0;

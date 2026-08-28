@@ -52,13 +52,17 @@ test('the flat route state preserves adv and page across debounced filter syncs'
 
 test('a deep-linked ?page=n restores loaded results before the URL is resynced to page 1', () => {
   assert.match(page, /function currentPageNumber\(\): number/)
-  assert.match(page, /function syncPageInUrl\(page: number\)/)
+  assert.match(page, /async function syncPageInUrl\(page: number\)/)
   assert.match(page, /async function restoreToPage\(targetPage: number\)/)
   assert.match(page, /const pageRestoring = ref\(true\)/)
 
   // The very first (non-append) load on mount must not wipe the requested page
   // out of the URL before restoreToPage has had a chance to load up to it.
-  assert.match(page, /if \(import\.meta\.client && !pageRestoring\.value && view\.value === "active"\) syncPageInUrl\(currentPageNumber\(\)\)/)
+  assert.match(page, /if \(import\.meta\.client && !pageRestoring\.value && view\.value === "active"\) await syncPageInUrl\(currentPageNumber\(\)\)/)
+  // The page-bookmark write and the filter-serialize write both call
+  // router.replace; sequencing them (await, page before filters) prevents
+  // whichever fires second from racing the other and clobbering it.
+  assert.match(page, /await syncPageInUrl\(currentPageNumber\(\)\);\s*\n\s*if \(!append\) await syncQueryParams\(\);/)
 
   const mountedStart = page.indexOf('onMounted(async () => {')
   const mountedEnd = page.indexOf('\nwatch(modalOpen', mountedStart)
