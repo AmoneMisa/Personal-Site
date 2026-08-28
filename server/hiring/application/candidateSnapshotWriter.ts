@@ -1,6 +1,6 @@
 import { useStateStore } from '~~/server/utils/stateStore'
 import { isLikelyCvPost } from '../domain/telegramCandidateParser'
-import { normalizeCandidate } from '../../utils/hiringNormalize'
+import { mentionsEmploymentOrSchedule, normalizeCandidate } from '../../utils/hiringNormalize'
 import { withProfessionExperience } from '../../utils/hiringExperience'
 import { isCharityAppeal, isRecruitingOpportunity, repairCandidateProfile } from '../../utils/hiringQuality'
 import {
@@ -176,7 +176,7 @@ function mergeCandidateAi(profile: CvProfile, data: CandidateAiData): CvProfile 
   if (hasAiField(data, 'relocationReady')) merged.relocationReady = data.relocationReady ?? null
 
   const education = data.education?.trim() || ''
-  if (education && !/занятост|зайнятіст|удал[её]нн|дистанцион|remote|full[- ]?time|part[- ]?time|график\s+работ|bandlik/iu.test(education)) {
+  if (education && !mentionsEmploymentOrSchedule(education)) {
     merged.education = education
   }
 

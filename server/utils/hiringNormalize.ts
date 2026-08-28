@@ -15,12 +15,14 @@ import { ishBorLocationFromText, trimIshBorProfileText } from './hiringIshBorFie
 import { careeristRoleFromText, trimCareeristProfileText } from './hiringCareeristFields'
 import { parseSalary as parseWebSalary } from './hiringWebFields'
 import {
+  candidateFieldRegex,
   detectCandidateFeatureCodes,
   detectCandidateRelocationPreference,
   detectCandidateRemotePreference,
   detectEmploymentTypes,
   detectProfessionMatches,
   detectSharedSeniority,
+  detectWorkModes,
   extractCandidateContactHours,
   extractCandidateGoalRole,
   extractCandidateSalaryField,
@@ -32,6 +34,18 @@ import {
   isFlexibleCandidateRole,
   resolveSharedProfessionContext,
 } from './hiringLexicon'
+
+// A CV field mistakenly filled with employment/schedule info instead of
+// education (a common source-board quirk). Checks the lexicon's own
+// employmentType/workMode/schedule field-label vocabulary plus actual
+// work-mode/employment-type values, rather than a hand-rolled word list.
+export function mentionsEmploymentOrSchedule(text: string): boolean {
+  return candidateFieldRegex('employmentType').test(text)
+    || candidateFieldRegex('workMode').test(text)
+    || candidateFieldRegex('schedule').test(text)
+    || detectWorkModes(text).length > 0
+    || detectEmploymentTypes(text).length > 0
+}
 
 const JUNIOR_CONTRADICTION_YEARS = 4
 
@@ -356,16 +370,15 @@ function normalizedCandidateSkills(profile: CvProfile, text: string): string[] {
 }
 
 const HIDDEN_NAME_RE = /^(?:(?:фио|піб|name)?\s*(?:скрыт\p{L}*|прихован\p{L}*|hidden|yashiril\p{L}*|ascuns)|onlayn|online|resume|резюме|[?？�\uFFFD]{2,})$/iu
-const EMPLOYMENT_AS_EDUCATION_RE = /занятост|зайнятіст|удал[её]нн|дистанцион|remote|full[- ]?time|part[- ]?time|график\s+работ|bandlik/iu
 function normalizeCandidateEducation(profile: CvProfile, text: string): string | null | undefined {
   const raw = profile.education?.trim() || ''
   const withoutPreviewBoilerplate = raw.replace(/\s*[·|]\s*Location:\s*[\s\S]*$/iu, '').trim()
-  if (withoutPreviewBoilerplate && !EMPLOYMENT_AS_EDUCATION_RE.test(withoutPreviewBoilerplate)) return withoutPreviewBoilerplate
+  if (withoutPreviewBoilerplate && !mentionsEmploymentOrSchedule(withoutPreviewBoilerplate)) return withoutPreviewBoilerplate
   if (profile.sourceKey?.startsWith('flagma')) {
     const demographics = text.match(
       /\|\s*([^\n|]{0,120}(?:образован\p{L}*|освіт\p{L}*|studii|ta(?:['’])?lim)[^\n|]{0,120})/iu,
     )?.[1]?.trim()
-    if (demographics && !EMPLOYMENT_AS_EDUCATION_RE.test(demographics)) return demographics
+    if (demographics && !mentionsEmploymentOrSchedule(demographics)) return demographics
     const shortDemographics = text.match(/\|\s*([^\n|]{2,80})/u)?.[1]?.trim()
     if (shortDemographics && /(?:высш|средн|бакалавр|магистр|колледж|лицей|образован)/iu.test(shortDemographics)) {
       return shortDemographics
