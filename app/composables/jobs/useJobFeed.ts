@@ -4,6 +4,8 @@ import type { Job, JobResult, JobStats } from "~/types/jobs";
 import { safeFetch } from "~/utils/safeFetch";
 import { useLatestRequest } from "~/composables/search/useLatestRequest";
 
+const FILTER_REQUEST_DEBOUNCE_MS = 180;
+
 export function useJobFeed(usdRates: Ref<Record<string, number>>) {
   const jobs = ref<Job[]>([]);
   const total = ref(0);
@@ -20,6 +22,21 @@ export function useJobFeed(usdRates: Ref<Record<string, number>>) {
   const requests = useLatestRequest();
   let warmTimer: ReturnType<typeof setTimeout> | undefined;
   let warmParams: Record<string, string> | null = null;
+  let filterDebounceTimer: ReturnType<typeof setTimeout> | undefined;
+  let filterDebounceResolve: ((run: boolean) => void) | undefined;
+
+  function debounceFilterRequest(): Promise<boolean> {
+    if (filterDebounceTimer) clearTimeout(filterDebounceTimer);
+    filterDebounceResolve?.(false);
+    return new Promise((resolve) => {
+      filterDebounceResolve = resolve;
+      filterDebounceTimer = setTimeout(() => {
+        filterDebounceTimer = undefined;
+        filterDebounceResolve = undefined;
+        resolve(true);
+      }, FILTER_REQUEST_DEBOUNCE_MS);
+    });
+  }
 
   function scheduleWarmPoll() {
     if (warmTimer) clearTimeout(warmTimer);
@@ -33,6 +50,8 @@ export function useJobFeed(usdRates: Ref<Record<string, number>>) {
   async function loadFeed(params: Record<string, string>, options: { append?: boolean; background?: boolean } = {}): Promise<JobResult | undefined> {
     const append = !!options.append;
     const background = !!options.background;
+    if (!append && !background && !(await debounceFilterRequest())) return undefined;
+
     const requestId = requests.next();
     if (!append) warmParams = { ...params };
     if (!background) {
@@ -75,6 +94,8 @@ export function useJobFeed(usdRates: Ref<Record<string, number>>) {
 
   onBeforeUnmount(() => {
     if (warmTimer) clearTimeout(warmTimer);
+    if (filterDebounceTimer) clearTimeout(filterDebounceTimer);
+    filterDebounceResolve?.(false);
     requests.cancelPending();
   });
 
