@@ -3,6 +3,7 @@ export const WEB_CV_SOURCES = [
   { key: 'careerist-uz', label: 'Careerist UZ', country: 'UZ' },
   { key: 'rabotakz', label: 'Rabota.kz', country: 'KZ' },
   { key: 'talent-ua', label: 'Talent.UA', country: 'UA' },
+  { key: 'workua-api', label: 'Work.ua · API', country: 'UA' },
   { key: 'flagma-ro', label: 'Flagma RO', country: 'RO' },
 ] as const
 
