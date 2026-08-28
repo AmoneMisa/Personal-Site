@@ -3,12 +3,14 @@ import { CAREERIST_SOURCE } from './careerist'
 import { FLAGMA_SOURCES } from './flagma'
 import { RABOTA_KZ_SOURCE } from './rabotaKz'
 import { TALENT_SOURCE } from './talentUa'
+import { WORK_UA_API_SOURCE } from './workUa'
 
 export const WEB_ADAPTERS: Record<string, WebCvAdapter> = {
   ...FLAGMA_SOURCES,
   [CAREERIST_SOURCE.key]: CAREERIST_SOURCE,
   [RABOTA_KZ_SOURCE.key]: RABOTA_KZ_SOURCE,
   [TALENT_SOURCE.key]: TALENT_SOURCE,
+  [WORK_UA_API_SOURCE.key]: WORK_UA_API_SOURCE,
 }
 
 export function getWebAdapter(key: string): WebCvAdapter {

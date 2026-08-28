@@ -1,12 +1,13 @@
 import { moneyCurrencyFromText } from '@whiteslove/parsing-lexicon/currency'
 import { detectEmploymentTypes, detectWorkModes, detectWorkSchedules } from '@whiteslove/parsing-lexicon/hiring-work-semantics'
+import { crawlCyclicJobBoard } from './cyclicJobBoardCrawler'
 import type { Job } from './jobTypes'
 
 const BASE_URL = 'https://jobs.ua/vacancy'
 const REQUEST_TIMEOUT_MS = 20_000
-const DEFAULT_MAX_PAGES = 2
-const MAX_PAGES_LIMIT = 10
-const DEFAULT_REQUEST_DELAY_MS = 1_000
+const DEFAULT_PAGES_PER_RUN = 8
+const DEFAULT_MAX_PAGE = 1_500
+const DEFAULT_REQUEST_DELAY_MS = 750
 const MAX_DESCRIPTION = 1_200
 
 function decodeEntities(value: string): string {
@@ -158,7 +159,7 @@ export function parseJobsUaVacancies(html: string, now = new Date()): Job[] {
 
 function listingUrl(page: number): string {
   const path = page === 1 ? BASE_URL : `${BASE_URL}/page-${page}`
-  return `${path}?period=7`
+  return `${path}?period=14`
 }
 
 async function fetchPage(page: number): Promise<string> {
@@ -174,43 +175,24 @@ async function fetchPage(page: number): Promise<string> {
   return response.text()
 }
 
-function delay(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms))
-}
-
 export async function fetchJobsUaJobs(q: string): Promise<Job[]> {
   if (String(process.env.JOBS_UA_SOURCE || 'on').toLowerCase() === 'off') return []
 
-  const maxPages = integer(process.env.JOBS_UA_MAX_PAGES, DEFAULT_MAX_PAGES, 1, MAX_PAGES_LIMIT)
-  const requestDelayMs = integer(process.env.JOBS_UA_REQUEST_DELAY_MS, DEFAULT_REQUEST_DELAY_MS, 500, 10_000)
-  const jobs: Job[] = []
-  const seen = new Set<string>()
+  const pagesPerRun = integer(process.env.JOBS_UA_PAGES_PER_RUN, DEFAULT_PAGES_PER_RUN, 1, 50)
+  const maxPage = integer(process.env.JOBS_UA_MAX_PAGE, DEFAULT_MAX_PAGE, 2, 10_000)
+  const requestDelayMs = integer(process.env.JOBS_UA_REQUEST_DELAY_MS, DEFAULT_REQUEST_DELAY_MS, 0, 10_000)
+  const run = await crawlCyclicJobBoard({
+    key: 'jobs-ua',
+    pagesPerRun,
+    maxPage,
+    fetchPage,
+    parsePage: (html) => parseJobsUaVacancies(html),
+    requestDelayMs,
+  })
 
-  for (let page = 1; page <= maxPages; page++) {
-    if (page > 1) await delay(requestDelayMs)
-
-    let pageJobs: Job[]
-    try {
-      pageJobs = parseJobsUaVacancies(await fetchPage(page))
-    } catch (error) {
-      if (page === 1) throw error
-      console.warn('[jobs] Jobs.ua pagination stopped:', error instanceof Error ? error.message : String(error))
-      break
-    }
-
-    let added = 0
-    for (const job of pageJobs) {
-      if (seen.has(job.id)) continue
-      seen.add(job.id)
-      jobs.push(job)
-      added++
-    }
-    if (!pageJobs.length || !added) break
-  }
-
-  if (!q.trim()) return jobs
+  if (!q.trim()) return run.jobs
   const needle = q.toLocaleLowerCase('uk')
-  return jobs.filter((job) =>
+  return run.jobs.filter((job) =>
     `${job.title} ${job.company} ${job.location} ${job.description || ''}`
       .toLocaleLowerCase('uk')
       .includes(needle),
