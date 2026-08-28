@@ -1,7 +1,9 @@
 import { computed, ref, watch } from "vue";
+import { findGeoEntities } from "@whiteslove/geo-catalog";
 import type { FlatSort } from "~/types/flats";
 
 const SOCIAL_LISTING_SOURCES = ["facebook", "threads", "custom"];
+const MAP_ZONE_TYPES = new Set(["microdistrict", "mahalla", "local_area", "development_area"]);
 
 export function useFlatFilters() {
   const selectedCountries = ref<string[]>([]);
@@ -81,6 +83,32 @@ export function useFlatFilters() {
       pricePerSqmMax.value = undefined;
     }
   });
+
+  // FlatMap emits canonical geo names. The page's legacy handler writes non-district
+  // selections into the free-text query ref, so absorb exact catalog zone names here
+  // and convert them into structured filters before a feed request is built. This also
+  // keeps shared URLs explicit (`microdistrict=`, `quartal=`, `area=`) instead of
+  // accidentally routing a map click through Elasticsearch/full-text search.
+  watch(query, (value) => {
+    const name = value.trim();
+    const country = countries.value[0];
+    if (!name || !country || !city.value) return;
+    const cityPrefix = `${country.toLowerCase()}:${city.value.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`;
+    const match = findGeoEntities({ country }).find((entity) =>
+      MAP_ZONE_TYPES.has(entity.type)
+      && entity.canonicalName.toLocaleLowerCase() === name.toLocaleLowerCase()
+      && (entity.parentId === cityPrefix || entity.id.startsWith(`${cityPrefix}:`)),
+    );
+    if (!match) return;
+
+    microdistrict.value = "";
+    quartal.value = "";
+    mapArea.value = "";
+    if (match.type === "microdistrict") microdistrict.value = match.canonicalName;
+    else if (match.type === "mahalla") quartal.value = match.canonicalName;
+    else mapArea.value = match.canonicalName;
+    query.value = "";
+  }, { flush: "sync" });
 
   function buildFeedParams(options: {
     limit: number;
