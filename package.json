@@ -14,7 +14,7 @@
     "@nuxt/icon": "^2.5.0",
     "@nuxt/image": "^2.1.0",
     "@nuxtjs/i18n": "^10.6.0",
-    "@whiteslove/geo-catalog": "https://codeload.github.com/AmoneMisa/geo-catalog/tar.gz/daedad247fa765e58cfde725622ddf7f74e4720c",
+    "@whiteslove/geo-catalog": "https://codeload.github.com/AmoneMisa/geo-catalog/tar.gz/e8e778aaff7f2d8d7076e2e05176a2bc6c966113",
     "@whiteslove/parsing-lexicon": "^0.3.9",
     "chart.js": "^4.5.1",
     "emoji-picker-element": "^1.29.1",
