@@ -15,7 +15,9 @@ test('Work.ua API resume search maps public candidate cards through the shared w
   assert.equal(profile.sourceKey, 'workua-api')
   assert.equal(profile.origin, 'web')
   assert.equal(profile.country, 'UA')
-  assert.equal(profile.role, 'Manual QA Engineer (Web, API, Business Logic)')
+  // The shared hiring normalizer deliberately keeps the canonical profession
+  // while the source text remains available on the profile for matching/search.
+  assert.equal(profile.role, 'Manual QA Engineer')
   assert.equal(profile.url, href)
   assert.equal(profile.contactType, 'platform')
   assert.equal(profile.contact, href)
