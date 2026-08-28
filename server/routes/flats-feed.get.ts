@@ -34,6 +34,121 @@ const ALL_FEED_SOURCES = ['olx', 'telegram', 'facebook', 'threads'] as const
 const CURRENT_ALL_SOURCE_TOKENS = [...ALL_FEED_SOURCES, 'custom'] as const
 const SOCIAL_FEED_SOURCES = new Set(['telegram', 'facebook', 'threads'])
 
+const BOOLEAN_LISTING_FIELDS = [
+  'roomOnly',
+  'balcony',
+  'terrace',
+  'privateYard',
+  'dishwasher',
+  'airConditioner',
+  'gas',
+  'newBuilding',
+  'cadastral',
+  'firstRental',
+  'communalSeparated',
+  'petsAllowed',
+  'childrenAllowed',
+  'deposit',
+  'commission',
+  'furnished',
+  'parking',
+  'elevator',
+  'heating',
+  'hotWater',
+  'internet',
+  'smokingAllowed',
+  'negotiable',
+] as const
+
+type BooleanListingField = typeof BOOLEAN_LISTING_FIELDS[number]
+
+// The AI worker intentionally emits a small English/canonical vocabulary. Old
+// persisted rows and third-party parsers may still contain human English labels
+// such as "Yes", "Good" or "Women". Convert those to typed domain values here;
+// the Vue layer then renders them through the current UI locale instead of ever
+// exposing an English implementation value to a Russian (or other) interface.
+function normalizeBooleanLike(field: BooleanListingField, value: any): any {
+  if (typeof value === 'boolean' || value == null) return value
+  if (value === 1) return true
+  if (value === 0) return false
+  const normalized = String(value).trim().toLowerCase().replace(/[_.-]+/g, ' ').replace(/\s+/g, ' ')
+  if (['yes', 'true', 'present'].includes(normalized)) return true
+  if (['no', 'false', 'absent'].includes(normalized)) return false
+  if (['petsAllowed', 'childrenAllowed', 'smokingAllowed'].includes(field)) {
+    if (['allowed', 'available'].includes(normalized)) return true
+    if (['not allowed', 'unavailable'].includes(normalized)) return false
+  }
+  if (field === 'furnished') {
+    if (normalized === 'furnished') return true
+    if (normalized === 'unfurnished') return false
+  }
+  if (field === 'communalSeparated') {
+    if (['separate', 'separated', 'not included'].includes(normalized)) return true
+    if (['included', 'utilities included'].includes(normalized)) return false
+  }
+  return value
+}
+
+function normalizeConditionValue(value: any): any {
+  if (value == null || typeof value !== 'string') return value
+  const normalized = value.trim().toLowerCase().replace(/[_.-]+/g, ' ').replace(/\s+/g, ' ')
+  if (['needs renovation', 'renovation needed', 'needs repair', 'poor'].includes(normalized)) return 'needs_renovation'
+  if (['basic', 'simple'].includes(normalized)) return 'basic'
+  if (['good', 'good condition'].includes(normalized)) return 'good'
+  if (['modern', 'modern renovation', 'euro renovation', 'renovated'].includes(normalized)) return 'modern'
+  if (['luxury', 'premium', 'designer renovation'].includes(normalized)) return 'luxury'
+  return value
+}
+
+function normalizeAudienceValue(value: any): any {
+  if (value == null || typeof value !== 'string') return value
+  const normalized = value.trim().toLowerCase().replace(/[_.-]+/g, ' ').replace(/\s+/g, ' ')
+  if (['women', 'woman', 'female', 'girls', 'girls only', 'women only'].includes(normalized)) return 'women'
+  if (['men', 'man', 'male', 'men only'].includes(normalized)) return 'men'
+  if (['family', 'families', 'family only'].includes(normalized)) return 'family'
+  return value
+}
+
+function normalizeListingSemantics(listing: any): any {
+  const normalized = { ...listing }
+  for (const field of BOOLEAN_LISTING_FIELDS) {
+    if (field in normalized) normalized[field] = normalizeBooleanLike(field, normalized[field])
+  }
+  if ('condition' in normalized) normalized.condition = normalizeConditionValue(normalized.condition)
+  if ('audience' in normalized) normalized.audience = normalizeAudienceValue(normalized.audience)
+  return normalized
+}
+
+// Live OLX verification exists to answer "does this advert still exist?" and to
+// refresh source-authoritative basics. It is deliberately NOT a replacement for
+// the enriched feed object: the single-offer endpoint has no AI Vision result,
+// market comparison, nearby enrichment, or other asynchronous fields. Returning
+// null/empty enrichment from it used to make the popup briefly show AI values and
+// then erase them when the client spread the verification response over the card.
+const LIVE_REFRESH_FIELDS = new Set([
+  'id',
+  'publicId',
+  'source',
+  'country',
+  'title',
+  'description',
+  'propertyType',
+  'byAgency',
+  'price',
+  'currency',
+  'rooms',
+  'areaSqm',
+  'city',
+  'district',
+  'lat',
+  'lng',
+  'photo',
+  'photos',
+  'url',
+  'createdAt',
+  'dealType',
+])
+
 function rewritePhoto(p: unknown): unknown {
   return typeof p === 'string' && p.startsWith('/api/tg-photo/')
     ? `/flats-photo?path=${encodeURIComponent(p)}`
@@ -41,8 +156,9 @@ function rewritePhoto(p: unknown): unknown {
 }
 
 function shapeListing(listing: any): any {
-  const normalizedPrice = normalizeFlatPrice(listing)
-  const listingWithPrice = { ...listing, ...normalizedPrice }
+  const semanticListing = normalizeListingSemantics(listing)
+  const normalizedPrice = normalizeFlatPrice(semanticListing)
+  const listingWithPrice = { ...semanticListing, ...normalizedPrice }
   const normalizedListing = {
     ...listingWithPrice,
     roomOnly: normalizeFlatRoomOnly(listingWithPrice),
@@ -51,9 +167,22 @@ function shapeListing(listing: any): any {
     ...normalizedListing,
     dealType: normalizeFlatDealType(normalizedListing),
     potentiallyUnsafe: isPotentiallyUnsafeFlat(normalizedListing),
-    photo: rewritePhoto(listing?.photo),
-    photos: Array.isArray(listing?.photos) ? listing.photos.map(rewritePhoto) : [],
+    photo: rewritePhoto(normalizedListing?.photo),
+    photos: Array.isArray(normalizedListing?.photos) ? normalizedListing.photos.map(rewritePhoto) : [],
   }
+}
+
+function shapeLiveListing(listing: any): any {
+  const shaped = shapeListing(listing)
+  const live: Record<string, any> = {}
+  for (const [field, value] of Object.entries(shaped)) {
+    if (!LIVE_REFRESH_FIELDS.has(field)) continue
+    if (value == null) continue
+    if (typeof value === 'string' && !value.trim()) continue
+    if (Array.isArray(value) && value.length === 0) continue
+    live[field] = value
+  }
+  return live
 }
 
 function normalizeFeedDedupeText(value: unknown): string {
@@ -230,7 +359,7 @@ export default defineEventHandler(async (event) => {
       if (exact?.listing && String(exact.listing.id ?? '') === exactListingId) {
         return {
           count: 1,
-          listings: [shapeListing(exact.listing)],
+          listings: [shapeLiveListing(exact.listing)],
           exactListingFallback: 'source',
         }
       }
