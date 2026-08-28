@@ -52,6 +52,28 @@ export function formatMoney(amount: number, currency: string, locale?: string): 
   return symbol === normalized ? `${value} ${symbol}` : `${symbol}${value}`;
 }
 
+export interface MoneyAmountLike {
+  amount: number;
+  currency?: string | null;
+  approximate?: boolean;
+}
+
+// Shared formatter for the structured {amount, currency, approximate} shape
+// the parsing lexicon returns (utilitiesAmount, commissionAmount, perPersonPrice).
+// Falls back to fallbackCurrency when the parsed value has no currency of its
+// own (e.g. a bare "50 000" utilities mention with no unit) — never render
+// the object itself, which stringifies to "[object Object]".
+export function formatMoneyAmount(
+  value: MoneyAmountLike | null | undefined,
+  fallbackCurrency?: string,
+  locale?: string,
+): string | null {
+  if (value == null || !Number.isFinite(value.amount)) return null;
+  const currency = value.currency || fallbackCurrency;
+  const formatted = currency ? formatMoney(value.amount, currency, locale) : Math.round(value.amount).toLocaleString(locale);
+  return value.approximate ? `≈ ${formatted}` : formatted;
+}
+
 export function formatCompactNumber(amount: number): string {
   const abs = Math.abs(amount);
   if (abs < 1_000) return Math.round(amount).toLocaleString("en-US");

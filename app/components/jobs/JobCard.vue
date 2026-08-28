@@ -63,7 +63,8 @@ const cardBadges = computed(() => [
 const visibleBadges = computed(() => cardBadges.value.slice(0, 6));
 const hiddenBadgeCount = computed(() => Math.max(0, cardBadges.value.length - visibleBadges.value.length));
 const countryLabel = computed(() => props.job.country || props.job.location.split(",").at(-1)?.trim() || "");
-const bylineTitle = computed(() => [props.job.company, props.job.location].filter(Boolean).join(" · "));
+const officeLocationsLabel = computed(() => props.job.officeLocations?.length ? props.job.officeLocations.join(" / ") : "");
+const bylineTitle = computed(() => [props.job.company, officeLocationsLabel.value || props.job.location].filter(Boolean).join(" · "));
 const compactSalary = computed(() => props.salary ? compactSalaryText(props.salary) : null);
 const compactConvertedSalary = computed(() => props.convertedSalary ? compactSalaryText(props.convertedSalary) : null);
 
@@ -156,7 +157,7 @@ function openCard() { emit("open", props.job); }
         <UiDraggablePills :items="tagPills" :visible-hint-count="3" />
       </div>
       <div class="job-card__bottom">
-        <div class="job-card__byline text-muted" :title="bylineTitle"><span class="job-card__company">{{ job.company }}</span><span v-if="countryLabel" class="job-card__dot">·</span><span v-if="countryLabel">{{ countryLabel }}</span></div>
+        <div class="job-card__byline text-muted" :title="bylineTitle"><span class="job-card__company">{{ job.company }}</span><span v-if="officeLocationsLabel" class="job-card__dot">·</span><span v-if="officeLocationsLabel">{{ officeLocationsLabel }}</span><span v-else-if="countryLabel" class="job-card__dot">·</span><span v-else-if="countryLabel">{{ countryLabel }}</span></div>
         <div class="job-card__actions">
           <button type="button" class="job-card__action" :class="{ 'job-card__action_active': favorite }" :aria-label="favorite ? t('removeFavorite') : t('addFavorite')" :title="favorite ? t('removeFavorite') : t('addFavorite')" @click.stop="emit('favorite', job)">
             <u-icon name="i-lucide-heart" />

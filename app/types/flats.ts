@@ -21,6 +21,16 @@ export interface FlatMarketComparison {
 
 export type FlatAudience = "women" | "men" | "family";
 
+export interface FlatMoneyAmount {
+  amount: number;
+  currency: string | null;
+  approximate?: boolean;
+}
+
+export interface FlatPerPersonPrice extends FlatMoneyAmount {
+  scope: "person";
+}
+
 export interface FlatListing {
   id: string;
   publicId?: number | null;
@@ -81,6 +91,12 @@ export interface FlatListing {
   depositCurrency?: string | null;
   commission?: boolean | null;
   commissionPercent?: number | null;
+  commissionAmount?: FlatMoneyAmount | null;
+  studentTarget?: boolean | null;
+  landlordPresent?: boolean | null;
+  priceScope?: "person" | null;
+  perPersonPrice?: FlatPerPersonPrice | null;
+  transitRoutes?: string[];
   furnished?: boolean | null;
   condition?: "needs_renovation" | "basic" | "good" | "modern" | "luxury" | null;
   amenities?: string[];
@@ -91,7 +107,7 @@ export interface FlatListing {
   internet?: boolean | null;
   smokingAllowed?: boolean | null;
   negotiable?: boolean | null;
-  utilitiesAmount?: number | null;
+  utilitiesAmount?: FlatMoneyAmount | null;
   minLeaseTerm?: string | null;
   availableFrom?: string | null;
   tags?: string[];

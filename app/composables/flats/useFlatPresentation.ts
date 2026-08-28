@@ -143,8 +143,6 @@ export function useFlatPresentation(options: FlatPresentationOptions) {
     };
     const directKey = direct[normalized];
     if (directKey) return t(directKey);
-    const rooms = normalized.match(/^(\d+)\s+rooms?$/);
-    if (rooms) return t("roomsN", { n: Number(rooms[1]) });
     return locName(value, "any");
   }
 

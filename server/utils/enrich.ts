@@ -31,6 +31,7 @@ import { toUsd } from './currency'
 import {
   detectEmploymentTypes,
   detectExperienceRequirement,
+  detectLexiconCities,
   detectLexiconCity,
   detectProbation,
   detectSharedManagementRole,
@@ -191,6 +192,15 @@ function detectCity(job: Job, country: string): string | undefined {
   const knownCity = detectLexiconCity(first, country)
   if (resolveCountry(first) === country && !knownCity) return undefined
   return knownCity || first
+}
+
+function detectOfficeLocations(text: string): string[] | undefined {
+  // Multiple offices commonly span more than one country (e.g. "San
+  // Francisco, London or Berlin"), so this intentionally does not restrict
+  // to a single detected country the way detectCity() does for the primary
+  // location.
+  const cities = detectLexiconCities(text)
+  return cities.length > 1 ? cities : undefined
 }
 
 // ---- Shared vacancy context ----
@@ -396,6 +406,7 @@ export function enrichJob(job: Job): Job {
     ...clean,
     country,
     city: detectCity(clean, country),
+    officeLocations: detectOfficeLocations(`${title}\n${clean.location}\n${description}`),
     workMode: detectWorkMode(text, job),
     relocation: detectRelocation(hiringContext),
     employmentKind: detectEmploymentKind(clean, text),

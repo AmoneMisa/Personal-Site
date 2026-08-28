@@ -62,6 +62,7 @@ export interface Job {
   title: string
   company: string
   location: string
+  officeLocations?: string[]
   url: string
   source: JobSource
   remote: boolean

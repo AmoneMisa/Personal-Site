@@ -15,7 +15,7 @@ import SearchShareDialog from "~/components/search/SearchShareDialog.vue";
 import SearchSourceTabs from "~/components/search/SearchSourceTabs.vue";
 import SearchEmptyState from "~/components/search/SearchEmptyState.vue";
 import { queryString } from "~/utils/queryParams";
-import { convertCurrency } from "~/utils/search/money";
+import { convertCurrency, formatMoneyAmount } from "~/utils/search/money";
 import { regionalSearchCountry } from "~/utils/search/regionalCountry";
 import { useFlatFilters } from "~/composables/flats/useFlatFilters";
 import { useFlatFilterBlocks } from "~/composables/flats/useFlatFilterBlocks";
@@ -541,8 +541,16 @@ const conditionLabel = (c?: Listing["condition"]) => c === "needs_renovation" ? 
 const sourceLabel = (s?: string) => (s === "olx" ? "OLX" : s === "telegram" ? "Telegram" : strOr(s));
 function floorLabel(l: Listing) { if (l.floor != null && l.totalFloors != null) return `${l.floor} / ${l.totalFloors}`; return l.floor != null || l.totalFloors != null ? String(l.floor ?? l.totalFloors) : t("nd"); }
 function depositLabel(l: Listing) { if (l.depositAmount != null) return `${l.depositAmount.toLocaleString()} ${l.depositCurrency || l.currency}`; return fmtBool(l.deposit); }
-function commissionLabel(l: Listing) { if (l.commissionPercent != null) return `${l.commissionPercent}%`; return fmtBool(l.commission); }
+function commissionLabel(l: Listing) {
+  if (l.commissionPercent != null) return `${l.commissionPercent}%`;
+  const amount = formatMoneyAmount(l.commissionAmount, l.currency, locale.value);
+  if (amount != null) return amount;
+  return fmtBool(l.commission);
+}
 function communalLabel(l: Listing) { if (l.communalSeparated === true) return t("communalSeparate"); if (l.communalSeparated === false) return t("communalIncluded"); return t("notSpecified"); }
+function perPersonPriceLabel(l: Listing) {
+  return formatMoneyAmount(l.perPersonPrice, l.currency, locale.value) || t("notSpecified");
+}
 type FlatSpecGroup = "advert" | "property" | "location" | "amenities" | "terms" | "costs";
 type FlatSpecRow = { label: string; value: string; group: FlatSpecGroup; groupLabel: string; column: 1 | 2 | 3 };
 const specRows = computed<FlatSpecRow[]>(() => {
@@ -609,7 +617,12 @@ const specRows = computed<FlatSpecRow[]>(() => {
     row("costs", t("specDeposit"), depositLabel(l)),
     row("costs", t("specCommission"), commissionLabel(l)),
     row("costs", t("specCommunal"), communalLabel(l)),
-    row("costs", t("specUtilAmount"), l.utilitiesAmount != null ? `${l.utilitiesAmount.toLocaleString()} ${l.currency}` : t("notSpecified")),
+    row("costs", t("specUtilAmount"), formatMoneyAmount(l.utilitiesAmount, l.currency, locale.value) || t("notSpecified")),
+
+    row("terms", t("specStudentTarget"), fmtBool(l.studentTarget)),
+    row("terms", t("specLandlordPresent"), fmtBool(l.landlordPresent)),
+    ...(l.priceScope === "person" ? [row("costs", t("specPerPersonPrice"), perPersonPriceLabel(l))] : []),
+    ...(l.transitRoutes?.length ? [row("location", t("specTransitRoutes"), l.transitRoutes.join(", "))] : []),
   ];
 });
 const {

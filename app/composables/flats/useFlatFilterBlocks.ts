@@ -29,6 +29,9 @@ export function useFlatFilterBlocks(options: {
   const commit = () => options.scheduleLoad();
   const saleOnlyHidden = () => dealType.value !== "any" && dealType.value !== "sale";
   const rentOnlyHidden = () => dealType.value === "sale";
+  // Long-term rent search is by room-share/room-only vs. whole-flat, not by a
+  // specific room count — that belongs to a separate filter-search feature.
+  const longRentHidden = () => dealType.value === "longRent";
 
   return computed<SearchFilterBlock[]>(() => [
     {
@@ -53,8 +56,8 @@ export function useFlatFilterBlocks(options: {
     {
       id: "apartment", title: options.t("groupApartment"), icon: "i-lucide-house",
       fields: [
-        { id: "rooms-min", control: "number", label: `${options.t("rangeRooms")} · ${options.t("rangeFrom")}`, value: roomsMin.value, min: 0, onUpdate: update(roomsMin), onCommit: commit },
-        { id: "rooms-max", control: "number", label: `${options.t("rangeRooms")} · ${options.t("rangeTo")}`, value: roomsMax.value, min: 0, onUpdate: update(roomsMax), onCommit: commit },
+        { id: "rooms-min", control: "number", label: `${options.t("rangeRooms")} · ${options.t("rangeFrom")}`, value: roomsMin.value, min: 0, hidden: longRentHidden(), onUpdate: update(roomsMin), onCommit: commit },
+        { id: "rooms-max", control: "number", label: `${options.t("rangeRooms")} · ${options.t("rangeTo")}`, value: roomsMax.value, min: 0, hidden: longRentHidden(), onUpdate: update(roomsMax), onCommit: commit },
         { id: "bedrooms-min", control: "number", label: `${options.t("rangeBedrooms")} · ${options.t("rangeFrom")}`, value: bedroomsMin.value, min: 0, onUpdate: update(bedroomsMin), onCommit: commit },
         { id: "bedrooms-max", control: "number", label: `${options.t("rangeBedrooms")} · ${options.t("rangeTo")}`, value: bedroomsMax.value, min: 0, onUpdate: update(bedroomsMax), onCommit: commit },
         { id: "area-min", control: "number", label: `${options.t("rangeArea")} · ${options.t("rangeFrom")}`, value: areaMin.value, min: 0, onUpdate: update(areaMin), onCommit: commit },

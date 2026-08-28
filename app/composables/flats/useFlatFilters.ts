@@ -87,8 +87,8 @@ export function useFlatFilters() {
     if (priceMin.value != null) params.priceMin = String(priceMin.value);
     if (priceMax.value != null) params.priceMax = String(priceMax.value);
     if (priceMin.value != null || priceMax.value != null) params.priceCurrency = displayCurrency.value;
-    if (roomsMin.value != null) params.roomsMin = String(roomsMin.value);
-    if (roomsMax.value != null) params.roomsMax = String(roomsMax.value);
+    if (dealType.value !== "longRent" && roomsMin.value != null) params.roomsMin = String(roomsMin.value);
+    if (dealType.value !== "longRent" && roomsMax.value != null) params.roomsMax = String(roomsMax.value);
     if (bedroomsMin.value != null) params.bedroomsMin = String(bedroomsMin.value);
     if (bedroomsMax.value != null) params.bedroomsMax = String(bedroomsMax.value);
     if (areaMin.value != null) params.areaMin = String(areaMin.value);
