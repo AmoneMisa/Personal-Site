@@ -18,7 +18,7 @@ export function useFlatRouteState(options: {
   function serialize(): Record<string, string> {
     const q: Record<string, string> = {};
     const {
-      countries, city, district, metro, propertyType, dealType, agency, audience,
+      countries, city, district, microdistrict, quartal, mapArea, metro, propertyType, dealType, agency, audience,
       petFriendly, roomOnlyFilter, onlyWithPhotos, childrenRequired, newBuildingOnly,
       dishwasherOnly, airConditionerOnly, parkingOnly, internetOnly, gasOnly, balconyOnly,
       terraceOnly, privateYardOnly, sort, priceMin, priceMax, displayCurrency, roomsMin,
@@ -26,9 +26,12 @@ export function useFlatRouteState(options: {
       metroMaxM, nearbyKind, nearbyMaxM, floorMin, floorMax, totalFloorsMin, totalFloorsMax,
       yearMin, yearMax, maxAgeDays, query, source,
     } = filters;
-    if (countries.value.length) q.countries = countries.value.join(",");
+    if (countries.value.length) q.countries = countries.value[0]!;
     if (city.value) q.city = city.value;
     if (district.value) q.district = district.value;
+    if (microdistrict.value) q.microdistrict = microdistrict.value;
+    if (quartal.value) q.quartal = quartal.value;
+    if (mapArea.value) q.area = mapArea.value;
     if (metro.value) q.metro = metro.value;
     if (propertyType.value !== "any") q.propertyType = propertyType.value;
     if (dealType.value !== "any") q.dealType = dealType.value;
@@ -60,9 +63,12 @@ export function useFlatRouteState(options: {
 
   function deserialize(params: LocationQuery | Record<string, unknown>) {
     const countryParam = queryString(params.countries);
-    if (countryParam) filters.countries.value = countryParam.split(",").filter(Boolean);
+    if (countryParam) filters.countries.value = [countryParam.split(",").find(Boolean) || countryParam];
     filters.city.value = queryString(params.city);
     filters.district.value = queryString(params.district);
+    filters.microdistrict.value = queryString(params.microdistrict);
+    filters.quartal.value = queryString(params.quartal);
+    filters.mapArea.value = queryString(params.area);
     filters.propertyType.value = ["flat", "house"].includes(queryString(params.propertyType)) ? queryString(params.propertyType) : "any";
     filters.dealType.value = ["sale", "longRent", "roomRent", "shortRent"].includes(queryString(params.dealType)) ? queryString(params.dealType) : "any";
     filters.agency.value = ["owner", "agency"].includes(queryString(params.agency)) ? queryString(params.agency) : "any";
