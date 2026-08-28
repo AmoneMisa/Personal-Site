@@ -119,6 +119,10 @@
   line-height: 1.35;
 }
 
+.jobs .job-card__meta-row {
+  gap: 5px !important;
+}
+
 .jobs .job-card__badge {
   padding: 1px 6px !important;
   border-radius: 5px !important;

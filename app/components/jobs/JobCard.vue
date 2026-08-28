@@ -63,6 +63,20 @@ const cardBadges = computed(() => [
 ].filter((item): item is { label: string; kind: string; title?: string } => !!item));
 const visibleBadges = computed(() => cardBadges.value.slice(0, 6));
 const hiddenBadgeCount = computed(() => Math.max(0, cardBadges.value.length - visibleBadges.value.length));
+const metaItems = computed(() => {
+  const items = visibleBadges.value.map((badge) => ({ ...badge, key: badge.kind + badge.label }));
+  if (hiddenBadgeCount.value) {
+    items.push({
+      label: `+${hiddenBadgeCount.value}`,
+      kind: "more",
+      title: cardBadges.value.slice(visibleBadges.value.length).map((badge) => badge.label).join(", "),
+      key: "more",
+    });
+  }
+  return items;
+});
+const metaRowA = computed(() => metaItems.value.filter((_, index) => index % 2 === 0));
+const metaRowB = computed(() => metaItems.value.filter((_, index) => index % 2 === 1));
 const countryLabel = computed(() => props.job.country || props.job.location.split(",").at(-1)?.trim() || "");
 const officeLocationsLabel = computed(() => props.job.officeLocations?.length ? props.job.officeLocations.join(" / ") : "");
 const bylineTitle = computed(() => [props.job.company, officeLocationsLabel.value || props.job.location].filter(Boolean).join(" · "));
@@ -85,6 +99,32 @@ const tagPills = computed(() => {
   return pills((props.job.tags || []).filter((tag) => pillKey(tag) !== company), "job-card__tag");
 });
 function openCard() { emit("open", props.job); }
+
+const metaRail = ref<HTMLElement | null>(null);
+let metaPointerId: number | null = null;
+let metaStartX = 0;
+let metaStartScrollLeft = 0;
+
+function startMetaDrag(event: PointerEvent) {
+  if (event.pointerType === "touch" || !metaRail.value) return;
+  metaPointerId = event.pointerId;
+  metaStartX = event.clientX;
+  metaStartScrollLeft = metaRail.value.scrollLeft;
+  metaRail.value.setPointerCapture(event.pointerId);
+  metaRail.value.classList.add("is-dragging");
+}
+
+function moveMetaDrag(event: PointerEvent) {
+  if (metaPointerId !== event.pointerId || !metaRail.value) return;
+  metaRail.value.scrollLeft = metaStartScrollLeft - (event.clientX - metaStartX);
+}
+
+function stopMetaDrag(event: PointerEvent) {
+  if (metaPointerId !== event.pointerId || !metaRail.value) return;
+  if (metaRail.value.hasPointerCapture(event.pointerId)) metaRail.value.releasePointerCapture(event.pointerId);
+  metaRail.value.classList.remove("is-dragging");
+  metaPointerId = null;
+}
 </script>
 
 <template>
@@ -116,9 +156,21 @@ function openCard() { emit("open", props.job); }
       </div>
     </div>
 
-    <div class="job-card__meta">
-      <span v-for="badge in visibleBadges" :key="badge.kind + badge.label" class="job-card__badge" :class="`job-card__badge_${badge.kind}`" :title="badge.title">{{ badge.label }}</span>
-      <span v-if="hiddenBadgeCount" class="job-card__badge job-card__badge_more" :title="cardBadges.slice(visibleBadges.length).map((badge) => badge.label).join(', ')">+{{ hiddenBadgeCount }}</span>
+    <div
+      ref="metaRail"
+      class="job-card__meta"
+      @click.stop
+      @pointerdown.stop="startMetaDrag"
+      @pointermove.stop="moveMetaDrag"
+      @pointerup.stop="stopMetaDrag"
+      @pointercancel.stop="stopMetaDrag"
+    >
+      <div class="job-card__meta-row">
+        <span v-for="badge in metaRowA" :key="badge.key" class="job-card__badge" :class="`job-card__badge_${badge.kind}`" :title="badge.title">{{ badge.label }}</span>
+      </div>
+      <div class="job-card__meta-row">
+        <span v-for="badge in metaRowB" :key="badge.key" class="job-card__badge" :class="`job-card__badge_${badge.kind}`" :title="badge.title">{{ badge.label }}</span>
+      </div>
     </div>
 
     <div v-if="salary || convertedSalary" class="job-card__compensation">
@@ -183,7 +235,10 @@ function openCard() { emit("open", props.job); }
 .job-card__title { width: 100%; min-width: 0; margin: 0; overflow-wrap: break-word; font-weight: 700; font-size: 15px; line-height: 1.4; color: var(--text-white, inherit); }
 .job-card__ats { justify-self: end; white-space: nowrap; font-size: 11px; font-weight: 700; padding: 2px 8px; border: 1px solid; border-radius: 7px; background: rgba(2,6,23,.18); }
 .job-card__date { min-width: 0; font-size: 11px; line-height: 1.2; white-space: nowrap; }
-.job-card__meta { display: flex; flex-wrap: wrap; align-content: flex-start; align-items: center; gap: 5px; max-height: 48px; overflow: hidden; margin-top: 9px; }
+.job-card__meta { display: flex; flex-direction: column; gap: 5px; overflow-x: auto; overflow-y: hidden; margin-top: 9px; scrollbar-width: none; touch-action: pan-x; cursor: grab; user-select: none; }
+.job-card__meta::-webkit-scrollbar { display: none; }
+.job-card__meta.is-dragging { cursor: grabbing; }
+.job-card__meta-row { display: flex; flex-wrap: nowrap; align-items: center; gap: 5px; }
 .job-card__badge { flex: 0 0 auto; white-space: nowrap; border-radius: 6px; padding: 2px 8px; font-size: 11px; line-height: 1.35; color: #34d399; background: rgba(52,211,153,.14); }
 .job-card__badge_mode { color: #38bdf8; background: rgba(56,189,248,.14); }
 .job-card__badge_visa { color: #fbbf24; background: rgba(251,191,36,.14); }
