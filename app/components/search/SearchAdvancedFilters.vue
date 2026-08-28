@@ -49,7 +49,8 @@ onMounted(() => {
   </div>
 </template>
 
-<style scoped>
+<style scoped lang="scss">
+@use "../../assets/css/mixins/breakpoints" as *;
 .search-advanced-filters {
   display: grid;
   width: 100%;
@@ -128,7 +129,7 @@ onMounted(() => {
   grid-column: 1 / -1;
 }
 
-@media (max-width: 699px) {
+@include bp-down(md) {
   .search-advanced-filters__toggle {
     margin-top: 2px;
     padding: 12px 12px 0;
@@ -149,7 +150,7 @@ onMounted(() => {
   }
 }
 
-@media (min-width: 700px) {
+@include bp-up(md) {
   .search-advanced-filters__panel { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 </style>

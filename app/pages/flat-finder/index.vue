@@ -876,7 +876,8 @@ onBeforeUnmount(() => { modalOpen.value = false; lightboxOpen.value = false; rel
   </SearchPageShell>
 </template>
 
-<style scoped>
+<style scoped lang="scss">
+@use "../../assets/css/mixins/breakpoints" as *;
 .flats { position: relative; isolation: isolate; padding-top: 24px; padding-bottom: 96px; }
 .flats__header { position: relative; z-index: 1; }
 .flats__title { font-size: 32px; font-weight: 600; }
@@ -983,7 +984,7 @@ onBeforeUnmount(() => { modalOpen.value = false; lightboxOpen.value = false; rel
   .flats__filter-blocks :deep(.filter-section:nth-child(odd)) { border-left: 0; padding-left: 0; }
   .flats__filter-blocks :deep(.filter-section:nth-child(even)) { padding-right: 0; }
 }
-@media (max-width: 760px) {
+@include bp-down(md) {
   .flats__controls_redesign { margin-inline: -4px; }
   .flats__searchbar { grid-template-columns: 1fr; }
   .flats__secondary-nav { gap: 8px; }

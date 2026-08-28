@@ -224,7 +224,8 @@ function stopMetaDrag(event: PointerEvent) {
   </article>
 </template>
 
-<style scoped>
+<style scoped lang="scss">
+@use "../../assets/css/mixins/breakpoints" as *;
 .job-card { position: relative; isolation: isolate; overflow: hidden; padding: 18px; border-radius: 14px; border: 1px solid var(--line); background: var(--bg-panel); box-shadow: inset 0 1px 0 rgba(255,255,255,.04), 0 16px 36px rgba(2,6,23,.12); transition: transform 160ms ease, border-color 180ms ease, box-shadow 180ms ease; height: auto; min-height: 0; display: flex; flex-direction: column; cursor: pointer; }
 .job-card:focus-visible { outline: 2px solid var(--accent-pink, #e0679a); outline-offset: 3px; }
 .job-card_scored { border-color: var(--line); box-shadow: inset 0 1px 0 rgba(255,255,255,.04), 0 16px 36px rgba(2,6,23,.12); }
@@ -293,7 +294,7 @@ function stopMetaDrag(event: PointerEvent) {
 :global(.job-modal__badges > .job-card__badge_salary:has(+ .job-card__salary)),
 :global(.job-modal__badges > .job-card__badge_salary:has(+ .job-card__badge_salary)) { display: none; }
 
-@media (max-width: 480px) {
+@include bp-down(xs) {
   .job-card { padding: 15px; }
   .job-card__head { gap: 8px; }
   .job-card__salary { font-size: 13px; }

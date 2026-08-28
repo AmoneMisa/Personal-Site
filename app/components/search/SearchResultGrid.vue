@@ -20,7 +20,8 @@ withDefaults(defineProps<{
   </div>
 </template>
 
-<style scoped>
+<style scoped lang="scss">
+@use "../../assets/css/mixins/breakpoints" as *;
 .search-result-grid {
   display: grid;
   grid-template-columns: 1fr;
@@ -28,16 +29,16 @@ withDefaults(defineProps<{
   align-items: stretch;
 }
 .search-result-grid_equal { grid-auto-rows: 1fr; }
-@media (min-width: 640px) {
+@include bp-up(sm) {
   .search-result-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
-@media (min-width: 1024px) {
+@include bp-up(lg) {
   .search-result-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 }
-@media (min-width: 1180px) {
+@include bp-up(xl) {
   .search-result-grid_dense { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 }
-@media (min-width: 1440px) {
+@include bp-up(xxl) {
   .search-result-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 }
 </style>

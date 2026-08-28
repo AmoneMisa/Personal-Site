@@ -887,7 +887,9 @@ onBeforeUnmount(() => {
   </SearchPageShell>
 </template>
 
-<style scoped>
+<style scoped lang="scss">
+@use "../../assets/css/mixins/breakpoints" as *;
+
 .jobs { position: relative; isolation: isolate; padding-top: 24px; padding-bottom: 96px; }
 .jobs__header { position: relative; z-index: 1; }
 .jobs__title { font-size: 32px; font-weight: 600; }
@@ -920,17 +922,17 @@ onBeforeUnmount(() => {
 .jobs__field { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
 .jobs__field-label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; opacity: 0.7; }
 .jobs__field_inline { align-self: center; min-height: var(--ui-control-h-md); }
-@media (min-width: 700px) {
+@include bp-up(md) {
   .jobs-filter-group__grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .jobs-filter-group__grid_salary { grid-template-columns: minmax(0, 1.4fr) minmax(110px, .7fr) minmax(130px, .8fr); }
   .jobs-filter-group__grid_salary .jobs__field_inline { grid-column: 1 / -1; }
   .jobs__field_wide { grid-column: span 2; }
   .jobs-filter-actions { grid-column: 1 / -1; }
 }
-@media (min-width: 1200px) {
+@include bp-up(xl) {
   .jobs-filter-group__grid_location { grid-template-columns: minmax(180px, .8fr) minmax(0, 1.6fr); }
 }
-@media (max-width: 620px) {
+@include bp-down(sm) {
   .jobs__results-toolbar { align-items: stretch; flex-direction: column; }
   .jobs__sort { flex: 1 1 auto; width: 100%; min-width: 0; }
 }

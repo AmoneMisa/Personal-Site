@@ -737,7 +737,9 @@ onBeforeUnmount(() => {
   </SearchPageShell>
 </template>
 
-<style scoped>
+<style scoped lang="scss">
+@use "../../assets/css/mixins/breakpoints" as *;
+
 .hiring { position: relative; isolation: isolate; padding-top: 24px; padding-bottom: 96px; }
 .hiring__header { position: relative; z-index: 1; }
 .hiring__title { font-size: 32px; font-weight: 600; }
@@ -754,7 +756,7 @@ onBeforeUnmount(() => {
 .hiring__filter-blocks { grid-column: 1 / -1; }
 .hiring__filter-blocks :deep(.search-filter-blocks__grid) { align-items: end; }
 .hiring-filter-group__grid { display: grid; grid-template-columns: 1fr; gap: 12px; align-items: end; }
-@media (min-width: 700px) {
+@include bp-up(md) {
   .hiring-filter-group__grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .hiring-filter-group__grid_salary { grid-template-columns: minmax(0, 1.5fr) minmax(110px, .6fr); }
   .hiring__field_wide { grid-column: span 2; }
@@ -782,7 +784,7 @@ onBeforeUnmount(() => {
 .hiring-modal__desc { font-size: 13.5px; line-height: 1.55; white-space: pre-wrap; color: var(--text-soft, inherit); margin-top: 8px; }
 .hiring-modal__tags { display: flex; flex-wrap: wrap; gap: 6px; }
 .hiring-modal__tag { font-size: 11px; padding: 2px 8px; border-radius: 6px; border: 1px solid var(--line); color: var(--ui-text-muted); }
-@media (max-width: 700px) {
+@include bp-down(md) {
   .hiring__controls { grid-template-columns: 1fr; }
   .hiring__controls > :deep(button) { width: 100%; }
   .hiring__results-toolbar { align-items: stretch; flex-direction: column; }

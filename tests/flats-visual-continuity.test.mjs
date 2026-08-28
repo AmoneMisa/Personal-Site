@@ -14,6 +14,6 @@ test('flat photos dissolve into the card with a contained dark fade on desktop a
   assert.match(card, /bottom: 0; height: 40%/u)
   assert.doesNotMatch(card, /backdrop-filter/u)
   assert.match(card, /linear-gradient\(180deg, rgba\(11,16,42,0\) 0%, rgba\(11,16,42,\.14\) 34%, rgba\(11,16,42,\.55\) 74%, var\(--bg-panel\) 100%\)/u)
-  assert.match(card, /@media \(max-width: 760px\)[\s\S]*?height: 148px/u)
+  assert.match(card, /@include bp-down\(md\)[\s\S]*?height: 148px/u)
   assert.match(card, /linear-gradient\(90deg, rgba\(11,16,42,0\) 0%, rgba\(11,16,42,\.16\) 34%, rgba\(11,16,42,\.58\) 72%, var\(--bg-panel\) 100%\)/u)
 })

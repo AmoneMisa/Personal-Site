@@ -244,7 +244,8 @@ function openCard() {
   </article>
 </template>
 
-<style scoped>
+<style scoped lang="scss">
+@use "../../assets/css/mixins/breakpoints" as *;
 .hiring-card {
   --money-color: #f1a6c6;
   position: relative;
@@ -464,7 +465,7 @@ function openCard() {
   white-space: nowrap;
 }
 
-@media (max-width: 700px) {
+@include bp-down(md) {
   .hiring-card {
     min-height: 218px;
     padding: 14px;

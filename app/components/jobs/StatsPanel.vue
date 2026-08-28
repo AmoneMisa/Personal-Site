@@ -291,8 +291,9 @@ const formatExperience = (value: number) => t("experienceYears", { n: value });
   </UiAnalyticsPanel>
 </template>
 
-<style scoped>
+<style scoped lang="scss">
+@use "../../assets/css/mixins/breakpoints" as *;
 .stats__grid,.charts-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}.stats__card,.analytics-card{min-width:0;padding:14px;border:1px solid rgba(85,111,174,.3);border-radius:11px;background:rgba(12,18,48,.9)}.stats__card_wide,.analytics-card_wide{grid-column:span 2}.analytics-card_full{grid-column:1/-1}.stats__card_skills{grid-column:span 2}.stats__label,.analytics-card h3{margin:0 0 9px;color:var(--ui-text-muted);font-size:11px;font-weight:750;letter-spacing:.05em;text-transform:uppercase}.stats__big{color:#f08ab8;font-size:28px;font-weight:750;overflow-wrap:anywhere}.stats__sub{margin-top:4px;color:var(--ui-text-muted);font-size:12px}.stats__row{display:flex;justify-content:space-between;gap:12px;padding:3px 0;font-size:13px}.stats__row span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.stats__row strong{flex:0 0 auto}.stats__row em,.stats__chips em{color:var(--ui-text-muted);font-size:11px;font-style:normal}.stats__row_divider{margin-top:5px;padding-top:7px;border-top:1px solid var(--line)}.stats__chips{display:flex;flex-wrap:wrap;gap:6px}.stats__chips span{padding:3px 9px;border:1px solid rgba(85,111,174,.34);border-radius:999px;color:var(--ui-text-muted);font-size:12px}.stats__chips_accent span{border-color:rgba(224,103,154,.38);color:#ee9bc0}
-@media(max-width:1000px){.stats__grid,.charts-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.stats__card_wide,.analytics-card_wide,.analytics-card_full{grid-column:1/-1}.stats__card_skills{grid-column:span 1}}
-@media(max-width:650px){.stats__switch{width:100%}.stats__grid,.charts-grid{grid-template-columns:1fr}.stats__card_wide,.analytics-card_wide,.analytics-card_full,.stats__card_skills{grid-column:auto}}
+@include bp-down(lg){.stats__grid,.charts-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.stats__card_wide,.analytics-card_wide,.analytics-card_full{grid-column:1/-1}.stats__card_skills{grid-column:span 1}}
+@include bp-down(sm){.stats__switch{width:100%}.stats__grid,.charts-grid{grid-template-columns:1fr}.stats__card_wide,.analytics-card_wide,.analytics-card_full,.stats__card_skills{grid-column:auto}}
 </style>

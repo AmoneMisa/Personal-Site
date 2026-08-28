@@ -1,0 +1,56 @@
+// One canonical responsive scale for the whole site.
+//
+// Before this existed the app had ~40 distinct breakpoint values (27 max-width,
+// 13 min-width), including hand-managed near-duplicate pairs (639/640, 699/700,
+// 767/768, 1179/1180) written that way to stop a min- and a max- query both
+// matching on the boundary pixel. One place got it wrong: the hiring page had
+// `min-width: 700px` and `max-width: 700px` side by side, so both applied at
+// exactly 700px.
+//
+// `bp-down()` subtracts a hairline instead, so an `up`/`down` pair on the same
+// token can never overlap and callers never have to remember the -1.
+//
+// Usage:
+//   @use "../../assets/css/mixins/breakpoints" as *;
+//   @include bp-down(md) { ... }   // narrower than md
+//   @include bp-up(lg)   { ... }   // lg and wider
+@use "sass:map";
+
+$breakpoints: (
+  "xs": 480px,
+  "sm": 640px,
+  "md": 768px,
+  "lg": 1024px,
+  "xl": 1280px,
+  "xxl": 1440px,
+);
+
+@function bp($name) {
+  @if not map.has-key($breakpoints, $name) {
+    @error "Unknown breakpoint `#{$name}`. Known: #{map.keys($breakpoints)}.";
+  }
+  @return map.get($breakpoints, $name);
+}
+
+// Styles that apply from $name upward.
+@mixin bp-up($name) {
+  @media (min-width: bp($name)) {
+    @content;
+  }
+}
+
+// Styles that apply below $name. The 0.02px step is the standard trick for
+// avoiding a boundary overlap with bp-up($name) while staying above the
+// precision floor browsers round fractional media query widths to.
+@mixin bp-down($name) {
+  @media (max-width: bp($name) - 0.02px) {
+    @content;
+  }
+}
+
+// Styles that apply only between two tokens: [$from, $to).
+@mixin bp-between($from, $to) {
+  @media (min-width: bp($from)) and (max-width: bp($to) - 0.02px) {
+    @content;
+  }
+}

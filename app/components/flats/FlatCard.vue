@@ -131,6 +131,7 @@ const emit = defineEmits<{
 </template>
 
 <style scoped lang="scss">
+@use "../../assets/css/mixins/breakpoints" as *;
 @use "../../assets/css/mixins/flat-tone" as *;
 .flat-card { position: relative; min-width: 0; height: 100%; align-self: stretch; border: 1px solid var(--line); border-radius: 12px; overflow: hidden; background: var(--bg-panel); cursor: pointer; transition: transform 140ms ease, border-color 180ms ease, box-shadow 180ms ease; display: flex; flex-direction: column; }
 .flat-card:hover { transform: translateY(-2px); border-color: rgba(224,103,154,0.4); box-shadow: 0 12px 30px rgba(0,0,0,.16); }
@@ -162,7 +163,7 @@ const emit = defineEmits<{
 .flat-card__meta { display: flex; align-items: center; justify-content: space-between; gap: 6px 10px; margin-top: auto; padding-top: 8px; font-size: 11.5px; line-height: 1.35; }.flat-card__location { min-width: 0; display: inline-flex; align-items: center; gap: 5px; flex: 1 1 auto; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }.flat-card__meta-tail { display: inline-flex; flex: 0 0 auto; gap: 5px; white-space: nowrap; margin-left: auto; }.flat-card__src { text-transform: capitalize; opacity: 0.72; }
 .flat-card_favorite { border-color: rgba(224,103,154,0.52); }.flat-card_hidden { opacity: 0.64; border-style: dashed; }
 
-@media (max-width: 760px) {
+@include bp-down(md) {
   .flat-card { display: grid; grid-template-columns: minmax(112px, 42%) minmax(0, 1fr); height: 148px; min-height: 148px; }
   .flat-card__photo { width: 100%; height: 148px; min-height: 0; aspect-ratio: auto; overflow: hidden; }
   .flat-card__photo::before { inset: 0 0 0 auto; width: 48%; height: auto; background: linear-gradient(90deg, rgba(11,16,42,0) 0%, rgba(11,16,42,.1) 24%, rgba(11,16,42,.42) 54%, rgba(11,16,42,.8) 80%, var(--bg-panel) 100%); }

@@ -672,7 +672,8 @@ onBeforeUnmount(() => {
   </Teleport>
 </template>
 
-<style scoped>
+<style scoped lang="scss">
+@use "../../assets/css/mixins/breakpoints" as *;
 .flat-map-shell { position: relative; z-index: 0; isolation: isolate; scroll-margin-block: 24px; }
 .flat-map-shell_full {
   position: fixed;
@@ -767,7 +768,7 @@ onBeforeUnmount(() => {
 :deep(.leaflet-container) { background: var(--bg-panel); font-family: inherit; }
 :deep(.leaflet-popup-content) { font-size: 13px; }
 
-@media (max-width: 640px) {
+@include bp-down(sm) {
   .flat-map-shell_full { padding: 0; }
   .flat-map-shell_full .flat-map { border: 0; border-radius: 0; }
   .flat-map__tools { top: max(8px, env(safe-area-inset-top)); right: 8px; gap: 5px; }

@@ -28,7 +28,8 @@ defineProps<{ blocks: SearchFilterBlock[] }>();
   </div>
 </template>
 
-<style scoped>
+<style scoped lang="scss">
+@use "../../assets/css/mixins/breakpoints" as *;
 .search-filter-blocks {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -39,7 +40,7 @@ defineProps<{ blocks: SearchFilterBlock[] }>();
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 10px;
 }
-@media (max-width: 760px) {
+@include bp-down(md) {
   .search-filter-blocks,
   .search-filter-blocks__grid { grid-template-columns: 1fr; }
 }

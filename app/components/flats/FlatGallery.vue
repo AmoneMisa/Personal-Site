@@ -245,7 +245,8 @@ onBeforeUnmount(() => window.removeEventListener("keydown", onKeydown));
   </teleport>
 </template>
 
-<style scoped>
+<style scoped lang="scss">
+@use "../../assets/css/mixins/breakpoints" as *;
 .flat-gallery {
   display: grid;
   grid-template-columns: minmax(0, 1.65fr) repeat(2, minmax(0, .72fr));
@@ -322,7 +323,7 @@ onBeforeUnmount(() => window.removeEventListener("keydown", onKeydown));
 .flat-lightbox__nav_right { right: 16px; }
 .flat-lightbox__close { top: 16px; right: 20px; width: 44px; height: 44px; font-size: 24px; }
 .flat-lightbox__counter { position: fixed; bottom: 18px; left: 50%; z-index: 1; transform: translateX(-50%); padding: 6px 10px; border: 1px solid #343a62; border-radius: 6px; background: #131730; color: var(--text-primary); font: 500 12px/1.2 "JetBrains Mono", monospace; pointer-events: auto; }
-@media (max-width: 760px) {
+@include bp-down(md) {
   .flat-gallery {
     height: clamp(220px, 42vh, 285px);
     grid-template-columns: minmax(0, 1.55fr) minmax(82px, .7fr);

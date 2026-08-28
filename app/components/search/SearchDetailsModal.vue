@@ -98,6 +98,7 @@ const modalUi = computed(() => {
 </template>
 
 <style lang="scss">
+@use "../../assets/css/mixins/breakpoints" as *;
 @use "../../assets/css/mixins/flat-tone" as *;
 
 /* Flat Finder deliberately keeps every fact in one place: the specification
@@ -170,7 +171,7 @@ const modalUi = computed(() => {
   white-space: nowrap;
 }
 
-@media (max-width: 640px) {
+@include bp-down(sm) {
   .search-details-public-title__good-price {
     padding-inline: 7px;
     font-size: 11px;
