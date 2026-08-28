@@ -21,37 +21,7 @@ const hasUnderwaterLife = computed(() => (
     ]"
     aria-hidden="true"
   >
-    <!-- Looking through moving water: a turbulence displacement warps the scene
-         itself, so the reef bends and settles the way it does when you open
-         your eyes underwater. Only the backdrop is warped — the mascots stay
-         crisp, both because they are the subject and because filtering them
-         would fight their own animation. -->
-    <svg v-if="hasUnderwaterLife" class="ocean-page-backdrop__filter-defs" aria-hidden="true" focusable="false">
-      <defs>
-        <filter id="ocean-refraction" x="-8%" y="-8%" width="116%" height="116%" color-interpolation-filters="sRGB">
-          <!-- Generated once and reused; only the displacement scale animates,
-               which is far cheaper than regenerating the noise every frame. -->
-          <feTurbulence
-            type="fractalNoise"
-            base-frequency="0.008 0.017"
-            num-octaves="2"
-            seed="7"
-            stitch-tiles="stitch"
-            result="stream"
-          />
-          <feDisplacementMap in="SourceGraphic" in2="stream" x-channel-selector="R" y-channel-selector="G" scale="14">
-            <animate attributeName="scale" values="9;20;9" dur="15s" repeatCount="indefinite" calcMode="spline" key-times="0;0.5;1" key-splines="0.4 0 0.6 1; 0.4 0 0.6 1" />
-          </feDisplacementMap>
-        </filter>
-      </defs>
-    </svg>
-
-    <div class="ocean-page-backdrop__refract">
-      <div class="ocean-page-backdrop__image" />
-    </div>
-    <div v-if="hasUnderwaterLife" class="ocean-page-backdrop__water" />
-    <div v-if="hasUnderwaterLife" class="ocean-page-backdrop__caustics ocean-page-backdrop__caustics_primary" />
-    <div v-if="hasUnderwaterLife" class="ocean-page-backdrop__caustics ocean-page-backdrop__caustics_secondary" />
+    <div class="ocean-page-backdrop__image" />
     <ocean-bubbles v-if="hasUnderwaterLife" />
     <underwater-ambient2d v-if="hasUnderwaterLife" />
     <header-crab v-if="hasUnderwaterLife" />
@@ -77,32 +47,10 @@ const hasUnderwaterLife = computed(() => (
 }
 
 .ocean-page-backdrop__image,
-.ocean-page-backdrop__water,
-.ocean-page-backdrop__caustics,
 .ocean-page-backdrop__vignette {
   position: absolute;
   inset: 0;
   pointer-events: none;
-}
-
-.ocean-page-backdrop__filter-defs {
-  position: absolute;
-  width: 0;
-  height: 0;
-  pointer-events: none;
-}
-
-/* Carries the refraction. Kept as a wrapper rather than putting the filter on
-   __image, because that element already animates `filter` for its saturate and
-   brightness breathing and the two would overwrite each other. */
-.ocean-page-backdrop__refract {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-}
-
-.ocean-page-backdrop_has-life .ocean-page-backdrop__refract {
-  filter: url("#ocean-refraction");
 }
 
 /* The darkening and cold cast of being under the surface. Cheap, and it does
@@ -127,51 +75,6 @@ const hasUnderwaterLife = computed(() => (
   transform: scale(1.02);
   animation: ocean-water-breathe 22s ease-in-out infinite alternate;
   will-change: transform, filter;
-}
-
-.ocean-page-backdrop__water {
-  z-index: 0;
-  inset: -12% -8%;
-  opacity: .34;
-  mix-blend-mode: screen;
-  background:
-    radial-gradient(ellipse 46% 8% at 20% 10%, rgba(194, 239, 255, .2) 0 12%, transparent 58%),
-    radial-gradient(ellipse 40% 7% at 69% 16%, rgba(135, 211, 255, .16) 0 10%, transparent 61%),
-    radial-gradient(ellipse 32% 6% at 43% 28%, rgba(91, 183, 255, .12) 0 9%, transparent 64%),
-    radial-gradient(ellipse 30% 6% at 89% 36%, rgba(179, 232, 255, .1) 0 8%, transparent 62%);
-  background-size: 138% 128%, 146% 136%, 132% 142%, 152% 134%;
-  filter: blur(13px);
-  transform-origin: 50% 0;
-  animation: ocean-water-flow 11s ease-in-out infinite alternate;
-}
-
-.ocean-page-backdrop__caustics {
-  z-index: 0;
-  mix-blend-mode: screen;
-  transform-origin: 50% 0;
-  will-change: transform, opacity;
-}
-
-.ocean-page-backdrop__caustics_primary {
-  inset: -5% -6% 34%;
-  opacity: .28;
-  background:
-    repeating-radial-gradient(ellipse at 14% -8%, transparent 0 26px, rgba(184, 235, 255, .055) 31px 34px, transparent 40px 62px),
-    repeating-radial-gradient(ellipse at 72% -12%, transparent 0 31px, rgba(121, 205, 255, .045) 38px 41px, transparent 48px 78px);
-  filter: blur(7px);
-  mask-image: linear-gradient(to bottom, #000 0%, rgba(0, 0, 0, .82) 48%, transparent 100%);
-  animation: ocean-caustic-drift 9s ease-in-out infinite alternate;
-}
-
-.ocean-page-backdrop__caustics_secondary {
-  inset: -9% -8% 45%;
-  opacity: .2;
-  background:
-    radial-gradient(52% 20% at 17% 7%, rgba(175, 232, 255, .25), transparent 74%),
-    radial-gradient(38% 16% at 78% 10%, rgba(142, 219, 255, .2), transparent 76%),
-    radial-gradient(32% 11% at 49% 18%, rgba(120, 202, 255, .15), transparent 78%);
-  filter: blur(22px);
-  animation: ocean-caustic-swell 21s ease-in-out infinite alternate-reverse;
 }
 
 .ocean-page-backdrop_reef {
@@ -212,27 +115,9 @@ const hasUnderwaterLife = computed(() => (
   100% { transform: translate3d(-.08%, .2%, 0) scale(1.021); filter: saturate(1.01) brightness(1.005); }
 }
 
-@keyframes ocean-water-flow {
-  0% { transform: translate3d(-4.8%, -1.8%, 0) skewX(-2deg) scale(1.04, .94); opacity: .24; filter: blur(13px) hue-rotate(-3deg); }
-  48% { transform: translate3d(1.8%, 2.2%, 0) skewX(1.4deg) scale(1.08, 1.05); opacity: .39; filter: blur(10px) hue-rotate(3deg); }
-  100% { transform: translate3d(4.6%, -.8%, 0) skewX(-.8deg) scale(1.02, 1.08); opacity: .28; filter: blur(14px) hue-rotate(-1deg); }
-}
-
-@keyframes ocean-caustic-drift {
-  0% { transform: translate3d(-3.2%, -1.4%, 0) rotate(-.5deg) scale(1.05, .93); opacity: .18; }
-  52% { transform: translate3d(.8%, 1%, 0) rotate(.4deg) scale(1.1, 1.05); opacity: .34; }
-  100% { transform: translate3d(3%, -.4%, 0) rotate(-.2deg) scale(1.04, 1.1); opacity: .22; }
-}
-
 @keyframes ocean-lens-breathe {
   0% { opacity: .88; }
   100% { opacity: 1; }
-}
-
-@keyframes ocean-caustic-swell {
-  0% { transform: translate3d(-.9%, -.4%, 0) scale(1.02); opacity: .08; }
-  55% { transform: translate3d(.3%, .6%, 0) scale(1.065, .96); opacity: .14; }
-  100% { transform: translate3d(1%, -.1%, 0) scale(1.035, 1.04); opacity: .1; }
 }
 
 @media (max-width: 720px) {
@@ -244,17 +129,8 @@ const hasUnderwaterLife = computed(() => (
     will-change: auto;
   }
 
-  .ocean-page-backdrop__water,
-  .ocean-page-backdrop__caustics,
   :deep(.ocean-bubbles) {
     display: none !important;
-  }
-
-  /* An animated SVG displacement over the whole viewport is too expensive to
-     justify on phones. The vignette stays, since it gives most of the
-     underwater read for free. */
-  .ocean-page-backdrop_has-life .ocean-page-backdrop__refract {
-    filter: none;
   }
 
   .ocean-page-backdrop__vignette {
@@ -268,15 +144,10 @@ const hasUnderwaterLife = computed(() => (
 
 @media (prefers-reduced-motion: reduce) {
   .ocean-page-backdrop__image,
-  .ocean-page-backdrop__water,
-  .ocean-page-backdrop__caustics,
   .ocean-page-backdrop__vignette {
     animation: none;
   }
 
   .ocean-page-backdrop__image { transform: none; }
-
-  /* Holds the refraction at a fixed offset instead of pulsing it. */
-  .ocean-page-backdrop_has-life .ocean-page-backdrop__refract { filter: none; }
 }
 </style>
