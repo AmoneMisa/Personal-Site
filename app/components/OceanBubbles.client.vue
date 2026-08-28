@@ -49,9 +49,9 @@ let probes: BubbleProbe[] = [];
 const random = (min: number, max: number) => min + Math.random() * (max - min);
 
 function bubbleCount() {
-  if (width < 640) return 18;
-  if (width < 1024) return 28;
-  return 42;
+  if (width < 640) return 12;
+  if (width < 1024) return 18;
+  return 24;
 }
 
 function makeBubble(anywhere = false): Bubble {
