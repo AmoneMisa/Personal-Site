@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { safeFetch } from "~/utils/safeFetch";
+import { capitalizeFirst } from "~/utils/text";
 import JobCard from "~/components/jobs/JobCard.vue";
 import SearchResultGrid from "~/components/search/SearchResultGrid.vue";
 import SearchDetailsModal from "~/components/search/SearchDetailsModal.vue";
@@ -834,7 +835,7 @@ onBeforeUnmount(() => {
             </span>
           </div>
           <UiSpecTable :rows="vacRows" :hide-empty-label="t('hideEmpty')" :empty-value="t('notSpecified')" />
-          <p v-if="activeJob.description" class="job-modal__desc">{{ activeJob.description }}</p>
+          <p v-if="activeJob.description" class="job-modal__desc">{{ capitalizeFirst(activeJob.description) }}</p>
           <p v-else class="text-muted">{{ t("noDescription") }}</p>
           <div v-if="activeJob.skills?.length || activeJob.niceToHave?.length" class="job-modal__tags">
             <span v-for="s in activeJob.skills" :key="s" class="job-modal__tag job-modal__tag_skill">{{ s }}</span>

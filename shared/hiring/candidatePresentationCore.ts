@@ -13,47 +13,12 @@ export type HiringCandidateLocale = 'en' | 'ru'
 const REMOTE_GENERIC_RE = /(?:онлайн|online|onlayn|удал[её]н|remote|masofaviy)/iu
 const HORECA_GENERIC_RE = /(?:ищу|нужна|нужен|работа|ишу)?[^\n]{0,40}(?:кафе|кафетер|ресторан|общепит|horeca)(?:[^\n]{0,40}(?:работ|подработ))?/iu
 
-const ROLE_ALIAS_RULES: RoleAliasRule[] = [
-  { keys: ['Commercial Director'], re: /^коммерческ\p{L}*\s+директор|\bchief\s+commercial\s+officer\b|\bCCO\b/iu },
-  { keys: ['Bank Operations Specialist'], re: /^(?:стаж[её]р\s+)?операционист$/iu },
-  { keys: ['Driver'], re: /^(?:xaydovchilik|haydovchilik|shafyo['’ʻʼ‘`]?rlik|shofyo['’ʻʼ‘`]?rlik)$/iu },
-  { keys: ['Retail Worker'], re: /^do['’ʻʼ‘`]?kon$/iu },
-  { keys: ['Salesperson'], re: /^(?:savdo|sotuvchi)$/iu },
-  { keys: ['Logistics Specialist'], re: /^logistika(?:\s+updater)?$/iu },
-  { keys: ['Pharmacist'], re: /^(?:dorishunos|farmatsevt|farmatsevt)$/iu },
-  { keys: ['Lawyer', 'Teacher'], re: /huquqshunos[^\n,;]*(?:,|\/|\s)+(?:pedagog|o['’ʻʼ‘`]?qituvchi)|pedagog[^\n,;]*(?:,|\/|\s)+huquqshunos/iu },
-  { keys: ['Lawyer'], re: /^(?:yurisprudensiya\s+)?huquq(?:shunos)?[^\n]*|^yur(?:isprudensiya|ist)[^\n]*$/iu },
-  { keys: ['Teacher'], re: /^(?:matematika\s+)?o['’ʻʼ‘`]?qituvchi(?:lik)?$/iu },
-  { keys: ['Insurance Specialist'], re: /sug['’ʻʼ‘`]?urta/iu },
-  { keys: ['Finance / Banking Specialist'], re: /^kredit\s+bo['’ʻʼ‘`]?yicha\s+mutaxa(?:s|ss)is$/iu },
-  { keys: ['Welder'], re: /^(?:svarchik|svarshik)$/iu },
-  { keys: ['Confectioner'], re: /qandolat|qandolatchi/iu },
-  { keys: ['Factory Worker'], re: /^(?:jizzax\s+)?kia\s+zavodidan\s+ish\s+kerak$|^zavod\s+ishlari(?:\s+.*)?$/iu },
-  { keys: ['HVAC Technician'], re: /^(?:konditsaner|kanditsaner|konditsioner)(?:\s+.*)?$/iu },
-  { keys: ['Notary Assistant'], re: /^(?:natarus|notarius)\s+yordamchisi(?:\s+.*)?$/iu },
-  { keys: ['Mobile Content Creator'], re: /^mobilografiya(?:\s+bo['’ʻʼ‘`]?yicha)?$/iu },
-  { keys: ['IT Specialist'], re: /^(?:kompyuter\s+(?:sohasida|xizmatlari\s+bo['’ʻʼ‘`]?yicha\s+ish\s+kerak)|it\s+kompyuter)$/iu },
-  { keys: ['CCTV / Intercom Technician'], re: /kamera\s+(?:dama?fon|domofon)|domofon\s+xizmat/iu },
-  { keys: ['Internal Control Specialist'], re: /^(?:ichki\s+nazoratchi|внутренний\s+аудит)$/iu },
-  { keys: ['Brand Ambassador'], re: /^(?:бренд\s+фейс|brand\s+face)$/iu },
-  { keys: ['Security Specialist'], re: /^по\s+безопасност\p{L}*\s+объекта$/iu },
-  { keys: ['Restaurant Manager'], re: /^(?:restoran|restaurant)[^\n]*(?:boshqaruv|manager|menejer)/iu },
-  { keys: ['ERP Administrator', 'Analyst'], re: /^erp\s+administrator\p{L}*\s*(?:&|,|\/|va)\s*data\s+tahlilchi$/iu },
-  { keys: ['Administrator'], re: /^virtual\s+asistent$/iu },
-  { keys: ['Engineer'], re: /^(?:texnolog|technolog)\s+(?:injener|инженер)|^(?:injener|инженер)\s+(?:texnolog|technolog)/iu },
-  { keys: ['Electrician'], re: /^elektrik$/iu },
-  { keys: ['Construction Worker'], re: /^(?:yo['’ʻʼ‘`]?l|йул|йўл)\s+qurilish|^(?:yo['’ʻʼ‘`]?l|йул|йўл)\s+курилиш/iu },
-  { keys: ['Barista'], re: /^(?:koffe|coffee)\s+ledy$/iu },
-  { keys: ['Translator', 'Operator'], re: /tarjimon\p{L}*[^\n]*(?:operator|data\s+otish)|operator\p{L}*[^\n]*tarjimon/iu },
-  { keys: ['Librarian'], re: /^kutubxonachi$/iu },
-  { keys: ['Singer / Vocalist'], re: /^(?:vokal\s*:\s*)?xonanda$/iu },
-  { keys: ['Model'], re: /^model$/iu },
-  { keys: ['Flight Attendant'], re: /^(?:бортпроводник|bortprovodnik)$/iu },
-  { keys: ['Healthcare Specialist'], re: /^(?:mededsina|meditsina|медицина)$/iu },
-  { keys: ['Tourism / Hospitality Specialist'], re: /^mehmonxona[^\n]*turfirma|^turfirma[^\n]*mehmonxona/iu },
-  { keys: ['Chief Accountant'], re: /^bosh\s+b(?:u(?:x|h)?|o)?galter$/iu },
-  { keys: ['Accountant'], re: /word[^\n]*excel[^\n]*hisob\s+kitob|^помо(?:ш|щ)ник\s+бухгалт/iu },
-]
+function capitalizeFirst(value: string): string {
+  const match = value.match(/\p{L}/u)
+  if (!match || match.index == null) return value
+  const index = match.index
+  return value.slice(0, index) + value.charAt(index).toLocaleUpperCase() + value.slice(index + 1)
+}
 
 function smartNameCase(value: string): string {
   const trimmed = value.trim().replace(/\s{2,}/g, ' ')
@@ -84,7 +49,7 @@ function normalizeRoleKeys(value: string): { keys: string[]; normalized: boolean
   if (/\bish\s+(?:kere|kerak)\b/iu.test(raw) && !/\b(?:dasturchi|menejer|buxgalter|haydovchi|o['’ʻʼ‘`]?qituvchi|operator|kassir|sotuvchi|mehmonxona|turfirma|kompyuter)\b/iu.test(raw)) {
     return { keys: ['Any Role'], normalized: true }
   }
-  return { keys: [raw], normalized: false }
+  return { keys: [capitalizeFirst(raw)], normalized: false }
 }
 
 export function publicCandidateProfessionKeys(profile: CvProfile): string[] {
@@ -97,7 +62,7 @@ export function publicCandidateProfessionKeys(profile: CvProfile): string[] {
 
   const text = profile.originalText || profile.description || ''
   if (HORECA_GENERIC_RE.test(text)) return ['Restaurant / Cafe Worker']
-  if (REMOTE_GENERIC_RE.test(text) || GENERIC_ROLE_RE.test(profile.role || '')) return ['Any Role']
+  if (REMOTE_GENERIC_RE.test(text)) return ['Any Role']
   return []
 }
 

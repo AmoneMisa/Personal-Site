@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { scoreColor } from "~/utils/atsScore";
+import { capitalizeFirst } from "~/utils/text";
 import type { Job, JobAtsResult } from "~/types/jobs";
 import { formatRelativeDate } from "~/utils/search/relativeDate";
 import { compactSalaryText } from "~/utils/search/money";
@@ -134,7 +135,7 @@ function openCard() { emit("open", props.job); }
         {{ languageLabel(language.language) }}<template v-if="language.level"> ({{ language.level }})</template>
       </span>
     </div>
-    <p v-if="job.description" class="job-card__desc text-muted">{{ job.description }}</p>
+    <p v-if="job.description" class="job-card__desc text-muted">{{ capitalizeFirst(job.description) }}</p>
 
     <div class="job-card__footer">
       <template v-if="ats">

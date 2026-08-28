@@ -4,6 +4,7 @@
 // this component only presents normalized listing fields.
 import { computed, ref } from "vue";
 import { localizeJobLanguageList } from "~/utils/jobs/languageLabel";
+import { capitalizeFirst } from "~/utils/text";
 
 export interface SpecRow {
   label: string;
@@ -99,6 +100,26 @@ const flatFieldByLabel = computed(() => new Map<string, string>([
   [t("flats.specNearby"), "nearby"],
 ]));
 
+// Free-text "meaning" values (as opposed to numbers-with-units, booleans or
+// already-translated enum labels) get their first letter capitalized for
+// display, since the underlying source text is sometimes all-lowercase.
+// Matched by translated label so it works across locales, following the
+// same pattern as flatFieldByLabel above.
+const freeTextLabels = computed(() => new Set([
+  t("flats.specAddress"),
+  t("flats.specKvartal"),
+  t("flats.specComplex"),
+  t("hiring.specEducation"),
+  t("hiring.specContactHours"),
+  t("jobs.vCompany"),
+  t("jobs.vLocation"),
+  t("jobs.vCity"),
+  t("jobs.vSchedule"),
+  t("jobs.vContractType"),
+  t("jobs.vEducation"),
+  t("jobs.vApplicationLanguage"),
+]));
+
 const visionAmenityFields = new Set([
   "closedYard",
   "kitchen",
@@ -134,8 +155,12 @@ function displayLabel(row: SpecRow): string {
   return row.label;
 }
 
+function withFreeTextCase(row: SpecRow, value: string): string {
+  return freeTextLabels.value.has(row.label) ? capitalizeFirst(value) : value;
+}
+
 function displayValue(row: SpecRow): string {
-  if (!isJobs.value) return row.value;
+  if (!isJobs.value) return withFreeTextCase(row, row.value);
 
   if (row.label === t("jobs.vLanguages") || row.label === t("jobs.vApplicationLanguage")) {
     return localizeJobLanguageList(row.value, (key) => t(`jobs.${key}`));
@@ -160,7 +185,8 @@ function displayValue(row: SpecRow): string {
     [/\bPrototyping\b/gi, t("jobs.skillPrototyping")],
   ];
 
-  return replacements.reduce((value, [pattern, replacement]) => value.replace(pattern, replacement), row.value);
+  const localized = replacements.reduce((value, [pattern, replacement]) => value.replace(pattern, replacement), row.value);
+  return withFreeTextCase(row, localized);
 }
 
 const contextualRows = computed<SpecRow[]>(() => {

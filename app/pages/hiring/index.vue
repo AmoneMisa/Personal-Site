@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { safeFetch } from "~/utils/safeFetch";
 import { locationLabel } from "~/utils/locationLabels";
+import { capitalizeFirst } from "~/utils/text";
 import CandidateCard from "~/components/hiring/CandidateCard.vue";
 import SearchResultGrid from "~/components/search/SearchResultGrid.vue";
 import SearchDetailsModal from "~/components/search/SearchDetailsModal.vue";
@@ -707,7 +708,7 @@ onBeforeUnmount(() => {
           <UiSpecTable :rows="specRows" :hide-empty-label="t('hideEmpty')" :empty-value="t('notSpecified')" />
           <details v-if="active.description" class="hiring-modal__descbox" open>
             <summary>{{ t("cvBody") }}</summary>
-            <p class="hiring-modal__desc">{{ active.description }}</p>
+            <p class="hiring-modal__desc">{{ capitalizeFirst(active.description) }}</p>
           </details>
           <div v-if="active.tags?.length" class="hiring-modal__tags">
             <span v-for="tag in active.tags" :key="tag" class="hiring-modal__tag">{{ tag }}</span>
