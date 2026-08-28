@@ -7,7 +7,7 @@ interface FlatMetaOptions {
   countries: Ref<string[]>;
   city: Ref<string>;
   t: (key: string) => string;
-  locationLabel: (value: string, kind: "city" | "district" | "metro") => string;
+  locationLabel: (value: string, kind: "country" | "city" | "district" | "metro") => string;
   preferredCountry: () => string;
 }
 
@@ -37,7 +37,10 @@ export function useFlatMeta(options: FlatMetaOptions) {
     }
     return [...values].sort();
   });
-  const countryItems = computed<SelectOption[]>(() => meta.value.map((country) => ({ value: country.code, label: country.name })));
+  const countryItems = computed<SelectOption[]>(() => meta.value.map((country) => ({
+    value: country.code,
+    label: options.locationLabel(country.code, "country"),
+  })));
   const cityItems = computed<SelectOption[]>(() => [
     { label: options.t("cityAny"), value: "__any__" },
     ...cityOptions.value.map((city) => ({ label: options.locationLabel(city, "city"), value: city })),
