@@ -1,5 +1,7 @@
 import { extractCandidateContacts } from '@whiteslove/parsing-lexicon/hiring-candidate-fields'
+import { detectCandidateRemotePreference } from '@whiteslove/parsing-lexicon/hiring-semantics'
 import { recordWebDiagnostic, type WebSourceDiagnostic } from '../../utils/hiringDiagnostics'
+import { SHARED_CANDIDATE_INTENT_RE, SHARED_EMPLOYER_INTENT_RE } from '../../utils/hiringLexicon'
 import { normalizeCandidate } from '../../utils/hiringNormalize'
 import type { CvProfile } from '../../utils/hiringTypes'
 import { detectCity } from '../domain/telegramCandidateParser'
@@ -51,9 +53,6 @@ const TARGETS: LinkedInTarget[] = [
   { key: 'linkedin-ro-bucharest-job-search', label: 'LinkedIn: caut loc de muncă București', country: 'RO', city: 'Bucharest', query: '"caut loc de muncă" București', scope: 'both' },
 ]
 
-const CANDIDATE_INTENT_RE = /(?:\bopen\s+to\s+work\b|\blooking\s+for\s+(?:a\s+)?(?:new\s+)?(?:job|role|work|opportunit(?:y|ies))\b|\bseeking\s+(?:a\s+)?(?:new\s+)?(?:job|role|work|opportunit(?:y|ies))\b|\bavailable\s+for\s+(?:new\s+)?opportunit(?:y|ies)\b|(?:^|\W)(?:ищу|шукаю)\s+(?:себе\s+)?(?:работу|подработку|роботу|підробіток)(?:\W|$)|(?:^|\W)(?:ish\s+(?:qidiryapman|qidiraman|izlayapman)|ish(?:\s+joyi)?\s+kerak)(?:\W|$)|(?:^|\W)(?:caut\s+(?:un\s+)?loc\s+de\s+munc[ăa]|(?:îmi|imi)\s+caut\s+(?:un\s+)?(?:job|loc\s+de\s+munc[ăa]))(?:\W|$))/iu
-const VACANCY_INTENT_RE = /(?:\bwe(?:'re|\s+are)\s+hiring\b|\bnow\s+hiring\b|\bjob\s+opening\b|\bhiring\s+for\b|(?:^|\W)(?:ваканси(?:я|и|ю|й)|вакансія|ищем\s+(?:сотруд|разработ|специал)|шукаємо\s+(?:співробіт|розроб|фахів)|требуется\s+(?:сотруд|специал)|потрібен\s+(?:співробіт|фахів))(?:\W|$))/iu
-
 function configuredTargets(): LinkedInTarget[] {
   if (String(process.env.HIRING_LINKEDIN_SOURCE || 'on').toLowerCase() === 'off') return []
   const selected = String(process.env.HIRING_LINKEDIN_SOURCES || '').trim()
@@ -88,7 +87,7 @@ function itemToProfile(item: LinkedInItem, target: LinkedInTarget, checkedAt: st
   const text = String(item.text || item.title || '').replace(/\s+/g, ' ').trim()
   const url = String(item.url || '').trim()
   if (!text || !url || !/^https?:\/\/(?:www\.)?linkedin\.com\/(?:in|posts)\//i.test(url)) return null
-  if (!CANDIDATE_INTENT_RE.test(text) || VACANCY_INTENT_RE.test(text)) return null
+  if (!SHARED_CANDIDATE_INTENT_RE.test(text) || SHARED_EMPLOYER_INTENT_RE.test(text)) return null
 
   const publicContacts = contacts(text, target.country)
   const direct = publicContacts.telegram || publicContacts.email || publicContacts.phone || null
@@ -101,7 +100,7 @@ function itemToProfile(item: LinkedInItem, target: LinkedInTarget, checkedAt: st
     sourceLabel: target.label, sourceCountry: target.country, country: target.country,
     name: author && author.length <= 100 ? author : '', role, professions: role ? [role] : [],
     city: detectCity(text, target.country) || target.city || null, isAdult: true,
-    remote: /\bremote\b|\bwfh\b|work\s+from\s+home|удал[её]н|віддален|дистанц|masofaviy|de\s+acas[ăa]/iu.test(text) ? true : null,
+    remote: detectCandidateRemotePreference(text),
     url, publishedAt: null, updatedAt: checkedAt, activityAt: checkedAt, createdAt: checkedAt,
     originalText: text.slice(0, 4_000), description: text.slice(0, 4_000), photos: [], photo: null,
     contacts: publicContacts, contact: direct || url, contactType: direct ? 'direct' : 'platform',

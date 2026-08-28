@@ -1,4 +1,5 @@
 import { detectUsLocation } from '@whiteslove/parsing-lexicon/hiring-source-semantics'
+import { detectWorkModes } from '@whiteslove/parsing-lexicon/hiring-work-semantics'
 import type { Job } from './jobTypes'
 
 const REPO = 'NotifyYouInc/2026-H1B-Sponsor-Jobs'
@@ -93,7 +94,7 @@ function parseJob(markdown: string, filename: string): Job | null {
     url: applyUrl,
     applyUrl,
     source: 'companies',
-    remote: /remote|work from home|wfh/i.test(`${title} ${location}`),
+    remote: detectWorkModes(`${title} ${location}`).includes('remote'),
     tags: ['H1B Sponsor Feed', 'H1B sponsor history', 'USA', category].filter(Boolean) as string[],
     postedAt: postedAt(field(markdown, 'Posted')),
     description: evidence,

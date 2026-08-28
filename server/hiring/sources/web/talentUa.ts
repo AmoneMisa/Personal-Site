@@ -1,3 +1,4 @@
+import { detectCandidateRelocationPreference } from '@whiteslove/parsing-lexicon/hiring-semantics'
 import type { CvProfile } from '../../../../shared/contracts/hiring'
 import { activityDate, cityFrom, dayMonthDate, htmlText, isRecent } from '../../../../shared/hiring/webFields'
 import { buildWebProfile, type CandidateBlock, type WebCvAdapter } from './common'
@@ -36,7 +37,7 @@ function parseTalent(sourceBlock: CandidateBlock, source: WebCvAdapter): CvProfi
     city: cityFrom(cityText, 'UA') || cityText || null,
     ...(skills.length ? { skills } : {}),
     updatedAt: activity,
-    relocationReady: /возможен переезд|можливий переїзд/iu.test(block.text),
+    relocationReady: detectCandidateRelocationPreference(block.text),
   })
 }
 

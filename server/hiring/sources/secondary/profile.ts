@@ -1,17 +1,12 @@
-import { extractCandidateContacts } from '@whiteslove/parsing-lexicon/hiring-candidate-fields'
+import { extractCandidateContacts, extractCandidateExperienceYears } from '@whiteslove/parsing-lexicon/hiring-candidate-fields'
+import { detectCandidateRelocationPreference, detectCandidateRemotePreference } from '@whiteslove/parsing-lexicon/hiring-semantics'
 import { parseHiringSourceSalary } from '@whiteslove/parsing-lexicon/hiring-source-semantics'
+import { detectEmploymentTypes } from '@whiteslove/parsing-lexicon/hiring-work-semantics'
 import type { CvProfile } from '../../../../shared/contracts/hiring'
 import { cityFrom, parseAge } from '../../../../shared/hiring/webFields'
 import { normalizeCandidate } from '../../../utils/hiringNormalize'
 
 export type SecondarySourceKey = 'novarobota-ua' | 'layboard-kz' | 'amountwork-ro'
-
-function parseExperience(text: string): number | null {
-  if (/без опыта|без досвіду|no experience|fără experiență/iu.test(text)) return 0
-  const match = text.match(/(?:опыт(?: работы)?|досвід(?: роботи)?|experience|experiență)[^\d]{0,40}(\d+(?:[.,]\d+)?)\s*(?:лет|год(?:а)?|рок(?:и|ів)?|years?|ani)/iu)
-    || text.match(/\b(\d+(?:[.,]\d+)?)\s*(?:лет|год(?:а)?|рок(?:и|ів)?|years?|ani)\b[^\n]{0,40}(?:опыт|досвід|experience|experiență)/iu)
-  return match ? Number(match[1]!.replace(',', '.')) : null
-}
 
 function parseSalary(text: string, fallback: string): Pick<CvProfile, 'salaryMin' | 'salaryMax' | 'currency'> {
   const parsed = parseHiringSourceSalary(text)
@@ -69,14 +64,11 @@ export function buildSecondaryProfile(input: {
     professions: [input.role],
     age,
     isAdult: age == null ? true : age >= 18,
-    experienceYears: parseExperience(input.text),
+    experienceYears: extractCandidateExperienceYears(input.text),
     city: input.city ?? cityFrom(input.text, input.country),
-    remote: /удал[её]н|віддален|remote|online|онлайн|la distanță/iu.test(input.text) ? true : null,
-    relocationReady: /возможен переезд|готов\p{L}* к переезду|можливий переїзд|relocat/iu.test(input.text) ? true : null,
-    employmentTypes: [
-      ...(/полная занятость|повна зайнятість|full[- ]?time|permanent/iu.test(input.text) ? ['full_time' as const] : []),
-      ...(/неполная занятость|неповна зайнятість|part[- ]?time|подработка|підробіток/iu.test(input.text) ? ['part_time' as const] : []),
-    ],
+    remote: detectCandidateRemotePreference(input.text),
+    relocationReady: detectCandidateRelocationPreference(input.text),
+    employmentTypes: [...detectEmploymentTypes(input.text)],
     publishedAt: input.activity,
     updatedAt: input.activity,
     activityAt: input.activity,

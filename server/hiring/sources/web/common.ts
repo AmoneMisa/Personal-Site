@@ -1,3 +1,4 @@
+import { detectCandidateRelocationPreference, detectCandidateRemotePreference } from '@whiteslove/parsing-lexicon/hiring-semantics'
 import type { CvProfile } from '../../../../shared/contracts/hiring'
 import {
   absoluteUrl,
@@ -113,8 +114,8 @@ export function buildWebProfile(
     city: partial.city ?? cityFrom(block.text, source.country),
     experienceYears: partial.experienceYears ?? parseExperience(block.text),
     employmentTypes: partial.employmentTypes ?? employment(block.text),
-    remote: partial.remote ?? /удал[её]н|remote|masofadan|la distanță/iu.test(block.text),
-    relocationReady: partial.relocationReady ?? /возможен переезд|готов\p{L}* к переезду|ko['’]?chib o['’]?tish|relocat/iu.test(block.text),
+    remote: partial.remote ?? detectCandidateRemotePreference(block.text),
+    relocationReady: partial.relocationReady ?? detectCandidateRelocationPreference(block.text),
     ...parseSalary(block.text, source.country),
     ...partial,
   })

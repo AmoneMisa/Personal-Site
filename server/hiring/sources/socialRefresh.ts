@@ -3,6 +3,7 @@ import { normalizeCandidate, trimThreadsProfileText } from '../../utils/hiringNo
 import { detectCity, isLikelyCvPost } from '../domain/telegramCandidateParser'
 import type { CvProfile } from '../../utils/hiringTypes'
 import { extractCandidateContacts } from '@whiteslove/parsing-lexicon/hiring-candidate-fields'
+import { detectCandidateRemotePreference } from '@whiteslove/parsing-lexicon/hiring-semantics'
 import { persistWebProfiles } from '../webProfilePersistence'
 
 const REQUEST_TIMEOUT_MS = 180_000
@@ -126,7 +127,7 @@ function itemToProfile(item: SocialItem, target: SocialTarget): CvProfile | null
     sourceLabel: target.label, sourceCountry: target.country, country: target.country,
     name: nameFrom(item, text), role, professions: role ? [role] : [],
     city: detectCity(text, target.country) || target.city || null, isAdult: true,
-    remote: /remote|удал[её]н|віддален|дистанц|masofaviy|онлайн|online|la\s+distan(?:ță|ta)|de\s+acas[ăa]/iu.test(text) ? true : null,
+    remote: detectCandidateRemotePreference(text),
     url: item.url, publishedAt: createdAt, updatedAt: createdAt, activityAt: createdAt, createdAt,
     originalText: text.slice(0, 4_000), description: text.slice(0, 4_000),
     photos: Array.isArray(item.images) ? item.images.slice(0, 8) : [], photo: Array.isArray(item.images) ? item.images[0] || null : null,
