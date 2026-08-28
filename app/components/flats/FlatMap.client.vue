@@ -1,6 +1,19 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import type { FlatMapFeedResult, FlatMapPoint } from "~/types/flats";
+import type * as LeafletNS from "leaflet";
+
+// Bundled from npm (same-origin, cached, no third-party round trip) but imported
+// dynamically: Leaflet touches `window` at module-evaluation time, and this file's
+// top-level statements still run through Nuxt's SSR module graph even though the
+// component itself is client-only, so a static import here would 500 on the server.
+let Leaflet: typeof LeafletNS | null = null;
+async function loadLeaflet(): Promise<typeof LeafletNS> {
+  if (Leaflet) return Leaflet;
+  const [mod] = await Promise.all([import("leaflet"), import("leaflet/dist/leaflet.css")]);
+  Leaflet = mod.default ?? (mod as unknown as typeof LeafletNS);
+  return Leaflet;
+}
 
 interface FlatPoint {
   id: string;
@@ -21,6 +34,19 @@ interface MapFocusDetail {
   lng: number;
 }
 
+interface FlatMapZone {
+  id: string;
+  name: string;
+  label: string;
+  lat: number;
+  lng: number;
+  radiusM: number;
+  color: string;
+  boundary?: { type: "Polygon" | "MultiPolygon"; coordinates: unknown };
+}
+
+type ZoneKind = "district" | "microdistrict" | "quartal" | "area";
+
 const props = defineProps<{
   points: FlatPoint[];
   drawLabel?: string;
@@ -29,20 +55,30 @@ const props = defineProps<{
   drawHint?: string;
   expandLabel?: string;
   collapseLabel?: string;
+  districtZones?: FlatMapZone[];
+  microdistrictMarkers?: FlatMapZone[];
+  quartalMarkers?: FlatMapZone[];
+  areaZones?: FlatMapZone[];
+  districtsLabel?: string;
+  microdistrictsLabel?: string;
+  quartalsLabel?: string;
+  areasLabel?: string;
 }>();
 
 const emit = defineEmits<{
   (e: "select", id: string): void;
   (e: "area-change", points: Array<{ lat: number; lng: number }>): void;
+  (e: "zone-select", payload: { kind: ZoneKind; name: string }): void;
 }>();
 
 const route = useRoute();
 const router = useRouter();
-const LEAFLET_JS = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.js";
-const LEAFLET_CSS = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.css";
 const CLUSTER_PX = 38;
-const ZOOM_CLUSTER_THRESHOLD = 24;
-const SPREAD_PX = 50;
+// Any cluster with real geographic spread zooms in as far as the map allows before
+// falling back to the radial popout — only listings that are still coincident at
+// max zoom (same building) can't be separated by zooming and need the popout.
+const ZOOM_CLUSTER_THRESHOLD = 1;
+const CLUSTER_ZOOM_MAX = 19;
 const RADIAL_PAGE_SIZE = 9;
 const FOCUS_ZOOM = 18;
 const DETAIL_QUERY_KEYS = new Set(["flat", "flatSource", "flatCountry", "shared"]);
@@ -55,6 +91,10 @@ const radial = ref<{ x: number; y: number; items: FlatPoint[]; page: number } | 
 const expanded = ref(false);
 const remotePoints = ref<FlatPoint[]>([]);
 const focusedPoint = ref<MapFocusDetail | null>(null);
+const showDistricts = ref(true);
+const showMicrodistricts = ref(false);
+const showQuartals = ref(false);
+const showAreas = ref(true);
 let mapFeedSequence = 0;
 let lastMapFeedKey = "";
 
@@ -144,6 +184,10 @@ let map: any = null;
 let layer: any = null;
 let areaLayer: any = null;
 let focusLayer: any = null;
+let districtLayer: any = null;
+let microdistrictLayer: any = null;
+let quartalLayer: any = null;
+let zoneAreaLayer: any = null;
 let lastFitSig = "";
 
 async function setExpanded(value: boolean) {
@@ -186,32 +230,6 @@ function onKeydown(event: KeyboardEvent) {
   if (event.key === "Escape" && expanded.value) void setExpanded(false);
 }
 
-function loadLeaflet(): Promise<any> {
-  const w = window as any;
-  if (w.L) return Promise.resolve(w.L);
-  if (!document.querySelector(`link[href="${LEAFLET_CSS}"]`)) {
-    const link = document.createElement("link");
-    link.rel = "stylesheet";
-    link.href = LEAFLET_CSS;
-    document.head.appendChild(link);
-  }
-  return new Promise((resolve, reject) => {
-    const existing = document.querySelector(`script[src="${LEAFLET_JS}"]`) as HTMLScriptElement | null;
-    if (existing) {
-      existing.addEventListener("load", () => resolve((window as any).L));
-      existing.addEventListener("error", reject);
-      if ((window as any).L) resolve((window as any).L);
-      return;
-    }
-    const script = document.createElement("script");
-    script.src = LEAFLET_JS;
-    script.async = true;
-    script.onload = () => resolve((window as any).L);
-    script.onerror = reject;
-    document.head.appendChild(script);
-  });
-}
-
 interface Cluster { lat: number; lng: number; items: FlatPoint[] }
 
 function clusterPoints(): Cluster[] {
@@ -241,7 +259,7 @@ function clusterPoints(): Cluster[] {
 }
 
 function renderMarkers() {
-  const L = (window as any).L;
+  const L = Leaflet;
   if (!map || !layer || !L) return;
   layer.clearLayers();
   closeRadial();
@@ -262,7 +280,7 @@ function renderMarkers() {
 }
 
 function renderFocusedPoint() {
-  const L = (window as any).L;
+  const L = Leaflet;
   if (!focusLayer || !L) return;
   focusLayer.clearLayers();
   const point = focusedPoint.value;
@@ -305,18 +323,6 @@ function onMapFocus(event: Event) {
   if (detail) focusOnPoint(detail);
 }
 
-function clusterSpreadPx(c: Cluster) {
-  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-  for (const p of c.items) {
-    const pt = map.latLngToContainerPoint([p.lat, p.lng]);
-    minX = Math.min(minX, pt.x);
-    maxX = Math.max(maxX, pt.x);
-    minY = Math.min(minY, pt.y);
-    maxY = Math.max(maxY, pt.y);
-  }
-  return Math.hypot(maxX - minX, maxY - minY);
-}
-
 function radialRadius(count: number): number {
   const mobile = window.innerWidth <= 640;
   if (mobile) return count <= 4 ? 72 : 94;
@@ -347,14 +353,19 @@ function openPoint(point: FlatPoint) {
 }
 
 function openCluster(c: Cluster) {
-  const L = (window as any).L;
+  const L = Leaflet;
   if (c.items.length === 1) {
     openPoint(c.items[0]);
     return;
   }
-  if (c.items.length > ZOOM_CLUSTER_THRESHOLD && clusterSpreadPx(c) > SPREAD_PX) {
-    const bounds = c.items.map((p) => [p.lat, p.lng]) as [number, number][];
-    map.fitBounds(L.latLngBounds(bounds), { padding: [40, 40], maxZoom: 17 });
+  // A formed cluster's on-screen spread is small by construction (that's why the
+  // points merged), so checking pixel spread mostly missed genuinely distinct
+  // addresses. Checking the real lat/lng bounds instead: if the points aren't all
+  // literally the same coordinate, zooming in will keep separating them further.
+  const bounds = L.latLngBounds(c.items.map((p) => [p.lat, p.lng]) as [number, number][]);
+  const hasRealSpread = !bounds.getNorthEast().equals(bounds.getSouthWest());
+  if (c.items.length > ZOOM_CLUSTER_THRESHOLD && hasRealSpread && map.getZoom() < CLUSTER_ZOOM_MAX) {
+    map.fitBounds(bounds, { padding: [40, 40], maxZoom: CLUSTER_ZOOM_MAX });
     return;
   }
   const pt = map.latLngToContainerPoint([c.lat, c.lng]);
@@ -398,7 +409,7 @@ function fitToPoints() {
 }
 
 function renderArea() {
-  const L = (window as any).L;
+  const L = Leaflet;
   if (!areaLayer || !L) return;
   areaLayer.clearLayers();
   if (area.value.length >= 2) {
@@ -412,6 +423,89 @@ function renderArea() {
   for (const point of area.value) {
     L.circleMarker([point.lat, point.lng], { radius: 5, color: "#fff", weight: 2, fillColor: "#e0679a", fillOpacity: 1 }).addTo(areaLayer);
   }
+}
+
+function emitZoneSelect(kind: ZoneKind, name: string) {
+  closeRadial();
+  emit("zone-select", { kind, name });
+}
+
+// Renders a zone as its real boundary polygon when the catalog provides one, falling
+// back to an approximated circle (sized upstream to avoid overlap) when it doesn't.
+function renderZoneShape(layerGroup: any, zone: FlatMapZone, kind: ZoneKind, style: Record<string, unknown>) {
+  const L = Leaflet;
+  const onClick = (event: any) => { L.DomEvent.stopPropagation(event); emitZoneSelect(kind, zone.name); };
+  if (zone.boundary) {
+    const shape = L.geoJSON(zone.boundary as any, { style: () => style }).addTo(layerGroup);
+    shape.on("click", onClick);
+    shape.bindTooltip(zone.label, { direction: "top" });
+    return shape;
+  }
+  const circle = L.circle([zone.lat, zone.lng], { radius: zone.radiusM, ...style }).addTo(layerGroup);
+  circle.on("click", onClick);
+  return circle;
+}
+
+function renderDistrictZones() {
+  const L = Leaflet;
+  if (!districtLayer || !L) return;
+  districtLayer.clearLayers();
+  if (!showDistricts.value) return;
+  for (const zone of props.districtZones || []) {
+    renderZoneShape(districtLayer, zone, "district", { color: zone.color, weight: 2, fillColor: zone.color, fillOpacity: 0.22 });
+    const label = L.divIcon({
+      className: "flat-zone-label-wrap",
+      html: `<span class="flat-zone-label" style="border-color:${zone.color}">${zone.label}</span>`,
+      iconSize: [0, 0],
+    });
+    L.marker([zone.lat, zone.lng], { icon: label, interactive: false }).addTo(districtLayer);
+  }
+}
+
+function renderZoneMarkers(layerGroup: any, zones: FlatMapZone[], kind: ZoneKind, shape: "circle" | "square") {
+  const L = Leaflet;
+  if (!layerGroup || !L) return;
+  layerGroup.clearLayers();
+  for (const zone of zones) {
+    const icon = L.divIcon({
+      className: "flat-zone-marker-wrap",
+      html: `<span class="flat-zone-marker flat-zone-marker_${shape}" style="background:${zone.color}" title="${zone.label}"></span>`,
+      iconSize: [14, 14],
+      iconAnchor: [7, 7],
+    });
+    const marker = L.marker([zone.lat, zone.lng], { icon });
+    marker.bindTooltip(zone.label, { direction: "top", offset: [0, -8] });
+    marker.on("click", () => emitZoneSelect(kind, zone.name));
+    marker.addTo(layerGroup);
+  }
+}
+
+function renderMicrodistricts() {
+  if (showMicrodistricts.value) renderZoneMarkers(microdistrictLayer, props.microdistrictMarkers || [], "microdistrict", "circle");
+  else microdistrictLayer?.clearLayers();
+}
+
+function renderQuartals() {
+  if (showQuartals.value) renderZoneMarkers(quartalLayer, props.quartalMarkers || [], "quartal", "square");
+  else quartalLayer?.clearLayers();
+}
+
+function renderAreaZones() {
+  const L = Leaflet;
+  if (!zoneAreaLayer || !L) return;
+  zoneAreaLayer.clearLayers();
+  if (!showAreas.value) return;
+  for (const zone of props.areaZones || []) {
+    const shape = renderZoneShape(zoneAreaLayer, zone, "area", { color: zone.color, weight: 2, dashArray: "6 5", fillColor: zone.color, fillOpacity: 0.14 });
+    if (!zone.boundary) shape.bindTooltip(zone.label, { direction: "top" });
+  }
+}
+
+function renderAllZoneLayers() {
+  renderDistrictZones();
+  renderMicrodistricts();
+  renderQuartals();
+  renderAreaZones();
 }
 
 function toggleDrawing() {
@@ -430,7 +524,7 @@ onMounted(async () => {
   window.addEventListener("flat-map-focus", onMapFocus as EventListener);
   void loadFullMapFeed();
   if (!el.value) return;
-  let L: any;
+  let L: typeof LeafletNS;
   try {
     L = await loadLeaflet();
   } catch {
@@ -438,7 +532,12 @@ onMounted(async () => {
     return;
   }
   if (!el.value) return;
-  map = L.map(el.value, { scrollWheelZoom: false, zoomSnap: 0.5 }).setView([41.31, 69.24], 5);
+  try {
+    map = L.map(el.value, { scrollWheelZoom: false, zoomSnap: 0.5 }).setView([41.31, 69.24], 5);
+  } catch {
+    failed.value = true;
+    return;
+  }
   L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
     attribution: "&copy; OpenStreetMap contributors",
     maxNativeZoom: 19,
@@ -448,6 +547,10 @@ onMounted(async () => {
   layer = L.layerGroup().addTo(map);
   areaLayer = L.layerGroup().addTo(map);
   focusLayer = L.layerGroup().addTo(map);
+  districtLayer = L.layerGroup().addTo(map);
+  microdistrictLayer = L.layerGroup().addTo(map);
+  quartalLayer = L.layerGroup().addTo(map);
+  zoneAreaLayer = L.layerGroup().addTo(map);
   map.on("click", (event: any) => {
     if (!drawing.value) {
       closeRadial();
@@ -462,11 +565,14 @@ onMounted(async () => {
   map.on("zoomstart", closeRadial);
   renderMarkers();
   renderFocusedPoint();
+  renderAllZoneLayers();
   fitToPoints();
 });
 
 watch(renderedPoints, () => { renderMarkers(); fitToPoints(); }, { deep: true });
 watch(() => route.query, () => { void loadFullMapFeed(); }, { deep: true });
+watch(() => [props.districtZones, props.microdistrictMarkers, props.quartalMarkers, props.areaZones], renderAllZoneLayers, { deep: true });
+watch([showDistricts, showMicrodistricts, showQuartals, showAreas], renderAllZoneLayers);
 
 onBeforeUnmount(() => {
   mapFeedSequence += 1;
@@ -479,6 +585,10 @@ onBeforeUnmount(() => {
   layer = null;
   areaLayer = null;
   focusLayer = null;
+  districtLayer = null;
+  microdistrictLayer = null;
+  quartalLayer = null;
+  zoneAreaLayer = null;
 });
 </script>
 
@@ -504,6 +614,18 @@ onBeforeUnmount(() => {
         </button>
         <button v-if="area.length" type="button" class="flat-map__tool" @click="clearArea">
           × <span>{{ props.clearLabel || "Clear" }}</span>
+        </button>
+        <button v-if="districtZones?.length" type="button" class="flat-map__tool" :class="{ 'flat-map__tool_active': showDistricts }" @click="showDistricts = !showDistricts">
+          <span>{{ props.districtsLabel || "Districts" }}</span>
+        </button>
+        <button v-if="microdistrictMarkers?.length" type="button" class="flat-map__tool" :class="{ 'flat-map__tool_active': showMicrodistricts }" @click="showMicrodistricts = !showMicrodistricts">
+          <span>{{ props.microdistrictsLabel || "Microdistricts" }}</span>
+        </button>
+        <button v-if="quartalMarkers?.length" type="button" class="flat-map__tool" :class="{ 'flat-map__tool_active': showQuartals }" @click="showQuartals = !showQuartals">
+          <span>{{ props.quartalsLabel || "Quartals" }}</span>
+        </button>
+        <button v-if="areaZones?.length" type="button" class="flat-map__tool" :class="{ 'flat-map__tool_active': showAreas }" @click="showAreas = !showAreas">
+          <span>{{ props.areasLabel || "Areas" }}</span>
         </button>
       </div>
       <div v-if="drawing" class="flat-map__hint">{{ props.drawHint || "Click points on the map to outline an area." }}</div>
@@ -627,6 +749,20 @@ onBeforeUnmount(() => {
 .flat-radial__thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .flat-radial__thumb-empty { display: block; width: 60%; height: 60%; margin: 20% auto; object-fit: contain; opacity: 0.4; }
 .flat-radial__price { padding: 4px 6px; font-size: 12px; font-weight: 600; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+:deep(.flat-zone-label-wrap) { pointer-events: none; }
+:deep(.flat-zone-label) {
+  display: inline-block; transform: translate(-50%, -50%);
+  padding: 3px 8px; border: 1.5px solid; border-radius: 999px;
+  background: rgba(13,17,40,0.92); color: var(--text-primary, #fff);
+  font-size: 11px; font-weight: 700; white-space: nowrap; pointer-events: none;
+}
+:deep(.flat-zone-marker) {
+  display: block; width: 12px; height: 12px; border: 2px solid #fff;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.5); cursor: pointer;
+}
+:deep(.flat-zone-marker_circle) { border-radius: 50%; }
+:deep(.flat-zone-marker_square) { border-radius: 2px; }
 
 :deep(.leaflet-container) { background: var(--bg-panel); font-family: inherit; }
 :deep(.leaflet-popup-content) { font-size: 13px; }

@@ -27,6 +27,7 @@ import { useFlatRouteState } from "~/composables/flats/useFlatRouteState";
 import { useFlatTranslation } from "~/composables/flats/useFlatTranslation";
 import { useFlatPresentation } from "~/composables/flats/useFlatPresentation";
 import { useFlatMeta } from "~/composables/flats/useFlatMeta";
+import { useDistrictZones } from "~/composables/flats/useDistrictZones";
 import { useFlatAvailabilityCache } from "~/composables/flats/useFlatAvailabilityCache";
 import { useSavedCollections } from "~/composables/search/useSavedCollections";
 import { useInfiniteFeed } from "~/composables/search/useInfiniteFeed";
@@ -175,6 +176,22 @@ const {
   locationLabel: (value, kind) => locName(value, kind),
   preferredCountry: () => defaultCountry.value,
 });
+
+const { districtZones, microdistrictMarkers, quartalMarkers, areaZones } = useDistrictZones({
+  countries,
+  city,
+  districtOptions,
+  locale: () => String(locale.value),
+});
+
+function onZoneSelect({ kind, name }: { kind: "district" | "microdistrict" | "quartal" | "area"; name: string }) {
+  if (kind === "district") {
+    district.value = name;
+  } else {
+    query.value = name;
+  }
+  scheduleLoad();
+}
 
 const SOURCES = ["olx", "telegram"];
 const NEARBY_KINDS = [
@@ -818,7 +835,7 @@ onBeforeUnmount(() => { modalOpen.value = false; lightboxOpen.value = false; rel
       <UiSortSelect class="flats__sort" v-model="sort" :items="sortItems" :label="extraLabels.sort" @update:model-value="scheduleLoad(0)" />
     </div>
     <FlatsStatsPanel v-if="view === 'active' && statistics" :statistics="statistics" :display-currency="displayCurrency" :convert="convert" />
-<section v-if="listings.length" class="flats__map-wrap"><flat-map :points="mapPoints" :draw-label="t('drawArea')" :done-label="t('done')" :clear-label="t('clearArea')" :draw-hint="t('drawHint')" :expand-label="t('mapExpand')" :collapse-label="t('mapCollapse')" @select="openById" @area-change="drawnArea = $event" /></section>
+<section v-if="listings.length" class="flats__map-wrap"><flat-map :points="mapPoints" :draw-label="t('drawArea')" :done-label="t('done')" :clear-label="t('clearArea')" :draw-hint="t('drawHint')" :expand-label="t('mapExpand')" :collapse-label="t('mapCollapse')" :district-zones="districtZones" :microdistrict-markers="microdistrictMarkers" :quartal-markers="quartalMarkers" :area-zones="areaZones" :districts-label="t('districtsLayer')" :microdistricts-label="t('microdistrictsLayer')" :quartals-label="t('quartalsLayer')" :areas-label="t('areasLayer')" @select="openById" @area-change="drawnArea = $event" @zone-select="onZoneSelect" /></section>
 
     <SearchResultGrid>
       <FlatCard
