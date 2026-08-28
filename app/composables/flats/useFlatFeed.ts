@@ -3,6 +3,8 @@ import type { FlatFeedResult, FlatListing, FlatStatistics } from "~/types/flats"
 import { safeFetch } from "~/utils/safeFetch";
 import { useLatestRequest } from "~/composables/search/useLatestRequest";
 
+const FILTER_REQUEST_DEBOUNCE_MS = 180;
+
 export function useFlatFeed(options: { onAvailabilityChecked?: (keys: string[]) => void } = {}) {
   const listings = ref<FlatListing[]>([]);
   const total = ref(0);
@@ -19,6 +21,21 @@ export function useFlatFeed(options: { onAvailabilityChecked?: (keys: string[]) 
   let statisticsRequestId = 0;
   let warmTimer: ReturnType<typeof setTimeout> | undefined;
   let warmParams: Record<string, string> | null = null;
+  let filterDebounceTimer: ReturnType<typeof setTimeout> | undefined;
+  let filterDebounceResolve: ((run: boolean) => void) | undefined;
+
+  function debounceFilterRequest(): Promise<boolean> {
+    if (filterDebounceTimer) clearTimeout(filterDebounceTimer);
+    filterDebounceResolve?.(false);
+    return new Promise((resolve) => {
+      filterDebounceResolve = resolve;
+      filterDebounceTimer = setTimeout(() => {
+        filterDebounceTimer = undefined;
+        filterDebounceResolve = undefined;
+        resolve(true);
+      }, FILTER_REQUEST_DEBOUNCE_MS);
+    });
+  }
 
   async function setStatisticsWithoutViewportJump(value: FlatStatistics) {
     if (!import.meta.client) {
@@ -68,6 +85,8 @@ export function useFlatFeed(options: { onAvailabilityChecked?: (keys: string[]) 
   async function loadFeed(params: Record<string, string>, options: { append?: boolean; background?: boolean } = {}): Promise<FlatFeedResult | undefined> {
     const append = !!options.append;
     const background = !!options.background;
+    if (!append && !background && !(await debounceFilterRequest())) return undefined;
+
     const requestId = requests.next();
     const wantsStatistics = !append && params.includeStats === "1";
     const currentStatisticsRequestId = !append ? ++statisticsRequestId : statisticsRequestId;
@@ -135,6 +154,8 @@ export function useFlatFeed(options: { onAvailabilityChecked?: (keys: string[]) 
 
   onBeforeUnmount(() => {
     if (warmTimer) clearTimeout(warmTimer);
+    if (filterDebounceTimer) clearTimeout(filterDebounceTimer);
+    filterDebounceResolve?.(false);
     statisticsRequestId++;
     requests.cancelPending();
   });
