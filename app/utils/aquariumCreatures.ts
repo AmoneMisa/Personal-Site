@@ -39,7 +39,7 @@ export type SteeringProfile = {
   bubbleRadius: number;
 };
 
-export const MAX_VISIBLE_PETS = 4;
+export const MAX_VISIBLE_PETS = 3;
 
 export const aquariumCreatures: CreaturePreset[] = [
   { id: "shark", src: "/images/ocean-creatures/shark-clean-hq-animated.webp", kind: "shark", top: "18%", size: "clamp(196px, 18.6vw, 340px)", duration: "34s", delay: "-9s", direction: "rtl", opacity: 0.88 },

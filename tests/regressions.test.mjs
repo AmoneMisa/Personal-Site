@@ -364,7 +364,7 @@ test('underwater ambience uses the original cleaned mascots and visible bubbles'
   }
   assert.match(creatures, /inflatedExit/u)
   assert.match(creatures, /huntTargetId/u)
-  assert.match(creatures, /MAX_VISIBLE_PETS = 4/u)
+  assert.match(creatures, /MAX_VISIBLE_PETS = 3/u)
   assert.match(creatures, /state\.preset\.id === "shark" \|\| initialGuests\.includes/u)
   assert.match(creatures, /rotatePetSlot/u)
   assert.match(ambient, /<aquarium-pet-sprite/u)
