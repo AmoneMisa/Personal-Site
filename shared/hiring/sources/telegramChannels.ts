@@ -21,11 +21,13 @@ export interface HiringTelegramChannelDescriptor {
 export const HIRING_TELEGRAM_CHANNELS: readonly HiringTelegramChannelDescriptor[] = [
   { handle: 'ISH_QIDIR', label: 'Ish Qidir', country: 'UZ', location: 'Uzbekistan', tags: ['Resume', 'Mass market'], requireCandidateMarker: true, historyLimit: 3_000 },
   { handle: 'myrabota_uz', label: 'Работа в Ташкенте', country: 'UZ', location: 'Tashkent', tags: ['Resume', 'Mass market'], requireCandidateMarker: true, historyLimit: 2_000 },
+  { handle: 'ish_uz', label: 'Ish.uz', country: 'UZ', location: 'Tashkent', tags: ['Resume', 'Mass market', 'Tashkent'], requireCandidateMarker: true, historyLimit: 5_000, priority: 'high' },
   { handle: 'UzJobs', label: 'UzJobs', country: 'UZ', location: 'Uzbekistan', tags: ['Resume', 'Mass market'], requireCandidateMarker: true, historyLimit: 5_000 },
   { handle: 'uzb_vakansiya', label: 'UZB Vakansiya', country: 'UZ', location: 'Uzbekistan', tags: ['Resume', 'Mass market'], requireCandidateMarker: true, historyLimit: 3_000 },
   { handle: 'ishchi', label: 'ISHCHI', country: 'UZ', location: 'Uzbekistan', tags: ['Resume', 'Mass market'], requireCandidateMarker: true, historyLimit: 3_000 },
   { handle: 'freelancer_Uzbek', label: 'Freelancer Uz', country: 'UZ', location: 'Uzbekistan', tags: ['Resume', 'Freelance', 'Digital', 'Creative'], requireCandidateMarker: true, historyLimit: 5_000, priority: 'high' },
   { handle: 'Jobs_uz_vacancy', label: 'Jobs Uz', country: 'UZ', location: 'Uzbekistan', tags: ['Resume', 'Mass market', 'Digital'], requireCandidateMarker: true, historyLimit: 5_000, priority: 'high' },
+  { handle: 'hrangels', label: 'HR ANGELS', country: 'UZ', location: 'Tashkent', tags: ['Resume', 'HR', 'Operations', 'Tashkent'], requireCandidateMarker: true, historyLimit: 3_000, priority: 'high' },
   { handle: 'ishbor_olx_uz', label: 'OLX.UZ Ish', country: 'UZ', location: 'Uzbekistan', tags: ['Resume', 'Mass market'], requireCandidateMarker: true, historyLimit: 5_000, enabled: false },
   { handle: 'ISH_QAYERDA', label: 'Ish Qayerda', country: 'UZ', location: 'Uzbekistan', tags: ['Resume', 'Education'], requireCandidateMarker: true, historyLimit: 3_000 },
   { handle: 'UstozShogird', label: 'Ustoz Shogird', country: 'UZ', location: 'Uzbekistan', tags: ['Resume', 'IT', 'Student'], requireCandidateMarker: true, historyLimit: 3_000, priority: 'high' },
