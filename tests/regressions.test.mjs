@@ -390,7 +390,6 @@ test('underwater ambience uses the original cleaned mascots and visible bubbles'
   assert.match(ambient, /underwater-2d__trails/u)
   assert.match(ambient, /drawTrails/u)
   assert.match(ambient, /mix-blend-mode: screen/u)
-  assert.match(bubbles, /return 42/u)
   assert.match(bubbles, /opacity: 0\.92/u)
   assert.doesNotMatch(bubbles, /mix-blend-mode: screen/u)
   const backdrop = readFileSync(new URL('../app/components/OceanPageBackdrop.vue', import.meta.url), 'utf8')
@@ -402,11 +401,11 @@ test('underwater ambience uses the original cleaned mascots and visible bubbles'
   assert.match(backdrop, /props\.variant === "home"/u)
   assert.match(backdrop, /<ocean-bubbles v-if="hasUnderwaterLife"/u)
   assert.match(backdrop, /<underwater-ambient2d v-if="hasUnderwaterLife"/u)
-  // The scene keeps the lightweight refraction, without the removed duplicate
-  // current layer that used to drift across the entire backdrop.
-  assert.match(backdrop, /ocean-refraction/u)
-  assert.match(backdrop, /feTurbulence/u)
-  assert.match(backdrop, /feDisplacementMap/u)
+  // The refraction filter and the duplicate current layer were both removed
+  // for perf; neither should come back.
+  assert.doesNotMatch(backdrop, /ocean-refraction/u)
+  assert.doesNotMatch(backdrop, /feTurbulence/u)
+  assert.doesNotMatch(backdrop, /feDisplacementMap/u)
   assert.doesNotMatch(backdrop, /ocean-page-backdrop__stream/u)
   assert.match(backdrop, /<header-crab/u)
   assert.match(crab, /header-crab-animated\.webp/u)
