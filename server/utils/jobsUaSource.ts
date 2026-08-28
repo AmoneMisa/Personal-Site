@@ -1,3 +1,5 @@
+import { moneyCurrencyFromText } from '@whiteslove/parsing-lexicon/currency'
+import { detectEmploymentTypes, detectWorkModes, detectWorkSchedules } from '@whiteslove/parsing-lexicon/hiring-work-semantics'
 import type { Job } from './jobTypes'
 
 const BASE_URL = 'https://jobs.ua/vacancy'
@@ -57,10 +59,7 @@ function salaryFrom(value: string): Pick<Job, 'salaryMin' | 'salaryMax' | 'salar
     .filter((amount) => Number.isFinite(amount) && amount > 0)
   if (!amounts.length) return {}
 
-  let salaryCurrency: string | undefined
-  if (/(?:грн|uah|₴)/iu.test(text)) salaryCurrency = 'UAH'
-  else if (/(?:usd|дол|\$)/iu.test(text)) salaryCurrency = 'USD'
-  else if (/(?:eur|євро|евро|€)/iu.test(text)) salaryCurrency = 'EUR'
+  const salaryCurrency = moneyCurrencyFromText(text) || undefined
 
   const salaryMin = amounts[0]
   const salaryMax = amounts.length > 1 ? amounts[1] : amounts[0]
@@ -80,9 +79,9 @@ function scheduleFrom(card: string): string {
 }
 
 function workFields(schedule: string): Pick<Job, 'remote' | 'workMode' | 'employmentKind' | 'workSchedules'> {
-  const remote = /(?:дистанц|віддал|удален|remote)/iu.test(schedule)
-  const parttime = /(?:неповн|неполн|частичн|part[ -]?time)/iu.test(schedule)
-  const shift = /(?:змінн|сменн|позмінн|shift)/iu.test(schedule)
+  const remote = detectWorkModes(schedule).includes('remote')
+  const parttime = detectEmploymentTypes(schedule).includes('part_time')
+  const shift = detectWorkSchedules(schedule).includes('shift')
   return {
     remote,
     workMode: remote ? 'remote' : 'office',
