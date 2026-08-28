@@ -1,3 +1,4 @@
+import { isCandidateNameHidden } from '@whiteslove/parsing-lexicon/hiring-candidate-fields'
 import type { CvProfile } from '../../../../shared/contracts/hiring'
 import {
   activityDate,
@@ -16,7 +17,7 @@ const FLAGMA_EDUCATION_RE = /(?:Образование|Освіта|Ta['’]lim|
 
 function realName(value: string): string {
   if (!value || value.length > 100) return ''
-  if (/скрыт|прихован|hidden|yashiring|ascuns/iu.test(value)) return ''
+  if (isCandidateNameHidden(value)) return ''
   return value
 }
 

@@ -1,9 +1,9 @@
+import { isCandidateNameHidden } from '@whiteslove/parsing-lexicon/hiring-candidate-fields'
 import type { CvProfile } from '../contracts/hiring'
 import { extractCandidateGender } from './candidateFields'
 
 export type HiringCandidateLocale = 'en' | 'ru'
 
-const HIDDEN_NAME_RE = /^(?:[?？�\uFFFD]{2,}|(?:фио|имя|name|full name)?\s*(?:скрыт\p{L}*|hidden|yashiril\p{L}*|ascuns)|не\s+указано|not\s+specified|anonymous|аноним)$/iu
 const GENERIC_ROLE_RE = /^(?:ищу\s+(?:работу|подработку)(?:\s+(?:онлайн|удал[её]нно))?|удал[её]нн\p{L}*\s+подработк\p{L}*(?:\s+за\s+компьютером)?(?:\s+для\s+студентов)?|работа\s+студентам|подработка|работа|работу|любая\s+работа|любая\s+занятость|не\s*важно|без\s+разницы|нет\s+разницы|farqi\s+yo['’ʻʼ‘`]?q|farqi\s+yuq|boshqa\s+ishlar?|ish|ish\s+kerak|ish\s+qidir(?:yapman|aman)|ish\s+izlayapman|onlayn\s+is(?:h|ch)(?:i|chi)?|online\s+is(?:h|ch)(?:i|chi)?|onlayn|online|удал[её]нно|remote(?:\s+work)?|tungi|uyda|ofisda|bilmaym\p{L}*|noma['’ʻʼ‘`]?lum(?:\s+\p{L}+)?|ba|va)$/iu
 const REMOTE_GENERIC_RE = /(?:онлайн|online|onlayn|удал[её]н|remote|masofaviy)/iu
 const HORECA_GENERIC_RE = /(?:ищу|нужна|нужен|работа|ишу)?[^\n]{0,40}(?:кафе|кафетер|ресторан|общепит|horeca)(?:[^\n]{0,40}(?:работ|подработ))?/iu
@@ -69,7 +69,7 @@ function smartNameCase(value: string): string {
 
 export function publicCandidateName(name: string | null | undefined, locale: HiringCandidateLocale): string {
   const raw = String(name || '').trim()
-  if (!raw || HIDDEN_NAME_RE.test(raw)) return locale === 'en' ? 'Name hidden' : 'ФИО скрыто'
+  if (!raw || isCandidateNameHidden(raw)) return locale === 'en' ? 'Name hidden' : 'ФИО скрыто'
   return smartNameCase(raw)
 }
 

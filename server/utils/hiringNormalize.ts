@@ -1,7 +1,7 @@
 // Candidate profile normalization + deduplication.
 // Free-form posts are normalized without overwriting the original message.
 
-import { extractCandidateContacts } from '@whiteslove/parsing-lexicon/hiring-candidate-fields'
+import { extractCandidateContacts, isCandidateNameHidden } from '@whiteslove/parsing-lexicon/hiring-candidate-fields'
 import {
   extractCandidateExperienceMentions,
   parseCandidateSalary,
@@ -369,7 +369,6 @@ function normalizedCandidateSkills(profile: CvProfile, text: string): string[] {
   })
 }
 
-const HIDDEN_NAME_RE = /^(?:(?:фио|піб|name)?\s*(?:скрыт\p{L}*|прихован\p{L}*|hidden|yashiril\p{L}*|ascuns)|onlayn|online|resume|резюме|[?？�\uFFFD]{2,})$/iu
 function normalizeCandidateEducation(profile: CvProfile, text: string): string | null | undefined {
   const raw = profile.education?.trim() || ''
   const withoutPreviewBoilerplate = raw.replace(/\s*[·|]\s*Location:\s*[\s\S]*$/iu, '').trim()
@@ -428,10 +427,10 @@ export function normalizeCandidate(profile: CvProfile): CvProfile {
   const rawName = profile.name?.trim() || ''
   const roleAsName = profile.origin === 'web' && rawName.split(/\s+/u).length <= 3
     && collectProfessions(rawName).length > 0
-  const nameCandidate = rawName && !HIDDEN_NAME_RE.test(rawName) && !roleAsName
+  const nameCandidate = rawName && !isCandidateNameHidden(rawName) && !roleAsName
     ? extractCandidateName(rawName) || rawName
     : extractCandidateName(originalText)
-  const name = normalizeCandidateNameCase(normalizeMixedScriptName(HIDDEN_NAME_RE.test(nameCandidate) ? '' : nameCandidate))
+  const name = normalizeCandidateNameCase(normalizeMixedScriptName(isCandidateNameHidden(nameCandidate) ? '' : nameCandidate))
     .replace(/\s{2,}/g, ' ')
     .trim()
     .slice(0, 100)
@@ -516,7 +515,7 @@ function fingerprint(profile: CvProfile): string {
   const contact = profile.contacts?.telegram || profile.contacts?.email || profile.contacts?.phone
   if (contact) return `c:${contact.toLowerCase()}`
   const name = (profile.name || '').toLocaleLowerCase('ru').replace(/[^\p{L}\p{N}]+/gu, '')
-  if (profile.origin === 'web' && name.length >= 4 && !HIDDEN_NAME_RE.test(profile.name || '')) {
+  if (profile.origin === 'web' && name.length >= 4 && !isCandidateNameHidden(profile.name || '')) {
     const source = (profile.sourceKey || profile.source || '').toLocaleLowerCase('ru')
     const city = (profile.city || '').toLocaleLowerCase('ru').replace(/[^\p{L}\p{N}]+/gu, '')
     const professions = [...(profile.professions || [])].sort().join(',').toLocaleLowerCase('en')
