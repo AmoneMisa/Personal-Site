@@ -10,54 +10,139 @@ const MAX_DESCRIPTION = 2_400
 const MAX_AGE_MS = 14 * 86_400_000
 const USER_AGENT = 'jobFinder/1.0 (vacancy search; contact: admin@whiteslove.me)'
 
-// These are source-owned DOU category names, not a local profession lexicon.
-const DEFAULT_DOU_CATEGORIES = [
+/**
+ * DOU owns these category names. Keeping the complete source taxonomy here is
+ * ingestion configuration, not a second profession lexicon: semantic matching
+ * of a user query still belongs to parsing-lexicon + Elasticsearch.
+ */
+export const DOU_CATEGORIES = [
   '.NET',
-  'Android',
+  'Account Manager',
+  'AI/ML',
   'Analyst',
+  'Android',
+  'Animator',
+  'Architect',
+  'Artist',
+  'Assistant',
+  'Big Data',
+  'Blockchain',
   'C++',
+  'C-level',
+  'Copywriter',
   'Data Engineer',
   'Data Science',
+  'DBA',
   'Design',
   'DevOps',
   'Embedded',
+  'Engineering Manager',
+  'Erlang',
+  'ERP/CRM',
+  'Finance',
   'Flutter',
   'Front End',
   'Golang',
+  'Hardware',
   'HR',
   'iOS/macOS',
   'Java',
+  'Legal',
   'Marketing',
+  'No-code',
   'Node.js',
+  'Office Manager',
+  'Other',
   'PHP',
+  'Procurement',
   'Product Manager',
   'Project Manager',
   'Python',
   'QA',
+  'React Native',
   'Ruby',
   'Rust',
   'Sales',
+  'Salesforce',
+  'SAP',
+  'Scala',
+  'Scrum Master',
   'Security',
+  'SEO',
   'Support',
+  'SysAdmin',
+  'Technical Writer',
   'Unity',
+  'Unreal Engine',
+  'Військова справа',
+] as const
+
+// Used only when a board's category index cannot be read. These are broad
+// source-facing discovery terms, deliberately spanning non-IT work as well.
+const WORK_UA_FALLBACK_SEARCHES = [
+  'IT',
+  'адміністрація',
+  'будівництво',
+  'бухгалтерія',
+  'готельно ресторанний бізнес',
+  'дизайн',
+  'змі',
+  'краса фітнес спорт',
+  'культура',
+  'логістика',
+  'маркетинг',
+  'медицина фармацевтика',
+  'нерухомість',
+  'освіта',
+  'охорона безпека',
+  'продаж закупівля',
+  'виробництво',
+  'роздрібна торгівля',
+  'секретаріат',
+  'сільське господарство',
+  'страхування',
+  'сфера обслуговування',
+  'телекомунікації',
+  'топменеджмент',
+  'транспорт',
+  'HR',
+  'фінанси банк',
+  'юриспруденція',
 ]
 
-// Public-board discovery streams are an ingestion policy. Semantic matching of
-// an end-user query (for example Frontend -> skills/profession context) stays in
-// parsing-lexicon + Elasticsearch rather than in these source adapters.
-const DEFAULT_BOARD_SEARCH_STREAMS = [
-  'frontend',
-  'react',
-  'vue',
-  'javascript',
-  'backend',
-  'fullstack',
-  'devops',
-  'qa',
-  'data',
-  'product',
-  'designer',
+const ROBOTA_UA_FALLBACK_SEARCHES = [
+  'vyrobnytstvo',
+  'avtobiznes',
+  'administratyvnyy-personal',
+  'it',
+  'budivnytstvo',
+  'bukhhalteriya',
+  'zakupivli',
+  'hr',
+  'dizayn',
+  'banky',
+  'hoteli',
+  'lohistyka',
+  'marketynh',
+  'medytsyna',
+  'prodazhi',
+  'rozdribna-torhivlya',
+  'transport',
+  'finansy',
+  'yurysprudentsiya',
 ]
+
+type PublicBoardStream = {
+  key: string
+  label: string
+  baseUrl: string
+}
+
+type CrawlBoardStream = {
+  key: string
+  label: string
+  pageUrl: (page: number) => string
+}
 
 function integer(value: string | undefined, fallback: number, min: number, max: number): number {
   const parsed = Number.parseInt(String(value || ''), 10)
@@ -86,6 +171,13 @@ function stripHtml(value: unknown): string {
     .trim()
 }
 
+function cleanStreamLabel(value: unknown): string {
+  return stripHtml(value)
+    .replace(/[\s\u00a0]+\d[\d\s\u00a0]*$/u, '')
+    .trim()
+    .slice(0, 120)
+}
+
 function rssText(value: unknown): string {
   if (value == null) return ''
   if (typeof value === 'object') {
@@ -108,9 +200,9 @@ async function fetchText(url: string): Promise<string> {
   return response.text()
 }
 
-function sourceTerms(value: string | undefined, defaults: string[]): string[] {
+function sourceTerms(value: string | undefined, defaults: readonly string[]): string[] {
   const raw = String(value || '').trim()
-  return (raw ? raw.split(',') : defaults)
+  return (raw ? raw.split(',') : [...defaults])
     .map((item) => item.trim())
     .filter(Boolean)
 }
@@ -159,6 +251,35 @@ function dedupe(jobs: Job[]): Job[] {
     if (!byUrl.has(key)) byUrl.set(key, job)
   }
   return [...byUrl.values()]
+}
+
+function dedupeStreams(streams: CrawlBoardStream[]): CrawlBoardStream[] {
+  const byKey = new Map<string, CrawlBoardStream>()
+  for (const stream of streams) if (!byKey.has(stream.key)) byKey.set(stream.key, stream)
+  return [...byKey.values()]
+}
+
+function streamKey(value: string): string {
+  return value
+    .normalize('NFKC')
+    .toLocaleLowerCase('en')
+    .replace(/[^\p{L}\p{N}]+/gu, '-')
+    .replace(/^-|-$/g, '')
+    .slice(0, 100) || 'default'
+}
+
+async function mapLimited<T, R>(items: T[], concurrency: number, worker: (item: T) => Promise<R>): Promise<R[]> {
+  const results = new Array<R>(items.length)
+  let next = 0
+  const runners = Array.from({ length: Math.min(Math.max(1, concurrency), items.length) }, async () => {
+    while (true) {
+      const index = next++
+      if (index >= items.length) return
+      results[index] = await worker(items[index]!)
+    }
+  })
+  await Promise.all(runners)
+  return results
 }
 
 async function parseRssFeed(url: string, tag: string, idPrefix: string): Promise<Job[]> {
@@ -211,35 +332,26 @@ async function parseRssFeed(url: string, tag: string, idPrefix: string): Promise
 export async function fetchDouJobs(q: string): Promise<Job[]> {
   if (String(process.env.DOU_SOURCE || 'on').toLowerCase() === 'off') return []
 
-  const categories = sourceTerms(process.env.DOU_JOB_CATEGORIES, DEFAULT_DOU_CATEGORIES)
-  const results = await Promise.allSettled(categories.map(async (category) => {
-    const params = new URLSearchParams({ category })
-    return parseRssFeed(
-      `https://jobs.dou.ua/vacancies/feeds/?${params.toString()}`,
-      `DOU · ${category}`,
-      `companies-dou-${category.toLocaleLowerCase('en').replace(/[^a-z0-9]+/g, '-')}`,
-    )
-  }))
-
-  const jobs = results.flatMap((result, index) => {
-    if (result.status === 'fulfilled') return result.value
-    console.warn(
-      `[jobs] DOU category "${categories[index]}" failed:`,
-      result.reason instanceof Error ? result.reason.message : String(result.reason),
-    )
-    return []
+  const categories = sourceTerms(process.env.DOU_JOB_CATEGORIES, DOU_CATEGORIES)
+  const concurrency = integer(process.env.DOU_CATEGORY_CONCURRENCY, 6, 1, 12)
+  const results = await mapLimited(categories, concurrency, async (category) => {
+    try {
+      const params = new URLSearchParams({ category })
+      return await parseRssFeed(
+        `https://jobs.dou.ua/vacancies/feeds/?${params.toString()}`,
+        `DOU · ${category}`,
+        `companies-dou-${streamKey(category)}`,
+      )
+    } catch (error) {
+      console.warn(
+        `[jobs] DOU category "${category}" failed:`,
+        error instanceof Error ? error.message : String(error),
+      )
+      return []
+    }
   })
-  return dedupe(jobs).filter((job) => queryMatches(job, q))
-}
 
-export async function fetchDjinniJobs(q: string): Promise<Job[]> {
-  if (String(process.env.DJINNI_SOURCE || 'on').toLowerCase() === 'off') return []
-  const jobs = await parseRssFeed(
-    process.env.DJINNI_RSS_URL || 'https://djinni.co/jobs/rss/',
-    'Djinni',
-    'companies-djinni',
-  )
-  return dedupe(jobs).filter((job) => queryMatches(job, q))
+  return dedupe(results.flat()).filter((job) => queryMatches(job, q))
 }
 
 function searchCardRanges(html: string, pattern: RegExp): Array<{ href: string; id: string; inner: string; index: number }> {
@@ -256,6 +368,87 @@ function headingOrAnchor(inner: string): string {
   const heading = inner.match(/<(?:h1|h2|h3|h4)\b[^>]*>([\s\S]*?)<\/(?:h1|h2|h3|h4)>/i)?.[1]
   const title = stripHtml(heading || inner)
   return title.length <= 220 ? title : ''
+}
+
+export function parseDjinniPage(html: string, now = new Date()): Job[] {
+  const matches = searchCardRanges(
+    html,
+    /<a\b[^>]*href=["']((?:https?:\/\/(?:www\.)?djinni\.co)?\/jobs\/(\d+)-[^"']*\/?)["'][^>]*>([\s\S]*?)<\/a>/gi,
+  )
+  const jobs: Job[] = []
+  const seen = new Set<string>()
+
+  for (const [index, match] of matches.entries()) {
+    if (seen.has(match.id)) continue
+    const title = headingOrAnchor(match.inner)
+    if (!title || /^more$/i.test(title)) continue
+
+    const end = matches.slice(index + 1).find((candidate) => candidate.id !== match.id)?.index
+      ?? Math.min(html.length, match.index + 12_000)
+    const text = stripHtml(html.slice(match.index, end)).slice(0, MAX_DESCRIPTION)
+    const postedAt = recentPostedAt(text, now)
+    if (!postedAt) continue
+    const location = sourceLocation(text)
+    const url = canonicalUrl(match.href, 'https://djinni.co')
+    if (!url) continue
+
+    seen.add(match.id)
+    jobs.push({
+      id: `companies-djinni-${match.id}`,
+      title,
+      company: 'Djinni employer',
+      location: location.location,
+      city: location.city,
+      country: 'UA',
+      url,
+      applyUrl: url,
+      source: 'companies',
+      remote: location.remote,
+      tags: ['Djinni'],
+      postedAt,
+      description: text || undefined,
+      employerType: 'board',
+      ...extractSalaryFromText(text),
+    })
+  }
+
+  return jobs
+}
+
+export async function fetchDjinniJobs(q: string): Promise<Job[]> {
+  if (String(process.env.DJINNI_SOURCE || 'on').toLowerCase() === 'off') return []
+
+  const [rssResult, crawlResult] = await Promise.allSettled([
+    parseRssFeed(
+      process.env.DJINNI_RSS_URL || 'https://djinni.co/jobs/rss/',
+      'Djinni',
+      'companies-djinni-rss',
+    ),
+    crawlCyclicJobBoard({
+      key: 'djinni:all-jobs',
+      pagesPerRun: integer(process.env.DJINNI_PAGES_PER_RUN, 12, 1, 50),
+      maxPage: integer(process.env.DJINNI_MAX_PAGE, 600, 2, 2_000),
+      fetchPage: (page) => fetchText(page === 1 ? 'https://djinni.co/jobs/' : `https://djinni.co/jobs/?page=${page}`),
+      parsePage: (html) => parseDjinniPage(html),
+      requestDelayMs: integer(process.env.DJINNI_REQUEST_DELAY_MS, 250, 0, 5_000),
+    }),
+  ])
+
+  const jobs: Job[] = []
+  if (rssResult.status === 'fulfilled') jobs.push(...rssResult.value)
+  else console.warn('[jobs] Djinni RSS failed:', rssResult.reason instanceof Error ? rssResult.reason.message : String(rssResult.reason))
+
+  if (crawlResult.status === 'fulfilled') {
+    jobs.push(...crawlResult.value.jobs)
+    console.log(
+      `[jobs] Djinni coverage pages=${crawlResult.value.pages.join(',')} `
+      + `next=${crawlResult.value.nextPage} cycle=${crawlResult.value.cycle}`,
+    )
+  } else {
+    console.warn('[jobs] Djinni crawl failed:', crawlResult.reason instanceof Error ? crawlResult.reason.message : String(crawlResult.reason))
+  }
+
+  return dedupe(jobs).filter((job) => queryMatches(job, q))
 }
 
 export function parseWorkUaPage(html: string, stream: string, now = new Date()): Job[] {
@@ -348,66 +541,187 @@ export function parseRobotaUaPage(html: string, stream: string, now = new Date()
   return jobs
 }
 
-function streamKey(value: string): string {
-  return value.toLocaleLowerCase('en').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'default'
+function section(html: string, startPattern: RegExp, endPattern: RegExp): string {
+  const startMatch = startPattern.exec(html)
+  if (!startMatch || startMatch.index == null) return html
+  const start = startMatch.index
+  const rest = html.slice(start + startMatch[0].length)
+  const endMatch = endPattern.exec(rest)
+  return endMatch && endMatch.index != null ? html.slice(start, start + startMatch[0].length + endMatch.index) : html.slice(start)
 }
 
-async function mapLimited<T, R>(items: T[], concurrency: number, worker: (item: T) => Promise<R>): Promise<R[]> {
-  const results = new Array<R>(items.length)
-  let next = 0
-  const runners = Array.from({ length: Math.min(Math.max(1, concurrency), items.length) }, async () => {
-    while (true) {
-      const index = next++
-      if (index >= items.length) return
-      results[index] = await worker(items[index]!)
-    }
-  })
-  await Promise.all(runners)
-  return results
+export function parseWorkUaCategoryIndex(html: string): PublicBoardStream[] {
+  const scope = section(html, /(?:Пошук\s+вакансій\s+за\s+категоріями|Вакансії\s+за\s+категоріями)/iu, /Вакансії\s+за\s+містами/iu)
+  const pattern = /<a\b[^>]*href=["'](\/jobs-([^"'?#/]+)\/?)["'][^>]*>([\s\S]*?)<\/a>/gi
+  const streams = new Map<string, PublicBoardStream>()
+  let match: RegExpExecArray | null
+
+  while ((match = pattern.exec(scope))) {
+    const key = streamKey(match[2] || '')
+    const label = cleanStreamLabel(match[3]) || match[2] || key
+    if (!key || streams.has(key)) continue
+    const path = String(match[1]).endsWith('/') ? String(match[1]) : `${match[1]}/`
+    streams.set(key, { key, label, baseUrl: `https://www.work.ua${path}` })
+  }
+
+  return [...streams.values()]
 }
 
-async function fetchSearchStreams(options: {
+export function parseRobotaUaProfessionalStreams(html: string): PublicBoardStream[] {
+  const scope = section(html, /Професійні\s+сфери/iu, /Популярні\s+професії/iu)
+  const pattern = /<a\b[^>]*href=["'](?:https?:\/\/(?:www\.)?robota\.ua)?\/zapros\/([^\/?#"']+)(?:\/ukraine)?[^"']*["'][^>]*>([\s\S]*?)<\/a>/gi
+  const streams = new Map<string, PublicBoardStream>()
+  let match: RegExpExecArray | null
+
+  while ((match = pattern.exec(scope))) {
+    const rawSlug = String(match[1] || '').trim()
+    const key = streamKey(rawSlug)
+    const label = cleanStreamLabel(match[2]) || rawSlug
+    if (!key || !rawSlug || streams.has(key)) continue
+    streams.set(key, {
+      key,
+      label,
+      baseUrl: `https://robota.ua/zapros/${rawSlug}/ukraine`,
+    })
+  }
+
+  return [...streams.values()]
+}
+
+function workUaCategoryStream(stream: PublicBoardStream): CrawlBoardStream {
+  return {
+    key: `category:${stream.key}`,
+    label: stream.label,
+    pageUrl: (page) => {
+      const url = new URL(stream.baseUrl)
+      url.searchParams.set('days', '14')
+      url.searchParams.set('sort', 'publication')
+      if (page > 1) url.searchParams.set('page', String(page))
+      return url.toString()
+    },
+  }
+}
+
+function workUaSearchStream(term: string): CrawlBoardStream {
+  return {
+    key: `search:${streamKey(term)}`,
+    label: term,
+    pageUrl: (page) => {
+      const url = new URL('https://www.work.ua/jobs/')
+      url.searchParams.set('search', term)
+      url.searchParams.set('days', '14')
+      url.searchParams.set('sort', 'publication')
+      if (page > 1) url.searchParams.set('page', String(page))
+      return url.toString()
+    },
+  }
+}
+
+function robotaUaCategoryStream(stream: PublicBoardStream): CrawlBoardStream {
+  return {
+    key: `category:${stream.key}`,
+    label: stream.label,
+    pageUrl: (page) => page > 1 ? `${stream.baseUrl}?page=${page}` : stream.baseUrl,
+  }
+}
+
+function robotaUaSearchStream(slug: string): CrawlBoardStream {
+  const key = streamKey(slug)
+  const baseUrl = `https://robota.ua/zapros/${encodeURIComponent(slug)}/ukraine`
+  return {
+    key: `search:${key}`,
+    label: slug,
+    pageUrl: (page) => page > 1 ? `${baseUrl}?page=${page}` : baseUrl,
+  }
+}
+
+async function fetchBoardStreams(options: {
   boardKey: string
-  streams: string[]
+  streams: CrawlBoardStream[]
   pagesPerRun: number
   maxPage: number
-  pageUrl: (stream: string, page: number) => string
+  concurrency: number
+  requestDelayMs: number
   parser: (html: string, stream: string) => Job[]
 }): Promise<Job[]> {
-  const runs = await mapLimited(options.streams, 3, async (stream) => {
+  const streams = dedupeStreams(options.streams)
+  const runs = await mapLimited(streams, options.concurrency, async (stream) => {
     try {
       return await crawlCyclicJobBoard({
-        key: `${options.boardKey}:${streamKey(stream)}`,
+        key: `${options.boardKey}:${stream.key}`,
         pagesPerRun: options.pagesPerRun,
         maxPage: options.maxPage,
-        fetchPage: (page) => fetchText(options.pageUrl(stream, page)),
-        parsePage: (html) => options.parser(html, stream),
-        requestDelayMs: 250,
+        fetchPage: (page) => fetchText(stream.pageUrl(page)),
+        parsePage: (html) => options.parser(html, stream.label),
+        requestDelayMs: options.requestDelayMs,
       })
     } catch (error) {
       console.warn(
-        `[jobs] ${options.boardKey} stream "${stream}" failed:`,
+        `[jobs] ${options.boardKey} stream "${stream.label}" failed:`,
         error instanceof Error ? error.message : String(error),
       )
       return null
     }
   })
-  return dedupe(runs.flatMap((run) => run?.jobs || []))
+
+  const successful = runs.filter((run): run is NonNullable<typeof run> => Boolean(run))
+  const pages = successful.reduce((sum, run) => sum + run.pages.length, 0)
+  const cycles = successful.filter((run) => run.reachedEnd).length
+  const jobs = dedupe(successful.flatMap((run) => run.jobs))
+  console.log(
+    `[jobs] ${options.boardKey} coverage streams=${streams.length} pages=${pages} `
+    + `jobs=${jobs.length} completedCycles=${cycles}`,
+  )
+  return jobs
+}
+
+async function discoverWorkUaStreams(): Promise<CrawlBoardStream[]> {
+  let discovered: PublicBoardStream[] = []
+  try {
+    discovered = parseWorkUaCategoryIndex(await fetchText('https://www.work.ua/jobs/by-category/'))
+  } catch (error) {
+    console.warn('[jobs] Work.ua category discovery failed:', error instanceof Error ? error.message : String(error))
+  }
+
+  const extras = sourceTerms(process.env.WORK_UA_SEARCH_STREAMS, [])
+  const streams = discovered.map(workUaCategoryStream)
+  streams.push(...extras.map(workUaSearchStream))
+
+  if (!streams.length) {
+    streams.push(...WORK_UA_FALLBACK_SEARCHES.map(workUaSearchStream))
+  }
+
+  return dedupeStreams(streams)
+}
+
+async function discoverRobotaUaStreams(): Promise<CrawlBoardStream[]> {
+  let discovered: PublicBoardStream[] = []
+  try {
+    discovered = parseRobotaUaProfessionalStreams(await fetchText('https://robota.ua/'))
+  } catch (error) {
+    console.warn('[jobs] robota.ua professional-sphere discovery failed:', error instanceof Error ? error.message : String(error))
+  }
+
+  const extras = sourceTerms(process.env.ROBOTA_UA_SEARCH_STREAMS, [])
+  const streams = discovered.map(robotaUaCategoryStream)
+  streams.push(...extras.map(robotaUaSearchStream))
+
+  if (!streams.length) {
+    streams.push(...ROBOTA_UA_FALLBACK_SEARCHES.map(robotaUaSearchStream))
+  }
+
+  return dedupeStreams(streams)
 }
 
 export async function fetchWorkUaJobs(q: string): Promise<Job[]> {
   if (String(process.env.WORK_UA_SOURCE || 'on').toLowerCase() === 'off') return []
-  const streams = sourceTerms(process.env.WORK_UA_SEARCH_STREAMS, DEFAULT_BOARD_SEARCH_STREAMS)
-  const jobs = await fetchSearchStreams({
+  const jobs = await fetchBoardStreams({
     boardKey: 'work-ua',
-    streams,
+    streams: await discoverWorkUaStreams(),
     pagesPerRun: integer(process.env.WORK_UA_PAGES_PER_RUN, 2, 1, 20),
-    maxPage: integer(process.env.WORK_UA_MAX_PAGE, 250, 2, 2_000),
-    pageUrl: (stream, page) => {
-      const params = new URLSearchParams({ search: stream, days: '14' })
-      if (page > 1) params.set('page', String(page))
-      return `https://www.work.ua/jobs/?${params.toString()}`
-    },
+    maxPage: integer(process.env.WORK_UA_MAX_PAGE, 2_000, 2, 10_000),
+    concurrency: integer(process.env.WORK_UA_CONCURRENCY, 3, 1, 8),
+    requestDelayMs: integer(process.env.WORK_UA_REQUEST_DELAY_MS, 500, 0, 10_000),
     parser: parseWorkUaPage,
   })
   return jobs.filter((job) => queryMatches(job, q))
@@ -415,16 +729,13 @@ export async function fetchWorkUaJobs(q: string): Promise<Job[]> {
 
 export async function fetchRobotaUaJobs(q: string): Promise<Job[]> {
   if (String(process.env.ROBOTA_UA_SOURCE || 'on').toLowerCase() === 'off') return []
-  const streams = sourceTerms(process.env.ROBOTA_UA_SEARCH_STREAMS, DEFAULT_BOARD_SEARCH_STREAMS)
-  const jobs = await fetchSearchStreams({
+  const jobs = await fetchBoardStreams({
     boardKey: 'robota-ua',
-    streams,
+    streams: await discoverRobotaUaStreams(),
     pagesPerRun: integer(process.env.ROBOTA_UA_PAGES_PER_RUN, 2, 1, 20),
-    maxPage: integer(process.env.ROBOTA_UA_MAX_PAGE, 250, 2, 2_000),
-    pageUrl: (stream, page) => {
-      const base = `https://robota.ua/zapros/${encodeURIComponent(stream)}/ukraine`
-      return page > 1 ? `${base}?page=${page}` : base
-    },
+    maxPage: integer(process.env.ROBOTA_UA_MAX_PAGE, 2_000, 2, 10_000),
+    concurrency: integer(process.env.ROBOTA_UA_CONCURRENCY, 3, 1, 8),
+    requestDelayMs: integer(process.env.ROBOTA_UA_REQUEST_DELAY_MS, 500, 0, 10_000),
     parser: parseRobotaUaPage,
   })
   return jobs.filter((job) => queryMatches(job, q))
