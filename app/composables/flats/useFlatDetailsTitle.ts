@@ -32,12 +32,16 @@ export function useFlatDetailsTitle(options: {
 
   const text = computed(() => [dealLabel.value, cityLabel.value].filter(Boolean).join(", "));
 
-  // The price itself is deliberately left uncolored (it already sits right
-  // next to the median comparison text); the ID carries the price-vs-median
-  // signal instead, since it is the one thing on screen in every state.
-  const idTone = computed<FlatPriceTone | null>(() => (
-    flatPriceTone(options.priceUsd.value, options.listing.value?.marketComparison?.medianUsd)
-  ));
+  // Match FlatCard exactly: listings with enough market context use the
+  // price-vs-median band; listings without a comparison still keep the normal
+  // pink price tone instead of falling back to white in the popup title.
+  const idTone = computed<FlatPriceTone | null>(() => {
+    if (!options.listing.value) return null;
+    return flatPriceTone(
+      options.priceUsd.value,
+      options.listing.value.marketComparison?.medianUsd,
+    ) ?? "pink";
+  });
 
   return { text, idTone };
 }
