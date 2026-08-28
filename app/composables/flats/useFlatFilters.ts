@@ -70,6 +70,20 @@ export function useFlatFilters() {
   const source = ref("");
   const showAdvanced = ref(false);
 
+  function clearMapZones() {
+    microdistrict.value = "";
+    quartal.value = "";
+    mapArea.value = "";
+  }
+
+  // A structured map zone is scoped by country/city/district. Clear it synchronously
+  // when that scope changes so the next request cannot combine a zone from the old
+  // location with the new selection. Synchronous clearing also keeps route restore
+  // deterministic: deserialize sets the scope first, then restores its zone value.
+  watch(selectedCountries, clearMapZones, { flush: "sync" });
+  watch(city, clearMapZones, { flush: "sync" });
+  watch(district, clearMapZones, { flush: "sync" });
+
   watch(dealType, (value) => {
     if (value === "sale") {
       audience.value = "any";
@@ -102,9 +116,7 @@ export function useFlatFilters() {
     );
     if (!match) return;
 
-    microdistrict.value = "";
-    quartal.value = "";
-    mapArea.value = "";
+    clearMapZones();
     if (match.type === "microdistrict") microdistrict.value = match.canonicalName;
     else if (match.type === "mahalla") quartal.value = match.canonicalName;
     else mapArea.value = match.canonicalName;
@@ -181,9 +193,7 @@ export function useFlatFilters() {
     countries.value = [defaultCountry];
     city.value = "";
     district.value = "";
-    microdistrict.value = "";
-    quartal.value = "";
-    mapArea.value = "";
+    clearMapZones();
     metro.value = "";
     propertyType.value = "any";
     dealType.value = "any";
