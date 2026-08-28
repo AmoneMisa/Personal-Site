@@ -69,10 +69,11 @@ test('flat geography statistics stay populated when a scoped country slice is em
   assert.match(stats, /<SearchSourceTabs v-model="dealScope"/u)
 })
 
-test('country geography delegates display rendering to the shared geography package', () => {
+test('location geography delegates exact and cross-kind rendering to the shared geography package', () => {
   assert.match(locations, /LocationKind = 'country' \| 'city' \| 'district' \| 'metro' \| 'any'/u)
   assert.match(locations, /@whiteslove\/parsing-lexicon\/geography-display/u)
-  assert.match(locations, /return geographyDisplayName\(value, locale, kind\)/u)
+  assert.match(locations, /const exact = geographyDisplayName\(value, locale, kind\)/u)
+  assert.match(locations, /\? geographyDisplayName\(value, locale, 'any'\)/u)
   assert.doesNotMatch(locations, /countryDisplayLabel|DISTRICT_RU|METRO_RU|METRO_ALIAS_RU/u)
 })
 

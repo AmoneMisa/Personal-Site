@@ -402,11 +402,12 @@ test('underwater ambience uses the original cleaned mascots and visible bubbles'
   assert.match(backdrop, /props\.variant === "home"/u)
   assert.match(backdrop, /<ocean-bubbles v-if="hasUnderwaterLife"/u)
   assert.match(backdrop, /<underwater-ambient2d v-if="hasUnderwaterLife"/u)
-  // Underwater stream: the scene refracts, and the current drifts across it.
+  // The scene keeps the lightweight refraction, without the removed duplicate
+  // current layer that used to drift across the entire backdrop.
   assert.match(backdrop, /ocean-refraction/u)
   assert.match(backdrop, /feTurbulence/u)
   assert.match(backdrop, /feDisplacementMap/u)
-  assert.match(backdrop, /ocean-page-backdrop__stream/u)
+  assert.doesNotMatch(backdrop, /ocean-page-backdrop__stream/u)
   assert.match(backdrop, /<header-crab/u)
   assert.match(crab, /header-crab-animated\.webp/u)
   assert.match(crab, /header-crab-scamper/u)
