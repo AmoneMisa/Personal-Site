@@ -16,6 +16,7 @@ const props = withDefaults(defineProps<{
 
 const open = defineModel<boolean>("open", { required: true });
 const route = useRoute();
+const { locale } = useI18n();
 const isFlatFinder = computed(() => route.path.endsWith("/flat-finder"));
 const isSearchBoard = computed(() => ["/flat-finder", "/jobs", "/hiring"].some((path) => route.path.endsWith(path)));
 
@@ -24,6 +25,8 @@ const { text: flatTitleText, idTone: flatIdTone } = useFlatDetailsTitle({
   listing: activeFlatListing,
   priceUsd: computed(() => props.flatPriceUsd),
 });
+const flatGoodPrice = computed(() => activeFlatListing.value?.marketComparison?.goodPrice === true);
+const flatGoodPriceLabel = computed(() => String(locale.value).toLowerCase().startsWith("en") ? "Good price" : "Хорошая цена");
 
 // "#12345 <text>" applies to any search-board detail (a job vacancy or
 // candidate carries its own publicId too), not just flats — flatTitleText
@@ -77,6 +80,10 @@ const modalUi = computed(() => {
           <slot v-else-if="$slots.title" name="title" />
           <span v-else class="search-details-public-title__text">{{ publicTitleText }}</span>
         </div>
+        <span v-if="flatGoodPrice" class="search-details-public-title__good-price">
+          <u-icon name="i-lucide-trending-down" aria-hidden="true" />
+          {{ flatGoodPriceLabel }}
+        </span>
       </div>
       <slot v-else-if="$slots.title" name="title" />
       <span v-else>{{ effectiveTitle }}</span>
@@ -115,11 +122,12 @@ const modalUi = computed(() => {
 }
 
 .search-details-public-title {
+  width: 100%;
   min-width: 0;
   margin: 0;
   padding-right: 36px;
   display: flex;
-  align-items: baseline;
+  align-items: center;
   gap: 8px;
   font-size: 18px;
   font-weight: 700;
@@ -133,12 +141,39 @@ const modalUi = computed(() => {
 }
 @include flat-tone-modifiers(".search-details-public-title__id");
 
-.search-details-public-title__content { min-width: 0; }
+.search-details-public-title__content {
+  flex: 1 1 auto;
+  min-width: 0;
+}
 
 .search-details-public-title__text {
+  display: block;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.search-details-public-title__good-price {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 9px;
+  border: 1px solid rgb(74 222 128 / 36%);
+  border-radius: 999px;
+  background: rgb(34 197 94 / 13%);
+  color: #86efac;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+@media (max-width: 640px) {
+  .search-details-public-title__good-price {
+    padding-inline: 7px;
+    font-size: 11px;
+  }
 }
 </style>
