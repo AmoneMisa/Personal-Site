@@ -1,10 +1,24 @@
-import { ref, watch } from "vue";
+import { computed, ref, watch } from "vue";
 import type { FlatSort } from "~/types/flats";
 
 const SOCIAL_LISTING_SOURCES = ["facebook", "threads", "custom"];
 
 export function useFlatFilters() {
-  const countries = ref<string[]>([]);
+  const selectedCountries = ref<string[]>([]);
+  // The backend still accepts a `countries` CSV for compatibility, but the housing
+  // UI is intentionally single-country. Keep the public ref array-shaped so the
+  // existing route/meta contracts do not need a parallel API, while rejecting the
+  // multi-select state Nuxt UI can otherwise produce.
+  const countries = computed<string[]>({
+    get: () => selectedCountries.value,
+    set: (values) => {
+      const normalized = [...new Set((values || []).map((value) => String(value).trim().toUpperCase()).filter(Boolean))];
+      if (!normalized.length) return;
+      const current = selectedCountries.value[0];
+      const next = normalized.find((value) => value !== current) || normalized[0];
+      selectedCountries.value = [next];
+    },
+  });
   const city = ref("");
   const district = ref("");
   const propertyType = ref("any");
@@ -78,7 +92,7 @@ export function useFlatFilters() {
     const rentOnly = dealType.value === "longRent" || dealType.value === "shortRent" || dealType.value === "roomRent";
     if (options.append && cursorSort && options.nextCursor) params.cursor = options.nextCursor;
     else params.offset = String(options.append ? options.loadedCount : 0);
-    if (countries.value.length) params.countries = countries.value.join(",");
+    if (countries.value.length) params.countries = countries.value[0]!;
     if (city.value) params.city = city.value;
     if (district.value) params.district = district.value;
     if (propertyType.value !== "any") params.propertyType = propertyType.value;
