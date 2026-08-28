@@ -570,7 +570,7 @@ function perPersonPriceLabel(l: Listing) {
   return formatMoneyAmount(l.perPersonPrice, l.currency, locale.value) || t("notSpecified");
 }
 type FlatSpecGroup = "advert" | "property" | "location" | "amenities" | "terms" | "costs";
-type FlatSpecRow = { label: string; value: string; group: FlatSpecGroup; groupLabel: string; column: 1 | 2 | 3 };
+type FlatSpecRow = { label: string; value: string; group: FlatSpecGroup; groupLabel: string; column: 1 | 2 | 3; wrap?: boolean };
 const specRows = computed<FlatSpecRow[]>(() => {
   const l = active.value; if (!l) return [];
   const groupColumn: Record<FlatSpecGroup, 1 | 2 | 3> = {
@@ -581,12 +581,13 @@ const specRows = computed<FlatSpecRow[]>(() => {
     terms: 3,
     costs: 3,
   };
-  const row = (group: FlatSpecGroup, label: string, value: string): FlatSpecRow => ({
+  const row = (group: FlatSpecGroup, label: string, value: string, wrap?: boolean): FlatSpecRow => ({
     group,
     groupLabel: t(`specGroup${group.charAt(0).toUpperCase()}${group.slice(1)}`),
     column: groupColumn[group],
     label,
     value,
+    wrap,
   });
   return [
     row("advert", t("specDeal"), dealLabel(l.dealType) || t("notSpecified")),
@@ -606,11 +607,11 @@ const specRows = computed<FlatSpecRow[]>(() => {
 
     row("location", t("specCity"), strOr(locName(l.city, "city"))),
     row("location", t("specDistrict"), strOr(locName(l.district, "district"))),
-    row("location", t("specKvartal"), strOr(l.area || l.kvartal)),
+    row("location", t("specKvartal"), strOr(locName(l.area || l.kvartal, "any"))),
     row("location", t("specMetro"), strOr(metroLabelWithAlias(l.metro, locale.value))),
     row("location", t("specAddress"), strOr(l.address)),
-    row("location", t("specShops"), listOr(l.nearbyShops)),
-    row("location", t("specNearby"), nearbyListOr(l.nearby)),
+    row("location", t("specShops"), listOr(l.nearbyShops), true),
+    row("location", t("specNearby"), nearbyListOr(l.nearby), true),
 
     row("amenities", t("specParking"), fmtBool(l.parking)),
     row("amenities", t("specElevator"), fmtBool(l.elevator)),

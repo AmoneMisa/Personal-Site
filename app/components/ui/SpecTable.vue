@@ -15,6 +15,8 @@ export interface SpecRow {
   groupLabel?: string;
   column?: 1 | 2 | 3;
   icon?: string;
+  /** Multi-item list values (nearby places, shops) wrap instead of being clipped to one line. */
+  wrap?: boolean;
 }
 
 const props = withDefaults(defineProps<{
@@ -367,7 +369,7 @@ function iconForRow(row: SpecRow): string {
             >
               <u-icon :name="iconForRow(row)" />
             </span>
-            <span class="spec-table__value" :title="displayValue(row)">{{ displayValue(row) }}</span>
+            <span class="spec-table__value" :class="{ 'spec-table__value_wrap': row.wrap }" :title="displayValue(row)">{{ displayValue(row) }}</span>
             <span
               v-if="aiHintForRow(row)"
               class="spec-table__ai-hint spec-table__ai-hint_grid"
@@ -503,6 +505,12 @@ function iconForRow(row: SpecRow): string {
   line-height: 1.3;
   white-space: nowrap;
   text-overflow: ellipsis;
+}
+.spec-table__value_wrap {
+  overflow: visible;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  text-overflow: clip;
 }
 .spec-table__ai-hint_grid { margin-left: 0 !important; font-size: 9px !important; }
 

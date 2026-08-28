@@ -396,7 +396,7 @@ function slotStyle(i: number, n: number) {
 }
 
 function fitToPoints() {
-  if (focusedPoint.value) return;
+  if (!map || focusedPoint.value) return;
   const bounds: [number, number][] = [];
   for (const p of renderedPoints.value) {
     if (Number.isFinite(p.lat) && Number.isFinite(p.lng)) bounds.push([p.lat, p.lng]);
