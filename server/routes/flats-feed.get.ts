@@ -60,18 +60,32 @@ const BOOLEAN_LISTING_FIELDS = [
   'negotiable',
 ] as const
 
+type BooleanListingField = typeof BOOLEAN_LISTING_FIELDS[number]
+
 // The AI worker intentionally emits a small English/canonical vocabulary. Old
 // persisted rows and third-party parsers may still contain human English labels
 // such as "Yes", "Good" or "Women". Convert those to typed domain values here;
 // the Vue layer then renders them through the current UI locale instead of ever
 // exposing an English implementation value to a Russian (or other) interface.
-function normalizeBooleanLike(value: any): any {
+function normalizeBooleanLike(field: BooleanListingField, value: any): any {
   if (typeof value === 'boolean' || value == null) return value
   if (value === 1) return true
   if (value === 0) return false
   const normalized = String(value).trim().toLowerCase().replace(/[_.-]+/g, ' ').replace(/\s+/g, ' ')
-  if (['yes', 'true', 'allowed', 'available', 'present', 'included', 'furnished'].includes(normalized)) return true
-  if (['no', 'false', 'not allowed', 'unavailable', 'absent', 'not included', 'unfurnished'].includes(normalized)) return false
+  if (['yes', 'true', 'present'].includes(normalized)) return true
+  if (['no', 'false', 'absent'].includes(normalized)) return false
+  if (['petsAllowed', 'childrenAllowed', 'smokingAllowed'].includes(field)) {
+    if (['allowed', 'available'].includes(normalized)) return true
+    if (['not allowed', 'unavailable'].includes(normalized)) return false
+  }
+  if (field === 'furnished') {
+    if (normalized === 'furnished') return true
+    if (normalized === 'unfurnished') return false
+  }
+  if (field === 'communalSeparated') {
+    if (['separate', 'separated', 'not included'].includes(normalized)) return true
+    if (['included', 'utilities included'].includes(normalized)) return false
+  }
   return value
 }
 
@@ -98,7 +112,7 @@ function normalizeAudienceValue(value: any): any {
 function normalizeListingSemantics(listing: any): any {
   const normalized = { ...listing }
   for (const field of BOOLEAN_LISTING_FIELDS) {
-    if (field in normalized) normalized[field] = normalizeBooleanLike(normalized[field])
+    if (field in normalized) normalized[field] = normalizeBooleanLike(field, normalized[field])
   }
   if ('condition' in normalized) normalized.condition = normalizeConditionValue(normalized.condition)
   if ('audience' in normalized) normalized.audience = normalizeAudienceValue(normalized.audience)
