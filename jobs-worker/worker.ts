@@ -16,7 +16,7 @@ import { configuredSources, refreshSource } from './jobsRuntime'
 const POLL_MS = Math.max(250, Number(process.env.JOBS_QUEUE_POLL_MS) || Number(process.env.JOBS_QUEUE_POLL_SECONDS || 1) * 1000)
 const ERROR_RETRY_MS = Math.max(1_000, Number(process.env.JOBS_QUEUE_ERROR_RETRY_MS) || 5_000)
 const DISPATCH_INTERVAL_MS = Math.max(5_000, Number(process.env.JOBS_QUEUE_DISPATCH_TICK_SECONDS || 10) * 1000)
-const HISTORY_PRUNE_INTERVAL_MS = Math.max(60_000, Number(process.env.JOBS_QUEUE_HISTORY_PRUNE_SECONDS || 21_600) * 1000)
+const HISTORY_PRUNE_INTERVAL_MS = Math.max(60_000, Number(process.env.JOBS_QUEUE_HISTORY_PRUNE_SECONDS) || 21_600 * 1000)
 const WORKER_ID = String(process.env.JOBS_QUEUE_WORKER_ID || `${hostname()}:jobs`).slice(0, 200)
 
 let stopping = false
@@ -65,6 +65,9 @@ function installJobBrowserFallback() {
     'flagma.uz',
     'flagma.ro',
     'flagma.kg',
+    'jobs.ua',
+    'work.ua',
+    'robota.ua',
     'taskfavour.com',
     'remote.co',
     'simplyhired.com',
