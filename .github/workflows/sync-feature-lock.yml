@@ -29,3 +29,4 @@ jobs:
           python -m py_compile job-browser-fetcher/app.py
       - run: npm test
       - run: npm run build
+      # Keep this workflow branch-local; it is removed before the PR is opened.
