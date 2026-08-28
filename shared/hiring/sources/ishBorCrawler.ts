@@ -88,6 +88,8 @@ export async function crawlIshBorPages<T>(
     const summaries = listSummaries(await fetchHtml(url))
     if (page > 1) lastHistoricalPage = page
     if (!summaries.length) {
+      // A sparse/old page is not proof that newer profiles cannot exist below it.
+      // Only the board returning no rows closes the historical walk.
       if (page > 1) bootstrapComplete = true
       break
     }
@@ -96,8 +98,7 @@ export async function crawlIshBorPages<T>(
 
   const summaries = [...all.values()]
   const profiles: T[] = []
-  const recentByPage = new Map<number, number>()
-  const failuresByPage = new Map<number, number>()
+  let earliestFailedHistoricalPage: number | null = null
   for (let offset = 0; offset < summaries.length; offset += DETAIL_BATCH) {
     const batch = summaries.slice(offset, offset + DETAIL_BATCH)
     const results = await Promise.allSettled(
@@ -107,29 +108,24 @@ export async function crawlIshBorPages<T>(
       })),
     )
     results.forEach((result, index) => {
-      if (result.status === 'fulfilled' && result.value.profile) {
-        profiles.push(result.value.profile)
-        recentByPage.set(result.value.page, (recentByPage.get(result.value.page) || 0) + 1)
-      } else if (result.status === 'rejected') {
-        const page = batch[index]!.page
-        failuresByPage.set(page, (failuresByPage.get(page) || 0) + 1)
+      if (result.status === 'fulfilled') {
+        if (result.value.profile) profiles.push(result.value.profile)
+        return
+      }
+      const page = batch[index]!.page
+      if (page > 1) {
+        earliestFailedHistoricalPage = earliestFailedHistoricalPage == null
+          ? page
+          : Math.min(earliestFailedHistoricalPage, page)
       }
     })
-  }
-
-  if (!bootstrapComplete) {
-    for (const page of pages.filter((value) => value > 1)) {
-      if (!recentByPage.get(page) && !failuresByPage.get(page)) {
-        bootstrapComplete = true
-        break
-      }
-    }
   }
 
   const newest = summaries.find((summary) => summary.page === 1)
   const nextBackfillPage = bootstrapComplete
     ? Math.max(2, cursor.backfillPage || 1)
-    : Math.max(backfillStart + 1, lastHistoricalPage)
+    : earliestFailedHistoricalPage
+      ?? Math.max(backfillStart + 1, lastHistoricalPage + 1)
 
   return {
     profiles,
