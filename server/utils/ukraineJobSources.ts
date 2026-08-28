@@ -1,53 +1,62 @@
 import { XMLParser } from 'fast-xml-parser'
-import type { Job } from './jobTypes'
+import { parseHiringActivityDate } from '@whiteslove/parsing-lexicon/hiring-temporal'
+import { crawlCyclicJobBoard } from './cyclicJobBoardCrawler'
 import { extractSalaryFromText } from './enrich'
+import { detectLexiconCity, detectWorkModes } from './hiringLexicon'
+import type { Job } from './jobTypes'
 
 const REQUEST_TIMEOUT_MS = 25_000
 const MAX_DESCRIPTION = 2_400
+const MAX_AGE_MS = 14 * 86_400_000
 const USER_AGENT = 'jobFinder/1.0 (vacancy search; contact: admin@whiteslove.me)'
 
+// These are source-owned DOU category names, not a local profession lexicon.
 const DEFAULT_DOU_CATEGORIES = [
-  'Front End',
-  'Node.js',
-  'Python',
-  'Java',
   '.NET',
-  'PHP',
-  'QA',
-  'DevOps',
+  'Android',
+  'Analyst',
+  'C++',
+  'Data Engineer',
   'Data Science',
   'Design',
-  'Project Manager',
+  'DevOps',
+  'Embedded',
+  'Flutter',
+  'Front End',
+  'Golang',
+  'HR',
+  'iOS/macOS',
+  'Java',
+  'Marketing',
+  'Node.js',
+  'PHP',
   'Product Manager',
+  'Project Manager',
+  'Python',
+  'QA',
+  'Ruby',
+  'Rust',
+  'Sales',
+  'Security',
+  'Support',
+  'Unity',
 ]
 
-const DEFAULT_SEARCH_TERMS = [
+// Public-board discovery streams are an ingestion policy. Semantic matching of
+// an end-user query (for example Frontend -> skills/profession context) stays in
+// parsing-lexicon + Elasticsearch rather than in these source adapters.
+const DEFAULT_BOARD_SEARCH_STREAMS = [
   'frontend',
-  'front-end',
   'react',
   'vue',
   'javascript',
-  'typescript',
-  'nuxt',
-]
-
-const UA_CITIES = [
-  'Київ', 'Kyiv', 'Киев',
-  'Львів', 'Lviv', 'Львов',
-  'Харків', 'Kharkiv', 'Харьков',
-  'Одеса', 'Odesa', 'Одесса',
-  'Дніпро', 'Dnipro', 'Днепр',
-  'Запоріжжя', 'Zaporizhzhia', 'Запорожье',
-  'Вінниця', 'Vinnytsia', 'Винница',
-  'Чернівці', 'Chernivtsi', 'Черновцы',
-  'Івано-Франківськ', 'Ivano-Frankivsk',
-  'Ужгород', 'Uzhhorod',
-  'Тернопіль', 'Ternopil', 'Тернополь',
-  'Черкаси', 'Cherkasy', 'Черкассы',
-  'Полтава', 'Poltava',
-  'Хмельницький', 'Khmelnytskyi', 'Хмельницкий',
-  'Житомир', 'Zhytomyr',
-  'Рівне', 'Rivne', 'Ровно',
+  'backend',
+  'fullstack',
+  'devops',
+  'qa',
+  'data',
+  'product',
+  'designer',
 ]
 
 function integer(value: string | undefined, fallback: number, min: number, max: number): number {
@@ -124,19 +133,23 @@ function canonicalUrl(raw: string, base: string): string {
   }
 }
 
-function cityFromText(text: string): string | undefined {
-  const lower = text.toLocaleLowerCase('uk')
-  return UA_CITIES.find((city) => lower.includes(city.toLocaleLowerCase('uk')))
-}
-
-function boardLocation(text: string): { location: string; city?: string; remote: boolean } {
-  const remote = /\bremote\b|віддален|дистанційн|удален/iu.test(text)
-  const city = cityFromText(text)
+function sourceLocation(text: string): { location: string; city?: string; remote: boolean } {
+  const city = detectLexiconCity(text, 'UA') || undefined
+  const remote = detectWorkModes(text).includes('remote')
   return {
-    location: city ? `${city}, Ukraine` : 'Ukraine',
+    location: city ? `${city}, Ukraine` : remote ? 'Remote, Ukraine' : 'Ukraine',
     city,
     remote,
   }
+}
+
+function recentPostedAt(text: string, fallback = new Date()): string | null {
+  const parsed = parseHiringActivityDate(text)
+  if (!parsed) return fallback.toISOString()
+  const time = Date.parse(parsed)
+  if (!Number.isFinite(time)) return fallback.toISOString()
+  if (time < fallback.getTime() - MAX_AGE_MS || time > fallback.getTime() + 48 * 60 * 60 * 1000) return null
+  return new Date(time).toISOString()
 }
 
 function dedupe(jobs: Job[]): Job[] {
@@ -167,10 +180,11 @@ async function parseRssFeed(url: string, tag: string, idPrefix: string): Promise
     const company = stripHtml(rssText(item?.['dc:creator'] || item?.author?.name || item?.author)) || `${tag} employer`
     const region = stripHtml(rssText(item?.region || item?.location || item?.['job:location']))
     const context = `${rawTitle} ${region} ${description}`
-    const location = boardLocation(context)
+    const location = sourceLocation(context)
     const dateValue = item?.pubDate || item?.published || item?.updated
     const posted = dateValue ? new Date(dateValue) : new Date()
     const postedAt = Number.isNaN(posted.getTime()) ? new Date().toISOString() : posted.toISOString()
+    if (Date.parse(postedAt) < Date.now() - MAX_AGE_MS) continue
 
     out.push({
       id: `${idPrefix}-${rssText(item?.guid) || link || index}`,
@@ -209,7 +223,10 @@ export async function fetchDouJobs(q: string): Promise<Job[]> {
 
   const jobs = results.flatMap((result, index) => {
     if (result.status === 'fulfilled') return result.value
-    console.warn(`[jobs] DOU category "${categories[index]}" failed:`, result.reason instanceof Error ? result.reason.message : String(result.reason))
+    console.warn(
+      `[jobs] DOU category "${categories[index]}" failed:`,
+      result.reason instanceof Error ? result.reason.message : String(result.reason),
+    )
     return []
   })
   return dedupe(jobs).filter((job) => queryMatches(job, q))
@@ -241,7 +258,7 @@ function headingOrAnchor(inner: string): string {
   return title.length <= 220 ? title : ''
 }
 
-function parseWorkUaPage(html: string, term: string): Job[] {
+export function parseWorkUaPage(html: string, stream: string, now = new Date()): Job[] {
   const matches = searchCardRanges(
     html,
     /<a\b[^>]*href=["'](\/jobs\/(\d+)\/?(?:[^"']*)?)["'][^>]*>([\s\S]*?)<\/a>/gi,
@@ -257,7 +274,9 @@ function parseWorkUaPage(html: string, term: string): Job[] {
     const end = matches.slice(index + 1).find((candidate) => candidate.id !== match.id)?.index
       ?? Math.min(html.length, match.index + 8_000)
     const text = stripHtml(html.slice(match.index, end)).slice(0, MAX_DESCRIPTION)
-    const location = boardLocation(text)
+    const postedAt = recentPostedAt(text, now)
+    if (!postedAt) continue
+    const location = sourceLocation(text)
     const url = canonicalUrl(match.href, 'https://www.work.ua')
     if (!url) continue
 
@@ -273,8 +292,8 @@ function parseWorkUaPage(html: string, term: string): Job[] {
       applyUrl: url,
       source: 'companies',
       remote: location.remote,
-      tags: ['Work.ua', term],
-      postedAt: new Date().toISOString(),
+      tags: ['Work.ua', stream],
+      postedAt,
       description: text || undefined,
       employerType: 'board',
       ...extractSalaryFromText(text),
@@ -284,7 +303,7 @@ function parseWorkUaPage(html: string, term: string): Job[] {
   return jobs
 }
 
-function parseRobotaUaPage(html: string, term: string): Job[] {
+export function parseRobotaUaPage(html: string, stream: string, now = new Date()): Job[] {
   const matches = searchCardRanges(
     html,
     /<a\b[^>]*href=["']((?:https?:\/\/(?:www\.)?robota\.ua)?\/company\d+\/vacancy(\d+)[^"']*)["'][^>]*>([\s\S]*?)<\/a>/gi,
@@ -300,7 +319,9 @@ function parseRobotaUaPage(html: string, term: string): Job[] {
     const end = matches.slice(index + 1).find((candidate) => candidate.id !== match.id)?.index
       ?? Math.min(html.length, match.index + 10_000)
     const text = stripHtml(html.slice(match.index, end)).slice(0, MAX_DESCRIPTION)
-    const location = boardLocation(text)
+    const postedAt = recentPostedAt(text, now)
+    if (!postedAt) continue
+    const location = sourceLocation(text)
     const url = canonicalUrl(match.href, 'https://robota.ua')
     if (!url) continue
 
@@ -316,8 +337,8 @@ function parseRobotaUaPage(html: string, term: string): Job[] {
       applyUrl: url,
       source: 'companies',
       remote: location.remote,
-      tags: ['Robota.ua', term],
-      postedAt: new Date().toISOString(),
+      tags: ['Robota.ua', stream],
+      postedAt,
       description: text || undefined,
       employerType: 'board',
       ...extractSalaryFromText(text),
@@ -327,55 +348,85 @@ function parseRobotaUaPage(html: string, term: string): Job[] {
   return jobs
 }
 
-async function fetchSearchTerms(
-  terms: string[],
-  maxPages: number,
-  pageUrl: (term: string, page: number) => string,
-  parser: (html: string, term: string) => Job[],
-): Promise<Job[]> {
-  const all: Job[] = []
-  for (const term of terms) {
-    for (let page = 1; page <= maxPages; page++) {
-      try {
-        const pageJobs = parser(await fetchText(pageUrl(term, page)), term)
-        all.push(...pageJobs)
-        if (!pageJobs.length) break
-      } catch (error) {
-        console.warn(`[jobs] UA board search "${term}" page ${page} failed:`, error instanceof Error ? error.message : String(error))
-        break
-      }
+function streamKey(value: string): string {
+  return value.toLocaleLowerCase('en').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'default'
+}
+
+async function mapLimited<T, R>(items: T[], concurrency: number, worker: (item: T) => Promise<R>): Promise<R[]> {
+  const results = new Array<R>(items.length)
+  let next = 0
+  const runners = Array.from({ length: Math.min(Math.max(1, concurrency), items.length) }, async () => {
+    while (true) {
+      const index = next++
+      if (index >= items.length) return
+      results[index] = await worker(items[index]!)
     }
-  }
-  return dedupe(all)
+  })
+  await Promise.all(runners)
+  return results
+}
+
+async function fetchSearchStreams(options: {
+  boardKey: string
+  streams: string[]
+  pagesPerRun: number
+  maxPage: number
+  pageUrl: (stream: string, page: number) => string
+  parser: (html: string, stream: string) => Job[]
+}): Promise<Job[]> {
+  const runs = await mapLimited(options.streams, 3, async (stream) => {
+    try {
+      return await crawlCyclicJobBoard({
+        key: `${options.boardKey}:${streamKey(stream)}`,
+        pagesPerRun: options.pagesPerRun,
+        maxPage: options.maxPage,
+        fetchPage: (page) => fetchText(options.pageUrl(stream, page)),
+        parsePage: (html) => options.parser(html, stream),
+        requestDelayMs: 250,
+      })
+    } catch (error) {
+      console.warn(
+        `[jobs] ${options.boardKey} stream "${stream}" failed:`,
+        error instanceof Error ? error.message : String(error),
+      )
+      return null
+    }
+  })
+  return dedupe(runs.flatMap((run) => run?.jobs || []))
 }
 
 export async function fetchWorkUaJobs(q: string): Promise<Job[]> {
   if (String(process.env.WORK_UA_SOURCE || 'on').toLowerCase() === 'off') return []
-  const terms = sourceTerms(process.env.WORK_UA_SEARCH_TERMS, DEFAULT_SEARCH_TERMS)
-  const maxPages = integer(process.env.WORK_UA_MAX_PAGES, 1, 1, 5)
-  const jobs = await fetchSearchTerms(
-    terms,
-    maxPages,
-    (term, page) => {
-      const params = new URLSearchParams({ search: term })
+  const streams = sourceTerms(process.env.WORK_UA_SEARCH_STREAMS, DEFAULT_BOARD_SEARCH_STREAMS)
+  const jobs = await fetchSearchStreams({
+    boardKey: 'work-ua',
+    streams,
+    pagesPerRun: integer(process.env.WORK_UA_PAGES_PER_RUN, 2, 1, 20),
+    maxPage: integer(process.env.WORK_UA_MAX_PAGE, 250, 2, 2_000),
+    pageUrl: (stream, page) => {
+      const params = new URLSearchParams({ search: stream, days: '14' })
       if (page > 1) params.set('page', String(page))
       return `https://www.work.ua/jobs/?${params.toString()}`
     },
-    parseWorkUaPage,
-  )
+    parser: parseWorkUaPage,
+  })
   return jobs.filter((job) => queryMatches(job, q))
 }
 
 export async function fetchRobotaUaJobs(q: string): Promise<Job[]> {
   if (String(process.env.ROBOTA_UA_SOURCE || 'on').toLowerCase() === 'off') return []
-  const terms = sourceTerms(process.env.ROBOTA_UA_SEARCH_TERMS, DEFAULT_SEARCH_TERMS)
-  const maxPages = integer(process.env.ROBOTA_UA_MAX_PAGES, 1, 1, 5)
-  const jobs = await fetchSearchTerms(
-    terms,
-    maxPages,
-    (term, page) => `https://robota.ua/zapros/${encodeURIComponent(term)}/ukraine${page > 1 ? `?page=${page}` : ''}`,
-    parseRobotaUaPage,
-  )
+  const streams = sourceTerms(process.env.ROBOTA_UA_SEARCH_STREAMS, DEFAULT_BOARD_SEARCH_STREAMS)
+  const jobs = await fetchSearchStreams({
+    boardKey: 'robota-ua',
+    streams,
+    pagesPerRun: integer(process.env.ROBOTA_UA_PAGES_PER_RUN, 2, 1, 20),
+    maxPage: integer(process.env.ROBOTA_UA_MAX_PAGE, 250, 2, 2_000),
+    pageUrl: (stream, page) => {
+      const base = `https://robota.ua/zapros/${encodeURIComponent(stream)}/ukraine`
+      return page > 1 ? `${base}?page=${page}` : base
+    },
+    parser: parseRobotaUaPage,
+  })
   return jobs.filter((job) => queryMatches(job, q))
 }
 
@@ -390,7 +441,10 @@ export async function fetchUkraineBoardJobs(q: string): Promise<Job[]> {
   const jobs: Job[] = []
   results.forEach((result, index) => {
     if (result.status === 'fulfilled') jobs.push(...result.value)
-    else console.warn(`[jobs] ${loaders[index]!.label} failed:`, result.reason instanceof Error ? result.reason.message : String(result.reason))
+    else console.warn(
+      `[jobs] ${loaders[index]!.label} failed:`,
+      result.reason instanceof Error ? result.reason.message : String(result.reason),
+    )
   })
   return dedupe(jobs)
 }
