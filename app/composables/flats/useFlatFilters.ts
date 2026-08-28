@@ -1,5 +1,5 @@
 import { computed, ref, watch } from "vue";
-import { findGeoEntities } from "@whiteslove/geo-catalog";
+import { findGeoEntities, resolveLexiconGeoEntity } from "@whiteslove/geo-catalog";
 import type { FlatSort } from "~/types/flats";
 
 const SOCIAL_LISTING_SOURCES = ["facebook", "threads", "custom"];
@@ -93,11 +93,12 @@ export function useFlatFilters() {
     const name = value.trim();
     const country = countries.value[0];
     if (!name || !country || !city.value) return;
-    const cityPrefix = `${country.toLowerCase()}:${city.value.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`;
+    const cityEntity = resolveLexiconGeoEntity({ country, type: "city", canonical: city.value });
+    if (!cityEntity) return;
     const match = findGeoEntities({ country }).find((entity) =>
       MAP_ZONE_TYPES.has(entity.type)
       && entity.canonicalName.toLocaleLowerCase() === name.toLocaleLowerCase()
-      && (entity.parentId === cityPrefix || entity.id.startsWith(`${cityPrefix}:`)),
+      && (entity.parentId === cityEntity.id || entity.id.startsWith(`${cityEntity.id}:`)),
     );
     if (!match) return;
 
