@@ -21,6 +21,9 @@ export function useFlatFilters() {
   });
   const city = ref("");
   const district = ref("");
+  const microdistrict = ref("");
+  const quartal = ref("");
+  const mapArea = ref("");
   const propertyType = ref("any");
   const dealType = ref("any");
   const agency = ref("any");
@@ -95,6 +98,9 @@ export function useFlatFilters() {
     if (countries.value.length) params.countries = countries.value[0]!;
     if (city.value) params.city = city.value;
     if (district.value) params.district = district.value;
+    if (microdistrict.value) params.microdistrict = microdistrict.value;
+    if (quartal.value) params.quartal = quartal.value;
+    if (mapArea.value) params.area = mapArea.value;
     if (propertyType.value !== "any") params.propertyType = propertyType.value;
     if (dealType.value !== "any") params.dealType = dealType.value === "roomRent" ? "longRent" : dealType.value;
     if (agency.value !== "any") params.agency = agency.value;
@@ -146,6 +152,9 @@ export function useFlatFilters() {
     countries.value = [defaultCountry];
     city.value = "";
     district.value = "";
+    microdistrict.value = "";
+    quartal.value = "";
+    mapArea.value = "";
     metro.value = "";
     propertyType.value = "any";
     dealType.value = "any";
@@ -191,12 +200,12 @@ export function useFlatFilters() {
   }
 
   return {
-    countries, city, district, propertyType, dealType, agency, petFriendly, roomOnlyFilter,
-    onlyWithPhotos, childrenRequired, newBuildingOnly, dishwasherOnly, airConditionerOnly,
-    parkingOnly, internetOnly, gasOnly, balconyOnly, terraceOnly, privateYardOnly, sort,
-    audience, metro, priceMin, priceMax, roomsMin, roomsMax, bedroomsMin, bedroomsMax,
-    areaMin, areaMax, pricePerSqmMin, pricePerSqmMax, metroMaxM, nearbyKind, nearbyMaxM,
-    floorMin, floorMax, totalFloorsMin, totalFloorsMax, yearMin, yearMax, maxAgeDays,
-    displayCurrency, query, source, showAdvanced, buildFeedParams, resetValues,
+    countries, city, district, microdistrict, quartal, mapArea, propertyType, dealType, agency,
+    petFriendly, roomOnlyFilter, onlyWithPhotos, childrenRequired, newBuildingOnly,
+    dishwasherOnly, airConditionerOnly, parkingOnly, internetOnly, gasOnly, balconyOnly,
+    terraceOnly, privateYardOnly, sort, audience, metro, priceMin, priceMax, roomsMin, roomsMax,
+    bedroomsMin, bedroomsMax, areaMin, areaMax, pricePerSqmMin, pricePerSqmMax, metroMaxM,
+    nearbyKind, nearbyMaxM, floorMin, floorMax, totalFloorsMin, totalFloorsMax, yearMin, yearMax,
+    maxAgeDays, displayCurrency, query, source, showAdvanced, buildFeedParams, resetValues,
   };
 }
