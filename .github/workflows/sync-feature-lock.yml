@@ -21,6 +21,11 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci --no-audit --no-fund
-      - run: node --experimental-transform-types --check jobs-worker/worker.ts
+      - name: Check ingestion syntax
+        run: |
+          node --experimental-transform-types --check jobs-worker/worker.ts
+          node --experimental-transform-types --check server/utils/ukraineJobSources.ts
+          node --experimental-transform-types --check server/utils/jobsUaSource.ts
+          python -m py_compile job-browser-fetcher/app.py
       - run: npm test
       - run: npm run build
