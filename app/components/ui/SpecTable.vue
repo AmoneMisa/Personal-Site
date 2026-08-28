@@ -367,7 +367,7 @@ function iconForRow(row: SpecRow): string {
             >
               <u-icon :name="iconForRow(row)" />
             </span>
-            <span class="spec-table__value">{{ displayValue(row) }}</span>
+            <span class="spec-table__value" :title="displayValue(row)">{{ displayValue(row) }}</span>
             <span
               v-if="aiHintForRow(row)"
               class="spec-table__ai-hint spec-table__ai-hint_grid"
@@ -431,10 +431,14 @@ function iconForRow(row: SpecRow): string {
   min-width: 0;
 }
 .spec-table__column + .spec-table__column { border-left: 1px solid var(--line, #252a4a); }
-.spec-table__section + .spec-table__section { border-top: 8px solid var(--bg-panel, #131730); }
 .spec-table__section-title {
+  display: flex;
+  align-items: center;
   margin: 0;
-  padding: 8px 10px 6px;
+  height: 46px;
+  padding: 8px 10px;
+  overflow: hidden;
+  background: var(--bg-panel, #131730);
   border-bottom: 1px solid var(--line, #252a4a);
   color: var(--text-muted, #9ea4c1);
   font-size: 10px;
@@ -493,10 +497,12 @@ function iconForRow(row: SpecRow): string {
 .spec-table__icon:focus-visible { border-radius: 5px; box-shadow: 0 0 0 1px currentColor; }
 .spec-table__value {
   min-width: 0;
+  overflow: hidden;
   color: var(--text-primary, #e4e5f0);
   font-size: 12.5px;
   line-height: 1.3;
-  overflow-wrap: anywhere;
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
 .spec-table__ai-hint_grid { margin-left: 0 !important; font-size: 9px !important; }
 
@@ -538,7 +544,7 @@ function iconForRow(row: SpecRow): string {
   .spec-table__grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .spec-table__column:nth-child(3) {
     grid-column: 1 / -1;
-    border-top: 8px solid var(--bg-panel, #131730);
+    border-top: 1px solid var(--line, #252a4a);
     border-left: 0;
   }
 }
@@ -546,12 +552,6 @@ function iconForRow(row: SpecRow): string {
   .spec-table__table th { white-space: normal; width: 42%; padding-right: 12px; }
 }
 @media (max-width: 430px) {
-  .spec-table__grid { grid-template-columns: 1fr; }
-  .spec-table__column + .spec-table__column {
-    grid-column: auto;
-    border-top: 8px solid var(--bg-panel, #131730);
-    border-left: 0;
-  }
   .spec-table__head { align-items: flex-start; gap: 8px 12px; }
 }
 </style>
