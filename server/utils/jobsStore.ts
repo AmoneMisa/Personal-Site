@@ -1,7 +1,7 @@
 // Persistent vacancy store. A scheduled worker (server/tasks/jobs/refresh.ts)
-// pulls every configured board once, merges the result into one file-backed snapshot,
-// and prunes closed/old postings. The /jobs-feed request path then reads only
-// from this store, so it never blocks on (or is geo-blocked by) upstream boards.
+// pulls every configured board once, merges the result into a durable snapshot
+// and the Personal Site jobs PostgreSQL read model, then prunes closed/old
+// postings. The /jobs-feed path never blocks on upstream boards.
 //
 // Retention: a posting is kept while it is < 14 days old AND was seen in the last
 // STALE_DAYS refreshes (so a vacancy that disappears from its source — i.e. was
@@ -9,6 +9,7 @@
 import {
   syncJobsSearchIndex,
 } from './jobsElastic'
+import { syncJobsDb } from '../jobs/infrastructure/database'
 import { useStateStore } from '~~/server/utils/stateStore'
 import { ALL_SOURCES, type Job, type JobSource } from './jobTypes'
 import { refreshRates } from './currency'
@@ -524,8 +525,8 @@ async function performJobStoreRefresh(): Promise<RefreshSummary> {
 
   const kept = publishMemoryStore(byKey, now)
 
-  // The persistent state snapshot is the source of truth. Elasticsearch is only
-  // a derived search index, so indexing errors never fail a vacancy refresh.
+  // The snapshot remains the recovery source while PostgreSQL is the indexed
+  // website read model and Elasticsearch is a compatibility search index.
   try {
     await syncJobsSearchIndex(kept)
   } catch (err) {
@@ -533,6 +534,12 @@ async function performJobStoreRefresh(): Promise<RefreshSummary> {
       '[jobs:elasticsearch] sync failed:',
       (err as Error).message,
     )
+  }
+
+  try {
+    await syncJobsDb(kept)
+  } catch (err) {
+    console.error('[jobs:db] sync failed:', (err as Error).message)
   }
 
   // The current in-memory result is complete now. Persistent snapshot writing

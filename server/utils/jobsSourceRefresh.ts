@@ -2,6 +2,7 @@ import { useStateStore } from '~~/server/utils/stateStore'
 import { ALL_SOURCES, type Job, type JobSource } from './jobTypes'
 import { enrichJob } from './enrich'
 import { syncJobsSearchIndex } from './jobsElastic'
+import { syncJobsDb } from '../jobs/infrastructure/database'
 import { fetchExtraTelegramJobs } from './extraTelegramJobSources'
 import { fetchLinkedInJobs } from './linkedinSource'
 import { fetchFacebookJobs, fetchThreadsJobs } from './socialJobSources'
@@ -302,6 +303,14 @@ async function mergeFetchedSource(source: JobSource, jobs: Job[]) {
   } catch (error) {
     console.error(
       `[jobs:queue:${source}] Elasticsearch sync failed:`,
+      (error as Error).message,
+    )
+  }
+  try {
+    await syncJobsDb(kept)
+  } catch (error) {
+    console.error(
+      `[jobs:queue:${source}] PostgreSQL sync failed:`,
       (error as Error).message,
     )
   }

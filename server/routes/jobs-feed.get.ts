@@ -1,12 +1,14 @@
 // GET /jobs-feed — read-only vacancy feed served by the isolated jobs API.
-// Ingestion lives exclusively in jobs-worker; this request path only reads the
-// persisted snapshot, filters/sorts it and optionally queries Elasticsearch.
+// Ingestion lives exclusively in jobs-worker; this request path reads the
+// Personal Site jobs PostgreSQL read model. The persisted snapshot and
+// Elasticsearch remain rollout/outage fallbacks; crawling never runs here.
 
 import {
   ALL_SOURCES,
   EMPLOYMENT_KINDS,
   type EmploymentKind,
   FREE_SOURCES,
+  type JobQuery,
   type JobSource,
   type Relocation,
   type SortKey,
@@ -18,6 +20,7 @@ import { getRates, loadRates } from '../utils/currency'
 import { jobSearchKey, searchJobMatches } from '../utils/jobsElastic'
 import { keepUsaForeignerCandidate } from '../utils/jobVisaSponsorship'
 import { publicEntityId } from '../../shared/publicEntityId'
+import { queryJobsDb } from '../jobs/infrastructure/database'
 
 function isConfigured(source: JobSource): boolean {
   switch (source) {
@@ -139,6 +142,52 @@ export default defineEventHandler(async (event) => {
   // Rate refresh is independent of ingestion and never awaited by the feed.
   loadRates().catch(() => {})
 
+  const jobQuery: JobQuery = {
+    q: search,
+    location: String(q.location ?? '').trim(),
+    remote,
+    sources: finalSources,
+    sort,
+    maxAgeDays: clampInt(q.maxAgeDays, 14, 1, 14),
+    salaryMin,
+    countries,
+    cities,
+    includeRu,
+    includeBy,
+    workMode,
+    relocation,
+    employmentKind,
+    hasSalary,
+    maxExperienceYears,
+    foreignerFriendly,
+    hideRiskyIndustries,
+    noExperience,
+    language,
+    languageLevel,
+    excludeLanguages,
+    skills,
+    page: clampInt(q.page, 1, 1, 10000),
+    pageSize: clampInt(q.pageSize, 20, 1, 100),
+  }
+
+  const databaseResult = await queryJobsDb(jobQuery)
+  if (databaseResult) {
+    setResponseHeader(event, 'Cache-Control', 'private, max-age=30')
+    return {
+      ...databaseResult,
+      jobs: databaseResult.jobs.map((job) => ({
+        ...job,
+        publicId: publicEntityId('job', job.source, job.id),
+      })),
+      rates: getRates(),
+      warming: false,
+      loadedSources: databaseResult.loadedSources,
+      pendingSources: [],
+      failedSources: [],
+      engine: 'postgresql',
+    }
+  }
+
   const pool = await getStoredSnapshot()
   let searchMatches: Awaited<ReturnType<typeof searchJobMatches>> = null
 
@@ -165,31 +214,9 @@ export default defineEventHandler(async (event) => {
   setResponseHeader(event, 'Cache-Control', 'private, max-age=30')
 
   const result = filterAndPaginate(searchPool, {
+    ...jobQuery,
     q: searchMatches ? '' : search,
-    location: String(q.location ?? '').trim(),
-    remote,
-    sources: finalSources,
-    sort,
-    maxAgeDays: clampInt(q.maxAgeDays, 14, 1, 14),
-    salaryMin,
-    countries,
-    cities,
-    includeRu,
-    includeBy,
-    workMode,
-    relocation,
-    employmentKind,
-    hasSalary,
-    maxExperienceYears,
     foreignerFriendly: usaBroadForeignerFilter ? undefined : foreignerFriendly,
-    hideRiskyIndustries,
-    noExperience,
-    language,
-    languageLevel,
-    excludeLanguages,
-    skills,
-    page: clampInt(q.page, 1, 1, 10000),
-    pageSize: clampInt(q.pageSize, 20, 1, 100),
   })
 
   // The USA foreigner filter is applied before aggregate.ts because it uses a

@@ -8,12 +8,20 @@
 
 import { getStoredJobsSnapshot } from '../utils/jobsSnapshot'
 import { publicEntityId } from '../../shared/publicEntityId'
+import { getJobByPublicIdDb } from '../jobs/infrastructure/database'
 
 export default defineEventHandler(async (event) => {
   const query = getQuery(event)
   const id = String(query.id ?? '').trim()
   const publicId = String(query.publicId ?? '').trim()
   if (!id && !publicId) return { job: null }
+
+  if (publicId) {
+    const databaseJob = await getJobByPublicIdDb(publicId)
+    if (databaseJob) {
+      return { job: { ...databaseJob, publicId: publicEntityId('job', databaseJob.source, databaseJob.id) } }
+    }
+  }
 
   const jobs = await getStoredJobsSnapshot()
   const found = id

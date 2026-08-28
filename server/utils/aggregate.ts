@@ -236,7 +236,7 @@ function normalizeProfessionTitle(title: string): string {
 // Use the existing shared skill taxonomy as the primary profession-area signal.
 // This avoids maintaining another Frontend/Backend/Data/etc. dictionary solely for
 // statistics. Raw titles are only a fallback for vacancies with no classified skills.
-function professionArea(job: Job): string {
+export function jobProfessionArea(job: Job): string {
   const counts = new Map<string, number>()
   for (const detail of [...(job.skillDetails || []), ...(job.niceToHaveDetails || [])]) {
     const key = detail.subcategory?.trim()
@@ -281,7 +281,7 @@ function computeStats(jobs: Job[]): JobStats {
   for (const job of jobs) {
     const pay = salaryValue(job)
     const requiredExperience = experienceValue(job)
-    const profession = professionArea(job)
+    const profession = jobProfessionArea(job)
 
     addGroup(sourceGroups, job.source, pay)
     addGroup(countryGroups, job.country || 'OTHER', pay)

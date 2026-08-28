@@ -511,7 +511,7 @@ export function normalizeCandidate(profile: CvProfile): CvProfile {
   }
 }
 
-function fingerprint(profile: CvProfile): string {
+export function candidateFingerprint(profile: CvProfile): string {
   const contact = profile.contacts?.telegram || profile.contacts?.email || profile.contacts?.phone
   if (contact) return `c:${contact.toLowerCase()}`
   const name = (profile.name || '').toLocaleLowerCase('ru').replace(/[^\p{L}\p{N}]+/gu, '')
@@ -534,7 +534,7 @@ function fingerprint(profile: CvProfile): string {
 export function dedupeCandidates(profiles: CvProfile[]): CvProfile[] {
   const best = new Map<string, CvProfile>()
   for (const profile of profiles) {
-    const key = fingerprint(profile)
+    const key = candidateFingerprint(profile)
     const current = best.get(key)
     if (!current) {
       best.set(key, profile)

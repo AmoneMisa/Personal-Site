@@ -94,15 +94,16 @@ state; there is no standalone Redis service in this repository.
 ## Services
 
 - Nuxt SSR site with static i18n, portfolio/CV pages and browser tools.
-- Nitro read APIs for jobs and hiring data.
+- Nitro read APIs backed by indexed Personal Site PostgreSQL schemas for jobs
+  and hiring, with database-side filtering, pagination and analytics.
 - `jobs-worker` for scheduling, queue processing, scraping, normalization,
   enrichment and indexing of jobs/hiring data.
 - `job-browser-fetcher` for job pages that require browser-like TLS/HTTP behavior.
 - Flat Finder proxy backed by the separately deployed `flat-finder` service.
 - FastAPI PDF, conversion, DockerHub and country-index APIs.
 - Telegram bot for apartment, job and candidate subscriptions.
-- Shared `site_state` filesystem volume plus PostgreSQL/Elasticsearch integrations
-  configured through the environment.
+- Shared `site_state` recovery snapshots plus PostgreSQL read models and
+  Elasticsearch compatibility indexes configured through the environment.
 
 ## License
 

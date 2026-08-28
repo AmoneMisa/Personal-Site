@@ -1,6 +1,7 @@
 // GET /hiring-feed — read-only candidate CV/resume feed.
-// Search uses the persisted snapshot and Elasticsearch only; crawling, targeted
-// web search, normalization writes and backfill belong exclusively to jobs-worker.
+// Normal reads, filters, pagination and analytics use the Personal Site hiring
+// PostgreSQL schema. Snapshot/Elasticsearch paths remain safe rollout fallbacks;
+// crawling, normalization writes and backfill belong exclusively to jobs-worker.
 
 import { getHiringSourceDiagnostics } from '../utils/hiringSources'
 import { HIRING_COUNTRIES } from '../../shared/hiring/hiringMarkets'
@@ -37,6 +38,7 @@ import {
   collapseHiringProfessionFilterValues,
   expandHiringProfessionFilters,
 } from '../../shared/hiringProfessionGroups'
+import { hiringDbEnabled, queryDbCandidates } from '../hiring/infrastructure/database'
 
 const PAGE_MAX = 60
 
@@ -450,6 +452,75 @@ export default defineEventHandler(async (event) => {
   const locale = requestLocale(event)
   const offset = Math.max(0, Number(params.get('offset')) || 0)
   const limit = Math.min(PAGE_MAX, Math.max(1, Number(params.get('limit')) || 20))
+
+  if (hiringDbEnabled()) {
+    await loadRates()
+    const databaseFeed = await queryDbCandidates(params, offset, limit)
+    if (databaseFeed) {
+      const [persistedSourceRuns] = await Promise.all([loadDbSourceRuns()])
+      const sourceStatuses = getHiringSourceDiagnostics()
+      const webStatusesByHandle = new Map(
+        persistedSourceRuns
+          .filter((item) => /^(?:web|social):/i.test(item.handle))
+          .map((item) => [item.handle.toLowerCase(), item]),
+      )
+      for (const item of getHiringWebDiagnostics()) webStatusesByHandle.set(item.handle.toLowerCase(), item)
+      const webSourceStatuses = [...webStatusesByHandle.values()].sort((a, b) => a.handle.localeCompare(b.handle))
+      const sourceErrors = [
+        ...sourceStatuses
+          .filter((item) => item.status === 'error')
+          .map((item) => ({ source: 'telegram', country: item.country, handle: item.handle, error: item.error || 'source failed' })),
+        ...webSourceStatuses
+          .filter((item) => item.status === 'error')
+          .map((item) => ({
+            source: 'key' in item ? item.key : item.handle.replace(/^(?:web|social):/i, ''),
+            country: item.country,
+            handle: item.handle,
+            error: item.error || 'source failed',
+          })),
+      ]
+      const counts = databaseFeed.sourceCounts
+      setResponseHeader(event, 'Cache-Control', 'private, max-age=30')
+      return {
+        count: databaseFeed.count,
+        profiles: databaseFeed.profiles.map((profile) => publicProfile(profile, locale)),
+        statistics: databaseFeed.statistics,
+        rates: getRates(),
+        sourceCounts: counts,
+        sourceStatuses,
+        webSourceStatuses,
+        sourceErrors,
+        lastCrawlAt: [...persistedSourceRuns.map((run) => run.lastSuccessAt || ''), ...sourceStatuses.map((item) => item.checkedAt)]
+          .filter(Boolean).sort().pop() || null,
+        funnel: { parsed: 0, duplicate: 0, expired: 0, visibilityRejected: 0, shown: databaseFeed.count },
+        warming: false,
+        engine: 'postgresql',
+        filters: {
+          countries: params.get('countries') || '', city: params.get('city') || '', query: params.get('query') || '',
+          remote: params.get('remote') || '', experienceMin: params.get('experienceMin') || '',
+          salaryFrom: params.get('salaryFrom') || '', salaryTo: params.get('salaryTo') || '',
+          salaryCurrency: params.get('salaryCurrency') || 'USD', sort: params.get('sort') || 'recent',
+          ageMin: params.get('ageMin') || '', ageMax: params.get('ageMax') || '', gender: params.get('gender') || '',
+          professions: params.get('professions') || '', seniority: params.get('seniority') || '',
+          skills: params.get('skills') || '', languages: params.get('languages') || '', sources: params.get('sources') || '',
+          offset, limit,
+        },
+        meta: {
+          countries: HIRING_COUNTRIES,
+          professions: professionValues(),
+          sources: [
+            ...(counts.telegram ? [{ value: 'telegram', label: 'Telegram', origin: 'telegram' as const }] : []),
+            ...(counts.web ? [{ value: 'web', label: 'Web', origin: 'web' as const }] : []),
+            ...(counts.facebook ? [{ value: 'facebook', label: 'Facebook', origin: 'facebook' as const }] : []),
+            ...(counts.threads ? [{ value: 'threads', label: 'Threads', origin: 'threads' as const }] : []),
+            ...[...listWebSources(), ...listUzJobsSources()]
+              .filter((source) => (counts[source.key] || 0) > 0)
+              .map((source) => ({ value: source.key, label: source.label, origin: 'web' as const })),
+          ],
+        },
+      }
+    }
+  }
 
   const [telegramStored, webStored, persistedSourceRuns] = await Promise.all([
     getStoredCvProfilesSnapshot(),
