@@ -29,3 +29,4 @@ jobs:
           node --experimental-transform-types --check shared/hiring/sources/telegramChannels.ts
       - run: npm test
       - run: npm run build
+      # Branch-local verification only; removed before final PR state.
