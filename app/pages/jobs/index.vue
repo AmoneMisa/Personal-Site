@@ -25,6 +25,7 @@ import { useSavedCollections } from "~/composables/search/useSavedCollections";
 import { useInfiniteFeed } from "~/composables/search/useInfiniteFeed";
 import { ANY_SELECT_VALUE, useNullableSelect } from "~/composables/search/useNullableSelect";
 import { useShareLink } from "~/composables/search/useShareLink";
+import { queryString } from "~/utils/queryParams";
 import { publicEntityId } from "~~/shared/publicEntityId";
 
 // Job Finder service. Auto-routed at /jobs. Aggregates many boards, enforces a
@@ -36,6 +37,8 @@ const { t: translate, locale } = useI18n();
 const t = (key: string, params: Record<string, unknown> = {}) =>
   translate(`jobs.${key}`, params);
 const localePath = useLocalePath();
+const route = useRoute();
+const router = useRouter();
 const jobPublicId = (job: Job | null) => job
   ? job.publicId ?? publicEntityId("job", job.source, job.id)
   : null;
@@ -191,24 +194,59 @@ function markSeen(job: Job | RecentJob) {
   } catch { /* storage full/disabled */ }
 }
 
+/**
+ * Mirrors the open vacancy in the address bar as a clean ?adv=<publicId> link
+ * (no source/id pair, no filters), the same pattern flats uses. Replaces
+ * rather than pushes, so opening posting after posting does not fill history.
+ */
+function syncJobInUrl(job: Job | null) {
+  if (import.meta.server) return;
+  const query: Record<string, string> = {};
+  for (const [key, value] of Object.entries(route.query)) {
+    const text = queryString(value);
+    if (text) query[key] = text;
+  }
+  if (job) {
+    query.adv = String(jobPublicId(job));
+    delete query.job;
+  } else {
+    delete query.adv;
+    delete query.job;
+  }
+  void router.replace({ query });
+}
 function openJob(job: Job) {
   activeJob.value = job;
   jobModalOpen.value = true;
   resetShareFeedback();
   markSeen(job);
-  persistState();
+  syncJobInUrl(job);
 }
 // Fetch a single vacancy by id and open it — used by shared links and the
 // recently-viewed strip, which must open a posting outside the current results.
 async function openSharedJob(id: string) {
+  const local = jobs.value.find((job) => job.id === id);
+  if (local) { openJob(local); return; }
   const { data } = await safeFetch<{ job: Job | null }>("/jobs-vacancy", { params: { id } });
   if (data?.job) openJob(data.job);
 }
+// The publicId is a stable, source-independent key (an FNV hash of source+id,
+// same formula the server stamps on every vacancy), so a bare ?adv= link can
+// open a posting without knowing its raw source id up front.
+async function openSharedJobByPublicId(publicId: string) {
+  const local = jobs.value.find((job) => String(jobPublicId(job)) === publicId);
+  if (local) { openJob(local); return; }
+  const { data } = await safeFetch<{ job: Job | null }>("/jobs-vacancy", { params: { publicId } });
+  if (data?.job) openJob(data.job);
+}
 
+// Clean link: the publicId alone is enough to open the posting, so — like
+// flats — this deliberately does not carry the current filters along.
 function jobShareLink(job: Job | RecentJob): string {
+  const query = { adv: String(publicEntityId("job", job.source, job.id)) };
+  const resolved = router.resolve({ path: localePath("/jobs"), query });
   const base = import.meta.client ? window.location.origin : "https://whiteslove.me";
-  const qs = new URLSearchParams({ ...currentState(), job: job.id }).toString();
-  return `${base}${localePath("/jobs")}${qs ? `?${qs}` : ""}`;
+  return `${base}${resolved.href}`;
 }
 
 async function shareJob(job: Job | RecentJob): Promise<boolean> {
@@ -303,6 +341,21 @@ const {
 const countryLabel = (code: string) =>
   countryOptions.find((c) => c.value === code)?.label ?? code;
 
+// Jobs already paginate by real page numbers server-side (unlike flats'
+// offset/cursor feed), so the ?page= URL bookmark just mirrors page.value
+// directly instead of deriving it from loaded-item count.
+const pageRestoring = ref(true);
+function syncPageInUrl(pageNumber: number) {
+  if (import.meta.server) return;
+  const query: Record<string, string> = {};
+  for (const [key, value] of Object.entries(route.query)) {
+    const text = queryString(value);
+    if (text) query[key] = text;
+  }
+  if (pageNumber > 1) query.page = String(pageNumber);
+  else delete query.page;
+  void router.replace({ query });
+}
 async function load(
   toPage = 1,
   options: { append?: boolean; background?: boolean } = {},
@@ -320,6 +373,17 @@ async function load(
   // Persist the filters that produced this result (foreground loads only, so a
   // background warm-poll or a "load more" page doesn't rewrite the URL).
   if (!options.append && !options.background) persistState();
+  // Skip while the mount sequence is still restoring a deep-linked ?page=n:
+  // the first (non-append) load only fills page 1, and syncing right then
+  // would strip the requested page before restoreToPage catches up.
+  if (!options.background && !pageRestoring.value) syncPageInUrl(page.value);
+}
+async function restoreToPage(targetPage: number) {
+  let guard = 0;
+  while (canLoadMore.value && page.value < targetPage && guard < 50) {
+    await load(page.value + 1, { append: true });
+    guard += 1;
+  }
 }
 
 function loadMore() {
@@ -337,11 +401,11 @@ function resetFilters() {
 // the address bar) AND to localStorage (so a reload restores the last search).
 const SEARCH_STATE_KEY = "jobs:last-search:v1";
 
-const { persist: persistState, restore: restoreState, serialize: currentState } = useJobRouteState({
+const { sync: persistState, restore: restoreState } = useJobRouteState({
+  router,
+  route,
   storageKey: SEARCH_STATE_KEY,
   filters: jobFilters,
-  ignoredUrlKeys: ["job"],
-  extraQuery: () => jobModalOpen.value && activeJob.value ? { job: activeJob.value.id } : {},
 });
 
 // Salary in the vacancy's own currency (as provided by the source).
@@ -588,18 +652,35 @@ const jobFilterBlocks = useJobFilterBlocks({
 // Do not suspend SSR/hydration on the aggregated feed. A cold job store can
 // take several seconds while upstream boards time out; keeping that request at
 // top level leaves all filters rendered but inert until it finishes.
-onMounted(() => {
+onMounted(async () => {
   loadSeen(); // restore "seen"/recently-viewed marks
   loadSavedJobs();
-  const sharedJobId = new URLSearchParams(window.location.search).get("job");
+  const sharedAdvId = queryString(route.query.adv);
+  const sharedJobId = queryString(route.query.job);
+  const requestedPage = Math.max(1, Math.trunc(Number(queryString(route.query.page))) || 1);
   restoreState(); // hydrate filters from the URL query, else last-saved localStorage
-  void load(1);
-  if (sharedJobId) void openSharedJob(sharedJobId); // a shared link opens the vacancy popup
+  await load(1);
+  if (requestedPage > 1) await restoreToPage(requestedPage);
+  pageRestoring.value = false;
+  // A shared link opens the vacancy popup: the clean ?adv= publicId link wins
+  // over the legacy ?job=<id> triple when both are somehow present.
+  if (sharedAdvId) void openSharedJobByPublicId(sharedAdvId);
+  else if (sharedJobId) void openSharedJob(sharedJobId);
 });
 watch(jobModalOpen, (isOpen) => {
   if (isOpen) return;
   activeJob.value = null;
-  persistState();
+  syncJobInUrl(null);
+});
+// A link that names a posting should open it, whether the page is mounting
+// for the first time or the query changed underneath one that is already up.
+watch(() => queryString(route.query.adv), (publicId, previous) => {
+  if (!import.meta.client || !publicId || publicId === previous || jobModalOpen.value) return;
+  void openSharedJobByPublicId(publicId);
+});
+watch(() => queryString(route.query.job), (id, previous) => {
+  if (!import.meta.client || !id || id === previous || jobModalOpen.value) return;
+  void openSharedJob(id);
 });
 onBeforeUnmount(() => {
   if (loadTimer) clearTimeout(loadTimer);

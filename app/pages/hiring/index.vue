@@ -256,25 +256,26 @@ const hiringRouteState = useHiringRouteState({ router, route, filters: hiringFil
 function currentFilterQuery(): Record<string, string> { return hiringRouteState.serialize(); }
 function applyQueryParams(params: Record<string, unknown>) { hiringRouteState.deserialize(params); }
 
-function activeCvSource(profile: CvProfile): string {
-  return profile.sourceKey || profile.origin || profile.source;
-}
-
+// The publicId is a stable, source-independent key (an FNV hash of
+// source+country+id, the same formula the server stamps on every profile),
+// so it alone identifies a candidate — no cv/cvSource/cvCountry triple needed.
 function activeCvQuery(profile: CvProfile): Record<string, string> {
-  return {
-    cv: profile.id,
-    cvSource: activeCvSource(profile),
-    ...(profile.country ? { cvCountry: profile.country } : {}),
-  };
+  return { adv: String(candidatePublicId(profile)) };
 }
 
 const { schedule: scheduleQuerySync, sync: syncQueryParams } = hiringRouteState;
 
 async function syncActiveCvQuery(profile: CvProfile | null) {
+  // currentFilterQuery() only re-derives the filter keys, so the ?page= scroll
+  // bookmark (not a filter) has to be carried over explicitly or opening/
+  // closing a profile would silently drop it from the address bar.
+  const pageParam = queryString(route.query.page);
   await router.replace({
-    query: profile
-      ? { ...currentFilterQuery(), ...activeCvQuery(profile) }
-      : currentFilterQuery(),
+    query: {
+      ...currentFilterQuery(),
+      ...(pageParam ? { page: pageParam } : {}),
+      ...(profile ? activeCvQuery(profile) : {}),
+    },
   });
 }
 
@@ -289,6 +290,22 @@ function savePreset() {
   if (saveSearchPreset()) presetModalOpen.value = false;
 }
 
+// A URL bookmark of how many PAGE_SIZE batches are loaded, mirroring flats:
+// the feed itself stays offset-based infinite scroll under the hood, but a
+// shared ?page=n link restores roughly how far a visitor had scrolled.
+const pageRestoring = ref(true);
+function currentPageNumber(): number { return Math.max(1, Math.ceil(profiles.value.length / PAGE_SIZE)); }
+function syncPageInUrl(pageNumber: number) {
+  if (import.meta.server) return;
+  const query: Record<string, string> = {};
+  for (const [key, value] of Object.entries(route.query)) {
+    const text = queryString(value);
+    if (text) query[key] = text;
+  }
+  if (pageNumber > 1) query.page = String(pageNumber);
+  else delete query.page;
+  void router.replace({ query });
+}
 async function load(append = false, background = false) {
   const params = buildFeedParams({
     limit: PAGE_SIZE,
@@ -297,9 +314,17 @@ async function load(append = false, background = false) {
   });
   const data = await loadFeed(params, { append, background });
   if (!data) return;
+  if (!background && !pageRestoring.value) syncPageInUrl(currentPageNumber());
   if (data.meta?.professions?.length) professionValues.value = data.meta.professions;
   if (data.meta?.sources?.length) availableSources.value = data.meta.sources;
   if (!append && !background) void syncQueryParams();
+}
+async function restoreToPage(targetPage: number) {
+  let guard = 0;
+  while (hasMore.value && profiles.value.length < targetPage * PAGE_SIZE && guard < 50) {
+    await load(true, false);
+    guard += 1;
+  }
 }
 
 function scheduleLoad(delay = 250) {
@@ -454,11 +479,10 @@ const {
   share: shareLink,
   copyFallback: copyListingShareLink,
 } = useShareLink();
+// Clean link: the publicId alone is enough to open the profile, so — like
+// flats and jobs — this deliberately does not carry the current filters along.
 function makeCvShareLink(profile: CvProfile): string {
-  const resolved = router.resolve({
-    path: route.path,
-    query: { ...currentFilterQuery(), ...activeCvQuery(profile) },
-  });
+  const resolved = router.resolve({ path: route.path, query: activeCvQuery(profile) });
   return new URL(resolved.href, window.location.origin).toString();
 }
 async function shareCv(profile: CvProfile) {
@@ -467,6 +491,8 @@ async function shareCv(profile: CvProfile) {
   await shareLink({ title, text: title, url: link, key: profile.id });
 }
 
+// Legacy triple-param link (cv/cvSource/cvCountry), kept so old shared links
+// keep working.
 async function openSharedCv(id: string, sourceName = "", countryCode = "", attempt = 0) {
   const local = profiles.value.find((profile) => profile.id === id);
   if (local) { openCv(local); return; }
@@ -481,6 +507,20 @@ async function openSharedCv(id: string, sourceName = "", countryCode = "", attem
     sharedPostTimer = setTimeout(() => {
       sharedPostTimer = undefined;
       void openSharedCv(id, sourceName, countryCode, attempt + 1);
+    }, 1800);
+  }
+}
+async function openSharedCvByPublicId(publicId: string, attempt = 0) {
+  const local = profiles.value.find((profile) => String(candidatePublicId(profile)) === publicId);
+  if (local) { openCv(local); return; }
+  const { data } = await safeFetch<FeedResult>("/hiring-feed", { params: { publicId, limit: "1", offset: "0" } });
+  const exact = data?.profiles?.find((profile) => String(candidatePublicId(profile)) === publicId);
+  if (exact) { openCv(exact); return; }
+  if (data?.warming && attempt < 20) {
+    if (sharedPostTimer) clearTimeout(sharedPostTimer);
+    sharedPostTimer = setTimeout(() => {
+      sharedPostTimer = undefined;
+      void openSharedCvByPublicId(publicId, attempt + 1);
     }, 1800);
   }
 }
@@ -511,9 +551,11 @@ function profileCountryCurrency(profile: CvProfile): string {
 }
 
 onMounted(async () => {
+  const sharedAdvId = queryString(route.query.adv);
   const sharedCvId = queryString(route.query.cv);
   const sharedCvSource = queryString(route.query.cvSource);
   const sharedCvCountry = queryString(route.query.cvCountry);
+  const requestedPage = Math.max(1, Math.trunc(Number(queryString(route.query.page))) || 1);
   defaultCountry.value = regionalSearchCountry();
   loadPersonalState();
   applyQueryParams(route.query);
@@ -524,13 +566,26 @@ onMounted(async () => {
     shareModalOpen.value = true;
   }
   await load(false);
-  if (sharedCvId) await openSharedCv(sharedCvId, sharedCvSource, sharedCvCountry);
+  if (requestedPage > 1) await restoreToPage(requestedPage);
+  pageRestoring.value = false;
+  if (sharedAdvId) await openSharedCvByPublicId(sharedAdvId);
+  else if (sharedCvId) await openSharedCv(sharedCvId, sharedCvSource, sharedCvCountry);
 });
 
 watch(modalOpen, (isOpen) => {
   if (isOpen) return;
   active.value = null;
   void syncActiveCvQuery(null);
+});
+// A link that names a profile should open it, whether the page is mounting
+// for the first time or the query changed underneath one that is already up.
+watch(() => queryString(route.query.adv), (publicId, previous) => {
+  if (!import.meta.client || !publicId || publicId === previous || modalOpen.value) return;
+  void openSharedCvByPublicId(publicId);
+});
+watch(() => queryString(route.query.cv), (id, previous) => {
+  if (!import.meta.client || !id || id === previous || modalOpen.value) return;
+  void openSharedCv(id, queryString(route.query.cvSource), queryString(route.query.cvCountry));
 });
 
 onBeforeUnmount(() => {

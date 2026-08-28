@@ -196,6 +196,12 @@ function matchesFilters(profile: CvProfile, params: URLSearchParams): boolean {
   const profileId = params.get('profileId') || params.get('listingId')
   if (profileId && profile.id !== profileId) return false
 
+  // publicId is a one-way hash (source, country, id) stamped by
+  // repairPublicFacts on every snapshot entry — a clean ?adv= link matches it
+  // directly against the already-computed field instead of any raw identity.
+  const publicId = params.get('publicId')
+  if (publicId && String(profile.publicId ?? '') !== publicId) return false
+
   return true
 }
 

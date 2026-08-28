@@ -68,7 +68,7 @@ export function useHiringRouteState(options: {
     deserialize,
     preserve: () => {
       const preserved: Record<string, string> = {};
-      for (const key of ["cv", "cvSource", "cvCountry"] as const) {
+      for (const key of ["adv", "cv", "cvSource", "cvCountry", "page"] as const) {
         const value = queryString(options.route.query[key]);
         if (value) preserved[key] = value;
       }

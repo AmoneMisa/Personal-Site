@@ -1,11 +1,20 @@
+import type { LocationQuery, Router } from "vue-router";
 import { JOB_SALARY_PERIODS, type useJobFilters } from "~/composables/jobs/useJobFilters";
 import type { SalaryPeriod } from "~/utils/search/money";
+import { queryBoolean, queryString } from "~/utils/queryParams";
+import { useSearchRouteState } from "../search/useSearchRouteState";
+
+// Keys that identify a shared listing/page bookmark rather than a filter.
+// They must never count toward "the URL carries search state" (see restore()
+// below) and must survive every debounced filter-driven URL sync, the same
+// way flats/hiring preserve their own non-filter keys.
+const NON_FILTER_KEYS = new Set(["adv", "job", "page"]);
 
 interface JobRouteStateOptions {
-  storageKey: string;
+  router: Router;
+  route: { query: LocationQuery };
   filters: ReturnType<typeof useJobFilters>;
-  extraQuery?: () => Record<string, string>;
-  ignoredUrlKeys?: string[];
+  storageKey: string;
 }
 
 export function useJobRouteState(options: JobRouteStateOptions) {
@@ -42,55 +51,83 @@ export function useJobRouteState(options: JobRouteStateOptions) {
     return state;
   }
 
-  function deserialize(state: Record<string, string>) {
-    if (!state || typeof state !== "object") return;
-    query.value = state.q ?? "";
-    source.value = state.source ?? "";
-    salaryMin.value = state.salaryMin ? Number(state.salaryMin) : undefined;
-    displayCurrency.value = state.currency ?? "USD";
-    displayPeriod.value = JOB_SALARY_PERIODS.includes(state.period as SalaryPeriod) ? state.period as SalaryPeriod : "month";
-    sort.value = state.sort ?? "date";
-    countries.value = state.country ? state.country.split(",").filter(Boolean) : [];
-    cities.value = state.cities ?? "";
-    includeRu.value = state.includeRu === "1";
-    includeBy.value = state.includeBy === "1";
-    workMode.value = state.workMode ?? "";
-    relocation.value = state.relocation ?? "";
-    employmentKind.value = state.employment ?? "";
-    hasSalary.value = state.hasSalary === "1";
-    maxExperience.value = state.maxExp ? Number(state.maxExp) : undefined;
-    foreignerOnly.value = state.foreigner === "1";
-    hideRisky.value = state.hideRisky !== "0";
-    noExperience.value = state.noExp === "1";
-    language.value = state.language ?? "";
-    languageLevel.value = state.level ?? "";
-    excludeLanguages.value = state.exclLang ? state.exclLang.split(",").filter(Boolean) : [];
-    skills.value = state.skills ?? "";
+  function deserialize(params: LocationQuery | Record<string, unknown>) {
+    query.value = queryString(params.q);
+    source.value = queryString(params.source);
+    const salaryMinRaw = queryString(params.salaryMin);
+    salaryMin.value = salaryMinRaw ? Number(salaryMinRaw) : undefined;
+    displayCurrency.value = queryString(params.currency) || "USD";
+    const periodParam = queryString(params.period) as SalaryPeriod;
+    displayPeriod.value = JOB_SALARY_PERIODS.includes(periodParam) ? periodParam : "month";
+    sort.value = queryString(params.sort) || "date";
+    const countryParam = queryString(params.country);
+    countries.value = countryParam ? countryParam.split(",").filter(Boolean) : [];
+    cities.value = queryString(params.cities);
+    includeRu.value = queryBoolean(params.includeRu);
+    includeBy.value = queryBoolean(params.includeBy);
+    workMode.value = queryString(params.workMode);
+    relocation.value = queryString(params.relocation);
+    employmentKind.value = queryString(params.employment);
+    hasSalary.value = queryBoolean(params.hasSalary);
+    const maxExpRaw = queryString(params.maxExp);
+    maxExperience.value = maxExpRaw ? Number(maxExpRaw) : undefined;
+    foreignerOnly.value = queryBoolean(params.foreigner);
+    hideRisky.value = queryString(params.hideRisky) !== "0";
+    noExperience.value = queryBoolean(params.noExp);
+    language.value = queryString(params.language);
+    languageLevel.value = queryString(params.level);
+    const exclLangParam = queryString(params.exclLang);
+    excludeLanguages.value = exclLangParam ? exclLangParam.split(",").filter(Boolean) : [];
+    skills.value = queryString(params.skills);
     if (sort.value === "ats") sort.value = "date";
   }
 
-  function persist() {
+  function persistLocal() {
     if (!import.meta.client) return;
-    const state = serialize();
-    try { localStorage.setItem(options.storageKey, JSON.stringify(state)); } catch { /* storage full or disabled */ }
-    const queryState = { ...state, ...(options.extraQuery?.() || {}) };
-    const search = new URLSearchParams(queryState).toString();
-    window.history.replaceState(window.history.state, "", search ? `?${search}` : window.location.pathname);
+    try { localStorage.setItem(options.storageKey, JSON.stringify(serialize())); } catch { /* storage full or disabled */ }
   }
 
+  const routeState = useSearchRouteState({
+    router: options.router,
+    serialize,
+    deserialize,
+    preserve: () => {
+      const preserved: Record<string, string> = {};
+      for (const key of NON_FILTER_KEYS) {
+        const value = queryString(options.route.query[key]);
+        if (value) preserved[key] = value;
+      }
+      return preserved;
+    },
+    debounceMs: 250,
+  });
+
+  // The URL query wins whenever it carries any real filter (so a search stays
+  // shareable via the address bar); otherwise fall back to the last search
+  // kept in localStorage, so a plain reload/return visit resumes where the
+  // visitor left off instead of resetting to the defaults.
   function restore() {
-    if (!import.meta.client) return;
-    const fromUrl = new URLSearchParams(window.location.search);
-    const ignored = new Set(options.ignoredUrlKeys || []);
-    if ([...fromUrl.keys()].some((key) => !ignored.has(key))) {
-      deserialize(Object.fromEntries(fromUrl.entries()));
+    const hasUrlState = Object.keys(options.route.query).some((key) => !NON_FILTER_KEYS.has(key));
+    if (hasUrlState) {
+      deserialize(options.route.query);
       return;
     }
+    if (!import.meta.client) return;
     try {
       const raw = localStorage.getItem(options.storageKey);
       if (raw) deserialize(JSON.parse(raw));
     } catch { /* corrupt state */ }
   }
 
-  return { persist, restore, serialize, deserialize };
+  async function sync() {
+    persistLocal();
+    await routeState.sync();
+  }
+
+  function schedule(delay?: number) {
+    persistLocal();
+    routeState.schedule(delay);
+  }
+
+  return { ...routeState, sync, schedule, restore, serialize, deserialize };
 }
