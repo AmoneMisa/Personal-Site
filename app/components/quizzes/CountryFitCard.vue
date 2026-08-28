@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { useCountryDestinations } from "~/composables/quizzes/useCountryDestinations";
+
 type IndicesNormalized = {
   income: number | null;
   education: number | null;
@@ -53,6 +55,12 @@ const props = withDefaults(defineProps<{
 const emit = defineEmits<{ (e: "remove", key: string): void }>();
 
 const {t} = useI18n();
+
+// The quiz used to be a dead end: it ranked countries but linked nowhere, so a
+// result could not be acted on. Offer the site's own country-filtered pages, but
+// only where that country is genuinely covered.
+const {destinationsFor} = useCountryDestinations();
+const destinations = computed(() => destinationsFor(props.item.key, props.item.fallbackName));
 
 function fmt100(v: number | null | undefined) {
   if (typeof v !== "number") return "—";
@@ -303,6 +311,18 @@ const priceColumns = computed(() => {
         </div>
       </div>
     </div>
+
+    <div v-if="destinations.length" class="result-card__links">
+      <NuxtLink
+          v-for="link in destinations"
+          :key="link.id"
+          :to="link.to"
+          class="result-card__link"
+      >
+        <Icon :name="link.icon" class="i-icon"/>
+        {{ t(`quizzes.countryFit.explore.${link.id}`, { country: t(item.titleKey, item.fallbackName) || item.fallbackName }) }}
+      </NuxtLink>
+    </div>
   </div>
 </template>
 
@@ -311,6 +331,36 @@ const priceColumns = computed(() => {
   position: relative;
   background: var(--bg-panel);
   box-shadow: 0 12px 28px rgba(2, 5, 18, 0.2);
+}
+
+.result-card__links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--ui-border);
+}
+
+.result-card__link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  border: 1px solid var(--ui-border);
+  border-radius: 999px;
+  color: var(--text-white);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.2;
+  text-decoration: none;
+  transition: border-color 120ms ease, color 120ms ease;
+}
+
+.result-card__link:hover,
+.result-card__link:focus-visible {
+  border-color: var(--accent-pink, #e0679a);
+  color: var(--accent-pink, #e0679a);
 }
 
 .ratings {
