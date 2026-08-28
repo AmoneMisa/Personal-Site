@@ -35,7 +35,7 @@ test('shared social/LinkedIn discovery catalogs stay aligned with executable tar
 test('Tashkent-heavy public resume Telegram feeds are part of the canonical hiring catalog', () => {
   const byHandle = new Map(HIRING_TELEGRAM_CHANNELS.map((channel) => [channel.handle.toLowerCase(), channel]))
 
-  for (const handle of ['freelancer_uzbek', 'jobs_uz_vacancy']) {
+  for (const handle of ['ish_uz', 'freelancer_uzbek', 'jobs_uz_vacancy', 'hrangels']) {
     const source = byHandle.get(handle)
     assert.ok(source, handle)
     assert.equal(source.country, 'UZ')
