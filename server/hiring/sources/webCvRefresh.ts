@@ -11,6 +11,7 @@ import { crawlCareerist } from './web/careerist'
 import { crawlFlagma, isFlagmaSource } from './web/flagma'
 import { crawlRabotaKz } from './web/rabotaKz'
 import { crawlTalentUa } from './web/talentUa'
+import { crawlWorkUaApi } from './web/workUa'
 import { auditWebSource, type WebSourceAudit } from './webAudit'
 
 export { auditWebSource, type WebSourceAudit }
@@ -24,6 +25,7 @@ export async function crawlWebSource(key: string, cursor?: WebCursor) {
   if (key === 'careerist-uz') return crawlCareerist(cursor)
   if (key === 'rabotakz') return crawlRabotaKz(cursor)
   if (key === 'talent-ua') return crawlTalentUa(cursor)
+  if (key === 'workua-api') return crawlWorkUaApi(cursor)
   throw new Error(`unknown web source: ${key}`)
 }
 
