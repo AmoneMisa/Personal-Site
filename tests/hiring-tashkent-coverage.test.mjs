@@ -6,6 +6,8 @@ import { crawlIshBorPages } from '../shared/hiring/sources/ishBorCrawler.ts'
 import { listHiringLinkedInSourceKeys } from '../shared/hiring/sources/linkedInSources.ts'
 import { listHiringSocialSourceKeys } from '../shared/hiring/sources/socialSources.ts'
 import { HIRING_TELEGRAM_CHANNELS } from '../shared/hiring/sources/telegramChannels.ts'
+import { hiringLinkedInSourceHandles, listHiringLinkedInSources } from '../server/hiring/sources/linkedInRefresh.ts'
+import { hiringSocialSourceHandles, listSocialSources } from '../server/hiring/sources/socialRefresh.ts'
 
 test('Tashkent hiring discovery uses broad RU, UZ and EN social search coverage', () => {
   const social = listHiringSocialSourceKeys().filter((key) => key.startsWith('threads-uz-'))
@@ -18,6 +20,16 @@ test('Tashkent hiring discovery uses broad RU, UZ and EN social search coverage'
   assert.ok(social.includes('threads-uz-en-looking'))
   assert.ok(linkedin.includes('linkedin-uz-tashkent-open-to-work'))
   assert.ok(linkedin.includes('linkedin-uz-tashkent-ish-qidiryapman'))
+})
+
+test('shared social/LinkedIn discovery catalogs stay aligned with executable targets', () => {
+  const socialRuntime = new Set(hiringSocialSourceHandles().map((value) => value.replace(/^social:/, '')))
+  const linkedInRuntime = new Set(hiringLinkedInSourceHandles().map((value) => value.replace(/^linkedin:/, '')))
+
+  assert.deepEqual(new Set(listHiringSocialSourceKeys()), socialRuntime)
+  assert.deepEqual(new Set(listSocialSources().map((source) => source.key)), socialRuntime)
+  assert.deepEqual(new Set(listHiringLinkedInSourceKeys()), linkedInRuntime)
+  assert.deepEqual(new Set(listHiringLinkedInSources().map((source) => source.key)), linkedInRuntime)
 })
 
 test('Tashkent-heavy public resume Telegram feeds are part of the canonical hiring catalog', () => {
