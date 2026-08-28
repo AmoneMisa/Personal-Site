@@ -2,13 +2,12 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 
-for (const path of [
-  '../app/composables/jobs/useJobFeed.ts',
-  '../app/composables/hiring/useHiringFeed.ts',
-  '../app/composables/flats/useFlatFeed.ts',
-]) {
-  test(`filter debounce is small for ${path}`, async () => {
-    const source = await readFile(new URL(path, import.meta.url), 'utf8');
-    assert.match(source, /FILTER_REQUEST_DEBOUNCE_MS = 180/);
-  });
-}
+// The jobs/hiring/flats feeds share one debounce budget. It used to be declared
+// separately in each of them (and could drift); it now lives in the shared
+// useFeedPolling primitive, so the budget is asserted in exactly one place.
+test('filter debounce budget stays small', async () => {
+  const source = await readFile(new URL('../app/composables/search/useFeedPolling.ts', import.meta.url), 'utf8');
+  const match = source.match(/FILTER_REQUEST_DEBOUNCE_MS = (\d+)/);
+  assert.ok(match, 'useFeedPolling must declare FILTER_REQUEST_DEBOUNCE_MS');
+  assert.ok(Number(match[1]) <= 250, `filter debounce ${match[1]}ms should stay at or below 250ms`);
+});

@@ -3,8 +3,7 @@ import type { Ref } from "vue";
 import type { Job, JobResult, JobStats } from "~/types/jobs";
 import { safeFetch } from "~/utils/safeFetch";
 import { useLatestRequest } from "~/composables/search/useLatestRequest";
-
-const FILTER_REQUEST_DEBOUNCE_MS = 180;
+import { useFeedPolling } from "~/composables/search/useFeedPolling";
 
 export function useJobFeed(usdRates: Ref<Record<string, number>>) {
   const jobs = ref<Job[]>([]);
@@ -20,42 +19,19 @@ export function useJobFeed(usdRates: Ref<Record<string, number>>) {
   const pendingSourceCount = ref(0);
   const loadMoreSentinel = ref<HTMLElement | null>(null);
   const requests = useLatestRequest();
-  let warmTimer: ReturnType<typeof setTimeout> | undefined;
-  let warmParams: Record<string, string> | null = null;
-  let filterDebounceTimer: ReturnType<typeof setTimeout> | undefined;
-  let filterDebounceResolve: ((run: boolean) => void) | undefined;
-
-  function debounceFilterRequest(): Promise<boolean> {
-    if (filterDebounceTimer) clearTimeout(filterDebounceTimer);
-    filterDebounceResolve?.(false);
-    return new Promise((resolve) => {
-      filterDebounceResolve = resolve;
-      filterDebounceTimer = setTimeout(() => {
-        filterDebounceTimer = undefined;
-        filterDebounceResolve = undefined;
-        resolve(true);
-      }, FILTER_REQUEST_DEBOUNCE_MS);
-    });
-  }
-
-  function scheduleWarmPoll() {
-    if (warmTimer) clearTimeout(warmTimer);
-    if (!warming.value || !warmParams) return;
-    warmTimer = setTimeout(() => {
-      warmTimer = undefined;
-      void loadFeed(warmParams!, { background: true });
-    }, 1800);
-  }
+  const polling = useFeedPolling<Record<string, string>>({
+    onWarmPoll: (params) => { void loadFeed(params, { background: true }); },
+  });
 
   async function loadFeed(params: Record<string, string>, options: { append?: boolean; background?: boolean } = {}): Promise<JobResult | undefined> {
     const append = !!options.append;
     const background = !!options.background;
-    if (!append && !background && !(await debounceFilterRequest())) return undefined;
+    if (!append && !background && !(await polling.debounceFilterRequest())) return undefined;
 
     const requestId = requests.next();
-    if (!append) warmParams = { ...params };
+    if (!append) polling.rememberWarmParams({ ...params });
     if (!background) {
-      if (warmTimer) clearTimeout(warmTimer);
+      polling.cancelWarmPoll();
       if (append) loadingMore.value = true;
       else loading.value = true;
       failed.value = false;
@@ -88,14 +64,11 @@ export function useJobFeed(usdRates: Ref<Record<string, number>>) {
       loading.value = false;
       loadingMore.value = false;
     }
-    scheduleWarmPoll();
+    polling.scheduleWarmPoll(warming.value);
     return !error ? data : undefined;
   }
 
   onBeforeUnmount(() => {
-    if (warmTimer) clearTimeout(warmTimer);
-    if (filterDebounceTimer) clearTimeout(filterDebounceTimer);
-    filterDebounceResolve?.(false);
     requests.cancelPending();
   });
 

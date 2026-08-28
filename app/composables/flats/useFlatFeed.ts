@@ -2,10 +2,13 @@ import { nextTick, ref } from "vue";
 import type { FlatFeedResult, FlatListing, FlatStatistics } from "~/types/flats";
 import { safeFetch } from "~/utils/safeFetch";
 import { useLatestRequest } from "~/composables/search/useLatestRequest";
+import { useFeedPolling } from "~/composables/search/useFeedPolling";
 
-const FILTER_REQUEST_DEBOUNCE_MS = 180;
-
-export function useFlatFeed(options: { onAvailabilityChecked?: (keys: string[]) => void } = {}) {
+// Named `feedOptions`, not `options`: loadFeed() below takes its own `options`
+// parameter, and the two used to collide. The inner one shadowed this, so
+// `options.onAvailabilityChecked?.()` inside loadFeed silently resolved to
+// undefined and the availability cache was never refreshed from feed responses.
+export function useFlatFeed(feedOptions: { onAvailabilityChecked?: (keys: string[]) => void } = {}) {
   const listings = ref<FlatListing[]>([]);
   const total = ref(0);
   const loading = ref(false);
@@ -19,23 +22,9 @@ export function useFlatFeed(options: { onAvailabilityChecked?: (keys: string[]) 
   const loadMoreSentinel = ref<HTMLElement | null>(null);
   const requests = useLatestRequest();
   let statisticsRequestId = 0;
-  let warmTimer: ReturnType<typeof setTimeout> | undefined;
-  let warmParams: Record<string, string> | null = null;
-  let filterDebounceTimer: ReturnType<typeof setTimeout> | undefined;
-  let filterDebounceResolve: ((run: boolean) => void) | undefined;
-
-  function debounceFilterRequest(): Promise<boolean> {
-    if (filterDebounceTimer) clearTimeout(filterDebounceTimer);
-    filterDebounceResolve?.(false);
-    return new Promise((resolve) => {
-      filterDebounceResolve = resolve;
-      filterDebounceTimer = setTimeout(() => {
-        filterDebounceTimer = undefined;
-        filterDebounceResolve = undefined;
-        resolve(true);
-      }, FILTER_REQUEST_DEBOUNCE_MS);
-    });
-  }
+  const polling = useFeedPolling<Record<string, string>>({
+    onWarmPoll: (params) => { void loadFeed(params, { background: true }); },
+  });
 
   async function setStatisticsWithoutViewportJump(value: FlatStatistics) {
     if (!import.meta.client) {
@@ -51,15 +40,6 @@ export function useFlatFeed(options: { onAvailabilityChecked?: (keys: string[]) 
         window.scrollTo({ top, left, behavior: "auto" });
       }
     });
-  }
-
-  function scheduleWarmPoll() {
-    if (warmTimer) clearTimeout(warmTimer);
-    if (!warming.value || !warmParams) return;
-    warmTimer = setTimeout(() => {
-      warmTimer = undefined;
-      void loadFeed(warmParams!, { background: true });
-    }, 1800);
   }
 
   async function loadStatistics(params: Record<string, string>, requestId: number) {
@@ -85,14 +65,14 @@ export function useFlatFeed(options: { onAvailabilityChecked?: (keys: string[]) 
   async function loadFeed(params: Record<string, string>, options: { append?: boolean; background?: boolean } = {}): Promise<FlatFeedResult | undefined> {
     const append = !!options.append;
     const background = !!options.background;
-    if (!append && !background && !(await debounceFilterRequest())) return undefined;
+    if (!append && !background && !(await polling.debounceFilterRequest())) return undefined;
 
     const requestId = requests.next();
     const wantsStatistics = !append && params.includeStats === "1";
     const currentStatisticsRequestId = !append ? ++statisticsRequestId : statisticsRequestId;
-    if (!append) warmParams = { ...params };
+    if (!append) polling.rememberWarmParams({ ...params });
     if (!background) {
-      if (warmTimer) clearTimeout(warmTimer);
+      polling.cancelWarmPoll();
       if (append) loadingMore.value = true;
       else loading.value = true;
       failed.value = false;
@@ -113,17 +93,17 @@ export function useFlatFeed(options: { onAvailabilityChecked?: (keys: string[]) 
         loading.value = false;
         loadingMore.value = false;
       }
-      scheduleWarmPoll();
+      polling.scheduleWarmPoll(warming.value);
       return undefined;
     }
-    if (data.availabilityChecked?.length) options.onAvailabilityChecked?.(data.availabilityChecked);
+    if (data.availabilityChecked?.length) feedOptions.onAvailabilityChecked?.(data.availabilityChecked);
     if (background) {
       if (!append) total.value = data.count ?? total.value;
       sourceErrors.value = data.sourceErrors || [];
       if (data.statistics) void setStatisticsWithoutViewportJump(data.statistics);
       warming.value = !!data.warming;
       if (wantsStatistics) void loadStatistics(params, currentStatisticsRequestId);
-      scheduleWarmPoll();
+      polling.scheduleWarmPoll(warming.value);
       return data;
     }
 
@@ -148,14 +128,11 @@ export function useFlatFeed(options: { onAvailabilityChecked?: (keys: string[]) 
     loading.value = false;
     loadingMore.value = false;
     if (wantsStatistics) void loadStatistics(params, currentStatisticsRequestId);
-    scheduleWarmPoll();
+    polling.scheduleWarmPoll(warming.value);
     return data;
   }
 
   onBeforeUnmount(() => {
-    if (warmTimer) clearTimeout(warmTimer);
-    if (filterDebounceTimer) clearTimeout(filterDebounceTimer);
-    filterDebounceResolve?.(false);
     statisticsRequestId++;
     requests.cancelPending();
   });

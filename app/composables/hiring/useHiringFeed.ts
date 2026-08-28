@@ -2,8 +2,7 @@ import { ref } from "vue";
 import type { HiringCvProfile, HiringFeedResult, HiringStatistics } from "~/types/hiring";
 import { safeFetch } from "~/utils/safeFetch";
 import { useLatestRequest } from "~/composables/search/useLatestRequest";
-
-const FILTER_REQUEST_DEBOUNCE_MS = 180;
+import { useFeedPolling } from "~/composables/search/useFeedPolling";
 
 export function useHiringFeed() {
   const profiles = ref<HiringCvProfile[]>([]);
@@ -17,42 +16,19 @@ export function useHiringFeed() {
   const sourceErrors = ref<HiringFeedResult["sourceErrors"]>([]);
   const usdRates = ref<Record<string, number>>({ USD: 1 });
   const requests = useLatestRequest();
-  let warmTimer: ReturnType<typeof setTimeout> | undefined;
-  let warmParams: Record<string, string> | null = null;
-  let filterDebounceTimer: ReturnType<typeof setTimeout> | undefined;
-  let filterDebounceResolve: ((run: boolean) => void) | undefined;
-
-  function debounceFilterRequest(): Promise<boolean> {
-    if (filterDebounceTimer) clearTimeout(filterDebounceTimer);
-    filterDebounceResolve?.(false);
-    return new Promise((resolve) => {
-      filterDebounceResolve = resolve;
-      filterDebounceTimer = setTimeout(() => {
-        filterDebounceTimer = undefined;
-        filterDebounceResolve = undefined;
-        resolve(true);
-      }, FILTER_REQUEST_DEBOUNCE_MS);
-    });
-  }
-
-  function scheduleWarmPoll() {
-    if (warmTimer) clearTimeout(warmTimer);
-    if (!warming.value || !warmParams) return;
-    warmTimer = setTimeout(() => {
-      warmTimer = undefined;
-      void loadFeed(warmParams!, { background: true });
-    }, 1800);
-  }
+  const polling = useFeedPolling<Record<string, string>>({
+    onWarmPoll: (params) => { void loadFeed(params, { background: true }); },
+  });
 
   async function loadFeed(params: Record<string, string>, options: { append?: boolean; background?: boolean } = {}): Promise<HiringFeedResult | undefined> {
     const append = !!options.append;
     const background = !!options.background;
-    if (!append && !background && !(await debounceFilterRequest())) return undefined;
+    if (!append && !background && !(await polling.debounceFilterRequest())) return undefined;
 
     const requestId = requests.next();
-    if (!append) warmParams = { ...params };
+    if (!append) polling.rememberWarmParams({ ...params });
     if (!background) {
-      if (warmTimer) clearTimeout(warmTimer);
+      polling.cancelWarmPoll();
       if (append) loadingMore.value = true;
       else loading.value = !profiles.value.length;
       failed.value = false;
@@ -81,14 +57,11 @@ export function useHiringFeed() {
       loadingMore.value = false;
       filtersPending.value = false;
     }
-    scheduleWarmPoll();
+    polling.scheduleWarmPoll(warming.value);
     return !error && data && !data.error ? data : undefined;
   }
 
   onBeforeUnmount(() => {
-    if (warmTimer) clearTimeout(warmTimer);
-    if (filterDebounceTimer) clearTimeout(filterDebounceTimer);
-    filterDebounceResolve?.(false);
     requests.cancelPending();
   });
 

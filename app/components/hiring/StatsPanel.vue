@@ -65,7 +65,7 @@ const salarySamples = computed(() => currentStatistics.value.salarySamples);
 <template>
   <UiAnalyticsPanel v-if="profiles.length" class="hiring-stats" :title="t('statsTitle')" :collapse-label="t('statsCollapse')" :expand-label="t('statsExpand')">
     <div class="hiring-stats__grid">
-      <article class="analytics-card analytics-card_wide"><div class="analytics-card__head"><h3>{{ t("statsActivity") }}</h3><div class="segments"><button v-for="days in activityOptions" :key="days" type="button" :class="{active:activityDays===days}" @click="activityDays=days">{{ t("statsDays",{n:days}) }}</button></div></div><UiAnalyticsLine :series="activity.series" :labels="activity.labels" /></article>
+      <article class="analytics-card analytics-card_wide"><div class="analytics-card__head"><h3>{{ t("statsActivity") }}</h3><div class="segments" role="group" :aria-label="t('statsActivity')"><button v-for="days in activityOptions" :key="days" type="button" :class="{active:activityDays===days}" :aria-pressed="activityDays===days" @click="activityDays=days">{{ t("statsDays",{n:days}) }}</button></div></div><UiAnalyticsLine :series="activity.series" :labels="activity.labels" /></article>
       <article class="analytics-card"><h3>{{ t("statsGender") }}</h3><UiAnalyticsDonut :items="genderItems" :center-label="t('statsCandidates')" /></article>
       <article class="analytics-card"><h3>{{ t("statsPlatforms") }}</h3><UiAnalyticsBars :items="platformBars" /></article>
       <article class="analytics-card"><h3>{{ t("statsLocations") }}</h3><UiAnalyticsBars :items="locationBars" /></article>
@@ -78,7 +78,8 @@ const salarySamples = computed(() => currentStatistics.value.salarySamples);
   </UiAnalyticsPanel>
 </template>
 
-<style scoped>
+<style scoped lang="scss">
+@use "../../assets/css/mixins/breakpoints" as *;
 .hiring-stats__grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}.analytics-card{min-width:0;padding:14px;border:1px solid rgba(85,111,174,.3);border-radius:11px;background:rgba(12,18,48,.9)}.analytics-card_wide{grid-column:span 2}.analytics-card_salary,.analytics-card_salary-range{grid-column:span 2}.analytics-card h3{margin:0 0 12px;color:var(--ui-text-muted);font-size:11px;font-weight:750;letter-spacing:.05em;text-transform:uppercase}.analytics-card__head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px}.analytics-card__head small{color:var(--ui-text-muted)}.analytics-card__empty{display:grid;min-height:190px;margin:0;place-items:center;color:var(--ui-text-muted);font-size:13px;text-align:center}.segments{display:flex;gap:4px;padding:3px;border:1px solid rgba(85,111,174,.3);border-radius:8px}.segments button{padding:4px 8px;border:0;border-radius:6px;background:transparent;color:var(--ui-text-muted);font-size:10px;cursor:pointer}.segments button.active{background:rgba(224,103,154,.18);color:#f2a2c5}
-@media(max-width:1000px){.hiring-stats__grid{grid-template-columns:repeat(2,minmax(0,1fr))}.analytics-card_wide,.analytics-card_salary,.analytics-card_salary-range{grid-column:1/-1}}@media(max-width:650px){.hiring-stats__grid{grid-template-columns:1fr;padding-inline:12px}.analytics-card_wide,.analytics-card_salary,.analytics-card_salary-range{grid-column:auto}.hiring-stats__toggle{font-size:0!important}.analytics-card__head{flex-direction:column}.segments{width:100%}.segments button{flex:1}}
+@include bp-down(lg){.hiring-stats__grid{grid-template-columns:repeat(2,minmax(0,1fr))}.analytics-card_wide,.analytics-card_salary,.analytics-card_salary-range{grid-column:1/-1}}@include bp-down(sm){.hiring-stats__grid{grid-template-columns:1fr;padding-inline:12px}.analytics-card_wide,.analytics-card_salary,.analytics-card_salary-range{grid-column:auto}.analytics-card__head{flex-direction:column}.segments{width:100%}.segments button{flex:1}}
 </style>
