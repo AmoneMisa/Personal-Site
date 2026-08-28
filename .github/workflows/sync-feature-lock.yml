@@ -1,18 +1,16 @@
-name: Sync feature package lock
+name: Verify Ukraine jobs feature branch
 
 on:
   push:
     branches: [ fix/ua-jobs-search-expansion ]
     paths:
-      - package.json
       - .github/workflows/sync-feature-lock.yml
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
-  sync:
-    if: ${{ !contains(github.event.head_commit.message, '[lock-sync]') }}
+  verify:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -22,14 +20,7 @@ jobs:
         with:
           node-version: 24
           cache: npm
-      - run: npm install --package-lock-only --ignore-scripts --no-audit --no-fund
-      - name: Commit lockfile
-        run: |
-          if git diff --quiet -- package-lock.json; then
-            exit 0
-          fi
-          git config user.name github-actions[bot]
-          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
-          git add package-lock.json
-          git commit -m 'chore: sync package lock [lock-sync]'
-          git push origin HEAD:fix/ua-jobs-search-expansion
+      - run: npm ci --no-audit --no-fund
+      - run: node --experimental-transform-types --check jobs-worker/worker.ts
+      - run: npm test
+      - run: npm run build
