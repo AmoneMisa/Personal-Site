@@ -12,6 +12,7 @@ import { fetchSourceExpansionJobs } from './sourceExpansionJobs'
 import { fetchAviationExpansionJobs } from './aviationExpansionJobs'
 import { fetchIntelliasJobs } from './intelliasJobs'
 import { fetchJobsUaJobs } from './jobsUaSource'
+import { fetchUkraineBoardJobs } from './ukraineJobSources'
 import {
   fetchAdzuna,
   fetchArbeitnow,
@@ -130,6 +131,7 @@ async function fetchAllCompanies(q: string): Promise<Job[]> {
     { label: 'aviation-expansion', load: () => fetchAviationExpansionJobs(q) },
     { label: 'intellias', load: () => fetchIntelliasJobs(q) },
     { label: 'jobs-ua', load: () => fetchJobsUaJobs(q) },
+    { label: 'ua-boards', load: () => fetchUkraineBoardJobs(q) },
   ]
 
   const results = await Promise.allSettled(loaders.map(({ load }) => load()))
