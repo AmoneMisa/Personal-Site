@@ -27,13 +27,10 @@ function distanceM(a: { lat: number; lng: number }, b: { lat: number; lng: numbe
   return 2 * EARTH_RADIUS_M * Math.asin(Math.sqrt(h));
 }
 
-// The catalog only gives us a center point + an "accuracyM" uncertainty radius (up to
-// several km for districts), not a real boundary polygon. Drawing accuracyM directly
-// produces circles that overlap into one giant blob at city zoom. Instead we shrink each
-// circle to roughly half the distance to its nearest sibling, so same-layer zones read as
-// distinct, non-overlapping regions like the reference map, capped to a sane min/max.
+// Radius is only used for catalog entities that do not have a real polygon.
 function fitNonOverlappingRadii(zones: FlatMapZone[], min: number, max: number): FlatMapZone[] {
   return zones.map((zone, index) => {
+    if (zone.boundary) return zone;
     let nearest = Infinity;
     for (let other = 0; other < zones.length; other += 1) {
       if (other === index) continue;
@@ -62,7 +59,7 @@ function zoneFromEntity(entity: GeoEntity, index: number, locale: string): FlatM
 function descendantsOf(cityId: string | null, country: string, type: GeoEntity["type"]): GeoEntity[] {
   if (!cityId) return [];
   const prefix = `${cityId}:`;
-  return findGeoEntities({ country, type }).filter((entity) => entity.id.startsWith(prefix));
+  return findGeoEntities({ country, type }).filter((entity) => entity.parentId === cityId || entity.id.startsWith(prefix));
 }
 
 export interface UseDistrictZonesOptions {
@@ -84,10 +81,18 @@ export function useDistrictZones(options: UseDistrictZonesOptions) {
 
   const districtZones = computed<FlatMapZone[]>(() => {
     if (!country.value || !cityName.value) return [];
-    const zones = toValue(options.districtOptions)
-      .map((name) => resolveLexiconGeoEntity({ country: country.value, city: cityName.value, type: "district", canonical: name }))
-      .filter((entity): entity is GeoEntity => Boolean(entity))
-      .map((entity, index) => zoneFromEntity(entity, index, locale.value));
+
+    // District options from /flats-meta describe districts represented by current
+    // listings. They are not a complete administrative map. Prefer every canonical
+    // district that the geo catalog knows for the selected city, so map coverage is
+    // independent of current inventory and real OSM boundaries are all drawn.
+    const canonical = descendantsOf(cityEntity.value?.id ?? null, country.value, "district");
+    const entities = canonical.length
+      ? canonical
+      : toValue(options.districtOptions)
+          .map((name) => resolveLexiconGeoEntity({ country: country.value, city: cityName.value, type: "district", canonical: name }))
+          .filter((entity): entity is GeoEntity => Boolean(entity));
+    const zones = entities.map((entity, index) => zoneFromEntity(entity, index, locale.value));
     return fitNonOverlappingRadii(zones, 350, 1800);
   });
 
