@@ -7,9 +7,13 @@ const packageLock = await readFile(new URL('../package-lock.json', import.meta.u
 const workerDockerfile = await readFile(new URL('../jobs-worker/Dockerfile', import.meta.url), 'utf8')
 
 test('Docker dependency installation does not require git or SSH', () => {
-  const immutableGeoTarball = /https:\/\/codeload\.github\.com\/AmoneMisa\/geo-catalog\/tar\.gz\/[0-9a-f]{40}/
-  assert.match(packageJson, immutableGeoTarball)
-  assert.match(packageLock, immutableGeoTarball)
-  assert.doesNotMatch(packageLock, /git\+ssh:|git@github\.com/)
+  // geo-catalog is a normal published npm package now (was a private git tarball
+  // pinned by commit SHA before it had a registry release), so the invariant this
+  // guards against — needing git/SSH inside the Docker build — is checked directly
+  // against how npm actually resolved it, not a specific historical URL shape.
+  const gitDependencyReference = /git\+ssh:|git@github\.com|github:AmoneMisa\/geo-catalog(?!\/)/
+  assert.doesNotMatch(packageJson, gitDependencyReference)
+  assert.doesNotMatch(packageLock, gitDependencyReference)
+  assert.match(packageLock, /"resolved":\s*"https:\/\/registry\.npmjs\.org\/@whiteslove\/geo-catalog\//)
   assert.match(workerDockerfile, /RUN npm ci --omit=dev --no-audit --no-fund/)
 })
