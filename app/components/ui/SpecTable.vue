@@ -91,6 +91,12 @@ const flatFieldByLabel = computed(() => new Map<string, string>([
   [t("flats.specFurnished"), "furnished"],
   [t("flats.specBalcony"), "balcony"],
   [t("flats.specAC"), "airConditioner"],
+  [t("flats.specCity"), "city"],
+  [t("flats.specDistrict"), "district"],
+  [t("flats.specMetro"), "metro"],
+  [t("flats.specAddress"), "address"],
+  [t("flats.specShops"), "nearbyShops"],
+  [t("flats.specNearby"), "nearby"],
 ]));
 
 const visionAmenityFields = new Set([
@@ -104,8 +110,8 @@ const visionAmenityFields = new Set([
 ]);
 
 const aiVisionTitle = computed(() => locale.value.startsWith("en")
-  ? "Data from AI Vision"
-  : "Данные из AI-Vision");
+  ? "Data obtained with AI vision"
+  : "Данные при помощи AI-зрения");
 
 function aiHintForRow(row: SpecRow): string | null {
   const fields = flatVisionDerivedFields.value;
@@ -342,7 +348,7 @@ function iconForRow(row: SpecRow): string {
               :title="aiHintForRow(row) || undefined"
               :aria-label="aiHintForRow(row) || undefined"
               tabindex="0"
-            >AI</span>
+            >(?)</span>
           </div>
         </section>
       </div>
