@@ -779,7 +779,7 @@ onBeforeUnmount(() => { modalOpen.value = false; lightboxOpen.value = false; rel
         />
 
         <div class="filter-primary-grid">
-          <div class="flats__field"><u-select-menu :label="t('country')" v-model="countries" :items="countryItems" value-key="value" label-key="label" multiple :placeholder="t('countryAny')" class="flats__select" @update:model-value="scheduleLoad()" /></div>
+          <div class="flats__field"><u-select-menu :label="t('country')" v-model="countries" :items="countryItems" value-key="value" label-key="label" :placeholder="t('countryAny')" class="flats__select" @update:model-value="scheduleLoad()" /></div>
           <div class="flats__field"><u-select-menu :label="t('city')" v-model="citySel" :items="cityItems" value-key="value" label-key="label" class="flats__select" @update:model-value="scheduleLoad()" /></div>
           <div class="flats__field"><u-select-menu :label="t('dealType')" v-model="dealType" :items="dealTypeItems" value-key="value" label-key="label" :search-input="false" class="flats__select" @update:model-value="scheduleLoad()" /></div>
           <div class="flats__field"><u-select-menu :label="t('agency')" v-model="agency" :items="agencyItems" value-key="value" label-key="label" :search-input="false" class="flats__select" @update:model-value="scheduleLoad()" /></div>
