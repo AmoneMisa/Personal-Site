@@ -4,7 +4,7 @@ import type { Job } from './jobTypes'
 
 const BASE_URL = 'https://jobs.ua/vacancy'
 const REQUEST_TIMEOUT_MS = 20_000
-const DEFAULT_MAX_PAGES = 2
+const DEFAULT_MAX_PAGES = 10
 const MAX_PAGES_LIMIT = 10
 const DEFAULT_REQUEST_DELAY_MS = 1_000
 const MAX_DESCRIPTION = 1_200
