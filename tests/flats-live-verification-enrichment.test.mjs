@@ -35,14 +35,19 @@ test("live OLX verification only returns source-authoritative non-empty fields",
 test("English AI semantics are canonicalized before localized rendering", async () => {
   const source = await read("server/routes/flats-feed.get.ts");
 
-  assert.match(source, /function normalizeBooleanLike\(value: any\)/);
-  assert.match(source, /\['yes', 'true', 'allowed', 'available', 'present', 'included', 'furnished'\]/);
-  assert.match(source, /\['no', 'false', 'not allowed', 'unavailable', 'absent', 'not included', 'unfurnished'\]/);
+  assert.match(source, /function normalizeBooleanLike\(field: BooleanListingField, value: any\)/);
+  assert.match(source, /\['yes', 'true', 'present'\]/);
+  assert.match(source, /\['no', 'false', 'absent'\]/);
+  assert.match(source, /\['petsAllowed', 'childrenAllowed', 'smokingAllowed'\]/);
+  assert.match(source, /field === 'furnished'/);
+  assert.match(source, /field === 'communalSeparated'/);
+  assert.match(source, /\['included', 'utilities included'\]/);
   assert.match(source, /return 'needs_renovation'/);
   assert.match(source, /return 'modern'/);
   assert.match(source, /return 'luxury'/);
   assert.match(source, /return 'women'/);
   assert.match(source, /return 'men'/);
   assert.match(source, /return 'family'/);
+  assert.match(source, /normalizeBooleanLike\(field, normalized\[field\]\)/);
   assert.match(source, /const semanticListing = normalizeListingSemantics\(listing\)/);
 });
