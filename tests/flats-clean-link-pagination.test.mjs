@@ -9,13 +9,28 @@ const routeState = await readFile(new URL('../app/composables/flats/useFlatRoute
 test('flats-feed resolves a clean ?publicId= link without going through the filtered search', () => {
   assert.match(route, /const publicIdParam = String\(upstreamParams\.get\('publicId'\) \|\| ''\)\.trim\(\)/)
   assert.match(route, /\/api\/listing\/by-public-id\/\$\{encodeURIComponent\(publicIdParam\)\}/)
-  assert.match(route, /return \{ count: 1, listings: \[shapeListing\(result\.listing\)\] \}/)
+  assert.match(route, /const data = \{ count: 1, listings: \[shapeListing\(result\.listing\)\] \}/)
 
   // The publicId branch must return before the filtered-search/exactListingId
   // machinery runs, otherwise a clean link would still need listingId/source/country.
   const publicIdIndex = route.indexOf("upstreamParams.get('publicId')")
   const exactListingIndex = route.indexOf("upstreamParams.get('listingId')")
   assert.ok(publicIdIndex > -1 && exactListingIndex > -1 && publicIdIndex < exactListingIndex)
+})
+
+test('a resolved ?publicId= listing is cached briefly so a burst of opens on one shared link is one Postgres round trip', () => {
+  assert.match(route, /const PUBLIC_ID_CACHE_TTL_MS = FEED_FRESH_MS/)
+  assert.match(route, /const publicIdCache = new Map<string, \{ at: number; data: any \}>\(\)/)
+  assert.match(route, /const cached = publicIdCache\.get\(publicIdParam\)/)
+  assert.match(route, /if \(cached && Date\.now\(\) - cached\.at < PUBLIC_ID_CACHE_TTL_MS\) return cached\.data/)
+  assert.match(route, /publicIdCache\.set\(publicIdParam, \{ at: Date\.now\(\), data \}\)/)
+
+  // A miss (listing not found / still ingesting) must never be cached, or a
+  // newly-active listing would stay invisible until the TTL expires.
+  assert.match(route, /Not-found stays uncached/)
+  const hitIndex = route.indexOf('publicIdCache.set(publicIdParam')
+  const notFoundCommentIndex = route.indexOf('Not-found stays uncached')
+  assert.ok(hitIndex > -1 && notFoundCommentIndex > -1 && hitIndex < notFoundCommentIndex)
 })
 
 test('opening or sharing a listing prefers the bare publicId over the flat/flatSource/flatCountry triple', () => {

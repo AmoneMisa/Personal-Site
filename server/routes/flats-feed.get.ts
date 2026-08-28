@@ -28,8 +28,14 @@ const STATS_UPSTREAM_TIMEOUT_MS = 55_000
 // roughly ten-second request ceiling. Return an inconclusive result before that
 // ceiling instead of letting a slow OLX response turn into a user-visible 504.
 const EXACT_LOOKUP_TIMEOUT_MS = 8_000
+// A clean ?adv= link hits this endpoint on every open — sharing one link in a
+// group chat means a burst of visitors resolving the same publicId within
+// seconds. A short TTL absorbs that burst as one Postgres round trip while
+// staying fresh enough that a price edit or deactivation shows up quickly.
+const PUBLIC_ID_CACHE_TTL_MS = FEED_FRESH_MS
 const feedCache = new Map<string, { at: number; data: any }>()
 const feedRefreshes = new Map<string, Promise<any>>()
+const publicIdCache = new Map<string, { at: number; data: any }>()
 const ALL_FEED_SOURCES = ['olx', 'telegram', 'facebook', 'threads'] as const
 const CURRENT_ALL_SOURCE_TOKENS = [...ALL_FEED_SOURCES, 'custom'] as const
 const SOCIAL_FEED_SOURCES = new Set(['telegram', 'facebook', 'threads'])
@@ -346,14 +352,20 @@ export default defineEventHandler(async (event) => {
   const publicIdParam = String(upstreamParams.get('publicId') || '').trim()
   if (publicIdParam && /^\d+$/.test(publicIdParam)) {
     setResponseHeader(event, 'Cache-Control', 'no-store')
+    const cached = publicIdCache.get(publicIdParam)
+    if (cached && Date.now() - cached.at < PUBLIC_ID_CACHE_TTL_MS) return cached.data
     try {
       const result = await $fetch<any>(
         `${FLAT_API_URL}/api/listing/by-public-id/${encodeURIComponent(publicIdParam)}`,
         { timeout: EXACT_LOOKUP_TIMEOUT_MS },
       )
       if (result?.listing) {
-        return { count: 1, listings: [shapeListing(result.listing)] }
+        const data = { count: 1, listings: [shapeListing(result.listing)] }
+        publicIdCache.set(publicIdParam, { at: Date.now(), data })
+        return data
       }
+      // Not-found stays uncached: a listing still being ingested must not be
+      // kept invisible behind a cached miss until the TTL expires.
       return { count: 0, listings: [] }
     } catch (error: any) {
       const status = Number(error?.statusCode || error?.response?.status || 0)
