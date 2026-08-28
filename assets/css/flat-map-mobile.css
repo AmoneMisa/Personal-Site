@@ -1,0 +1,31 @@
+/* Mobile-only positioning for controls rendered by FlatMap.client.vue.
+   Keep the toolbar out of Leaflet's zoom control and make the long set of
+   geography toggles horizontally scrollable instead of overflowing the map. */
+@media (max-width: 640px) {
+  .flat-map-shell .flat-map__tools {
+    left: 72px;
+    right: 8px;
+    width: auto;
+    max-width: none;
+    justify-content: flex-start;
+    overflow-x: auto;
+    overflow-y: hidden;
+    overscroll-behavior-inline: contain;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+    padding-bottom: 3px;
+  }
+
+  .flat-map-shell .flat-map__tools::-webkit-scrollbar {
+    display: none;
+  }
+
+  .flat-map-shell .flat-map__tool {
+    flex: 0 0 auto;
+    white-space: nowrap;
+  }
+
+  .flat-map-shell_full .flat-map__tools {
+    top: max(8px, env(safe-area-inset-top));
+  }
+}
