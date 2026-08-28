@@ -1,7 +1,8 @@
 // GET /jobs-feed — read-only vacancy feed served by the isolated jobs API.
 // Ingestion lives exclusively in jobs-worker; this request path reads the
-// Personal Site jobs PostgreSQL read model. The persisted snapshot and
-// Elasticsearch remain rollout/outage fallbacks; crawling never runs here.
+// Personal Site jobs PostgreSQL read model. Search requests intentionally use
+// Elasticsearch over the persisted snapshot so fuzzy/transliterated matching
+// remains active; PostgreSQL stays the fast path for structured/filter-only reads.
 
 import {
   ALL_SOURCES,
@@ -170,21 +171,26 @@ export default defineEventHandler(async (event) => {
     pageSize: clampInt(q.pageSize, 20, 1, 100),
   }
 
-  const databaseResult = await queryJobsDb(jobQuery)
-  if (databaseResult) {
-    setResponseHeader(event, 'Cache-Control', 'private, max-age=30')
-    return {
-      ...databaseResult,
-      jobs: databaseResult.jobs.map((job) => ({
-        ...job,
-        publicId: publicEntityId('job', job.source, job.id),
-      })),
-      rates: getRates(),
-      warming: false,
-      loadedSources: databaseResult.loadedSources,
-      pendingSources: [],
-      failedSources: [],
-      engine: 'postgresql',
+  // PostgreSQL is excellent for structured filtering, but its plainto_tsquery
+  // fallback must not shadow the fuzzy/transliterated Elasticsearch index. A
+  // textual q therefore goes through the existing ES + snapshot path below.
+  if (!search) {
+    const databaseResult = await queryJobsDb(jobQuery)
+    if (databaseResult) {
+      setResponseHeader(event, 'Cache-Control', 'private, max-age=30')
+      return {
+        ...databaseResult,
+        jobs: databaseResult.jobs.map((job) => ({
+          ...job,
+          publicId: publicEntityId('job', job.source, job.id),
+        })),
+        rates: getRates(),
+        warming: false,
+        loadedSources: databaseResult.loadedSources,
+        pendingSources: [],
+        failedSources: [],
+        engine: 'postgresql',
+      }
     }
   }
 
@@ -237,5 +243,6 @@ export default defineEventHandler(async (event) => {
     loadedSources: [...new Set(pool.map((job) => job.source))],
     pendingSources: [],
     failedSources: [],
+    engine: searchMatches ? 'elasticsearch' : 'snapshot',
   }
 })
