@@ -135,6 +135,7 @@ const {
 let loadTimer: ReturnType<typeof setTimeout> | undefined;
 let sharedListingTimer: ReturnType<typeof setTimeout> | undefined;
 let lastPaginationScrollY = 0;
+const pageRestoring = ref(true);
 
 const { copyText } = useClipboard();
 const {
@@ -296,6 +297,21 @@ function savePreset() {
   if (saveSearchPreset()) presetModalOpen.value = false;
 }
 async function loadRates() { const { data } = await safeFetch<{ rates?: Record<string, number> }>("/flats-rates"); if (data?.rates && data.rates.USD) rates.value = data.rates; }
+// The listing feed itself is offset/cursor-based infinite scroll, not paged —
+// "page" here is purely a URL bookmark of how many PAGE_SIZE batches are
+// loaded, so a shared link can restore roughly where the visitor left off.
+function currentPageNumber(): number { return Math.max(1, Math.ceil(listings.value.length / PAGE_SIZE)); }
+function syncPageInUrl(page: number) {
+  if (import.meta.server) return;
+  const query: Record<string, string> = {};
+  for (const [key, value] of Object.entries(route.query)) {
+    const text = queryString(value);
+    if (text) query[key] = text;
+  }
+  if (page > 1) query.page = String(page);
+  else delete query.page;
+  void router.replace({ query });
+}
 async function load(append = false, background = false) {
   const params = buildFeedParams({
     limit: PAGE_SIZE,
@@ -308,6 +324,17 @@ async function load(append = false, background = false) {
   if (!data || background) return;
   if (!append && import.meta.client) lastPaginationScrollY = window.scrollY;
   if (!append) void syncQueryParams();
+  // Skip while the mount sequence is still restoring a deep-linked `?page=n`:
+  // the first (non-append) load only fills page 1, and syncing right then would
+  // strip the requested page before restoreToPage gets a chance to catch up.
+  if (import.meta.client && !pageRestoring.value && view.value === "active") syncPageInUrl(currentPageNumber());
+}
+async function restoreToPage(targetPage: number) {
+  let guard = 0;
+  while (hasMore.value && listings.value.length < targetPage * PAGE_SIZE && guard < 50) {
+    await load(true, false);
+    guard += 1;
+  }
 }
 // One debounce for every filter interaction. Picking a country, then a city,
 // then a district used to fire a request per click at 80ms apart, and each
@@ -367,10 +394,23 @@ function syncListingInUrl(listing: Listing | null) {
   }
 
   if (listing) {
-    query.flat = listing.id;
-    query.flatSource = listing.source;
-    query.flatCountry = listing.country;
+    // The publicId is a stable, source-independent key (backed by the flat-finder
+    // Postgres row id), so it alone identifies the advert — no source/country
+    // pair needed. Older shared links still carry the triple; keep writing it
+    // only as a fallback for listings without a publicId yet.
+    if (listing.publicId != null) {
+      query.adv = String(listing.publicId);
+      delete query.flat;
+      delete query.flatSource;
+      delete query.flatCountry;
+    } else {
+      query.flat = listing.id;
+      query.flatSource = listing.source;
+      query.flatCountry = listing.country;
+      delete query.adv;
+    }
   } else {
+    delete query.adv;
     delete query.flat;
     delete query.flatSource;
     delete query.flatCountry;
@@ -574,7 +614,13 @@ const {
   share: shareLink,
   copyFallback: copyListingShareLink,
 } = useShareLink();
-function makeListingShareLink(l: Listing): string { const resolved = router.resolve({ path: route.path, query: { flat: l.id, flatSource: l.source, flatCountry: l.country } }); return new URL(resolved.href, window.location.origin).toString(); }
+function makeListingShareLink(l: Listing): string {
+  const query = l.publicId != null
+    ? { adv: String(l.publicId) }
+    : { flat: l.id, flatSource: l.source, flatCountry: l.country };
+  const resolved = router.resolve({ path: route.path, query });
+  return new URL(resolved.href, window.location.origin).toString();
+}
 async function shareFlat(l: Listing) {
   const link = makeListingShareLink(l); const title = displayListingTitle(l);
   await shareLink({ title, text: title, url: link, key: l.id });
@@ -591,13 +637,37 @@ async function openSharedListing(id: string, sourceName = "", countryCode = "", 
   }
   if (data?.warming && attempt < 20) { if (sharedListingTimer) clearTimeout(sharedListingTimer); sharedListingTimer = setTimeout(() => { sharedListingTimer = undefined; void openSharedListing(id, sourceName, countryCode, attempt + 1); }, 1800); }
 }
+async function openSharedListingByPublicId(publicId: string, attempt = 0) {
+  const local = listings.value.find((listing) => String(listing.publicId ?? "") === publicId);
+  if (local) { await openListing(local); return; }
+  const { data, error } = await safeFetch<FeedResult>("/flats-feed", { params: { publicId } });
+  const exact = data?.listings?.find((listing) => String(listing.publicId ?? "") === publicId);
+  if (exact) { await openListing(exact); return; }
+  if (!error) {
+    // A clean advert link that no longer resolves (listing removed/deactivated)
+    // shouldn't linger in the address bar pointing at nothing.
+    if (queryString(route.query.adv) === publicId) syncListingInUrl(null);
+    return;
+  }
+  // A lookup failure here is a transient network/upstream hiccup, not a
+  // "still warming" state (this endpoint is a direct DB read) — a short,
+  // bounded retry is enough.
+  if (attempt < 5) { if (sharedListingTimer) clearTimeout(sharedListingTimer); sharedListingTimer = setTimeout(() => { sharedListingTimer = undefined; void openSharedListingByPublicId(publicId, attempt + 1); }, 1500); }
+}
 onMounted(async () => {
+  const sharedAdvId = queryString(route.query.adv);
   const sharedFlatId = queryString(route.query.flat); const sharedFlatSource = queryString(route.query.flatSource); const sharedFlatCountry = queryString(route.query.flatCountry);
+  const requestedPage = Math.max(1, Math.trunc(Number(queryString(route.query.page))) || 1);
   defaultCountry.value = regionalSearchCountry();
   if (!queryString(route.query.countries)) countries.value = [defaultCountry.value];
   loadPersonalState(); applyQueryParams(route.query); void loadRates(); await loadMeta(); await nextTick(); restoring.value = false;
   if (queryString(route.query.shared) === "1") { showAdvanced.value = true; sharedLinkOpened.value = true; shareModalOpen.value = true; }
-  await load(false); if (sharedFlatId) await openSharedListing(sharedFlatId, sharedFlatSource, sharedFlatCountry); await nextTick(); lastPaginationScrollY = window.scrollY;
+  await load(false);
+  if (requestedPage > 1) await restoreToPage(requestedPage);
+  pageRestoring.value = false;
+  if (sharedAdvId) await openSharedListingByPublicId(sharedAdvId);
+  else if (sharedFlatId) await openSharedListing(sharedFlatId, sharedFlatSource, sharedFlatCountry);
+  await nextTick(); lastPaginationScrollY = window.scrollY;
 });
 watch(modalOpen, (open) => { if (open) return; syncListingInUrl(null); lightboxOpen.value = false; cancelTranslation(); nextTick(() => setTimeout(releaseStuckScrollLock, 350)); });
 watch(lightboxOpen, (open) => { if (!open) nextTick(() => setTimeout(releaseStuckScrollLock, 350)); });
@@ -605,6 +675,10 @@ watch(lightboxOpen, (open) => { if (!open) nextTick(() => setTimeout(releaseStuc
 // the first time or the query changed underneath one that is already up. The
 // mount-time read covers only the first case; this covers both, and cannot
 // loop, because opening a listing sets modalOpen before it writes the query.
+watch(() => queryString(route.query.adv), (publicId, previous) => {
+  if (!import.meta.client || !publicId || publicId === previous || modalOpen.value) return;
+  void openSharedListingByPublicId(publicId);
+});
 watch(() => queryString(route.query.flat), (id, previous) => {
   if (!import.meta.client || !id || id === previous || modalOpen.value) return;
   void openSharedListing(id, queryString(route.query.flatSource), queryString(route.query.flatCountry));

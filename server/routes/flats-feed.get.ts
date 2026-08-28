@@ -340,6 +340,29 @@ export default defineEventHandler(async (event) => {
   const metro = upstreamParams.get('metro')
   if (metro) upstreamParams.set('metro', canonicalMetroValue(metro))
 
+  // A clean listing link names only the advert's stable publicId — no filters,
+  // no source/country. Resolve it directly against the backend's dedicated
+  // lookup and skip the whole filtered-search path.
+  const publicIdParam = String(upstreamParams.get('publicId') || '').trim()
+  if (publicIdParam && /^\d+$/.test(publicIdParam)) {
+    setResponseHeader(event, 'Cache-Control', 'no-store')
+    try {
+      const result = await $fetch<any>(
+        `${FLAT_API_URL}/api/listing/by-public-id/${encodeURIComponent(publicIdParam)}`,
+        { timeout: EXACT_LOOKUP_TIMEOUT_MS },
+      )
+      if (result?.listing) {
+        return { count: 1, listings: [shapeListing(result.listing)] }
+      }
+      return { count: 0, listings: [] }
+    } catch (error: any) {
+      const status = Number(error?.statusCode || error?.response?.status || 0)
+      if (status === 404) return { count: 0, listings: [] }
+      setResponseStatus(event, 502)
+      return { count: 0, listings: [], error: 'Listing lookup failed' }
+    }
+  }
+
   const exactListingId = String(upstreamParams.get('listingId') || '').trim()
   const exactSource = requestedSources.length === 1 ? requestedSources[0]! : ''
   const exactCountryCode = exactCountry(upstreamParams)

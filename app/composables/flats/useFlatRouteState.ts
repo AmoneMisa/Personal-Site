@@ -100,7 +100,7 @@ export function useFlatRouteState(options: {
     deserialize,
     preserve: () => {
       const preserved: Record<string, string> = {};
-      for (const key of ["flat", "flatSource", "flatCountry"] as const) {
+      for (const key of ["adv", "flat", "flatSource", "flatCountry", "page"] as const) {
         const value = queryString(options.route.query[key]);
         if (value) preserved[key] = value;
       }
