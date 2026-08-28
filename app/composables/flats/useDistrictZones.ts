@@ -1,7 +1,7 @@
 import { computed, type MaybeRefOrGetter } from "vue";
 import { toValue } from "vue";
 import { findGeoEntities, resolveLexiconGeoEntity, type GeoBoundaryGeometry, type GeoEntity } from "@whiteslove/geo-catalog";
-import { locationLabel } from "~/utils/locationLabels";
+import { zoneNameLabel } from "~/utils/locationLabels";
 
 export interface FlatMapZone {
   id: string;
@@ -46,16 +46,11 @@ function fitNonOverlappingRadii(zones: FlatMapZone[], min: number, max: number):
   });
 }
 
-// locationLabel's "any" kind runs generic landmark/city lookups meant for free-text
-// fields, not microdistrict/mahalla/local_area names — it has mis-translated names
-// like "Tashkent City" into "город Ташкент" (treating it as a plain city reference).
-// Only "district" has a real translation table in the shared lexicon; everything
-// else is safer shown as its raw canonical name than silently mistranslated.
-function zoneFromEntity(entity: GeoEntity, index: number, locale: string, kind: "district" | "any"): FlatMapZone {
+function zoneFromEntity(entity: GeoEntity, index: number, locale: string): FlatMapZone {
   return {
     id: entity.id,
     name: entity.canonicalName,
-    label: kind === "district" ? locationLabel(entity.canonicalName, locale, kind) : entity.canonicalName,
+    label: zoneNameLabel(entity.canonicalName, locale),
     lat: entity.center.lat,
     lng: entity.center.lng,
     radiusM: entity.accuracyM || 400,
@@ -92,22 +87,22 @@ export function useDistrictZones(options: UseDistrictZonesOptions) {
     const zones = toValue(options.districtOptions)
       .map((name) => resolveLexiconGeoEntity({ country: country.value, city: cityName.value, type: "district", canonical: name }))
       .filter((entity): entity is GeoEntity => Boolean(entity))
-      .map((entity, index) => zoneFromEntity(entity, index, locale.value, "district"));
+      .map((entity, index) => zoneFromEntity(entity, index, locale.value));
     return fitNonOverlappingRadii(zones, 350, 1800);
   });
 
   const microdistrictMarkers = computed<FlatMapZone[]>(() => descendantsOf(cityEntity.value?.id ?? null, country.value, "microdistrict")
-    .map((entity, index) => zoneFromEntity(entity, index, locale.value, "any")));
+    .map((entity, index) => zoneFromEntity(entity, index, locale.value)));
 
   const quartalMarkers = computed<FlatMapZone[]>(() => descendantsOf(cityEntity.value?.id ?? null, country.value, "mahalla")
-    .map((entity, index) => zoneFromEntity(entity, index, locale.value, "any")));
+    .map((entity, index) => zoneFromEntity(entity, index, locale.value)));
 
   const areaZones = computed<FlatMapZone[]>(() => {
     const entities = [
       ...descendantsOf(cityEntity.value?.id ?? null, country.value, "local_area"),
       ...descendantsOf(cityEntity.value?.id ?? null, country.value, "development_area"),
     ];
-    const zones = entities.map((entity, index) => zoneFromEntity(entity, index, locale.value, "any"));
+    const zones = entities.map((entity, index) => zoneFromEntity(entity, index, locale.value));
     return fitNonOverlappingRadii(zones, 150, 700);
   });
 

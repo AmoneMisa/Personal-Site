@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { safeFetch } from "~/utils/safeFetch";
-import { metroLabelWithAlias, locationLabel, type LocationKind } from "~/utils/locationLabels";
+import { metroLabelWithAlias, locationLabel, zoneNameLabel, type LocationKind } from "~/utils/locationLabels";
 import FlatMap from "~/components/flats/FlatMap.client.vue";
 import FlatCard from "~/components/flats/FlatCard.vue";
 import SearchResultGrid from "~/components/search/SearchResultGrid.vue";
@@ -603,13 +603,13 @@ const specRows = computed<FlatSpecRow[]>(() => {
     row("property", t("specYear"), numOr(l.buildingYear)),
     row("property", t("specNewBuilding"), fmtBool(l.newBuilding)),
     row("property", t("specCondition"), conditionLabel(l.condition)),
-    row("property", t("specComplex"), strOr(l.residenceComplex)),
+    row("property", t("specComplex"), strOr(l.residenceComplex), true),
 
     row("location", t("specCity"), strOr(locName(l.city, "city"))),
     row("location", t("specDistrict"), strOr(locName(l.district, "district"))),
-    row("location", t("specKvartal"), strOr(locName(l.area || l.kvartal, "any"))),
+    row("location", t("specKvartal"), strOr(zoneNameLabel(l.area || l.kvartal, locale.value))),
     row("location", t("specMetro"), strOr(metroLabelWithAlias(l.metro, locale.value))),
-    row("location", t("specAddress"), strOr(l.address)),
+    row("location", t("specAddress"), strOr(l.address), true),
     row("location", t("specShops"), listOr(l.nearbyShops), true),
     row("location", t("specNearby"), nearbyListOr(l.nearby), true),
 

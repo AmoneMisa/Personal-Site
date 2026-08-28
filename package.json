@@ -14,7 +14,7 @@
     "@nuxt/icon": "^2.5.0",
     "@nuxt/image": "^2.1.0",
     "@nuxtjs/i18n": "^10.6.0",
-    "@whiteslove/geo-catalog": "github:AmoneMisa/geo-catalog#b2506eb",
+    "@whiteslove/geo-catalog": "0.3.0",
     "@whiteslove/parsing-lexicon": "^0.3.4",
     "chart.js": "^4.5.1",
     "emoji-picker-element": "^1.29.1",

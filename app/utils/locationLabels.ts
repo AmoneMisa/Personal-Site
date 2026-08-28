@@ -54,3 +54,22 @@ export function locationLabel(
 export function metroLabelWithAlias(value: string | null | undefined, locale: string): string {
   return geographyMetroLabelWithAlias(value, locale)
 }
+
+// For microdistrict/quartal/informal-area names (no dedicated LocationKind of their
+// own): try only the district/microdistrict/metro tables directly, in that order,
+// and never fall through to locationLabel's "any" cascade — that cascade also does
+// fuzzy city/country entity matching, which has mistranslated names that merely
+// resemble a city ("Tashkent City" became "город Ташкент"). Many Tashkent
+// microdistrict/quartal names coincide with metro station names (the city's metro
+// stations are named after the areas they serve), so the metro table often has real
+// coverage even for non-metro places. Names with no entry in any of the three stay
+// as their raw canonical form rather than risk a wrong match.
+export function zoneNameLabel(value: string | null | undefined, locale: string): string {
+  const raw = String(value ?? '').trim()
+  if (!raw) return raw
+  for (const kind of ['district', 'microdistrict', 'metro'] as const) {
+    const translated = geographyDisplayName(raw, locale, kind)
+    if (translated && translated !== raw) return translated
+  }
+  return raw
+}
