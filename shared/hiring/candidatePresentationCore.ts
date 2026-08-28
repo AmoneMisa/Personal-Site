@@ -1,17 +1,17 @@
 import { isCandidateNameHidden } from '@whiteslove/parsing-lexicon/hiring-candidate-fields'
+import { normalizeSourceRoleKeys } from '@whiteslove/parsing-lexicon/hiring-source-aliases'
 import type { CvProfile } from '../contracts/hiring'
 import { extractCandidateGender } from './candidateFields'
 
 export type HiringCandidateLocale = 'en' | 'ru'
 
-const GENERIC_ROLE_RE = /^(?:ищу\s+(?:работу|подработку)(?:\s+(?:онлайн|удал[её]нно))?|удал[её]нн\p{L}*\s+подработк\p{L}*(?:\s+за\s+компьютером)?(?:\s+для\s+студентов)?|работа\s+студентам|подработка|работа|работу|любая\s+работа|любая\s+занятость|не\s*важно|без\s+разницы|нет\s+разницы|farqi\s+yo['’ʻʼ‘`]?q|farqi\s+yuq|boshqa\s+ishlar?|ish|ish\s+kerak|ish\s+qidir(?:yapman|aman)|ish\s+izlayapman|onlayn\s+is(?:h|ch)(?:i|chi)?|online\s+is(?:h|ch)(?:i|chi)?|onlayn|online|удал[её]нно|remote(?:\s+work)?|tungi|uyda|ofisda|bilmaym\p{L}*|noma['’ʻʼ‘`]?lum(?:\s+\p{L}+)?|ba|va)$/iu
+// The generic/operative/water-supply/finance-banking/role-alias checks that
+// used to live here as local regex now live in the lexicon's
+// SOURCE_ROLE_NORMALIZATION_RULES (normalizeSourceRoleKeys). HORECA is kept
+// local: it needs a "but not if it already names a specific role" carve-out
+// this presentation layer applies on top, not a role classification itself.
 const REMOTE_GENERIC_RE = /(?:онлайн|online|onlayn|удал[её]н|remote|masofaviy)/iu
 const HORECA_GENERIC_RE = /(?:ищу|нужна|нужен|работа|ишу)?[^\n]{0,40}(?:кафе|кафетер|ресторан|общепит|horeca)(?:[^\n]{0,40}(?:работ|подработ))?/iu
-const FINANCE_GENERIC_RE = /^(?:финансы?\s*[,/&+]\s*банки?|банки?\s*[,/&+]\s*финансы?|finance\s*[,/&+]\s*banking)$/iu
-const WATER_SUPPLY_RE = /^(?:suv\s+ta['’ʻʼ‘`]?minoti|водоснабжение)$/iu
-const OPERATIVE_OFFICER_RE = /^(?:оперативник|оперуполномоченн\p{L}*|оперативный\s+уполномоченн\p{L}*)$/iu
-
-interface RoleAliasRule { keys: string[]; re: RegExp }
 
 const ROLE_ALIAS_RULES: RoleAliasRule[] = [
   { keys: ['Commercial Director'], re: /^коммерческ\p{L}*\s+директор|\bchief\s+commercial\s+officer\b|\bCCO\b/iu },
@@ -76,16 +76,11 @@ export function publicCandidateName(name: string | null | undefined, locale: Hir
 function normalizeRoleKeys(value: string): { keys: string[]; normalized: boolean } {
   const raw = value.trim().replace(/^[,.;:«»"'`\s]+|[,.;:«»"'`\s]+$/gu, '').replace(/\s{2,}/g, ' ')
   if (!raw) return { keys: [], normalized: false }
-  if (OPERATIVE_OFFICER_RE.test(raw)) return { keys: ['Operative Officer'], normalized: true }
-  if (FINANCE_GENERIC_RE.test(raw)) return { keys: ['Finance / Banking Specialist'], normalized: true }
-  if (WATER_SUPPLY_RE.test(raw)) return { keys: ['Water Supply Specialist'], normalized: true }
   if (HORECA_GENERIC_RE.test(raw) && !/(?:официант|повар|бариста|бармен|кассир|waiter|cook|chef|barista|bartender)/iu.test(raw)) {
     return { keys: ['Restaurant / Cafe Worker'], normalized: true }
   }
-  if (GENERIC_ROLE_RE.test(raw)) return { keys: ['Any Role'], normalized: true }
-  for (const alias of ROLE_ALIAS_RULES) {
-    if (alias.re.test(raw)) return { keys: alias.keys, normalized: true }
-  }
+  const sourceKeys = normalizeSourceRoleKeys(raw)
+  if (sourceKeys) return { keys: [...sourceKeys], normalized: true }
   if (/\bish\s+(?:kere|kerak)\b/iu.test(raw) && !/\b(?:dasturchi|menejer|buxgalter|haydovchi|o['’ʻʼ‘`]?qituvchi|operator|kassir|sotuvchi|mehmonxona|turfirma|kompyuter)\b/iu.test(raw)) {
     return { keys: ['Any Role'], normalized: true }
   }
