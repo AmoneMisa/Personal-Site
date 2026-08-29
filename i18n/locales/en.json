@@ -2565,11 +2565,6 @@
             "href": "https://github.com/AmoneMisa/i18nPropertiesManager"
           },
           {
-            "label": "Character manager",
-            "sub": "Lost Ark · Electron.js",
-            "href": "#pet-projects"
-          },
-          {
             "label": "All projects",
             "sub": "full list with descriptions",
             "href": "/projects"
@@ -2577,6 +2572,11 @@
         ],
         "pagesTitle": "Useful pages",
         "pages": [
+          {
+            "label": "Quizzes",
+            "sub": "all quizzes and guides",
+            "href": "/quizzes"
+          },
           {
             "label": "Country fit",
             "sub": "quiz: where to relocate",
