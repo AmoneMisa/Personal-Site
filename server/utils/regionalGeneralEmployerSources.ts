@@ -1,6 +1,7 @@
 import type { Job } from './jobTypes'
 import { detectWorkModes } from './hiringLexicon'
 import { fetchExpandedRegionalRemoteJobs } from './expandedRegionalRemoteSources'
+import { fetchRegionalServiceJobs } from './regionalServiceJobSources'
 
 const UA = 'jobFinder/1.0 (job aggregator; contact: admin@whiteslove.me)'
 const REQUEST_TIMEOUT_MS = 20_000
@@ -185,11 +186,18 @@ function filterQuery(jobs: Job[], q: string): Job[] {
 export async function fetchRegionalGeneralEmployerJobs(q: string): Promise<Job[]> {
   if (String(process.env.REGIONAL_GENERAL_EMPLOYER_SOURCE || 'on').toLowerCase() === 'off') return []
 
-  const [results, expanded] = await Promise.all([
+  const [results, expanded, serviceJobs] = await Promise.all([
     Promise.allSettled(REGIONAL_GENERAL_EMPLOYERS.map(fetchEmployer)),
     fetchExpandedRegionalRemoteJobs(q).catch((error) => {
       console.warn(
         '[jobs:regional-general] expanded regional/remote feeds failed:',
+        error instanceof Error ? error.message : String(error),
+      )
+      return [] as Job[]
+    }),
+    fetchRegionalServiceJobs(q).catch((error) => {
+      console.warn(
+        '[jobs:regional-general] regional service feeds failed:',
         error instanceof Error ? error.message : String(error),
       )
       return [] as Job[]
@@ -205,5 +213,5 @@ export async function fetchRegionalGeneralEmployerJobs(q: string): Promise<Job[]
     )
   })
 
-  return filterQuery([...jobs, ...expanded], q)
+  return filterQuery([...jobs, ...expanded, ...serviceJobs], q)
 }
