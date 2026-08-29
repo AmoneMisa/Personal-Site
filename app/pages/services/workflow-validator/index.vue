@@ -25,6 +25,11 @@ const FILTERS: Array<{ value: WorkflowIssueLevel | "all"; labelKey: string }> = 
   { value: "info", labelKey: "filterInfo" },
 ];
 
+// Mirrors the codes fixWorkflow.ts actually handles (WorkflowFixCode, minus
+// "formatting" which isn't a listed issue) — only used here to badge which
+// issues below the Fix button will resolve.
+const FIXABLE_CODES = new Set(["on-parsed-as-boolean", "missing-name", "hardcoded-secret"]);
+
 function onDrop(event: DragEvent) {
   dragging.value = false;
   void ui.loadFile(event.dataTransfer?.files?.[0]);
@@ -57,6 +62,17 @@ function onPick(event: Event) {
         </u-button>
         <u-button v-if="ui.hasInput" type="button" size="sm" color="neutral" variant="outline" icon="i-lucide-eraser" @click="ui.clear()">
           {{ t("services.workflowValidator.controls.clear") }}
+        </u-button>
+        <u-button
+          v-if="ui.canFix"
+          type="button"
+          size="sm"
+          color="primary"
+          variant="solid"
+          icon="i-lucide-wand-sparkles"
+          @click="ui.applyFix()"
+        >
+          {{ t("services.workflowValidator.controls.fix") }}
         </u-button>
         <span v-if="ui.fileName" class="wfv__filename">{{ ui.fileName }}</span>
         <input
@@ -118,6 +134,10 @@ function onPick(event: Event) {
           </p>
 
           <template v-else>
+            <p v-if="ui.lastAppliedFixes.length" class="wfv__state wfv__state_fixed">
+              <u-icon name="i-lucide-wand-sparkles" />
+              {{ t("services.workflowValidator.messages.fixed", { n: ui.lastAppliedFixes.length }) }}
+            </p>
             <p class="wfv__summary">
               <span v-if="ui.summary.errors" class="wfv__count wfv__count_error">{{ t("services.workflowValidator.messages.errors", { n: ui.summary.errors }) }}</span>
               <span v-if="ui.summary.warnings" class="wfv__count wfv__count_warning">{{ t("services.workflowValidator.messages.warnings", { n: ui.summary.warnings }) }}</span>
@@ -133,6 +153,7 @@ function onPick(event: Event) {
                     <span v-if="issue.line" class="wfv__issue-loc">{{ t("services.workflowValidator.messages.at", { line: issue.line, col: issue.col }) }}</span>
                     <span v-else-if="issue.path" class="wfv__issue-loc">{{ issue.path }}</span>
                     <code class="wfv__issue-code">{{ issue.code }}</code>
+                    <span v-if="FIXABLE_CODES.has(issue.code)" class="wfv__issue-fixable">{{ t("services.workflowValidator.messages.fixable") }}</span>
                   </p>
                 </div>
               </li>
@@ -206,6 +227,7 @@ function onPick(event: Event) {
 .wfv__state { display: flex; align-items: center; gap: 8px; margin: 0; padding: 14px; border: 1px dashed var(--line); border-radius: 8px; color: var(--text-muted); font-size: 13px; }
 .wfv__state_ok { border-style: solid; border-color: rgba(74, 222, 128, .5); color: #4ade80; }
 .wfv__state_error { border-style: solid; border-color: rgba(239, 68, 68, .5); color: #ef4444; }
+.wfv__state_fixed { border-style: solid; border-color: rgba(224, 103, 154, .5); color: var(--accent-pink, #e0679a); }
 
 .wfv__summary { display: flex; flex-wrap: wrap; gap: 8px; margin: 0; }
 .wfv__count { padding: 2px 9px; border-radius: 999px; font-size: 11.5px; font-weight: 700; }
@@ -231,4 +253,8 @@ function onPick(event: Event) {
 .wfv__issue-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 4px 0 0; }
 .wfv__issue-loc { color: var(--text-muted); font-size: 11.5px; overflow-wrap: anywhere; }
 .wfv__issue-code { color: var(--text-muted); font-size: 11px; opacity: .75; }
+.wfv__issue-fixable {
+  padding: 1px 7px; border-radius: 999px; background: rgba(224, 103, 154, .16);
+  color: var(--accent-pink, #e0679a); font-size: 10.5px; font-weight: 700;
+}
 </style>

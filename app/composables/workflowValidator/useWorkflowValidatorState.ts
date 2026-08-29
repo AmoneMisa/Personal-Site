@@ -4,6 +4,7 @@ import {
   validateWorkflow,
   type WorkflowIssueLevel,
 } from "~/utils/workflows/validateWorkflow";
+import { fixWorkflow, type WorkflowFixCode } from "~/utils/workflows/fixWorkflow";
 
 const SAMPLE = `name: CI
 on:
@@ -52,21 +53,48 @@ export function useWorkflowValidatorState() {
   const hasInput = computed(() => source.value.trim().length > 0);
   const isClean = computed(() => hasInput.value && !tooLarge.value && result.value.issues.length === 0);
 
+  // Fixing is a dry run until applied: computed off the current source, not
+  // mutating anything, so the button can be shown/labelled before it's clicked.
+  const appliedFixes = ref<WorkflowFixCode[]>([]);
+  // Only trust `appliedFixes` while the source still matches what Fix produced —
+  // otherwise a further edit (or another Fix click with nothing left to do)
+  // would leave a stale "fixed N issues" message showing.
+  const appliedFixesSource = ref<string | null>(null);
+  const lastAppliedFixes = computed(() => (
+    appliedFixesSource.value === source.value ? appliedFixes.value : []
+  ));
+  const fixPreview = computed(() => {
+    if (!hasInput.value || tooLarge.value || !result.value.parsed) return null;
+    return fixWorkflow(source.value);
+  });
+  const canFix = computed(() => !!fixPreview.value?.changed);
+
+  function applyFix() {
+    const preview = fixPreview.value;
+    if (!preview?.changed) return;
+    source.value = preview.fixed;
+    appliedFixes.value = preview.applied;
+    appliedFixesSource.value = preview.fixed;
+  }
+
   function loadSample() {
     source.value = SAMPLE;
     fileName.value = "";
     loadError.value = "";
+    appliedFixesSource.value = null;
   }
 
   function clear() {
     source.value = "";
     fileName.value = "";
     loadError.value = "";
+    appliedFixesSource.value = null;
   }
 
   async function loadFile(file: File | null | undefined) {
     if (!file) return;
     loadError.value = "";
+    appliedFixesSource.value = null;
     if (file.size > MAX_INPUT_BYTES) {
       loadError.value = "tooLarge";
       return;
@@ -90,6 +118,9 @@ export function useWorkflowValidatorState() {
     visibleIssues,
     hasInput,
     isClean,
+    canFix,
+    lastAppliedFixes,
+    applyFix,
     loadSample,
     loadFile,
     clear,
