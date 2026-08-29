@@ -70,7 +70,7 @@ useSeoMeta({
 const defaultCountry = ref("UA");
 const flatFilters = useFlatFilters();
 const {
-  countries, city, district, propertyType, dealType, agency, petFriendly, roomOnlyFilter,
+  countries, city, district, microdistrict, quartal, mapArea, propertyType, dealType, agency, petFriendly, roomOnlyFilter,
   onlyWithPhotos, childrenRequired, newBuildingOnly, dishwasherOnly, airConditionerOnly,
   parkingOnly, internetOnly, gasOnly, balconyOnly, terraceOnly, privateYardOnly, sort,
   audience, metro, priceMin, priceMax, roomsMin, roomsMax, bedroomsMin, bedroomsMax,
@@ -185,11 +185,10 @@ const { districtZones, microdistrictMarkers, quartalMarkers, areaZones, cityZone
 });
 
 function onZoneSelect({ kind, name }: { kind: "district" | "microdistrict" | "quartal" | "area"; name: string }) {
-  if (kind === "district") {
-    district.value = name;
-  } else {
-    query.value = name;
-  }
+  if (kind === "district") district.value = name;
+  else if (kind === "microdistrict") microdistrict.value = name;
+  else if (kind === "quartal") quartal.value = name;
+  else mapArea.value = name;
   scheduleLoad();
 }
 
@@ -230,6 +229,17 @@ const sortItems = computed<Item[]>(() => [
 ]);
 const districtSel = useNullableSelect(district);
 const metroSel = useNullableSelect(metro);
+const microdistrictSel = useNullableSelect(microdistrict);
+const quartalSel = useNullableSelect(quartal);
+const mapAreaSel = useNullableSelect(mapArea);
+// Options come straight from the geo catalog (the same zones the map draws),
+// not from /flats-meta -- there's no per-listing aggregation for these finer
+// levels yet, so the list can include zones with no current listings.
+const zoneItems = (zones: { name: string; label: string }[]): Item[] =>
+  [{ label: t("all"), value: ANY_SELECT_VALUE }, ...zones.map((z) => ({ value: z.name, label: z.label }))];
+const microdistrictItems = computed<Item[]>(() => zoneItems(microdistrictMarkers.value));
+const quartalItems = computed<Item[]>(() => zoneItems(quartalMarkers.value));
+const areaItems = computed<Item[]>(() => zoneItems(areaZones.value));
 const audienceItems = computed<Item[]>(() => [
   { label: t('audienceAny'), value: "any" },
   { label: t('audienceWomen'), value: "women" },
@@ -253,14 +263,23 @@ const flatAdvancedFilterBlocks = useFlatFilterBlocks({
   filters: flatFilters,
   districtSelect: districtSel,
   metroSelect: metroSel,
+  microdistrictSelect: microdistrictSel,
+  quartalSelect: quartalSel,
+  areaSelect: mapAreaSel,
   nearbyKindSelect: nearbyKindSel,
   districtItems,
   metroItems,
+  microdistrictItems,
+  quartalItems,
+  areaItems,
   nearbyKindItems,
   audienceItems,
   propertyTypeItems,
   hasDistricts: () => districtOptions.value.length > 0,
   hasMetro: () => metroOptions.value.length > 0,
+  hasMicrodistricts: () => microdistrictMarkers.value.length > 0,
+  hasQuartals: () => quartalMarkers.value.length > 0,
+  hasAreas: () => areaZones.value.length > 0,
   scheduleLoad,
 });
 
@@ -729,8 +748,8 @@ watch(
     () => JSON.stringify(currentFilterQuery()),
     () => { if (!restoring.value) scheduleQuerySync(); },
 );
-watch(city, () => { if (restoring.value) return; district.value = ""; metro.value = ""; query.value = ""; });
-watch(countries, () => { if (restoring.value) return; district.value = ""; metro.value = ""; city.value = ""; query.value = ""; });
+watch(city, () => { if (restoring.value) return; district.value = ""; microdistrict.value = ""; quartal.value = ""; mapArea.value = ""; metro.value = ""; query.value = ""; });
+watch(countries, () => { if (restoring.value) return; district.value = ""; microdistrict.value = ""; quartal.value = ""; mapArea.value = ""; metro.value = ""; city.value = ""; query.value = ""; });
 onBeforeUnmount(() => { modalOpen.value = false; lightboxOpen.value = false; releaseStuckScrollLock(); if (loadTimer) clearTimeout(loadTimer); if (sharedListingTimer) clearTimeout(sharedListingTimer); cancelTranslation(); });
 </script>
 
@@ -808,6 +827,9 @@ onBeforeUnmount(() => { modalOpen.value = false; lightboxOpen.value = false; rel
         <UiFilterFooter class="filter-actions-row" :reset-label="t('reset')" @reset="resetFilters">
           <div class="active-filter-chips">
             <button v-if="district" type="button" class="filter-chip" @click="district = ''; scheduleLoad()">{{ t("district") }}: {{ locName(district, 'district') }} <span>×</span></button>
+            <button v-if="microdistrict" type="button" class="filter-chip" @click="microdistrict = ''; scheduleLoad()">{{ t("microdistrictsLayer") }}: {{ zoneNameLabel(microdistrict, locale) }} <span>×</span></button>
+            <button v-if="quartal" type="button" class="filter-chip" @click="quartal = ''; scheduleLoad()">{{ t("quartalsLayer") }}: {{ zoneNameLabel(quartal, locale) }} <span>×</span></button>
+            <button v-if="mapArea" type="button" class="filter-chip" @click="mapArea = ''; scheduleLoad()">{{ t("areasLayer") }}: {{ zoneNameLabel(mapArea, locale) }} <span>×</span></button>
             <button v-if="roomsMin != null" type="button" class="filter-chip" @click="roomsMin = undefined; scheduleLoad()">{{ roomsMin }}+ {{ t('roomsChip') }} <span>×</span></button>
             <button v-if="petFriendly" type="button" class="filter-chip" @click="petFriendly = false; scheduleLoad()"><u-icon name="i-lucide-paw-print" /> {{ t('pets') }} <span>×</span></button>
           </div>
