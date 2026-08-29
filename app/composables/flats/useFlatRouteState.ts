@@ -21,7 +21,8 @@ export function useFlatRouteState(options: {
       countries, city, district, microdistrict, quartal, mapArea, metro, propertyType, dealType, agency, audience,
       petFriendly, roomOnlyFilter, onlyWithPhotos, childrenRequired, newBuildingOnly,
       dishwasherOnly, airConditionerOnly, parkingOnly, internetOnly, gasOnly, balconyOnly,
-      terraceOnly, privateYardOnly, sort, priceMin, priceMax, displayCurrency, roomsMin,
+      terraceOnly, privateYardOnly, noElevatorOnly, noDepositOnly, communalIncludedOnly, noCommissionOnly,
+      commissionPercentMin, commissionPercentMax, sort, priceMin, priceMax, displayCurrency, roomsMin,
       roomsMax, bedroomsMin, bedroomsMax, areaMin, areaMax, pricePerSqmMin, pricePerSqmMax,
       metroMaxM, nearbyKind, nearbyMaxM, floorMin, floorMax, totalFloorsMin, totalFloorsMax,
       yearMin, yearMax, maxAgeDays, query, source,
@@ -50,8 +51,12 @@ export function useFlatRouteState(options: {
     if (balconyOnly.value) q.balcony = "1";
     if (terraceOnly.value) q.terrace = "1";
     if (privateYardOnly.value) q.privateYard = "1";
+    if (noElevatorOnly.value) q.noElevator = "1";
+    if (noDepositOnly.value) q.noDeposit = "1";
+    if (communalIncludedOnly.value) q.communalIncluded = "1";
+    if (noCommissionOnly.value) q.noCommission = "1";
     if (sort.value !== "newest") q.sort = sort.value;
-    for (const [key, value] of Object.entries({ priceMin: priceMin.value, priceMax: priceMax.value, roomsMin: roomsMin.value, roomsMax: roomsMax.value, bedroomsMin: bedroomsMin.value, bedroomsMax: bedroomsMax.value, areaMin: areaMin.value, areaMax: areaMax.value, pricePerSqmMin: pricePerSqmMin.value, pricePerSqmMax: pricePerSqmMax.value, metroMaxM: metroMaxM.value, nearbyMaxM: nearbyMaxM.value, floorMin: floorMin.value, floorMax: floorMax.value, totalFloorsMin: totalFloorsMin.value, totalFloorsMax: totalFloorsMax.value, yearMin: yearMin.value, yearMax: yearMax.value, maxAgeDays: maxAgeDays.value })) {
+    for (const [key, value] of Object.entries({ priceMin: priceMin.value, priceMax: priceMax.value, roomsMin: roomsMin.value, roomsMax: roomsMax.value, bedroomsMin: bedroomsMin.value, bedroomsMax: bedroomsMax.value, areaMin: areaMin.value, areaMax: areaMax.value, pricePerSqmMin: pricePerSqmMin.value, pricePerSqmMax: pricePerSqmMax.value, metroMaxM: metroMaxM.value, nearbyMaxM: nearbyMaxM.value, floorMin: floorMin.value, floorMax: floorMax.value, totalFloorsMin: totalFloorsMin.value, totalFloorsMax: totalFloorsMax.value, yearMin: yearMin.value, yearMax: yearMax.value, maxAgeDays: maxAgeDays.value, commissionPercentMin: commissionPercentMin.value, commissionPercentMax: commissionPercentMax.value })) {
       if (value != null) q[key] = String(value);
     }
     if (displayCurrency.value !== "USD") q.currency = displayCurrency.value;
@@ -87,9 +92,13 @@ export function useFlatRouteState(options: {
     filters.balconyOnly.value = queryBoolean(params.balcony);
     filters.terraceOnly.value = queryBoolean(params.terrace);
     filters.privateYardOnly.value = queryBoolean(params.privateYard);
+    filters.noElevatorOnly.value = queryBoolean(params.noElevator);
+    filters.noDepositOnly.value = queryBoolean(params.noDeposit);
+    filters.communalIncludedOnly.value = queryBoolean(params.communalIncluded);
+    filters.noCommissionOnly.value = queryBoolean(params.noCommission);
     const sortParam = queryString(params.sort) as FlatSort;
     filters.sort.value = FLAT_SORTS.includes(sortParam) ? sortParam : "newest";
-    for (const key of ["priceMin", "priceMax", "roomsMin", "roomsMax", "bedroomsMin", "bedroomsMax", "areaMin", "areaMax", "pricePerSqmMin", "pricePerSqmMax", "metroMaxM", "nearbyMaxM", "floorMin", "floorMax", "totalFloorsMin", "totalFloorsMax", "yearMin", "yearMax", "maxAgeDays"] as const) {
+    for (const key of ["priceMin", "priceMax", "roomsMin", "roomsMax", "bedroomsMin", "bedroomsMax", "areaMin", "areaMax", "pricePerSqmMin", "pricePerSqmMax", "metroMaxM", "nearbyMaxM", "floorMin", "floorMax", "totalFloorsMin", "totalFloorsMax", "yearMin", "yearMax", "maxAgeDays", "commissionPercentMin", "commissionPercentMax"] as const) {
       filters[key].value = Number(queryString(params[key])) || undefined;
     }
     if (queryString(params.currency)) filters.displayCurrency.value = queryString(params.currency);

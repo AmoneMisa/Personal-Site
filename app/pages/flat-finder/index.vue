@@ -72,7 +72,8 @@ const flatFilters = useFlatFilters();
 const {
   countries, city, district, microdistrict, quartal, mapArea, propertyType, dealType, agency, petFriendly, roomOnlyFilter,
   onlyWithPhotos, childrenRequired, newBuildingOnly, dishwasherOnly, airConditionerOnly,
-  parkingOnly, internetOnly, gasOnly, balconyOnly, terraceOnly, privateYardOnly, sort,
+  parkingOnly, internetOnly, gasOnly, balconyOnly, terraceOnly, privateYardOnly,
+  noElevatorOnly, noDepositOnly, communalIncludedOnly, noCommissionOnly, sort,
   audience, metro, priceMin, priceMax, roomsMin, roomsMax, bedroomsMin, bedroomsMax,
   areaMin, areaMax, pricePerSqmMin, pricePerSqmMax, metroMaxM, nearbyKind, nearbyMaxM,
   floorMin, floorMax, totalFloorsMin, totalFloorsMax, yearMin, yearMax, maxAgeDays,
@@ -832,6 +833,10 @@ onBeforeUnmount(() => { modalOpen.value = false; lightboxOpen.value = false; rel
             <button v-if="mapArea" type="button" class="filter-chip" @click="mapArea = ''; scheduleLoad()">{{ t("areasLayer") }}: {{ zoneNameLabel(mapArea, locale) }} <span>×</span></button>
             <button v-if="roomsMin != null" type="button" class="filter-chip" @click="roomsMin = undefined; scheduleLoad()">{{ roomsMin }}+ {{ t('roomsChip') }} <span>×</span></button>
             <button v-if="petFriendly" type="button" class="filter-chip" @click="petFriendly = false; scheduleLoad()"><u-icon name="i-lucide-paw-print" /> {{ t('pets') }} <span>×</span></button>
+            <button v-if="noElevatorOnly" type="button" class="filter-chip" @click="noElevatorOnly = false; scheduleLoad()">{{ t('noElevator') }} <span>×</span></button>
+            <button v-if="noDepositOnly" type="button" class="filter-chip" @click="noDepositOnly = false; scheduleLoad()">{{ t('noDeposit') }} <span>×</span></button>
+            <button v-if="communalIncludedOnly" type="button" class="filter-chip" @click="communalIncludedOnly = false; scheduleLoad()">{{ t('communalIncluded') }} <span>×</span></button>
+            <button v-if="noCommissionOnly" type="button" class="filter-chip" @click="noCommissionOnly = false; scheduleLoad()">{{ t('noCommission') }} <span>×</span></button>
           </div>
         </UiFilterFooter>
       </section>

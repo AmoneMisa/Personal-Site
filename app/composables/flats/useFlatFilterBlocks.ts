@@ -33,6 +33,8 @@ export function useFlatFilterBlocks(options: {
     areaMin, areaMax, pricePerSqmMin, pricePerSqmMax, floorMin, floorMax,
     totalFloorsMin, totalFloorsMax, yearMin, yearMax, audience, propertyType, maxAgeDays,
     dealType, petFriendly, childrenRequired, onlyWithPhotos, newBuildingOnly,
+    noElevatorOnly, noDepositOnly, communalIncludedOnly, noCommissionOnly,
+    commissionPercentMin, commissionPercentMax,
   } = options.filters;
   const update = <T>(target: Model<T>) => (value: SearchFilterValue) => { target.value = value as T; };
   const commit = () => options.scheduleLoad();
@@ -50,6 +52,9 @@ export function useFlatFilterBlocks(options: {
         { id: "children", control: "checkbox", label: options.t("children"), value: childrenRequired.value, hidden: rentOnlyHidden(), onUpdate: update(childrenRequired), onCommit: commit },
         { id: "photos", control: "checkbox", label: options.t("onlyWithPhotos"), value: onlyWithPhotos.value, onUpdate: update(onlyWithPhotos), onCommit: commit },
         { id: "new-building", control: "checkbox", label: options.t("newBuilding"), value: newBuildingOnly.value, onUpdate: update(newBuildingOnly), onCommit: commit },
+        { id: "no-elevator", control: "checkbox", label: options.t("noElevator"), value: noElevatorOnly.value, onUpdate: update(noElevatorOnly), onCommit: commit },
+        { id: "no-deposit", control: "checkbox", label: options.t("noDeposit"), value: noDepositOnly.value, onUpdate: update(noDepositOnly), onCommit: commit },
+        { id: "communal-included", control: "checkbox", label: options.t("communalIncluded"), value: communalIncludedOnly.value, hidden: rentOnlyHidden(), onUpdate: update(communalIncludedOnly), onCommit: commit },
       ],
     },
     {
@@ -95,6 +100,9 @@ export function useFlatFilterBlocks(options: {
         { id: "audience", control: "select", label: options.t("audience"), value: audience.value, options: options.audienceItems.value, searchable: false, hidden: rentOnlyHidden(), onUpdate: update(audience), onCommit: commit },
         { id: "property-type", control: "select", label: options.t("propertyType"), value: propertyType.value, options: options.propertyTypeItems.value, searchable: false, onUpdate: update(propertyType), onCommit: commit },
         { id: "fresh-days", control: "number", label: options.t("freshDays"), value: maxAgeDays.value, min: 1, max: 21, onUpdate: update(maxAgeDays), onCommit: commit },
+        { id: "no-commission", control: "checkbox", label: options.t("noCommission"), value: noCommissionOnly.value, onUpdate: update(noCommissionOnly), onCommit: commit },
+        { id: "commission-pct-min", control: "number", label: `${options.t("rangeCommissionPercent")} · ${options.t("rangeFrom")}`, value: commissionPercentMin.value, min: 0, max: 100, hidden: noCommissionOnly.value, onUpdate: update(commissionPercentMin), onCommit: commit },
+        { id: "commission-pct-max", control: "number", label: `${options.t("rangeCommissionPercent")} · ${options.t("rangeTo")}`, value: commissionPercentMax.value, min: 0, max: 100, hidden: noCommissionOnly.value, onUpdate: update(commissionPercentMax), onCommit: commit },
       ],
     },
   ]);

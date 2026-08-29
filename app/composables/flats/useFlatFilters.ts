@@ -42,6 +42,12 @@ export function useFlatFilters() {
   const balconyOnly = ref(false);
   const terraceOnly = ref(false);
   const privateYardOnly = ref(false);
+  const noElevatorOnly = ref(false);
+  const noDepositOnly = ref(false);
+  const communalIncludedOnly = ref(false);
+  const noCommissionOnly = ref(false);
+  const commissionPercentMin = ref<number>();
+  const commissionPercentMax = ref<number>();
   const sort = ref<FlatSort>("newest");
   const audience = ref("any");
   const metro = ref("");
@@ -181,6 +187,14 @@ export function useFlatFilters() {
     if (balconyOnly.value) params.balcony = "1";
     if (terraceOnly.value) params.terrace = "1";
     if (privateYardOnly.value) params.privateYard = "1";
+    if (noElevatorOnly.value) params.noElevator = "1";
+    if (noDepositOnly.value) params.noDeposit = "1";
+    if (communalIncludedOnly.value) params.communalIncluded = "1";
+    if (noCommissionOnly.value) params.noCommission = "1";
+    else {
+      if (commissionPercentMin.value != null) params.commissionPercentMin = String(commissionPercentMin.value);
+      if (commissionPercentMax.value != null) params.commissionPercentMax = String(commissionPercentMax.value);
+    }
     params.sort = sort.value;
     if (query.value.trim()) params.query = query.value.trim();
     const defaultSources = [...new Set([...options.sources, ...SOCIAL_LISTING_SOURCES])];
@@ -212,6 +226,12 @@ export function useFlatFilters() {
     balconyOnly.value = false;
     terraceOnly.value = false;
     privateYardOnly.value = false;
+    noElevatorOnly.value = false;
+    noDepositOnly.value = false;
+    communalIncludedOnly.value = false;
+    noCommissionOnly.value = false;
+    commissionPercentMin.value = undefined;
+    commissionPercentMax.value = undefined;
     sort.value = "newest";
     priceMin.value = undefined;
     priceMax.value = undefined;
@@ -242,7 +262,8 @@ export function useFlatFilters() {
     countries, city, district, microdistrict, quartal, mapArea, propertyType, dealType, agency,
     petFriendly, roomOnlyFilter, onlyWithPhotos, childrenRequired, newBuildingOnly,
     dishwasherOnly, airConditionerOnly, parkingOnly, internetOnly, gasOnly, balconyOnly,
-    terraceOnly, privateYardOnly, sort, audience, metro, priceMin, priceMax, roomsMin, roomsMax,
+    terraceOnly, privateYardOnly, noElevatorOnly, noDepositOnly, communalIncludedOnly, noCommissionOnly,
+    commissionPercentMin, commissionPercentMax, sort, audience, metro, priceMin, priceMax, roomsMin, roomsMax,
     bedroomsMin, bedroomsMax, areaMin, areaMax, pricePerSqmMin, pricePerSqmMax, metroMaxM,
     nearbyKind, nearbyMaxM, floorMin, floorMax, totalFloorsMin, totalFloorsMax, yearMin, yearMax,
     maxAgeDays, displayCurrency, query, source, showAdvanced, buildFeedParams, resetValues,
