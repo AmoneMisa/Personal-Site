@@ -58,11 +58,19 @@ const props = defineProps<{
   districtZones?: FlatMapZone[];
   microdistrictMarkers?: FlatMapZone[];
   quartalMarkers?: FlatMapZone[];
+  metroStations?: FlatMapZone[];
+  universityZones?: FlatMapZone[];
+  shoppingMallZones?: FlatMapZone[];
+  parkZones?: FlatMapZone[];
   areaZones?: FlatMapZone[];
   cityZone?: FlatMapZone | null;
   districtsLabel?: string;
   microdistrictsLabel?: string;
   quartalsLabel?: string;
+  metroLabel?: string;
+  universitiesLabel?: string;
+  shoppingMallsLabel?: string;
+  parksLabel?: string;
   areasLabel?: string;
   cityLabel?: string;
 }>();
@@ -96,6 +104,10 @@ const focusedPoint = ref<MapFocusDetail | null>(null);
 const showDistricts = ref(true);
 const showMicrodistricts = ref(false);
 const showQuartals = ref(false);
+const showMetro = ref(true);
+const showUniversities = ref(false);
+const showShoppingMalls = ref(false);
+const showParks = ref(false);
 const showAreas = ref(true);
 const showCity = ref(true);
 const selectedDistrictName = ref<string | null>(null);
@@ -191,6 +203,10 @@ let focusLayer: any = null;
 let districtLayer: any = null;
 let microdistrictLayer: any = null;
 let quartalLayer: any = null;
+let metroLayer: any = null;
+let universityLayer: any = null;
+let shoppingMallLayer: any = null;
+let parkLayer: any = null;
 let zoneAreaLayer: any = null;
 let cityLayer: any = null;
 let lastFitSig = "";
@@ -444,13 +460,26 @@ function emitZoneSelect(kind: ZoneKind, name: string) {
   emit("zone-select", { kind, name });
 }
 
+function focusZone(zone: FlatMapZone) {
+  if (!map) return;
+  if (zone.boundary && Leaflet) {
+    map.flyToBounds(Leaflet.geoJSON(zone.boundary as any).getBounds(), { padding: [42, 42], maxZoom: 15, duration: 0.65 });
+  } else {
+    map.flyTo([zone.lat, zone.lng], kindZoom(zone), { animate: true, duration: 0.65 });
+  }
+}
+
+function kindZoom(zone: FlatMapZone): number {
+  return zone.radiusM >= 1200 ? 13 : zone.radiusM >= 500 ? 14 : 15;
+}
+
 // Renders a zone as its real boundary polygon when the catalog provides one, falling
 // back to an approximated circle (sized upstream to avoid overlap) when it doesn't.
 function renderZoneShape(layerGroup: any, zone: FlatMapZone, kind: ZoneKind, style: Record<string, unknown>) {
   const L = Leaflet;
-  const onClick = (event: any) => { L.DomEvent.stopPropagation(event); emitZoneSelect(kind, zone.name); };
+  const onClick = (event: any) => { L.DomEvent.stopPropagation(event); focusZone(zone); emitZoneSelect(kind, zone.name); };
   if (zone.boundary) {
-    const shape = L.geoJSON(zone.boundary as any, { style: () => style }).addTo(layerGroup);
+    const shape = L.geoJSON(zone.boundary as any, { style: () => style, bubblingMouseEvents: false }).addTo(layerGroup);
     shape.on("click", onClick);
     shape.bindTooltip(zone.label, { direction: "top" });
     return shape;
@@ -478,32 +507,73 @@ function renderDistrictZones() {
   }
 }
 
-function renderZoneMarkers(layerGroup: any, zones: FlatMapZone[], kind: ZoneKind, shape: "circle" | "square") {
+function renderZoneShapes(layerGroup: any, zones: FlatMapZone[], kind: ZoneKind, style: Record<string, unknown>) {
   const L = Leaflet;
   if (!layerGroup || !L) return;
   layerGroup.clearLayers();
   for (const zone of zones) {
-    const icon = L.divIcon({
-      className: "flat-zone-marker-wrap",
-      html: `<span class="flat-zone-marker flat-zone-marker_${shape}" style="background:${zone.color}" title="${zone.label}"></span>`,
-      iconSize: [14, 14],
-      iconAnchor: [7, 7],
-    });
-    const marker = L.marker([zone.lat, zone.lng], { icon });
-    marker.bindTooltip(zone.label, { direction: "top", offset: [0, -8] });
-    marker.on("click", () => emitZoneSelect(kind, zone.name));
-    marker.addTo(layerGroup);
+    const shape = renderZoneShape(layerGroup, zone, kind, { ...style, color: zone.color, fillColor: zone.color, className: "flat-zone-shape" });
+    if (!zone.boundary) shape.bindTooltip(zone.label, { direction: "top" });
   }
 }
 
 function renderMicrodistricts() {
-  if (showMicrodistricts.value) renderZoneMarkers(microdistrictLayer, props.microdistrictMarkers || [], "microdistrict", "circle");
+  if (showMicrodistricts.value) renderZoneShapes(microdistrictLayer, props.microdistrictMarkers || [], "microdistrict", { weight: 2, opacity: .9, fillOpacity: .18 });
   else microdistrictLayer?.clearLayers();
 }
 
 function renderQuartals() {
-  if (showQuartals.value) renderZoneMarkers(quartalLayer, props.quartalMarkers || [], "quartal", "square");
+  if (showQuartals.value) renderZoneShapes(quartalLayer, props.quartalMarkers || [], "quartal", { weight: 1.5, dashArray: "3 4", opacity: .9, fillOpacity: .16 });
   else quartalLayer?.clearLayers();
+}
+
+function renderMetro() {
+  const L = Leaflet;
+  if (!metroLayer || !L) return;
+  metroLayer.clearLayers();
+  if (!showMetro.value) return;
+  for (const station of props.metroStations || []) {
+    for (const [radius, color, opacity] of [[1000, "#8b5cf6", .055], [500, "#22c55e", .08], [200, "#f59e0b", .13]] as const) {
+      L.circle([station.lat, station.lng], { radius, color, weight: 1.25, opacity: .75, fillColor: color, fillOpacity: opacity, interactive: false }).addTo(metroLayer);
+    }
+    const marker = L.circleMarker([station.lat, station.lng], { radius: 5, color: "#fff", weight: 2, fillColor: "#2563eb", fillOpacity: 1, bubblingMouseEvents: false });
+    marker.bindTooltip(`${station.label} · 200 / 500 / 1000 m`, { direction: "top" });
+    marker.on("click", (event: any) => { L.DomEvent.stopPropagation(event); map.flyTo([station.lat, station.lng], 15, { animate: true }); });
+    marker.addTo(metroLayer);
+  }
+}
+
+function renderAmenityLayer(layerGroup: any, zones: FlatMapZone[], visible: boolean, symbol: string) {
+  const L = Leaflet;
+  if (!layerGroup || !L) return;
+  layerGroup.clearLayers();
+  if (!visible) return;
+  for (const zone of zones) {
+    if (zone.boundary) {
+      const shape = L.geoJSON(zone.boundary as any, {
+        style: () => ({ color: zone.color, weight: 2, opacity: .95, fillColor: zone.color, fillOpacity: .2, className: "flat-zone-shape" }),
+        bubblingMouseEvents: false,
+      }).addTo(layerGroup);
+      shape.bindTooltip(zone.label, { direction: "top" });
+      shape.on("click", (event: any) => { L.DomEvent.stopPropagation(event); focusZone(zone); });
+      continue;
+    }
+    const icon = L.divIcon({
+      className: "flat-amenity-marker-wrap",
+      html: `<span class="flat-amenity-marker" style="--amenity-color:${zone.color}">${symbol}</span>`,
+      iconSize: [24, 24], iconAnchor: [12, 12],
+    });
+    const marker = L.marker([zone.lat, zone.lng], { icon, bubblingMouseEvents: false });
+    marker.bindTooltip(zone.label, { direction: "top", offset: [0, -11] });
+    marker.on("click", (event: any) => { L.DomEvent.stopPropagation(event); focusZone(zone); });
+    marker.addTo(layerGroup);
+  }
+}
+
+function renderAmenities() {
+  renderAmenityLayer(universityLayer, props.universityZones || [], showUniversities.value, "U");
+  renderAmenityLayer(shoppingMallLayer, props.shoppingMallZones || [], showShoppingMalls.value, "ТЦ");
+  renderAmenityLayer(parkLayer, props.parkZones || [], showParks.value, "♣");
 }
 
 function renderAreaZones() {
@@ -533,6 +603,8 @@ function renderAllZoneLayers() {
   renderDistrictZones();
   renderMicrodistricts();
   renderQuartals();
+  renderMetro();
+  renderAmenities();
   renderAreaZones();
 }
 
@@ -580,6 +652,10 @@ onMounted(async () => {
   microdistrictLayer = L.layerGroup().addTo(map);
   quartalLayer = L.layerGroup().addTo(map);
   zoneAreaLayer = L.layerGroup().addTo(map);
+  metroLayer = L.layerGroup().addTo(map);
+  universityLayer = L.layerGroup().addTo(map);
+  shoppingMallLayer = L.layerGroup().addTo(map);
+  parkLayer = L.layerGroup().addTo(map);
   map.on("click", (event: any) => {
     if (!drawing.value) {
       closeRadial();
@@ -604,8 +680,12 @@ onMounted(async () => {
 
 watch(renderedPoints, () => { renderMarkers(); fitToPoints(); }, { deep: true });
 watch(() => route.query, () => { void loadFullMapFeed(); }, { deep: true });
-watch(() => [props.districtZones, props.microdistrictMarkers, props.quartalMarkers, props.areaZones, props.cityZone], renderAllZoneLayers, { deep: true });
-watch([showDistricts, showMicrodistricts, showQuartals, showAreas, showCity], renderAllZoneLayers);
+watch(() => [props.districtZones, props.microdistrictMarkers, props.quartalMarkers, props.metroStations, props.universityZones, props.shoppingMallZones, props.parkZones, props.areaZones, props.cityZone], renderAllZoneLayers, { deep: true });
+watch([showDistricts, showMicrodistricts, showQuartals, showMetro, showUniversities, showShoppingMalls, showParks, showAreas, showCity], renderAllZoneLayers);
+watch(() => props.cityZone, (zone, previous) => {
+  if (!zone || zone.id === previous?.id || !map) return;
+  focusZone(zone);
+}, { deep: true });
 
 onBeforeUnmount(() => {
   mapFeedSequence += 1;
@@ -621,6 +701,10 @@ onBeforeUnmount(() => {
   districtLayer = null;
   microdistrictLayer = null;
   quartalLayer = null;
+  metroLayer = null;
+  universityLayer = null;
+  shoppingMallLayer = null;
+  parkLayer = null;
   zoneAreaLayer = null;
   cityLayer = null;
 });
@@ -652,15 +736,18 @@ onBeforeUnmount(() => {
         <button v-if="cityZone?.boundary" type="button" class="flat-map__tool" :class="{ 'flat-map__tool_active': showCity }" @click="showCity = !showCity">
           <span>{{ props.cityLabel || "City" }}</span>
         </button>
-        <button v-if="districtZones?.length" type="button" class="flat-map__tool" :class="{ 'flat-map__tool_active': showDistricts }" @click="showDistricts = !showDistricts">
-          <span>{{ props.districtsLabel || "Districts" }}</span>
-        </button>
-        <button v-if="microdistrictMarkers?.length" type="button" class="flat-map__tool" :class="{ 'flat-map__tool_active': showMicrodistricts }" @click="showMicrodistricts = !showMicrodistricts">
-          <span>{{ props.microdistrictsLabel || "Microdistricts" }}</span>
+        <button v-if="districtZones?.length" type="button" class="flat-map__tool flat-map__tool_active" @click="showMicrodistricts = !showMicrodistricts">
+          <span>{{ showMicrodistricts ? `${props.districtsLabel || 'Districts'} + ${props.microdistrictsLabel || 'Microdistricts'}` : (props.districtsLabel || 'Districts') }}</span>
         </button>
         <button v-if="quartalMarkers?.length" type="button" class="flat-map__tool" :class="{ 'flat-map__tool_active': showQuartals }" @click="showQuartals = !showQuartals">
           <span>{{ props.quartalsLabel || "Quartals" }}</span>
         </button>
+        <button v-if="metroStations?.length" type="button" class="flat-map__tool" :class="{ 'flat-map__tool_active': showMetro }" @click="showMetro = !showMetro">
+          <span>{{ props.metroLabel || "Metro" }} · 200/500/1000 м</span>
+        </button>
+        <button v-if="universityZones?.length" type="button" class="flat-map__tool" :class="{ 'flat-map__tool_active': showUniversities }" @click="showUniversities = !showUniversities"><span>{{ props.universitiesLabel || "Universities" }}</span></button>
+        <button v-if="shoppingMallZones?.length" type="button" class="flat-map__tool" :class="{ 'flat-map__tool_active': showShoppingMalls }" @click="showShoppingMalls = !showShoppingMalls"><span>{{ props.shoppingMallsLabel || "Major malls" }}</span></button>
+        <button v-if="parkZones?.length" type="button" class="flat-map__tool" :class="{ 'flat-map__tool_active': showParks }" @click="showParks = !showParks"><span>{{ props.parksLabel || "Parks" }}</span></button>
         <button v-if="areaZones?.length" type="button" class="flat-map__tool" :class="{ 'flat-map__tool_active': showAreas }" @click="showAreas = !showAreas">
           <span>{{ props.areasLabel || "Areas" }}</span>
         </button>
@@ -816,6 +903,11 @@ onBeforeUnmount(() => {
 }
 :deep(.flat-zone-marker_circle) { border-radius: 50%; }
 :deep(.flat-zone-marker_square) { border-radius: 2px; }
+:deep(.flat-amenity-marker) {
+  display: grid; place-items: center; width: 22px; height: 22px; box-sizing: border-box;
+  border: 2px solid #fff; border-radius: 50%; background: var(--amenity-color); color: #fff;
+  box-shadow: 0 2px 5px rgba(0,0,0,.5); font-size: 8px; font-weight: 900; line-height: 1;
+}
 
 :deep(.leaflet-container) { background: var(--bg-panel); font-family: inherit; }
 :deep(.leaflet-popup-content) { font-size: 13px; }

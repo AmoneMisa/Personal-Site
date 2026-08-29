@@ -154,6 +154,18 @@ export function useDistrictZones(options: UseDistrictZonesOptions) {
   const quartalMarkers = computed<FlatMapZone[]>(() => descendantsOf(cityEntity.value?.id ?? null, country.value, "mahalla")
     .map((entity, index) => zoneFromEntity(entity, index, locale.value)));
 
+  const metroStations = computed<FlatMapZone[]>(() => descendantsOf(cityEntity.value?.id ?? null, country.value, "metro")
+    .map((entity, index) => zoneFromEntity(entity, index, locale.value)));
+
+  const universityZones = computed<FlatMapZone[]>(() => descendantsOf(cityEntity.value?.id ?? null, country.value, "poi.university")
+    .map((entity, index) => ({ ...zoneFromEntity(entity, index, locale.value), color: "#38bdf8" })));
+
+  const shoppingMallZones = computed<FlatMapZone[]>(() => descendantsOf(cityEntity.value?.id ?? null, country.value, "poi.shopping_mall")
+    .map((entity, index) => ({ ...zoneFromEntity(entity, index, locale.value), color: "#f97316" })));
+
+  const parkZones = computed<FlatMapZone[]>(() => descendantsOf(cityEntity.value?.id ?? null, country.value, "poi.park")
+    .map((entity, index) => ({ ...zoneFromEntity(entity, index, locale.value), color: "#22c55e" })));
+
   const areaZones = computed<FlatMapZone[]>(() => {
     const entities = [
       ...descendantsOf(cityEntity.value?.id ?? null, country.value, "local_area"),
@@ -165,5 +177,8 @@ export function useDistrictZones(options: UseDistrictZonesOptions) {
 
   const cityZone = computed<FlatMapZone | null>(() => cityHullZone(districtZones.value, cityEntity.value, locale.value));
 
-  return { districtZones, microdistrictMarkers, quartalMarkers, areaZones, cityZone };
+  return {
+    districtZones, microdistrictMarkers, quartalMarkers, metroStations,
+    universityZones, shoppingMallZones, parkZones, areaZones, cityZone,
+  };
 }
