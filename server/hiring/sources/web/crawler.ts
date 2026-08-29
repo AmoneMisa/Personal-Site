@@ -36,6 +36,8 @@ async function fetchPage(url: string): Promise<string> {
 
 export function webProfileId(url: string): string {
   const patterns = [
+    /resume_view-(\d+)/i,
+    /\/resume\/([a-f0-9]{16,})/i,
     /-rr(\d+)\.html/i,
     /\/cv\/list\/([a-z0-9]{8,})/i,
     /-(\d{5,})\.html/i,
