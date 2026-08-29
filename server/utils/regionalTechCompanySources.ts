@@ -5,8 +5,10 @@ const UA = 'jobFinder/1.0 (job aggregator; contact: admin@whiteslove.me)'
 const REQUEST_TIMEOUT_MS = 20_000
 
 export type RegionalCompanyCountry = 'UA' | 'RO' | 'UZ'
+export type RegionalCompanyAts = 'lever' | 'smartrecruiters'
 
-type RegionalLeverCompany = {
+export type RegionalTechCompany = {
+  ats: RegionalCompanyAts
   handle: string
   label: string
   country: RegionalCompanyCountry
@@ -16,16 +18,24 @@ type RegionalLeverCompany = {
 // Direct employer feeds verified live in 2026-08. Some employers are global;
 // aliases below deliberately keep only vacancies that explicitly target the
 // requested country/cities so they do not flood the shared `companies` source.
-export const REGIONAL_TECH_COMPANIES: RegionalLeverCompany[] = [
-  { handle: 'provectus', label: 'Provectus', country: 'UA', aliases: ['ukraine', 'kyiv', 'kiev', 'odesa', 'odessa', 'lviv'] },
+export const REGIONAL_TECH_COMPANIES: RegionalTechCompany[] = [
+  { ats: 'lever', handle: 'provectus', label: 'Provectus', country: 'UA', aliases: ['ukraine', 'kyiv', 'kiev', 'odesa', 'odessa', 'lviv'] },
   // Kyivstar uses "All" for many Ukraine-wide roles on its own country board.
-  { handle: 'kyivstar', label: 'Kyivstar', country: 'UA', aliases: ['ukraine', 'kyiv', 'kiev', 'all'] },
-  { handle: '3pillarglobal', label: '3Pillar', country: 'RO', aliases: ['romania', 'bucharest', 'cluj', 'iasi', 'timișoara', 'timisoara'] },
-  { handle: 'brillio-2', label: 'Brillio', country: 'RO', aliases: ['romania', 'bucharest', 'bihor'] },
-  { handle: 'viseven', label: 'Viseven', country: 'RO', aliases: ['romania', 'bucharest'] },
-  { handle: 'civitta', label: 'Civitta', country: 'RO', aliases: ['romania', 'bucharest'] },
-  { handle: 'binance', label: 'Binance', country: 'UZ', aliases: ['uzbekistan', 'tashkent', 'toshkent'] },
-  { handle: 'weloglobal', label: 'Welo Global', country: 'UZ', aliases: ['uzbekistan', 'tashkent', 'toshkent'] },
+  { ats: 'lever', handle: 'kyivstar', label: 'Kyivstar', country: 'UA', aliases: ['ukraine', 'kyiv', 'kiev', 'all'] },
+  { ats: 'smartrecruiters', handle: 'SigmaSoftware2', label: 'Sigma Software', country: 'UA', aliases: ['ukraine', 'kyiv', 'kiev', 'kharkiv', 'odesa', 'odessa', 'lviv', 'dnipro'] },
+
+  { ats: 'lever', handle: '3pillarglobal', label: '3Pillar', country: 'RO', aliases: ['romania', 'bucharest', 'cluj', 'iasi', 'timișoara', 'timisoara'] },
+  { ats: 'lever', handle: 'brillio-2', label: 'Brillio', country: 'RO', aliases: ['romania', 'bucharest', 'bihor', 'cluj', 'oradea'] },
+  { ats: 'lever', handle: 'viseven', label: 'Viseven', country: 'RO', aliases: ['romania', 'bucharest'] },
+  { ats: 'lever', handle: 'civitta', label: 'Civitta', country: 'RO', aliases: ['romania', 'bucharest'] },
+  { ats: 'lever', handle: 'qualysoft', label: 'Qualysoft', country: 'RO', aliases: ['romania', 'bucharest'] },
+  { ats: 'smartrecruiters', handle: 'Endava', label: 'Endava', country: 'RO', aliases: ['romania', 'bucharest', 'cluj', 'iasi', 'timișoara', 'timisoara'] },
+  { ats: 'smartrecruiters', handle: 'ACCESA', label: 'Accesa', country: 'RO', aliases: ['romania', 'cluj', 'cluj-napoca', 'oradea'] },
+
+  { ats: 'lever', handle: 'binance', label: 'Binance', country: 'UZ', aliases: ['uzbekistan', 'tashkent', 'toshkent'] },
+  { ats: 'lever', handle: 'weloglobal', label: 'Welo Global', country: 'UZ', aliases: ['uzbekistan', 'tashkent', 'toshkent'] },
+  { ats: 'smartrecruiters', handle: 'Gcore', label: 'Gcore', country: 'UZ', aliases: ['uzbekistan', 'tashkent', 'toshkent'] },
+  { ats: 'smartrecruiters', handle: 'ACCESA', label: 'Accesa', country: 'UZ', aliases: ['uzbekistan', 'tashkent', 'toshkent'] },
 ]
 
 type LeverPosting = {
@@ -44,6 +54,23 @@ type LeverPosting = {
   workplaceType?: string
 }
 
+type SmartRecruitersPosting = {
+  id?: string
+  name?: string
+  releasedDate?: string
+  location?: {
+    city?: string
+    region?: string
+    country?: string
+    fullLocation?: string
+    remote?: boolean
+  }
+  function?: { label?: string }
+  industry?: { label?: string }
+  department?: { label?: string }
+  typeOfEmployment?: { label?: string }
+}
+
 function stripHtml(value: unknown): string {
   return String(value || '')
     .replace(/<script\b[\s\S]*?<\/script>/gi, ' ')
@@ -55,20 +82,20 @@ function stripHtml(value: unknown): string {
     .trim()
 }
 
-function matchesCountry(posting: LeverPosting, company: RegionalLeverCompany): boolean {
-  const location = String(posting.categories?.location || '').toLocaleLowerCase('en')
-  if (!location) return false
-  return company.aliases.some((alias) => location.includes(alias.toLocaleLowerCase('en')))
+function matchesLocation(location: string, company: RegionalTechCompany): boolean {
+  const normalized = location.toLocaleLowerCase('en')
+  if (!normalized) return false
+  return company.aliases.some((alias) => normalized.includes(alias.toLocaleLowerCase('en')))
 }
 
 export function mapRegionalLeverPostings(
   postings: LeverPosting[],
-  company: RegionalLeverCompany,
+  company: RegionalTechCompany,
 ): Job[] {
   return postings.flatMap((posting) => {
-    if (!posting.text || !posting.hostedUrl || !matchesCountry(posting, company)) return []
+    const location = String(posting.categories?.location || '')
+    if (!posting.text || !posting.hostedUrl || !matchesLocation(location, company)) return []
 
-    const location = posting.categories?.location || company.country
     const description = stripHtml(posting.descriptionPlain || posting.description).slice(0, 6000)
     const semanticText = `${posting.text} ${location} ${posting.workplaceType || ''} ${description}`
 
@@ -76,7 +103,7 @@ export function mapRegionalLeverPostings(
       id: `companies-regional-${company.country.toLowerCase()}-${company.handle}-${posting.id || posting.hostedUrl}`,
       title: posting.text,
       company: company.label,
-      location,
+      location: location || company.country,
       url: posting.hostedUrl,
       source: 'companies' as const,
       remote: detectWorkModes(semanticText).includes('remote') || /remote/i.test(String(posting.workplaceType || '')),
@@ -91,7 +118,41 @@ export function mapRegionalLeverPostings(
   })
 }
 
-async function fetchLeverCompany(company: RegionalLeverCompany): Promise<Job[]> {
+function smartRecruitersLocation(posting: SmartRecruitersPosting): string {
+  return posting.location?.fullLocation
+    || [posting.location?.city, posting.location?.region, posting.location?.country]
+      .filter(Boolean)
+      .join(', ')
+    || ''
+}
+
+export function mapRegionalSmartRecruitersPostings(
+  postings: SmartRecruitersPosting[],
+  company: RegionalTechCompany,
+): Job[] {
+  return postings.flatMap((posting) => {
+    const location = smartRecruitersLocation(posting)
+    if (!posting.id || !posting.name || !matchesLocation(location, company)) return []
+
+    return [{
+      id: `companies-regional-${company.country.toLowerCase()}-sr-${company.handle}-${posting.id}`,
+      title: posting.name,
+      company: company.label,
+      location: location || company.country,
+      url: `https://jobs.smartrecruiters.com/${company.handle}/${posting.id}`,
+      source: 'companies' as const,
+      remote: posting.location?.remote === true || detectWorkModes(`${posting.name} ${location}`).includes('remote'),
+      tags: [company.label, company.country, posting.function?.label, posting.department?.label, posting.industry?.label]
+        .filter((value): value is string => Boolean(value))
+        .slice(0, 8),
+      postedAt: new Date(posting.releasedDate || Date.now()).toISOString(),
+      employmentType: posting.typeOfEmployment?.label,
+      employerType: 'direct' as const,
+    }]
+  })
+}
+
+async function fetchLeverCompany(company: RegionalTechCompany): Promise<Job[]> {
   const response = await fetch(
     `https://api.lever.co/v0/postings/${encodeURIComponent(company.handle)}?mode=json`,
     {
@@ -102,6 +163,25 @@ async function fetchLeverCompany(company: RegionalLeverCompany): Promise<Job[]> 
   if (!response.ok) throw new Error(`${company.label} -> ${response.status}`)
   const postings = await response.json() as LeverPosting[]
   return mapRegionalLeverPostings(Array.isArray(postings) ? postings : [], company)
+}
+
+async function fetchSmartRecruitersCompany(company: RegionalTechCompany): Promise<Job[]> {
+  const response = await fetch(
+    `https://api.smartrecruiters.com/v1/companies/${encodeURIComponent(company.handle)}/postings?limit=100`,
+    {
+      headers: { 'User-Agent': UA, Accept: 'application/json' },
+      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+    },
+  )
+  if (!response.ok) throw new Error(`${company.label} -> ${response.status}`)
+  const data = await response.json() as { content?: SmartRecruitersPosting[] }
+  return mapRegionalSmartRecruitersPostings(Array.isArray(data.content) ? data.content : [], company)
+}
+
+async function fetchRegionalCompany(company: RegionalTechCompany): Promise<Job[]> {
+  return company.ats === 'smartrecruiters'
+    ? fetchSmartRecruitersCompany(company)
+    : fetchLeverCompany(company)
 }
 
 function filterQuery(jobs: Job[], q: string): Job[] {
@@ -117,7 +197,7 @@ function filterQuery(jobs: Job[], q: string): Job[] {
 export async function fetchRegionalTechCompanyJobs(q: string): Promise<Job[]> {
   if (String(process.env.REGIONAL_TECH_COMPANY_SOURCE || 'on').toLowerCase() === 'off') return []
 
-  const results = await Promise.allSettled(REGIONAL_TECH_COMPANIES.map(fetchLeverCompany))
+  const results = await Promise.allSettled(REGIONAL_TECH_COMPANIES.map(fetchRegionalCompany))
   const jobs: Job[] = []
 
   results.forEach((result, index) => {
