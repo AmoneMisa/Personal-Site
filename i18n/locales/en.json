@@ -302,7 +302,8 @@
     "nearbyKind_transport": "Public transport",
     "nearbyKind_historic": "Landmark / museum",
     "nearbyKind_cinema": "Cinema",
-    "nearbyKind_landmark": "Major destination"
+    "nearbyKind_landmark": "Major destination",
+    "sourceFilter": "Source"
   },
   "common": {
     "add": "Add",
@@ -490,7 +491,8 @@
     "seniorityLead": "Lead",
     "skills": "Skills",
     "skillsPlaceholder": "React, TypeScript",
-    "specContactHours": "Contact hours"
+    "specContactHours": "Contact hours",
+    "sourceFilter": "Source"
   },
   "jobs": {
     "filterCoverage": "Exclusions & coverage",
@@ -698,7 +700,8 @@
     "wmRemote": "Remote",
     "workMode": "Work mode",
     "yesterday": "yesterday",
-    "hideEmpty": "Hide empty fields"
+    "hideEmpty": "Hide empty fields",
+    "sourceFilter": "Source"
   },
   "quizzes": {
     "countryFit": {
@@ -2143,7 +2146,8 @@
         "filterAll": "All",
         "filterErrors": "Errors",
         "filterWarnings": "Warnings",
-        "filterInfo": "Notes"
+        "filterInfo": "Notes",
+        "fix": "Fix issues"
       },
       "panel": {
         "input": "Workflow YAML",
@@ -2158,7 +2162,9 @@
         "infos": "{n} note(s)",
         "at": "line {line}, column {col}",
         "tooLarge": "That file is too large to lint here. Workflows are normally a few kilobytes.",
-        "unreadable": "That file could not be read."
+        "unreadable": "That file could not be read.",
+        "fixed": "Fixed {n} issue(s) — the workflow above has been updated.",
+        "fixable": "auto-fixable"
       }
     }
   },

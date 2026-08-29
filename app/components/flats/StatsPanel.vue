@@ -131,7 +131,7 @@ function displayGeoLabel(value: string, dimension: FlatStatsGeoDimension): strin
 </script>
 
 <template>
-  <UiAnalyticsPanel class="flat-stats" :title="t('statsTitle')" :collapse-label="t('statsCollapse')" :expand-label="t('statsExpand')">
+  <UiAnalyticsPanel class="flat-stats" :title="t('statsTitle')" :collapse-label="t('statsCollapse')" :expand-label="t('statsExpand')" :default-expanded="false">
     <div class="flat-stats__body">
       <article class="flat-stats__card flat-stats__card_wide">
         <div class="flat-stats__head"><h3>{{ t("statsActivity") }}</h3><div class="flat-stats__segments"><button v-for="days in activityOptions" :key="days" type="button" :class="{ active: activityDays === days }" @click="activityDays = days">{{ t("statsDays", { n: days }) }}</button></div></div>

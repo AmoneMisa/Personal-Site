@@ -619,7 +619,7 @@ onBeforeUnmount(() => {
       </u-button>
 
       <div class="hiring__row">
-        <SearchSourceTabs :model-value="source" :items="sourceOptions" @update:model-value="selectSource" />
+        <SearchSourceTabs :model-value="source" :items="sourceOptions" :toggle-label="t('sourceFilter')" @update:model-value="selectSource" />
         <SearchSavedTabs
           :model-value="view"
           :items="viewTabs"

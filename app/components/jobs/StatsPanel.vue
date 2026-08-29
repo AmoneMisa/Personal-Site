@@ -206,7 +206,7 @@ const formatExperience = (value: number) => t("experienceYears", { n: value });
 </script>
 
 <template>
-  <UiAnalyticsPanel class="stats" :title="t('statsTitle')" :collapse-label="t('statsCollapse')" :expand-label="t('statsExpand')">
+  <UiAnalyticsPanel class="stats" :title="t('statsTitle')" :collapse-label="t('statsCollapse')" :expand-label="t('statsExpand')" :default-expanded="false">
     <template #controls>
       <UiAnalyticsTabs
         class="stats__switch"

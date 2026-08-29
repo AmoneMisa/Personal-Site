@@ -755,7 +755,7 @@ onBeforeUnmount(() => { modalOpen.value = false; lightboxOpen.value = false; rel
       </div>
 
       <div class="flats__row flats__secondary-nav">
-        <SearchSourceTabs :model-value="source" :items="sourceOptions" @update:model-value="selectSource" />
+        <SearchSourceTabs :model-value="source" :items="sourceOptions" :toggle-label="t('sourceFilter')" @update:model-value="selectSource" />
         <SearchSavedTabs
           :model-value="view"
           :items="viewTabs"

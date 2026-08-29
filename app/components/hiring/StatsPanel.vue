@@ -63,7 +63,7 @@ const salarySamples = computed(() => currentStatistics.value.salarySamples);
 </script>
 
 <template>
-  <UiAnalyticsPanel v-if="profiles.length" class="hiring-stats" :title="t('statsTitle')" :collapse-label="t('statsCollapse')" :expand-label="t('statsExpand')">
+  <UiAnalyticsPanel v-if="profiles.length" class="hiring-stats" :title="t('statsTitle')" :collapse-label="t('statsCollapse')" :expand-label="t('statsExpand')" :default-expanded="false">
     <div class="hiring-stats__grid">
       <article class="analytics-card analytics-card_wide"><div class="analytics-card__head"><h3>{{ t("statsActivity") }}</h3><div class="segments" role="group" :aria-label="t('statsActivity')"><button v-for="days in activityOptions" :key="days" type="button" :class="{active:activityDays===days}" :aria-pressed="activityDays===days" @click="activityDays=days">{{ t("statsDays",{n:days}) }}</button></div></div><UiAnalyticsLine :series="activity.series" :labels="activity.labels" /></article>
       <article class="analytics-card"><h3>{{ t("statsGender") }}</h3><UiAnalyticsDonut :items="genderItems" :center-label="t('statsCandidates')" /></article>

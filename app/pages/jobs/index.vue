@@ -718,7 +718,7 @@ onBeforeUnmount(() => {
       <u-input v-model="query" clearable icon="i-lucide-search" :label="t('search')" :placeholder="t('searchPlaceholder')" @clear="clearSearch" />
 
       <div class="jobs__row">
-        <SearchSourceTabs :model-value="source" :items="sourceOptions" @update:model-value="selectSource">
+        <SearchSourceTabs :model-value="source" :items="sourceOptions" :toggle-label="t('sourceFilter')" @update:model-value="selectSource">
           <template #label="{ item }">{{ item.label ?? t(item.labelKey!) }}</template>
         </SearchSourceTabs>
         <SearchSavedTabs

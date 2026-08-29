@@ -302,7 +302,8 @@
     "nearbyKind_transport": "Общественный транспорт",
     "nearbyKind_historic": "Достопримечательность",
     "nearbyKind_cinema": "Кинотеатр",
-    "nearbyKind_landmark": "Крупный объект"
+    "nearbyKind_landmark": "Крупный объект",
+    "sourceFilter": "Источник"
   },
   "common": {
     "add": "Добавить",
@@ -490,7 +491,8 @@
     "seniorityLead": "Lead",
     "skills": "Навыки",
     "skillsPlaceholder": "React, TypeScript",
-    "specContactHours": "Время для связи"
+    "specContactHours": "Время для связи",
+    "sourceFilter": "Источник"
   },
   "jobs": {
     "filterCoverage": "Исключения и охват",
@@ -698,7 +700,8 @@
     "wmRemote": "Удалённо",
     "workMode": "Формат работы",
     "yesterday": "вчера",
-    "hideEmpty": "Скрыть пустые поля"
+    "hideEmpty": "Скрыть пустые поля",
+    "sourceFilter": "Источник"
   },
   "quizzes": {
     "countryFit": {
@@ -2143,7 +2146,8 @@
         "filterAll": "Все",
         "filterErrors": "Ошибки",
         "filterWarnings": "Предупреждения",
-        "filterInfo": "Заметки"
+        "filterInfo": "Заметки",
+        "fix": "Исправить"
       },
       "panel": {
         "input": "YAML workflow",
@@ -2158,7 +2162,9 @@
         "infos": "Заметок: {n}",
         "at": "строка {line}, столбец {col}",
         "tooLarge": "Этот файл слишком большой для проверки здесь. Workflow обычно занимает несколько килобайт.",
-        "unreadable": "Не удалось прочитать файл."
+        "unreadable": "Не удалось прочитать файл.",
+        "fixed": "Исправлено проблем: {n} — workflow выше обновлён.",
+        "fixable": "исправляется автоматически"
       }
     }
   },
