@@ -1152,11 +1152,316 @@
         "residencyNote": "A general impression, not immigration advice — real difficulty depends heavily on your nationality and visa category, and changes over time."
       }
     },
+    "careerFit": {
+      "title": "Career Fit",
+      "headline": "Which profession fits you?",
+      "description": "Answer a few questions about how you like to work, and we'll suggest professions that fit — with a link to open jobs for each.",
+      "resultsTitle": "Best-fitting professions",
+      "noAnswersYet": "Answer a few questions to see your matches.",
+      "viewJobs": "View jobs",
+      "c1": {
+        "title": "What kind of tasks energize you most?",
+        "o1": "Working with numbers and data",
+        "o2": "Working with and helping people",
+        "o3": "Building or fixing things"
+      },
+      "c2": {
+        "title": "Do you enjoy creative work like design, writing or art?",
+        "o1": "Yes, I need creative outlets",
+        "o2": "Sometimes",
+        "o3": "Not really"
+      },
+      "c3": {
+        "title": "How do you feel about working with computers/technology all day?",
+        "o1": "I love it",
+        "o2": "I'm fine with it",
+        "o3": "I'd rather not sit at a screen all day"
+      },
+      "c4": {
+        "title": "Do you like leading and organizing people or projects?",
+        "o1": "Yes, I love leading",
+        "o2": "Sometimes",
+        "o3": "I'd rather focus on my own work"
+      },
+      "c5": {
+        "title": "How important is helping or caring for others directly?",
+        "o1": "Very important to me",
+        "o2": "Somewhat important",
+        "o3": "Not a priority"
+      },
+      "c6": {
+        "title": "Do you prefer strict structure and rules, or flexibility?",
+        "o1": "I like structure and order",
+        "o2": "A balance of both",
+        "o3": "I want flexibility and freedom"
+      },
+      "c7": {
+        "title": "How do you feel about physical or active work?",
+        "o1": "I love being active",
+        "o2": "I don't mind it occasionally",
+        "o3": "I prefer sitting/desk work"
+      },
+      "c8": {
+        "title": "What matters more: a stable career path, or building something of your own?",
+        "o1": "A stable, established path",
+        "o2": "A balance of both",
+        "o3": "Building my own thing"
+      },
+      "c9": {
+        "title": "Do you enjoy solving complex logical or technical problems?",
+        "o1": "Yes, very much",
+        "o2": "Sometimes",
+        "o3": "I prefer people- or creativity-focused problems"
+      },
+      "c10": {
+        "title": "How important is working with your hands (building, repairing, cooking)?",
+        "o1": "Very important",
+        "o2": "Somewhat",
+        "o3": "Not important"
+      },
+      "c11": {
+        "title": "Do you enjoy public speaking, persuading or selling?",
+        "o1": "Yes, I love it",
+        "o2": "It's fine sometimes",
+        "o3": "I try to avoid it"
+      },
+      "c12": {
+        "title": "How much do you care about medical/health topics?",
+        "o1": "I'm fascinated by them",
+        "o2": "Neutral",
+        "o3": "Not interested"
+      },
+      "professions": {
+        "developer": {
+          "title": "Software Developer",
+          "desc": "Builds and maintains software — a strong fit for logical, technical, independent problem-solvers."
+        },
+        "dataAnalyst": {
+          "title": "Data Analyst",
+          "desc": "Turns numbers into decisions — great for analytical, detail-oriented minds."
+        },
+        "uxDesigner": {
+          "title": "UX/Product Designer",
+          "desc": "Shapes how products feel to use — a mix of creativity, empathy and structured thinking."
+        },
+        "graphicDesigner": {
+          "title": "Graphic Designer",
+          "desc": "Visual storytelling and branding — for people who think in images."
+        },
+        "marketer": {
+          "title": "Marketing Specialist",
+          "desc": "Blends creativity, communication and business sense to reach audiences."
+        },
+        "salesManager": {
+          "title": "Sales Manager",
+          "desc": "Builds relationships and closes deals — for confident, people-first communicators."
+        },
+        "projectManager": {
+          "title": "Project Manager",
+          "desc": "Keeps teams and plans on track — for organized people who like leading through structure."
+        },
+        "accountant": {
+          "title": "Accountant",
+          "desc": "Precise, structured, detail-driven work with numbers and rules."
+        },
+        "lawyer": {
+          "title": "Lawyer",
+          "desc": "Analytical reasoning within a structured, rule-based system."
+        },
+        "teacher": {
+          "title": "Teacher / Tutor",
+          "desc": "Helping others learn and grow — for patient, people-focused communicators."
+        },
+        "nurse": {
+          "title": "Nurse / Medical Worker",
+          "desc": "Hands-on care for others — for people who want direct, daily impact on wellbeing."
+        },
+        "psychologist": {
+          "title": "Psychologist / Counselor",
+          "desc": "Deep listening and analysis to help people understand themselves."
+        },
+        "engineer": {
+          "title": "Engineer",
+          "desc": "Applies technical and analytical thinking to real, physical problems."
+        },
+        "electrician": {
+          "title": "Electrician / Technician",
+          "desc": "Hands-on, practical, technical work you can see results from immediately."
+        },
+        "chef": {
+          "title": "Chef / Cook",
+          "desc": "Hands-on creativity — for people who like making things with immediate, tangible results."
+        },
+        "fitnessTrainer": {
+          "title": "Fitness Trainer / Coach",
+          "desc": "Active, people-focused work centered on health and motivation."
+        },
+        "entrepreneur": {
+          "title": "Entrepreneur / Founder",
+          "desc": "Builds something of your own — for independent, business-minded risk-takers."
+        },
+        "writer": {
+          "title": "Writer / Content Creator",
+          "desc": "Independent, creative work built around ideas and words."
+        }
+      }
+    },
+    "lifeValues": {
+      "title": "What I Want in Life",
+      "headline": "Understand your core values",
+      "description": "A short, reflective quiz about what actually matters to you — not a personality test, more a mirror for priorities you may already sense but haven't put into words.",
+      "resultsTitle": "Your top values",
+      "noAnswersYet": "Answer a few questions to see your values profile.",
+      "suggestCountryFit": "You value freedom and adventure — see which countries fit you",
+      "suggestCareerFit": "You value growth and recognition — see which careers fit you",
+      "v1": {
+        "title": "When making a big decision, what matters most to you?",
+        "o1": "Stability and security",
+        "o2": "New opportunities",
+        "o3": "What the people I love need"
+      },
+      "v2": {
+        "title": "How do you feel about routine versus unpredictability?",
+        "o1": "I love routine and predictability",
+        "o2": "A mix is fine",
+        "o3": "I crave unpredictability and adventure"
+      },
+      "v3": {
+        "title": "What would make you feel most fulfilled at the end of the day?",
+        "o1": "Having accomplished something meaningful",
+        "o2": "Having spent time with people I love",
+        "o3": "Having learned something new"
+      },
+      "v4": {
+        "title": "How important is having control over your own time and decisions?",
+        "o1": "Extremely important",
+        "o2": "Somewhat important",
+        "o3": "I prefer clear guidance"
+      },
+      "v5": {
+        "title": "How do you feel about money and material comfort?",
+        "o1": "Very important to me",
+        "o2": "Nice, but not my priority",
+        "o3": "Not a big motivator for me"
+      },
+      "v6": {
+        "title": "What role does creativity play in your ideal life?",
+        "o1": "Central — I need to create",
+        "o2": "An occasional outlet",
+        "o3": "Not essential to me"
+      },
+      "v7": {
+        "title": "How important are your physical and mental health to your daily choices?",
+        "o1": "Top priority",
+        "o2": "Important, but flexible",
+        "o3": "I rarely think about it"
+      },
+      "v8": {
+        "title": "How connected do you want to feel to a community or cause?",
+        "o1": "Very connected — I want to contribute",
+        "o2": "Somewhat connected",
+        "o3": "I prefer independence"
+      },
+      "v9": {
+        "title": "What drives you most at work?",
+        "o1": "Recognition and impact",
+        "o2": "Mastering my craft",
+        "o3": "Just enjoying the process"
+      },
+      "v10": {
+        "title": "How important is exploring life's bigger questions (meaning, purpose, spirituality)?",
+        "o1": "Very important",
+        "o2": "I think about it occasionally",
+        "o3": "Not really my focus"
+      },
+      "v11": {
+        "title": "Imagine a free weekend. What sounds best?",
+        "o1": "Trying something new or traveling",
+        "o2": "Relaxing with family",
+        "o3": "Learning or reading"
+      },
+      "v12": {
+        "title": "How do you feel about taking risks?",
+        "o1": "I love taking risks",
+        "o2": "Only calculated risks",
+        "o3": "I avoid risk"
+      },
+      "v13": {
+        "title": "What kind of respect matters most to you?",
+        "o1": "Being seen as an expert or leader",
+        "o2": "Being a good, kind person to those close to me",
+        "o3": "I don't need external validation"
+      },
+      "v14": {
+        "title": "If you had unlimited money, what would you still spend most of your time on?",
+        "o1": "Creating things",
+        "o2": "Learning and exploring",
+        "o3": "Helping others and my community"
+      },
+      "values": {
+        "security_stability": {
+          "title": "Security & Stability",
+          "desc": "You value predictability, safety and a solid foundation under your feet."
+        },
+        "freedom_autonomy": {
+          "title": "Freedom & Autonomy",
+          "desc": "You value independence and the ability to make your own choices."
+        },
+        "achievement_growth": {
+          "title": "Achievement & Growth",
+          "desc": "You're driven by accomplishment, mastery and moving forward."
+        },
+        "relationships_family": {
+          "title": "Relationships & Family",
+          "desc": "Close relationships and the people you love matter most."
+        },
+        "adventure_novelty": {
+          "title": "Adventure & Novelty",
+          "desc": "New experiences, travel and excitement keep you feeling alive."
+        },
+        "creativity_expression": {
+          "title": "Creativity & Expression",
+          "desc": "You need to make and express things that are your own."
+        },
+        "wealth_comfort": {
+          "title": "Wealth & Comfort",
+          "desc": "Financial comfort and material security matter to your sense of ease."
+        },
+        "health_wellbeing": {
+          "title": "Health & Wellbeing",
+          "desc": "Your physical and mental health shape how you live day to day."
+        },
+        "community_belonging": {
+          "title": "Community & Belonging",
+          "desc": "Being connected to and contributing to a group matters to you."
+        },
+        "knowledge_growth": {
+          "title": "Knowledge & Curiosity",
+          "desc": "Learning and understanding the world is a core part of your fulfillment."
+        },
+        "spirituality_meaning": {
+          "title": "Meaning & Spirituality",
+          "desc": "You're drawn to life's bigger questions and a sense of purpose."
+        },
+        "recognition_influence": {
+          "title": "Recognition & Influence",
+          "desc": "Being respected and having an impact on others matters to you."
+        }
+      }
+    },
+    "categories": {
+      "relocation": "Relocation",
+      "career": "Career",
+      "selfKnowledge": "Self-knowledge"
+    },
     "empty": {
       "text": "Try changing your search or pick another quiz.",
       "title": "Nothing found"
     },
     "headline": "Quizzes",
+    "filters": {
+      "all": "All"
+    },
     "how": {
       "step1": {
         "text": "Open the quiz that matches your goal.",
@@ -1172,7 +1477,7 @@
       }
     },
     "howTitle": "How it works",
-    "searchPlaceHolder": "Search quizzes…",
+    "searchPlaceholder": "Search quizzes…",
     "subtitle": "Short quizzes to help you choose a country, lifestyle, and priorities.",
     "title": "Pick a quiz",
     "usaCompareTitle": "Compare US states"
@@ -1196,6 +1501,20 @@
       "countryFit": {
         "description": "Find out which country fits your lifestyle, budget and preferences best.",
         "title": "Country fit quiz"
+      },
+      "careerFit": {
+        "description": "Answer a few questions and find out which professions fit how you like to work.",
+        "title": "Career fit quiz"
+      },
+      "lifeValues": {
+        "description": "A short reflective quiz to help you understand what you actually want in life.",
+        "title": "What I want in life quiz"
+      },
+      "quizzes": {
+        "title": "Quizzes",
+        "description": "Short quizzes to help you choose a country, a profession, and understand your own priorities.",
+        "ogTitle": "WhitesLove quizzes",
+        "ogDescription": "Country fit, career fit, and life values — short quizzes with real results."
       },
       "dockerSearch": {
         "description": "Find relevant Docker tags, aliases, and best-fit image variants for your use case.",

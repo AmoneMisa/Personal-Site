@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import PageHeader from "~/components/common/PageHeader.vue";
-import { safeFetch } from "~/utils/safeFetch";
+import QuizCard from "~/components/quizzes/QuizCard.vue";
 
 type QuizType = {
   id: string;
@@ -18,7 +18,6 @@ type QuizCategoryType = {
 };
 
 const { t } = useI18n();
-const config = useRuntimeConfig();
 
 useSeoMeta({
   title: () => t("seo.pages.quizzes.title"),
@@ -30,16 +29,37 @@ useSeoMeta({
   ogDescription: () => t("seo.pages.quizzes.ogDescription")
 });
 
-const { data: rawQuizzesData } = await safeFetch<QuizType[]>(
-    `${config.public.apiBase}/quizzes`
-);
+// Static, like the rest of this site's content — there is no backend content
+// service for quizzes (and shouldn't be: quizzes are code, not data).
+const quizCategories: QuizCategoryType[] = [
+  { id: "relocation", titleKey: "quizzes.categories.relocation" },
+  { id: "career", titleKey: "quizzes.categories.career" },
+  { id: "selfKnowledge", titleKey: "quizzes.categories.selfKnowledge" },
+];
 
-const { data: quizCategoriesData } = await safeFetch<QuizCategoryType[]>(
-    `${config.public.apiBase}/quiz-categories`
-);
-
-const quizzes = computed(() => (Array.isArray(rawQuizzesData) ? rawQuizzesData : []));
-const quizCategories = computed(() => (Array.isArray(quizCategoriesData) ? quizCategoriesData : []));
+const quizzes: QuizType[] = [
+  {
+    id: "country-fit",
+    titleKey: "quizzes.countryFit.title",
+    descriptionKey: "quizzes.countryFit.description",
+    link: "/quizzes/country-fit",
+    categoryId: "relocation",
+  },
+  {
+    id: "career-fit",
+    titleKey: "quizzes.careerFit.title",
+    descriptionKey: "quizzes.careerFit.description",
+    link: "/quizzes/career-fit",
+    categoryId: "career",
+  },
+  {
+    id: "life-values",
+    titleKey: "quizzes.lifeValues.title",
+    descriptionKey: "quizzes.lifeValues.description",
+    link: "/quizzes/life-values",
+    categoryId: "selfKnowledge",
+  },
+];
 
 const query = ref("");
 const activeCategory = ref<"all" | string>("all");
@@ -47,7 +67,7 @@ const activeCategory = ref<"all" | string>("all");
 const normalizedQuery = computed(() => query.value.trim().toLowerCase());
 
 const filteredQuizzes = computed(() => {
-  const byCategory = quizzes.value.filter(q =>
+  const byCategory = quizzes.filter(q =>
       activeCategory.value === "all" || q.categoryId === activeCategory.value
   );
 

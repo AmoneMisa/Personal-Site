@@ -30,6 +30,8 @@ const ROUTES: { path: string; changefreq: string; priority: number }[] = [
   { path: "/flat-finder", changefreq: "daily", priority: 0.8 },
   { path: "/quizzes", changefreq: "monthly", priority: 0.6 },
   { path: "/quizzes/country-fit", changefreq: "monthly", priority: 0.6 },
+  { path: "/quizzes/career-fit", changefreq: "monthly", priority: 0.6 },
+  { path: "/quizzes/life-values", changefreq: "monthly", priority: 0.6 },
   { path: "/services/converter", changefreq: "monthly", priority: 0.7 },
   { path: "/services/dockerhub", changefreq: "monthly", priority: 0.7 },
   { path: "/services/email-editor", changefreq: "monthly", priority: 0.7 },
