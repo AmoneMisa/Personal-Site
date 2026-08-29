@@ -6,6 +6,10 @@ import { crawlIshBorPages } from '../shared/hiring/sources/ishBorCrawler.ts'
 import { listHiringLinkedInSourceKeys } from '../shared/hiring/sources/linkedInSources.ts'
 import { listHiringSocialSourceKeys } from '../shared/hiring/sources/socialSources.ts'
 import { HIRING_TELEGRAM_CHANNELS } from '../shared/hiring/sources/telegramChannels.ts'
+import { WEB_CV_SOURCES } from '../shared/hiring/sources/webCvSources.ts'
+import { HH_UZ_SOURCE } from '../server/hiring/sources/web/hhUz.ts'
+import { parseUzJobsResumeRows } from '../server/hiring/sources/web/uzJobs.ts'
+import { webProfileId } from '../server/hiring/sources/web/crawler.ts'
 import { hiringLinkedInSourceHandles, listHiringLinkedInSources } from '../server/hiring/sources/linkedInRefresh.ts'
 import { hiringSocialSourceHandles, listSocialSources } from '../server/hiring/sources/socialRefresh.ts'
 
@@ -42,6 +46,64 @@ test('Tashkent-heavy public resume Telegram feeds are part of the canonical hiri
     assert.equal(source.requireCandidateMarker, true)
     assert.equal(source.priority, 'high')
   }
+})
+
+test('Uzbekistan web-CV catalog includes hh.uz Tashkent and UzJobs resumes', () => {
+  const uz = new Map(WEB_CV_SOURCES.filter((source) => source.country === 'UZ').map((source) => [source.key, source]))
+  assert.ok(uz.has('flagma-uz'))
+  assert.ok(uz.has('careerist-uz'))
+  assert.ok(uz.has('hh-uz-tashkent'))
+  assert.ok(uz.has('uzjobs-resumes'))
+  assert.ok(uz.size >= 4)
+})
+
+test('hh.uz Tashkent resume cards map recent active candidates and reject not-looking profiles', () => {
+  const active = HH_UZ_SOURCE.parse({
+    href: 'https://tashkent.hh.uz/resume/9c9b48fe00045b3f780039ed1f74585a457863',
+    title: 'Менеджер по продажам',
+    html: '',
+    text: '30 лет · Обновлено сегодня · Активно ищет работу · Общий опыт 7 лет 1 месяц · 10 000 000 сум',
+  }, HH_UZ_SOURCE)
+  assert.ok(active)
+  assert.equal(active.country, 'UZ')
+  assert.equal(active.city, 'Tashkent')
+  assert.equal(active.role, 'Менеджер по продажам')
+
+  const inactive = HH_UZ_SOURCE.parse({
+    href: 'https://tashkent.hh.uz/resume/5b5837ce00018fd7290039ed1f57486e41646e',
+    title: 'Повар',
+    html: '',
+    text: '40 лет · Обновлено сегодня · Не ищет работу · Общий опыт 3 года',
+  }, HH_UZ_SOURCE)
+  assert.equal(inactive, null)
+})
+
+test('UzJobs locked resume table rows still become anonymized hiring candidates', () => {
+  const html = `
+    <table>
+      <tr>
+        <td>100046</td>
+        <td>Services / Administrator<br>Trade and sales / Sales manager</td>
+        <td>Tashkent</td>
+        <td>29.08.2026 10:15:00</td>
+      </tr>
+    </table>
+  `
+  const profiles = parseUzJobsResumeRows(html)
+  assert.equal(profiles.length, 1)
+  assert.equal(profiles[0].country, 'UZ')
+  assert.equal(profiles[0].city, 'Tashkent')
+  assert.equal(profiles[0].role, 'Administrator')
+  assert.match(profiles[0].url, /resume_view-100046-/)
+  assert.equal(profiles[0].contactType, 'platform')
+})
+
+test('web candidate cursor identities support hh hashes and UzJobs ids', () => {
+  assert.equal(
+    webProfileId('https://tashkent.hh.uz/resume/9c9b48fe00045b3f780039ed1f74585a457863?x=1'),
+    '9c9b48fe00045b3f780039ed1f74585a457863',
+  )
+  assert.equal(webProfileId('https://uzjobs.uz/e/resume_view-100046-1-1.html'), '100046')
 })
 
 test('IshBor historical crawl continues past an old sparse page', async () => {
