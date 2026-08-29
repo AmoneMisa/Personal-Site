@@ -73,7 +73,8 @@ const {
   countries, city, district, microdistrict, quartal, mapArea, propertyType, dealType, agency, petFriendly, roomOnlyFilter,
   onlyWithPhotos, childrenRequired, newBuildingOnly, dishwasherOnly, airConditionerOnly,
   parkingOnly, internetOnly, gasOnly, balconyOnly, terraceOnly, privateYardOnly,
-  noElevatorOnly, noDepositOnly, communalIncludedOnly, noCommissionOnly, sort,
+  noElevatorOnly, noDepositOnly, communalIncludedOnly, noCommissionOnly,
+  tvOnly, microwaveOnly, ovenOnly, bidetOnly, walkInClosetOnly, bathtubOnly, showerOnly, euroLayoutOnly, sort,
   audience, metro, priceMin, priceMax, roomsMin, roomsMax, bedroomsMin, bedroomsMax,
   areaMin, areaMax, pricePerSqmMin, pricePerSqmMax, metroMaxM, nearbyKind, nearbyMaxM,
   floorMin, floorMax, totalFloorsMin, totalFloorsMax, yearMin, yearMax, maxAgeDays,
@@ -216,7 +217,10 @@ const currencyItems = computed<Item[]>(() => {
 const extraLabels = computed(() => ({
   amenities: t("amenities"), dishwasher: t("dishwasher"), ac: t("airConditioner"),
   parking: t("parking"), internet: t("internet"), gas: t("gas"), balcony: t("balcony"),
-  terrace: t("terrace"), yard: t("privateYard"), sort: t("sort"), newest: t("sortNewest"),
+  terrace: t("terrace"), yard: t("privateYard"),
+  tv: t("tv"), microwave: t("microwave"), oven: t("oven"), bidet: t("bidet"),
+  walkInCloset: t("walkInCloset"), bathtub: t("bathtub"), shower: t("shower"),
+  sort: t("sort"), newest: t("sortNewest"),
   oldest: t("sortOldest"), priceAsc: t("sortPriceAsc"), priceDesc: t("sortPriceDesc"),
   titleAsc: t("sortTitleAsc"), titleDesc: t("sortTitleDesc"),
 }));
@@ -823,6 +827,13 @@ onBeforeUnmount(() => { modalOpen.value = false; lightboxOpen.value = false; rel
           <u-button type="button" size="xs" color="neutral" icon="i-lucide-panel-top" :variant="balconyOnly ? 'solid' : 'outline'" @click="balconyOnly = !balconyOnly; scheduleLoad()">{{ extraLabels.balcony }}</u-button>
           <u-button type="button" size="xs" color="neutral" icon="i-lucide-sun" :variant="terraceOnly ? 'solid' : 'outline'" @click="terraceOnly = !terraceOnly; scheduleLoad()">{{ extraLabels.terrace }}</u-button>
           <u-button type="button" size="xs" color="neutral" icon="i-lucide-tree-pine" :variant="privateYardOnly ? 'solid' : 'outline'" @click="privateYardOnly = !privateYardOnly; scheduleLoad()">{{ extraLabels.yard }}</u-button>
+          <u-button type="button" size="xs" color="neutral" icon="i-lucide-tv" :variant="tvOnly ? 'solid' : 'outline'" @click="tvOnly = !tvOnly; scheduleLoad()">{{ extraLabels.tv }}</u-button>
+          <u-button type="button" size="xs" color="neutral" icon="i-lucide-microwave" :variant="microwaveOnly ? 'solid' : 'outline'" @click="microwaveOnly = !microwaveOnly; scheduleLoad()">{{ extraLabels.microwave }}</u-button>
+          <u-button type="button" size="xs" color="neutral" icon="i-lucide-cooking-pot" :variant="ovenOnly ? 'solid' : 'outline'" @click="ovenOnly = !ovenOnly; scheduleLoad()">{{ extraLabels.oven }}</u-button>
+          <u-button type="button" size="xs" color="neutral" icon="i-lucide-shower-head" :variant="bidetOnly ? 'solid' : 'outline'" @click="bidetOnly = !bidetOnly; scheduleLoad()">{{ extraLabels.bidet }}</u-button>
+          <u-button type="button" size="xs" color="neutral" icon="i-lucide-shirt" :variant="walkInClosetOnly ? 'solid' : 'outline'" @click="walkInClosetOnly = !walkInClosetOnly; scheduleLoad()">{{ extraLabels.walkInCloset }}</u-button>
+          <u-button type="button" size="xs" color="neutral" icon="i-lucide-bath" :variant="bathtubOnly ? 'solid' : 'outline'" @click="bathtubOnly = !bathtubOnly; scheduleLoad()">{{ extraLabels.bathtub }}</u-button>
+          <u-button type="button" size="xs" color="neutral" icon="i-lucide-droplets" :variant="showerOnly ? 'solid' : 'outline'" @click="showerOnly = !showerOnly; scheduleLoad()">{{ extraLabels.shower }}</u-button>
         </div>
 
         <UiFilterFooter class="filter-actions-row" :reset-label="t('reset')" @reset="resetFilters">
@@ -837,6 +848,7 @@ onBeforeUnmount(() => { modalOpen.value = false; lightboxOpen.value = false; rel
             <button v-if="noDepositOnly" type="button" class="filter-chip" @click="noDepositOnly = false; scheduleLoad()">{{ t('noDeposit') }} <span>×</span></button>
             <button v-if="communalIncludedOnly" type="button" class="filter-chip" @click="communalIncludedOnly = false; scheduleLoad()">{{ t('communalIncluded') }} <span>×</span></button>
             <button v-if="noCommissionOnly" type="button" class="filter-chip" @click="noCommissionOnly = false; scheduleLoad()">{{ t('noCommission') }} <span>×</span></button>
+            <button v-if="euroLayoutOnly" type="button" class="filter-chip" @click="euroLayoutOnly = false; scheduleLoad()">{{ t('euroLayout') }} <span>×</span></button>
           </div>
         </UiFilterFooter>
       </section>

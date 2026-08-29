@@ -46,6 +46,14 @@ export function useFlatFilters() {
   const noDepositOnly = ref(false);
   const communalIncludedOnly = ref(false);
   const noCommissionOnly = ref(false);
+  const tvOnly = ref(false);
+  const microwaveOnly = ref(false);
+  const ovenOnly = ref(false);
+  const bidetOnly = ref(false);
+  const walkInClosetOnly = ref(false);
+  const bathtubOnly = ref(false);
+  const showerOnly = ref(false);
+  const euroLayoutOnly = ref(false);
   const commissionPercentMin = ref<number>();
   const commissionPercentMax = ref<number>();
   const sort = ref<FlatSort>("newest");
@@ -190,6 +198,14 @@ export function useFlatFilters() {
     if (noElevatorOnly.value) params.noElevator = "1";
     if (noDepositOnly.value) params.noDeposit = "1";
     if (communalIncludedOnly.value) params.communalIncluded = "1";
+    if (tvOnly.value) params.tv = "1";
+    if (microwaveOnly.value) params.microwave = "1";
+    if (ovenOnly.value) params.oven = "1";
+    if (bidetOnly.value) params.bidet = "1";
+    if (walkInClosetOnly.value) params.walkInCloset = "1";
+    if (bathtubOnly.value) params.bathtub = "1";
+    if (showerOnly.value) params.shower = "1";
+    if (euroLayoutOnly.value) params.euroLayout = "1";
     if (noCommissionOnly.value) params.noCommission = "1";
     else {
       if (commissionPercentMin.value != null) params.commissionPercentMin = String(commissionPercentMin.value);
@@ -229,6 +245,14 @@ export function useFlatFilters() {
     noElevatorOnly.value = false;
     noDepositOnly.value = false;
     communalIncludedOnly.value = false;
+    tvOnly.value = false;
+    microwaveOnly.value = false;
+    ovenOnly.value = false;
+    bidetOnly.value = false;
+    walkInClosetOnly.value = false;
+    bathtubOnly.value = false;
+    showerOnly.value = false;
+    euroLayoutOnly.value = false;
     noCommissionOnly.value = false;
     commissionPercentMin.value = undefined;
     commissionPercentMax.value = undefined;
@@ -263,6 +287,7 @@ export function useFlatFilters() {
     petFriendly, roomOnlyFilter, onlyWithPhotos, childrenRequired, newBuildingOnly,
     dishwasherOnly, airConditionerOnly, parkingOnly, internetOnly, gasOnly, balconyOnly,
     terraceOnly, privateYardOnly, noElevatorOnly, noDepositOnly, communalIncludedOnly, noCommissionOnly,
+    tvOnly, microwaveOnly, ovenOnly, bidetOnly, walkInClosetOnly, bathtubOnly, showerOnly, euroLayoutOnly,
     commissionPercentMin, commissionPercentMax, sort, audience, metro, priceMin, priceMax, roomsMin, roomsMax,
     bedroomsMin, bedroomsMax, areaMin, areaMax, pricePerSqmMin, pricePerSqmMax, metroMaxM,
     nearbyKind, nearbyMaxM, floorMin, floorMax, totalFloorsMin, totalFloorsMax, yearMin, yearMax,

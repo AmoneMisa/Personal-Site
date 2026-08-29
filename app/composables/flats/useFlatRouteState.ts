@@ -22,6 +22,7 @@ export function useFlatRouteState(options: {
       petFriendly, roomOnlyFilter, onlyWithPhotos, childrenRequired, newBuildingOnly,
       dishwasherOnly, airConditionerOnly, parkingOnly, internetOnly, gasOnly, balconyOnly,
       terraceOnly, privateYardOnly, noElevatorOnly, noDepositOnly, communalIncludedOnly, noCommissionOnly,
+      tvOnly, microwaveOnly, ovenOnly, bidetOnly, walkInClosetOnly, bathtubOnly, showerOnly, euroLayoutOnly,
       commissionPercentMin, commissionPercentMax, sort, priceMin, priceMax, displayCurrency, roomsMin,
       roomsMax, bedroomsMin, bedroomsMax, areaMin, areaMax, pricePerSqmMin, pricePerSqmMax,
       metroMaxM, nearbyKind, nearbyMaxM, floorMin, floorMax, totalFloorsMin, totalFloorsMax,
@@ -54,6 +55,14 @@ export function useFlatRouteState(options: {
     if (noElevatorOnly.value) q.noElevator = "1";
     if (noDepositOnly.value) q.noDeposit = "1";
     if (communalIncludedOnly.value) q.communalIncluded = "1";
+    if (tvOnly.value) q.tv = "1";
+    if (microwaveOnly.value) q.microwave = "1";
+    if (ovenOnly.value) q.oven = "1";
+    if (bidetOnly.value) q.bidet = "1";
+    if (walkInClosetOnly.value) q.walkInCloset = "1";
+    if (bathtubOnly.value) q.bathtub = "1";
+    if (showerOnly.value) q.shower = "1";
+    if (euroLayoutOnly.value) q.euroLayout = "1";
     if (noCommissionOnly.value) q.noCommission = "1";
     if (sort.value !== "newest") q.sort = sort.value;
     for (const [key, value] of Object.entries({ priceMin: priceMin.value, priceMax: priceMax.value, roomsMin: roomsMin.value, roomsMax: roomsMax.value, bedroomsMin: bedroomsMin.value, bedroomsMax: bedroomsMax.value, areaMin: areaMin.value, areaMax: areaMax.value, pricePerSqmMin: pricePerSqmMin.value, pricePerSqmMax: pricePerSqmMax.value, metroMaxM: metroMaxM.value, nearbyMaxM: nearbyMaxM.value, floorMin: floorMin.value, floorMax: floorMax.value, totalFloorsMin: totalFloorsMin.value, totalFloorsMax: totalFloorsMax.value, yearMin: yearMin.value, yearMax: yearMax.value, maxAgeDays: maxAgeDays.value, commissionPercentMin: commissionPercentMin.value, commissionPercentMax: commissionPercentMax.value })) {
@@ -95,6 +104,14 @@ export function useFlatRouteState(options: {
     filters.noElevatorOnly.value = queryBoolean(params.noElevator);
     filters.noDepositOnly.value = queryBoolean(params.noDeposit);
     filters.communalIncludedOnly.value = queryBoolean(params.communalIncluded);
+    filters.tvOnly.value = queryBoolean(params.tv);
+    filters.microwaveOnly.value = queryBoolean(params.microwave);
+    filters.ovenOnly.value = queryBoolean(params.oven);
+    filters.bidetOnly.value = queryBoolean(params.bidet);
+    filters.walkInClosetOnly.value = queryBoolean(params.walkInCloset);
+    filters.bathtubOnly.value = queryBoolean(params.bathtub);
+    filters.showerOnly.value = queryBoolean(params.shower);
+    filters.euroLayoutOnly.value = queryBoolean(params.euroLayout);
     filters.noCommissionOnly.value = queryBoolean(params.noCommission);
     const sortParam = queryString(params.sort) as FlatSort;
     filters.sort.value = FLAT_SORTS.includes(sortParam) ? sortParam : "newest";
