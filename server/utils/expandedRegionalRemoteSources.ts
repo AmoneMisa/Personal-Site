@@ -4,7 +4,7 @@ import { detectWorkModes } from './hiringLexicon'
 const UA = 'jobFinder/1.0 (job aggregator; contact: admin@whiteslove.me)'
 const REQUEST_TIMEOUT_MS = 20_000
 
-type TargetMarket = 'UA' | 'RO' | 'UZ' | 'US' | 'KG' | 'KZ' | 'CN' | 'JP' | 'KR' | 'REMOTE'
+type TargetMarket = 'UA' | 'RO' | 'UZ' | 'US' | 'CA' | 'CY' | 'KG' | 'KZ' | 'CN' | 'JP' | 'KR' | 'REMOTE'
 
 type LeverTarget = {
   handle: string
@@ -17,29 +17,21 @@ type LeverTarget = {
 // appear in more than one market when its public Lever board explicitly lists
 // vacancies for those countries. URL deduplication collapses overlaps later.
 export const EXPANDED_REGIONAL_REMOTE_COMPANIES: LeverTarget[] = [
-  // Romania: general operations, customer support, field work, sales and management.
   { handle: 'tsmg', label: 'TSMG', market: 'RO', aliases: ['romania', 'bucharest'] },
   { handle: 'companial', label: 'Companial', market: 'RO', aliases: ['romania', 'bucharest'] },
-
-  // Ukraine: cross-border remote employers plus Binance's Ukraine-specific slice.
   { handle: 'remofirst', label: 'RemoFirst', market: 'UA', aliases: ['ukraine', 'kyiv', 'kiev'] },
   { handle: 'binance', label: 'Binance', market: 'UA', aliases: ['ukraine', 'kyiv', 'kiev'] },
-
-  // Uzbekistan: RemoFirst explicitly includes Uzbekistan in multiple remote roles.
   { handle: 'remofirst', label: 'RemoFirst', market: 'UZ', aliases: ['uzbekistan', 'tashkent', 'toshkent'] },
 
-  // Kyrgyzstan: explicit Bishkek / Kyrgyzstan listings and CIS-remote eligibility.
   { handle: 'weloglobal', label: 'Welo Global', market: 'KG', aliases: ['kyrgyzstan', 'bishkek'] },
   { handle: 'binance', label: 'Binance', market: 'KG', aliases: ['kyrgyzstan', 'bishkek'] },
 
-  // Kazakhstan: sales, customer experience, compliance, management and tech.
   { handle: 'xm', label: 'XM', market: 'KZ', aliases: ['kazakhstan', 'almaty', 'astana'] },
   { handle: 'aleph', label: 'Aleph', market: 'KZ', aliases: ['kazakhstan', 'almaty'] },
   { handle: 'creatio', label: 'Creatio', market: 'KZ', aliases: ['kazakhstan', 'almaty', 'astana'] },
   { handle: 'xsolla', label: 'Xsolla', market: 'KZ', aliases: ['kazakhstan', 'almaty', 'astana'] },
   { handle: 'binance', label: 'Binance', market: 'KZ', aliases: ['kazakhstan', 'almaty', 'astana'] },
 
-  // Mainland China: engineering plus finance, sales, product, account management.
   { handle: 'xsolla', label: 'Xsolla', market: 'CN', aliases: ['china', 'beijing', 'shanghai', 'shenzhen', 'dalian'] },
   { handle: 'shopback-2', label: 'ShopBack', market: 'CN', aliases: ['china', 'shenzhen', 'shanghai'] },
   { handle: 'Coda', label: 'Coda', market: 'CN', aliases: ['china', 'shanghai'] },
@@ -47,7 +39,6 @@ export const EXPANDED_REGIONAL_REMOTE_COMPANIES: LeverTarget[] = [
   { handle: 'weloglobal', label: 'Welo Global', market: 'CN', aliases: ['china', 'beijing', 'shanghai', 'dalian'] },
   { handle: 'ppro', label: 'PPRO', market: 'CN', aliases: ['china', 'shanghai'] },
 
-  // Japan: operations, finance, HR, marketing, recruiting, sales and technology.
   { handle: 'cic', label: 'CIC', market: 'JP', aliases: ['japan', 'tokyo', 'fukuoka', 'jp'] },
   { handle: 'mendix', label: 'Mendix', market: 'JP', aliases: ['japan', 'tokyo'] },
   { handle: 'xsolla', label: 'Xsolla', market: 'JP', aliases: ['japan', 'tokyo'] },
@@ -56,13 +47,22 @@ export const EXPANDED_REGIONAL_REMOTE_COMPANIES: LeverTarget[] = [
   { handle: 'EnvisionRPO', label: 'Envision RPO', market: 'JP', aliases: ['japan', 'tokyo'] },
   { handle: 'cagents', label: 'CAI', market: 'JP', aliases: ['japan', 'tokyo'] },
 
-  // South Korea: business, sales, customer success, marketing and technical roles.
   { handle: 'xsolla', label: 'Xsolla', market: 'KR', aliases: ['south korea', 'seoul', 'korea'] },
   { handle: 'aleph', label: 'Aleph', market: 'KR', aliases: ['south korea', 'seoul'] },
   { handle: 'insiderone', label: 'Insider One', market: 'KR', aliases: ['south korea', 'seoul', 'korea'] },
   { handle: 'weloglobal', label: 'Welo Global', market: 'KR', aliases: ['south korea', 'seoul', 'korea'] },
+  { handle: 'mistplay', label: 'Mistplay', market: 'KR', aliases: ['south korea', 'seoul', 'korea'] },
+  { handle: 'rws', label: 'RWS TrainAI', market: 'KR', aliases: ['south korea', 'seoul', 'korea'] },
 
-  // USA / US-remote: support, operations, security, sales and management-heavy boards.
+  { handle: 'pointclickcare', label: 'PointClickCare', market: 'CA', aliases: ['canada', 'remote- canada', 'remote - canada'] },
+  { handle: 'applydigital', label: 'APPLY', market: 'CA', aliases: ['canada', 'remote - canada', 'remote canada'] },
+  { handle: 'cscgeneration-2', label: 'CSC Generation', market: 'CA', aliases: ['canada', 'remote - canada', 'remote canada'] },
+
+  { handle: 'capital', label: 'Capital.com', market: 'CY', aliases: ['cyprus', 'limassol', 'nicosia'] },
+  { handle: 'unlimit', label: 'Unlimit', market: 'CY', aliases: ['cyprus', 'limassol', 'nicosia'] },
+  { handle: 'xsolla', label: 'Xsolla', market: 'CY', aliases: ['cyprus', 'limassol', 'nicosia'] },
+  { handle: 'aleph', label: 'Aleph', market: 'CY', aliases: ['cyprus', 'limassol', 'nicosia'] },
+
   { handle: 'pointclickcare', label: 'PointClickCare', market: 'US', aliases: ['united states', 'remote - us', 'us remote', 'usa'] },
   { handle: 'atmosera', label: 'Atmosera', market: 'US', aliases: ['united states', 'remote - us', 'remote us', 'usa'] },
   { handle: 'entrata', label: 'Entrata', market: 'US', aliases: ['united states', 'remote - us', 'remote us', 'usa'] },
@@ -71,7 +71,6 @@ export const EXPANDED_REGIONAL_REMOTE_COMPANIES: LeverTarget[] = [
   { handle: 'deleteme', label: 'DeleteMe', market: 'US', aliases: ['united states', 'remote - us', 'remote us', 'usa'] },
   { handle: 'protective', label: 'Protective', market: 'US', aliases: ['united states', 'work from home', 'remote - us', 'usa'] },
 
-  // Broad remote sources with explicit worldwide / multi-country remote locations.
   { handle: 'remofirst', label: 'RemoFirst', market: 'REMOTE', aliases: ['remote', 'worldwide', 'distributed'] },
   { handle: 'weloglobal', label: 'Welo Global', market: 'REMOTE', aliases: ['remote', 'worldwide', 'remote - europe'] },
 ]
