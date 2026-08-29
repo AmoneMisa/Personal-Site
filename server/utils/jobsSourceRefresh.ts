@@ -7,6 +7,7 @@ import { fetchExtraTelegramJobs } from './extraTelegramJobSources'
 import { fetchLinkedInJobs } from './linkedinSource'
 import { fetchFacebookJobs, fetchThreadsJobs } from './socialJobSources'
 import { fetchExtraPublicJobs } from './extraPublicJobSources'
+import { fetchCuratedRemoteJobs } from './curatedRemoteJobSources'
 import { fetchUsaVisaSponsorJobs } from './usaVisaSponsorSource'
 import { fetchSourceExpansionJobs } from './sourceExpansionJobs'
 import { fetchAviationExpansionJobs } from './aviationExpansionJobs'
@@ -126,6 +127,10 @@ async function fetchAllCompanies(q: string): Promise<Job[]> {
   const loaders = [
     { label: 'companies', load: () => fetchCompanies(q) },
     { label: 'public-boards', load: () => fetchExtraPublicJobs(q) },
+    // These boards used to rely on the generic public-board anchor parser.
+    // Keep them inside the companies umbrella, but let source-aware adapters
+    // overwrite matching URLs with better company/location/date fidelity.
+    { label: 'curated-remote-boards', load: () => fetchCuratedRemoteJobs(q) },
     { label: 'usa-visa-sponsors', load: () => fetchUsaVisaSponsorJobs(q) },
     { label: 'source-expansion', load: () => fetchSourceExpansionJobs(q) },
     { label: 'aviation-expansion', load: () => fetchAviationExpansionJobs(q) },
