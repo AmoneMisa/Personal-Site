@@ -19,7 +19,7 @@ export const REGIONAL_TECH_COMPANIES: RegionalLeverCompany[] = [
   { handle: '3pillarglobal', label: '3Pillar', country: 'RO', aliases: ['romania', 'bucharest', 'cluj', 'iasi', 'timișoara', 'timisoara'] },
   { handle: 'brillio-2', label: 'Brillio', country: 'RO', aliases: ['romania', 'bucharest', 'bihor'] },
   { handle: 'viseven', label: 'Viseven', country: 'RO', aliases: ['romania', 'bucharest'] },
-  { handle: 'Civitta', label: 'Civitta', country: 'RO', aliases: ['romania', 'bucharest'] },
+  { handle: 'civitta', label: 'Civitta', country: 'RO', aliases: ['romania', 'bucharest'] },
   { handle: 'binance', label: 'Binance', country: 'UZ', aliases: ['uzbekistan', 'tashkent', 'toshkent'] },
   { handle: 'weloglobal', label: 'Welo Global', country: 'UZ', aliases: ['uzbekistan', 'tashkent', 'toshkent'] },
 ]
