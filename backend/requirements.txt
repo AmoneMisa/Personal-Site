@@ -14,3 +14,5 @@ ghostscript
 openpyxl
 xmltodict
 pdf2docx
+pyyaml
+pillow-avif-plugin

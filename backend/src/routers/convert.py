@@ -10,7 +10,9 @@ from pathlib import Path
 from typing import Literal
 
 import openpyxl
+import pillow_avif  # noqa: F401 - side-effect import, registers the AVIF codec with Pillow
 import xmltodict
+import yaml
 from PIL import Image
 from fastapi import APIRouter, UploadFile, File, Form
 from fastapi.responses import StreamingResponse
@@ -32,11 +34,11 @@ def api_error(code: str, message: str, status: int = 400, field: str | None = No
 # ---------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------
-IMAGE_INPUT_EXTS = {"png", "jpg", "jpeg", "webp"}
-IMAGE_TARGET_EXTS = {"png", "jpg", "jpeg", "webp"}
+IMAGE_INPUT_EXTS = {"png", "jpg", "jpeg", "webp", "gif", "bmp", "tif", "tiff", "avif"}
+IMAGE_TARGET_EXTS = {"png", "jpg", "jpeg", "webp", "gif", "bmp", "tiff", "avif"}
 
-DATA_INPUT_EXTS = {"csv", "json", "xml"}
-DATA_TARGET_EXTS = {"csv", "json", "xml", "xlsx"}
+DATA_INPUT_EXTS = {"csv", "tsv", "json", "xml", "xlsx", "yaml", "yml"}
+DATA_TARGET_EXTS = {"csv", "tsv", "json", "xml", "xlsx", "yaml", "yml"}
 
 DOC_INPUT_EXTS = {"docx", "pdf"}
 DOC_TARGET_EXTS = {"docx", "pdf"}
@@ -65,23 +67,25 @@ def guess_mime_for_ext(ext: str) -> str:
         return "application/xml"
     if ext == "csv":
         return "text/csv"
+    if ext == "tsv":
+        return "text/tab-separated-values"
+    if ext in {"yaml", "yml"}:
+        return "application/yaml"
     if ext in {"jpg", "jpeg"}:
         return "image/jpeg"
     if ext == "png":
         return "image/png"
     if ext == "webp":
         return "image/webp"
+    if ext == "gif":
+        return "image/gif"
+    if ext == "bmp":
+        return "image/bmp"
+    if ext in {"tif", "tiff"}:
+        return "image/tiff"
+    if ext == "avif":
+        return "image/avif"
     return "application/octet-stream"
-
-
-def enforce_single_file(files: list[UploadFile], field: str = "files"):
-    if len(files) != 1:
-        api_error(
-            "ONLY_ONE_FILE",
-            "Для этого типа конвертации можно загрузить только один файл.",
-            status=422,
-            field=field,
-        )
 
 
 def zip_bytes(outputs: list[tuple[str, bytes]]) -> bytes:
@@ -120,7 +124,12 @@ def convert_image_bytes(input_bytes: bytes, src_ext: str, target_ext: str) -> by
                 img = img.convert("RGB")
 
         out = io.BytesIO()
-        save_format = "JPEG" if target_ext in {"jpg", "jpeg"} else target_ext.upper()
+        if target_ext in {"jpg", "jpeg"}:
+            save_format = "JPEG"
+        elif target_ext == "tif":
+            save_format = "TIFF"
+        else:
+            save_format = target_ext.upper()
 
         # Some sane defaults
         save_kwargs = {}
@@ -135,84 +144,169 @@ def convert_image_bytes(input_bytes: bytes, src_ext: str, target_ext: str) -> by
 
 # ---------------------------------------------------------
 # Data conversions
+#
+# Every format is parsed into one canonical Python object (dict/list/scalar,
+# same shape json.loads would give you) and every target is serialized from
+# that same object. This is what lets any-input-to-any-target work (7 formats
+# would otherwise be 42 bespoke bytes-to-bytes functions) and it's also what
+# makes every conversion consistently error as a clean api_error instead of
+# an unhandled 500 - all parsing and serializing goes through these functions.
 # ---------------------------------------------------------
-def csv_to_json_bytes(csv_bytes: bytes) -> bytes:
-    text = csv_bytes.decode("utf-8-sig", errors="replace")
-    reader = csv.DictReader(io.StringIO(text))
-    rows = list(reader)
-    return json.dumps(rows, ensure_ascii=False, indent=2).encode("utf-8")
+def _unwrap_for_table(obj):
+    # XML round-trips wrap arrays as {"root": {"item": [...]}} (see
+    # serialize_xml_bytes) since XML has no bare-array shape. Unwrap that
+    # nesting so XML -> CSV/TSV/XLSX still finds the underlying row list
+    # instead of rejecting it as "not a list".
+    while isinstance(obj, dict) and len(obj) == 1:
+        obj = next(iter(obj.values()))
+    return obj
 
 
-def json_to_csv_bytes(json_bytes: bytes) -> bytes:
-    payload = json.loads(json_bytes.decode("utf-8", errors="replace"))
-    if not isinstance(payload, list):
-        api_error("INVALID_JSON", "JSON для конвертации в CSV должен быть массивом объектов.", status=422)
+def _row_dicts_to_table(rows) -> tuple[list[str], list[list]]:
+    rows = _unwrap_for_table(rows)
+    if not isinstance(rows, list):
+        api_error(
+            "INVALID_DATA",
+            "Табличный формат (CSV/TSV/XLSX) требует список объектов (JSON-массив) на входе.",
+            status=422,
+        )
 
-    # gather headers (union)
     headers: list[str] = []
     seen = set()
-    for row in payload:
+    for row in rows:
         if isinstance(row, dict):
             for k in row.keys():
                 if k not in seen:
                     seen.add(k)
                     headers.append(k)
 
-    out = io.StringIO()
-    writer = csv.DictWriter(out, fieldnames=headers, extrasaction="ignore")
-    writer.writeheader()
-    for row in payload:
-        if not isinstance(row, dict):
-            continue
-        writer.writerow(row)
+    table = [[row.get(h) if isinstance(row, dict) else None for h in headers] for row in rows]
+    return headers, table
 
+
+def parse_delimited_bytes(raw: bytes, delimiter: str) -> list:
+    text = raw.decode("utf-8-sig", errors="replace")
+    try:
+        reader = csv.DictReader(io.StringIO(text), delimiter=delimiter)
+        return list(reader)
+    except csv.Error as e:
+        api_error("INVALID_CSV", f"Не удалось разобрать табличные данные: {e}", status=422)
+
+
+def serialize_delimited_bytes(obj, delimiter: str) -> bytes:
+    headers, table = _row_dicts_to_table(obj)
+    out = io.StringIO()
+    writer = csv.writer(out, delimiter=delimiter)
+    writer.writerow(headers)
+    writer.writerows(table)
     return out.getvalue().encode("utf-8")
 
 
-def xml_to_json_bytes(xml_bytes: bytes) -> bytes:
-    text = xml_bytes.decode("utf-8", errors="replace")
-    obj = xmltodict.parse(text)
+def parse_json_bytes(raw: bytes):
+    try:
+        return json.loads(raw.decode("utf-8", errors="replace"))
+    except json.JSONDecodeError as e:
+        api_error("INVALID_JSON", f"Некорректный JSON: {e}", status=422)
+
+
+def serialize_json_bytes(obj) -> bytes:
     return json.dumps(obj, ensure_ascii=False, indent=2).encode("utf-8")
 
 
-def json_to_xml_bytes(json_bytes: bytes) -> bytes:
-    obj = json.loads(json_bytes.decode("utf-8", errors="replace"))
-    # Ensure one root element (простая стратегия)
+def parse_xml_bytes(raw: bytes):
+    text = raw.decode("utf-8", errors="replace")
+    try:
+        return xmltodict.parse(text)
+    except Exception as e:
+        api_error("INVALID_XML", f"Некорректный XML: {e}", status=422)
+
+
+def serialize_xml_bytes(obj) -> bytes:
+    # xmltodict needs exactly one root tag name mapped to its content. A dict
+    # with one key is used as-is (its value becomes the root's content), so a
+    # round-tripped XML document keeps its original root tag name. Anything
+    # else (a bare list/scalar, or a dict with != 1 key, e.g. from CSV/JSON/
+    # YAML) is wrapped under a synthetic "root" tag.
     if isinstance(obj, dict) and len(obj) == 1:
         root_obj = obj
     else:
         root_obj = {"root": obj}
-    xml = xmltodict.unparse(root_obj, pretty=True)
+
+    # A list can't sit directly as a root's value - xmltodict has no element
+    # name to give each item - so nest it one level deeper under "item". This
+    # is the fix for the crash on any array-shaped JSON (the single most
+    # common JSON shape, including this endpoint's own CSV/XLSX/TSV -> JSON
+    # output): xmltodict.unparse({"root": [...]}) used to raise
+    # "document with multiple roots".
+    root_key, root_val = next(iter(root_obj.items()))
+    if isinstance(root_val, list):
+        root_obj = {root_key: {"item": root_val}}
+
+    try:
+        xml = xmltodict.unparse(root_obj, pretty=True)
+    except Exception as e:
+        api_error("XML_EXPORT_FAILED", f"Не удалось сериализовать в XML: {e}", status=422)
     return xml.encode("utf-8")
 
 
-def csv_to_xlsx_bytes(csv_bytes: bytes) -> bytes:
-    text = csv_bytes.decode("utf-8-sig", errors="replace")
-    reader = csv.reader(io.StringIO(text))
+def parse_yaml_bytes(raw: bytes):
+    try:
+        return yaml.safe_load(raw.decode("utf-8", errors="replace"))
+    except yaml.YAMLError as e:
+        api_error("INVALID_YAML", f"Некорректный YAML: {e}", status=422)
 
+
+def serialize_yaml_bytes(obj) -> bytes:
+    return yaml.safe_dump(obj, allow_unicode=True, sort_keys=False).encode("utf-8")
+
+
+def parse_xlsx_bytes(raw: bytes) -> list:
+    try:
+        wb = openpyxl.load_workbook(io.BytesIO(raw), data_only=True)
+    except Exception as e:
+        api_error("INVALID_XLSX", f"Не удалось открыть XLSX: {e}", status=422)
+
+    ws = wb.active
+    rows_iter = ws.iter_rows(values_only=True)
+    headers = [str(h) if h is not None else "" for h in next(rows_iter, [])]
+    if not headers:
+        return []
+
+    return [dict(zip(headers, row)) for row in rows_iter]
+
+
+def serialize_xlsx_bytes(obj) -> bytes:
+    headers, table = _row_dicts_to_table(obj)
     wb = openpyxl.Workbook()
     ws = wb.active
-    for r_idx, row in enumerate(reader, start=1):
-        for c_idx, val in enumerate(row, start=1):
-            ws.cell(row=r_idx, column=c_idx, value=val)
+    ws.append(headers)
+    for row in table:
+        ws.append(row)
 
     out = io.BytesIO()
     wb.save(out)
     return out.getvalue()
 
 
-def passthrough_json_bytes(data: bytes) -> bytes:
-    # normalize/pretty-print
-    obj = json.loads(data.decode("utf-8", errors="replace"))
-    return json.dumps(obj, ensure_ascii=False, indent=2).encode("utf-8")
+DATA_PARSERS = {
+    "csv": lambda raw: parse_delimited_bytes(raw, ","),
+    "tsv": lambda raw: parse_delimited_bytes(raw, "\t"),
+    "json": parse_json_bytes,
+    "xml": parse_xml_bytes,
+    "xlsx": parse_xlsx_bytes,
+    "yaml": parse_yaml_bytes,
+    "yml": parse_yaml_bytes,
+}
 
-
-def passthrough_xml_bytes(data: bytes) -> bytes:
-    # parse/unparse to normalize formatting a bit
-    text = data.decode("utf-8", errors="replace")
-    obj = xmltodict.parse(text)
-    xml = xmltodict.unparse(obj, pretty=True)
-    return xml.encode("utf-8")
+DATA_SERIALIZERS = {
+    "csv": lambda obj: serialize_delimited_bytes(obj, ","),
+    "tsv": lambda obj: serialize_delimited_bytes(obj, "\t"),
+    "json": serialize_json_bytes,
+    "xml": serialize_xml_bytes,
+    "xlsx": serialize_xlsx_bytes,
+    "yaml": serialize_yaml_bytes,
+    "yml": serialize_yaml_bytes,
+}
 
 
 # ---------------------------------------------------------
@@ -293,7 +387,7 @@ def pdf_to_docx_via_pdf2docx(pdf_bytes: bytes) -> bytes:
 @router.post("/media")
 async def convert_media(
         files: list[UploadFile] = File(...),
-        target: Literal["png", "jpeg", "jpg", "webp"] = Form(...)
+        target: Literal["png", "jpeg", "jpg", "webp", "gif", "bmp", "tiff", "avif"] = Form(...)
 ):
     if not files:
         api_error("NO_FILES", "Не переданы файлы.", field="files", status=422)
@@ -338,7 +432,7 @@ async def convert_media(
 @router.post("/data")
 async def convert_data(
         file: UploadFile = File(...),
-        target: Literal["csv", "json", "xml", "xlsx"] = Form(...)
+        target: Literal["csv", "tsv", "json", "xml", "xlsx", "yaml", "yml"] = Form(...)
 ):
     if not file:
         api_error("NO_FILE", "Не передан файл.", field="file", status=422)
@@ -352,29 +446,12 @@ async def convert_data(
 
     raw = await file.read()
 
-    # Routes
-    if src_ext == "csv" and target == "json":
-        out = csv_to_json_bytes(raw)
-    elif src_ext == "json" and target == "csv":
-        out = json_to_csv_bytes(raw)
-    elif src_ext == "xml" and target == "json":
-        out = xml_to_json_bytes(raw)
-    elif src_ext == "json" and target == "xml":
-        out = json_to_xml_bytes(raw)
-    elif src_ext == "csv" and target == "xlsx":
-        out = csv_to_xlsx_bytes(raw)
-    elif src_ext == "json" and target == "json":
-        out = passthrough_json_bytes(raw)
-    elif src_ext == "xml" and target == "xml":
-        out = passthrough_xml_bytes(raw)
-    elif src_ext == "csv" and target == "csv":
-        out = raw
-    else:
-        api_error(
-            "UNSUPPORTED_CONVERSION",
-            f"Конвертация {src_ext} → {target} пока не поддержана этим эндпоинтом.",
-            status=422,
-        )
+    # csv->csv, json->json etc. still round-trip through parse+serialize (not
+    # a raw passthrough) so the output is normalized/pretty-printed the same
+    # way every other conversion is, and so a malformed same-format file is
+    # still caught as INVALID_* instead of being handed back unchanged.
+    obj = DATA_PARSERS[src_ext](raw)
+    out = DATA_SERIALIZERS[target](obj)
 
     out_name = f"{base_name(file.filename or 'file')}.{target}"
     return streaming_download(out, out_name, guess_mime_for_ext(target))

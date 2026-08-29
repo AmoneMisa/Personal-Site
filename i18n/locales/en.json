@@ -1642,8 +1642,8 @@
       },
       "modes": {
         "data": {
-          "desc": "CSV/JSON/XML → CSV/JSON/XML/XLSX. One file at a time.",
-          "description": "CSV/JSON/XML → CSV/JSON/XML/XLSX. Single file.",
+          "desc": "CSV/TSV/JSON/XML/XLSX/YAML → any of the same. One file at a time.",
+          "description": "CSV/TSV/JSON/XML/XLSX/YAML → any of the same. Single file.",
           "title": "Data"
         },
         "docs": {
@@ -1655,8 +1655,8 @@
           "title": "Documents"
         },
         "media": {
-          "desc": "Convert PNG/JPG/WebP. Up to 20 files.",
-          "description": "PNG/JPEG/WEBP → single format. Up to 20 files, returns ZIP.",
+          "desc": "PNG/JPG/WebP/GIF/BMP/TIFF/AVIF → any of the same. Up to 20 files.",
+          "description": "PNG/JPEG/WEBP/GIF/BMP/TIFF/AVIF → single format. Up to 20 files, returns ZIP.",
           "title": "Images"
         }
       },

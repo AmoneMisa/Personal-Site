@@ -5,6 +5,10 @@ export type ConverterMode = "media" | "data" | "document";
 
 const MODE_CONFIG = {
   media: {
+    // Matches backend/src/routers/convert.py's IMAGE_INPUT_EXTS/IMAGE_TARGET_EXTS
+    // exactly - keep these in sync, this list used to advertise gif/bmp/tiff/avif
+    // as inputs and png/jpeg/jpg/webp as the only targets, so half those input
+    // formats had no valid target and would always fail server-side.
     targets: ["png", "jpeg", "jpg", "webp", "gif", "bmp", "tiff", "avif"],
     extensions: ["png", "jpg", "jpeg", "webp", "gif", "bmp", "tif", "tiff", "avif"],
     accept: ".png,.jpg,.jpeg,.webp,.gif,.bmp,.tif,.tiff,.avif",
@@ -14,18 +18,25 @@ const MODE_CONFIG = {
     multiple: true,
   },
   data: {
-    targets: ["csv", "json", "xml", "xlsx", "yaml", "tsv"],
-    extensions: ["csv", "json", "xml", "xlsx", "yaml", "yml", "tsv"],
-    accept: ".csv,.json,.xml,.xlsx,.yaml,.yml,.tsv",
+    // Matches backend's DATA_INPUT_EXTS/DATA_TARGET_EXTS exactly.
+    targets: ["csv", "tsv", "json", "xml", "xlsx", "yaml"],
+    extensions: ["csv", "tsv", "json", "xml", "xlsx", "yaml", "yml"],
+    accept: ".csv,.tsv,.json,.xml,.xlsx,.yaml,.yml",
     defaultTarget: "json",
     endpoint: "/convert/data",
     maxFiles: 1,
     multiple: false,
   },
   document: {
-    targets: ["pdf", "docx", "txt", "html", "md", "odt", "rtf"],
-    extensions: ["docx", "pdf", "txt", "html", "htm", "md", "odt", "rtf"],
-    accept: ".docx,.pdf,.txt,.html,.htm,.md,.odt,.rtf",
+    // Matches backend's DOC_INPUT_EXTS/DOC_TARGET_EXTS exactly. txt/html/md/
+    // odt/rtf used to be advertised here with no backend support at all
+    // (convert.py only ever implemented docx<->pdf) - every pick of those
+    // was guaranteed to fail. Adding them back needs a real document-
+    // conversion backend (e.g. generalizing the LibreOffice call, or pandoc
+    // for md/html/odt/rtf) which isn't wired up yet.
+    targets: ["pdf", "docx"],
+    extensions: ["docx", "pdf"],
+    accept: ".docx,.pdf",
     defaultTarget: "pdf",
     endpoint: "/convert/document",
     maxFiles: 1,

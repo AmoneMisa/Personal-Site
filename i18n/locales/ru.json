@@ -1642,8 +1642,8 @@
       },
       "modes": {
         "data": {
-          "desc": "CSV/JSON/XML → CSV/JSON/XML/XLSX. По одному файлу.",
-          "description": "CSV/JSON/XML → CSV/JSON/XML/XLSX. По одному файлу.",
+          "desc": "CSV/TSV/JSON/XML/XLSX/YAML → любой из этих форматов. По одному файлу.",
+          "description": "CSV/TSV/JSON/XML/XLSX/YAML → любой из этих форматов. По одному файлу.",
           "title": "Данные"
         },
         "docs": {
@@ -1655,8 +1655,8 @@
           "title": "Документы"
         },
         "media": {
-          "desc": "Конвертация PNG/JPG/WebP. Можно до 20 файлов.",
-          "description": "PNG/JPEG/WEBP → один формат. До 20 файлов, вернём zip.",
+          "desc": "Конвертация PNG/JPG/WebP/GIF/BMP/TIFF/AVIF. Можно до 20 файлов.",
+          "description": "PNG/JPEG/WEBP/GIF/BMP/TIFF/AVIF → один формат. До 20 файлов, вернём zip.",
           "title": "Изображения"
         }
       },
