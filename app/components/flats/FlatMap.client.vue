@@ -193,6 +193,11 @@ let lastFitSig = "";
 async function setExpanded(value: boolean) {
   expanded.value = value;
   if (import.meta.client) document.body.style.overflow = value ? "hidden" : "";
+  // Wheel-zoom stays off while the map is embedded inline so scrolling the page
+  // over it doesn't get hijacked; once expanded to full screen it no longer
+  // shares scroll with the page, so the wheel can zoom the map as expected.
+  if (value) map?.scrollWheelZoom?.enable();
+  else map?.scrollWheelZoom?.disable();
   await nextTick();
   requestAnimationFrame(() => map?.invalidateSize());
   setTimeout(() => map?.invalidateSize(), 260);
@@ -452,7 +457,7 @@ function renderDistrictZones() {
   districtLayer.clearLayers();
   if (!showDistricts.value) return;
   for (const zone of props.districtZones || []) {
-    renderZoneShape(districtLayer, zone, "district", { color: zone.color, weight: 2, fillColor: zone.color, fillOpacity: 0.22 });
+    renderZoneShape(districtLayer, zone, "district", { color: zone.color, weight: 2.5, opacity: 0.9, fillColor: zone.color, fillOpacity: 0.22, className: "flat-zone-shape" });
     const label = L.divIcon({
       className: "flat-zone-label-wrap",
       html: `<span class="flat-zone-label" style="border-color:${zone.color}">${zone.label}</span>`,
@@ -683,6 +688,15 @@ onBeforeUnmount(() => {
   background: var(--bg-primary, #0b0f2a);
 }
 .flat-map-shell_full .flat-map { height: 100%; border-radius: 8px; }
+// Clicking a district/microdistrict/area shape gives its SVG path DOM focus;
+// the browser's default focus outline is a rectangle around the shape's
+// bounding box, not its actual outline, which reads as a stray square.
+.flat-map :deep(.leaflet-interactive) { outline: none; }
+.flat-map :deep(.flat-zone-shape) {
+  transition: fill-opacity .15s ease, stroke-opacity .15s ease, stroke-width .15s ease;
+  cursor: pointer;
+}
+.flat-map :deep(.flat-zone-shape:hover) { fill-opacity: .4 !important; stroke-width: 3.5px; }
 .flat-map {
   width: 100%;
   height: 420px;
@@ -690,7 +704,10 @@ onBeforeUnmount(() => {
   overflow: hidden;
   border: 1px solid var(--line);
 }
-.flat-map__tools { position: absolute; z-index: 500; top: 12px; right: 12px; display: flex; gap: 7px; }
+.flat-map__tools {
+  position: absolute; z-index: 500; top: 12px; left: 12px; right: 12px;
+  display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 7px;
+}
 .flat-map__tool {
   min-height: 34px; padding: 0 10px; border: 1px solid var(--line); border-radius: 6px;
   background: rgba(13,17,40,0.94); color: var(--text-primary); cursor: pointer;
