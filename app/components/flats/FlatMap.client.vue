@@ -59,10 +59,12 @@ const props = defineProps<{
   microdistrictMarkers?: FlatMapZone[];
   quartalMarkers?: FlatMapZone[];
   areaZones?: FlatMapZone[];
+  cityZone?: FlatMapZone | null;
   districtsLabel?: string;
   microdistrictsLabel?: string;
   quartalsLabel?: string;
   areasLabel?: string;
+  cityLabel?: string;
 }>();
 
 const emit = defineEmits<{
@@ -95,6 +97,7 @@ const showDistricts = ref(true);
 const showMicrodistricts = ref(false);
 const showQuartals = ref(false);
 const showAreas = ref(true);
+const showCity = ref(true);
 const selectedDistrictName = ref<string | null>(null);
 let mapFeedSequence = 0;
 let lastMapFeedKey = "";
@@ -189,6 +192,7 @@ let districtLayer: any = null;
 let microdistrictLayer: any = null;
 let quartalLayer: any = null;
 let zoneAreaLayer: any = null;
+let cityLayer: any = null;
 let lastFitSig = "";
 
 async function setExpanded(value: boolean) {
@@ -513,7 +517,19 @@ function renderAreaZones() {
   }
 }
 
+function renderCityZone() {
+  const L = Leaflet;
+  if (!cityLayer || !L) return;
+  cityLayer.clearLayers();
+  const zone = props.cityZone;
+  if (!showCity.value || !zone?.boundary) return;
+  L.geoJSON(zone.boundary as any, {
+    style: () => ({ color: zone.color, weight: 2, opacity: 0.55, dashArray: "4 6", fill: false, interactive: false }),
+  }).addTo(cityLayer);
+}
+
 function renderAllZoneLayers() {
+  renderCityZone();
   renderDistrictZones();
   renderMicrodistricts();
   renderQuartals();
@@ -559,6 +575,7 @@ onMounted(async () => {
   layer = L.layerGroup().addTo(map);
   areaLayer = L.layerGroup().addTo(map);
   focusLayer = L.layerGroup().addTo(map);
+  cityLayer = L.layerGroup().addTo(map);
   districtLayer = L.layerGroup().addTo(map);
   microdistrictLayer = L.layerGroup().addTo(map);
   quartalLayer = L.layerGroup().addTo(map);
@@ -587,8 +604,8 @@ onMounted(async () => {
 
 watch(renderedPoints, () => { renderMarkers(); fitToPoints(); }, { deep: true });
 watch(() => route.query, () => { void loadFullMapFeed(); }, { deep: true });
-watch(() => [props.districtZones, props.microdistrictMarkers, props.quartalMarkers, props.areaZones], renderAllZoneLayers, { deep: true });
-watch([showDistricts, showMicrodistricts, showQuartals, showAreas], renderAllZoneLayers);
+watch(() => [props.districtZones, props.microdistrictMarkers, props.quartalMarkers, props.areaZones, props.cityZone], renderAllZoneLayers, { deep: true });
+watch([showDistricts, showMicrodistricts, showQuartals, showAreas, showCity], renderAllZoneLayers);
 
 onBeforeUnmount(() => {
   mapFeedSequence += 1;
@@ -605,6 +622,7 @@ onBeforeUnmount(() => {
   microdistrictLayer = null;
   quartalLayer = null;
   zoneAreaLayer = null;
+  cityLayer = null;
 });
 </script>
 
@@ -630,6 +648,9 @@ onBeforeUnmount(() => {
         </button>
         <button v-if="area.length" type="button" class="flat-map__tool" @click="clearArea">
           × <span>{{ props.clearLabel || "Clear" }}</span>
+        </button>
+        <button v-if="cityZone?.boundary" type="button" class="flat-map__tool" :class="{ 'flat-map__tool_active': showCity }" @click="showCity = !showCity">
+          <span>{{ props.cityLabel || "City" }}</span>
         </button>
         <button v-if="districtZones?.length" type="button" class="flat-map__tool" :class="{ 'flat-map__tool_active': showDistricts }" @click="showDistricts = !showDistricts">
           <span>{{ props.districtsLabel || "Districts" }}</span>

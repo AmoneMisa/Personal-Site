@@ -116,6 +116,7 @@
     "drawArea": "Draw area",
     "mapExpand": "Full screen",
     "mapCollapse": "Close",
+    "cityLayer": "City",
     "districtsLayer": "Districts",
     "microdistrictsLayer": "Microdistricts",
     "quartalsLayer": "Quartals",

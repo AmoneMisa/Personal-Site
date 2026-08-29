@@ -56,6 +56,58 @@ function zoneFromEntity(entity: GeoEntity, index: number, locale: string): FlatM
   };
 }
 
+// Monotone-chain convex hull. Points are [lng, lat] pairs (GeoJSON order).
+function convexHull(points: readonly (readonly [number, number])[]): [number, number][] {
+  const sorted = [...new Map(points.map((p) => [`${p[0]},${p[1]}`, p])).values()]
+    .sort((a, b) => (a[0] - b[0]) || (a[1] - b[1]));
+  if (sorted.length < 3) return sorted.map((p) => [p[0], p[1]]);
+
+  const cross = (o: readonly number[], a: readonly number[], b: readonly number[]) =>
+    (a[0]! - o[0]!) * (b[1]! - o[1]!) - (a[1]! - o[1]!) * (b[0]! - o[0]!);
+
+  const build = (pts: readonly (readonly [number, number])[]) => {
+    const hull: [number, number][] = [];
+    for (const p of pts) {
+      while (hull.length >= 2 && cross(hull[hull.length - 2]!, hull[hull.length - 1]!, p) <= 0) hull.pop();
+      hull.push([p[0], p[1]]);
+    }
+    return hull;
+  };
+  const lower = build(sorted);
+  const upper = build([...sorted].reverse());
+  return [...lower.slice(0, -1), ...upper.slice(0, -1)];
+}
+
+// A quick geographic outline for the whole city, since the catalog has no
+// authoritative city/oblast boundary polygon of its own. Built only from
+// vertices of districts we already have real OSM boundaries for, so it is
+// grounded in verified data -- not a survey-grade city limit, just enough to
+// orient the viewer at a glance.
+function cityHullZone(districtZones: FlatMapZone[], entity: GeoEntity | null, locale: string): FlatMapZone | null {
+  if (!entity) return null;
+  const points: [number, number][] = [];
+  for (const zone of districtZones) {
+    if (!zone.boundary) continue;
+    const polygons = zone.boundary.type === "MultiPolygon" ? zone.boundary.coordinates : [zone.boundary.coordinates];
+    for (const polygon of polygons) {
+      const outer = polygon[0];
+      if (outer) for (const [lng, lat] of outer) points.push([lng!, lat!]);
+    }
+  }
+  if (points.length < 3) return null;
+  const hull = convexHull(points);
+  return {
+    id: entity.id,
+    name: entity.canonicalName,
+    label: zoneNameLabel(entity.canonicalName, locale),
+    lat: entity.center.lat,
+    lng: entity.center.lng,
+    radiusM: 0,
+    color: "#f4f4f5",
+    boundary: { type: "Polygon", coordinates: [[...hull, hull[0]!]] },
+  };
+}
+
 function descendantsOf(cityId: string | null, country: string, type: GeoEntity["type"]): GeoEntity[] {
   if (!cityId) return [];
   const prefix = `${cityId}:`;
@@ -111,5 +163,7 @@ export function useDistrictZones(options: UseDistrictZonesOptions) {
     return fitNonOverlappingRadii(zones, 150, 700);
   });
 
-  return { districtZones, microdistrictMarkers, quartalMarkers, areaZones };
+  const cityZone = computed<FlatMapZone | null>(() => cityHullZone(districtZones.value, cityEntity.value, locale.value));
+
+  return { districtZones, microdistrictMarkers, quartalMarkers, areaZones, cityZone };
 }
