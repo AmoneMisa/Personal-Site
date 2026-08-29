@@ -13,6 +13,9 @@ type RegionalLeverCompany = {
   aliases: string[]
 }
 
+// Direct employer feeds verified live in 2026-08. Some employers are global;
+// aliases below deliberately keep only vacancies that explicitly target the
+// requested country/cities so they do not flood the shared `companies` source.
 export const REGIONAL_TECH_COMPANIES: RegionalLeverCompany[] = [
   { handle: 'provectus', label: 'Provectus', country: 'UA', aliases: ['ukraine', 'kyiv', 'kiev', 'odesa', 'odessa', 'lviv'] },
   { handle: 'kyivstar', label: 'Kyivstar', country: 'UA', aliases: ['ukraine', 'kyiv', 'kiev', 'all'] },
