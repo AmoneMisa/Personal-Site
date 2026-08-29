@@ -9,24 +9,23 @@ import {
 test('service feed catalog covers Korea and Uzbekistan service categories', () => {
   const markets = new Set(REGIONAL_SERVICE_JOB_FEEDS.map((feed) => feed.market))
   assert.deepEqual([...markets].sort(), ['KR', 'UZ'])
+  assert.ok(REGIONAL_SERVICE_JOB_FEEDS.length >= 18)
 
   const koreaCategories = REGIONAL_SERVICE_JOB_FEEDS
     .filter((feed) => feed.market === 'KR')
     .map((feed) => feed.category)
     .join(' ')
-  assert.match(koreaCategories, /Waitstaff/)
-  assert.match(koreaCategories, /Barista/)
-  assert.match(koreaCategories, /Kitchen/)
-  assert.match(koreaCategories, /Security/)
-  assert.match(koreaCategories, /Cashier/)
-  assert.match(koreaCategories, /Cleaning/)
+  for (const category of ['Waitstaff', 'Barista', 'Kitchen', 'Security', 'Cashier', 'Cleaning', 'Hotel', 'Retail', 'Warehouse', 'Delivery', 'Care']) {
+    assert.match(koreaCategories, new RegExp(category))
+  }
 
   const uzCategories = REGIONAL_SERVICE_JOB_FEEDS
     .filter((feed) => feed.market === 'UZ')
     .map((feed) => feed.category)
     .join(' ')
-  assert.match(uzCategories, /Restaurant/)
-  assert.match(uzCategories, /Security/)
+  for (const category of ['Restaurant', 'Security', 'Retail', 'Transport', 'Hotel', 'Housekeeping', 'Cashier']) {
+    assert.match(uzCategories, new RegExp(category))
+  }
 })
 
 test('JobKorea service parser maps waiter-style detail links as board vacancies', () => {
