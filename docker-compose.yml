@@ -27,7 +27,7 @@ services:
       JOB_BROWSER_RETRY_BACKOFF: ${JOB_BROWSER_RETRY_BACKOFF:-2}
       JOB_BROWSER_429_COOLDOWN: ${JOB_BROWSER_429_COOLDOWN:-900}
       JOB_BROWSER_403_COOLDOWN: ${JOB_BROWSER_403_COOLDOWN:-900}
-      JOB_BROWSER_ALLOWED_HOSTS: ${JOB_BROWSER_ALLOWED_HOSTS:-}
+      JOB_BROWSER_ALLOWED_HOSTS: ${JOB_BROWSER_ALLOWED_HOSTS:-flexjobs.com,wellfound.com,workingnomads.com,jobspresso.co,virtualvocations.com,skipthedrive.com}
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:4040/health',timeout=3).status==200 else 1)"]
       interval: 20s
@@ -87,7 +87,7 @@ services:
       JOBS_ELASTICSEARCH_INDEX: job-listings-v1
       JOB_BROWSER_FETCHER_URL: http://job-browser-fetcher:4040
       JOB_BROWSER_PROXY_TIMEOUT_MS: ${JOB_BROWSER_PROXY_TIMEOUT_MS:-65000}
-      JOB_BROWSER_ALLOWED_HOSTS: ${JOB_BROWSER_ALLOWED_HOSTS:-}
+      JOB_BROWSER_ALLOWED_HOSTS: ${JOB_BROWSER_ALLOWED_HOSTS:-flexjobs.com,wellfound.com,workingnomads.com,jobspresso.co,virtualvocations.com,skipthedrive.com}
       QUEUE_INTERNAL_KEY: ${QUEUE_INTERNAL_KEY:-}
       HIRING_SOCIAL_SOURCE: ${HIRING_SOCIAL_SOURCE:-on}
       HIRING_SOCIAL_SOURCES: ${HIRING_SOCIAL_SOURCES:-}
