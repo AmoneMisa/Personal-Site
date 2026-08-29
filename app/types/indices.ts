@@ -40,4 +40,11 @@ export type CountryIndicesNormalized = {
     commuteTime?: number | null;
     societyInternational?: number | null;
     langBarrier?: number | null;
+
+    taxBurden?: number | null;
+    forest?: number | null;
+    migrants?: number | null;
+    educationQuality?: number | null;
+    healthcareAccess?: number | null;
+    governance?: number | null;
 };

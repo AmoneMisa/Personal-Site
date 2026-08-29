@@ -1,5 +1,7 @@
 <script setup lang="ts">
+import { computed } from "vue";
 import { useCountryDestinations } from "~/composables/quizzes/useCountryDestinations";
+import { countryFactsFor } from "~/utils/quizzes/country/countryFacts";
 
 type IndicesNormalized = {
   income: number | null;
@@ -61,6 +63,34 @@ const {t} = useI18n();
 // only where that country is genuinely covered.
 const {destinationsFor} = useCountryDestinations();
 const destinations = computed(() => destinationsFor(props.item.key, props.item.fallbackName));
+
+// General-knowledge reference facts, not live-sourced — see countryFacts.ts for
+// what these mean and why residencyDifficulty especially is a soft, informal
+// impression rather than data.
+const facts = computed(() => countryFactsFor(props.item.key));
+type FactBadge = { icon: string; label: string; title?: string };
+const factBadges = computed<FactBadge[]>(() => {
+  const f = facts.value;
+  if (!f) return [];
+  const badges: FactBadge[] = [];
+  if (f.island) badges.push({ icon: "i-lucide-palmtree", label: t("quizzes.countryFit.facts.island") });
+  else if (f.coastline) badges.push({ icon: "i-lucide-waves", label: t("quizzes.countryFit.facts.coastline") });
+  if (f.volcanic) badges.push({ icon: "i-lucide-flame", label: t("quizzes.countryFit.facts.volcanic") });
+  if (f.seismicRisk !== "low") {
+    badges.push({
+      icon: "i-lucide-activity",
+      label: t(f.seismicRisk === "high" ? "quizzes.countryFit.facts.seismicHigh" : "quizzes.countryFit.facts.seismicModerate"),
+    });
+  }
+  badges.push({ icon: "i-lucide-landmark", label: f.mainReligion });
+  badges.push({ icon: "i-lucide-languages", label: t("quizzes.countryFit.facts.languages", { n: f.languagesCount }) });
+  badges.push({
+    icon: "i-lucide-id-card",
+    label: t(`quizzes.countryFit.facts.residency${f.residencyDifficulty.charAt(0).toUpperCase()}${f.residencyDifficulty.slice(1)}`),
+    title: t("quizzes.countryFit.facts.residencyNote"),
+  });
+  return badges;
+});
 
 function fmt100(v: number | null | undefined) {
   if (typeof v !== "number") return "—";
@@ -312,6 +342,18 @@ const priceColumns = computed(() => {
       </div>
     </div>
 
+    <div v-if="factBadges.length" class="result-card__facts">
+      <span
+          v-for="(badge, index) in factBadges"
+          :key="index"
+          class="result-card__fact"
+          :title="badge.title"
+      >
+        <Icon :name="badge.icon" class="i-icon"/>
+        {{ badge.label }}
+      </span>
+    </div>
+
     <div v-if="destinations.length" class="result-card__links">
       <NuxtLink
           v-for="link in destinations"
@@ -331,6 +373,27 @@ const priceColumns = computed(() => {
   position: relative;
   background: var(--bg-panel);
   box-shadow: 0 12px 28px rgba(2, 5, 18, 0.2);
+}
+
+.result-card__facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.result-card__fact {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text-muted, #9ea4c1);
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.2;
+  cursor: default;
 }
 
 .result-card__links {

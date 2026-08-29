@@ -38,7 +38,8 @@ export type AxisKey =
     | "society_private"
     | "society_international"
     | "mentality_close_need"
-    | "culture_change_ok";
+    | "culture_change_ok"
+    | "disaster_risk_ok";
 
 export type Effects = Partial<Record<AxisKey, number>>;
 
@@ -112,7 +113,8 @@ export const countryFitQuiz: QuizConfig = {
         "society_private",
         "society_international",
         "mentality_close_need",
-        "culture_change_ok"
+        "culture_change_ok",
+        "disaster_risk_ok"
     ],
     questions: [
         {
@@ -352,6 +354,23 @@ export const countryFitQuiz: QuizConfig = {
                 { id: "q21_o1", textKey: "quizzes.countryFit.q21.o1", effects: { mentality_close_need: 3, culture_change_ok: -1 } },
                 { id: "q21_o2", textKey: "quizzes.countryFit.q21.o2", effects: { culture_change_ok: 2 } },
                 { id: "q21_o3", textKey: "quizzes.countryFit.q21.o3", effects: { culture_change_ok: 3, mentality_close_need: -1 } }
+            ]
+        },
+        {
+            id: "q22_disaster_risk",
+            order: 220,
+            titleKey: "quizzes.countryFit.q22.title",
+            descriptionKey: "quizzes.countryFit.q22.desc",
+            // Positive weight means "wants more of the matched value" throughout this
+            // engine (see addPart/applySigned01 in useCountryQuizEngine.ts), so the
+            // axis is framed as wanting SAFETY (positive = avoid risk), matched
+            // against each country's disaster-safety score. A mild negative for
+            // "doesn't bother me" nudges toward higher-risk places without making
+            // risk itself the thing being optimized for.
+            options: [
+                { id: "q22_o1", textKey: "quizzes.countryFit.q22.o1", effects: { disaster_risk_ok: 3 } },
+                { id: "q22_o2", textKey: "quizzes.countryFit.q22.o2", effects: { disaster_risk_ok: 1 } },
+                { id: "q22_o3", textKey: "quizzes.countryFit.q22.o3", effects: { disaster_risk_ok: -1 } }
             ]
         }
     ]

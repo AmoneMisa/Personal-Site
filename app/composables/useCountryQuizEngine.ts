@@ -3,6 +3,7 @@ import type {CountryEntity, Vector} from "~/utils/quizzes/country/countries";
 import {countries} from "~/utils/quizzes/country/countries";
 import type {CountryIndicesBundle} from "~/types/indices";
 import {usStateVectorOverrides} from "~/composables/usStateVectorOverrides";
+import {countryFactsFor} from "~/utils/quizzes/country/countryFacts";
 
 export type LanguageLevel = "native" | "fluent" | "intermediate" | "basic" | "none";
 export type JobType = "remote" | "local" | "mixed";
@@ -249,7 +250,8 @@ const badToGood01 = (v10: number) => clamp(1 - (v10 / 10), 0, 1); // 10 плох
 function liveScore100(
     user: UserProfile,
     pref: Record<AxisKey, number>,
-    indices?: CountryIndicesBundle["normalized"]
+    indices?: CountryIndicesBundle["normalized"],
+    countryKey?: string
 ) {
     const parts: Array<{ w: number; v: number }> = [];
 
@@ -366,6 +368,68 @@ function liveScore100(
         addPart(parts, prefVal, indices!.internet / 10, mul);
     }
 
+    // tax burden (higher score = lower tax) -> the existing Q13 axis had no
+    // live backing at all before this; it only matched against the hand-set
+    // per-country vector.
+    if (isValidIndex(indices?.taxBurden)) {
+        addPart(parts, pref.tax_low_need, idx01(indices!.taxBurden!), 0.6);
+    }
+
+    // forest cover -> Q7 (mountains and forests)
+    if (isValidIndex(indices?.forest)) {
+        addPart(parts, pref.nature_mountains_forest, idx01(indices!.forest!), 0.45);
+    }
+
+    // international migrant stock -> Q12. For actual countries this is the
+    // *only* live signal society_international has ever had: `indices.
+    // societyInternational` is only ever populated for US states (ACS
+    // foreign-born %), never for World Bank countries.
+    if (isValidIndex(indices?.migrants)) {
+        addPart(parts, pref.society_international, idx01(indices!.migrants!), 0.5);
+    }
+
+    // WB Human Capital Index -> same axes as the existing education-spend
+    // signal, since both describe "how good is the education system" from
+    // different angles (fiscal input vs. outcome-based index).
+    if (isValidIndex(indices?.educationQuality)) {
+        const prefVal =
+            (pref.income_growth_need ?? 0) * 0.4 +
+            (pref.quality_high_need ?? 0) * 0.7 +
+            (pref.social_support_need ?? 0) * 0.3;
+
+        addPart(parts, prefVal, idx01(indices!.educationQuality!), 0.5);
+    }
+
+    // physicians + hospital beds per capita -> same axes as the existing
+    // health-spend signal (input spend vs. actual capacity/access).
+    if (isValidIndex(indices?.healthcareAccess)) {
+        const prefVal =
+            (pref.quality_high_need ?? 0) * 0.7 +
+            (pref.social_support_need ?? 0) * 0.5 +
+            (pref.stability_need ?? 0) * 0.3;
+
+        addPart(parts, prefVal, idx01(indices!.healthcareAccess!), 0.5);
+    }
+
+    // WGI government effectiveness + political stability -> Q15/Q16, which
+    // previously only matched against the hand-set per-country vector.
+    if (isValidIndex(indices?.governance)) {
+        const prefVal = (pref.stability_need ?? 0) * 0.6 + (pref.rules_ok ?? 0) * 0.4;
+        addPart(parts, prefVal, idx01(indices!.governance!), 0.6);
+    }
+
+    // Natural disaster risk: not live data (no reliable per-country API for
+    // this), matched against the static facts in countryFacts.ts instead.
+    // value01 here is *safety* (1 = no risk), since disaster_risk_ok is framed
+    // as "wants to avoid risk" — see the comment on the quiz question itself.
+    const facts = countryKey ? countryFactsFor(countryKey) : null;
+    if (facts) {
+        const riskLevel01 = facts.seismicRisk === "high" ? 1 : facts.seismicRisk === "moderate" ? 0.5 : 0;
+        const volcanicPenalty = facts.volcanic ? 0.15 : 0;
+        const safety01 = clamp(1 - riskLevel01 - volcanicPenalty, 0, 1);
+        addPart(parts, pref.disaster_risk_ok, safety01, 0.5);
+    }
+
     if (!parts.length) return 50;
 
     const sumW = parts.reduce((a, p) => a + p.w, 0);
@@ -427,7 +491,7 @@ export function matchCountries(
 
         let score = base01 * sparsityPenalty - (lang.penalty + work.penalty) * 0.05;
 
-        const live100 = liveScore100(user, pref, indices);
+        const live100 = liveScore100(user, pref, indices, e.key);
 
         const why = [...lang.notes.slice(0, 2), ...work.notes.slice(0, 1)].filter(Boolean);
 

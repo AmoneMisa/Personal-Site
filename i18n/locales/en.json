@@ -1131,6 +1131,25 @@
       "explore": {
         "jobs": "Jobs in {country}",
         "flats": "Apartments in {country}"
+      },
+      "q22": {
+        "title": "Natural disaster risk",
+        "desc": "Some places sit on active fault lines or near volcanoes. How much does that matter to you?",
+        "o1": "I want to avoid areas prone to earthquakes or volcanic activity",
+        "o2": "It is a minor factor, not decisive",
+        "o3": "Doesn't bother me — I am comfortable with that risk"
+      },
+      "facts": {
+        "island": "Island nation",
+        "coastline": "Coastline",
+        "volcanic": "Volcanic activity",
+        "seismicModerate": "Moderate earthquake risk",
+        "seismicHigh": "High earthquake risk",
+        "languages": "{n}+ languages in daily life",
+        "residencyEasy": "Residency: generally accessible",
+        "residencyModerate": "Residency: moderate process",
+        "residencyHard": "Residency: demanding process",
+        "residencyNote": "A general impression, not immigration advice — real difficulty depends heavily on your nationality and visa category, and changes over time."
       }
     },
     "empty": {
