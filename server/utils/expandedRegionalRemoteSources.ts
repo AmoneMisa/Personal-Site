@@ -4,7 +4,7 @@ import { detectWorkModes } from './hiringLexicon'
 const UA = 'jobFinder/1.0 (job aggregator; contact: admin@whiteslove.me)'
 const REQUEST_TIMEOUT_MS = 20_000
 
-type TargetMarket = 'UA' | 'RO' | 'UZ' | 'US' | 'REMOTE'
+type TargetMarket = 'UA' | 'RO' | 'UZ' | 'US' | 'KG' | 'KZ' | 'CN' | 'JP' | 'KR' | 'REMOTE'
 
 type LeverTarget = {
   handle: string
@@ -27,6 +27,35 @@ export const EXPANDED_REGIONAL_REMOTE_COMPANIES: LeverTarget[] = [
 
   // Uzbekistan: RemoFirst explicitly includes Uzbekistan in multiple remote roles.
   { handle: 'remofirst', label: 'RemoFirst', market: 'UZ', aliases: ['uzbekistan', 'tashkent', 'toshkent'] },
+
+  // Kyrgyzstan: explicit Bishkek / Kyrgyzstan listings and CIS-remote eligibility.
+  { handle: 'weloglobal', label: 'Welo Global', market: 'KG', aliases: ['kyrgyzstan', 'bishkek'] },
+  { handle: 'binance', label: 'Binance', market: 'KG', aliases: ['kyrgyzstan', 'bishkek'] },
+
+  // Kazakhstan: sales, customer experience, compliance, management and tech.
+  { handle: 'xm', label: 'XM', market: 'KZ', aliases: ['kazakhstan', 'almaty', 'astana'] },
+  { handle: 'aleph', label: 'Aleph', market: 'KZ', aliases: ['kazakhstan', 'almaty'] },
+  { handle: 'creatio', label: 'Creatio', market: 'KZ', aliases: ['kazakhstan', 'almaty', 'astana'] },
+  { handle: 'xsolla', label: 'Xsolla', market: 'KZ', aliases: ['kazakhstan', 'almaty', 'astana'] },
+
+  // Mainland China: engineering plus finance, sales, product, account management.
+  { handle: 'xsolla', label: 'Xsolla', market: 'CN', aliases: ['china', 'beijing', 'shanghai', 'shenzhen', 'dalian'] },
+  { handle: 'shopback-2', label: 'ShopBack', market: 'CN', aliases: ['china', 'shenzhen', 'shanghai'] },
+  { handle: 'Coda', label: 'Coda', market: 'CN', aliases: ['china', 'shanghai'] },
+  { handle: 'dnb', label: 'Dun & Bradstreet', market: 'CN', aliases: ['china', 'shanghai', 'beijing'] },
+  { handle: 'weloglobal', label: 'Welo Global', market: 'CN', aliases: ['china', 'beijing', 'shanghai', 'dalian'] },
+
+  // Japan: operations, finance, HR, marketing, sales and technology.
+  { handle: 'cic', label: 'CIC', market: 'JP', aliases: ['japan', 'tokyo', 'fukuoka', 'jp'] },
+  { handle: 'mendix', label: 'Mendix', market: 'JP', aliases: ['japan', 'tokyo'] },
+  { handle: 'xsolla', label: 'Xsolla', market: 'JP', aliases: ['japan', 'tokyo'] },
+  { handle: 'weloglobal', label: 'Welo Global', market: 'JP', aliases: ['japan', 'tokyo'] },
+
+  // South Korea: business, sales, customer success, marketing and technical roles.
+  { handle: 'xsolla', label: 'Xsolla', market: 'KR', aliases: ['south korea', 'seoul', 'korea'] },
+  { handle: 'aleph', label: 'Aleph', market: 'KR', aliases: ['south korea', 'seoul'] },
+  { handle: 'insiderone', label: 'Insider One', market: 'KR', aliases: ['south korea', 'seoul', 'korea'] },
+  { handle: 'weloglobal', label: 'Welo Global', market: 'KR', aliases: ['south korea', 'seoul', 'korea'] },
 
   // USA / US-remote: support, operations, security, sales and management-heavy boards.
   { handle: 'pointclickcare', label: 'PointClickCare', market: 'US', aliases: ['united states', 'remote - us', 'us remote', 'usa'] },
