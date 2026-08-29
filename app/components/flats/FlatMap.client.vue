@@ -95,6 +95,7 @@ const showDistricts = ref(true);
 const showMicrodistricts = ref(false);
 const showQuartals = ref(false);
 const showAreas = ref(true);
+const selectedDistrictName = ref<string | null>(null);
 let mapFeedSequence = 0;
 let lastMapFeedKey = "";
 
@@ -432,6 +433,10 @@ function renderArea() {
 
 function emitZoneSelect(kind: ZoneKind, name: string) {
   closeRadial();
+  if (kind === "district") {
+    selectedDistrictName.value = selectedDistrictName.value === name ? null : name;
+    renderDistrictZones();
+  }
   emit("zone-select", { kind, name });
 }
 
@@ -457,10 +462,12 @@ function renderDistrictZones() {
   districtLayer.clearLayers();
   if (!showDistricts.value) return;
   for (const zone of props.districtZones || []) {
-    renderZoneShape(districtLayer, zone, "district", { color: zone.color, weight: 2.5, opacity: 0.9, fillColor: zone.color, fillOpacity: 0.22, className: "flat-zone-shape" });
+    const dimmed = selectedDistrictName.value != null && zone.name !== selectedDistrictName.value;
+    const className = `flat-zone-shape${dimmed ? " flat-zone-shape_dim" : ""}`;
+    renderZoneShape(districtLayer, zone, "district", { color: zone.color, weight: 2.5, opacity: dimmed ? 0.5 : 0.9, fillColor: zone.color, fillOpacity: dimmed ? 0.08 : 0.22, className });
     const label = L.divIcon({
       className: "flat-zone-label-wrap",
-      html: `<span class="flat-zone-label" style="border-color:${zone.color}">${zone.label}</span>`,
+      html: `<span class="flat-zone-label${dimmed ? " flat-zone-label_dim" : ""}" style="border-color:${zone.color}">${zone.label}</span>`,
       iconSize: [0, 0],
     });
     L.marker([zone.lat, zone.lng], { icon: label, interactive: false }).addTo(districtLayer);
@@ -559,6 +566,10 @@ onMounted(async () => {
   map.on("click", (event: any) => {
     if (!drawing.value) {
       closeRadial();
+      if (selectedDistrictName.value != null) {
+        selectedDistrictName.value = null;
+        renderDistrictZones();
+      }
       return;
     }
     area.value = [...area.value, { lat: event.latlng.lat, lng: event.latlng.lng }];
@@ -697,6 +708,9 @@ onBeforeUnmount(() => {
   cursor: pointer;
 }
 .flat-map :deep(.flat-zone-shape:hover) { fill-opacity: .4 !important; stroke-width: 3.5px; }
+.flat-map :deep(.flat-zone-shape_dim) { filter: grayscale(0.85); transition: filter .15s ease, fill-opacity .15s ease, stroke-opacity .15s ease; }
+.flat-map :deep(.flat-zone-shape_dim:hover) { filter: grayscale(0.4); }
+:deep(.flat-zone-label_dim) { opacity: .55; filter: grayscale(0.85); }
 .flat-map {
   width: 100%;
   height: 420px;
