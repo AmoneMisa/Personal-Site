@@ -9,6 +9,7 @@ import { fetchFacebookJobs, fetchThreadsJobs } from './socialJobSources'
 import { fetchExtraPublicJobs } from './extraPublicJobSources'
 import { fetchCuratedRemoteJobs } from './curatedRemoteJobSources'
 import { fetchUsaTechCompanyJobs } from './usaTechCompanySources'
+import { fetchRegionalTechCompanyJobs } from './regionalTechCompanySources'
 import { fetchUsaVisaSponsorJobs } from './usaVisaSponsorSource'
 import { fetchSourceExpansionJobs } from './sourceExpansionJobs'
 import { fetchAviationExpansionJobs } from './aviationExpansionJobs'
@@ -133,6 +134,7 @@ async function fetchAllCompanies(q: string): Promise<Job[]> {
     // overwrite matching URLs with better company/location/date fidelity.
     { label: 'curated-remote-boards', load: () => fetchCuratedRemoteJobs(q) },
     { label: 'usa-tech-companies', load: () => fetchUsaTechCompanyJobs(q) },
+    { label: 'regional-tech-companies', load: () => fetchRegionalTechCompanyJobs(q) },
     { label: 'usa-visa-sponsors', load: () => fetchUsaVisaSponsorJobs(q) },
     { label: 'source-expansion', load: () => fetchSourceExpansionJobs(q) },
     { label: 'aviation-expansion', load: () => fetchAviationExpansionJobs(q) },
