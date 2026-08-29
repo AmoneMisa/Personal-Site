@@ -52,6 +52,14 @@ class NormalizedDTO(BaseModel):
     societyInternational: Optional[float] = None
     langBarrier: Optional[float] = None
 
+    # extra indices (0..10), added for the governance/health/migration questions
+    taxBurden: Optional[float] = None  # higher score = lower tax burden
+    forest: Optional[float] = None
+    migrants: Optional[float] = None
+    educationQuality: Optional[float] = None  # WB Human Capital Index, distinct from `education` (spend-based)
+    healthcareAccess: Optional[float] = None  # physicians + hospital beds per capita, combined
+    governance: Optional[float] = None  # avg of Government Effectiveness + Political Stability (WGI)
+
 
 class BundleDTO(BaseModel):
     key: str
@@ -87,6 +95,19 @@ WB_INDICATORS: Dict[str, str] = {
     "pm25_ug_m3": "EN.ATM.PM25.MC.M3",
     "gini": "SI.POV.GINI",
     "health_exp_pc_usd": "SH.XPD.CHEX.PC.CD",
+
+    # added for governance/health/migration/tax/forest questions — every code
+    # below was verified against the live WB API before adding (some obvious
+    # short-form governance codes like PV.EST/GE.EST look right but 404;
+    # the WGI dataset only resolves under its GOV_WGI_*_EST aliases).
+    "tax_pct_gdp": "GC.TAX.TOTL.GD.ZS",
+    "forest_pct_land": "AG.LND.FRST.ZS",
+    "migrant_stock_pct": "SM.POP.TOTL.ZS",
+    "human_capital_index": "HD.HCI.OVRL",
+    "physicians_per_1000": "SH.MED.PHYS.ZS",
+    "hospital_beds_per_1000": "SH.MED.BEDS.ZS",
+    "gov_effectiveness": "GOV_WGI_GE_EST",
+    "political_stability": "GOV_WGI_PV_EST",
 }
 
 # -------------------------------------------------
@@ -242,6 +263,45 @@ def normalize_wb(latest_by_code: Dict[str, Optional[float]]) -> NormalizedDTO:
     hx = latest_by_code.get(WB_INDICATORS["health_exp_pc_usd"])
     if hx is not None:
         out.health = round1(clamp01(hx / 8000.0) * 10.0)
+
+    tax = latest_by_code.get(WB_INDICATORS["tax_pct_gdp"])
+    if tax is not None:
+        # 10..35% of GDP => 10..0 (higher tax burden scores lower)
+        out.taxBurden = round1(clamp01(1.0 - ((tax - 10.0) / (35.0 - 10.0))) * 10.0)
+
+    forest = latest_by_code.get(WB_INDICATORS["forest_pct_land"])
+    if forest is not None:
+        out.forest = round1(clamp01(forest / 70.0) * 10.0)
+
+    migrants = latest_by_code.get(WB_INDICATORS["migrant_stock_pct"])
+    if migrants is not None:
+        # 0..25% => 0..10; most countries sit well under this
+        out.migrants = round1(clamp01(migrants / 25.0) * 10.0)
+
+    hci = latest_by_code.get(WB_INDICATORS["human_capital_index"])
+    if hci is not None:
+        # already 0..1
+        out.educationQuality = round1(clamp01(hci) * 10.0)
+
+    physicians = latest_by_code.get(WB_INDICATORS["physicians_per_1000"])
+    beds = latest_by_code.get(WB_INDICATORS["hospital_beds_per_1000"])
+    health_access_parts = []
+    if physicians is not None:
+        health_access_parts.append(clamp01(physicians / 5.0))  # ~5 per 1000 is a strong health system
+    if beds is not None:
+        health_access_parts.append(clamp01(beds / 8.0))  # ~8 per 1000 is a strong health system
+    if health_access_parts:
+        out.healthcareAccess = round1((sum(health_access_parts) / len(health_access_parts)) * 10.0)
+
+    gov_eff = latest_by_code.get(WB_INDICATORS["gov_effectiveness"])
+    pol_stab = latest_by_code.get(WB_INDICATORS["political_stability"])
+    governance_parts = []
+    if gov_eff is not None:
+        governance_parts.append(clamp01((gov_eff + 2.5) / 5.0))  # WGI estimates run roughly -2.5..2.5
+    if pol_stab is not None:
+        governance_parts.append(clamp01((pol_stab + 2.5) / 5.0))
+    if governance_parts:
+        out.governance = round1((sum(governance_parts) / len(governance_parts)) * 10.0)
 
     return out
 
