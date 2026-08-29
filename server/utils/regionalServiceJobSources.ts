@@ -62,6 +62,41 @@ export const REGIONAL_SERVICE_JOB_FEEDS: ServiceFeed[] = [
     kind: 'jobkorea',
     category: 'Cleaning / Facility service',
   },
+  {
+    label: 'JobKorea · Hotel front desk',
+    market: 'KR',
+    url: 'https://www.jobkorea.co.kr/Search/?stext=%ED%98%B8%ED%85%94%20%ED%94%84%EB%A1%A0%ED%8A%B8',
+    kind: 'jobkorea',
+    category: 'Hotel / Front desk',
+  },
+  {
+    label: 'JobKorea · Retail store',
+    market: 'KR',
+    url: 'https://www.jobkorea.co.kr/Search/?stext=%EB%A7%A4%EC%9E%A5%EA%B4%80%EB%A6%AC%20%ED%8C%90%EB%A7%A4',
+    kind: 'jobkorea',
+    category: 'Retail / Store service',
+  },
+  {
+    label: 'JobKorea · Warehouse',
+    market: 'KR',
+    url: 'https://www.jobkorea.co.kr/Search/?stext=%EB%AC%BC%EB%A5%98%20%EC%B0%BD%EA%B3%A0',
+    kind: 'jobkorea',
+    category: 'Warehouse / Logistics',
+  },
+  {
+    label: 'JobKorea · Delivery',
+    market: 'KR',
+    url: 'https://www.jobkorea.co.kr/Search/?stext=%EB%B0%B0%EC%86%A1%20%EB%B0%B0%EB%8B%AC',
+    kind: 'jobkorea',
+    category: 'Delivery / Courier',
+  },
+  {
+    label: 'JobKorea · Care service',
+    market: 'KR',
+    url: 'https://www.jobkorea.co.kr/Search/?stext=%EC%9A%94%EC%96%91%EB%B3%B4%ED%98%B8',
+    kind: 'jobkorea',
+    category: 'Care / Personal service',
+  },
 
   // Uzbekistan: OLX has high-volume local service categories that complement
   // ish-bor/ishgo and the corporate employers already ingested elsewhere.
@@ -78,6 +113,41 @@ export const REGIONAL_SERVICE_JOB_FEEDS: ServiceFeed[] = [
     url: 'https://www.olx.uz/rabota/ohrana-bezopasnost/tashkent/',
     kind: 'olx-uz',
     category: 'Security',
+  },
+  {
+    label: 'OLX UZ · Retail',
+    market: 'UZ',
+    url: 'https://www.olx.uz/rabota/roznichnaya-torgovlya-prodazhi/tashkent/',
+    kind: 'olx-uz',
+    category: 'Retail / Cashier / Sales floor',
+  },
+  {
+    label: 'OLX UZ · Logistics',
+    market: 'UZ',
+    url: 'https://www.olx.uz/rabota/transport-logistika/tashkent/',
+    kind: 'olx-uz',
+    category: 'Transport / Courier / Warehouse',
+  },
+  {
+    label: 'OLX UZ · Hotel',
+    market: 'UZ',
+    url: 'https://www.olx.uz/rabota/tashkent/q-%D0%B3%D0%BE%D1%81%D1%82%D0%B8%D0%BD%D0%B8%D1%86%D1%83/',
+    kind: 'olx-uz',
+    category: 'Hotel / Tourism / Front desk',
+  },
+  {
+    label: 'OLX UZ · Housekeeping',
+    market: 'UZ',
+    url: 'https://www.olx.uz/rabota/tashkent/q-%D0%B3%D0%BE%D1%80%D0%BD%D0%B8%D1%87%D0%BD%D0%B0%D1%8F-%D0%B3%D0%BE%D1%81%D1%82%D0%B8%D0%BD%D0%B8%D1%86%D0%B0/',
+    kind: 'olx-uz',
+    category: 'Housekeeping / Cleaning',
+  },
+  {
+    label: 'OLX UZ · Cashier',
+    market: 'UZ',
+    url: 'https://www.olx.uz/rabota/tashkent/q-%D0%BA%D0%B0%D1%81%D1%81%D0%B8%D1%80/',
+    kind: 'olx-uz',
+    category: 'Cashier',
   },
 ]
 
@@ -148,8 +218,6 @@ export function parseJobKoreaServicePage(html: string, feed: ServiceFeed): Job[]
     if (title.length < 3 || title.length > 180) continue
     if (/^(?:지원|즉시지원|상세|기업정보|스크랩|채용정보)$/u.test(title)) continue
 
-    // JobKorea commonly repeats a posting link for company/title/actions. Keep
-    // the most vacancy-like text and let URL dedup collapse the repetitions.
     byUrl.set(url, serviceJob(feed, url, title))
   }
 
