@@ -64,7 +64,7 @@ const numbeo = (
     trafficCommuteTimeIndex: number,
     pollutionIndex: number,
     climateIndex: number
-): CountryIndicesBundle => <CountryIndicesBundle>({
+): CountryIndicesBundle => ({
     numbeo: {
         qualityOfLifeIndex,
         purchasingPowerIndex,
@@ -76,7 +76,7 @@ const numbeo = (
         pollutionIndex,
         climateIndex
     }
-});
+} as CountryIndicesBundle);
 
 const EU = (
     key: string,
