@@ -71,5 +71,21 @@ export function zoneNameLabel(value: string | null | undefined, locale: string):
     const translated = geographyDisplayName(raw, locale, kind)
     if (translated && translated !== raw) return translated
   }
+
+  // Quartal composites (e.g. "Chilanzar-20A") aren't in any lexicon table as a
+  // whole string, only their district/microdistrict prefix is. Match on an
+  // exact "<Key>-" prefix only (never a loose substring) so we don't repeat
+  // the fuzzy-match bug this function otherwise avoids, and keep the quartal
+  // suffix as-is since it isn't translatable geography.
+  const separatorIndex = raw.indexOf('-')
+  if (separatorIndex > 0) {
+    const prefix = raw.slice(0, separatorIndex)
+    const suffix = raw.slice(separatorIndex)
+    for (const kind of ['district', 'microdistrict', 'metro'] as const) {
+      const translated = geographyDisplayName(prefix, locale, kind)
+      if (translated && translated !== prefix) return `${translated}${suffix}`
+    }
+  }
+
   return raw
 }
