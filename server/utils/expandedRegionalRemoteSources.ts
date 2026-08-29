@@ -37,6 +37,7 @@ export const EXPANDED_REGIONAL_REMOTE_COMPANIES: LeverTarget[] = [
   { handle: 'aleph', label: 'Aleph', market: 'KZ', aliases: ['kazakhstan', 'almaty'] },
   { handle: 'creatio', label: 'Creatio', market: 'KZ', aliases: ['kazakhstan', 'almaty', 'astana'] },
   { handle: 'xsolla', label: 'Xsolla', market: 'KZ', aliases: ['kazakhstan', 'almaty', 'astana'] },
+  { handle: 'binance', label: 'Binance', market: 'KZ', aliases: ['kazakhstan', 'almaty', 'astana'] },
 
   // Mainland China: engineering plus finance, sales, product, account management.
   { handle: 'xsolla', label: 'Xsolla', market: 'CN', aliases: ['china', 'beijing', 'shanghai', 'shenzhen', 'dalian'] },
@@ -44,12 +45,16 @@ export const EXPANDED_REGIONAL_REMOTE_COMPANIES: LeverTarget[] = [
   { handle: 'Coda', label: 'Coda', market: 'CN', aliases: ['china', 'shanghai'] },
   { handle: 'dnb', label: 'Dun & Bradstreet', market: 'CN', aliases: ['china', 'shanghai', 'beijing'] },
   { handle: 'weloglobal', label: 'Welo Global', market: 'CN', aliases: ['china', 'beijing', 'shanghai', 'dalian'] },
+  { handle: 'ppro', label: 'PPRO', market: 'CN', aliases: ['china', 'shanghai'] },
 
-  // Japan: operations, finance, HR, marketing, sales and technology.
+  // Japan: operations, finance, HR, marketing, recruiting, sales and technology.
   { handle: 'cic', label: 'CIC', market: 'JP', aliases: ['japan', 'tokyo', 'fukuoka', 'jp'] },
   { handle: 'mendix', label: 'Mendix', market: 'JP', aliases: ['japan', 'tokyo'] },
   { handle: 'xsolla', label: 'Xsolla', market: 'JP', aliases: ['japan', 'tokyo'] },
   { handle: 'weloglobal', label: 'Welo Global', market: 'JP', aliases: ['japan', 'tokyo'] },
+  { handle: 'binance', label: 'Binance', market: 'JP', aliases: ['japan', 'tokyo'] },
+  { handle: 'EnvisionRPO', label: 'Envision RPO', market: 'JP', aliases: ['japan', 'tokyo'] },
+  { handle: 'cagents', label: 'CAI', market: 'JP', aliases: ['japan', 'tokyo'] },
 
   // South Korea: business, sales, customer success, marketing and technical roles.
   { handle: 'xsolla', label: 'Xsolla', market: 'KR', aliases: ['south korea', 'seoul', 'korea'] },
