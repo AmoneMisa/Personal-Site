@@ -1,0 +1,12 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.flatfinder.flat_finder",
+      "sha256_cert_fingerprints": [
+        "9F:2B:FC:1A:3B:93:6C:8C:E1:50:A7:ED:AA:D5:EA:E3:57:D2:14:8B:4D:41:99:25:F6:58:1B:FD:D3:9D:E7:2E"
+      ]
+    }
+  }
+]
