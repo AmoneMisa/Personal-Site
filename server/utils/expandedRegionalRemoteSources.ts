@@ -47,6 +47,7 @@ export const EXPANDED_REGIONAL_REMOTE_COMPANIES: LeverTarget[] = [
   { handle: 'EnvisionRPO', label: 'Envision RPO', market: 'JP', aliases: ['japan', 'tokyo'] },
   { handle: 'cagents', label: 'CAI', market: 'JP', aliases: ['japan', 'tokyo'] },
 
+  // Korea includes both permanent commercial roles and remote contract work.
   { handle: 'xsolla', label: 'Xsolla', market: 'KR', aliases: ['south korea', 'seoul', 'korea'] },
   { handle: 'aleph', label: 'Aleph', market: 'KR', aliases: ['south korea', 'seoul'] },
   { handle: 'insiderone', label: 'Insider One', market: 'KR', aliases: ['south korea', 'seoul', 'korea'] },
@@ -54,10 +55,12 @@ export const EXPANDED_REGIONAL_REMOTE_COMPANIES: LeverTarget[] = [
   { handle: 'mistplay', label: 'Mistplay', market: 'KR', aliases: ['south korea', 'seoul', 'korea'] },
   { handle: 'rws', label: 'RWS TrainAI', market: 'KR', aliases: ['south korea', 'seoul', 'korea'] },
 
+  // Canada: national/remote roles across product, customer, marketing, finance and engineering.
   { handle: 'pointclickcare', label: 'PointClickCare', market: 'CA', aliases: ['canada', 'remote- canada', 'remote - canada'] },
   { handle: 'applydigital', label: 'APPLY', market: 'CA', aliases: ['canada', 'remote - canada', 'remote canada'] },
   { handle: 'cscgeneration-2', label: 'CSC Generation', market: 'CA', aliases: ['canada', 'remote - canada', 'remote canada'] },
 
+  // Cyprus: Limassol/Nicosia-heavy finance, operations, legal, risk, sales and tech.
   { handle: 'capital', label: 'Capital.com', market: 'CY', aliases: ['cyprus', 'limassol', 'nicosia'] },
   { handle: 'unlimit', label: 'Unlimit', market: 'CY', aliases: ['cyprus', 'limassol', 'nicosia'] },
   { handle: 'xsolla', label: 'Xsolla', market: 'CY', aliases: ['cyprus', 'limassol', 'nicosia'] },
