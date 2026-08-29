@@ -4,6 +4,7 @@ import CustomInput from "~/components/common/CustomInput.vue";
 import SvgCodeTextarea from "~/components/svgEditor/SvgCodeTextarea.vue";
 import ColorsReplaceModal from "~/components/svgEditor/ColorsReplaceModal.vue";
 import StrokeEditorModal from "~/components/svgEditor/StrokeEditorModal.vue";
+import TransformEditorModal from "~/components/svgEditor/TransformEditorModal.vue";
 import CustomButton from "~/components/common/CustomButton.vue";
 
 type ParseResult =
@@ -23,6 +24,7 @@ const isReady = computed(() => (previewSvg.value || "").length > 0);
 
 const colorsModalOpen = ref(false);
 const strokeModalOpen = ref(false);
+const transformModalOpen = ref(false);
 
 function safeTrim(v: string) {
   return String(v || "").trim();
@@ -293,6 +295,11 @@ function openStrokeModal() {
   strokeModalOpen.value = true;
 }
 
+function openTransformModal() {
+  if (!isReady.value) return;
+  transformModalOpen.value = true;
+}
+
 function onApplyColorReplacements(payload: { replacements: Record<string, { mode: "color" | "currentColor"; color: string }> }) {
   const next = replaceColors(previewSvg.value, payload.replacements);
   previewSvg.value = next;
@@ -301,6 +308,12 @@ function onApplyColorReplacements(payload: { replacements: Record<string, { mode
 }
 
 function onApplyStrokeEdits(payload: { svg: string }) {
+  previewSvg.value = payload.svg;
+  normalizedCode.value = payload.svg;
+  inputCode.value = payload.svg;
+}
+
+function onApplyTransformEdits(payload: { svg: string }) {
   previewSvg.value = payload.svg;
   normalizedCode.value = payload.svg;
   inputCode.value = payload.svg;
@@ -375,6 +388,15 @@ function onApplyStrokeEdits(payload: { svg: string }) {
               >
                 {{ t("services.svgEditor.actions.editStroke") }}
               </custom-button>
+
+              <custom-button
+                  type="button"
+                  :disabled="!isReady"
+                  :title="t('services.svgEditor.titles.transform')"
+                  @click="openTransformModal"
+              >
+                {{ t("services.svgEditor.actions.transform") }}
+              </custom-button>
             </div>
           </div>
         </u-card>
@@ -417,6 +439,12 @@ function onApplyStrokeEdits(payload: { svg: string }) {
         v-model:open="strokeModalOpen"
         :svg="previewSvg"
         @apply="onApplyStrokeEdits"
+    />
+
+    <transform-editor-modal
+        v-model:open="transformModalOpen"
+        :svg="previewSvg"
+        @apply="onApplyTransformEdits"
     />
   </div>
 </template>

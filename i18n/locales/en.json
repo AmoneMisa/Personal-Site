@@ -2289,7 +2289,8 @@
         "editStroke": "Edit stroke",
         "minify": "Minify",
         "removeDimensions": "Remove size",
-        "replaceColors": "Replace colors"
+        "replaceColors": "Replace colors",
+        "transform": "Move / scale / rotate"
       },
       "errors": {
         "empty": "SVG code is empty.",
@@ -2350,6 +2351,27 @@
             "saveElement": "Save changes for selected element"
           },
           "useCurrentColor": "Use currentColor"
+        },
+        "transform": {
+          "title": "Move / scale / rotate",
+          "elements": "Elements",
+          "edit": "Transform",
+          "moveX": "Move X",
+          "moveY": "Move Y",
+          "scale": "Scale (%)",
+          "rotate": "Rotate (deg)",
+          "reset": "Reset",
+          "placeholders": {
+            "scale": "e.g. 100",
+            "rotate": "e.g. 0"
+          },
+          "errors": {
+            "invalidNumber": "Enter a valid number.",
+            "invalidScale": "Scale must be a positive number."
+          },
+          "titles": {
+            "resetElement": "Reset move/scale/rotate for this element"
+          }
         }
       },
       "outputs": {
@@ -2368,14 +2390,15 @@
           "title": "Preview"
         }
       },
-      "subtitle": "Upload a file or paste SVG code. Preview updates instantly, clean up and edit colors/stroke.",
+      "subtitle": "Upload a file or paste SVG code. Preview updates instantly, clean up, edit colors/stroke, and move/scale/rotate individual pieces.",
       "title": "SVG Editor",
       "titles": {
         "apply": "Apply code to preview",
         "editStroke": "Add/remove/edit stroke and stroke-width",
         "minify": "Remove extra tags and comments",
         "removeDimensions": "Remove width and height from root <svg>",
-        "replaceColors": "Replace fill/stroke colors (including currentColor)"
+        "replaceColors": "Replace fill/stroke colors (including currentColor)",
+        "transform": "Move, scale and rotate individual SVG elements"
       }
     },
     "title": "Services",
