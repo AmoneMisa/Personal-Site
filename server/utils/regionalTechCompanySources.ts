@@ -18,6 +18,7 @@ type RegionalLeverCompany = {
 // requested country/cities so they do not flood the shared `companies` source.
 export const REGIONAL_TECH_COMPANIES: RegionalLeverCompany[] = [
   { handle: 'provectus', label: 'Provectus', country: 'UA', aliases: ['ukraine', 'kyiv', 'kiev', 'odesa', 'odessa', 'lviv'] },
+  // Kyivstar uses "All" for many Ukraine-wide roles on its own country board.
   { handle: 'kyivstar', label: 'Kyivstar', country: 'UA', aliases: ['ukraine', 'kyiv', 'kiev', 'all'] },
   { handle: '3pillarglobal', label: '3Pillar', country: 'RO', aliases: ['romania', 'bucharest', 'cluj', 'iasi', 'timișoara', 'timisoara'] },
   { handle: 'brillio-2', label: 'Brillio', country: 'RO', aliases: ['romania', 'bucharest', 'bihor'] },
