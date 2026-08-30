@@ -64,6 +64,12 @@ const props = defineProps<{
   parkZones?: FlatMapZone[];
   areaZones?: FlatMapZone[];
   cityZone?: FlatMapZone | null;
+  selectedDistrict?: string;
+  selectedMicrodistrict?: string;
+  selectedQuartal?: string;
+  selectedArea?: string;
+  selectedMetro?: string;
+  selectedMetroRadiusM?: number;
   districtsLabel?: string;
   microdistrictsLabel?: string;
   quartalsLabel?: string;
@@ -78,7 +84,7 @@ const props = defineProps<{
 const emit = defineEmits<{
   (e: "select", id: string): void;
   (e: "area-change", points: Array<{ lat: number; lng: number }>): void;
-  (e: "zone-select", payload: { kind: ZoneKind; name: string }): void;
+  (e: "zone-select", payload: { kind: ZoneKind; name: string; radiusM?: number }): void;
 }>();
 
 const route = useRoute();
@@ -488,17 +494,64 @@ function handleLayerClick(event: any, action: () => void) {
   action();
 }
 
-function emitZoneSelect(kind: ZoneKind, name: string) {
+function selectedName(kind: ZoneKind): string {
+  if (kind === "district") return props.selectedDistrict || "";
+  if (kind === "microdistrict") return props.selectedMicrodistrict || "";
+  if (kind === "quartal") return props.selectedQuartal || "";
+  if (kind === "area") return props.selectedArea || "";
+  return props.selectedMetro || "";
+}
+
+function isZoneSelected(kind: ZoneKind, name: string): boolean {
+  return selectedName(kind) === name;
+}
+
+function emitZoneSelect(kind: ZoneKind, name: string, radiusM?: number) {
   closeRadial();
+  const sameZone = isZoneSelected(kind, name);
+  const sameRadius = kind !== "metro" || radiusM == null || Number(props.selectedMetroRadiusM) === radiusM;
+  const nextName = sameZone && sameRadius ? "" : name;
   if (kind === "district") {
-    selectedDistrictName.value = selectedDistrictName.value === name ? null : name;
+    selectedDistrictName.value = nextName || null;
     renderDistrictZones();
   }
-  // Metro is a proximity/focus overlay, not one of the page's canonical zone
-  // events. Keeping it local also prevents the parent area's fallback handler
-  // from interpreting a metro station as an administrative area.
-  if (kind === "metro") return;
-  emit("zone-select", { kind, name });
+  emit("zone-select", {
+    kind,
+    name: nextName,
+    ...(kind === "metro" && nextName && radiusM != null ? { radiusM } : {}),
+  });
+}
+
+function selectedZoneFromProps(): { kind: ZoneKind; zone: FlatMapZone } | null {
+  const groups: Array<[ZoneKind, FlatMapZone[] | undefined, string | undefined]> = [
+    ["metro", props.metroStations, props.selectedMetro],
+    ["area", props.areaZones, props.selectedArea],
+    ["quartal", props.quartalMarkers, props.selectedQuartal],
+    ["microdistrict", props.microdistrictMarkers, props.selectedMicrodistrict],
+    ["district", props.districtZones, props.selectedDistrict],
+  ];
+  for (const [kind, zones, name] of groups) {
+    if (!name) continue;
+    const zone = (zones || []).find((candidate) => candidate.name === name);
+    if (zone) return { kind, zone };
+  }
+  return null;
+}
+
+function enableLayerFor(kind: ZoneKind) {
+  if (kind === "district") showDistricts.value = true;
+  else if (kind === "microdistrict") showMicrodistricts.value = true;
+  else if (kind === "quartal") showQuartals.value = true;
+  else if (kind === "area") showAreas.value = true;
+  else showMetro.value = true;
+}
+
+function syncSelectionFromProps(focus = false) {
+  selectedDistrictName.value = props.selectedDistrict || null;
+  const selected = selectedZoneFromProps();
+  if (selected) enableLayerFor(selected.kind);
+  renderAllZoneLayers();
+  if (focus && selected) focusZone(selected.zone);
 }
 
 function focusZone(zone: FlatMapZone) {
@@ -518,15 +571,27 @@ function kindZoom(zone: FlatMapZone): number {
 // back to an approximated circle (sized upstream to avoid overlap) when it doesn't.
 function renderZoneShape(layerGroup: any, zone: FlatMapZone, kind: ZoneKind, style: Record<string, unknown>) {
   const L = Leaflet;
-  const onClick = (event: any) => handleLayerClick(event, () => { focusZone(zone); emitZoneSelect(kind, zone.name); });
+  const selected = isZoneSelected(kind, zone.name);
+  const baseWeight = Number(style.weight ?? 2);
+  const baseFillOpacity = Number(style.fillOpacity ?? 0.16);
+  const selectedStyle = selected
+    ? { ...style, weight: baseWeight + 1.25, opacity: 1, fillOpacity: Math.min(.42, baseFillOpacity + .14) }
+    : style;
+  const onClick = (event: any) => handleLayerClick(event, () => {
+    if (!selected) focusZone(zone);
+    emitZoneSelect(kind, zone.name);
+  });
   if (zone.boundary) {
-    const shape = L.geoJSON(zone.boundary as any, { style: () => style, bubblingMouseEvents: false }).addTo(layerGroup);
+    const shape = L.geoJSON(zone.boundary as any, { style: () => selectedStyle, bubblingMouseEvents: false }).addTo(layerGroup);
     shape.on("click", onClick);
     shape.bindTooltip(zone.label, { direction: "top" });
+    if (selected) shape.openTooltip?.();
     return shape;
   }
-  const circle = L.circle([zone.lat, zone.lng], { radius: zone.radiusM, ...style }).addTo(layerGroup);
+  const circle = L.circle([zone.lat, zone.lng], { radius: zone.radiusM, ...selectedStyle, bubblingMouseEvents: false }).addTo(layerGroup);
   circle.on("click", onClick);
+  circle.bindTooltip(zone.label, { direction: "top" });
+  if (selected) circle.openTooltip?.();
   return circle;
 }
 
@@ -553,8 +618,7 @@ function renderZoneShapes(layerGroup: any, zones: FlatMapZone[], kind: ZoneKind,
   if (!layerGroup || !L) return;
   layerGroup.clearLayers();
   for (const zone of zones) {
-    const shape = renderZoneShape(layerGroup, zone, kind, { ...style, color: zone.color, fillColor: zone.color, className: "flat-zone-shape" });
-    if (!zone.boundary) shape.bindTooltip(zone.label, { direction: "top" });
+    renderZoneShape(layerGroup, zone, kind, { ...style, color: zone.color, fillColor: zone.color, className: "flat-zone-shape" });
   }
 }
 
@@ -587,21 +651,44 @@ function renderMetro() {
   if (!metroLayer || !L) return;
   metroLayer.clearLayers();
   if (!showMetro.value) return;
-  const onMetroRingClick = (event: any) => handleLayerClick(event, () => {
-    const point = eventLatLng(event);
-    const station = point ? nearestMetroStation(point) : null;
-    if (!station) return;
-    focusZone(station);
-    emitZoneSelect("metro", station.name);
-  });
   for (const station of props.metroStations || []) {
+    const stationSelected = isZoneSelected("metro", station.name);
     for (const [radius, color, opacity] of [[1000, "#8b5cf6", .055], [500, "#22c55e", .08], [200, "#f59e0b", .13]] as const) {
-      const ring = L.circle([station.lat, station.lng], { radius, color, weight: 1.25, opacity: .75, fillColor: color, fillOpacity: opacity, bubblingMouseEvents: false }).addTo(metroLayer);
-      ring.on("click", onMetroRingClick);
+      const radiusSelected = stationSelected && Number(props.selectedMetroRadiusM) === radius;
+      const ring = L.circle([station.lat, station.lng], {
+        radius,
+        color,
+        weight: radiusSelected ? 3 : 1.25,
+        opacity: radiusSelected ? 1 : .75,
+        fillColor: color,
+        fillOpacity: radiusSelected ? Math.min(.24, opacity + .11) : opacity,
+        bubblingMouseEvents: false,
+      }).addTo(metroLayer);
+      ring.bindTooltip(`${station.label} · ${radius} m`, { direction: "top" });
+      if (radiusSelected) ring.openTooltip?.();
+      ring.on("click", (event: any) => handleLayerClick(event, () => {
+        const point = eventLatLng(event);
+        const nearest = point ? nearestMetroStation(point) : station;
+        if (!nearest) return;
+        const togglingOff = isZoneSelected("metro", nearest.name) && Number(props.selectedMetroRadiusM) === radius;
+        if (!togglingOff) focusZone(nearest);
+        emitZoneSelect("metro", nearest.name, radius);
+      }));
     }
-    const marker = L.circleMarker([station.lat, station.lng], { radius: 6, color: "#fff", weight: 2, fillColor: "#2563eb", fillOpacity: 1, bubblingMouseEvents: false });
+    const marker = L.circleMarker([station.lat, station.lng], {
+      radius: stationSelected ? 8 : 6,
+      color: "#fff",
+      weight: stationSelected ? 3 : 2,
+      fillColor: stationSelected ? "#e0679a" : "#2563eb",
+      fillOpacity: 1,
+      bubblingMouseEvents: false,
+    });
     marker.bindTooltip(`${station.label} · 200 / 500 / 1000 m`, { direction: "top" });
-    marker.on("click", (event: any) => handleLayerClick(event, () => { focusZone(station); emitZoneSelect("metro", station.name); }));
+    if (stationSelected) marker.openTooltip?.();
+    marker.on("click", (event: any) => handleLayerClick(event, () => {
+      if (!stationSelected) focusZone(station);
+      emitZoneSelect("metro", station.name);
+    }));
     marker.addTo(metroLayer);
   }
 }
@@ -723,10 +810,6 @@ onMounted(async () => {
   map.on("click", (event: any) => {
     if (addDrawPoint(event)) return;
     closeRadial();
-    if (selectedDistrictName.value != null) {
-      selectedDistrictName.value = null;
-      renderDistrictZones();
-    }
   });
   map.on("zoomend", renderMarkers);
   map.on("movestart", closeRadial);
@@ -734,12 +817,20 @@ onMounted(async () => {
   renderMarkers();
   renderFocusedPoint();
   renderAllZoneLayers();
-  fitToPoints();
+  if (selectedZoneFromProps()) syncSelectionFromProps(true);
+  else fitToPoints();
 });
 
 watch(renderedPoints, () => { renderMarkers(); fitToPoints(); }, { deep: true });
 watch(() => route.query, () => { void loadFullMapFeed(); }, { deep: true });
-watch(() => [props.districtZones, props.microdistrictMarkers, props.quartalMarkers, props.metroStations, props.universityZones, props.shoppingMallZones, props.parkZones, props.areaZones, props.cityZone], renderAllZoneLayers, { deep: true });
+watch(() => [props.districtZones, props.microdistrictMarkers, props.quartalMarkers, props.metroStations, props.universityZones, props.shoppingMallZones, props.parkZones, props.areaZones, props.cityZone], () => syncSelectionFromProps(false), { deep: true });
+watch(
+  () => [props.selectedDistrict, props.selectedMicrodistrict, props.selectedQuartal, props.selectedArea, props.selectedMetro, props.selectedMetroRadiusM],
+  (next, previous) => {
+    const changed = next.some((value, index) => value !== previous?.[index]);
+    if (changed) syncSelectionFromProps(Boolean(selectedZoneFromProps()));
+  },
+);
 watch([showDistricts, showMicrodistricts, showQuartals, showMetro, showUniversities, showShoppingMalls, showParks, showAreas, showCity], renderAllZoneLayers);
 watch(() => props.cityZone, (zone, previous) => {
   if (!zone || zone.id === previous?.id || !map) return;

@@ -189,12 +189,17 @@ const {
   locale: () => String(locale.value),
 });
 
-function onZoneSelect({ kind, name }: { kind: "district" | "microdistrict" | "quartal" | "area"; name: string }) {
+function onZoneSelect({ kind, name, radiusM }: { kind: "district" | "microdistrict" | "quartal" | "area" | "metro"; name: string; radiusM?: number }) {
   if (kind === "district") district.value = name;
   else if (kind === "microdistrict") microdistrict.value = name;
   else if (kind === "quartal") quartal.value = name;
-  else mapArea.value = name;
-  scheduleLoad();
+  else if (kind === "area") mapArea.value = name;
+  else {
+    metro.value = name;
+    if (!name) metroMaxM.value = undefined;
+    else if (radiusM != null) metroMaxM.value = radiusM;
+  }
+  scheduleLoad(0);
 }
 
 const SOURCES = ["olx", "telegram"];
@@ -878,7 +883,7 @@ onBeforeUnmount(() => { modalOpen.value = false; lightboxOpen.value = false; rel
       <UiSortSelect class="flats__sort" v-model="sort" :items="sortItems" :label="extraLabels.sort" @update:model-value="scheduleLoad(0)" />
     </div>
     <FlatsStatsPanel v-if="view === 'active' && statistics" :statistics="statistics" :display-currency="displayCurrency" :convert="convert" />
-<section v-if="listings.length" class="flats__map-wrap"><flat-map :points="mapPoints" :draw-label="t('drawArea')" :done-label="t('done')" :clear-label="t('clearArea')" :draw-hint="t('drawHint')" :expand-label="t('mapExpand')" :collapse-label="t('mapCollapse')" :district-zones="districtZones" :microdistrict-markers="microdistrictMarkers" :quartal-markers="quartalMarkers" :metro-stations="metroStations" :university-zones="universityZones" :shopping-mall-zones="shoppingMallZones" :park-zones="parkZones" :area-zones="areaZones" :city-zone="cityZone" :districts-label="t('districtsLayer')" :microdistricts-label="t('microdistrictsLayer')" :quartals-label="t('quartalsLayer')" :metro-label="t('metro')" :universities-label="t('universitiesLayer')" :shopping-malls-label="t('shoppingMallsLayer')" :parks-label="t('parksLayer')" :areas-label="t('areasLayer')" :city-label="t('cityLayer')" @select="openById" @area-change="drawnArea = $event" @zone-select="onZoneSelect" /></section>
+<section v-if="listings.length" class="flats__map-wrap"><flat-map :points="mapPoints" :draw-label="t('drawArea')" :done-label="t('done')" :clear-label="t('clearArea')" :draw-hint="t('drawHint')" :expand-label="t('mapExpand')" :collapse-label="t('mapCollapse')" :district-zones="districtZones" :microdistrict-markers="microdistrictMarkers" :quartal-markers="quartalMarkers" :metro-stations="metroStations" :university-zones="universityZones" :shopping-mall-zones="shoppingMallZones" :park-zones="parkZones" :area-zones="areaZones" :city-zone="cityZone" :selected-district="district" :selected-microdistrict="microdistrict" :selected-quartal="quartal" :selected-area="mapArea" :selected-metro="metro" :selected-metro-radius-m="metroMaxM" :districts-label="t('districtsLayer')" :microdistricts-label="t('microdistrictsLayer')" :quartals-label="t('quartalsLayer')" :metro-label="t('metro')" :universities-label="t('universitiesLayer')" :shopping-malls-label="t('shoppingMallsLayer')" :parks-label="t('parksLayer')" :areas-label="t('areasLayer')" :city-label="t('cityLayer')" @select="openById" @area-change="drawnArea = $event" @zone-select="onZoneSelect" /></section>
 
     <SearchResultGrid>
       <FlatCard
