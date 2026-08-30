@@ -17,6 +17,8 @@ type ZoneDictionaryKey = 'microdistricts' | 'mahallas' | 'localAreas' | 'develop
 
 const CYRILLIC_RE = /\p{Script=Cyrillic}/u
 const NON_RUSSIAN_CYRILLIC_RE = /[ІіЇїЄєҐґЎўҚқҒғҲҳӘәӨөҰұҮүҢң]/u
+const UZBEK_CYRILLIC_SUFFIX_RE = /\b(?:массиви|махалласи|даҳаси|дахаси|мавзеси)\b/iu
+const COMPACT_ZONE_SUFFIX_RE = /\s+(?:массив|массиви|микрорайон|мкр|квартал|махалла|махалласи|даха|дахаси|даҳаси|мавзе|мавзеси)$/iu
 const ZONE_DICTIONARY_KEYS: readonly ZoneDictionaryKey[] = ['microdistricts', 'mahallas', 'localAreas', 'developmentAreas']
 
 function uiLanguage(locale: string): UiLanguage {
@@ -63,15 +65,32 @@ export function metroLabelWithAlias(value: string | null | undefined, locale: st
   return geographyMetroLabelWithAlias(value, locale)
 }
 
-function preferredDictionaryAlias(entry: LocationEntry, locale: string): string | null {
+function compactZoneBase(label: string): string {
+  return label.replace(COMPACT_ZONE_SUFFIX_RE, '').trim() || label
+}
+
+function preferredDictionaryAlias(entry: LocationEntry, locale: string, compactBase = false): string | null {
   const aliases = entry.aliases.map((value) => String(value).trim()).filter(Boolean)
   if (uiLanguage(locale) !== 'ru') return entry.canonical || entry.name || null
 
-  return aliases.find((alias) => CYRILLIC_RE.test(alias) && !NON_RUSSIAN_CYRILLIC_RE.test(alias))
-    || aliases.find((alias) => CYRILLIC_RE.test(alias))
+  const cyrillic = aliases.filter((alias) => CYRILLIC_RE.test(alias))
+  const russianScript = cyrillic.filter((alias) => !NON_RUSSIAN_CYRILLIC_RE.test(alias))
+  const pool = russianScript.length ? russianScript : cyrillic
+  const preferred = [...pool].sort((a, b) => {
+    const aPenalty = UZBEK_CYRILLIC_SUFFIX_RE.test(a) ? 1 : 0
+    const bPenalty = UZBEK_CYRILLIC_SUFFIX_RE.test(b) ? 1 : 0
+    return aPenalty - bPenalty
+  })[0]
     || entry.canonical
     || entry.name
     || null
+
+  return preferred && compactBase ? compactZoneBase(preferred) : preferred
+}
+
+function scopedZoneDictionary(countryCode: string, cityName: string) {
+  if (!countryCode || !cityName) return null
+  return dictionaryFor(countryCode as CountryCode, cityName)
 }
 
 function dictionaryZoneLabel(
@@ -80,8 +99,7 @@ function dictionaryZoneLabel(
   countryCode: string,
   cityName: string,
 ): string | null {
-  if (!countryCode || !cityName) return null
-  const dictionary = dictionaryFor(countryCode as CountryCode, cityName)
+  const dictionary = scopedZoneDictionary(countryCode, cityName)
   if (!dictionary) return null
 
   for (const key of ZONE_DICTIONARY_KEYS) {
@@ -93,6 +111,42 @@ function dictionaryZoneLabel(
     )
     if (!entry) continue
     return preferredDictionaryAlias(entry, locale)
+  }
+  return null
+}
+
+function dictionaryCompositeBaseLabel(
+  rawBase: string,
+  locale: string,
+  countryCode: string,
+  cityName: string,
+): string | null {
+  const dictionary = scopedZoneDictionary(countryCode, cityName)
+  if (!dictionary) return null
+
+  // Geo canonicals and source-language listing aliases can use different
+  // transliterations for the same named massif (e.g. Karasu vs Qorasuv).
+  // Probe only exact shared aliases and their generic locality forms, scoped
+  // to the selected city; never perform an unscoped fuzzy city/country match.
+  const probes = [
+    rawBase,
+    `${rawBase} massiv`,
+    `${rawBase} massivi`,
+    `${rawBase} массив`,
+    `${rawBase} массиви`,
+    `${rawBase} daha`,
+    `${rawBase} dahasi`,
+    `${rawBase} даха`,
+    `${rawBase} даҳаси`,
+  ]
+
+  for (const key of ZONE_DICTIONARY_KEYS) {
+    const entries = (dictionary[key] || []) as readonly LocationEntry[]
+    for (const probe of probes) {
+      const entry = findCanonical(probe, entries, { transliteration: true }) as LocationEntry | null
+      if (!entry) continue
+      return preferredDictionaryAlias(entry, locale, true)
+    }
   }
   return null
 }
@@ -127,13 +181,14 @@ export function zoneNameLabel(
   if (direct) return direct
 
   // Numbered/composite zones (for example "Karasu-3" or "Chilanzar-20A")
-  // can reuse the shared display/alias for their base token while preserving
-  // the canonical suffix used by filtering and routing.
+  // reuse the shared display/alias for their base token while preserving the
+  // canonical suffix used by filtering and routing.
   const separatorIndex = raw.indexOf('-')
   if (separatorIndex > 0) {
     const prefix = raw.slice(0, separatorIndex)
     const suffix = raw.slice(separatorIndex)
     const translated = directZoneLabel(prefix, locale, countryCode, cityName)
+      || dictionaryCompositeBaseLabel(prefix, locale, countryCode, cityName)
     if (translated) return `${translated}${suffix}`
   }
 
