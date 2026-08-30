@@ -6,10 +6,15 @@ import {
   geographyDisplayName,
   geographyMetroLabelWithAlias,
 } from '@whiteslove/parsing-lexicon/geography-display'
+import { dictionaryFor } from '@whiteslove/parsing-lexicon/locations'
 
 export type LocationKind = 'country' | 'city' | 'district' | 'metro' | 'any'
 
 type UiLanguage = 'ru' | 'en'
+
+const CYRILLIC_RE = /\p{Script=Cyrillic}/u
+const NON_RUSSIAN_CYRILLIC_RE = /[ІіЇїЄєҐґЎўҚқҒғҲҳӘәӨөҰұҮүҢң]/u
+const ZONE_DICTIONARY_KEYS = ['microdistricts', 'mahallas', 'localAreas', 'developmentAreas'] as const
 
 function uiLanguage(locale: string): UiLanguage {
   return String(locale).toLowerCase().startsWith('ru') ? 'ru' : 'en'
@@ -55,36 +60,78 @@ export function metroLabelWithAlias(value: string | null | undefined, locale: st
   return geographyMetroLabelWithAlias(value, locale)
 }
 
-// For microdistrict/quartal/informal-area names (no dedicated LocationKind of their
-// own): try only the district/microdistrict/metro tables directly, in that order,
-// and never fall through to locationLabel's "any" cascade — that cascade also does
-// fuzzy city/country entity matching, which has mistranslated names that merely
-// resemble a city ("Tashkent City" became "город Ташкент"). Many Tashkent
-// microdistrict/quartal names coincide with metro station names (the city's metro
-// stations are named after the areas they serve), so the metro table often has real
-// coverage even for non-metro places. Names with no entry in any of the three stay
-// as their raw canonical form rather than risk a wrong match.
-export function zoneNameLabel(value: string | null | undefined, locale: string): string {
-  const raw = String(value ?? '').trim()
-  if (!raw) return raw
-  for (const kind of ['district', 'microdistrict', 'metro'] as const) {
+function preferredDictionaryAlias(entry: any, locale: string): string | null {
+  if (!entry) return null
+  const aliases = (entry.aliases || []).map((value: unknown) => String(value).trim()).filter(Boolean)
+  if (uiLanguage(locale) !== 'ru') return entry.canonical || entry.name || null
+
+  return aliases.find((alias: string) => CYRILLIC_RE.test(alias) && !NON_RUSSIAN_CYRILLIC_RE.test(alias))
+    || aliases.find((alias: string) => CYRILLIC_RE.test(alias))
+    || entry.canonical
+    || entry.name
+    || null
+}
+
+function dictionaryZoneLabel(
+  raw: string,
+  locale: string,
+  countryCode: string,
+  cityName: string,
+): string | null {
+  if (!countryCode || !cityName) return null
+  const dictionary = dictionaryFor(countryCode, cityName) as Record<string, any[]> | null
+  if (!dictionary) return null
+
+  for (const key of ZONE_DICTIONARY_KEYS) {
+    const entry = (dictionary[key] || []).find((candidate: any) =>
+      candidate?.canonical === raw
+      || candidate?.name === raw
+      || candidate?.aliases?.includes(raw),
+    )
+    if (!entry) continue
+    return preferredDictionaryAlias(entry, locale)
+  }
+  return null
+}
+
+function directZoneLabel(
+  raw: string,
+  locale: string,
+  countryCode: string,
+  cityName: string,
+): string | null {
+  for (const kind of ['city', 'district', 'microdistrict', 'metro'] as const) {
     const translated = geographyDisplayName(raw, locale, kind)
     if (translated && translated !== raw) return translated
   }
+  const dictionary = dictionaryZoneLabel(raw, locale, countryCode, cityName)
+  return dictionary && dictionary !== raw ? dictionary : null
+}
 
-  // Quartal composites (e.g. "Chilanzar-20A") aren't in any lexicon table as a
-  // whole string, only their district/microdistrict prefix is. Match on an
-  // exact "<Key>-" prefix only (never a loose substring) so we don't repeat
-  // the fuzzy-match bug this function otherwise avoids, and keep the quartal
-  // suffix as-is since it isn't translatable geography.
+// Canonical map-zone names come from geo-catalog, while reusable multilingual
+// aliases belong to parsing-lexicon. Keep raw canonical values as filter values
+// and derive only the visible label here from the shared packages.
+export function zoneNameLabel(
+  value: string | null | undefined,
+  locale: string,
+  countryCode = '',
+  cityName = '',
+): string {
+  const raw = String(value ?? '').trim()
+  if (!raw) return raw
+
+  const direct = directZoneLabel(raw, locale, countryCode, cityName)
+  if (direct) return direct
+
+  // Numbered/composite zones (for example "Karasu-3" or "Chilanzar-20A")
+  // can reuse the shared display/alias for their base token while preserving
+  // the canonical suffix used by filtering and routing.
   const separatorIndex = raw.indexOf('-')
   if (separatorIndex > 0) {
     const prefix = raw.slice(0, separatorIndex)
     const suffix = raw.slice(separatorIndex)
-    for (const kind of ['district', 'microdistrict', 'metro'] as const) {
-      const translated = geographyDisplayName(prefix, locale, kind)
-      if (translated && translated !== prefix) return `${translated}${suffix}`
-    }
+    const translated = directZoneLabel(prefix, locale, countryCode, cityName)
+    if (translated) return `${translated}${suffix}`
   }
 
   return raw
