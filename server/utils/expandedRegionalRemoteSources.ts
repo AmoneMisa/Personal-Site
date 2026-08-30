@@ -5,8 +5,10 @@ const UA = 'jobFinder/1.0 (job aggregator; contact: admin@whiteslove.me)'
 const REQUEST_TIMEOUT_MS = 20_000
 
 type TargetMarket = 'UA' | 'RO' | 'UZ' | 'US' | 'CA' | 'CY' | 'KG' | 'KZ' | 'CN' | 'JP' | 'KR' | 'REMOTE'
+type BoardProvider = 'lever' | 'greenhouse'
 
-type LeverTarget = {
+type RegionalBoardTarget = {
+  provider?: BoardProvider
   handle: string
   label: string
   market: TargetMarket
@@ -14,14 +16,16 @@ type LeverTarget = {
 }
 
 // Additional direct employers verified live in 2026-08. The same company may
-// appear in more than one market when its public Lever board explicitly lists
+// appear in more than one market when its public ATS board explicitly lists
 // vacancies for those countries. URL deduplication collapses overlaps later.
-export const EXPANDED_REGIONAL_REMOTE_COMPANIES: LeverTarget[] = [
+export const EXPANDED_REGIONAL_REMOTE_COMPANIES: RegionalBoardTarget[] = [
   { handle: 'tsmg', label: 'TSMG', market: 'RO', aliases: ['romania', 'bucharest'] },
   { handle: 'companial', label: 'Companial', market: 'RO', aliases: ['romania', 'bucharest'] },
   { handle: 'remofirst', label: 'RemoFirst', market: 'UA', aliases: ['ukraine', 'kyiv', 'kiev'] },
   { handle: 'binance', label: 'Binance', market: 'UA', aliases: ['ukraine', 'kyiv', 'kiev'] },
   { handle: 'remofirst', label: 'RemoFirst', market: 'UZ', aliases: ['uzbekistan', 'tashkent', 'toshkent'] },
+  { provider: 'greenhouse', handle: 'exadelinc', label: 'Exadel', market: 'UZ', aliases: ['uzbekistan', 'tashkent', 'toshkent'] },
+  { provider: 'greenhouse', handle: 'exadelinc', label: 'Exadel', market: 'RO', aliases: ['romania', 'bucharest'] },
 
   { handle: 'weloglobal', label: 'Welo Global', market: 'KG', aliases: ['kyrgyzstan', 'bishkek'] },
   { handle: 'binance', label: 'Binance', market: 'KG', aliases: ['kyrgyzstan', 'bishkek'] },
@@ -94,6 +98,17 @@ type LeverPosting = {
   workplaceType?: string
 }
 
+type GreenhousePosting = {
+  id?: number | string
+  title?: string
+  absolute_url?: string
+  updated_at?: string
+  content?: string
+  location?: { name?: string }
+  departments?: Array<{ name?: string }>
+  offices?: Array<{ name?: string; location?: string }>
+}
+
 function stripHtml(value: unknown): string {
   return String(value || '')
     .replace(/<script\b[\s\S]*?<\/script>/gi, ' ')
@@ -101,28 +116,34 @@ function stripHtml(value: unknown): string {
     .replace(/<[^>]*>/g, ' ')
     .replace(/&nbsp;/gi, ' ')
     .replace(/&amp;/gi, '&')
+    .replace(/&#39;/gi, "'")
+    .replace(/&quot;/gi, '"')
     .replace(/\s+/g, ' ')
     .trim()
 }
 
-function matchesTarget(posting: LeverPosting, target: LeverTarget): boolean {
-  const location = String(posting.categories?.location || '').toLocaleLowerCase('en')
-  const workplace = String(posting.workplaceType || '').toLocaleLowerCase('en')
-  const text = `${location} ${workplace}`
-  if (!text.trim()) return false
-  return target.aliases.some((alias) => text.includes(alias.toLocaleLowerCase('en')))
+function targetMatchesLocation(location: string, target: RegionalBoardTarget): boolean {
+  const normalized = location.toLocaleLowerCase('en')
+  if (!normalized.trim()) return false
+  return target.aliases.some((alias) => normalized.includes(alias.toLocaleLowerCase('en')))
 }
 
-export function mapExpandedLeverPostings(postings: LeverPosting[], target: LeverTarget): Job[] {
+function matchesLeverTarget(posting: LeverPosting, target: RegionalBoardTarget): boolean {
+  const location = String(posting.categories?.location || '')
+  const workplace = String(posting.workplaceType || '')
+  return targetMatchesLocation(`${location} ${workplace}`, target)
+}
+
+export function mapExpandedLeverPostings(postings: LeverPosting[], target: RegionalBoardTarget): Job[] {
   return postings.flatMap((posting) => {
-    if (!posting.text || !posting.hostedUrl || !matchesTarget(posting, target)) return []
+    if (!posting.text || !posting.hostedUrl || !matchesLeverTarget(posting, target)) return []
 
     const location = posting.categories?.location || (target.market === 'REMOTE' ? 'Remote' : target.market)
     const description = stripHtml(posting.descriptionPlain || posting.description).slice(0, 6000)
     const semanticText = `${posting.text} ${location} ${posting.workplaceType || ''} ${description}`
 
     return [{
-      id: `companies-expanded-${target.market.toLowerCase()}-${target.handle}-${posting.id || posting.hostedUrl}`,
+      id: `companies-expanded-${target.market.toLowerCase()}-${posting.id || posting.hostedUrl}`,
       title: posting.text,
       company: target.label,
       location,
@@ -140,6 +161,34 @@ export function mapExpandedLeverPostings(postings: LeverPosting[], target: Lever
   })
 }
 
+export function mapExpandedGreenhousePostings(postings: GreenhousePosting[], target: RegionalBoardTarget): Job[] {
+  return postings.flatMap((posting) => {
+    const location = String(posting.location?.name || '')
+    if (!posting.title || !posting.absolute_url || !targetMatchesLocation(location, target)) return []
+
+    const description = stripHtml(posting.content).slice(0, 6000)
+    const semanticText = `${posting.title} ${location} ${description}`
+    return [{
+      id: `companies-expanded-${target.market.toLowerCase()}-${posting.id || posting.absolute_url}`,
+      title: posting.title,
+      company: target.label,
+      location: location || target.market,
+      url: posting.absolute_url,
+      source: 'companies' as const,
+      remote: detectWorkModes(semanticText).includes('remote'),
+      tags: [
+        target.market,
+        ...(posting.departments || []).map((item) => item.name).filter((value): value is string => Boolean(value)),
+      ].slice(0, 8),
+      postedAt: posting.updated_at && Number.isFinite(Date.parse(posting.updated_at))
+        ? new Date(posting.updated_at).toISOString()
+        : new Date().toISOString(),
+      description: description || undefined,
+      employerType: 'direct' as const,
+    }]
+  })
+}
+
 async function fetchLeverBoard(handle: string): Promise<LeverPosting[]> {
   const response = await fetch(`https://api.lever.co/v0/postings/${encodeURIComponent(handle)}?mode=json`, {
     headers: { 'User-Agent': UA, Accept: 'application/json' },
@@ -148,6 +197,16 @@ async function fetchLeverBoard(handle: string): Promise<LeverPosting[]> {
   if (!response.ok) throw new Error(`${handle} -> ${response.status}`)
   const postings = await response.json() as LeverPosting[]
   return Array.isArray(postings) ? postings : []
+}
+
+async function fetchGreenhouseBoard(handle: string): Promise<GreenhousePosting[]> {
+  const response = await fetch(`https://boards-api.greenhouse.io/v1/boards/${encodeURIComponent(handle)}/jobs?content=true`, {
+    headers: { 'User-Agent': UA, Accept: 'application/json' },
+    signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+  })
+  if (!response.ok) throw new Error(`${handle} -> ${response.status}`)
+  const body = await response.json() as { jobs?: GreenhousePosting[] }
+  return Array.isArray(body.jobs) ? body.jobs : []
 }
 
 function filterQuery(jobs: Job[], q: string): Job[] {
@@ -160,29 +219,44 @@ function filterQuery(jobs: Job[], q: string): Job[] {
   )
 }
 
+function boardKey(target: RegionalBoardTarget): string {
+  return `${target.provider || 'lever'}:${target.handle}`
+}
+
 export async function fetchExpandedRegionalRemoteJobs(q: string): Promise<Job[]> {
   if (String(process.env.EXPANDED_REGIONAL_REMOTE_SOURCE || 'on').toLowerCase() === 'off') return []
 
-  const handles = [...new Set(EXPANDED_REGIONAL_REMOTE_COMPANIES.map((target) => target.handle))]
-  const fetched = await Promise.allSettled(handles.map(async (handle) => ({ handle, postings: await fetchLeverBoard(handle) })))
-  const postingByHandle = new Map<string, LeverPosting[]>()
+  const boards = [...new Map(EXPANDED_REGIONAL_REMOTE_COMPANIES.map((target) => [boardKey(target), target])).values()]
+  const fetched = await Promise.allSettled(boards.map(async (target) => ({
+    key: boardKey(target),
+    provider: target.provider || 'lever',
+    postings: target.provider === 'greenhouse'
+      ? await fetchGreenhouseBoard(target.handle)
+      : await fetchLeverBoard(target.handle),
+  })))
+  const postingByBoard = new Map<string, { provider: BoardProvider; postings: LeverPosting[] | GreenhousePosting[] }>()
 
   fetched.forEach((result, index) => {
-    const handle = handles[index]!
+    const target = boards[index]!
+    const key = boardKey(target)
     if (result.status === 'fulfilled') {
-      postingByHandle.set(handle, result.value.postings)
+      postingByBoard.set(key, { provider: result.value.provider, postings: result.value.postings })
       return
     }
     console.warn(
-      `[jobs:expanded-regional-remote] ${handle} failed:`,
+      `[jobs:expanded-regional-remote] ${key} failed:`,
       result.reason instanceof Error ? result.reason.message : String(result.reason),
     )
   })
 
   const deduped = new Map<string, Job>()
   for (const target of EXPANDED_REGIONAL_REMOTE_COMPANIES) {
-    const postings = postingByHandle.get(target.handle) || []
-    for (const job of mapExpandedLeverPostings(postings, target)) deduped.set(job.url || job.id, job)
+    const board = postingByBoard.get(boardKey(target))
+    if (!board) continue
+    const jobs = board.provider === 'greenhouse'
+      ? mapExpandedGreenhousePostings(board.postings as GreenhousePosting[], target)
+      : mapExpandedLeverPostings(board.postings as LeverPosting[], target)
+    for (const job of jobs) deduped.set(job.url || job.id, job)
   }
 
   return filterQuery([...deduped.values()], q)
