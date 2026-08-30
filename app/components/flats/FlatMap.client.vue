@@ -45,7 +45,7 @@ interface FlatMapZone {
   boundary?: { type: "Polygon" | "MultiPolygon"; coordinates: unknown };
 }
 
-type ZoneKind = "district" | "microdistrict" | "quartal" | "area";
+type ZoneKind = "district" | "microdistrict" | "quartal" | "area" | "metro";
 
 const props = defineProps<{
   points: FlatPoint[];
@@ -300,7 +300,7 @@ function renderMarkers() {
       iconAnchor: [size / 2, size / 2],
     });
     const marker = L.marker([c.lat, c.lng], { icon });
-    marker.on("click", () => openCluster(c));
+    marker.on("click", (event: any) => handleLayerClick(event, () => openCluster(c)));
     marker.addTo(layer);
   }
 }
@@ -451,12 +451,53 @@ function renderArea() {
   }
 }
 
+function eventLatLng(event: any): { lat: number; lng: number } | null {
+  const original = event?.originalEvent;
+  if (original && map?.mouseEventToLatLng) {
+    try {
+      const point = map.mouseEventToLatLng(original);
+      if (Number.isFinite(point?.lat) && Number.isFinite(point?.lng)) return { lat: point.lat, lng: point.lng };
+    } catch {
+      // Fall through to Leaflet's event lat/lng for synthetic and marker events.
+    }
+  }
+  const lat = Number(event?.latlng?.lat);
+  const lng = Number(event?.latlng?.lng);
+  return Number.isFinite(lat) && Number.isFinite(lng) ? { lat, lng } : null;
+}
+
+function addDrawPoint(event: any): boolean {
+  if (!drawing.value) return false;
+  const point = eventLatLng(event);
+  if (!point) return true;
+  area.value = [...area.value, point];
+  renderArea();
+  emit("area-change", area.value.length >= 3 ? area.value : []);
+  return true;
+}
+
+function stopLayerClick(event: any) {
+  const L = Leaflet;
+  const original = event?.originalEvent ?? event;
+  if (L && original) L.DomEvent.stopPropagation(original);
+}
+
+function handleLayerClick(event: any, action: () => void) {
+  stopLayerClick(event);
+  if (addDrawPoint(event)) return;
+  action();
+}
+
 function emitZoneSelect(kind: ZoneKind, name: string) {
   closeRadial();
   if (kind === "district") {
     selectedDistrictName.value = selectedDistrictName.value === name ? null : name;
     renderDistrictZones();
   }
+  // Metro is a proximity/focus overlay, not one of the page's canonical zone
+  // events. Keeping it local also prevents the parent area's fallback handler
+  // from interpreting a metro station as an administrative area.
+  if (kind === "metro") return;
   emit("zone-select", { kind, name });
 }
 
@@ -477,7 +518,7 @@ function kindZoom(zone: FlatMapZone): number {
 // back to an approximated circle (sized upstream to avoid overlap) when it doesn't.
 function renderZoneShape(layerGroup: any, zone: FlatMapZone, kind: ZoneKind, style: Record<string, unknown>) {
   const L = Leaflet;
-  const onClick = (event: any) => { L.DomEvent.stopPropagation(event); focusZone(zone); emitZoneSelect(kind, zone.name); };
+  const onClick = (event: any) => handleLayerClick(event, () => { focusZone(zone); emitZoneSelect(kind, zone.name); });
   if (zone.boundary) {
     const shape = L.geoJSON(zone.boundary as any, { style: () => style, bubblingMouseEvents: false }).addTo(layerGroup);
     shape.on("click", onClick);
@@ -527,18 +568,40 @@ function renderQuartals() {
   else quartalLayer?.clearLayers();
 }
 
+function nearestMetroStation(point: { lat: number; lng: number }): FlatMapZone | null {
+  if (!map) return null;
+  let nearest: FlatMapZone | null = null;
+  let nearestDistance = Number.POSITIVE_INFINITY;
+  for (const station of props.metroStations || []) {
+    const distance = map.distance([point.lat, point.lng], [station.lat, station.lng]);
+    if (distance <= 1000 && distance < nearestDistance) {
+      nearest = station;
+      nearestDistance = distance;
+    }
+  }
+  return nearest;
+}
+
 function renderMetro() {
   const L = Leaflet;
   if (!metroLayer || !L) return;
   metroLayer.clearLayers();
   if (!showMetro.value) return;
+  const onMetroRingClick = (event: any) => handleLayerClick(event, () => {
+    const point = eventLatLng(event);
+    const station = point ? nearestMetroStation(point) : null;
+    if (!station) return;
+    focusZone(station);
+    emitZoneSelect("metro", station.name);
+  });
   for (const station of props.metroStations || []) {
     for (const [radius, color, opacity] of [[1000, "#8b5cf6", .055], [500, "#22c55e", .08], [200, "#f59e0b", .13]] as const) {
-      L.circle([station.lat, station.lng], { radius, color, weight: 1.25, opacity: .75, fillColor: color, fillOpacity: opacity, interactive: false }).addTo(metroLayer);
+      const ring = L.circle([station.lat, station.lng], { radius, color, weight: 1.25, opacity: .75, fillColor: color, fillOpacity: opacity, bubblingMouseEvents: false }).addTo(metroLayer);
+      ring.on("click", onMetroRingClick);
     }
-    const marker = L.circleMarker([station.lat, station.lng], { radius: 5, color: "#fff", weight: 2, fillColor: "#2563eb", fillOpacity: 1, bubblingMouseEvents: false });
+    const marker = L.circleMarker([station.lat, station.lng], { radius: 6, color: "#fff", weight: 2, fillColor: "#2563eb", fillOpacity: 1, bubblingMouseEvents: false });
     marker.bindTooltip(`${station.label} · 200 / 500 / 1000 m`, { direction: "top" });
-    marker.on("click", (event: any) => { L.DomEvent.stopPropagation(event); map.flyTo([station.lat, station.lng], 15, { animate: true }); });
+    marker.on("click", (event: any) => handleLayerClick(event, () => { focusZone(station); emitZoneSelect("metro", station.name); }));
     marker.addTo(metroLayer);
   }
 }
@@ -555,7 +618,7 @@ function renderAmenityLayer(layerGroup: any, zones: FlatMapZone[], visible: bool
         bubblingMouseEvents: false,
       }).addTo(layerGroup);
       shape.bindTooltip(zone.label, { direction: "top" });
-      shape.on("click", (event: any) => { L.DomEvent.stopPropagation(event); focusZone(zone); });
+      shape.on("click", (event: any) => handleLayerClick(event, () => focusZone(zone)));
       continue;
     }
     const icon = L.divIcon({
@@ -565,7 +628,7 @@ function renderAmenityLayer(layerGroup: any, zones: FlatMapZone[], visible: bool
     });
     const marker = L.marker([zone.lat, zone.lng], { icon, bubblingMouseEvents: false });
     marker.bindTooltip(zone.label, { direction: "top", offset: [0, -11] });
-    marker.on("click", (event: any) => { L.DomEvent.stopPropagation(event); focusZone(zone); });
+    marker.on("click", (event: any) => handleLayerClick(event, () => focusZone(zone)));
     marker.addTo(layerGroup);
   }
 }
@@ -610,6 +673,7 @@ function renderAllZoneLayers() {
 
 function toggleDrawing() {
   drawing.value = !drawing.value;
+  if (drawing.value) closeRadial();
 }
 
 function clearArea() {
@@ -657,17 +721,12 @@ onMounted(async () => {
   shoppingMallLayer = L.layerGroup().addTo(map);
   parkLayer = L.layerGroup().addTo(map);
   map.on("click", (event: any) => {
-    if (!drawing.value) {
-      closeRadial();
-      if (selectedDistrictName.value != null) {
-        selectedDistrictName.value = null;
-        renderDistrictZones();
-      }
-      return;
+    if (addDrawPoint(event)) return;
+    closeRadial();
+    if (selectedDistrictName.value != null) {
+      selectedDistrictName.value = null;
+      renderDistrictZones();
     }
-    area.value = [...area.value, { lat: event.latlng.lat, lng: event.latlng.lng }];
-    renderArea();
-    emit("area-change", area.value.length >= 3 ? area.value : []);
   });
   map.on("zoomend", renderMarkers);
   map.on("movestart", closeRadial);
