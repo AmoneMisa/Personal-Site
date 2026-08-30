@@ -494,6 +494,10 @@ function emitZoneSelect(kind: ZoneKind, name: string) {
     selectedDistrictName.value = selectedDistrictName.value === name ? null : name;
     renderDistrictZones();
   }
+  // Metro is a proximity/focus overlay, not one of the page's canonical zone
+  // events. Keeping it local also prevents the parent area's fallback handler
+  // from interpreting a metro station as an administrative area.
+  if (kind === "metro") return;
   emit("zone-select", { kind, name });
 }
 
