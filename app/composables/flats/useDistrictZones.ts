@@ -43,11 +43,11 @@ function fitNonOverlappingRadii(zones: FlatMapZone[], min: number, max: number):
   });
 }
 
-function zoneFromEntity(entity: GeoEntity, index: number, locale: string): FlatMapZone {
+function zoneFromEntity(entity: GeoEntity, index: number, locale: string, cityName: string): FlatMapZone {
   return {
     id: entity.id,
     name: entity.canonicalName,
-    label: zoneNameLabel(entity.canonicalName, locale),
+    label: zoneNameLabel(entity.canonicalName, locale, entity.country, cityName),
     lat: entity.center.lat,
     lng: entity.center.lng,
     radiusM: entity.accuracyM || 400,
@@ -99,7 +99,7 @@ function cityHullZone(districtZones: FlatMapZone[], entity: GeoEntity | null, lo
   return {
     id: entity.id,
     name: entity.canonicalName,
-    label: zoneNameLabel(entity.canonicalName, locale),
+    label: zoneNameLabel(entity.canonicalName, locale, entity.country, entity.canonicalName),
     lat: entity.center.lat,
     lng: entity.center.lng,
     radiusM: 0,
@@ -144,34 +144,34 @@ export function useDistrictZones(options: UseDistrictZonesOptions) {
       : toValue(options.districtOptions)
           .map((name) => resolveLexiconGeoEntity({ country: country.value, city: cityName.value, type: "district", canonical: name }))
           .filter((entity): entity is GeoEntity => Boolean(entity));
-    const zones = entities.map((entity, index) => zoneFromEntity(entity, index, locale.value));
+    const zones = entities.map((entity, index) => zoneFromEntity(entity, index, locale.value, cityName.value));
     return fitNonOverlappingRadii(zones, 350, 1800);
   });
 
   const microdistrictMarkers = computed<FlatMapZone[]>(() => descendantsOf(cityEntity.value?.id ?? null, country.value, "microdistrict")
-    .map((entity, index) => zoneFromEntity(entity, index, locale.value)));
+    .map((entity, index) => zoneFromEntity(entity, index, locale.value, cityName.value)));
 
   const quartalMarkers = computed<FlatMapZone[]>(() => descendantsOf(cityEntity.value?.id ?? null, country.value, "mahalla")
-    .map((entity, index) => zoneFromEntity(entity, index, locale.value)));
+    .map((entity, index) => zoneFromEntity(entity, index, locale.value, cityName.value)));
 
   const metroStations = computed<FlatMapZone[]>(() => descendantsOf(cityEntity.value?.id ?? null, country.value, "metro")
-    .map((entity, index) => zoneFromEntity(entity, index, locale.value)));
+    .map((entity, index) => zoneFromEntity(entity, index, locale.value, cityName.value)));
 
   const universityZones = computed<FlatMapZone[]>(() => descendantsOf(cityEntity.value?.id ?? null, country.value, "poi.university")
-    .map((entity, index) => ({ ...zoneFromEntity(entity, index, locale.value), color: "#38bdf8" })));
+    .map((entity, index) => ({ ...zoneFromEntity(entity, index, locale.value, cityName.value), color: "#38bdf8" })));
 
   const shoppingMallZones = computed<FlatMapZone[]>(() => descendantsOf(cityEntity.value?.id ?? null, country.value, "poi.shopping_mall")
-    .map((entity, index) => ({ ...zoneFromEntity(entity, index, locale.value), color: "#f97316" })));
+    .map((entity, index) => ({ ...zoneFromEntity(entity, index, locale.value, cityName.value), color: "#f97316" })));
 
   const parkZones = computed<FlatMapZone[]>(() => descendantsOf(cityEntity.value?.id ?? null, country.value, "poi.park")
-    .map((entity, index) => ({ ...zoneFromEntity(entity, index, locale.value), color: "#22c55e" })));
+    .map((entity, index) => ({ ...zoneFromEntity(entity, index, locale.value, cityName.value), color: "#22c55e" })));
 
   const areaZones = computed<FlatMapZone[]>(() => {
     const entities = [
       ...descendantsOf(cityEntity.value?.id ?? null, country.value, "local_area"),
       ...descendantsOf(cityEntity.value?.id ?? null, country.value, "development_area"),
     ];
-    const zones = entities.map((entity, index) => zoneFromEntity(entity, index, locale.value));
+    const zones = entities.map((entity, index) => zoneFromEntity(entity, index, locale.value, cityName.value));
     return fitNonOverlappingRadii(zones, 150, 700);
   });
 
