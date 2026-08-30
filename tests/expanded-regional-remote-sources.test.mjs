@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import {
   EXPANDED_REGIONAL_REMOTE_COMPANIES,
+  mapExpandedGreenhousePostings,
   mapExpandedLeverPostings,
 } from '../server/utils/expandedRegionalRemoteSources.ts'
 
@@ -21,7 +22,7 @@ test('expanded catalog covers all requested regional and remote markets', () => 
     [...markets].sort(),
     ['CA', 'CN', 'CY', 'JP', 'KG', 'KR', 'KZ', 'REMOTE', 'RO', 'UA', 'US', 'UZ'],
   )
-  assert.ok(EXPANDED_REGIONAL_REMOTE_COMPANIES.length >= 44)
+  assert.ok(EXPANDED_REGIONAL_REMOTE_COMPANIES.length >= 46)
 
   for (const [handle, market] of [
     ['ppro', 'CN'],
@@ -35,6 +36,8 @@ test('expanded catalog covers all requested regional and remote markets', () => 
     ['cscgeneration-2', 'CA'],
     ['capital', 'CY'],
     ['unlimit', 'CY'],
+    ['exadelinc', 'UZ'],
+    ['exadelinc', 'RO'],
   ]) {
     assert.ok(EXPANDED_REGIONAL_REMOTE_COMPANIES.some((item) => item.handle === handle && item.market === market))
   }
@@ -99,4 +102,29 @@ test('East Asia targets match country and city aliases without cross-market leak
   assert.equal(mapExpandedLeverPostings([posting('Tokyo, Japan')], japan).length, 1)
   assert.equal(mapExpandedLeverPostings([posting('Seoul, South Korea')], korea).length, 1)
   assert.equal(mapExpandedLeverPostings([posting('Singapore')], china).length, 0)
+})
+
+test('Exadel Greenhouse posting maps as a direct Uzbekistan job with full description', () => {
+  const exadel = EXPANDED_REGIONAL_REMOTE_COMPANIES.find((item) => item.handle === 'exadelinc' && item.market === 'UZ')
+  assert.ok(exadel)
+  assert.equal(exadel.provider, 'greenhouse')
+
+  const jobs = mapExpandedGreenhousePostings([{
+    id: 6161162004,
+    title: 'Senior Backend Engineer (.NET)',
+    absolute_url: 'https://job-boards.greenhouse.io/exadelinc/jobs/6161162004',
+    updated_at: '2026-08-29T12:00:00Z',
+    location: { name: 'Bulgaria, Georgia, Poland, Romania, Uzbekistan' },
+    departments: [{ name: 'Engineering' }],
+    content: '<p>Azure Cloud, Microservices Architecture, .NET 8, ASP.NET Core services, Mongo, Azure SQL, Angular 18, Kendo.</p><p>In-office, hybrid, or remote flexibility</p>',
+  }], exadel)
+
+  assert.equal(jobs.length, 1)
+  assert.equal(jobs[0].company, 'Exadel')
+  assert.equal(jobs[0].source, 'companies')
+  assert.equal(jobs[0].employerType, 'direct')
+  assert.equal(jobs[0].location, 'Bulgaria, Georgia, Poland, Romania, Uzbekistan')
+  assert.equal(jobs[0].remote, true)
+  assert.match(jobs[0].description, /ASP\.NET Core/)
+  assert.ok(jobs[0].tags.includes('Engineering'))
 })
