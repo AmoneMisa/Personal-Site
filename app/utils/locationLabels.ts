@@ -1,20 +1,23 @@
 import {
   GENERIC_LANDMARK_TERMS,
+  dictionaryFor,
   findCanonical,
+  type CountryCode,
+  type LocationEntry,
 } from '@whiteslove/parsing-lexicon'
 import {
   geographyDisplayName,
   geographyMetroLabelWithAlias,
 } from '@whiteslove/parsing-lexicon/geography-display'
-import { dictionaryFor } from '@whiteslove/parsing-lexicon/locations'
 
 export type LocationKind = 'country' | 'city' | 'district' | 'metro' | 'any'
 
 type UiLanguage = 'ru' | 'en'
+type ZoneDictionaryKey = 'microdistricts' | 'mahallas' | 'localAreas' | 'developmentAreas'
 
 const CYRILLIC_RE = /\p{Script=Cyrillic}/u
 const NON_RUSSIAN_CYRILLIC_RE = /[ІіЇїЄєҐґЎўҚқҒғҲҳӘәӨөҰұҮүҢң]/u
-const ZONE_DICTIONARY_KEYS = ['microdistricts', 'mahallas', 'localAreas', 'developmentAreas'] as const
+const ZONE_DICTIONARY_KEYS: readonly ZoneDictionaryKey[] = ['microdistricts', 'mahallas', 'localAreas', 'developmentAreas']
 
 function uiLanguage(locale: string): UiLanguage {
   return String(locale).toLowerCase().startsWith('ru') ? 'ru' : 'en'
@@ -60,13 +63,12 @@ export function metroLabelWithAlias(value: string | null | undefined, locale: st
   return geographyMetroLabelWithAlias(value, locale)
 }
 
-function preferredDictionaryAlias(entry: any, locale: string): string | null {
-  if (!entry) return null
-  const aliases = (entry.aliases || []).map((value: unknown) => String(value).trim()).filter(Boolean)
+function preferredDictionaryAlias(entry: LocationEntry, locale: string): string | null {
+  const aliases = entry.aliases.map((value) => String(value).trim()).filter(Boolean)
   if (uiLanguage(locale) !== 'ru') return entry.canonical || entry.name || null
 
-  return aliases.find((alias: string) => CYRILLIC_RE.test(alias) && !NON_RUSSIAN_CYRILLIC_RE.test(alias))
-    || aliases.find((alias: string) => CYRILLIC_RE.test(alias))
+  return aliases.find((alias) => CYRILLIC_RE.test(alias) && !NON_RUSSIAN_CYRILLIC_RE.test(alias))
+    || aliases.find((alias) => CYRILLIC_RE.test(alias))
     || entry.canonical
     || entry.name
     || null
@@ -79,14 +81,15 @@ function dictionaryZoneLabel(
   cityName: string,
 ): string | null {
   if (!countryCode || !cityName) return null
-  const dictionary = dictionaryFor(countryCode, cityName) as Record<string, any[]> | null
+  const dictionary = dictionaryFor(countryCode as CountryCode, cityName)
   if (!dictionary) return null
 
   for (const key of ZONE_DICTIONARY_KEYS) {
-    const entry = (dictionary[key] || []).find((candidate: any) =>
-      candidate?.canonical === raw
-      || candidate?.name === raw
-      || candidate?.aliases?.includes(raw),
+    const entries = (dictionary[key] || []) as readonly LocationEntry[]
+    const entry = entries.find((candidate) =>
+      candidate.canonical === raw
+      || candidate.name === raw
+      || candidate.aliases.includes(raw),
     )
     if (!entry) continue
     return preferredDictionaryAlias(entry, locale)
