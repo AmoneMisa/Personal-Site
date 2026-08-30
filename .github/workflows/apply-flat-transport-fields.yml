@@ -1,0 +1,78 @@
+name: Apply Flat Finder transport fields
+
+on:
+  push:
+    branches: [feat/flat-transport-fields]
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/flat-transport-fields
+          fetch-depth: 0
+      - name: Patch Flat Finder transport rows
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import json
+
+          root = Path('.')
+
+          types_path = root / 'app/types/flats.ts'
+          text = types_path.read_text()
+          marker = 'export interface FlatPerPersonPrice extends FlatMoneyAmount {'
+          transport_type = '''export interface FlatTransportStop {\n  id: string;\n  name: string;\n  mode: string;\n  distanceM: number;\n  routeRefs: string[];\n  geoEntityId?: string | null;\n  osm?: { type?: string; id?: number } | null;\n  source?: string | null;\n}\n\n'''
+          if 'export interface FlatTransportStop {' not in text:
+            assert marker in text
+            text = text.replace(marker, transport_type + marker, 1)
+          old = '  metro?: string | null;\n  address?: string | null;'
+          new = '  metro?: string | null;\n  nearbyMetro?: FlatTransportStop[];\n  nearbyTransport?: FlatTransportStop[];\n  address?: string | null;'
+          if old in text:
+            text = text.replace(old, new, 1)
+          types_path.write_text(text)
+
+          page_path = root / 'app/pages/flat-finder/index.vue'
+          text = page_path.read_text()
+          helper_marker = 'const amenitiesListOr = (values?: string[] | null) => values?.length ? values.map(nearbyItemLabel).join(", ") : t("notSpecified");\n'
+          helper = '''const transportListOr = (listing: Listing, mode: string) => {\n  const stops = listing.nearbyTransport?.filter((stop) => stop.mode === mode) || [];\n  if (!stops.length) return t("notSpecified");\n  return stops.map((stop) => {\n    const routes = stop.routeRefs?.length ? ` · ${stop.routeRefs.join(", ")}` : "";\n    return `${stop.name}${routes} · ${Math.round(stop.distanceM)} m`;\n  }).join(", ");\n};\n'''
+          if 'const transportListOr =' not in text:
+            assert helper_marker in text
+            text = text.replace(helper_marker, helper_marker + helper, 1)
+
+          old = '    row("location", t("specMetro"), strOr(metroLabelWithAlias(l.metro, locale.value))),\n    row("location", t("specAddress"), strOr(l.address), true),'
+          new = '    row("location", t("specMetro"), strOr(metroLabelWithAlias(l.metro, locale.value))),\n    row("location", t("specTram"), transportListOr(l, "tram"), true),\n    row("location", t("specBus"), transportListOr(l, "bus"), true),\n    row("location", t("specTrolleybus"), transportListOr(l, "trolleybus"), true),\n    row("location", t("specAddress"), strOr(l.address), true),'
+          assert old in text, 'location spec row marker not found'
+          text = text.replace(old, new, 1)
+          page_path.write_text(text)
+
+          spec_path = root / 'app/components/ui/SpecTable.vue'
+          text = spec_path.read_text()
+          old = '  [t("flats.specMetro"), "i-lucide-train-front"],\n  [t("flats.specAddress"), "i-lucide-map-pin"],'
+          new = '  [t("flats.specMetro"), "i-lucide-train-front"],\n  [t("flats.specTram"), "i-lucide-tram-front"],\n  [t("flats.specBus"), "i-lucide-bus-front"],\n  [t("flats.specTrolleybus"), "i-lucide-bus"],\n  [t("flats.specAddress"), "i-lucide-map-pin"],'
+          assert old in text, 'spec icon marker not found'
+          text = text.replace(old, new, 1)
+          spec_path.write_text(text)
+
+          for locale_name, values in [
+            ('en', {'specTram': 'Tram', 'specBus': 'Bus', 'specTrolleybus': 'Trolleybus'}),
+            ('ru', {'specTram': 'Трамвай', 'specBus': 'Автобус', 'specTrolleybus': 'Троллейбус'}),
+          ]:
+            path = root / f'i18n/locales/{locale_name}.json'
+            data = json.loads(path.read_text())
+            flats = data.setdefault('flats', {})
+            flats.update(values)
+            path.write_text(json.dumps(data, ensure_ascii=False, indent=2) + '\n')
+          PY
+      - name: Remove one-time workflow and commit
+        run: |
+          rm .github/workflows/apply-flat-transport-fields.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "feat(flats): show tram bus and trolleybus proximity"
+          git push origin HEAD:feat/flat-transport-fields
