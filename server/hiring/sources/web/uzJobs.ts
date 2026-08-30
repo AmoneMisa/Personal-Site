@@ -50,6 +50,11 @@ function parseUzJobsBlock(block: CandidateBlock, source: WebCvAdapter): CvProfil
     role: block.title,
     city: cityFrom(block.text, 'UZ'),
     updatedAt: activity,
+    // Public directory rows are anonymized and never expose a direct contact.
+    // Numeric ids and activity timestamps must not be inferred as phone data.
+    contactType: 'platform',
+    contact: block.href,
+    contacts: {},
   })
 }
 

@@ -1,10 +1,7 @@
+import { HIRING_FACEBOOK_GROUPS } from './facebookGroups'
+
 const SOCIAL_SOURCE_KEYS = [
-  'facebook-uz-tashkent-candidates',
-  'facebook-uz-tashkent-work',
-  'facebook-uz-work',
-  'facebook-uz-work-search',
-  'facebook-ua-freelancers',
-  'facebook-ro-bucharest-anglojobs',
+  ...HIRING_FACEBOOK_GROUPS.map((group) => group.key),
   'threads-uz-ru',
   'threads-uz-ru-alt',
   'threads-uz-ru-parttime',

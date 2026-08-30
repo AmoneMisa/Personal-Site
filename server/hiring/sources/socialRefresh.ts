@@ -5,6 +5,7 @@ import type { CvProfile } from '../../utils/hiringTypes'
 import { extractCandidateContacts } from '@whiteslove/parsing-lexicon/hiring-candidate-fields'
 import { detectCandidateRemotePreference } from '@whiteslove/parsing-lexicon/hiring-semantics'
 import { persistWebProfiles } from '../webProfilePersistence'
+import { HIRING_FACEBOOK_GROUPS } from '../../../shared/hiring/sources/facebookGroups'
 
 const REQUEST_TIMEOUT_MS = 180_000
 const DEFAULT_LIMIT = 80
@@ -41,12 +42,7 @@ type SocialResponse = {
 }
 
 const TARGETS: SocialTarget[] = [
-  { key: 'facebook-uz-tashkent-candidates', label: 'Ищу работу в Ташкенте', platform: 'facebook', country: 'UZ', city: 'Tashkent', target: 'https://www.facebook.com/groups/165844980247044/', limit: 120 },
-  { key: 'facebook-uz-tashkent-work', label: 'Работа в Ташкенте', platform: 'facebook', country: 'UZ', city: 'Tashkent', target: 'https://www.facebook.com/groups/210512423334861/', limit: 120 },
-  { key: 'facebook-uz-work', label: 'Есть работа! Узбекистан', platform: 'facebook', country: 'UZ', target: 'https://www.facebook.com/groups/182315195189726/', limit: 120 },
-  { key: 'facebook-uz-work-search', label: 'РАБОТА-УЗБЕКИСТАН', platform: 'facebook', country: 'UZ', target: 'https://www.facebook.com/groups/1734634446766716/', limit: 120 },
-  { key: 'facebook-ua-freelancers', label: 'Freelancers Ukraine', platform: 'facebook', country: 'UA', target: 'https://www.facebook.com/groups/freelancers.ukraine/', limit: 100 },
-  { key: 'facebook-ro-bucharest-anglojobs', label: 'Bucharest English speaking jobs', platform: 'facebook', country: 'RO', city: 'Bucharest', target: 'https://www.facebook.com/groups/bucharestanglojobs/', limit: 100 },
+  ...HIRING_FACEBOOK_GROUPS.map((group) => ({ ...group, platform: 'facebook' as const, limit: group.country === 'UZ' ? 120 : 100 })),
   { key: 'threads-uz-ru', label: 'Threads: ищу работу Ташкент', platform: 'threads', country: 'UZ', city: 'Tashkent', query: 'ищу работу Ташкент', limit: 40 },
   { key: 'threads-uz-ru-alt', label: 'Threads: работу ищу Ташкент', platform: 'threads', country: 'UZ', city: 'Tashkent', query: 'работу ищу Ташкент', limit: 40 },
   { key: 'threads-uz-ru-parttime', label: 'Threads: ищу подработку Ташкент', platform: 'threads', country: 'UZ', city: 'Tashkent', query: 'ищу подработку Ташкент', limit: 40 },

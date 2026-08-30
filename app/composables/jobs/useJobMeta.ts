@@ -4,6 +4,7 @@ export const JOB_SOURCE_OPTIONS = [
   { value: "jooble", label: "Jooble" },
   { value: "themuse", label: "The Muse" },
   { value: "jobicy", label: "Jobicy" },
+  { value: "hh", label: "HH.uz" },
   { value: "remotive", label: "Remotive" },
   { value: "remoteok", label: "RemoteOK" },
   { value: "arbeitnow", label: "Arbeitnow" },

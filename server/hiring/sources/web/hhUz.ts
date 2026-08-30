@@ -9,11 +9,15 @@ function parseHhUz(block: CandidateBlock, source: WebCvAdapter): CvProfile | nul
   const activity = activityDate(block.text)
   if (!isRecent(activity)) return null
 
-  return buildWebProfile(source, block, activity!, {
+  const profile = buildWebProfile(source, block, activity!, {
     role: block.title,
     city: 'Tashkent',
     updatedAt: activity,
   })
+
+  // hh.uz supplies a user-facing resume title. Keep it verbatim for the card;
+  // normalizeCandidate still records the canonical profession separately.
+  return { ...profile, role: block.title }
 }
 
 export const HH_UZ_SOURCE: WebCvAdapter = {

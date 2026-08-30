@@ -326,7 +326,7 @@ function detectApplicationLanguage(text: string): string | undefined {
 
 const BOARD_SOURCES = new Set<Job['source']>([
   'remotive', 'remoteok', 'arbeitnow', 'themuse', 'jobicy', 'adzuna', 'jooble',
-  'rss', 'devkg', 'ishgo', 'itjobsuz', 'olx',
+  'rss', 'devkg', 'ishgo', 'itjobsuz', 'olx', 'hh',
 ])
 
 function detectEmployerType(job: Job, text: string): EmployerType {

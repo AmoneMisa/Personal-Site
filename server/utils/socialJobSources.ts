@@ -3,6 +3,7 @@ import {
   detectVisaSponsorshipWording,
 } from '@whiteslove/parsing-lexicon/hiring-source-semantics'
 import type { Job, JobSource } from './jobTypes'
+import { HIRING_FACEBOOK_GROUPS } from '../../shared/hiring/sources/facebookGroups'
 import {
   REMOTE_JOB_QUERIES,
   USA_RELOCATION_QUERIES,
@@ -60,15 +61,20 @@ const THREADS_PRIORITY_QUERIES_PER_CYCLE = Math.max(
   2,
   Math.min(8, Number(process.env.THREADS_JOB_PRIORITY_QUERIES_PER_CYCLE) || 4),
 )
+const FACEBOOK_CONCURRENCY = Math.max(
+  1,
+  Math.min(8, Number(process.env.FACEBOOK_JOB_CONCURRENCY) || 4),
+)
 const MAX_AGE_MS = 14 * 24 * 60 * 60 * 1000
 
 // Discovery targets are source policy, not language semantics.
 const FACEBOOK_TARGETS: Target[] = [
-  { key: 'fb-uz-tashkent-work', platform: 'facebook', country: 'UZ', city: 'Tashkent', target: 'https://www.facebook.com/groups/210512423334861/', limit: 80 },
-  { key: 'fb-uz-work', platform: 'facebook', country: 'UZ', target: 'https://www.facebook.com/groups/182315195189726/', limit: 80 },
-  { key: 'fb-uz-work-search', platform: 'facebook', country: 'UZ', target: 'https://www.facebook.com/groups/1734634446766716/', limit: 80 },
-  { key: 'fb-ua-freelancers', platform: 'facebook', country: 'UA', target: 'https://www.facebook.com/groups/freelancers.ukraine/', limit: 60 },
-  { key: 'fb-ro-bucharest-jobs', platform: 'facebook', country: 'RO', city: 'Bucharest', target: 'https://www.facebook.com/groups/bucharestanglojobs/', limit: 60 },
+  ...HIRING_FACEBOOK_GROUPS.map((group) => ({
+    ...group,
+    key: group.key.replace(/^facebook-/, 'fb-'),
+    platform: 'facebook' as const,
+    limit: group.country === 'UZ' ? 80 : 60,
+  })),
 ]
 
 function priorityThreadsTargets(): Target[] {
@@ -240,14 +246,17 @@ async function fetchPlatform(targets: Target[], platform: Platform): Promise<Job
     return [...byUrl.values()]
   }
 
-  const settled = await Promise.allSettled(targets.map((target) => fetchTarget(target)))
-  settled.forEach((result, index) => {
-    if (result.status === 'fulfilled') {
-      for (const job of result.value) byUrl.set(job.url, job)
-      return
-    }
-    console.warn(`[jobs:${platform}] ${targets[index]?.key || 'target'} failed:`, result.reason instanceof Error ? result.reason.message : String(result.reason))
-  })
+  for (let offset = 0; offset < targets.length; offset += FACEBOOK_CONCURRENCY) {
+    const batch = targets.slice(offset, offset + FACEBOOK_CONCURRENCY)
+    const settled = await Promise.allSettled(batch.map((target) => fetchTarget(target)))
+    settled.forEach((result, index) => {
+      if (result.status === 'fulfilled') {
+        for (const job of result.value) byUrl.set(job.url, job)
+        return
+      }
+      console.warn(`[jobs:${platform}] ${batch[index]?.key || 'target'} failed:`, result.reason instanceof Error ? result.reason.message : String(result.reason))
+    })
+  }
   return [...byUrl.values()]
 }
 

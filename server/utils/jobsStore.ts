@@ -16,6 +16,7 @@ import { refreshRates } from './currency'
 import { getSkillMeta } from '~~/shared/jobSkills'
 import { toUsd } from './currency'
 import { enrichJob, PER_YEAR } from './enrich'
+import { fetchHhJobs } from './hhJobSource'
 import {
   aiFingerprint,
   aiWorkerEnabled,
@@ -53,6 +54,7 @@ const FETCHERS: Record<JobSource, (q: string) => Promise<Job[]>> = {
   arbeitnow: fetchArbeitnow,
   themuse: fetchTheMuse,
   jobicy: fetchJobicy,
+  hh: fetchHhJobs,
   adzuna: fetchAdzuna,
   jooble: fetchJooble,
   rss: fetchRss,
@@ -67,6 +69,8 @@ const FETCHERS: Record<JobSource, (q: string) => Promise<Job[]>> = {
 // Only pull optional sources when their credentials/opt-in are present.
 function isConfigured(source: JobSource): boolean {
   switch (source) {
+    case 'hh':
+      return process.env.HH_JOB_SOURCE !== 'off'
     case 'adzuna':
       return !!(process.env.ADZUNA_APP_ID && process.env.ADZUNA_APP_KEY)
     case 'jooble':

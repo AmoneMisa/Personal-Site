@@ -125,6 +125,7 @@ export type JobSource =
   | 'arbeitnow'
   | 'themuse'
   | 'jobicy'
+  | 'hh'
   | 'adzuna'
   | 'jooble'
   | 'rss'
@@ -144,6 +145,7 @@ export const FREE_SOURCES: JobSource[] = [
   'arbeitnow',
   'themuse',
   'jobicy',
+  'hh',
   'devkg',
   'telegram',
   'linkedin',

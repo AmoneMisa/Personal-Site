@@ -16,6 +16,7 @@ import { fetchSourceExpansionJobs } from './sourceExpansionJobs'
 import { fetchAviationExpansionJobs } from './aviationExpansionJobs'
 import { fetchIntelliasJobs } from './intelliasJobs'
 import { fetchJobsUaJobs } from './jobsUaSource'
+import { fetchHhJobs } from './hhJobSource'
 import { fetchUkraineBoardJobs } from './ukraineJobSources'
 import {
   fetchAdzuna,
@@ -169,6 +170,7 @@ const FETCHERS: Record<JobSource, (q: string) => Promise<Job[]>> = {
   arbeitnow: fetchArbeitnow,
   themuse: fetchTheMuse,
   jobicy: fetchJobicy,
+  hh: fetchHhJobs,
   adzuna: fetchAdzuna,
   jooble: fetchJooble,
   rss: fetchRss,
@@ -191,6 +193,8 @@ export function configuredJobSources(): JobSource[] {
 
 function isConfigured(source: JobSource): boolean {
   switch (source) {
+    case 'hh':
+      return process.env.HH_JOB_SOURCE !== 'off'
     case 'adzuna':
       return !!(process.env.ADZUNA_APP_ID && process.env.ADZUNA_APP_KEY)
     case 'jooble':

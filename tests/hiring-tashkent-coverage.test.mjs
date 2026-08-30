@@ -68,6 +68,7 @@ test('hh.uz Tashkent resume cards map recent active candidates and reject not-lo
   assert.equal(active.country, 'UZ')
   assert.equal(active.city, 'Tashkent')
   assert.equal(active.role, 'Менеджер по продажам')
+  assert.deepEqual(active.professions, ['Sales Manager'])
 
   const inactive = HH_UZ_SOURCE.parse({
     href: 'https://tashkent.hh.uz/resume/5b5837ce00018fd7290039ed1f57486e41646e',
@@ -96,6 +97,7 @@ test('UzJobs locked resume table rows still become anonymized hiring candidates'
   assert.equal(profiles[0].role, 'Administrator')
   assert.match(profiles[0].url, /resume_view-100046-/)
   assert.equal(profiles[0].contactType, 'platform')
+  assert.equal(profiles[0].contact, profiles[0].url)
 })
 
 test('web candidate cursor identities support hh hashes and UzJobs ids', () => {
