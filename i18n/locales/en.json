@@ -319,7 +319,10 @@
     "nearbyKind_historic": "Landmark / museum",
     "nearbyKind_cinema": "Cinema",
     "nearbyKind_landmark": "Major destination",
-    "sourceFilter": "Source"
+    "sourceFilter": "Source",
+    "specTram": "Tram",
+    "specBus": "Bus",
+    "specTrolleybus": "Trolleybus"
   },
   "common": {
     "add": "Add",

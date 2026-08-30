@@ -27,6 +27,17 @@ export interface FlatMoneyAmount {
   approximate?: boolean;
 }
 
+export interface FlatTransportStop {
+  id: string;
+  name: string;
+  mode: string;
+  distanceM: number;
+  routeRefs: string[];
+  geoEntityId?: string | null;
+  osm?: { type?: string; id?: number } | null;
+  source?: string | null;
+}
+
 export interface FlatPerPersonPrice extends FlatMoneyAmount {
   scope: "person";
 }
@@ -48,6 +59,8 @@ export interface FlatListing {
   region?: string | null;
   microdistrict?: string | null;
   metro?: string | null;
+  nearbyMetro?: FlatTransportStop[];
+  nearbyTransport?: FlatTransportStop[];
   address?: string | null;
   roomOnly?: boolean;
   lat: number | null;

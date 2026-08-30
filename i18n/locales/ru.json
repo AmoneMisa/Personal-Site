@@ -319,7 +319,10 @@
     "nearbyKind_historic": "Достопримечательность",
     "nearbyKind_cinema": "Кинотеатр",
     "nearbyKind_landmark": "Крупный объект",
-    "sourceFilter": "Источник"
+    "sourceFilter": "Источник",
+    "specTram": "Трамвай",
+    "specBus": "Автобус",
+    "specTrolleybus": "Троллейбус"
   },
   "common": {
     "add": "Добавить",
