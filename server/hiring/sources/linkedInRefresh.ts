@@ -6,6 +6,11 @@ import { normalizeCandidate } from '../../utils/hiringNormalize'
 import type { CvProfile } from '../../utils/hiringTypes'
 import { detectCity } from '../domain/telegramCandidateParser'
 import { persistWebProfiles } from '../webProfilePersistence'
+import {
+  linkedinVoyagerConfigured,
+  searchLinkedInPeopleReadOnly,
+  type LinkedInVoyagerCandidate,
+} from './linkedinVoyager'
 
 const REQUEST_TIMEOUT_MS = 180_000
 const DEFAULT_LIMIT = 24
@@ -37,6 +42,14 @@ type LinkedInResponse = {
   count?: number
   items?: LinkedInItem[]
   error?: string
+}
+
+const COUNTRY_NAMES: Record<LinkedInCountry, string> = {
+  UZ: 'Uzbekistan',
+  KZ: 'Kazakhstan',
+  KG: 'Kyrgyzstan',
+  UA: 'Ukraine',
+  RO: 'Romania',
 }
 
 const TARGETS: LinkedInTarget[] = [
@@ -113,7 +126,85 @@ function itemToProfile(item: LinkedInItem, target: LinkedInTarget, checkedAt: st
   })
 }
 
-async function fetchTarget(target: LinkedInTarget): Promise<{ profiles: CvProfile[]; fetched: number }> {
+function voyagerText(candidate: LinkedInVoyagerCandidate): string {
+  const experience = candidate.experiences
+    .map((item) => [item.title, item.company, item.duration, item.location].filter(Boolean).join(' · '))
+    .filter(Boolean)
+  return [
+    candidate.name,
+    candidate.openToWork ? 'Open to Work' : '',
+    candidate.headline,
+    candidate.location ? `Location: ${candidate.location}` : '',
+    candidate.company ? `Company: ${candidate.company}` : '',
+    candidate.skills.length ? `Skills: ${candidate.skills.join(', ')}` : '',
+    experience.length ? `Experience:\n${experience.join('\n')}` : '',
+  ].filter(Boolean).join('\n')
+}
+
+export function voyagerCandidateToProfile(
+  candidate: LinkedInVoyagerCandidate,
+  target: LinkedInTarget,
+  checkedAt: string,
+): CvProfile | null {
+  if (!candidate.id || !candidate.profileUrl || !candidate.name) return null
+  const text = voyagerText(candidate)
+  const currentRole = candidate.experiences[0]?.title || candidate.headline
+  const previousRoles = candidate.experiences.slice(1).map((item) => item.title).filter((value): value is string => Boolean(value))
+  return normalizeCandidate({
+    id: `linkedin-${target.key}-${candidate.id}`,
+    source: 'social',
+    origin: 'linkedin',
+    sourceKey: target.key,
+    sourceLabel: target.label,
+    sourceCountry: target.country,
+    country: target.country,
+    name: candidate.name.slice(0, 100),
+    role: currentRole,
+    professions: currentRole ? [currentRole] : [],
+    previousProfessions: previousRoles,
+    city: detectCity(candidate.location || text, target.country) || target.city || null,
+    isAdult: true,
+    remote: detectCandidateRemotePreference(text),
+    url: candidate.profileUrl,
+    publishedAt: null,
+    updatedAt: checkedAt,
+    activityAt: checkedAt,
+    createdAt: checkedAt,
+    originalText: text.slice(0, 8_000),
+    description: text.slice(0, 8_000),
+    skills: candidate.skills,
+    education: candidate.school || null,
+    photos: candidate.photo ? [candidate.photo] : [],
+    photo: candidate.photo || null,
+    contacts: {},
+    contact: candidate.profileUrl,
+    contactType: 'platform',
+    tags: [
+      target.label,
+      'LinkedIn',
+      target.country,
+      'Voyager read-only',
+      ...(candidate.openToWork ? ['Open to Work'] : []),
+    ],
+  })
+}
+
+async function fetchTargetViaVoyager(target: LinkedInTarget): Promise<{ profiles: CvProfile[]; fetched: number }> {
+  const checkedAt = new Date().toISOString()
+  const candidates = await searchLinkedInPeopleReadOnly({
+    keywords: target.query,
+    location: target.city || COUNTRY_NAMES[target.country],
+    limit: target.limit || DEFAULT_LIMIT,
+  })
+  return {
+    fetched: candidates.length,
+    profiles: candidates
+      .map((candidate) => voyagerCandidateToProfile(candidate, target, checkedAt))
+      .filter((profile): profile is CvProfile => Boolean(profile)),
+  }
+}
+
+async function fetchTargetViaWorker(target: LinkedInTarget): Promise<{ profiles: CvProfile[]; fetched: number }> {
   const endpoint = String(process.env.HIRING_SOCIAL_API_URL || '').replace(/\/$/, '')
   const internalKey = String(process.env.QUEUE_INTERNAL_KEY || '')
   if (!endpoint) throw new Error('HIRING_SOCIAL_API_URL is not configured')
@@ -134,6 +225,23 @@ async function fetchTarget(target: LinkedInTarget): Promise<{ profiles: CvProfil
     fetched: Number.isFinite(body.count) ? Number(body.count) : items.length,
     profiles: items.map((item) => itemToProfile(item, target, checkedAt)).filter((item): item is CvProfile => Boolean(item)),
   }
+}
+
+async function fetchTarget(target: LinkedInTarget): Promise<{ profiles: CvProfile[]; fetched: number }> {
+  if (linkedinVoyagerConfigured()) {
+    try {
+      const direct = await fetchTargetViaVoyager(target)
+      if (direct.fetched || !process.env.HIRING_SOCIAL_API_URL) return direct
+      console.warn(`[hiring:linkedin] ${target.key} Voyager returned no people; falling back to social worker`)
+    } catch (error) {
+      if (!process.env.HIRING_SOCIAL_API_URL) throw error
+      console.warn(
+        `[hiring:linkedin] ${target.key} Voyager failed; falling back to social worker:`,
+        error instanceof Error ? error.message : String(error),
+      )
+    }
+  }
+  return await fetchTargetViaWorker(target)
 }
 
 export async function refreshHiringLinkedInSource(handle: string): Promise<{ fetched: number; candidates: number; stored: number } | null> {
