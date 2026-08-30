@@ -8,9 +8,9 @@ const source = await readFile(
 );
 
 test('metro proximity rings consume clicks instead of falling through to districts', () => {
-  assert.ok(source.includes('ring.on("click", onMetroRingClick);'));
+  assert.ok(source.includes('ring.on("click", (event: any) => handleLayerClick(event'));
   assert.ok(source.includes('bubblingMouseEvents: false'));
-  assert.ok(source.includes('if (kind === "metro") return;'));
+  assert.ok(source.includes('emitZoneSelect("metro", nearest.name, radius);'));
 });
 
 test('draw mode consumes clicks on interactive map overlays before their normal action', () => {
