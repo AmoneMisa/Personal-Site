@@ -586,6 +586,14 @@ const strOr = (v?: string | null) => (v ? v : t("notSpecified"));
 const listOr = (v?: string[] | null) => (v && v.length ? v.join(", ") : t("notSpecified"));
 const nearbyListOr = (values?: string[] | null) => values?.length ? values.map(nearbyItemLabel).join(", ") : t("notSpecified");
 const amenitiesListOr = (values?: string[] | null) => values?.length ? values.map(nearbyItemLabel).join(", ") : t("notSpecified");
+const transportListOr = (listing: Listing, mode: string) => {
+  const stops = listing.nearbyTransport?.filter((stop) => stop.mode === mode) || [];
+  if (!stops.length) return t("notSpecified");
+  return stops.map((stop) => {
+    const routes = stop.routeRefs?.length ? ` · ${stop.routeRefs.join(", ")}` : "";
+    return `${stop.name}${routes} · ${Math.round(stop.distanceM)} m`;
+  }).join(", ");
+};
 const audienceLabel = (a?: Listing["audience"]) => a === "women" ? t("audWomen") : a === "men" ? t("audMen") : a === "family" ? t("audFamily") : t("audAny");
 const conditionLabel = (c?: Listing["condition"]) => c === "needs_renovation" ? t("condNeeds") : c === "basic" ? t("condBasic") : c === "good" ? t("condGood") : c === "modern" ? t("condModern") : c === "luxury" ? t("condLuxury") : t("notSpecified");
 const sourceLabel = (s?: string) => (s === "olx" ? "OLX" : s === "telegram" ? "Telegram" : strOr(s));
@@ -641,6 +649,9 @@ const specRows = computed<FlatSpecRow[]>(() => {
     row("location", t("specDistrict"), strOr(locName(l.district, "district"))),
     row("location", t("specKvartal"), strOr(zoneNameLabel(l.area || l.kvartal, locale.value))),
     row("location", t("specMetro"), strOr(metroLabelWithAlias(l.metro, locale.value))),
+    row("location", t("specTram"), transportListOr(l, "tram"), true),
+    row("location", t("specBus"), transportListOr(l, "bus"), true),
+    row("location", t("specTrolleybus"), transportListOr(l, "trolleybus"), true),
     row("location", t("specAddress"), strOr(l.address), true),
     row("location", t("specShops"), listOr(l.nearbyShops), true),
     row("location", t("specNearby"), nearbyListOr(l.nearby), true),
