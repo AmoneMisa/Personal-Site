@@ -172,6 +172,11 @@ export function resolveCountry(text: string): string | undefined {
 function detectCountry(job: Job): string {
   const loc = (job.location || '').trim()
   if (isHiringRemoteLocationScope(loc) || detectWorkModes(loc).includes('remote')) return 'REMOTE'
+  // Sources that already know their own country (e.g. HH.uz, which is
+  // Uzbekistan-only) tag it explicitly; trust that over re-guessing from
+  // free-text location, which can fail for scripts/formats the shared
+  // geography lexicon doesn't recognize (e.g. Cyrillic city names).
+  if (job.country && /^[A-Z]{2}$/.test(job.country)) return job.country
   // Prefer the location field; but many boards (notably DOU.ua) leave it as a
   // placeholder like "See listing" and only name the city/country in the title,
   // so fall back to the title + tags before giving up.

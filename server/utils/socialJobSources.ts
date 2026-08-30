@@ -199,6 +199,7 @@ function toJob(item: SocialItem, target: Target): Job | null {
     tags,
     postedAt,
     description: text.slice(0, 6_000),
+    country: /^[A-Z]{2}$/.test(target.country) ? target.country : undefined,
   }
 }
 

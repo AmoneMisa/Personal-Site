@@ -70,6 +70,7 @@ function installJobBrowserFallback() {
     'robota.ua',
     'djinni.co',
     'jobs.dou.ua',
+    'api.hh.ru',
     'taskfavour.com',
     'remote.co',
     'simplyhired.com',
