@@ -2,6 +2,7 @@ import {
   GENERIC_LANDMARK_TERMS,
   dictionaryFor,
   findCanonical,
+  normalizedAliasKeys,
   type CountryCode,
   type LocationEntry,
 } from '@whiteslove/parsing-lexicon'
@@ -69,18 +70,33 @@ function compactZoneBase(label: string): string {
   return label.replace(COMPACT_ZONE_SUFFIX_RE, '').trim() || label
 }
 
-function preferredDictionaryAlias(entry: LocationEntry, locale: string, compactBase = false): string | null {
+function aliasesShareIdentity(source: string, candidate: string): boolean {
+  if (!source || !candidate) return false
+  const sourceKeys = new Set(normalizedAliasKeys(source, { transliteration: true }))
+  return normalizedAliasKeys(candidate, { transliteration: true }).some((key) => sourceKeys.has(key))
+}
+
+function preferredDictionaryAlias(
+  entry: LocationEntry,
+  locale: string,
+  compactBase = false,
+  sourceAlias = '',
+): string | null {
   const aliases = entry.aliases.map((value) => String(value).trim()).filter(Boolean)
   if (uiLanguage(locale) !== 'ru') return entry.canonical || entry.name || null
 
   const cyrillic = aliases.filter((alias) => CYRILLIC_RE.test(alias))
   const russianScript = cyrillic.filter((alias) => !NON_RUSSIAN_CYRILLIC_RE.test(alias))
   const pool = russianScript.length ? russianScript : cyrillic
-  const preferred = [...pool].sort((a, b) => {
-    const aPenalty = UZBEK_CYRILLIC_SUFFIX_RE.test(a) ? 1 : 0
-    const bPenalty = UZBEK_CYRILLIC_SUFFIX_RE.test(b) ? 1 : 0
-    return aPenalty - bPenalty
-  })[0]
+  const affinity = sourceAlias
+    ? pool.find((alias) => aliasesShareIdentity(sourceAlias, alias))
+    : null
+  const preferred = affinity
+    || [...pool].sort((a, b) => {
+      const aPenalty = UZBEK_CYRILLIC_SUFFIX_RE.test(a) ? 1 : 0
+      const bPenalty = UZBEK_CYRILLIC_SUFFIX_RE.test(b) ? 1 : 0
+      return aPenalty - bPenalty
+    })[0]
     || entry.canonical
     || entry.name
     || null
@@ -104,13 +120,11 @@ function dictionaryZoneLabel(
 
   for (const key of ZONE_DICTIONARY_KEYS) {
     const entries = (dictionary[key] || []) as readonly LocationEntry[]
-    const entry = entries.find((candidate) =>
-      candidate.canonical === raw
-      || candidate.name === raw
-      || candidate.aliases.includes(raw),
-    )
-    if (!entry) continue
-    return preferredDictionaryAlias(entry, locale)
+    const canonicalEntry = entries.find((candidate) => candidate.canonical === raw || candidate.name === raw)
+    if (canonicalEntry) return preferredDictionaryAlias(canonicalEntry, locale)
+
+    const aliasEntry = entries.find((candidate) => candidate.aliases.includes(raw))
+    if (aliasEntry) return preferredDictionaryAlias(aliasEntry, locale, false, raw)
   }
   return null
 }
@@ -145,7 +159,7 @@ function dictionaryCompositeBaseLabel(
     for (const probe of probes) {
       const entry = findCanonical(probe, entries, { transliteration: true }) as LocationEntry | null
       if (!entry) continue
-      return preferredDictionaryAlias(entry, locale, true)
+      return preferredDictionaryAlias(entry, locale, true, probe)
     }
   }
   return null
