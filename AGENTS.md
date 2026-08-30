@@ -2697,7 +2697,51 @@ When deciding where code belongs, use these questions.
 
 ---
 
-# 77. Final architecture principle
+# 77. Card/popup/select labels must come from parsing-lexicon
+
+Any geo, work-mode, or hiring value shown to a user in a card, popup, or
+select — country, city, employment type, work mode, seniority, schedule,
+relocation, etc. — must be rendered from a field that was classified through
+`parsing-lexicon` (directly, or via `server/utils/hiringLexicon.ts` /
+`server/utils/enrich.ts` adapters), then localized through the app's own
+i18n keys.
+
+Never render a raw upstream provider value directly as a tag/pill/label just
+because it happened to arrive as a string. This includes:
+
+```text
+raw schema.org enums (e.g. "FULL_TIME", "TELECOMMUTE")
+raw API status/type codes
+unmapped source-specific abbreviations
+```
+
+Concrete example of the violation this rule exists to prevent: an ishGO.uz/
+IT-Jobs.uz card showed a bare `FULL_TIME` pill because
+`normalizeSchemaPosting` (`server/utils/sources.ts`) pushed the raw
+schema.org `employmentType` value straight into `job.tags`, and
+`JobCard.vue`'s `tagPills` renders `job.tags` verbatim with no translation.
+The correctly localized value already existed on `job.employmentKind` (set
+by `detectEmploymentKind` in `enrich.ts`, which does route through the
+lexicon) and is shown via `empLabel()` — the raw copy in `tags` was
+redundant and untranslated.
+
+If a value needs to reach the UI as a label:
+
+```text
+classify it (parsing-lexicon / enrich.ts / hiringLexicon.ts)
+    → store it on a typed field (e.g. employmentKind, workMode, country)
+
+render it
+    → app/ i18n key keyed off that typed field
+```
+
+Do not add provider strings to freeform `tags`/`officeLocations`-style
+arrays when a typed, lexicon-classified field for that concept already
+exists or should exist.
+
+---
+
+# 78. Final architecture principle
 
 Do not turn Personal Site into an integration dumping ground.
 

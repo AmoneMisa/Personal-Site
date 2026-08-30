@@ -1341,7 +1341,7 @@ function normalizeSchemaPosting(
     source: config.source,
     remote: posting.jobLocationType === 'TELECOMMUTE'
       || /remote|удал[её]н|дистанцион|masofaviy/i.test(`${description} ${employment.join(' ')}`),
-    tags: [config.label, ...employment].slice(0, 6),
+    tags: [config.label],
     postedAt: date.toISOString(),
     employmentType: employment[0],
     ...schemaSalary(posting),
