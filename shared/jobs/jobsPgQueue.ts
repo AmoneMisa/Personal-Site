@@ -305,6 +305,30 @@ export async function claimJobsQueueTask({
   }
 }
 
+export async function extendJobsQueueTaskLease({
+  id,
+  lockToken,
+  leaseMs = DEFAULT_LEASE_MS,
+}: {
+  id: string
+  lockToken: string
+  leaseMs?: number
+}) {
+  await initJobsPgQueue()
+  const name = schema()
+  const updated = await db().query(
+    `UPDATE ${name}.tasks
+     SET locked_until = NOW() + ($3::bigint * INTERVAL '1 millisecond'),
+         updated_at = NOW()
+     WHERE id = $1
+       AND status = 'running'
+       AND lock_token = $2::uuid
+     RETURNING locked_until`,
+    [id, lockToken, Math.max(60_000, leaseMs)],
+  )
+  return updated.rows[0]?.locked_until || null
+}
+
 export async function completeJobsQueueTask({
   id,
   lockToken,
