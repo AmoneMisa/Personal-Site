@@ -1,5 +1,9 @@
 import asyncio
+import os
+import shutil
+import tempfile
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -8,6 +12,9 @@ from fastapi.responses import JSONResponse
 from .routers import pdf, convert, dockerhub, countryIndices
 from .routers.pdf import pdf_storage_cleanup_loop
 from .utils.pdf_doc_id import normalize_pdf_doc_id, pdf_doc_id_from_path
+
+
+BACKEND_STATE_DIR = Path(os.getenv("BACKEND_STATE_DIR", "/var/app/state/backend"))
 
 
 @asynccontextmanager
@@ -52,6 +59,34 @@ async def enforce_pdf_document_boundary(request: Request, call_next):
         await pdf.ensure_doc_exists(canonical_id)
 
     return await call_next(request)
+
+
+@app.get("/live", include_in_schema=False)
+async def live():
+    """Process liveness: the ASGI event loop can still serve requests."""
+    return {"ok": True}
+
+
+@app.get("/ready", include_in_schema=False)
+async def ready():
+    """Readiness for the tool backend's local runtime dependencies."""
+    failures: list[str] = []
+
+    try:
+        BACKEND_STATE_DIR.mkdir(parents=True, exist_ok=True)
+        with tempfile.NamedTemporaryFile(dir=BACKEND_STATE_DIR, prefix=".ready-", delete=True):
+            pass
+    except OSError:
+        failures.append("state_dir")
+
+    if shutil.which("soffice") is None:
+        failures.append("libreoffice")
+    if shutil.which("gs") is None:
+        failures.append("ghostscript")
+
+    if failures:
+        return JSONResponse(status_code=503, content={"ok": False, "failures": failures})
+    return {"ok": True}
 
 
 app.add_middleware(
