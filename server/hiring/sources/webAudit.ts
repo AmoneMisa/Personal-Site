@@ -1,6 +1,6 @@
 import type { CvProfile } from '../../../shared/contracts/hiring'
 import { activityDate, cutoffDate, isRecent } from '../../../shared/hiring/webFields'
-import { blockAnchors, mergeSameCandidate } from './web/common'
+import { candidateBlocks, mergeSameCandidate } from './web/common'
 import { getWebAdapter } from './web/registry'
 
 const UA =
@@ -90,7 +90,7 @@ export async function auditWebSource(key: string, maxPages = 2): Promise<WebSour
       break
     }
 
-    const blocks = blockAnchors(html, source)
+    const blocks = candidateBlocks(html, source, page)
     audit.blocksFound += blocks.length
     if (!blocks.length) {
       audit.rejectReasons.push(`page ${page}: no candidate blocks in ${html.length} bytes`)
