@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+import asyncio
 import csv
 import io
 import json
+import os
 import subprocess
 import tempfile
 import zipfile
@@ -15,9 +17,27 @@ import xmltodict
 import yaml
 from PIL import Image
 from fastapi import APIRouter, UploadFile, File, Form
+from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import StreamingResponse
 
 router = APIRouter(prefix="/convert", tags=["Convert"])
+
+
+# ---------------------------------------------------------
+# Resource budgets
+# ---------------------------------------------------------
+MEDIA_MAX_FILE_SIZE = int(os.getenv("CONVERT_MEDIA_MAX_FILE_SIZE", str(12 * 1024 * 1024)))
+MEDIA_MAX_TOTAL_INPUT_SIZE = int(os.getenv("CONVERT_MEDIA_MAX_TOTAL_INPUT_SIZE", str(40 * 1024 * 1024)))
+MEDIA_MAX_TOTAL_OUTPUT_SIZE = int(os.getenv("CONVERT_MEDIA_MAX_TOTAL_OUTPUT_SIZE", str(64 * 1024 * 1024)))
+DATA_MAX_FILE_SIZE = int(os.getenv("CONVERT_DATA_MAX_FILE_SIZE", str(16 * 1024 * 1024)))
+DOC_MAX_FILE_SIZE = int(os.getenv("CONVERT_DOC_MAX_FILE_SIZE", str(50 * 1024 * 1024)))
+DOC_MAX_OUTPUT_SIZE = int(os.getenv("CONVERT_DOC_MAX_OUTPUT_SIZE", str(100 * 1024 * 1024)))
+CONVERSION_MAX_CONCURRENCY = max(1, int(os.getenv("CONVERT_MAX_CONCURRENCY", "2")))
+LIBREOFFICE_TIMEOUT_SECONDS = max(1, int(os.getenv("CONVERT_LIBREOFFICE_TIMEOUT_SECONDS", "120")))
+IMAGE_MAX_PIXELS = max(1, int(os.getenv("CONVERT_IMAGE_MAX_PIXELS", "40000000")))
+
+Image.MAX_IMAGE_PIXELS = IMAGE_MAX_PIXELS
+_conversion_slots = asyncio.Semaphore(CONVERSION_MAX_CONCURRENCY)
 
 
 # ---------------------------------------------------------
@@ -51,6 +71,31 @@ def safe_ext(filename: str) -> str:
 
 def base_name(filename: str) -> str:
     return Path(filename).stem
+
+
+async def read_upload_limited(upload: UploadFile, max_size: int, field: str = "file") -> bytes:
+    """Read an upload in bounded chunks and fail before arbitrary request bodies fill RAM."""
+    data = bytearray()
+    while True:
+        chunk = await upload.read(1024 * 1024)
+        if not chunk:
+            break
+        if len(data) + len(chunk) > max_size:
+            api_error(
+                "FILE_TOO_LARGE",
+                f"Максимальный размер файла: {max_size} байт.",
+                status=413,
+                field=field,
+            )
+        data.extend(chunk)
+    return bytes(data)
+
+
+async def close_upload(upload: UploadFile):
+    try:
+        await upload.close()
+    except Exception:
+        pass
 
 
 def guess_mime_for_ext(ext: str) -> str:
@@ -309,11 +354,16 @@ DATA_SERIALIZERS = {
 }
 
 
+def convert_data_bytes(raw: bytes, src_ext: str, target: str) -> bytes:
+    obj = DATA_PARSERS[src_ext](raw)
+    return DATA_SERIALIZERS[target](obj)
+
+
 # ---------------------------------------------------------
 # Document conversions
 # ---------------------------------------------------------
 def docx_to_pdf_via_libreoffice(docx_bytes: bytes) -> bytes:
-    # Requires `soffice` available in PATH
+    # Requires `soffice` available in PATH (installed by backend/Dockerfile).
     with tempfile.TemporaryDirectory() as tmp:
         tmp_path = Path(tmp)
         in_path = tmp_path / "input.docx"
@@ -322,7 +372,6 @@ def docx_to_pdf_via_libreoffice(docx_bytes: bytes) -> bytes:
 
         in_path.write_bytes(docx_bytes)
 
-        # LibreOffice headless conversion
         cmd = [
             "soffice",
             "--headless",
@@ -337,12 +386,24 @@ def docx_to_pdf_via_libreoffice(docx_bytes: bytes) -> bytes:
             str(in_path),
         ]
         try:
-            subprocess.run(cmd, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            subprocess.run(
+                cmd,
+                check=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                timeout=LIBREOFFICE_TIMEOUT_SECONDS,
+            )
         except FileNotFoundError:
             api_error(
                 "LIBREOFFICE_NOT_FOUND",
-                "Не найден soffice (LibreOffice). Установи LibreOffice на сервер и добавь soffice в PATH.",
+                "Не найден soffice (LibreOffice).",
                 status=500,
+            )
+        except subprocess.TimeoutExpired:
+            api_error(
+                "DOCX_TO_PDF_TIMEOUT",
+                "Конвертация DOCX→PDF превысила допустимое время.",
+                status=504,
             )
         except subprocess.CalledProcessError as e:
             api_error(
@@ -396,33 +457,59 @@ async def convert_media(
         api_error("TOO_MANY_FILES", "Для медиа можно загрузить максимум 20 файлов.", field="files", status=422)
 
     target_ext = "jpg" if target == "jpeg" else target
-
     outputs: list[tuple[str, bytes]] = []
+    total_input = 0
+    total_output = 0
 
-    for f in files:
-        ext = safe_ext(f.filename or "")
-        if ext not in IMAGE_INPUT_EXTS:
-            api_error(
-                "UNSUPPORTED_INPUT",
-                f"Неподдерживаемый тип файла для media: .{ext}",
-                field="files",
-                status=422,
-            )
+    try:
+        for f in files:
+            ext = safe_ext(f.filename or "")
+            if ext not in IMAGE_INPUT_EXTS:
+                api_error(
+                    "UNSUPPORTED_INPUT",
+                    f"Неподдерживаемый тип файла для media: .{ext}",
+                    field="files",
+                    status=422,
+                )
 
-        raw = await f.read()
-        try:
-            out_bytes = convert_image_bytes(raw, ext, target_ext)
-        except Exception as e:
-            api_error("CONVERT_FAILED", f"Ошибка конвертации изображения: {str(e)[:300]}", status=500)
+            raw = await read_upload_limited(f, MEDIA_MAX_FILE_SIZE, field="files")
+            total_input += len(raw)
+            if total_input > MEDIA_MAX_TOTAL_INPUT_SIZE:
+                api_error(
+                    "REQUEST_TOO_LARGE",
+                    f"Суммарный размер media-файлов не должен превышать {MEDIA_MAX_TOTAL_INPUT_SIZE} байт.",
+                    field="files",
+                    status=413,
+                )
 
-        out_name = f"{base_name(f.filename or 'file')}.{target_ext}"
-        outputs.append((out_name, out_bytes))
+            try:
+                async with _conversion_slots:
+                    out_bytes = await run_in_threadpool(convert_image_bytes, raw, ext, target_ext)
+            except Exception as e:
+                from fastapi import HTTPException
+                if isinstance(e, HTTPException):
+                    raise
+                api_error("CONVERT_FAILED", f"Ошибка конвертации изображения: {str(e)[:300]}", status=500)
+
+            total_output += len(out_bytes)
+            if total_output > MEDIA_MAX_TOTAL_OUTPUT_SIZE:
+                api_error(
+                    "OUTPUT_TOO_LARGE",
+                    f"Суммарный размер результата не должен превышать {MEDIA_MAX_TOTAL_OUTPUT_SIZE} байт.",
+                    status=413,
+                )
+
+            out_name = f"{base_name(f.filename or 'file')}.{target_ext}"
+            outputs.append((out_name, out_bytes))
+    finally:
+        for f in files:
+            await close_upload(f)
 
     if len(outputs) == 1:
         name, data = outputs[0]
         return streaming_download(data, name, guess_mime_for_ext(target_ext))
 
-    zip_data = zip_bytes(outputs)
+    zip_data = await run_in_threadpool(zip_bytes, outputs)
     return streaming_download(zip_data, "converted_media.zip", "application/zip")
 
 
@@ -444,14 +531,15 @@ async def convert_data(
     if target not in DATA_TARGET_EXTS:
         api_error("UNSUPPORTED_TARGET", f"Неподдерживаемый целевой формат: {target}", field="target", status=422)
 
-    raw = await file.read()
+    try:
+        raw = await read_upload_limited(file, DATA_MAX_FILE_SIZE)
+    finally:
+        await close_upload(file)
 
-    # csv->csv, json->json etc. still round-trip through parse+serialize (not
-    # a raw passthrough) so the output is normalized/pretty-printed the same
-    # way every other conversion is, and so a malformed same-format file is
-    # still caught as INVALID_* instead of being handed back unchanged.
-    obj = DATA_PARSERS[src_ext](raw)
-    out = DATA_SERIALIZERS[target](obj)
+    # csv->csv, json->json etc. still round-trip through parse+serialize so
+    # malformed same-format input is rejected instead of returned unchanged.
+    async with _conversion_slots:
+        out = await run_in_threadpool(convert_data_bytes, raw, src_ext, target)
 
     out_name = f"{base_name(file.filename or 'file')}.{target}"
     return streaming_download(out, out_name, guess_mime_for_ext(target))
@@ -478,14 +566,25 @@ async def convert_document(
     if src_ext == target:
         api_error("NOOP", "Входной формат уже совпадает с целевым.", status=422)
 
-    raw = await file.read()
+    try:
+        raw = await read_upload_limited(file, DOC_MAX_FILE_SIZE)
+    finally:
+        await close_upload(file)
 
-    if src_ext == "docx" and target == "pdf":
-        out = docx_to_pdf_via_libreoffice(raw)
-    elif src_ext == "pdf" and target == "docx":
-        out = pdf_to_docx_via_pdf2docx(raw)
-    else:
-        api_error("UNSUPPORTED_CONVERSION", f"Конвертация {src_ext} → {target} не поддержана.", status=422)
+    async with _conversion_slots:
+        if src_ext == "docx" and target == "pdf":
+            out = await run_in_threadpool(docx_to_pdf_via_libreoffice, raw)
+        elif src_ext == "pdf" and target == "docx":
+            out = await run_in_threadpool(pdf_to_docx_via_pdf2docx, raw)
+        else:
+            api_error("UNSUPPORTED_CONVERSION", f"Конвертация {src_ext} → {target} не поддержана.", status=422)
+
+    if len(out) > DOC_MAX_OUTPUT_SIZE:
+        api_error(
+            "OUTPUT_TOO_LARGE",
+            f"Размер результата не должен превышать {DOC_MAX_OUTPUT_SIZE} байт.",
+            status=413,
+        )
 
     out_name = f"{base_name(file.filename or 'file')}.{target}"
     return streaming_download(out, out_name, guess_mime_for_ext(target))
