@@ -23,6 +23,7 @@ import {
   parseHiringActivityDate,
   parseHiringDayMonthDate,
 } from '@whiteslove/parsing-lexicon/hiring-temporal'
+import { decodeHtmlEntities } from '../htmlText'
 import type { CvProfile } from './hiringTypes'
 
 export const MAX_AGE_MONTHS = 3
@@ -42,23 +43,10 @@ export {
   MONTHS_AGO_RE,
   YEARS_AGO_RE,
 } from '@whiteslove/parsing-lexicon/hiring-temporal'
-
-export function decodeEntities(value: string): string {
-  const named: Record<string, string> = {
-    amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", nbsp: ' ', ndash: '–', mdash: '—',
-  }
-  return value.replace(/&(#x?[0-9a-f]+|[a-z]+);/gi, (match, entity: string) => {
-    if (entity.startsWith('#')) {
-      const hex = entity[1]?.toLowerCase() === 'x'
-      const code = Number.parseInt(entity.slice(hex ? 2 : 1), hex ? 16 : 10)
-      return Number.isFinite(code) ? String.fromCodePoint(code) : match
-    }
-    return named[entity.toLowerCase()] ?? match
-  })
-}
+export { decodeHtmlEntities as decodeEntities } from '../htmlText'
 
 export function htmlText(value: string): string {
-  return decodeEntities(value)
+  return decodeHtmlEntities(value)
     .replace(/<(script|style|noscript|template)\b[^>]*>[\s\S]*?<\/\1>/gi, ' ')
     .replace(/<!--[\s\S]*?-->/g, ' ')
     .replace(/<([a-z][\w:-]*)\b[^>]*class=["'][^"']*(?:material-icons|material-symbols)[^"']*["'][^>]*>[\s\S]*?<\/\1>/gi, ' ')
@@ -74,7 +62,7 @@ export function htmlText(value: string): string {
 
 export function absoluteUrl(raw: string, base: string): string {
   try {
-    const url = new URL(decodeEntities(raw), base)
+    const url = new URL(decodeHtmlEntities(raw), base)
     url.hash = ''
     return url.toString()
   } catch {

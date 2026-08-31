@@ -12,6 +12,16 @@ SKIP_PULL="${SKIP_PULL:-0}"
 FORCE_DEPLOY="${FORCE_DEPLOY:-0}"
 mkdir -p "$STATE_DIR"
 
+# A production release is one immutable revision across every service. Explicit
+# overrides still exist for local recovery, but the normal path derives every tag
+# from DEPLOY_SHA so Compose can never silently mix a new frontend with old
+# mutable :latest auxiliary images.
+export FRONTEND_IMAGE_TAG="${FRONTEND_IMAGE_TAG:-$DEPLOY_SHA}"
+export BACKEND_IMAGE_TAG="${BACKEND_IMAGE_TAG:-$DEPLOY_SHA}"
+export JOBS_WORKER_IMAGE_TAG="${JOBS_WORKER_IMAGE_TAG:-$DEPLOY_SHA}"
+export JOB_BROWSER_FETCHER_IMAGE_TAG="${JOB_BROWSER_FETCHER_IMAGE_TAG:-$DEPLOY_SHA}"
+export SUBSCRIPTION_BOT_IMAGE_TAG="${SUBSCRIPTION_BOT_IMAGE_TAG:-$DEPLOY_SHA}"
+
 if [[ "$FORCE_DEPLOY" != "1" && -f "$STATE_DIR/deployed.sha" ]] &&
    [[ "$(cat "$STATE_DIR/deployed.sha")" == "$DEPLOY_SHA" ]]; then
   echo "Commit $DEPLOY_SHA is already deployed; skipping duplicate rollout."
@@ -33,6 +43,14 @@ if [ -d .git ]; then
     git restore --source=HEAD --staged --worktree -- docker-compose.yml
   fi
   git pull --ff-only
+fi
+
+# Preserve the last known-good immutable manifest before touching containers.
+# It is only replaced after a later successful deploy, so a failed rollout always
+# leaves an immediately usable rollback target.
+if [ -f "$STATE_DIR/deployed.manifest" ]; then
+  cp "$STATE_DIR/deployed.manifest" "$STATE_DIR/rollback.manifest.tmp"
+  mv "$STATE_DIR/rollback.manifest.tmp" "$STATE_DIR/rollback.manifest"
 fi
 
 # Production normally pulls prebuilt images. Local fallback sets SKIP_PULL=1
@@ -61,6 +79,28 @@ pull_if_needed() {
   "${compose[@]}" pull "$@"
 }
 
+run_database_migrations() {
+  echo "Applying versioned Jobs/Hiring/queue migrations..."
+  "${compose[@]}" run --rm --no-deps jobs-worker \
+    node --experimental-transform-types \
+      ./scripts/migrate-database.ts
+}
+
+prepare_database_schema() {
+  # Transitional read-model/backfill preparation. Once all historical candidate
+  # data migrations are versioned, this compatibility preflight can disappear.
+  echo "Preparing Jobs/Hiring/queue read models before runtime traffic..."
+  "${compose[@]}" run --rm --no-deps jobs-worker \
+    node --experimental-transform-types \
+      --import ./jobs-worker/alias-loader.mjs \
+      ./scripts/prepare-database-schema.ts
+}
+
+prepare_databases() {
+  run_database_migrations
+  prepare_database_schema
+}
+
 case "$target" in
   all)
     if [[ "$SKIP_PULL" == "1" ]]; then
@@ -68,6 +108,7 @@ case "$target" in
     else
       "${compose[@]}" pull
     fi
+    prepare_databases
     "${compose[@]}" up -d --no-build --remove-orphans
     ;;
   frontend)
@@ -76,6 +117,7 @@ case "$target" in
     ;;
   jobs)
     pull_if_needed frontend jobs-worker job-browser-fetcher
+    prepare_databases
     "${compose[@]}" up -d --no-build job-browser-fetcher frontend jobs-worker
     ;;
   backend)
@@ -92,20 +134,40 @@ esac
 
 if [ "$target" = "all" ] || [ "$target" = "frontend" ] || [ "$target" = "jobs" ]; then
   curl --fail --silent --show-error --retry 20 --retry-all-errors --retry-delay 3 \
+    http://127.0.0.1:8080/ready >/dev/null
+  curl --fail --silent --show-error --retry 20 --retry-all-errors --retry-delay 3 \
     http://127.0.0.1:8080/ >/dev/null
   curl --fail --silent --show-error --retry 20 --retry-all-errors --retry-delay 3 \
     http://127.0.0.1:8080/jobs >/dev/null
   curl --fail --silent --show-error --retry 20 --retry-all-errors --retry-delay 3 \
     http://127.0.0.1:8080/hiring >/dev/null
-  echo "Personal Site Nuxt runtime is healthy."
+  echo "Personal Site Nuxt runtime is ready and serving core boards."
 fi
 
-# Only mark the SHA after the rollout and health checks have succeeded.
+if [ "$target" = "all" ] || [ "$target" = "backend" ]; then
+  backend_id="$("${compose[@]}" ps -q backend)"
+  test -n "$backend_id"
+  docker exec "$backend_id" python -c \
+    "import urllib.request; assert urllib.request.urlopen('http://127.0.0.1:8000/ready', timeout=3).status == 200"
+  echo "Personal Site backend is ready."
+fi
+
+# Only mark the release after rollout and readiness checks have succeeded.
 printf '%s\n' "$DEPLOY_SHA" > "$STATE_DIR/deployed.sha.tmp"
 mv "$STATE_DIR/deployed.sha.tmp" "$STATE_DIR/deployed.sha"
 printf 'SHA=%s\nSOURCE=%s\nTIME=%s\n' \
   "$DEPLOY_SHA" "$DEPLOY_SOURCE" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > "$STATE_DIR/deployed.meta"
 
-echo "Recorded successful deployment: $DEPLOY_SHA ($DEPLOY_SOURCE)"
+cat > "$STATE_DIR/deployed.manifest.tmp" <<EOF
+DEPLOY_SHA=$DEPLOY_SHA
+FRONTEND_IMAGE_TAG=$FRONTEND_IMAGE_TAG
+BACKEND_IMAGE_TAG=$BACKEND_IMAGE_TAG
+JOBS_WORKER_IMAGE_TAG=$JOBS_WORKER_IMAGE_TAG
+JOB_BROWSER_FETCHER_IMAGE_TAG=$JOB_BROWSER_FETCHER_IMAGE_TAG
+SUBSCRIPTION_BOT_IMAGE_TAG=$SUBSCRIPTION_BOT_IMAGE_TAG
+EOF
+mv "$STATE_DIR/deployed.manifest.tmp" "$STATE_DIR/deployed.manifest"
+
+echo "Recorded successful immutable deployment: $DEPLOY_SHA ($DEPLOY_SOURCE)"
 
 prune_unused_docker_data

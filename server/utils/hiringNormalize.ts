@@ -7,6 +7,7 @@ import {
   parseCandidateSalary,
   sameHiringProfessionFamily,
 } from '@whiteslove/parsing-lexicon/hiring-source-semantics'
+import { professionDisplayLabel } from '@whiteslove/parsing-lexicon/hiring-source-aliases'
 import { canonicalSkillName, extractSkillDetails } from '~~/shared/jobSkills'
 import type { CandidateEmploymentType, CvProfile } from './hiringTypes'
 import type { Seniority } from './jobTypes'
@@ -91,20 +92,11 @@ export function normalizeSkills(rawSkills: string[] | undefined, text: string): 
   return [...out]
 }
 
-const PROFESSION_ACRONYMS = new Map<string, string>([
-  ['qa', 'QA'], ['hr', 'HR'], ['ui', 'UI'], ['ux', 'UX'], ['ai', 'AI'], ['ml', 'ML'],
-  ['seo', 'SEO'], ['sre', 'SRE'], ['dba', 'DBA'], ['crm', 'CRM'], ['erp', 'ERP'], ['pmo', 'PMO'],
-])
-
-function formatProfessionCanonical(canonical: string): string {
-  return canonical.split('_').map((part) =>
-    PROFESSION_ACRONYMS.get(part) || `${part.charAt(0).toUpperCase()}${part.slice(1)}`,
-  ).join(' ')
-}
-
 function collectProfessions(source: string): string[] {
   return [...new Set(
-    detectProfessionMatches(source, 16).map((match) => formatProfessionCanonical(match.canonical)),
+    detectProfessionMatches(source, 16)
+      .map((match) => match.label || professionDisplayLabel(match.canonical))
+      .filter(Boolean),
   )]
 }
 
@@ -151,7 +143,7 @@ export function normalizeProfessions(rawRole: string | undefined, text: string):
     mentionedProfessions?: Array<{ canonical?: string }>
   }
   const desired = resolved.desiredProfession?.canonical
-  if (desired) return [formatProfessionCanonical(desired)]
+  if (desired) return [professionDisplayLabel(desired) || desired]
 
   if (target && !isCandidateNonTargetContext(target)) {
     const targetMatches = collectProfessions(target)

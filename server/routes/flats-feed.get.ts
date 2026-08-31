@@ -1,296 +1,23 @@
 import { canonicalMetroValue } from '../utils/tashkentMetroLabels'
-import { normalizeFlatDealType, normalizeFlatPrice, normalizeFlatRoomOnly } from '../utils/flatDealType'
-import { isPotentiallyUnsafeFlat } from '../utils/flatSafety'
-import { canonicalCityValue } from '../../shared/locationCatalog'
-
-// GET /flats-feed — server-side proxy to the flat-finder backend's /api/listings.
-// The flat API is plain HTTP and the site is HTTPS, so a direct browser call is
-// blocked as mixed content; proxying here keeps it same-origin + HTTPS. Lives
-// outside /api (that prefix proxies to FastAPI). FLAT_API_URL configures the
-// upstream (defaults to the host-nginx port the desktop app already uses).
-const FLAT_API_URL = process.env.FLAT_API_URL || 'http://185.5.206.229:8082'
-const FEED_FRESH_MS = 30_000
-const FEED_STALE_MS = 60 * 60_000
-// An answer with no listings is almost always the upstream being unhappy — a
-// warming store, a degraded source, a timeout that resolved to nothing. Serving
-// one for the full hour turns a blip into "нет объявлений" for every visitor
-// asking that question, so empty answers get a short leash and are refetched.
-const EMPTY_STALE_MS = 60_000
-// The flat API answers an uncached query in ~6s and slower under load; 15s left
-// legitimate searches failing as if nothing matched.
-const UPSTREAM_TIMEOUT_MS = 25_000
-// Full statistics aggregate the complete filtered result and can legitimately
-// take longer than a page lookup. They are loaded off the critical rendering
-// path, so give only stats-only requests a larger budget instead of slowing the
-// listings feed itself.
-const STATS_UPSTREAM_TIMEOUT_MS = 55_000
-// Live source verification is background-only and sits behind gateways with a
-// roughly ten-second request ceiling. Return an inconclusive result before that
-// ceiling instead of letting a slow OLX response turn into a user-visible 504.
-const EXACT_LOOKUP_TIMEOUT_MS = 8_000
-// A clean ?adv= link hits this endpoint on every open — sharing one link in a
-// group chat means a burst of visitors resolving the same publicId within
-// seconds. A short TTL absorbs that burst as one Postgres round trip while
-// staying fresh enough that a price edit or deactivation shows up quickly.
-const PUBLIC_ID_CACHE_TTL_MS = FEED_FRESH_MS
-const feedCache = new Map<string, { at: number; data: any }>()
-const feedRefreshes = new Map<string, Promise<any>>()
-const publicIdCache = new Map<string, { at: number; data: any }>()
-const ALL_FEED_SOURCES = ['olx', 'telegram', 'facebook', 'threads'] as const
-const CURRENT_ALL_SOURCE_TOKENS = [...ALL_FEED_SOURCES, 'custom'] as const
-const SOCIAL_FEED_SOURCES = new Set(['telegram', 'facebook', 'threads'])
-
-const BOOLEAN_LISTING_FIELDS = [
-  'roomOnly',
-  'balcony',
-  'terrace',
-  'privateYard',
-  'dishwasher',
-  'airConditioner',
-  'gas',
-  'newBuilding',
-  'cadastral',
-  'firstRental',
-  'communalSeparated',
-  'petsAllowed',
-  'childrenAllowed',
-  'deposit',
-  'commission',
-  'furnished',
-  'parking',
-  'elevator',
-  'heating',
-  'hotWater',
-  'internet',
-  'smokingAllowed',
-  'negotiable',
-] as const
-
-type BooleanListingField = typeof BOOLEAN_LISTING_FIELDS[number]
-
-// The AI worker intentionally emits a small English/canonical vocabulary. Old
-// persisted rows and third-party parsers may still contain human English labels
-// such as "Yes", "Good" or "Women". Convert those to typed domain values here;
-// the Vue layer then renders them through the current UI locale instead of ever
-// exposing an English implementation value to a Russian (or other) interface.
-function normalizeBooleanLike(field: BooleanListingField, value: any): any {
-  if (typeof value === 'boolean' || value == null) return value
-  if (value === 1) return true
-  if (value === 0) return false
-  const normalized = String(value).trim().toLowerCase().replace(/[_.-]+/g, ' ').replace(/\s+/g, ' ')
-  if (['yes', 'true', 'present'].includes(normalized)) return true
-  if (['no', 'false', 'absent'].includes(normalized)) return false
-  if (['petsAllowed', 'childrenAllowed', 'smokingAllowed'].includes(field)) {
-    if (['allowed', 'available'].includes(normalized)) return true
-    if (['not allowed', 'unavailable'].includes(normalized)) return false
-  }
-  if (field === 'furnished') {
-    if (normalized === 'furnished') return true
-    if (normalized === 'unfurnished') return false
-  }
-  if (field === 'communalSeparated') {
-    if (['separate', 'separated', 'not included'].includes(normalized)) return true
-    if (['included', 'utilities included'].includes(normalized)) return false
-  }
-  return value
-}
-
-function normalizeConditionValue(value: any): any {
-  if (value == null || typeof value !== 'string') return value
-  const normalized = value.trim().toLowerCase().replace(/[_.-]+/g, ' ').replace(/\s+/g, ' ')
-  if (['needs renovation', 'renovation needed', 'needs repair', 'poor'].includes(normalized)) return 'needs_renovation'
-  if (['basic', 'simple'].includes(normalized)) return 'basic'
-  if (['good', 'good condition'].includes(normalized)) return 'good'
-  if (['modern', 'modern renovation', 'euro renovation', 'renovated'].includes(normalized)) return 'modern'
-  if (['luxury', 'premium', 'designer renovation'].includes(normalized)) return 'luxury'
-  return value
-}
-
-function normalizeAudienceValue(value: any): any {
-  if (value == null || typeof value !== 'string') return value
-  const normalized = value.trim().toLowerCase().replace(/[_.-]+/g, ' ').replace(/\s+/g, ' ')
-  if (['women', 'woman', 'female', 'girls', 'girls only', 'women only'].includes(normalized)) return 'women'
-  if (['men', 'man', 'male', 'men only'].includes(normalized)) return 'men'
-  if (['family', 'families', 'family only'].includes(normalized)) return 'family'
-  return value
-}
-
-function normalizeListingSemantics(listing: any): any {
-  const normalized = { ...listing }
-  for (const field of BOOLEAN_LISTING_FIELDS) {
-    if (field in normalized) normalized[field] = normalizeBooleanLike(field, normalized[field])
-  }
-  if ('condition' in normalized) normalized.condition = normalizeConditionValue(normalized.condition)
-  if ('audience' in normalized) normalized.audience = normalizeAudienceValue(normalized.audience)
-  return normalized
-}
-
-// Live OLX verification exists to answer "does this advert still exist?" and to
-// refresh source-authoritative basics. It is deliberately NOT a replacement for
-// the enriched feed object: the single-offer endpoint has no AI Vision result,
-// market comparison, nearby enrichment, or other asynchronous fields. Returning
-// null/empty enrichment from it used to make the popup briefly show AI values and
-// then erase them when the client spread the verification response over the card.
-const LIVE_REFRESH_FIELDS = new Set([
-  'id',
-  'publicId',
-  'source',
-  'country',
-  'title',
-  'description',
-  'propertyType',
-  'byAgency',
-  'price',
-  'currency',
-  'rooms',
-  'areaSqm',
-  'city',
-  'district',
-  'lat',
-  'lng',
-  'photo',
-  'photos',
-  'url',
-  'createdAt',
-  'dealType',
-])
-
-function rewritePhoto(p: unknown): unknown {
-  return typeof p === 'string' && p.startsWith('/api/tg-photo/')
-    ? `/flats-photo?path=${encodeURIComponent(p)}`
-    : p
-}
-
-function shapeListing(listing: any): any {
-  const semanticListing = normalizeListingSemantics(listing)
-  const normalizedPrice = normalizeFlatPrice(semanticListing)
-  const listingWithPrice = { ...semanticListing, ...normalizedPrice }
-  const normalizedListing = {
-    ...listingWithPrice,
-    roomOnly: normalizeFlatRoomOnly(listingWithPrice),
-  }
-  return {
-    ...normalizedListing,
-    dealType: normalizeFlatDealType(normalizedListing),
-    potentiallyUnsafe: isPotentiallyUnsafeFlat(normalizedListing),
-    photo: rewritePhoto(normalizedListing?.photo),
-    photos: Array.isArray(normalizedListing?.photos) ? normalizedListing.photos.map(rewritePhoto) : [],
-  }
-}
-
-function shapeLiveListing(listing: any): any {
-  const shaped = shapeListing(listing)
-  const live: Record<string, any> = {}
-  for (const [field, value] of Object.entries(shaped)) {
-    if (!LIVE_REFRESH_FIELDS.has(field)) continue
-    if (value == null) continue
-    if (typeof value === 'string' && !value.trim()) continue
-    if (Array.isArray(value) && value.length === 0) continue
-    live[field] = value
-  }
-  return live
-}
-
-function normalizeFeedDedupeText(value: unknown): string {
-  return String(value || '')
-    .toLowerCase()
-    .replace(/https?:\/\/\S+/giu, ' ')
-    .replace(/(?:^|\s)@[\p{L}\p{N}_]{3,}/gu, ' ')
-    .replace(/[\p{P}\p{S}]+/gu, ' ')
-    .replace(/\s+/g, ' ')
-    .trim()
-}
-
-function socialDedupeKey(listing: any): string | null {
-  const source = String(listing?.source || '').toLowerCase()
-  if (!SOCIAL_FEED_SOURCES.has(source)) return null
-
-  const text = normalizeFeedDedupeText(
-    `${listing?.title || ''}\n${listing?.description || listing?.text || listing?.originalText || ''}`,
-  )
-  // Short cards are too ambiguous to fingerprint safely. Keep their source IDs
-  // independent instead of risking two real apartments collapsing.
-  if (text.length < 80) return null
-
-  const areaSqm = Number(listing?.areaSqm)
-  const normalizedArea = Number.isFinite(areaSqm) ? Math.round(areaSqm * 2) / 2 : ''
-
-  // Source is deliberately omitted: exact Telegram/Facebook/Threads reposts of
-  // the same housing ad should produce one card, not one card per network.
-  return [
-    String(listing?.country || '').toUpperCase(),
-    canonicalCityValue(String(listing?.city || '')).toLowerCase(),
-    String(listing?.dealType || ''),
-    String(listing?.propertyType || ''),
-    String(listing?.price ?? ''),
-    String(listing?.currency || '').toUpperCase(),
-    String(listing?.rooms ?? ''),
-    String(normalizedArea),
-    text,
-  ].join('|')
-}
-
-function dedupeFeedListings(listings: any[]): any[] {
-  const seen = new Set<string>()
-  const out: any[] = []
-
-  for (const listing of listings) {
-    const key = socialDedupeKey(listing)
-    if (!key) {
-      out.push(listing)
-      continue
-    }
-    if (seen.has(key)) continue
-    seen.add(key)
-    out.push(listing)
-  }
-
-  return out
-}
-
-function shapeResponse(raw: any, requestedSources: string[]): any {
-  const data = { ...raw }
-  const rawListings = Array.isArray(raw?.listings) ? raw.listings : []
-
-  // An empty requestedSources list means "all sources". Do not run that result
-  // through a second hardcoded allow-list: the upstream may add/rename a source
-  // before this proxy is updated, which previously produced the impossible UI
-  // state `count > 0` together with an empty listings array. Explicit source
-  // filters still get the defensive client-side check below.
-  const selectedListings = requestedSources.length
-    ? rawListings.filter((listing: any) => requestedSources.includes(String(listing?.source || '').toLowerCase()))
-    : rawListings
-
-  data.listings = dedupeFeedListings(selectedListings.map(shapeListing))
-  const backendSources = Array.isArray(raw?.filters?.sources) ? raw.filters.sources : []
-  data.count = requestedSources.length && backendSources.length === 0
-    ? data.listings.length
-    : typeof raw?.count === 'number' ? raw.count : data.listings.length
-  return data
-}
-
-/** How long a cached answer may still be served: empty ones expire quickly. */
-function staleWindow(entry: { data: any } | undefined): number {
-  const listings = entry?.data?.listings
-  return Array.isArray(listings) && listings.length && !entry?.data?.warming
-    ? FEED_STALE_MS
-    : EMPTY_STALE_MS
-}
-
-function refreshFeed(key: string, url: string): Promise<any> {
-  const current = feedRefreshes.get(key)
-  if (current) return current
-  const statsOnly = /(?:[?&])statsOnly=(?:1|true)(?:&|$)/u.test(url)
-  const request = $fetch<any>(url, { timeout: statsOnly ? STATS_UPSTREAM_TIMEOUT_MS : UPSTREAM_TIMEOUT_MS })
-    .then((data) => {
-      const at = data?.warming ? Date.now() - FEED_FRESH_MS : Date.now()
-      feedCache.set(key, { at, data })
-      return data
-    })
-    .finally(() => feedRefreshes.delete(key))
-  feedRefreshes.set(key, request)
-  return request
-}
+import {
+  ALL_FEED_SOURCES,
+  CURRENT_ALL_SOURCE_TOKENS,
+  shapeListing,
+  shapeResponse,
+} from '../flats/feedListingShape'
+import {
+  FEED_FRESH_MS,
+  getCachedFeed,
+  normalizedSearchKey,
+  refreshFeed,
+  staleWindow,
+} from '../flats/feedCache'
+import {
+  FLAT_API_URL,
+  findCachedExactListing,
+  lookupPublicListing,
+  verifyOlxListingLive,
+} from '../flats/feedLookup'
 
 function exactCountry(params: URLSearchParams): string {
   const countries = (params.get('countries') || '')
@@ -298,24 +25,6 @@ function exactCountry(params: URLSearchParams): string {
     .map((country) => country.trim().toUpperCase())
     .filter((country) => /^[A-Z]{2}$/.test(country))
   return countries.length === 1 ? countries[0]! : ''
-}
-
-function findCachedExactListing(listingId: string, source: string, country: string): any | null {
-  const now = Date.now()
-  for (const entry of feedCache.values()) {
-    // A detail link may outlive the exact filtered cache key that produced it,
-    // but we should not resurrect an arbitrarily old/deleted advert from memory.
-    if (now - entry.at > FEED_STALE_MS) continue
-    const listings = Array.isArray(entry.data?.listings) ? entry.data.listings : []
-    const exact = listings.find((listing: any) => {
-      if (String(listing?.id ?? '') !== listingId) return false
-      if (source && String(listing?.source || '').toLowerCase() !== source) return false
-      if (country && String(listing?.country || '').toUpperCase() !== country) return false
-      return true
-    })
-    if (exact) return exact
-  }
-  return null
 }
 
 export default defineEventHandler(async (event) => {
@@ -327,10 +36,6 @@ export default defineEventHandler(async (event) => {
   const rawRequestedSources = requestedSourceTokens
     .filter((source) => ALL_FEED_SOURCES.includes(source as typeof ALL_FEED_SOURCES[number]))
 
-  // The current web UI historically sent `olx,telegram` to mean "all" because
-  // those were the only sources when the page was built. Social housing is now
-  // persisted too, so preserve the UI contract while letting the default feed
-  // return every available source. A single explicit source remains a real filter.
   const legacyAllSources = rawRequestedSources.length === 2
     && rawRequestedSources.includes('olx')
     && rawRequestedSources.includes('telegram')
@@ -339,40 +44,17 @@ export default defineEventHandler(async (event) => {
   const requestedSources = allSourcesRequest ? [] : rawRequestedSources
 
   const upstreamParams = new URLSearchParams(incoming.searchParams)
-  // An explicit list containing every UI source is semantically identical to
-  // no source filter. Removing it lets PostgreSQL use its optimized default-feed
-  // query instead of applying a redundant five-value filter on every row.
   if (allSourcesRequest) upstreamParams.delete('sources')
   const metro = upstreamParams.get('metro')
   if (metro) upstreamParams.set('metro', canonicalMetroValue(metro))
 
-  // A clean listing link names only the advert's stable publicId — no filters,
-  // no source/country. Resolve it directly against the backend's dedicated
-  // lookup and skip the whole filtered-search path.
   const publicIdParam = String(upstreamParams.get('publicId') || '').trim()
   if (publicIdParam && /^\d+$/.test(publicIdParam)) {
+    const canonicalPublicId = publicIdParam.replace(/^0+(?=\d)/, '')
     setResponseHeader(event, 'Cache-Control', 'no-store')
-    const cached = publicIdCache.get(publicIdParam)
-    if (cached && Date.now() - cached.at < PUBLIC_ID_CACHE_TTL_MS) return cached.data
-    try {
-      const result = await $fetch<any>(
-        `${FLAT_API_URL}/api/listing/by-public-id/${encodeURIComponent(publicIdParam)}`,
-        { timeout: EXACT_LOOKUP_TIMEOUT_MS },
-      )
-      if (result?.listing) {
-        const data = { count: 1, listings: [shapeListing(result.listing)] }
-        publicIdCache.set(publicIdParam, { at: Date.now(), data })
-        return data
-      }
-      // Not-found stays uncached: a listing still being ingested must not be
-      // kept invisible behind a cached miss until the TTL expires.
-      return { count: 0, listings: [] }
-    } catch (error: any) {
-      const status = Number(error?.statusCode || error?.response?.status || 0)
-      if (status === 404) return { count: 0, listings: [] }
-      setResponseStatus(event, 502)
-      return { count: 0, listings: [], error: 'Listing lookup failed' }
-    }
+    const lookup = await lookupPublicListing(canonicalPublicId)
+    if (lookup.upstreamFailed) setResponseStatus(event, 502)
+    return lookup.data
   }
 
   const exactListingId = String(upstreamParams.get('listingId') || '').trim()
@@ -381,38 +63,13 @@ export default defineEventHandler(async (event) => {
   const verifyLive = upstreamParams.get('verifyLive') === '1'
   upstreamParams.delete('verifyLive')
 
-  // Ordinary exact lookups stay on PostgreSQL so cards and shared links open
-  // immediately. The client follows with an explicit live verification after
-  // opening; only that second request is allowed to wait on OLX.
   if (verifyLive && exactListingId && exactSource === 'olx' && exactCountryCode) {
     setResponseHeader(event, 'Cache-Control', 'no-store')
-    try {
-      const exact = await $fetch<any>(
-        `${FLAT_API_URL}/api/listing/olx/${encodeURIComponent(exactListingId)}?country=${encodeURIComponent(exactCountryCode)}`,
-        { timeout: EXACT_LOOKUP_TIMEOUT_MS },
-      )
-      if (exact?.listing && String(exact.listing.id ?? '') === exactListingId) {
-        return {
-          count: 1,
-          listings: [shapeLiveListing(exact.listing)],
-          exactListingFallback: 'source',
-        }
-      }
-      return { count: 0, listings: [], exactListingFallback: 'source-unavailable' }
-    } catch (error: any) {
-      const status = Number(error?.statusCode || error?.response?.status || 0)
-      if (status === 404) {
-        return { count: 0, listings: [], exactListingFallback: 'source-inactive' }
-      }
-      // A timeout or temporary source failure is inconclusive. The client may
-      // still open the card already present in its feed, but must not mark it
-      // active or remove it as unavailable.
-      return { count: 0, listings: [], exactListingFallback: 'source-unavailable' }
-    }
+    return verifyOlxListingLive(exactListingId, exactCountryCode)
   }
 
   const url = `${FLAT_API_URL}/api/listings?${upstreamParams}`
-  const key = upstreamParams.toString()
+  const key = normalizedSearchKey(upstreamParams)
   const requestedOffset = Math.max(0, Number(upstreamParams.get('offset')) || 0)
   const requestedLimit = Math.min(60, Math.max(1, Number(upstreamParams.get('limit')) || 20))
   const enforcePage = (response: any) => ({
@@ -421,17 +78,23 @@ export default defineEventHandler(async (event) => {
       ? response.listings.slice(requestedOffset, requestedOffset + requestedLimit)
       : response?.listings || [],
   })
+
   const shapeWithCombinedFallback = async (raw: any) => {
     const shaped = shapeResponse(raw, requestedSources)
-    if (raw?.warming || requestedSources.length !== 1 || shaped.listings.length || Number(raw?.sourceCounts?.[requestedSources[0]!]) > 0) {
+    if (
+      raw?.warming
+      || requestedSources.length !== 1
+      || shaped.listings.length
+      || Number(raw?.sourceCounts?.[requestedSources[0]!]) > 0
+    ) {
       return enforcePage(shaped)
     }
 
     const combinedParams = new URLSearchParams(upstreamParams)
     combinedParams.delete('sources')
-    const combinedKey = `combined:${combinedParams}`
+    const combinedKey = `combined:${normalizedSearchKey(combinedParams)}`
     const combinedUrl = `${FLAT_API_URL}/api/listings?${combinedParams}`
-    const combinedCached = feedCache.get(combinedKey)
+    const combinedCached = getCachedFeed(combinedKey)
     const combinedRaw = combinedCached && Date.now() - combinedCached.at < staleWindow(combinedCached)
       ? combinedCached.data
       : await refreshFeed(combinedKey, combinedUrl)
@@ -445,32 +108,23 @@ export default defineEventHandler(async (event) => {
 
     const source = requestedSources.length === 1 ? requestedSources[0]! : ''
     const country = exactCountry(upstreamParams)
-
     if (Array.isArray(response?.listings) && response.listings.length) return response
 
     const cachedListing = findCachedExactListing(listingId, source, country)
-    if (cachedListing) {
-      return {
-        ...response,
-        count: 1,
-        listings: [shapeListing(cachedListing)],
-        exactListingFallback: 'cache',
-      }
+    if (!cachedListing) return response
+    return {
+      ...response,
+      count: 1,
+      listings: [shapeListing(cachedListing)],
+      exactListingFallback: 'cache',
     }
-
-    return response
   }
 
-  // PostgreSQL already excludes rows persisted with `active = FALSE`. Waiting
-  // for another source-verification batch here added up to five seconds after
-  // every cold database query and pushed otherwise successful feeds past the
-  // gateway timeout. The backend availability sweep owns persisted state; an
-  // explicit background `verifyLive` request still checks an opened OLX advert.
   const finalize = async (raw: any) => withExactListingFallback(
     await shapeWithCombinedFallback(raw),
   )
 
-  const cached = feedCache.get(key)
+  const cached = getCachedFeed(key)
   if (cached && Date.now() - cached.at < FEED_FRESH_MS) {
     setResponseHeader(event, 'Cache-Control', 'no-store')
     return finalize(cached.data)
@@ -483,13 +137,12 @@ export default defineEventHandler(async (event) => {
       stale: true,
     }
   }
+
   try {
     const data = await refreshFeed(key, url)
     setResponseHeader(event, 'Cache-Control', 'no-store')
     return finalize(data)
   } catch (err) {
-    // A stale answer, however old, beats reporting a failure — but only if it
-    // actually has something in it.
     if (cached && Array.isArray(cached.data?.listings) && cached.data.listings.length) {
       setResponseHeader(event, 'Cache-Control', 'no-store')
       return {

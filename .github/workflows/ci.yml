@@ -1,0 +1,86 @@
+name: Application CI
+
+on:
+  pull_request:
+    branches: [master]
+  push:
+    branches:
+      - 'refactor/**'
+      - 'fix/**'
+      - 'feat/**'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: application-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  node:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci --no-audit --no-fund
+
+      - name: Verify worker and operations syntax
+        run: |
+          node --experimental-transform-types --check jobs-worker/worker.ts
+          node --experimental-transform-types --check jobs-worker/workerHealth.ts
+          node --experimental-transform-types --check jobs-worker/workerHealthRuntime.ts
+          node --experimental-transform-types --check jobs-worker/workerHealthBootstrap.ts
+          node --experimental-transform-types --check jobs-worker/healthcheck.ts
+          node --experimental-transform-types --check scripts/migrate-database.ts
+          node --experimental-transform-types --check scripts/prepare-database-schema.ts
+          node --check jobs-worker/alias-loader.mjs
+
+      - name: Run code quality inventory
+        run: npm run audit:code
+
+      - name: Run ESLint
+        run: npm run lint -- --quiet
+
+      - name: Run application tests
+        run: npm test
+
+      - name: Build Nuxt application
+        run: npm run build
+
+      - name: Verify Compose syntax
+        run: |
+          touch db.env
+          docker compose config >/dev/null
+
+  backend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+
+      - name: Install backend dependencies
+        run: pip install -r requirements.txt
+
+      - name: Compile backend
+        run: python -m compileall -q src
+
+      - name: Run backend unit tests
+        run: python -m unittest discover -s tests -p 'test_*.py'

@@ -1,6 +1,7 @@
 import { detectUsLocation } from '@whiteslove/parsing-lexicon/hiring-source-semantics'
 import type { Job, SponsorshipConfidence } from './jobTypes'
 import { detectWorkModes } from './hiringLexicon'
+import { absoluteHttpUrl as absoluteUrl, decodeHtmlEntities, stripHtml } from './htmlText'
 
 type PublicBoard = {
   label: string
@@ -34,7 +35,7 @@ const FLAGMA_VACANCY_LINK_RE =
 
 /** Card markup as rows, because each row of a Flagma card means something. */
 function cardLines(fragment: string): string[] {
-  return decodeEntities(fragment)
+  return decodeHtmlEntities(fragment)
     .replace(/<br\s*\/?>/gi, '\n')
     .replace(/<\/(?:p|div|li|h[1-6]|tr|section|article|span|td)>/gi, '\n')
     .replace(/<[^>]*>/g, ' ')
@@ -138,11 +139,6 @@ const PUBLIC_JOB_BOARDS: PublicBoard[] = [
   { label: 'SimplyHired', url: 'https://www.simplyhired.com/' },
   { label: 'Escape the City', url: 'https://www.escapethecity.org/search/jobs' },
   { label: 'Diversity Jobs Group', url: 'https://diversityjobsgroup.com/job-listings/' },
-
-  // USA visa-sponsorship-focused boards. Confidence is deliberately explicit:
-  // "historical" means the employer has sponsored before, not that this exact
-  // vacancy promises sponsorship. The other values reflect the board's own
-  // curation/verification claims and are surfaced as evidence, not guarantees.
   {
     label: 'VisaJobSearch',
     url: 'https://www.visajobsearch.com/jobs',
@@ -198,42 +194,9 @@ const UA =
 const REQUEST_TIMEOUT_MS = 12_000
 const MAX_PER_BOARD = 100
 
-function decodeEntities(value: string): string {
-  const named: Record<string, string> = {
-    amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", nbsp: ' ', ndash: '–', mdash: '—',
-  }
-  return value.replace(/&(#x?[0-9a-f]+|[a-z]+);/gi, (match, entity: string) => {
-    if (entity.startsWith('#')) {
-      const hex = entity[1]?.toLowerCase() === 'x'
-      const code = Number.parseInt(entity.slice(hex ? 2 : 1), hex ? 16 : 10)
-      return Number.isFinite(code) ? String.fromCodePoint(code) : match
-    }
-    return named[entity.toLowerCase()] ?? match
-  })
-}
-
-function stripHtml(value: unknown): string {
-  return decodeEntities(String(value || ''))
-    .replace(/<br\s*\/?>/gi, ' ')
-    .replace(/<[^>]*>/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim()
-}
-
 function validDate(value: unknown): string {
   const time = Date.parse(String(value || ''))
   return Number.isNaN(time) ? new Date().toISOString() : new Date(time).toISOString()
-}
-
-function absoluteUrl(raw: string, base: string): string | undefined {
-  try {
-    const url = new URL(decodeEntities(raw), base)
-    if (!/^https?:$/.test(url.protocol)) return undefined
-    url.hash = ''
-    return url.toString()
-  } catch {
-    return undefined
-  }
 }
 
 function locationFromPosting(posting: any): string {
@@ -256,7 +219,6 @@ function locationFromPosting(posting: any): string {
   if (posting?.jobLocationType === 'TELECOMMUTE') return 'Remote'
   return 'See listing'
 }
-
 
 function boardTags(board: PublicBoard): string[] {
   const tags = [board.label]
@@ -336,14 +298,11 @@ function looksLikeJobUrl(url: URL): boolean {
     return false
   }
 
-  // A detail route normally contains a segment after the job-like noun.
   return /\/(?:jobs?|job|vacanc(?:y|ies)|positions?|openings?|opportunities)\/[a-z0-9][^/]{2,}/i.test(path)
     || /\/job[-_][a-z0-9][a-z0-9_-]{4,}/i.test(path)
 }
 
 function parseAnchors(html: string, board: PublicBoard): Job[] {
-  // If a board is multinational and we cannot infer location from the anchor,
-  // avoid fabricating a US location. JSON-LD results above can still be used.
   if (board.usOnly && !board.assumeUs) return []
 
   const byUrl = new Map<string, string>()

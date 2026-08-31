@@ -24,6 +24,7 @@ from ..processors.pdf_text import extract_text_blocks, extract_links
 from ..processors.pdf_textedit import apply_text_edits, apply_links
 from ..processors.pdf_image import extract_images, apply_image_edits
 from ..processors.pdf_pageops import add_design_page
+from ..utils.pdf_doc_id import require_canonical_pdf_doc_id
 from ..utils.state_store import get_state_store
 
 try:
@@ -58,7 +59,8 @@ def ensure_storage_root():
 
 
 def doc_folder(doc_id: str) -> str:
-    return os.path.join(STORAGE_ROOT, doc_id)
+    canonical_doc_id = require_canonical_pdf_doc_id(doc_id)
+    return os.path.join(STORAGE_ROOT, canonical_doc_id)
 
 
 def source_path(doc_id: str) -> str:
@@ -760,7 +762,10 @@ async def pdf_storage_cleanup_loop():
             r = get_state_store()
             if os.path.isdir(STORAGE_ROOT):
                 for doc_id in os.listdir(STORAGE_ROOT):
-                    folder = doc_folder(doc_id)
+                    try:
+                        folder = doc_folder(doc_id)
+                    except (TypeError, ValueError):
+                        continue
                     if not os.path.isdir(folder):
                         continue
                     try:

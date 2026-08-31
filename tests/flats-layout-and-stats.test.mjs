@@ -80,7 +80,7 @@ test('location geography delegates exact and cross-kind rendering to the shared 
 })
 
 test('flat statistics are not cleared while a country refresh waits for the background aggregate', () => {
-  assert.match(feed, /if \(!append && data\.statistics\) void setStatisticsWithoutViewportJump\(data\.statistics\)/u)
+  assert.match(feed, /if \(!append && data\.statistics\)\s*\{\s*void setStatisticsWithoutViewportJump\(data\.statistics\);?\s*\}/u)
   assert.doesNotMatch(feed, /statistics\.value = data\.statistics \|\| null/u)
   assert.match(feed, /const statisticsLoading = ref\(false\)/u)
 })

@@ -3,20 +3,22 @@ import { readFile } from 'node:fs/promises'
 import test from 'node:test'
 
 const route = await readFile(new URL('../server/routes/flats-feed.get.ts', import.meta.url), 'utf8')
+const feedLookup = await readFile(new URL('../server/flats/feedLookup.ts', import.meta.url), 'utf8')
 const page = await readFile(new URL('../app/pages/flat-finder/index.vue', import.meta.url), 'utf8')
 const safeFetch = await readFile(new URL('../app/utils/safeFetch.ts', import.meta.url), 'utf8')
 
 test('shared OLX lookup opens from PostgreSQL and reserves source waits for explicit verification', () => {
   assert.match(route, /upstreamParams\.get\('listingId'\)/)
   assert.match(route, /upstreamParams\.get\('verifyLive'\) === '1'/)
-  assert.match(route, /\/api\/listing\/olx\/\$\{encodeURIComponent\(exactListingId\)\}/)
-  assert.match(route, /exactListingFallback:\s*'source'/)
-  assert.match(route, /exactListingFallback:\s*'source-inactive'/)
-
   assert.match(route, /if \(verifyLive && exactListingId && exactSource === 'olx' && exactCountryCode\)/)
+  assert.match(route, /return verifyOlxListingLive\(exactListingId, exactCountryCode\)/)
   assert.match(route, /upstreamParams\.delete\('verifyLive'\)/)
-  assert.match(route, /EXACT_LOOKUP_TIMEOUT_MS = 8_000/)
-  assert.match(route, /exactListingFallback:\s*'source-unavailable'/)
+
+  assert.match(feedLookup, /EXACT_LOOKUP_TIMEOUT_MS = 8_000/)
+  assert.match(feedLookup, /\/api\/listing\/olx\/\$\{encodeURIComponent\(listingId\)\}/)
+  assert.match(feedLookup, /exactListingFallback:\s*'source'/)
+  assert.match(feedLookup, /exactListingFallback:\s*'source-inactive'/)
+  assert.match(feedLookup, /exactListingFallback:\s*'source-unavailable'/)
   assert.match(safeFetch, /timeout:\s*15000/)
 })
 
@@ -24,8 +26,15 @@ test('main feed trusts persisted availability without a second blocking OLX batc
   assert.doesNotMatch(route, /\/api\/listings\/verify/)
   assert.doesNotMatch(route, /filterPersistedInactiveOlx/)
   assert.doesNotMatch(route, /AVAILABILITY_TIMEOUT_MS/)
-  assert.match(route, /PostgreSQL already excludes rows persisted with `active = FALSE`/)
   assert.match(route, /const finalize = async \(raw: any\) => withExactListingFallback/)
+  assert.match(route, /const url = `\$\{FLAT_API_URL\}\/api\/listings\?\$\{upstreamParams\}`/)
+
+  // Live verification is an explicit exact-listing branch only. The generic
+  // persisted feed must remove verifyLive before constructing its upstream URL.
+  const liveBranch = route.indexOf("if (verifyLive && exactListingId && exactSource === 'olx' && exactCountryCode)")
+  const removeFlag = route.indexOf("upstreamParams.delete('verifyLive')")
+  const feedUrl = route.indexOf('const url = `${FLAT_API_URL}/api/listings?${upstreamParams}`')
+  assert.ok(liveBranch > -1 && removeFlag > -1 && feedUrl > -1 && removeFlag < liveBranch && liveBranch < feedUrl)
 })
 
 test('client opens OLX immediately and performs explicit live verification in the background', () => {

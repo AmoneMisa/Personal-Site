@@ -1,6 +1,7 @@
 import { detectCityFromText, detectCountryCodeFromText } from '@whiteslove/parsing-lexicon/geography-detection'
 import type { Job } from './jobTypes'
 import { detectWorkModes } from './hiringLexicon'
+import { absoluteHttpUrl as absoluteUrl, htmlLines, stripHtml } from './htmlText'
 
 const UA =
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ' +
@@ -8,49 +9,6 @@ const UA =
 const REQUEST_TIMEOUT_MS = 20_000
 const MAX_AGE_DAYS = 14
 const MAX_DESCRIPTION = 4_000
-
-function decodeEntities(value: string): string {
-  const named: Record<string, string> = {
-    amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", nbsp: ' ', ndash: '–', mdash: '—',
-  }
-  return value.replace(/&(#x?[0-9a-f]+|[a-z]+);/gi, (match, entity: string) => {
-    if (entity.startsWith('#')) {
-      const hex = entity[1]?.toLowerCase() === 'x'
-      const code = Number.parseInt(entity.slice(hex ? 2 : 1), hex ? 16 : 10)
-      return Number.isFinite(code) ? String.fromCodePoint(code) : match
-    }
-    return named[entity.toLowerCase()] ?? match
-  })
-}
-
-function stripHtml(value: unknown): string {
-  return decodeEntities(String(value || ''))
-    .replace(/<br\s*\/?>/gi, ' ')
-    .replace(/<[^>]*>/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim()
-}
-
-function htmlLines(value: string): string[] {
-  return decodeEntities(value)
-    .replace(/<br\s*\/?>/gi, '\n')
-    .replace(/<\/(?:p|div|li|h[1-6]|article|section|tr|td)>/gi, '\n')
-    .replace(/<[^>]*>/g, ' ')
-    .split('\n')
-    .map((line) => line.replace(/\s+/g, ' ').trim())
-    .filter(Boolean)
-}
-
-function absoluteUrl(raw: string, base: string): string | null {
-  try {
-    const url = new URL(decodeEntities(raw), base)
-    if (!/^https?:$/.test(url.protocol)) return null
-    url.hash = ''
-    return url.toString()
-  } catch {
-    return null
-  }
-}
 
 async function fetchHtml(url: string): Promise<string> {
   const response = await fetch(url, {

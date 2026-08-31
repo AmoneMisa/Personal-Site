@@ -6,6 +6,7 @@ import {
   rotatingSlice,
 } from './jobSearchCoverage'
 import { detectWorkModes } from './hiringLexicon'
+import { decodeHtmlEntities } from './htmlText'
 
 // Read-only LinkedIn collector. Search uses the public guest endpoint exposed to
 // signed-out visitors; detail pages are fetched separately so discovery stays
@@ -88,23 +89,12 @@ export function linkedinSourceHealth(): Readonly<LinkedInSourceHealth> {
   return Object.freeze({ ...health })
 }
 
-function decodeEntities(value: string): string {
-  const named: Record<string, string> = {
-    amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", nbsp: ' ', ndash: '–', mdash: '—',
-  }
-  return value.replace(/&(#x?[0-9a-f]+|[a-z]+);/gi, (match, entity: string) => {
-    if (entity.startsWith('#')) {
-      const hex = entity[1]?.toLowerCase() === 'x'
-      const code = Number.parseInt(entity.slice(hex ? 2 : 1), hex ? 16 : 10)
-      return Number.isFinite(code) ? String.fromCodePoint(code) : match
-    }
-    return named[entity.toLowerCase()] ?? match
-  })
-}
-
-function stripHtml(value: string | undefined): string {
+// LinkedIn descriptions are structured prose rather than flat labels. Keep the
+// source-specific paragraph/list boundaries here, but delegate entity decoding
+// to the shared infrastructure helper so every source interprets entities alike.
+function linkedinText(value: string | undefined): string {
   if (!value) return ''
-  return decodeEntities(
+  return decodeHtmlEntities(
     value
       .replace(/<script\b[\s\S]*?<\/script>/gi, ' ')
       .replace(/<style\b[\s\S]*?<\/style>/gi, ' ')
@@ -124,7 +114,7 @@ function classText(html: string, tag: string, className: string): string {
   const match = html.match(
     new RegExp(`<${tag}[^>]*class=["'][^"']*${escaped}[^"']*["'][^>]*>([\\s\\S]*?)<\\/${tag}>`, 'i'),
   )
-  return stripHtml(match?.[1])
+  return linkedinText(match?.[1])
 }
 
 function classBlock(html: string, className: string): string {
@@ -157,7 +147,7 @@ function extractJobId(card: string): string | undefined {
 }
 
 function parseSalaryText(value: string): Pick<Job, 'salaryMin' | 'salaryMax' | 'salaryCurrency'> {
-  const text = stripHtml(value)
+  const text = linkedinText(value)
   if (!text) return {}
   const currency = /\bUSD\b/i.test(text) || text.includes('$') ? 'USD'
     : /\bEUR\b/i.test(text) || text.includes('€') ? 'EUR'
@@ -221,7 +211,7 @@ function criteriaFromDetail(html: string): Map<string, string> {
 function directApplyUrl(html: string): string | undefined {
   const code = html.match(/<code\b[^>]*id=["']applyUrl["'][^>]*>([\s\S]*?)<\/code>/i)?.[1]
   if (!code) return undefined
-  const decoded = decodeEntities(stripHtml(code))
+  const decoded = decodeHtmlEntities(linkedinText(code))
   const match = decoded.match(/(?:\?|&)url=([^"'\s&]+)/i)
   if (!match?.[1]) return undefined
   try {
@@ -233,7 +223,7 @@ function directApplyUrl(html: string): string | undefined {
 }
 
 export function parseLinkedInJobDetail(html: string): Partial<Job> {
-  const description = stripHtml(classBlock(html, 'show-more-less-html__markup'))
+  const description = linkedinText(classBlock(html, 'show-more-less-html__markup'))
   const criteria = criteriaFromDetail(html)
   const seniority = criteria.get('seniority level')
   const employmentType = criteria.get('employment type')

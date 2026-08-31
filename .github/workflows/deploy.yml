@@ -35,7 +35,7 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Detect affected services
+      - name: Detect affected verification scope
         id: detect
         shell: bash
         env:
@@ -57,72 +57,47 @@ jobs:
             [[ "$changed_files" == "__FULL_BUILD__" ]] || grep -Eq "$pattern" <<<"$changed_files"
           }
 
-          # Frontend is intentionally rebuilt and deployed on every master push.
+          # Production is deployed as one immutable release. Build every runtime
+          # image with the same commit SHA so Compose never mixes a new service
+          # with a stale/mutable `latest` image from another workflow run.
           frontend=true
-          backend=false
-          jobs_worker=false
-          job_browser_fetcher=false
-          subscription_bot=false
-
-          if matches '^(jobs-worker/|package(-lock)?\.json|server/|shared/|internal/)'; then
-            jobs_worker=true
-          fi
-
-          if matches '^backend/'; then
-            backend=true
-          fi
-
-          if matches '^job-browser-fetcher/'; then
-            job_browser_fetcher=true
-          fi
-
-          if matches '^subscription-bot/'; then
-            subscription_bot=true
-          fi
+          backend=true
+          jobs_worker=true
+          job_browser_fetcher=true
+          subscription_bot=true
 
           matrix='[]'
           add_service() {
-            local enabled="$1" name="$2" context="$3" dockerfile="$4" image="$5"
-            if [[ "$enabled" == true ]]; then
-              matrix="$(jq -c \
-                --arg name "$name" \
-                --arg context "$context" \
-                --arg file "$dockerfile" \
-                --arg image "$image" \
-                '. + [{name:$name,context:$context,file:$file,image:$image}]' <<<"$matrix")"
-            fi
+            local name="$1" context="$2" dockerfile="$3" image="$4"
+            matrix="$(jq -c \
+              --arg name "$name" \
+              --arg context "$context" \
+              --arg file "$dockerfile" \
+              --arg image "$image" \
+              '. + [{name:$name,context:$context,file:$file,image:$image}]' <<<"$matrix")"
           }
 
-          add_service "$frontend" frontend . ./Dockerfile "$FRONTEND_IMAGE"
-          add_service "$backend" backend ./backend ./backend/Dockerfile "$BACKEND_IMAGE"
-          add_service "$jobs_worker" jobs-worker . ./jobs-worker/Dockerfile "$JOBS_WORKER_IMAGE"
-          add_service "$job_browser_fetcher" job-browser-fetcher ./job-browser-fetcher ./job-browser-fetcher/Dockerfile "$JOB_BROWSER_FETCHER_IMAGE"
-          add_service "$subscription_bot" subscription-bot ./subscription-bot ./subscription-bot/Dockerfile "$SUBSCRIPTION_BOT_IMAGE"
-
-          has_builds=false
-          [[ "$matrix" != '[]' ]] && has_builds=true
+          add_service frontend . ./Dockerfile "$FRONTEND_IMAGE"
+          add_service backend ./backend ./backend/Dockerfile "$BACKEND_IMAGE"
+          add_service jobs-worker . ./jobs-worker/Dockerfile "$JOBS_WORKER_IMAGE"
+          add_service job-browser-fetcher ./job-browser-fetcher ./job-browser-fetcher/Dockerfile "$JOB_BROWSER_FETCHER_IMAGE"
+          add_service subscription-bot ./subscription-bot ./subscription-bot/Dockerfile "$SUBSCRIPTION_BOT_IMAGE"
 
           node_verify=false
           if matches '^(package(-lock)?\.json|eslint\.config\.mjs|app/|server/|shared/|i18n/|public/|internal/|jobs-worker/|scripts/|subscription-bot/|tests/|nuxt\.config\.ts|tsconfig[^/]*\.json)'; then
             node_verify=true
           fi
 
-          deploy=false
-          if [[ "$has_builds" == true ]] || matches '^(docker-compose\.yml|deploy\.sh)$'; then
-            deploy=true
-          fi
-
           echo "matrix={\"include\":$matrix}" >> "$GITHUB_OUTPUT"
-          echo "has_builds=$has_builds" >> "$GITHUB_OUTPUT"
-          echo "frontend=$frontend" >> "$GITHUB_OUTPUT"
+          echo "has_builds=true" >> "$GITHUB_OUTPUT"
+          echo "frontend=true" >> "$GITHUB_OUTPUT"
           echo "node_verify=$node_verify" >> "$GITHUB_OUTPUT"
-          echo "subscription_bot=$subscription_bot" >> "$GITHUB_OUTPUT"
-          echo "deploy=$deploy" >> "$GITHUB_OUTPUT"
+          echo "subscription_bot=true" >> "$GITHUB_OUTPUT"
+          echo "deploy=true" >> "$GITHUB_OUTPUT"
 
   verify:
     runs-on: ubuntu-latest
     needs: changes
-    if: needs.changes.outputs.node_verify == 'true' || needs.changes.outputs.deploy == 'true'
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -134,9 +109,6 @@ jobs:
           cache: npm
 
       - name: Install dependencies
-        # package.json pins parsing-lexicon to a concrete revision. npm install
-        # reconciles that one intentional pin if package-lock still reflects the
-        # previous revision, while retaining locked versions for other packages.
         run: npm install --no-audit --no-fund
 
       - name: Verify worker syntax
@@ -150,7 +122,6 @@ jobs:
         run: npm run lint -- --quiet
 
       - name: Verify Compose syntax
-        if: needs.changes.outputs.deploy == 'true'
         run: |
           touch db.env
           docker compose config >/dev/null
@@ -160,22 +131,18 @@ jobs:
         run: npm test
 
       - name: Verify subscription bot
-        if: needs.changes.outputs.subscription_bot == 'true'
         working-directory: subscription-bot
         run: |
           npm install --no-audit --no-fund
           npm run check
 
       - name: Build Nuxt application
-        if: needs.changes.outputs.frontend == 'true'
         run: npm run build
 
-  # Frontend is always rebuilt. Other runtime images are rebuilt only when
-  # their source or shared runtime dependencies changed.
   build:
     runs-on: ubuntu-latest
     needs: [changes, verify]
-    if: needs.changes.outputs.has_builds == 'true' && needs.verify.result == 'success'
+    if: needs.verify.result == 'success'
     strategy:
       fail-fast: false
       matrix: ${{ fromJSON(needs.changes.outputs.matrix) }}
@@ -210,12 +177,11 @@ jobs:
     needs: [changes, verify, build]
     if: >-
       always() &&
-      needs.changes.outputs.deploy == 'true' &&
       needs.verify.result == 'success' &&
-      (needs.build.result == 'success' || needs.build.result == 'skipped')
+      needs.build.result == 'success'
     environment: Production
     steps:
-      - name: Deploy via SSH
+      - name: Deploy immutable release via SSH
         uses: appleboy/ssh-action@v1.0.0
         with:
           host: ${{ vars.SERVER_HOST }}
@@ -223,26 +189,46 @@ jobs:
           key: ${{ secrets.SERVER_SSH_KEY }}
           command_timeout: 30m
           script: |
+            set -euo pipefail
             echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
             trap 'docker logout ghcr.io >/dev/null 2>&1 || true' EXIT
 
             cd ~/opt/myproject
 
             # Production is a deployment checkout, not a development branch.
-            # Always use the exact commit that this workflow built, even if the
-            # server checkout accumulated local/divergent history.
+            # Always use exactly the source revision whose five images were built.
             if [ -d .git ]; then
               git fetch origin master
               git reset --hard "${{ github.sha }}"
             fi
 
             FRONTEND_IMAGE_TAG="${{ github.sha }}" \
+            BACKEND_IMAGE_TAG="${{ github.sha }}" \
+            JOBS_WORKER_IMAGE_TAG="${{ github.sha }}" \
+            JOB_BROWSER_FETCHER_IMAGE_TAG="${{ github.sha }}" \
+            SUBSCRIPTION_BOT_IMAGE_TAG="${{ github.sha }}" \
             DEPLOY_SHA="${{ github.sha }}" DEPLOY_SOURCE=github \
               flock -w 1800 /tmp/personal-site-deploy.lock bash ./deploy.sh
 
-            container_id="$(FRONTEND_IMAGE_TAG="${{ github.sha }}" docker compose --env-file db.env ps -q frontend)"
-            expected_image="$(docker image inspect "${FRONTEND_IMAGE}:${{ github.sha }}" --format='{{.Id}}')"
-            actual_image="$(docker inspect "$container_id" --format='{{.Image}}')"
-            test -n "$container_id"
-            test "$actual_image" = "$expected_image"
-            echo "Verified frontend image for ${{ github.sha }}: $actual_image"
+            export FRONTEND_IMAGE_TAG="${{ github.sha }}"
+            export BACKEND_IMAGE_TAG="${{ github.sha }}"
+            export JOBS_WORKER_IMAGE_TAG="${{ github.sha }}"
+            export JOB_BROWSER_FETCHER_IMAGE_TAG="${{ github.sha }}"
+            export SUBSCRIPTION_BOT_IMAGE_TAG="${{ github.sha }}"
+
+            verify_service_image() {
+              local service="$1" image="$2"
+              local container_id expected_image actual_image
+              container_id="$(docker compose --env-file db.env ps -q "$service")"
+              test -n "$container_id"
+              expected_image="$(docker image inspect "$image:${{ github.sha }}" --format='{{.Id}}')"
+              actual_image="$(docker inspect "$container_id" --format='{{.Image}}')"
+              test "$actual_image" = "$expected_image"
+              echo "Verified $service image for ${{ github.sha }}: $actual_image"
+            }
+
+            verify_service_image frontend "${{ env.FRONTEND_IMAGE }}"
+            verify_service_image backend "${{ env.BACKEND_IMAGE }}"
+            verify_service_image jobs-worker "${{ env.JOBS_WORKER_IMAGE }}"
+            verify_service_image job-browser-fetcher "${{ env.JOB_BROWSER_FETCHER_IMAGE }}"
+            verify_service_image subscription-bot "${{ env.SUBSCRIPTION_BOT_IMAGE }}"

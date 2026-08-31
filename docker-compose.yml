@@ -2,14 +2,19 @@ services:
   backend:
     # Existing auxiliary site backend. Jobs/hiring do NOT use this service:
     # their API lives in Nuxt/Nitro and ingestion runs in `jobs-worker`.
-    image: ghcr.io/amonemisa/personal-site-backend:latest
+    image: ghcr.io/amonemisa/personal-site-backend:${BACKEND_IMAGE_TAG:-latest}
     restart: unless-stopped
     environment:
       BACKEND_STATE_DIR: /var/app/state/backend
     volumes:
       - site_state:/var/app/state
+    mem_limit: ${BACKEND_MEMORY_LIMIT:-1g}
+    cpus: ${BACKEND_CPU_LIMIT:-2.0}
+    pids_limit: ${BACKEND_PIDS_LIMIT:-256}
+    security_opt:
+      - no-new-privileges:true
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:8000/openapi.json',timeout=3).status==200 else 1)"]
+      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:8000/ready',timeout=3).status==200 else 1)"]
       interval: 30s
       timeout: 5s
       retries: 3
@@ -18,7 +23,7 @@ services:
   job-browser-fetcher:
     # Lightweight Chrome TLS/JA3 impersonation for public job pages whose WAF
     # blocks Node fetch. Internal-only: no host port is published.
-    image: ghcr.io/amonemisa/personal-site-job-browser-fetcher:latest
+    image: ghcr.io/amonemisa/personal-site-job-browser-fetcher:${JOB_BROWSER_FETCHER_IMAGE_TAG:-latest}
     restart: unless-stopped
     environment:
       JOB_BROWSER_IMPERSONATE: ${JOB_BROWSER_IMPERSONATE:-chrome124}
@@ -28,6 +33,11 @@ services:
       JOB_BROWSER_429_COOLDOWN: ${JOB_BROWSER_429_COOLDOWN:-900}
       JOB_BROWSER_403_COOLDOWN: ${JOB_BROWSER_403_COOLDOWN:-900}
       JOB_BROWSER_ALLOWED_HOSTS: ${JOB_BROWSER_ALLOWED_HOSTS:-flexjobs.com,wellfound.com,workingnomads.com,jobspresso.co,virtualvocations.com,skipthedrive.com}
+    mem_limit: ${JOB_BROWSER_MEMORY_LIMIT:-512m}
+    cpus: ${JOB_BROWSER_CPU_LIMIT:-1.0}
+    pids_limit: ${JOB_BROWSER_PIDS_LIMIT:-128}
+    security_opt:
+      - no-new-privileges:true
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:4040/health',timeout=3).status==200 else 1)"]
       interval: 20s
@@ -64,8 +74,13 @@ services:
     networks:
       - default
       - ai-net
+    mem_limit: ${FRONTEND_MEMORY_LIMIT:-768m}
+    cpus: ${FRONTEND_CPU_LIMIT:-1.5}
+    pids_limit: ${FRONTEND_PIDS_LIMIT:-256}
+    security_opt:
+      - no-new-privileges:true
     healthcheck:
-      test: ["CMD", "node", "-e", "fetch('http://localhost:3000/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      test: ["CMD", "node", "-e", "fetch('http://localhost:3000/ready').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
       interval: 30s
       timeout: 5s
       retries: 3
@@ -75,7 +90,7 @@ services:
     # The ONE jobs/hiring worker. It directly owns scheduling, Postgres queue
     # claim/complete/fail, scraping, parsing, normalization, AI enrichment and
     # Elasticsearch indexing. No HTTP execution hop through Nuxt exists.
-    image: ghcr.io/amonemisa/personal-site-jobs-worker:latest
+    image: ghcr.io/amonemisa/personal-site-jobs-worker:${JOBS_WORKER_IMAGE_TAG:-latest}
     restart: unless-stopped
     env_file:
       - ${SITE_ENV_FILE:-./db.env}
@@ -104,10 +119,14 @@ services:
       HIRING_QUEUE_ENABLED: ${HIRING_QUEUE_ENABLED:-on}
       JOBS_QUEUE_MAX_ATTEMPTS: ${JOBS_QUEUE_MAX_ATTEMPTS:-5}
       JOBS_QUEUE_LEASE_SECONDS: ${JOBS_QUEUE_LEASE_SECONDS:-240}
+      JOBS_QUEUE_HEARTBEAT_SECONDS: ${JOBS_QUEUE_HEARTBEAT_SECONDS:-60}
       JOBS_QUEUE_RETRY_BASE_MS: ${JOBS_QUEUE_RETRY_BASE_MS:-30000}
       JOBS_QUEUE_RETRY_MAX_MS: ${JOBS_QUEUE_RETRY_MAX_MS:-300000}
       JOBS_QUEUE_POLL_SECONDS: ${JOBS_QUEUE_POLL_SECONDS:-1}
       JOBS_QUEUE_DISPATCH_TICK_SECONDS: ${JOBS_QUEUE_DISPATCH_TICK_SECONDS:-10}
+      JOBS_WORKER_HEALTH_INTERVAL_SECONDS: ${JOBS_WORKER_HEALTH_INTERVAL_SECONDS:-20}
+      JOBS_WORKER_HEALTH_MAX_AGE_SECONDS: ${JOBS_WORKER_HEALTH_MAX_AGE_SECONDS:-90}
+      JOBS_WORKER_QUEUE_HEALTH_MAX_AGE_SECONDS: ${JOBS_WORKER_QUEUE_HEALTH_MAX_AGE_SECONDS:-120}
     volumes:
       - site_state:/var/app/state
     depends_on:
@@ -116,17 +135,22 @@ services:
     networks:
       - default
       - ai-net
+    mem_limit: ${JOBS_WORKER_MEMORY_LIMIT:-1g}
+    cpus: ${JOBS_WORKER_CPU_LIMIT:-2.0}
+    pids_limit: ${JOBS_WORKER_PIDS_LIMIT:-256}
+    security_opt:
+      - no-new-privileges:true
     healthcheck:
-      test: ["CMD-SHELL", "kill -0 1"]
+      test: ["CMD", "node", "--experimental-transform-types", "./jobs-worker/healthcheck.ts"]
       interval: 30s
       timeout: 5s
       retries: 3
-      start_period: 20s
+      start_period: 30s
 
   subscription-bot:
     # Private Telegram Bot API client for apartment/job/candidate subscriptions.
     # Disabled safely until TELEGRAM_SUBSCRIPTION_BOT_ENABLED=on is set in db.env.
-    image: ghcr.io/amonemisa/personal-site-subscription-bot:latest
+    image: ghcr.io/amonemisa/personal-site-subscription-bot:${SUBSCRIPTION_BOT_IMAGE_TAG:-latest}
     restart: unless-stopped
     env_file:
       - ${SITE_ENV_FILE:-./db.env}
@@ -147,6 +171,11 @@ services:
     networks:
       - default
       - ai-net
+    mem_limit: ${SUBSCRIPTION_BOT_MEMORY_LIMIT:-256m}
+    cpus: ${SUBSCRIPTION_BOT_CPU_LIMIT:-0.5}
+    pids_limit: ${SUBSCRIPTION_BOT_PIDS_LIMIT:-128}
+    security_opt:
+      - no-new-privileges:true
     healthcheck:
       test: ["CMD-SHELL", "kill -0 1"]
       interval: 30s

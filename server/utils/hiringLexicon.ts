@@ -125,18 +125,8 @@ export function classifySharedHiringMessage(text: string) {
   return kind === 'unknown' && hasExtendedCandidateIntent(text) ? 'candidate' : kind
 }
 
-const DISPLAY_CANONICAL_OVERRIDES: Record<string, string> = {
-  oil_gas_worker: 'oil_&_gas_worker',
-  finance_banking_specialist: 'finance_/_banking_specialist',
-  it_specialist: 'IT_specialist',
-  logistics_manager: 'logistics_specialist',
-}
-
 export function detectProfessionMatches(text: string, limit = 8) {
-  return matchExtendedProfessions(text, { limit }).map((match) => ({
-    ...match,
-    canonical: DISPLAY_CANONICAL_OVERRIDES[match.canonical] || match.canonical,
-  }))
+  return matchExtendedProfessions(text, { limit })
 }
 
 export function resolveSharedProfessionContext(text: string, options: { mode?: 'vacancy' | 'candidate' | null; title?: string } = {}) {

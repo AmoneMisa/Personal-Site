@@ -5,16 +5,21 @@ import { readFile } from "node:fs/promises";
 const read = (path) => readFile(new URL(`../${path}`, import.meta.url), "utf8");
 
 test("live OLX verification only returns source-authoritative non-empty fields", async () => {
-  const source = await read("server/routes/flats-feed.get.ts");
+  const route = await read("server/routes/flats-feed.get.ts");
+  const lookup = await read("server/flats/feedLookup.ts");
+  const shape = await read("server/flats/feedListingShape.ts");
 
-  assert.match(source, /const LIVE_REFRESH_FIELDS = new Set\(\[/);
-  assert.match(source, /listings: \[shapeLiveListing\(exact\.listing\)\]/);
-  assert.match(source, /if \(!LIVE_REFRESH_FIELDS\.has\(field\)\) continue/);
-  assert.match(source, /if \(value == null\) continue/);
-  assert.match(source, /if \(typeof value === 'string' && !value\.trim\(\)\) continue/);
-  assert.match(source, /if \(Array\.isArray\(value\) && value\.length === 0\) continue/);
+  assert.match(route, /verifyOlxListingLive/);
+  assert.match(route, /return verifyOlxListingLive\(exactListingId, exactCountryCode\)/);
+  assert.match(lookup, /shapeLiveListing/);
+  assert.match(lookup, /listings: \[shapeLiveListing\(exact\.listing\)\]/);
+  assert.match(shape, /const LIVE_REFRESH_FIELDS = new Set\(\[/);
+  assert.match(shape, /if \(!LIVE_REFRESH_FIELDS\.has\(field\)\) continue/);
+  assert.match(shape, /if \(value == null\) continue/);
+  assert.match(shape, /if \(typeof value === 'string' && !value\.trim\(\)\) continue/);
+  assert.match(shape, /if \(Array\.isArray\(value\) && value\.length === 0\) continue/);
 
-  const liveFields = source.match(/const LIVE_REFRESH_FIELDS = new Set\(\[([\s\S]*?)\]\)/)?.[1] || "";
+  const liveFields = shape.match(/const LIVE_REFRESH_FIELDS = new Set\(\[([\s\S]*?)\]\)/)?.[1] || "";
   for (const enrichmentOnly of [
     "vision",
     "marketComparison",
@@ -32,22 +37,25 @@ test("live OLX verification only returns source-authoritative non-empty fields",
   }
 });
 
-test("English AI semantics are canonicalized before localized rendering", async () => {
-  const source = await read("server/routes/flats-feed.get.ts");
+test("English AI semantics are canonicalized by the shaping module before localized rendering", async () => {
+  const route = await read("server/routes/flats-feed.get.ts");
+  const shape = await read("server/flats/feedListingShape.ts");
 
-  assert.match(source, /function normalizeBooleanLike\(field: BooleanListingField, value: any\)/);
-  assert.match(source, /\['yes', 'true', 'present'\]/);
-  assert.match(source, /\['no', 'false', 'absent'\]/);
-  assert.match(source, /\['petsAllowed', 'childrenAllowed', 'smokingAllowed'\]/);
-  assert.match(source, /field === 'furnished'/);
-  assert.match(source, /field === 'communalSeparated'/);
-  assert.match(source, /\['included', 'utilities included'\]/);
-  assert.match(source, /return 'needs_renovation'/);
-  assert.match(source, /return 'modern'/);
-  assert.match(source, /return 'luxury'/);
-  assert.match(source, /return 'women'/);
-  assert.match(source, /return 'men'/);
-  assert.match(source, /return 'family'/);
-  assert.match(source, /normalizeBooleanLike\(field, normalized\[field\]\)/);
-  assert.match(source, /const semanticListing = normalizeListingSemantics\(listing\)/);
+  assert.match(route, /shapeListing/);
+  assert.match(route, /shapeResponse/);
+  assert.match(shape, /function normalizeBooleanLike\(field: BooleanListingField, value: any\)/);
+  assert.match(shape, /\['yes', 'true', 'present'\]/);
+  assert.match(shape, /\['no', 'false', 'absent'\]/);
+  assert.match(shape, /\['petsAllowed', 'childrenAllowed', 'smokingAllowed'\]/);
+  assert.match(shape, /field === 'furnished'/);
+  assert.match(shape, /field === 'communalSeparated'/);
+  assert.match(shape, /\['included', 'utilities included'\]/);
+  assert.match(shape, /return 'needs_renovation'/);
+  assert.match(shape, /return 'modern'/);
+  assert.match(shape, /return 'luxury'/);
+  assert.match(shape, /return 'women'/);
+  assert.match(shape, /return 'men'/);
+  assert.match(shape, /return 'family'/);
+  assert.match(shape, /normalizeBooleanLike\(field, normalized\[field\]\)/);
+  assert.match(shape, /const semanticListing = normalizeListingSemantics\(listing\)/);
 });
