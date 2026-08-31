@@ -30,11 +30,14 @@ jobs:
           cache: npm
 
       - name: Install dependencies
-        run: npm install --no-audit --no-fund
+        run: npm ci --no-audit --no-fund
 
       - name: Verify worker syntax
         run: |
           node --experimental-transform-types --check jobs-worker/worker.ts
+          node --experimental-transform-types --check jobs-worker/workerHealth.ts
+          node --experimental-transform-types --check jobs-worker/workerHealthBootstrap.ts
+          node --experimental-transform-types --check jobs-worker/healthcheck.ts
           node --check jobs-worker/alias-loader.mjs
 
       - name: Run code quality inventory
