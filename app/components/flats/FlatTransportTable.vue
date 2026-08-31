@@ -14,6 +14,8 @@ const orderedStops = computed(() => [...props.stops].sort((left, right) => {
   return String(left.name || "").localeCompare(String(right.name || ""));
 }));
 
+const hasOverflow = computed(() => orderedStops.value.length > 6);
+
 function routeRefs(stop: FlatTransportStop): string {
   const refs = (stop.routeRefs || [])
     .map((route) => String(route || "").trim())
@@ -34,7 +36,13 @@ function distanceLabel(stop: FlatTransportStop): string {
       <span>{{ title }}</span>
     </h4>
 
-    <div class="flat-transport-table__rows" role="table" :aria-label="title">
+    <div
+      class="flat-transport-table__rows"
+      :class="{ 'flat-transport-table__rows--scrollable': hasOverflow }"
+      role="table"
+      :aria-label="title"
+      :tabindex="hasOverflow ? 0 : undefined"
+    >
       <div
         v-for="stop in orderedStops"
         :key="`${stop.id}:${stop.distanceM}`"
@@ -88,18 +96,33 @@ function distanceLabel(stop: FlatTransportStop): string {
 
 .flat-transport-table__rows {
   min-width: 0;
-  max-height: calc(var(--transport-row-height) * 7);
-  overflow-y: auto;
+  max-height: calc(var(--transport-row-height) * 6);
+  overflow-y: hidden;
   overscroll-behavior: contain;
   scrollbar-gutter: stable;
 }
+.flat-transport-table__rows--scrollable {
+  overflow-y: scroll;
+  scrollbar-color: var(--accent-pink, #e0679a) color-mix(in srgb, var(--line, #252a4a) 72%, transparent);
+  scrollbar-width: thin;
+}
+.flat-transport-table__rows--scrollable::-webkit-scrollbar { width: 8px; }
+.flat-transport-table__rows--scrollable::-webkit-scrollbar-track {
+  background: color-mix(in srgb, var(--line, #252a4a) 72%, transparent);
+}
+.flat-transport-table__rows--scrollable::-webkit-scrollbar-thumb {
+  border: 2px solid color-mix(in srgb, var(--line, #252a4a) 72%, transparent);
+  border-radius: 999px;
+  background: var(--accent-pink, #e0679a);
+}
 .flat-transport-table__row {
+  box-sizing: border-box;
   display: grid;
   grid-template-columns: minmax(34px, auto) minmax(0, 1fr) auto;
   align-items: center;
   gap: 7px;
   min-width: 0;
-  min-height: var(--transport-row-height);
+  height: var(--transport-row-height);
   padding: 7px 9px;
   border-bottom: 1px solid var(--line, #252a4a);
 }
@@ -126,7 +149,8 @@ function distanceLabel(stop: FlatTransportStop): string {
   color: var(--text-primary, #e4e5f0);
   font-size: 11.5px;
   line-height: 1.25;
-  overflow-wrap: anywhere;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .flat-transport-table__distance {
   display: inline-flex;
@@ -144,6 +168,7 @@ function distanceLabel(stop: FlatTransportStop): string {
 }
 
 @media (max-width: 520px) {
+  .flat-transport-table { --transport-row-height: 52px; }
   .flat-transport-table__row {
     grid-template-columns: minmax(32px, auto) minmax(0, 1fr);
     align-items: start;

@@ -29,14 +29,17 @@ test("transport tables use three columns above 768px and two at 768px or below",
   assert.match(group, /@media \(max-width: 768px\)[\s\S]*grid-template-columns: repeat\(2, minmax\(0, 1fr\)\)/);
 });
 
-test("each transport mode shows at most seven stop rows before scrolling", async () => {
+test("each transport mode shows at most six stop rows with a visible inner scrollbar", async () => {
   const table = await read("app/components/flats/FlatTransportTable.vue");
 
+  assert.match(table, /orderedStops\.value\.length > 6/);
   assert.match(table, /--transport-row-height:\s*42px/);
-  assert.match(table, /max-height:\s*calc\(var\(--transport-row-height\) \* 7\)/);
-  assert.match(table, /overflow-y:\s*auto/);
+  assert.match(table, /max-height:\s*calc\(var\(--transport-row-height\) \* 6\)/);
+  assert.match(table, /flat-transport-table__rows--scrollable[\s\S]*overflow-y:\s*scroll/);
+  assert.match(table, /scrollbar-width:\s*thin/);
+  assert.match(table, /::-webkit-scrollbar-thumb/);
   assert.match(table, /overscroll-behavior:\s*contain/);
-  assert.match(table, /min-height:\s*var\(--transport-row-height\)/);
+  assert.match(table, /height:\s*var\(--transport-row-height\)/);
 });
 
 test("dynamic transport icons stay in the offline Nuxt icon bundle", async () => {
