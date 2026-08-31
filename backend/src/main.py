@@ -19,6 +19,7 @@ from .utils.public_tool_limits import (
     valid_docker_tag,
     valid_index_key,
 )
+from .utils.state_store import get_state_store
 
 
 BACKEND_STATE_DIR = Path(os.getenv("BACKEND_STATE_DIR", "/var/app/state/backend"))
@@ -146,10 +147,10 @@ async def enforce_pdf_document_boundary(request: Request, call_next):
         return JSONResponse(status_code=400, content={"detail": "Non-canonical document id"})
 
     # Deletion is destructive. Resolve the document before the route can touch
-    # Redis/file state so a missing target is a normal 404 rather than a blind
-    # best-effort rmtree against a caller-controlled path.
+    # key/value or file state so a missing target is a normal 404 rather than a
+    # blind best-effort rmtree against a caller-controlled path.
     if request.method == "DELETE" and request.url.path == f"/pdf/{canonical_id}":
-        await pdf.ensure_doc_exists(canonical_id)
+        await pdf.ensure_doc_exists(get_state_store(), canonical_id)
 
     return await call_next(request)
 
