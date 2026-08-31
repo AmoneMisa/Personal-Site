@@ -36,6 +36,7 @@ jobs:
         run: |
           node --experimental-transform-types --check jobs-worker/worker.ts
           node --experimental-transform-types --check jobs-worker/workerHealth.ts
+          node --experimental-transform-types --check jobs-worker/workerHealthRuntime.ts
           node --experimental-transform-types --check jobs-worker/workerHealthBootstrap.ts
           node --experimental-transform-types --check jobs-worker/healthcheck.ts
           node --check jobs-worker/alias-loader.mjs
