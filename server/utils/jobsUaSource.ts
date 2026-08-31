@@ -1,6 +1,7 @@
 import { moneyCurrencyFromText } from '@whiteslove/parsing-lexicon/currency'
 import { detectEmploymentTypes, detectWorkModes, detectWorkSchedules } from '@whiteslove/parsing-lexicon/hiring-work-semantics'
 import { crawlCyclicJobBoard } from './cyclicJobBoardCrawler'
+import { decodeHtmlEntities as decodeEntities, stripHtml } from './htmlText'
 import type { Job } from './jobTypes'
 
 const BASE_URL = 'https://jobs.ua/vacancy'
@@ -9,28 +10,6 @@ const DEFAULT_PAGES_PER_RUN = 8
 const DEFAULT_MAX_PAGE = 1_500
 const DEFAULT_REQUEST_DELAY_MS = 750
 const MAX_DESCRIPTION = 1_200
-
-function decodeEntities(value: string): string {
-  return value
-    .replace(/&nbsp;|&#160;/gi, ' ')
-    .replace(/&amp;/gi, '&')
-    .replace(/&quot;/gi, '"')
-    .replace(/&#0*39;|&apos;/gi, "'")
-    .replace(/&lt;/gi, '<')
-    .replace(/&gt;/gi, '>')
-    .replace(/&#x([0-9a-f]+);/gi, (_match, code: string) => String.fromCodePoint(Number.parseInt(code, 16)))
-    .replace(/&#(\d+);/g, (_match, code: string) => String.fromCodePoint(Number(code)))
-}
-
-function stripHtml(value: string): string {
-  return decodeEntities(
-    value
-      .replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, ' ')
-      .replace(/<style\b[^>]*>[\s\S]*?<\/style>/gi, ' ')
-      .replace(/<br\s*\/?>/gi, ' ')
-      .replace(/<[^>]*>/g, ' '),
-  ).replace(/\s+/g, ' ').trim()
-}
 
 function attribute(fragment: string, name: string): string {
   const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
