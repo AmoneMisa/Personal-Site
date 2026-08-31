@@ -7,10 +7,10 @@ import {
   MAX_VISIBLE_PETS,
   steeringProfiles,
   type CreaturePreset,
+  type SteeringProfile,
   type SwimDirection,
 } from "~/utils/aquariumCreatures";
 type PointerMode = "none" | "interest" | "threat" | "panic";
-import type { SteeringProfile } from "~/utils/aquariumCreatures";
 
 type CreatureState = {
   preset: CreaturePreset;
@@ -424,7 +424,6 @@ function pufferInflation(state: CreatureState, now: number) {
 }
 
 function renderState(state: CreatureState, now = performance.now()) {
-  const profile = steeringProfiles[state.preset.kind];
   const horizontal = Math.max(1, Math.abs(state.vx));
   const rawAngle = Math.atan2(state.vy, horizontal) * (180 / Math.PI);
   const turnAngle = clamp(rawAngle * state.facing * 0.48, -8, 8);

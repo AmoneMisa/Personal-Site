@@ -3,6 +3,8 @@ import test from 'node:test'
 
 import { isLikelyCvPost } from '../server/hiring/domain/telegramCandidateParser.ts'
 
+import { extractProfessionExperience } from '../server/utils/hiringExperience.ts'
+
 // Every one of these was rejected while the intent patterns were anchored
 // with \b next to Cyrillic, where a JavaScript word boundary never fires:
 // only one of eight was recognised, and the Russian and Ukrainian side of the
@@ -43,8 +45,6 @@ test('HR news, career events and empty recommendations are not CVs', () => {
   ]
   for (const post of posts) assert.equal(isLikelyCvPost(post, true), false, post)
 })
-
-import { extractProfessionExperience } from '../server/utils/hiringExperience.ts'
 
 test('a duration in months is not read as that many years', () => {
   // "Опыт работы: 2 мес, Administrator" was being published as two years.

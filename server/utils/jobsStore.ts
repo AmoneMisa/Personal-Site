@@ -12,9 +12,8 @@ import {
 import { syncJobsDb } from '../jobs/infrastructure/database'
 import { useStateStore } from '~~/server/utils/stateStore'
 import { ALL_SOURCES, type Job, type JobSource } from './jobTypes'
-import { refreshRates } from './currency'
+import { refreshRates, toUsd } from './currency'
 import { getSkillMeta } from '~~/shared/jobSkills'
-import { toUsd } from './currency'
 import { enrichJob, PER_YEAR } from './enrich'
 import { fetchHhJobs } from './hhJobSource'
 import {

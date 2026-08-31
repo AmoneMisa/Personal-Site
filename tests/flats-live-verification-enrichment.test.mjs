@@ -28,7 +28,7 @@ test("live OLX verification only returns source-authoritative non-empty fields",
     "bathrooms",
     "bedrooms",
   ]) {
-    assert.doesNotMatch(liveFields, new RegExp(`['\"]${enrichmentOnly}['\"]`));
+    assert.doesNotMatch(liveFields, new RegExp(`['"]${enrichmentOnly}['"]`));
   }
 });
 

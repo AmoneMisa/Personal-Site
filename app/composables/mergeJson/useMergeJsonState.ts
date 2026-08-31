@@ -263,13 +263,13 @@ export function useMergeJsonState() {
         if (!selectedKey.value) return;
         const v = getByPath(autoResultTree.value as any, selectedKey.value);
         if (v === undefined) return;
-        delete pickByKey[selectedKey.value];
+        Reflect.deleteProperty(pickByKey, selectedKey.value);
         patchResultValue(selectedKey.value, v);
     }
 
     function takeAllFrom(which: Truth) {
         truth.value = which;
-        for (const k of Object.keys(pickByKey)) delete pickByKey[k];
+        for (const k of Object.keys(pickByKey)) Reflect.deleteProperty(pickByKey, k);
         addedKeys.clear();
         setResultFromAuto();
     }
@@ -474,7 +474,7 @@ export function useMergeJsonState() {
             const parts = k.split(".").filter(Boolean);
             const last = parts.pop();
             const parent = getByPath(base, parts.join("."));
-            if (parent && typeof parent === "object" && last) delete parent[last];
+            if (parent && typeof parent === "object" && last) Reflect.deleteProperty(parent, last);
         }
 
         resultObj.value = base as JsonValue;
@@ -492,7 +492,7 @@ export function useMergeJsonState() {
         const parts = p.split(".").filter(Boolean);
         const last = parts.pop();
         const parent = getByPath(base, parts.join("."));
-        if (parent && typeof parent === "object" && last) delete parent[last];
+        if (parent && typeof parent === "object" && last) Reflect.deleteProperty(parent, last);
 
         resultObj.value = base as JsonValue;
         resultTextJson.value = jsonStringify(base);

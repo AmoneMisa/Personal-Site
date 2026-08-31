@@ -1,4 +1,4 @@
-import {Canvas, Ellipse, FabricImage} from "fabric";
+import {Ellipse, FabricImage, type Canvas} from "fabric";
 import type {Ref} from "vue";
 import {ref} from "vue";
 import type {

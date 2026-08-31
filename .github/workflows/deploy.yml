@@ -103,7 +103,7 @@ jobs:
           [[ "$matrix" != '[]' ]] && has_builds=true
 
           node_verify=false
-          if matches '^(package(-lock)?\.json|app/|server/|shared/|i18n/|public/|internal/|jobs-worker/|tests/|nuxt\.config\.ts|tsconfig[^/]*\.json)'; then
+          if matches '^(package(-lock)?\.json|eslint\.config\.mjs|app/|server/|shared/|i18n/|public/|internal/|jobs-worker/|scripts/|subscription-bot/|tests/|nuxt\.config\.ts|tsconfig[^/]*\.json)'; then
             node_verify=true
           fi
 
@@ -144,6 +144,10 @@ jobs:
         run: |
           node --experimental-transform-types --check jobs-worker/worker.ts
           node --check jobs-worker/alias-loader.mjs
+
+      - name: Run ESLint
+        if: needs.changes.outputs.node_verify == 'true'
+        run: npm run lint -- --quiet
 
       - name: Verify Compose syntax
         if: needs.changes.outputs.deploy == 'true'

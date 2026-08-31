@@ -81,7 +81,7 @@ export async function auditWebSource(key: string, maxPages = 2): Promise<WebSour
   const byUrl = new Map<string, CvProfile>()
 
   for (let page = 1; page <= maxPages; page += 1) {
-    let html = ''
+    let html: string
     try {
       html = await fetchPage(source.pageUrl(page))
       audit.pagesFetched += 1

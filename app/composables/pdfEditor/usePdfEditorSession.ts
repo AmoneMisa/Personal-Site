@@ -164,7 +164,7 @@ export function usePdfEditorSession(options: PdfEditorSessionOptions) {
   watch(docId, async () => {
     page.value = 1;
     for (const record of [pageJson, pageLinks, autoLoaded, deletedImages]) {
-      Object.keys(record).forEach((key) => delete record[Number(key)]);
+      Object.keys(record).forEach((key) => Reflect.deleteProperty(record, Number(key)));
     }
     resetHistory();
     errorMsg.value = null;

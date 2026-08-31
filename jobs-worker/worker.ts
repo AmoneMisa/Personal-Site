@@ -34,7 +34,7 @@ function installJobSourceOverrides() {
   const originalFetch = globalThis.fetch.bind(globalThis)
 
   globalThis.fetch = (async (input: Parameters<typeof fetch>[0], init?: Parameters<typeof fetch>[1]) => {
-    let url = ''
+    let url: string
     try {
       url = input instanceof Request ? input.url : String(input)
     } catch {

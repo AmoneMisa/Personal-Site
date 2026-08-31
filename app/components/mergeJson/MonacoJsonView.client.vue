@@ -79,10 +79,10 @@ watch(() => props.revealPath, (p) => {
   if (r) editor.revealRangeInCenter(r);
 });
 const emit = defineEmits<{
-  (e: "update:modelValue", v: string): void;
-  (e: "select", key: string): void;
-  (e: "ready", api: { openFind: () => void; revealKey: (k: string) => void }): void;
-  (e: "nav", dir: 1 | -1): void;
+  "update:modelValue": [value: string];
+  select: [key: string];
+  ready: [api: { openFind: () => void; revealKey: (key: string) => void }];
+  nav: [direction: 1 | -1];
 }>();
 
 const el = ref<HTMLDivElement | null>(null);

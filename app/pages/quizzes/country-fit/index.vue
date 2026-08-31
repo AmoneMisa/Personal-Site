@@ -260,6 +260,7 @@ function lsSet(key: string, value: any) {
   try {
     localStorage.setItem(key, JSON.stringify(value));
   } catch {
+    // Persistence is optional when storage is unavailable or full.
   }
 }
 

@@ -18,11 +18,11 @@ type Props = {
 const props = defineProps<Props>();
 
 const emit = defineEmits<{
-  (e: "update:code", v: string): void;
-  (e: "jump-to-diagnostic", id: string): void;
-  (e: "select-diagnostic", id: string | null): void;
-  (e: "request-color-picker", payload: { clientX: number; clientY: number; startOffset: number; endOffset: number; current: string }): void;
-  (e: "monaco-ready", api: any): void;
+  "update:code": [value: string];
+  "jump-to-diagnostic": [id: string];
+  "select-diagnostic": [id: string | null];
+  "request-color-picker": [payload: { clientX: number; clientY: number; startOffset: number; endOffset: number; current: string }];
+  "monaco-ready": [api: any];
 }>();
 </script>
 

@@ -25,7 +25,6 @@ import {
   detectWorkModes,
   extractCandidateContactHours,
   extractCandidateGoalRole,
-  extractCandidateSalaryField,
   extractCandidateSkillField,
   extractCandidateTargetContext,
   extractCandidateWorkHistory,

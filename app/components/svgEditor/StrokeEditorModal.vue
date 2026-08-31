@@ -28,11 +28,6 @@ const parseError = ref<string | null>(null);
 const items = ref<StrokeItem[]>([]);
 const selectedId = ref<string | null>(null);
 
-const pickerOpen = ref(false);
-const pickerColor = ref("#15162A");
-const anchorClientX = ref(24);
-const anchorClientY = ref(24);
-
 const editStrokeWidth = ref<string>("");
 const editStrokeColor = ref<string>("");
 const useCurrentColor = ref(false);

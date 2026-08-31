@@ -8,9 +8,9 @@ type Props = {
 defineProps<Props>();
 
 const emit = defineEmits<{
-  (e: "update:modelValue", v: boolean): void;
-  (e: "confirm"): void;
-  (e: "close"): void;
+  "update:modelValue": [value: boolean];
+  confirm: [];
+  close: [];
 }>();
 
 const { t } = useI18n();

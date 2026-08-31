@@ -38,7 +38,7 @@ export default defineNuxtConfig({
     },
     compatibilityDate: '2025-07-15',
     devtools: {enabled: true},
-    modules: ['@nuxtjs/i18n', '@nuxt/icon', '@nuxt/image'],
+    modules: ['@nuxtjs/i18n', '@nuxt/icon', '@nuxt/image', '@nuxt/eslint'],
     // Keep the existing component tree, but also expose shared service components
     // by their actual component names (ServicePageHeader instead of the path-prefixed
     // ServicesServicePageHeader). Service pages already use <service-page-header>.

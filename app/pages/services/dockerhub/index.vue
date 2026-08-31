@@ -17,7 +17,6 @@ useServiceSeo("dockerSearch");
 // -----------------------------
 const {
   scrollRef: tabsScroll,
-  indicatorRef: tabLine,
   select: selectTab,
 } = useScrollableTabs();
 
@@ -110,7 +109,7 @@ const {
               {{ t(item.label) }}
             </template>
 
-            <template #content="{ item, index }">
+            <template #content="{ index }">
               <section v-if="index === 0">
                 <div class="docker-search__controls docker-search__controls_simple">
                   <div class="docker-search__field">

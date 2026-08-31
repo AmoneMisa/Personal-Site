@@ -328,12 +328,8 @@ function liveScore100(
 
     // remote (job-type aware)
     if (isValidIndex(indices?.remoteWork)) {
-        let syntheticPref = 0;
-        if (user.job.type === "remote") syntheticPref = +30;
-        else if (user.job.type === "local") syntheticPref = -30;
-        else syntheticPref = +10;
-
-        syntheticPref += (pref.worklife_need ?? 0) * 0.3;
+        const jobTypePreference = user.job.type === "remote" ? 30 : user.job.type === "local" ? -30 : 10;
+        const syntheticPref = jobTypePreference + (pref.worklife_need ?? 0) * 0.3;
         addPart(parts, syntheticPref, indices!.remoteWork / 10, 0.6);
     }
 
@@ -544,7 +540,7 @@ export function matchCountries(
     }
 
     // finalize groups
-    let groups = Array.from(map.values());
+    const groups = Array.from(map.values());
 
     // USA variants: sort, take top N, but ensure pinned states are present
     for (const g of groups) {

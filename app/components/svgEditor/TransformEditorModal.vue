@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import Modal from "~/components/common/Modal.vue";
 import CustomInput from "~/components/common/CustomInput.vue";
-import CustomButton from "~/components/common/CustomButton.vue";
 import {
   composeTransform,
   IDENTITY_TRANSFORM_EDIT,

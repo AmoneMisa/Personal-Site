@@ -7,8 +7,6 @@ export type JsonIndex = {
     key: Map<string, PathRange>;      // path -> key token range (optional)
 };
 
-const isNum = (s: string) => /^\d+$/.test(s);
-
 export function buildJsonIndex(text: string): JsonIndex {
     const root = parseTree(text);
     const leaf = new Map<string, PathRange>();

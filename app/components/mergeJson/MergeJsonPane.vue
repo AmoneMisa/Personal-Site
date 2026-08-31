@@ -29,9 +29,9 @@ withDefaults(defineProps<Props>(), {
 });
 
 defineEmits<{
-  (event: "update:modelValue", value: string): void;
-  (event: "select", key: string): void;
-  (event: "nav", direction: 1 | -1): void;
+  "update:modelValue": [value: string];
+  select: [key: string];
+  nav: [direction: 1 | -1];
 }>();
 </script>
 

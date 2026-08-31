@@ -1,3 +1,4 @@
+import { readStoredList, writeStoredList } from "~/utils/browserStorage";
 export interface SearchPreset {
   name: string;
   query: Record<string, string>;
@@ -46,4 +47,3 @@ export function useSearchPresets(options: SearchPresetOptions) {
 
   return { presets, presetName, loadPresets, savePreset, applyPreset, removePreset };
 }
-import { readStoredList, writeStoredList } from "~/utils/browserStorage";

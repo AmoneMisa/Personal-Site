@@ -47,7 +47,6 @@ import {
 import {
   extractSkillDetails,
   extractSkillNames,
-  getSkillMeta,
   type SkillDetail,
 } from '~~/shared/jobSkills'
 
@@ -93,7 +92,7 @@ export function cleanText(raw: string | undefined): string {
       .replace(/<[^>]*$/g, ' ') // strip a trailing tag cut off by truncation
     s = decodeEntities(s)
   }
-  return s.replace(/[\u0000-\u001f]+/g, ' ').replace(/\s+/g, ' ').trim()
+  return s.replace(/\p{Cc}+/gu, ' ').replace(/\s+/g, ' ').trim()
 }
 
 // ---- Currency → USD ----
@@ -386,7 +385,6 @@ export function enrichJob(job: Job): Job {
   const text = `${title} \n ${job.tags.join(' ')} \n ${description}`
   const hiringContext = sharedHiringContext(text, title)
   const allSkillDetails = extractSkillDetails(text)
-  const skills = allSkillDetails.map(({ name }) => name)
   const niceToHave = detectNiceToHave(text)
   const coreDetails = allSkillDetails.filter(({ name }) => !niceToHave.includes(name))
   const niceToHaveDetails = allSkillDetails.filter(({ name }) => niceToHave.includes(name))

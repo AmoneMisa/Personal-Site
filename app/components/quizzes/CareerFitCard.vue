@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type {ProfessionMatch} from "~/composables/useCareerQuizEngine";
 
-const props = defineProps<{ item: ProfessionMatch }>();
+defineProps<{ item: ProfessionMatch }>();
 
 const {t} = useI18n();
 const localePath = useLocalePath();

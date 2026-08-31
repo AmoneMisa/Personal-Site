@@ -16,7 +16,7 @@ export function toFlatText(root: any, order: "asc" | "desc") {
 }
 
 export function parseFlatValueSmart(raw: string) {
-    let s = normalizeQuotes(raw.trim());
+    const s = normalizeQuotes(raw.trim());
 
     const m = s.match(/^\[(string|number|boolean|null)\]$/i);
     if (m) {

@@ -225,7 +225,7 @@ async function crawlChannel(
 ): Promise<{ profiles: CvProfile[]; funnel: ChannelFunnel; cursor: ChannelCursor; mode: 'incremental' | 'backfill' | 'idle' }> {
   const funnel = emptyFunnel()
   const profiles: CvProfile[] = []
-  let next: ChannelCursor = { ...cursor }
+  const next: ChannelCursor = { ...cursor }
   let mode: 'incremental' | 'backfill' | 'idle' = 'idle'
 
   const incremental = await fetchWorkerPage(base, channel, q, {

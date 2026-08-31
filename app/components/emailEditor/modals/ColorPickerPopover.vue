@@ -17,8 +17,8 @@ const props = defineProps<{
 }>();
 
 const emit = defineEmits<{
-  (e: "apply"): void;
-  (e: "close"): void;
+  apply: [];
+  close: [];
 }>();
 
 const format = ref<ColorFormat>("hex");
@@ -237,6 +237,7 @@ async function pickFromScreen() {
     setRgba({ ...parsed, a: rgba.a });
     color.value = buildOutputString();
   } catch {
+    // The user cancelled the native eye-dropper dialog.
   }
 }
 

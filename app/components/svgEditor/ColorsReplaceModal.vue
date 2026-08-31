@@ -25,15 +25,6 @@ const emit = defineEmits<{
 
 const replacements = ref<Record<string, Replacement>>({});
 
-const pickerOpen = ref(false);
-const pickerColor = ref("#15162A");
-const pickerPreferHex = ref(true);
-
-const anchorClientX = ref(24);
-const anchorClientY = ref(24);
-
-const activeKey = ref<string | null>(null);
-
 watch(
     () => open.value,
     (v) => {
@@ -45,21 +36,6 @@ watch(
       replacements.value = next;
     }
 );
-
-function openPicker(key: string, e: MouseEvent) {
-  activeKey.value = key;
-  anchorClientX.value = e.clientX;
-  anchorClientY.value = e.clientY;
-  pickerColor.value = replacements.value[key]?.color || "#15162A";
-  pickerOpen.value = true;
-}
-
-function applyPicker() {
-  const k = activeKey.value;
-  if (!k) return;
-  const cur = replacements.value[k] || { mode: "color" as const, color: "#15162A" };
-  replacements.value[k] = { ...cur, color: pickerColor.value, mode: "color" };
-}
 
 function setCurrentColor(key: string, v: boolean) {
   const cur = replacements.value[key] || { mode: "color" as const, color: "#15162A" };

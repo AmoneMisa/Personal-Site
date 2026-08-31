@@ -16,10 +16,6 @@ const customDescriptionSize = computed(() =>
     hasTextSize(props.descriptionClasses) || hasTextSize(props.ui.description)
 );
 
-const customHeadlineSize = computed(() =>
-    hasTextSize(props.headLineClasses) || hasTextSize(props.ui.headline)
-);
-
 type UI = Partial<{
   root: string
   container: string

@@ -1,6 +1,5 @@
 <script setup lang="ts">
-const buttonTypes = ['default', 'white', 'black', 'gradient-white', 'figure', 'link', 'full'] as const;
-type LegacyType = typeof buttonTypes[number];
+type LegacyType = 'default' | 'white' | 'black' | 'gradient-white' | 'figure' | 'link' | 'full';
 
 type Variant = 'primary' | 'secondary' | 'ghost' | 'full';
 

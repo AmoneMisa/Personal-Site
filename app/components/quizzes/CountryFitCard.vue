@@ -327,15 +327,17 @@ const priceColumns = computed(() => {
           {{ t("quizzes.countryFit.prices.title") }}
         </div>
 
-        <div v-if="hasAnyPrice(item)" class="indices__col" v-for="(col, ci) in priceColumns" :key="'p'+ci">
-          <div class="indices__row" v-for="x in col" :key="String(x.def.key)">
-            <span class="indices__k">
-              <Icon :name="x.def.icon" class="i-icon"/>
-              {{ t(x.def.labelKey) }}
-            </span>
-            <span class="indices__val">{{ fmtPrice(x.value, x.def.fmt) }}</span>
+        <template v-if="hasAnyPrice(item)">
+          <div v-for="(col, ci) in priceColumns" :key="'p'+ci" class="indices__col">
+            <div v-for="x in col" :key="String(x.def.key)" class="indices__row">
+              <span class="indices__k">
+                <Icon :name="x.def.icon" class="i-icon"/>
+                {{ t(x.def.labelKey) }}
+              </span>
+              <span class="indices__val">{{ fmtPrice(x.value, x.def.fmt) }}</span>
+            </div>
           </div>
-        </div>
+        </template>
         <div class="indices__meta text-muted" v-if="indices?.updatedAtISO">
           {{ t("quizzes.countryFit.indices.updated") }}: {{ indices!.updatedAtISO.slice(0, 10) }}
         </div>

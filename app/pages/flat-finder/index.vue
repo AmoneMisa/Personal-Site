@@ -70,21 +70,20 @@ useSeoMeta({
 const defaultCountry = ref("UA");
 const flatFilters = useFlatFilters();
 const {
-  countries, city, district, microdistrict, quartal, mapArea, propertyType, dealType, agency, petFriendly, roomOnlyFilter,
+  countries, city, district, microdistrict, quartal, mapArea, dealType, agency, petFriendly, roomOnlyFilter,
   onlyWithPhotos, childrenRequired, newBuildingOnly, dishwasherOnly, airConditionerOnly,
   parkingOnly, internetOnly, gasOnly, balconyOnly, terraceOnly, privateYardOnly,
   noElevatorOnly, noDepositOnly, communalIncludedOnly, noCommissionOnly,
   tvOnly, microwaveOnly, ovenOnly, bidetOnly, walkInClosetOnly, bathtubOnly, showerOnly, euroLayoutOnly, sort,
-  audience, metro, priceMin, priceMax, roomsMin, roomsMax, bedroomsMin, bedroomsMax,
-  areaMin, areaMax, pricePerSqmMin, pricePerSqmMax, metroMaxM, nearbyKind, nearbyMaxM,
-  floorMin, floorMax, totalFloorsMin, totalFloorsMax, yearMin, yearMax, maxAgeDays,
+  metro, priceMin, priceMax, roomsMin,
+  metroMaxM, nearbyKind,
   displayCurrency, query, source, showAdvanced, buildFeedParams, resetValues: resetFilterValues,
 } = flatFilters;
 const rates = ref<Record<string, number>>({ USD: 1 });
 const { isFresh: isAvailabilityFresh, markFresh: markAvailabilityFresh, forget: forgetAvailability } = useFlatAvailabilityCache();
 
 const {
-  listings, total, loading, loadingMore, warming, failed, sourceErrors, statistics,
+  listings, total, loading, loadingMore, failed, sourceErrors, statistics,
   nextCursor, loadMoreSentinel, loadFeed,
 } = useFlatFeed({ onAvailabilityChecked: markAvailabilityFresh });
 const { listingPhoto, visiblePhotos, markPhotoFailedFromEvent } = useFlatPhotos();
@@ -112,7 +111,6 @@ const {
   hidden,
   recent,
   hiddenIds,
-  favoriteIds,
   isHidden,
   isFavorite,
   toggleFavorite,

@@ -17,7 +17,7 @@ const KIND_STYLE: Record<ShareOgKind, { accent: string; accentSoft: string; labe
 }
 
 function svgText(value: unknown): string {
-  return escapeXml(cleanShareText(value, 260).replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g, ''))
+  return escapeXml(cleanShareText(value, 260).replace(/\p{Cc}+/gu, ''))
 }
 
 function textLines(lines: string[], x: number, y: number, lineHeight: number, className: string): string {

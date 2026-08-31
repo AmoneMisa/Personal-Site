@@ -14,9 +14,9 @@ const props = defineProps<{
 }>();
 
 const emit = defineEmits<{
-  (e: "update:value", payload: { path: string; value: string }): void;
-  (e: "add", path: string): void;
-  (e: "remove", path: string): void;
+  "update:value": [payload: { path: string; value: string }];
+  add: [path: string];
+  remove: [path: string];
 }>();
 
 const newPath = ref("");

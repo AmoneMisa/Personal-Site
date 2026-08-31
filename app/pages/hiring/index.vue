@@ -25,11 +25,11 @@ import { useInfiniteFeed } from "~/composables/search/useInfiniteFeed";
 import { ANY_SELECT_VALUE, useNullableSelect } from "~/composables/search/useNullableSelect";
 import { useShareLink } from "~/composables/search/useShareLink";
 import { regionalSearchCountry } from "~/utils/search/regionalCountry";
-import {
-  type HiringCvProfile as CvProfile,
-  type HiringFeedResult as FeedResult,
-  type HiringSourceOption as SourceOption,
-  type HiringView,
+import type {
+  HiringCvProfile as CvProfile,
+  HiringFeedResult as FeedResult,
+  HiringSourceOption as SourceOption,
+  HiringView,
 } from "~/types/hiring";
 import { queryString } from "~/utils/queryParams";
 import { hiringProfessionLocale } from "~~/shared/hiringProfessionLabels";
@@ -68,7 +68,7 @@ useSeoMeta({
 
 const hiringFilters = useHiringFilters();
 const {
-  countries, city, remote, experienceMin, salaryFrom, salaryTo, salaryCurrency, sort,
+  countries, city, remote, experienceMin, sort,
   ageMin, ageMax, gender, professions, professionValues, query, seniority, skills, source,
   showAdvanced, buildFeedParams, resetValues: resetFilterValues,
 } = hiringFilters;
@@ -83,7 +83,6 @@ const {
   hidden,
   recent,
   hiddenIds,
-  favoriteIds,
   isHidden,
   isFavorite,
   toggleFavorite,
@@ -220,7 +219,6 @@ function loadPersonalState() {
 
 const activeProfiles = computed(() => profiles.value.filter((item) => !hiddenIds.value.has(item.id)));
 const {
-  canonicalSkillValues,
   canonicalSkillQuery,
   candidateMatchFilters,
   matchesLocally,

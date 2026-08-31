@@ -9,7 +9,7 @@ type Props = {
   disableConfirm?: boolean;
 };
 
-const props = withDefaults(defineProps<Props>(), {
+withDefaults(defineProps<Props>(), {
   subtitle: "",
   confirmText: "OK",
   cancelText: "Cancel",
@@ -18,9 +18,9 @@ const props = withDefaults(defineProps<Props>(), {
 });
 
 const emit = defineEmits<{
-  (e: "update:modelValue", v: boolean): void;
-  (e: "confirm"): void;
-  (e: "close"): void;
+  "update:modelValue": [value: boolean];
+  confirm: [];
+  close: [];
 }>();
 
 function close() {

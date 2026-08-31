@@ -4,6 +4,7 @@ import USelectMenu from "~/components/U/SelectMenu.vue";
 import type { SearchFilterField, SearchFilterValue } from "~/types/search";
 
 const props = defineProps<{ field: SearchFilterField }>();
+const inputValue = computed(() => props.field.value as string | number | null | undefined);
 
 function update(value: SearchFilterValue) {
   if (props.field.control === "number") {
@@ -23,7 +24,7 @@ function updateAndCommit(value: SearchFilterValue) {
   <div v-if="!field.hidden" class="search-filter-control" :class="field.class">
     <UInput
       v-if="field.control === 'text' || field.control === 'number'"
-      :model-value="field.value as string | number | null | undefined"
+      :model-value="inputValue"
       :type="field.control === 'number' ? 'number' : 'text'"
       :label="field.label"
       :placeholder="field.placeholder"

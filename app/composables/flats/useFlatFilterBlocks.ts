@@ -35,7 +35,7 @@ export function useFlatFilterBlocks(options: {
     dealType, petFriendly, childrenRequired, onlyWithPhotos, newBuildingOnly,
     noElevatorOnly, noDepositOnly, communalIncludedOnly, noCommissionOnly,
     commissionPercentMin, commissionPercentMax,
-    tvOnly, microwaveOnly, ovenOnly, bidetOnly, walkInClosetOnly, bathtubOnly, showerOnly, euroLayoutOnly,
+    euroLayoutOnly,
   } = options.filters;
   const update = <T>(target: Model<T>) => (value: SearchFilterValue) => { target.value = value as T; };
   const commit = () => options.scheduleLoad();

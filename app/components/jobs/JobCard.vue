@@ -210,7 +210,7 @@ function stopMetaDrag(event: PointerEvent) {
         <UiDraggablePills :items="tagPills" :visible-hint-count="3" />
       </div>
       <div class="job-card__bottom">
-        <div class="job-card__byline text-muted" :title="bylineTitle"><span class="job-card__company">{{ job.company }}</span><span v-if="officeLocationsLabel" class="job-card__dot">·</span><span v-if="officeLocationsLabel">{{ officeLocationsLabel }}</span><span v-else-if="countryLabel" class="job-card__dot">·</span><span v-else-if="countryLabel">{{ countryLabel }}</span></div>
+        <div class="job-card__byline text-muted" :title="bylineTitle"><span class="job-card__company">{{ job.company }}</span><span v-if="officeLocationsLabel" class="job-card__dot">·</span><span v-if="officeLocationsLabel">{{ officeLocationsLabel }}</span><template v-else-if="countryLabel"><span class="job-card__dot">·</span><span>{{ countryLabel }}</span></template></div>
         <div class="job-card__actions">
           <button type="button" class="job-card__action" :class="{ 'job-card__action_active': favorite }" :aria-label="favorite ? t('removeFavorite') : t('addFavorite')" :title="favorite ? t('removeFavorite') : t('addFavorite')" @click.stop="emit('favorite', job)">
             <u-icon name="i-lucide-heart" />

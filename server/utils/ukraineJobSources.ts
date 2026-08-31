@@ -569,7 +569,7 @@ export function parseWorkUaCategoryIndex(html: string): PublicBoardStream[] {
 
 export function parseRobotaUaProfessionalStreams(html: string): PublicBoardStream[] {
   const scope = section(html, /Професійні\s+сфери/iu, /Популярні\s+професії/iu)
-  const pattern = /<a\b[^>]*href=["'](?:https?:\/\/(?:www\.)?robota\.ua)?\/zapros\/([^\/?#"']+)(?:\/ukraine)?[^"']*["'][^>]*>([\s\S]*?)<\/a>/gi
+  const pattern = /<a\b[^>]*href=["'](?:https?:\/\/(?:www\.)?robota\.ua)?\/zapros\/([^/?#"']+)(?:\/ukraine)?[^"']*["'][^>]*>([\s\S]*?)<\/a>/gi
   const streams = new Map<string, PublicBoardStream>()
   let match: RegExpExecArray | null
 

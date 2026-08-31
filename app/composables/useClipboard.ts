@@ -15,9 +15,11 @@ export function useClipboard() {
     field.style.opacity = "0";
     document.body.appendChild(field);
     field.select();
-    let copied = false;
-    try { copied = document.execCommand("copy"); } finally { field.remove(); }
-    return copied;
+    try {
+      return document.execCommand("copy");
+    } finally {
+      field.remove();
+    }
   }
 
   return { copyText };

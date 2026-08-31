@@ -60,7 +60,7 @@ export function useEmailEditorActions(state: ReturnType<typeof import("./useEmai
     }
 
     function removeFakePath(path: string) {
-        delete state.fakeData.values[path];
+        Reflect.deleteProperty(state.fakeData.values, path);
     }
 
     function onToolbarAction(action: string) {

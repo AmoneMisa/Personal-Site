@@ -44,7 +44,6 @@ interface PdfCanvasControllerOptions {
 
 export function usePdfCanvasController(options: PdfCanvasControllerOptions) {
   const {
-    page,
     editor,
     selected,
     previewImg,

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type {LifeValueResult} from "~/composables/useLifeValuesQuizEngine";
 
-const props = defineProps<{ item: LifeValueResult; rank: number }>();
+defineProps<{ item: LifeValueResult; rank: number }>();
 
 const {t} = useI18n();
 </script>

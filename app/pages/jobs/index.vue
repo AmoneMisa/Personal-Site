@@ -101,10 +101,10 @@ function convertPeriod(amount: number, from: SourcePeriod | Period, to: Period):
 
 const jobFilters = useJobFilters();
 const {
-  query, source, salaryMin, displayCurrency, displayPeriod, sort, countries, cities,
-  includeRu, includeBy, workMode, relocation, employmentKind, hasSalary, maxExperience,
-  foreignerOnly, hideRisky, noExperience, language, languageLevel, excludeLanguages,
-  skills, showAdvanced, buildFeedParams, resetValues: resetFilterValues,
+  query, source, displayCurrency, displayPeriod, sort,
+  workMode, relocation, employmentKind,
+  language, languageLevel,
+  showAdvanced, buildFeedParams, resetValues: resetFilterValues,
 } = jobFilters;
 
 // Reka UI reserves an empty string for clearing a combobox and throws when an
@@ -135,8 +135,6 @@ const savedView = ref<SavedJobsView>("active");
 const {
   favorites: favoriteJobs,
   hidden: hiddenJobs,
-  hiddenIds,
-  favoriteIds,
   isHidden,
   isFavorite,
   toggleFavorite: toggleSavedFavorite,

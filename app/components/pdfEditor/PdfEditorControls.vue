@@ -3,13 +3,25 @@ import type {PdfEditorMode, PdfEditorState, PdfSelectedObjectState, PdfTextAlign
 
 defineProps<{editor: PdfEditorState; selected: PdfSelectedObjectState; fontFamilies: string[]; busy: boolean; canUndo: boolean; canRedo: boolean}>();
 defineEmits<{
-  (event: "toggle-full"): void;
-  (event: "set-mode", mode: PdfEditorMode): void;
-  (event: "add-rect" | "add-circle" | "add-text" | "add-image"): void;
-  (event: "undo" | "redo" | "remove" | "clear" | "load-text" | "replace-image"): void;
-  (event: "apply-font" | "apply-font-size" | "apply-color" | "apply-opacity" | "apply-geometry"): void;
-  (event: "toggle-style", style: "bold" | "italic" | "underline"): void;
-  (event: "align", align: PdfTextAlign): void;
+  "toggle-full": [];
+  "set-mode": [mode: PdfEditorMode];
+  "add-rect": [];
+  "add-circle": [];
+  "add-text": [];
+  "add-image": [];
+  undo: [];
+  redo: [];
+  remove: [];
+  clear: [];
+  "load-text": [];
+  "replace-image": [];
+  "apply-font": [];
+  "apply-font-size": [];
+  "apply-color": [];
+  "apply-opacity": [];
+  "apply-geometry": [];
+  "toggle-style": [style: "bold" | "italic" | "underline"];
+  align: [alignment: PdfTextAlign];
 }>();
 const {t} = useI18n();
 const drawingTools: {mode: PdfEditorMode; icon: string}[] = [

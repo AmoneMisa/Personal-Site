@@ -229,7 +229,7 @@ function desiredSalary(profile: CvProfile, targetCurrency: string): number | nul
 function sortCandidateProfiles(profiles: CvProfile[], sort: string, salaryCurrency: string): void {
   const recent = (a: CvProfile, b: CvProfile) => activityTimestamp(b) - activityTimestamp(a)
   profiles.sort((a, b) => {
-    let primary = 0
+    let primary: number
     switch (sort) {
       case 'name_asc': {
         const an = (a.name || '').trim()

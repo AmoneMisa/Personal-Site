@@ -37,7 +37,7 @@ const decorationsApi = useEmailEditorMonacoDecorations({
   onRequestColorPicker: (p) => emit("request-color-picker", p),
 });
 
-function languageFor(engine: TemplateEngine) {
+function languageFor(_engine: TemplateEngine) {
   return "html";
 }
 
