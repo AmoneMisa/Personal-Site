@@ -79,12 +79,26 @@ pull_if_needed() {
   "${compose[@]}" pull "$@"
 }
 
+run_database_migrations() {
+  echo "Applying versioned Jobs/Hiring/queue migrations..."
+  "${compose[@]}" run --rm --no-deps jobs-worker \
+    node --experimental-transform-types \
+      ./scripts/migrate-database.ts
+}
+
 prepare_database_schema() {
-  echo "Preparing Jobs/Hiring/queue schemas before runtime traffic..."
+  # Transitional read-model/backfill preparation. Once all historical candidate
+  # data migrations are versioned, this compatibility preflight can disappear.
+  echo "Preparing Jobs/Hiring/queue read models before runtime traffic..."
   "${compose[@]}" run --rm --no-deps jobs-worker \
     node --experimental-transform-types \
       --import ./jobs-worker/alias-loader.mjs \
       ./scripts/prepare-database-schema.ts
+}
+
+prepare_databases() {
+  run_database_migrations
+  prepare_database_schema
 }
 
 case "$target" in
@@ -94,7 +108,7 @@ case "$target" in
     else
       "${compose[@]}" pull
     fi
-    prepare_database_schema
+    prepare_databases
     "${compose[@]}" up -d --no-build --remove-orphans
     ;;
   frontend)
@@ -103,7 +117,7 @@ case "$target" in
     ;;
   jobs)
     pull_if_needed frontend jobs-worker job-browser-fetcher
-    prepare_database_schema
+    prepare_databases
     "${compose[@]}" up -d --no-build job-browser-fetcher frontend jobs-worker
     ;;
   backend)
