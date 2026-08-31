@@ -19,7 +19,6 @@ import {
   publicCandidateSalary,
 } from '../../utils/hiringCandidatePresentation'
 import {
-  ensureCurrentCandidateTable,
   rebuildCurrentCandidates,
   syncCurrentCandidateKeys,
 } from './currentCandidateReadModel'
@@ -66,77 +65,23 @@ function ensureSchema(): Promise<void> {
   if (schemaReady) return schemaReady
   const name = schema()
   schemaReady = (async () => {
-    await db().query(`CREATE SCHEMA IF NOT EXISTS ${name};`)
-    await db().query(`
-      CREATE TABLE IF NOT EXISTS ${name}.candidates (
-        id BIGSERIAL PRIMARY KEY,
-        source VARCHAR(32) NOT NULL,
-        country VARCHAR(8) NOT NULL,
-        source_id TEXT NOT NULL,
-        source_handle TEXT NOT NULL DEFAULT '',
-        name TEXT NOT NULL DEFAULT '',
-        role TEXT NOT NULL DEFAULT '',
-        city TEXT,
-        district TEXT,
-        remote BOOLEAN,
-        experience_years DOUBLE PRECISION,
-        created_at TIMESTAMPTZ NOT NULL,
-        url TEXT NOT NULL DEFAULT '',
-        first_seen_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-        last_seen_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-        active BOOLEAN NOT NULL DEFAULT TRUE,
-        data JSONB NOT NULL DEFAULT '{}'::jsonb,
-        CONSTRAINT candidates_source_country_id_unique UNIQUE (source, country, source_id)
-      );
-    `)
-    await db().query(`
-      CREATE TABLE IF NOT EXISTS ${name}.source_runs (
-        source VARCHAR(32) NOT NULL,
-        handle TEXT NOT NULL,
-        country VARCHAR(8) NOT NULL DEFAULT '',
-        status VARCHAR(16) NOT NULL,
-        fetched INTEGER NOT NULL DEFAULT 0,
-        candidates INTEGER NOT NULL DEFAULT 0,
-        error TEXT,
-        checked_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-        last_success_at TIMESTAMPTZ,
-        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-        PRIMARY KEY (source, handle)
-      );
-    `)
-    await db().query(`ALTER TABLE ${name}.candidates ADD COLUMN IF NOT EXISTS public_id BIGINT`)
-    await db().query(`ALTER TABLE ${name}.candidates ADD COLUMN IF NOT EXISTS origin TEXT`)
-    await db().query(`ALTER TABLE ${name}.candidates ADD COLUMN IF NOT EXISTS source_key TEXT`)
-    await db().query(`ALTER TABLE ${name}.candidates ADD COLUMN IF NOT EXISTS provider TEXT`)
-    await db().query(`ALTER TABLE ${name}.candidates ADD COLUMN IF NOT EXISTS canonical_city TEXT`)
-    await db().query(`ALTER TABLE ${name}.candidates ADD COLUMN IF NOT EXISTS activity_at TIMESTAMPTZ`)
-    await db().query(`ALTER TABLE ${name}.candidates ADD COLUMN IF NOT EXISTS gender TEXT`)
-    await db().query(`ALTER TABLE ${name}.candidates ADD COLUMN IF NOT EXISTS age SMALLINT`)
-    await db().query(`ALTER TABLE ${name}.candidates ADD COLUMN IF NOT EXISTS salary_min_usd DOUBLE PRECISION`)
-    await db().query(`ALTER TABLE ${name}.candidates ADD COLUMN IF NOT EXISTS salary_max_usd DOUBLE PRECISION`)
-    await db().query(`ALTER TABLE ${name}.candidates ADD COLUMN IF NOT EXISTS seniority TEXT`)
-    await db().query(`ALTER TABLE ${name}.candidates ADD COLUMN IF NOT EXISTS professions TEXT[] NOT NULL DEFAULT ARRAY[]::TEXT[]`)
-    await db().query(`ALTER TABLE ${name}.candidates ADD COLUMN IF NOT EXISTS sectors TEXT[] NOT NULL DEFAULT ARRAY[]::TEXT[]`)
-    await db().query(`ALTER TABLE ${name}.candidates ADD COLUMN IF NOT EXISTS skills TEXT[] NOT NULL DEFAULT ARRAY[]::TEXT[]`)
-    await db().query(`ALTER TABLE ${name}.candidates ADD COLUMN IF NOT EXISTS languages TEXT[] NOT NULL DEFAULT ARRAY[]::TEXT[]`)
-    await db().query(`ALTER TABLE ${name}.candidates ADD COLUMN IF NOT EXISTS description TEXT NOT NULL DEFAULT ''`)
-    await db().query(`ALTER TABLE ${name}.candidates ADD COLUMN IF NOT EXISTS search_text TEXT NOT NULL DEFAULT ''`)
-    await db().query(`ALTER TABLE ${name}.candidates ADD COLUMN IF NOT EXISTS dedupe_key TEXT`)
-    await db().query(`CREATE INDEX IF NOT EXISTS candidates_active_created_idx ON ${name}.candidates(active, created_at DESC);`)
-    await db().query(`CREATE INDEX IF NOT EXISTS candidates_country_created_idx ON ${name}.candidates(country, created_at DESC);`)
-    await db().query(`CREATE INDEX IF NOT EXISTS candidates_handle_idx ON ${name}.candidates(source_handle);`)
-    await db().query(`CREATE INDEX IF NOT EXISTS candidates_data_gin_idx ON ${name}.candidates USING GIN(data jsonb_path_ops);`)
-    await db().query(`CREATE INDEX IF NOT EXISTS candidates_public_id_idx ON ${name}.candidates(public_id) WHERE active = TRUE`)
-    await db().query(`CREATE INDEX IF NOT EXISTS candidates_active_activity_idx ON ${name}.candidates(activity_at DESC, id DESC) WHERE active = TRUE`)
-    await db().query(`CREATE INDEX IF NOT EXISTS candidates_city_lower_idx ON ${name}.candidates((LOWER(canonical_city)), activity_at DESC) WHERE active = TRUE`)
-    await db().query(`CREATE INDEX IF NOT EXISTS candidates_professions_gin_idx ON ${name}.candidates USING GIN(professions)`)
-    await db().query(`CREATE INDEX IF NOT EXISTS candidates_skills_gin_idx ON ${name}.candidates USING GIN(skills)`)
-    await db().query(`CREATE INDEX IF NOT EXISTS candidates_languages_gin_idx ON ${name}.candidates USING GIN(languages)`)
-    await db().query(`CREATE INDEX IF NOT EXISTS candidates_search_idx ON ${name}.candidates USING GIN(to_tsvector('simple', search_text))`)
-    await db().query(`CREATE INDEX IF NOT EXISTS candidates_dedupe_idx ON ${name}.candidates(dedupe_key, created_at DESC, id DESC) WHERE active = TRUE`)
-    await ensureCurrentCandidateTable(db(), name)
-    console.log(`[hiring:db] schema ${name} ready`)
+    const relations = await db().query(
+      `SELECT
+         to_regclass($1)::text AS candidates,
+         to_regclass($2)::text AS source_runs,
+         to_regclass($3)::text AS candidate_current,
+         to_regclass($4)::text AS migrations`,
+      [
+        `${name}.candidates`,
+        `${name}.source_runs`,
+        `${name}.candidate_current`,
+        `${name}._site_migrations`,
+      ],
+    )
+    const row = relations.rows[0]
+    if (!row?.candidates || !row?.source_runs || !row?.candidate_current || !row?.migrations) {
+      throw new Error(`Hiring schema ${name} is not migrated; run scripts/migrate-database.ts before runtime`)
+    }
   })().catch((error) => {
     schemaReady = undefined
     throw error
@@ -274,8 +219,10 @@ async function finishReadModelBackfill(): Promise<void> {
   candidateBackfillComplete = true
 }
 
-async function backfillCandidateReadModel(): Promise<void> {
-  if (candidateBackfillComplete) return
+export async function backfillDbCandidateReadModel(): Promise<void> {
+  if (!hiringDbEnabled() || candidateBackfillComplete) return
+  await ensureSchema()
+
   for (let batch = 0; batch < Math.ceil(HYDRATE_LIMIT / UPSERT_BATCH); batch += 1) {
     const legacy = await db().query<{
       data: CvProfile
@@ -318,7 +265,6 @@ export async function loadDbCandidates(): Promise<CvProfile[]> {
   if (!hiringDbEnabled()) return []
   try {
     await ensureSchema()
-    await backfillCandidateReadModel()
     const result = await db().query<{ data: CvProfile }>(
       `SELECT candidate.data
        FROM ${schema()}.candidate_current current
@@ -528,7 +474,6 @@ export async function queryDbCandidates(
   if (!hiringDbEnabled()) return null
   try {
     await ensureSchema()
-    await backfillCandidateReadModel()
 
     const pageFilter = candidateFilter(params)
     const pageValues = [...pageFilter.values, limit, offset]
