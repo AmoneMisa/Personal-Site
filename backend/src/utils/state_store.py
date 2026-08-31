@@ -4,12 +4,43 @@ import json
 import os
 import time
 import uuid
+from contextlib import asynccontextmanager
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
 
 _STATE_DIR = Path(os.getenv("BACKEND_STATE_DIR", "/var/app/state/backend"))
-_locks: dict[str, asyncio.Lock] = {}
 _store = None
+
+
+@dataclass
+class _KeyLockState:
+    lock: asyncio.Lock
+    users: int = 0
+
+
+_locks: dict[str, _KeyLockState] = {}
+_locks_guard = asyncio.Lock()
+
+
+@asynccontextmanager
+async def _key_lock(key: str):
+    """Serialize one key without retaining one asyncio.Lock per historical key."""
+    async with _locks_guard:
+        state = _locks.get(key)
+        if state is None:
+            state = _KeyLockState(lock=asyncio.Lock())
+            _locks[key] = state
+        state.users += 1
+
+    try:
+        async with state.lock:
+            yield
+    finally:
+        async with _locks_guard:
+            state.users -= 1
+            if state.users == 0 and _locks.get(key) is state:
+                _locks.pop(key, None)
 
 
 def _path(key: str) -> Path:
@@ -62,8 +93,7 @@ class PersistentFileKV:
         return await asyncio.to_thread(_read_sync, key)
 
     async def set(self, key: str, value, ex=None, px=None, nx=False):
-        lock = _locks.setdefault(key, asyncio.Lock())
-        async with lock:
+        async with _key_lock(key):
             if nx and await self.get(key) is not None:
                 return None
 
@@ -79,8 +109,7 @@ class PersistentFileKV:
     async def delete(self, *keys: str):
         removed = 0
         for key in keys:
-            lock = _locks.setdefault(key, asyncio.Lock())
-            async with lock:
+            async with _key_lock(key):
                 if await asyncio.to_thread(_remove_sync, key):
                     removed += 1
         return removed
