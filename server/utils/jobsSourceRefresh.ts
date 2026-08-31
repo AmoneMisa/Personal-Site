@@ -1,62 +1,16 @@
 import { useStateStore } from '~~/server/utils/stateStore'
-import { ALL_SOURCES, type Job, type JobSource } from './jobTypes'
-import { isJobSourceAvailable } from './jobSourceConfig'
-import { enrichJob } from './enrich'
-import { syncJobsSearchIndex } from './jobsElastic'
 import { syncJobsDb } from '../jobs/infrastructure/database'
-import { fetchExtraTelegramJobs } from './extraTelegramJobSources'
-import { fetchLinkedInJobs } from './linkedinSource'
-import { fetchFacebookJobs, fetchThreadsJobs } from './socialJobSources'
-import { fetchExtraPublicJobs } from './extraPublicJobSources'
-import { fetchCuratedRemoteJobs } from './curatedRemoteJobSources'
-import { fetchUsaTechCompanyJobs } from './usaTechCompanySources'
-import { fetchRegionalTechCompanyJobs } from './regionalTechCompanySources'
-import { fetchRegionalGeneralEmployerJobs } from './regionalGeneralEmployerSources'
-import { fetchUsaVisaSponsorJobs } from './usaVisaSponsorSource'
-import { fetchSourceExpansionJobs } from './sourceExpansionJobs'
-import { fetchAviationExpansionJobs } from './aviationExpansionJobs'
-import { fetchIntelliasJobs } from './intelliasJobs'
-import { fetchJobsUaJobs } from './jobsUaSource'
-import { fetchHhJobs } from './hhJobSource'
-import { fetchUkraineBoardJobs } from './ukraineJobSources'
-import {
-  fetchAdzuna,
-  fetchArbeitnow,
-  fetchCompanies,
-  fetchDevKg,
-  fetchIshGo,
-  fetchItJobsUz,
-  fetchJobicy,
-  fetchJooble,
-  fetchOlx,
-  fetchRemoteOk,
-  fetchRemotive,
-  fetchRss,
-  fetchTheMuse,
-  fetchTelegram,
-  isLikelyTelegramVacancy,
-} from './sources'
+import { enrichJob } from './enrich'
+import { isJobSourceAvailable } from './jobSourceConfig'
+import { fetchJobSource } from './jobSourceFetchers'
+import { syncJobsSearchIndex } from './jobsElastic'
+import { ALL_SOURCES, type Job, type JobSource } from './jobTypes'
+import { isLikelyTelegramVacancy } from './sources'
 
 const STORE_KEY = 'jobs:store:v4'
 const STORE_TTL_SECONDS = 15 * 86_400
 const MAX_AGE_DAYS = 14
 const STALE_DAYS = 4
-const SOURCE_TIMEOUT_MS = 30_000
-// `companies` is intentionally an umbrella source: official ATS feeds, career
-// pages, regional boards and aviation sources all run as isolated sub-loaders.
-// Give that fan-out room to finish while keeping one source refresh bounded.
-const COMPANIES_SOURCE_TIMEOUT_MS = 150_000
-// Regional LinkedIn pagination and serialized Threads searches intentionally do
-// more work than ordinary API/RSS sources. Keep them below the queue worker's
-// execution budget, but do not abort them at the generic 30-second ceiling.
-const LINKEDIN_SOURCE_TIMEOUT_MS = Math.max(
-  60_000,
-  Math.min(170_000, Number(process.env.LINKEDIN_SOURCE_TIMEOUT_MS) || 150_000),
-)
-const SOCIAL_SOURCE_TIMEOUT_MS = Math.max(
-  60_000,
-  Math.min(170_000, Number(process.env.SOCIAL_JOB_SOURCE_TIMEOUT_MS) || 150_000),
-)
 
 type StoredJob = Job & {
   lastSeen: string
@@ -120,72 +74,6 @@ export function sanitizeFetchedJob(input: Job): Job {
   return description === raw ? job : { ...job, description: description || undefined }
 }
 
-async function fetchAllTelegram(q: string): Promise<Job[]> {
-  const [primary, extra] = await Promise.all([
-    fetchTelegram(q),
-    fetchExtraTelegramJobs(q),
-  ])
-  return [...primary, ...extra]
-}
-
-async function fetchAllCompanies(q: string): Promise<Job[]> {
-  const loaders = [
-    { label: 'companies', load: () => fetchCompanies(q) },
-    { label: 'public-boards', load: () => fetchExtraPublicJobs(q) },
-    // These boards used to rely on the generic public-board anchor parser.
-    // Keep them inside the companies umbrella, but let source-aware adapters
-    // overwrite matching URLs with better company/location/date fidelity.
-    { label: 'curated-remote-boards', load: () => fetchCuratedRemoteJobs(q) },
-    { label: 'usa-tech-companies', load: () => fetchUsaTechCompanyJobs(q) },
-    { label: 'regional-tech-companies', load: () => fetchRegionalTechCompanyJobs(q) },
-    { label: 'regional-general-employers', load: () => fetchRegionalGeneralEmployerJobs(q) },
-    { label: 'usa-visa-sponsors', load: () => fetchUsaVisaSponsorJobs(q) },
-    { label: 'source-expansion', load: () => fetchSourceExpansionJobs(q) },
-    { label: 'aviation-expansion', load: () => fetchAviationExpansionJobs(q) },
-    { label: 'intellias', load: () => fetchIntelliasJobs(q) },
-    { label: 'jobs-ua', load: () => fetchJobsUaJobs(q) },
-    { label: 'ua-boards', load: () => fetchUkraineBoardJobs(q) },
-  ]
-
-  const results = await Promise.allSettled(loaders.map(({ load }) => load()))
-  const jobs: Job[] = []
-
-  results.forEach((result, index) => {
-    if (result.status === 'fulfilled') {
-      jobs.push(...result.value)
-      return
-    }
-
-    console.warn(
-      `[jobs] ${loaders[index]!.label} sub-source failed:`,
-      result.reason instanceof Error ? result.reason.message : String(result.reason),
-    )
-  })
-
-  return jobs
-}
-
-const FETCHERS: Record<JobSource, (q: string) => Promise<Job[]>> = {
-  remotive: fetchRemotive,
-  remoteok: fetchRemoteOk,
-  arbeitnow: fetchArbeitnow,
-  themuse: fetchTheMuse,
-  jobicy: fetchJobicy,
-  hh: fetchHhJobs,
-  adzuna: fetchAdzuna,
-  jooble: fetchJooble,
-  rss: fetchRss,
-  companies: fetchAllCompanies,
-  linkedin: fetchLinkedInJobs,
-  facebook: fetchFacebookJobs,
-  threads: fetchThreadsJobs,
-  devkg: fetchDevKg,
-  ishgo: fetchIshGo,
-  itjobsuz: fetchItJobsUz,
-  telegram: fetchAllTelegram,
-  olx: fetchOlx,
-}
-
 let mergeLock: Promise<unknown> = Promise.resolve()
 
 export function configuredJobSources(): JobSource[] {
@@ -216,32 +104,6 @@ function prune(list: StoredJob[], now: number): StoredJob[] {
 
     return true
   })
-}
-
-function sourceTimeoutMs(source: JobSource): number {
-  if (source === 'companies') return COMPANIES_SOURCE_TIMEOUT_MS
-  if (source === 'linkedin') return LINKEDIN_SOURCE_TIMEOUT_MS
-  if (source === 'facebook' || source === 'threads') return SOCIAL_SOURCE_TIMEOUT_MS
-  return SOURCE_TIMEOUT_MS
-}
-
-async function fetchSource(source: JobSource): Promise<Job[]> {
-  let timer: ReturnType<typeof setTimeout> | undefined
-  const timeoutMs = sourceTimeoutMs(source)
-
-  try {
-    return await Promise.race([
-      FETCHERS[source](''),
-      new Promise<Job[]>((_, reject) => {
-        timer = setTimeout(
-          () => reject(new Error(`timed out after ${timeoutMs / 1000}s`)),
-          timeoutMs,
-        )
-      }),
-    ])
-  } finally {
-    if (timer) clearTimeout(timer)
-  }
 }
 
 async function mergeFetchedSource(source: JobSource, jobs: Job[]) {
@@ -346,7 +208,7 @@ export async function refreshJobSource(source: JobSource) {
 }
 
 async function runJobSourceRefresh(source: JobSource) {
-  const jobs = await fetchSource(source)
+  const jobs = await fetchJobSource(source)
 
   // Fetching is parallel; mutation of the shared persistent store is serialized.
   const operation = mergeLock.then(
