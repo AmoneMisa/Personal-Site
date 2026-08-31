@@ -70,8 +70,8 @@ This document is the working execution plan for the site-wide technical audit. I
 - [x] Cap country-index bundle key counts and validate keys before caching/fan-out.
 - [x] Bound concurrent public country-index and DockerHub requests so fixed per-request fan-out has a hard process ceiling.
 - [x] Remove the persistent-file store's never-evicted per-key `asyncio.Lock` registry while preserving NX atomicity.
-- [ ] Bound persistent cache-file cardinality for long-running valid-but-unique public keys/repositories.
-- [ ] Finish DockerHub cardinality controls beyond syntax/length validation (for example namespace quota/cleanup policy).
+- [x] Bound persistent cache-file cardinality and remove expired/corrupt files through periodic state-store sweeps.
+- [ ] Finish DockerHub-specific churn controls beyond syntax/length validation and the global cache cap if production traffic shows cache-thrashing pressure.
 
 ---
 
@@ -98,15 +98,16 @@ This document is the working execution plan for the site-wide technical audit. I
 
 ### Hiring
 
-- [ ] Stop deduplicating the entire active candidate table on each read.
-- [ ] Move canonical/current-candidate dedupe to ingestion or a maintained read model.
-- [ ] Split/cached facets and statistics as for Jobs.
+- [x] Stop deduplicating the entire active candidate table on each ordinary read.
+- [x] Maintain a canonical/current-candidate read model and synchronize affected dedupe keys at ingestion time.
+- [x] Separate/cache Hiring analytics so ordinary page reads do not rebuild the complete statistics payload on every request.
 
 ### Schema lifecycle
 
-- [ ] Remove DDL and backfills from request paths.
+- [ ] Remove DDL and backfills from request/runtime paths.
 - [ ] Move schema changes/backfills into versioned migrations/deploy jobs.
-- [ ] Reduce runtime DB privileges after migrations are externalized.
+- [x] Add an explicit pre-deploy schema/read-model preparation step as a transition so first user requests no longer have to be the intended migration trigger.
+- [ ] Reduce runtime DB privileges after migrations are fully externalized.
 
 **Validation:** use `EXPLAIN (ANALYZE, BUFFERS)` against staging/production-like data before claiming measured query-latency improvements. The source-level changes above reduce work structurally but are not a substitute for production plans/latency measurements.
 
@@ -119,7 +120,7 @@ This document is the working execution plan for the site-wide technical audit. I
 - [x] Preserve the previous successful manifest and provide `rollback.sh` to restore the exact source/image revision.
 - [x] Split liveness from readiness for the FastAPI backend and add a separate Nuxt readiness endpoint.
 - [x] Readiness verifies writable persistent state and configured PostgreSQL dependencies; backend readiness also verifies required conversion binaries.
-- [ ] Add queue-worker health signals such as last dispatch/completion and pending/dead counts; Docker health still only proves PID liveness.
+- [x] Replace jobs-worker PID-only health with a persisted event-loop heartbeat plus PostgreSQL queue observations and dispatch/prune/task lifecycle timestamps.
 - [x] Add token-guarded queue lease renewal/heartbeat before horizontally scaling long-running workers.
 
 ---
@@ -137,16 +138,16 @@ Audit and remove reusable local logic for:
 - [ ] skill canonicalization/extraction that is source-independent;
 - [ ] candidate role/target-context semantics;
 - [ ] multilingual aliases, script/language heuristics and transliteration helpers;
-- [ ] generic geography display/alias choice rules;
+- [ ] generic geography display/alias choice rules. Draft upstream PR #80 adds a contextual `geographyZoneDisplayName()` owner; Personal Site removal waits for a green/published package revision.
 - [ ] generic housing/job/hiring semantic regexes and keyword dictionaries.
 
-Initial hotspot: `app/utils/locationLabels.ts` currently understands Cyrillic variants, Uzbek locality suffixes, alias affinity and probe forms. That domain knowledge should be exposed by the shared lexicon instead of reimplemented by the website.
+Initial hotspot: `app/utils/locationLabels.ts` currently understands Cyrillic variants, Uzbek locality suffixes, alias affinity and probe forms. That domain knowledge is being moved into the shared lexicon instead of being made another Personal Site-local shared helper.
 
 ### Move to `@whiteslove/geo-catalog`
 
 Audit and remove reusable local logic for:
 
-- [ ] geo hierarchy traversal (`children`/`descendants` APIs instead of consumer knowledge of ID prefixes). An upstream `getGeoDescendants()` change is being prepared; consumer removal waits for a published package revision.
+- [ ] geo hierarchy traversal (`children`/`descendants` APIs instead of consumer knowledge of ID prefixes). Upstream draft PR #23 adds `getGeoDescendants()`; consumer removal waits for a published package revision.
 - [x] Reuse package distance/spatial utilities instead of the local Haversine implementation in `useDistrictZones.ts`.
 - [ ] canonical boundary/hierarchy operations;
 - [ ] reusable city/zone spatial derivation if it is not presentation-specific.
@@ -170,7 +171,7 @@ Initial targets:
 - [ ] `server/routes/flats-feed.get.ts` — separate proxy contract, cache, compatibility shaping and request orchestration. Bounded caching is complete; responsibility split remains.
 - [ ] `server/routes/hiring-feed.get.ts` — separate HTTP parsing, query construction, presentation and compatibility logic.
 - [ ] `server/jobs/infrastructure/database.ts` — split schema/migrations, page queries, stats/facets and write concerns. Page/stat execution is split internally; module-level responsibility split remains.
-- [ ] `server/hiring/infrastructure/database.ts` — split read model/querying from schema/backfill/write concerns.
+- [ ] `server/hiring/infrastructure/database.ts` — split current read model/querying from schema/backfill/write concerns.
 - [ ] `server/utils/hiringNormalize.ts` — keep application orchestration while moving shared semantics upstream and source cleanup toward adapters.
 
 Rules for decomposition:
@@ -236,7 +237,10 @@ A duplicate is not automatically moved into local `shared/`: ownership rules abo
 - 2026-08-31: closed the first P0 batch: canonical PDF document-id boundary + destructive-delete existence check, centralized SVG sanitizer and malicious-input regression coverage.
 - 2026-08-31: added converter byte/pixel/concurrency/subprocess budgets, LibreOffice runtime support and container CPU/memory/PID/no-new-privileges limits.
 - 2026-08-31: introduced bounded TTL/LRU caches for Flat Finder proxy/public IDs, normalized query keys, bounded translation rate limiting and removed persistent backend lock-map growth.
-- 2026-08-31: constrained country-index/DockerHub public input/fan-out surfaces; persistent cache-file cardinality remains a separate follow-up.
+- 2026-08-31: constrained country-index/DockerHub public input/fan-out surfaces and added periodic persistent-file expiration/corruption/cardinality cleanup.
 - 2026-08-31: split Jobs page rows from analytics queries, projected analytics columns, added a normalized 60s stats cache and bounded salary-trend sampling. Runtime query plans still require `EXPLAIN (ANALYZE, BUFFERS)` on production-like data.
-- 2026-08-31: added backend/frontend readiness, immutable deployment manifests, exact-revision rollback, and queue lease heartbeat support.
-- 2026-08-31: removed the local Haversine implementation in favor of `@whiteslove/geo-catalog`; recursive descendant traversal remains pending an upstream package release.
+- 2026-08-31: replaced Hiring full-table read-time dedupe with a maintained current-candidate read model and cached analytics.
+- 2026-08-31: added backend/frontend readiness, immutable deployment manifests, exact-revision rollback, queue lease heartbeat and queue-aware worker operational health.
+- 2026-08-31: added a deployment-time database preparation step as a transition toward proper versioned migrations; request/runtime DDL is not considered solved yet.
+- 2026-08-31: removed the local Haversine implementation in favor of `@whiteslove/geo-catalog`; recursive descendant traversal remains pending upstream PR #23/release.
+- 2026-08-31: opened parsing-lexicon PR #80 to centralize contextual zone display/alias/script/transliteration logic currently leaked into `locationLabels.ts`; consumer cleanup waits for a green published package revision.
