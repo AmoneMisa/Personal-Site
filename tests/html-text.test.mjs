@@ -16,6 +16,7 @@ const ishBorCrawler = await readFile(new URL('../shared/hiring/sources/ishBorCra
 const aviationExpansion = await readFile(new URL('../server/utils/aviationExpansionJobs.ts', import.meta.url), 'utf8')
 const extraPublic = await readFile(new URL('../server/utils/extraPublicJobSources.ts', import.meta.url), 'utf8')
 const linkedIn = await readFile(new URL('../server/utils/linkedinSource.ts', import.meta.url), 'utf8')
+const curatedRemote = await readFile(new URL('../server/utils/curatedRemoteJobSources.ts', import.meta.url), 'utf8')
 
 test('HTML entity decoding handles named and numeric entities without invalid code points', () => {
   assert.equal(decodeHtmlEntities('A&nbsp;&amp;&#33;&#x21;'), 'A &!!')
@@ -86,4 +87,13 @@ test('LinkedIn reuses shared entity decoding while keeping paragraph semantics s
   assert.match(linkedIn, /return decodeHtmlEntities\(/)
   assert.doesNotMatch(linkedIn, /function decodeEntities\(/)
   assert.doesNotMatch(linkedIn, /function stripHtml\(/)
+})
+
+test('curated remote boards reuse shared HTML mechanics while preserving HTTPS-only policy', () => {
+  assert.match(curatedRemote, /import \{ absoluteHttpUrl, stripHtml \} from '\.\/htmlText'/)
+  assert.match(curatedRemote, /const url = absoluteHttpUrl\(raw, base\)/)
+  assert.match(curatedRemote, /url\?\.startsWith\('https:\/\/'\)/)
+  assert.doesNotMatch(curatedRemote, /function decodeEntities\(/)
+  assert.doesNotMatch(curatedRemote, /function stripHtml\(/)
+  assert.doesNotMatch(curatedRemote, /new URL\(decodeEntities\(raw\), base\)/)
 })
