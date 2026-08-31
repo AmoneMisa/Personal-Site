@@ -3,11 +3,8 @@ import { emptyWebCursor, type WebCursor } from '../../../../shared/hiring/hiring
 import { activityDate, cityFrom, htmlText, isRecent } from '../../../../shared/hiring/webFields'
 import { buildWebProfile, type CandidateBlock, type WebCvAdapter } from './common'
 import { webProfileId, type WebAdapterRun } from './crawler'
+import { fetchHiringWebPage } from './http'
 
-const UA =
-  'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 '
-  + '(KHTML, like Gecko) Chrome/126.0 Safari/537.36'
-const REQUEST_TIMEOUT_MS = 25_000
 const DEFAULT_MAX_PAGES = 5
 
 function resumeRole(lines: string[]): string {
@@ -82,19 +79,6 @@ export function parseUzJobsResumeRows(html: string): CvProfile[] {
   return profiles
 }
 
-async function fetchPage(url: string): Promise<string> {
-  const response = await fetch(url, {
-    headers: {
-      'User-Agent': UA,
-      Accept: 'text/html,application/xhtml+xml',
-      'Accept-Language': 'ru,en;q=0.8',
-    },
-    signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
-  })
-  if (!response.ok) throw new Error(`${new URL(url).host} -> ${response.status}`)
-  return response.text()
-}
-
 export async function crawlUzJobs(
   cursor: WebCursor = emptyWebCursor(UZJOBS_SOURCE.key),
 ): Promise<WebAdapterRun> {
@@ -117,7 +101,7 @@ export async function crawlUzJobs(
   let reachedKnown = false
 
   const readPage = async (page: number, stopAtCursor: boolean, trackNewest: boolean) => {
-    const html = await fetchPage(UZJOBS_SOURCE.pageUrl(page))
+    const html = await fetchHiringWebPage(UZJOBS_SOURCE.pageUrl(page))
     run.pages += 1
     const rows = html.match(/<tr\b[^>]*>[\s\S]*?<\/tr>/gi) || []
     run.fetched += rows.length
