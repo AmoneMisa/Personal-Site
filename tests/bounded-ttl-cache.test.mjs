@@ -36,3 +36,14 @@ test('bounded TTL cache supports per-entry TTLs and sweeps expired values()', ()
   assert.deepEqual(cache.values(1_011), ['y'])
   assert.equal(cache.size, 1)
 })
+
+test('bounded TTL cache can be invalidated after a read-model refresh', () => {
+  const cache = new BoundedTtlCache({ maxEntries: 5, defaultTtlMs: 1_000 })
+  cache.set('a', 1)
+  cache.set('b', 2)
+
+  cache.clear()
+
+  assert.equal(cache.size, 0)
+  assert.equal(cache.get('a'), undefined)
+})
