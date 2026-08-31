@@ -30,11 +30,13 @@ test('successful deployments persist a rollbackable image manifest', () => {
   assert.match(rollback, /FORCE_DEPLOY=1 DEPLOY_SOURCE=rollback/)
 })
 
-test('deployment gates success on dependency-aware readiness', () => {
+test('deployment gates success on dependency-aware, migration-aware readiness', () => {
   assert.match(deploy, /http:\/\/127\.0\.0\.1:8080\/ready/)
   assert.match(compose, /fetch\('http:\/\/localhost:3000\/ready'\)/)
   assert.match(ready, /await checkStateDirectory\(\)/)
-  assert.match(ready, /await checkDatabase\(url\)/)
+  assert.match(ready, /REQUIRED_DATABASE_MIGRATIONS\.jobs/)
+  assert.match(ready, /REQUIRED_DATABASE_MIGRATIONS\.hiring/)
+  assert.match(ready, /_site_migrations/)
   assert.match(ready, /setResponseStatus\(event, 503\)/)
 })
 
