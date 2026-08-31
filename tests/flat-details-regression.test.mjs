@@ -76,7 +76,12 @@ test("dynamic flat spec icons are bundled without Iconify runtime", async () => 
 
 test("full-screen photo zoom is click-driven", async () => {
   const source = await read("app/components/flats/FlatGallery.vue");
+  const modal = await read("app/components/search/SearchDetailsModal.vue");
+  const lightboxZIndex = Number(source.match(/\.flat-lightbox \{[^}]*z-index: (\d+)/)?.[1]);
+  const flatModalZIndex = Number(modal.match(/:z-index="isFlatFinder \? (\d+) : undefined"/)?.[1]);
   assert.match(source, /@click\.stop="toggleZoom"/);
+  assert.match(source, /<teleport to="body">[\s\S]*class="flat-lightbox"/);
+  assert.ok(lightboxZIndex > flatModalZIndex, "photo viewer must stack above the Flat Finder details modal");
   assert.match(source, /flat-lightbox__image_zoomed/);
   assert.match(source, /function toggleZoom\(event: MouseEvent\)/);
   assert.match(source, /@pointermove="onPointerMove"/);

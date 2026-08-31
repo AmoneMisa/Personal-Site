@@ -304,7 +304,9 @@ onBeforeUnmount(() => window.removeEventListener("keydown", onKeydown));
 .flat-gallery_count-4 { grid-template-columns: 1.65fr repeat(2, .72fr); }
 .flat-gallery_count-4 .flat-gallery__item:nth-child(4) { grid-column: 2 / -1; }
 
-.flat-lightbox { position: fixed; inset: 0; z-index: 5000; display: grid; place-items: center; isolation: isolate; background: #080b1a; padding: clamp(12px, 2vw, 28px); cursor: zoom-out; pointer-events: auto; }
+/* SearchDetailsModal uses 12000 on Flat Finder so the map cannot cover it.
+   The teleported full-screen viewer must be the topmost dialog. */
+.flat-lightbox { position: fixed; inset: 0; z-index: 13000; display: grid; place-items: center; isolation: isolate; background: #080b1a; padding: clamp(12px, 2vw, 28px); cursor: zoom-out; pointer-events: auto; }
 .flat-lightbox__stage { width: min(82vw, 1200px); height: min(76dvh, 720px); display: flex; align-items: center; justify-content: center; cursor: default; pointer-events: auto; touch-action: pan-y pinch-zoom; user-select: none; -webkit-user-select: none; overflow: hidden; }
 .flat-lightbox__stage_pannable { touch-action: none; cursor: grab; }
 .flat-lightbox__stage_dragging { cursor: grabbing; }
