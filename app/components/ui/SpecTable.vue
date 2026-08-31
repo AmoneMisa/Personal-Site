@@ -3,6 +3,8 @@
 // Flat Finder parsing belongs to @whiteslove/parsing-lexicon/backend ingestion;
 // this component only presents normalized listing fields.
 import { computed, ref } from "vue";
+import FlatTransportTables from "~/components/flats/FlatTransportTables.vue";
+import type { FlatTransportStop } from "~/types/flats";
 import { localizeJobLanguageList } from "~/utils/jobs/languageLabel";
 import { capitalizeFirst } from "~/utils/text";
 
@@ -50,6 +52,7 @@ type StoredFlat = {
   cadastral?: boolean | null;
   firstRental?: boolean | null;
   potentiallyUnsafe?: boolean;
+  nearbyTransport?: FlatTransportStop[];
   vision?: { derivedFields?: string[] };
 };
 
@@ -76,6 +79,13 @@ const currentFlatListing = computed<StoredFlat | null>(() => {
     return null;
   }
 });
+
+const flatTransportStops = computed(() => currentFlatListing.value?.nearbyTransport || []);
+const flatTransportLabels = computed(() => new Set([
+  t("flats.specBus"),
+  t("flats.specTrolleybus"),
+  t("flats.specTram"),
+]));
 
 const flatVisionDerivedFields = computed(() => new Set(
   props.visionDerivedFields.length
@@ -203,6 +213,7 @@ const contextualRows = computed<SpecRow[]>(() => {
   const mixedAudience = alternatives.has("family") && alternatives.has("women");
 
   let rows = props.rows
+    .filter((row) => !(flatTransportStops.value.length && flatTransportLabels.value.has(row.label)))
     .filter((row) => !(isSale && saleHiddenLabels.has(row.label)))
     .map((row): SpecRow => {
       if (row.label === t("flats.specAudience") && mixedAudience) {
@@ -402,6 +413,11 @@ function iconForRow(row: SpecRow): string {
         </tr>
       </tbody>
     </table>
+
+    <FlatTransportTables
+      v-if="isFlatFinder && flatTransportStops.length"
+      :stops="flatTransportStops"
+    />
   </div>
 </template>
 
