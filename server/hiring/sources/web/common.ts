@@ -20,6 +20,7 @@ export interface WebCvAdapter {
   root: string
   pageUrl: (page: number) => string
   linkRe: RegExp
+  extractBlocks?: (html: string, source: WebCvAdapter, page: number) => CandidateBlock[]
   parse: (block: CandidateBlock, source: WebCvAdapter) => CvProfile | null
 }
 
@@ -72,6 +73,10 @@ export function blockAnchors(html: string, source: WebCvAdapter): CandidateBlock
     )
     return { href: item.href, title, html: raw, text: htmlText(raw) }
   })
+}
+
+export function candidateBlocks(html: string, source: WebCvAdapter, page = 1): CandidateBlock[] {
+  return source.extractBlocks?.(html, source, page) ?? blockAnchors(html, source)
 }
 
 export function buildWebProfile(
