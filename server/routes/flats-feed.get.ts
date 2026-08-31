@@ -1,6 +1,7 @@
 import { canonicalMetroValue } from '../utils/tashkentMetroLabels'
 import { normalizeFlatDealType, normalizeFlatPrice, normalizeFlatRoomOnly } from '../utils/flatDealType'
 import { isPotentiallyUnsafeFlat } from '../utils/flatSafety'
+import { BoundedTtlCache } from '../utils/boundedTtlCache'
 import { canonicalCityValue } from '../../shared/locationCatalog'
 
 // GET /flats-feed — server-side proxy to the flat-finder backend's /api/listings.
@@ -33,9 +34,21 @@ const EXACT_LOOKUP_TIMEOUT_MS = 8_000
 // seconds. A short TTL absorbs that burst as one Postgres round trip while
 // staying fresh enough that a price edit or deactivation shows up quickly.
 const PUBLIC_ID_CACHE_TTL_MS = FEED_FRESH_MS
-const feedCache = new Map<string, { at: number; data: any }>()
+const FEED_CACHE_MAX_ENTRIES = 750
+const PUBLIC_ID_CACHE_MAX_ENTRIES = 1_000
+const MAX_INFLIGHT_REFRESHES = 64
+
+type FeedCacheEntry = { at: number; data: any }
+
+const feedCache = new BoundedTtlCache<string, FeedCacheEntry>({
+  maxEntries: FEED_CACHE_MAX_ENTRIES,
+  defaultTtlMs: FEED_STALE_MS,
+})
 const feedRefreshes = new Map<string, Promise<any>>()
-const publicIdCache = new Map<string, { at: number; data: any }>()
+const publicIdCache = new BoundedTtlCache<string, any>({
+  maxEntries: PUBLIC_ID_CACHE_MAX_ENTRIES,
+  defaultTtlMs: PUBLIC_ID_CACHE_TTL_MS,
+})
 const ALL_FEED_SOURCES = ['olx', 'telegram', 'facebook', 'threads'] as const
 const CURRENT_ALL_SOURCE_TOKENS = [...ALL_FEED_SOURCES, 'custom'] as const
 const SOCIAL_FEED_SOURCES = new Set(['telegram', 'facebook', 'threads'])
@@ -277,14 +290,27 @@ function staleWindow(entry: { data: any } | undefined): number {
     : EMPTY_STALE_MS
 }
 
+function normalizedSearchKey(params: URLSearchParams): string {
+  const entries = [...params.entries()].sort(([keyA, valueA], [keyB, valueB]) => {
+    const keyOrder = keyA.localeCompare(keyB)
+    return keyOrder || valueA.localeCompare(valueB)
+  })
+  return new URLSearchParams(entries).toString()
+}
+
 function refreshFeed(key: string, url: string): Promise<any> {
   const current = feedRefreshes.get(key)
   if (current) return current
+  if (feedRefreshes.size >= MAX_INFLIGHT_REFRESHES) {
+    return Promise.reject(new Error('Flat feed refresh capacity reached'))
+  }
+
   const statsOnly = /(?:[?&])statsOnly=(?:1|true)(?:&|$)/u.test(url)
   const request = $fetch<any>(url, { timeout: statsOnly ? STATS_UPSTREAM_TIMEOUT_MS : UPSTREAM_TIMEOUT_MS })
     .then((data) => {
       const at = data?.warming ? Date.now() - FEED_FRESH_MS : Date.now()
-      feedCache.set(key, { at, data })
+      const entry = { at, data }
+      feedCache.set(key, entry, staleWindow(entry))
       return data
     })
     .finally(() => feedRefreshes.delete(key))
@@ -302,9 +328,7 @@ function exactCountry(params: URLSearchParams): string {
 
 function findCachedExactListing(listingId: string, source: string, country: string): any | null {
   const now = Date.now()
-  for (const entry of feedCache.values()) {
-    // A detail link may outlive the exact filtered cache key that produced it,
-    // but we should not resurrect an arbitrarily old/deleted advert from memory.
+  for (const entry of feedCache.values(now)) {
     if (now - entry.at > FEED_STALE_MS) continue
     const listings = Array.isArray(entry.data?.listings) ? entry.data.listings : []
     const exact = listings.find((listing: any) => {
@@ -351,17 +375,18 @@ export default defineEventHandler(async (event) => {
   // lookup and skip the whole filtered-search path.
   const publicIdParam = String(upstreamParams.get('publicId') || '').trim()
   if (publicIdParam && /^\d+$/.test(publicIdParam)) {
+    const canonicalPublicId = publicIdParam.replace(/^0+(?=\d)/, '')
     setResponseHeader(event, 'Cache-Control', 'no-store')
-    const cached = publicIdCache.get(publicIdParam)
-    if (cached && Date.now() - cached.at < PUBLIC_ID_CACHE_TTL_MS) return cached.data
+    const cached = publicIdCache.get(canonicalPublicId)
+    if (cached) return cached
     try {
       const result = await $fetch<any>(
-        `${FLAT_API_URL}/api/listing/by-public-id/${encodeURIComponent(publicIdParam)}`,
+        `${FLAT_API_URL}/api/listing/by-public-id/${encodeURIComponent(canonicalPublicId)}`,
         { timeout: EXACT_LOOKUP_TIMEOUT_MS },
       )
       if (result?.listing) {
         const data = { count: 1, listings: [shapeListing(result.listing)] }
-        publicIdCache.set(publicIdParam, { at: Date.now(), data })
+        publicIdCache.set(canonicalPublicId, data)
         return data
       }
       // Not-found stays uncached: a listing still being ingested must not be
@@ -412,7 +437,7 @@ export default defineEventHandler(async (event) => {
   }
 
   const url = `${FLAT_API_URL}/api/listings?${upstreamParams}`
-  const key = upstreamParams.toString()
+  const key = normalizedSearchKey(upstreamParams)
   const requestedOffset = Math.max(0, Number(upstreamParams.get('offset')) || 0)
   const requestedLimit = Math.min(60, Math.max(1, Number(upstreamParams.get('limit')) || 20))
   const enforcePage = (response: any) => ({
@@ -429,7 +454,7 @@ export default defineEventHandler(async (event) => {
 
     const combinedParams = new URLSearchParams(upstreamParams)
     combinedParams.delete('sources')
-    const combinedKey = `combined:${combinedParams}`
+    const combinedKey = `combined:${normalizedSearchKey(combinedParams)}`
     const combinedUrl = `${FLAT_API_URL}/api/listings?${combinedParams}`
     const combinedCached = feedCache.get(combinedKey)
     const combinedRaw = combinedCached && Date.now() - combinedCached.at < staleWindow(combinedCached)
@@ -488,8 +513,8 @@ export default defineEventHandler(async (event) => {
     setResponseHeader(event, 'Cache-Control', 'no-store')
     return finalize(data)
   } catch (err) {
-    // A stale answer, however old, beats reporting a failure — but only if it
-    // actually has something in it.
+    // A still-live TTL entry beats reporting an upstream failure, but expired
+    // answers are removed rather than occupying heap forever.
     if (cached && Array.isArray(cached.data?.listings) && cached.data.listings.length) {
       setResponseHeader(event, 'Cache-Control', 'no-store')
       return {
