@@ -141,7 +141,9 @@ export function createWorkerHealthReporter({
   return {
     async start() {
       await flush(true)
-      timer = setInterval(() => { void flush(true) }, REPORT_INTERVAL_MS)
+      timer = setInterval(() => {
+        void flush(true)
+      }, REPORT_INTERVAL_MS)
       timer.unref()
     },
     async stop() {
