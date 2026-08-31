@@ -10,6 +10,11 @@ test('flat finder keeps the country filter single-valued', () => {
   assert.match(source, /params\.countries = countries\.value\[0\]/);
 });
 
+test('single-select country updates accept the primitive value emitted by USelectMenu', () => {
+  assert.match(source, /const rawValues = Array\.isArray\(values\) \? values : \[values\]/);
+  assert.match(source, /rawValues\.map\(\(value\) => String\(value\)\.trim\(\)\.toUpperCase\(\)\)/);
+});
+
 test('map zone filters are sent as structured params, not search text', () => {
   assert.match(source, /params\.microdistrict = microdistrict\.value/);
   assert.match(source, /params\.quartal = quartal\.value/);
