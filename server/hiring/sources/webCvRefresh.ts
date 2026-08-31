@@ -11,6 +11,7 @@ import { crawlCareerist } from './web/careerist'
 import { crawlFlagma, isFlagmaSource } from './web/flagma'
 import { crawlHhUz } from './web/hhUz'
 import { crawlRabotaKz } from './web/rabotaKz'
+import { crawlRegionalPublicCv, isRegionalPublicCvSource } from './web/regionalPublicBoards'
 import { crawlTalentUa } from './web/talentUa'
 import { crawlUzJobs } from './web/uzJobs'
 import { crawlWorkUaApi } from './web/workUa'
@@ -24,6 +25,7 @@ export function listWebSources(): Array<{ key: string; label: string; country: s
 
 export async function crawlWebSource(key: string, cursor?: WebCursor) {
   if (isFlagmaSource(key)) return crawlFlagma(key, cursor)
+  if (isRegionalPublicCvSource(key)) return crawlRegionalPublicCv(key, cursor)
   if (key === 'careerist-uz') return crawlCareerist(cursor)
   if (key === 'hh-uz-tashkent') return crawlHhUz(cursor)
   if (key === 'uzjobs-resumes') return crawlUzJobs(cursor)
