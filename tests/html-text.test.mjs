@@ -15,6 +15,7 @@ const regionalService = await readFile(new URL('../server/utils/regionalServiceJ
 const ishBorCrawler = await readFile(new URL('../shared/hiring/sources/ishBorCrawler.ts', import.meta.url), 'utf8')
 const aviationExpansion = await readFile(new URL('../server/utils/aviationExpansionJobs.ts', import.meta.url), 'utf8')
 const extraPublic = await readFile(new URL('../server/utils/extraPublicJobSources.ts', import.meta.url), 'utf8')
+const linkedIn = await readFile(new URL('../server/utils/linkedinSource.ts', import.meta.url), 'utf8')
 
 test('HTML entity decoding handles named and numeric entities without invalid code points', () => {
   assert.equal(decodeHtmlEntities('A&nbsp;&amp;&#33;&#x21;'), 'A &!!')
@@ -77,4 +78,12 @@ test('public job boards reuse generic HTML mechanics while keeping Flagma row pa
   assert.doesNotMatch(extraPublic, /function decodeEntities\(/)
   assert.doesNotMatch(extraPublic, /function stripHtml\(/)
   assert.doesNotMatch(extraPublic, /function absoluteUrl\(/)
+})
+
+test('LinkedIn reuses shared entity decoding while keeping paragraph semantics source-local', () => {
+  assert.match(linkedIn, /import \{ decodeHtmlEntities \} from '\.\/htmlText'/)
+  assert.match(linkedIn, /function linkedinText\(value: string \| undefined\)/)
+  assert.match(linkedIn, /return decodeHtmlEntities\(/)
+  assert.doesNotMatch(linkedIn, /function decodeEntities\(/)
+  assert.doesNotMatch(linkedIn, /function stripHtml\(/)
 })
