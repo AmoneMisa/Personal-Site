@@ -79,6 +79,14 @@ pull_if_needed() {
   "${compose[@]}" pull "$@"
 }
 
+prepare_database_schema() {
+  echo "Preparing Jobs/Hiring/queue schemas before runtime traffic..."
+  "${compose[@]}" run --rm --no-deps jobs-worker \
+    node --experimental-transform-types \
+      --import ./jobs-worker/alias-loader.mjs \
+      ./scripts/prepare-database-schema.ts
+}
+
 case "$target" in
   all)
     if [[ "$SKIP_PULL" == "1" ]]; then
@@ -86,6 +94,7 @@ case "$target" in
     else
       "${compose[@]}" pull
     fi
+    prepare_database_schema
     "${compose[@]}" up -d --no-build --remove-orphans
     ;;
   frontend)
@@ -94,6 +103,7 @@ case "$target" in
     ;;
   jobs)
     pull_if_needed frontend jobs-worker job-browser-fetcher
+    prepare_database_schema
     "${compose[@]}" up -d --no-build job-browser-fetcher frontend jobs-worker
     ;;
   backend)
