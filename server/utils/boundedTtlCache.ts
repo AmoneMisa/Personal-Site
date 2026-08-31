@@ -59,6 +59,10 @@ export class BoundedTtlCache<K, V> {
     return this.entries.delete(key)
   }
 
+  clear(): void {
+    this.entries.clear()
+  }
+
   values(now = Date.now()): V[] {
     this.sweepExpired(now)
     return [...this.entries.values()].map((entry) => entry.value)
