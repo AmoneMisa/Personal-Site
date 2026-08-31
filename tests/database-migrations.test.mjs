@@ -6,8 +6,11 @@ const read = (path) => readFile(new URL(`../${path}`, import.meta.url), 'utf8')
 
 const runner = await read('scripts/migrate-database.ts')
 const deploy = await read('deploy.sh')
+const prepare = await read('scripts/prepare-database-schema.ts')
 const envExample = await read('.env.example')
 const jobsRuntime = await read('server/jobs/infrastructure/database.ts')
+const hiringRuntime = await read('server/hiring/infrastructure/database.ts')
+const hiringCurrent = await read('server/hiring/infrastructure/currentCandidateReadModel.ts')
 const queueRuntime = await read('shared/jobs/jobsPgQueue.ts')
 const jobs = await read('db/migrations/jobs/001_initial_read_model.sql')
 const hiring = await read('db/migrations/hiring/001_candidate_read_model.sql')
@@ -51,6 +54,26 @@ test('jobs runtime only verifies migrated relations instead of performing DDL', 
   assert.doesNotMatch(jobsRuntime, /\bALTER\s+TABLE\b/i)
 })
 
+test('hiring runtime is DDL-free and deploy owns legacy read-model backfill', () => {
+  assert.match(hiringRuntime, /to_regclass/)
+  assert.match(hiringRuntime, /export async function backfillDbCandidateReadModel/)
+  assert.doesNotMatch(hiringRuntime, /\bCREATE\s+(?:SCHEMA|TABLE|INDEX)\b/i)
+  assert.doesNotMatch(hiringRuntime, /\bALTER\s+TABLE\b/i)
+  assert.doesNotMatch(hiringCurrent, /\bCREATE\s+(?:SCHEMA|TABLE|INDEX)\b/i)
+  assert.match(prepare, /await backfillDbCandidateReadModel\(\)/)
+
+  const loadRead = hiringRuntime.match(
+    /export async function loadDbCandidates[\s\S]*?(?=\nexport interface DbCandidateFeed)/,
+  )?.[0] || ''
+  const feedRead = hiringRuntime.match(
+    /export async function queryDbCandidates[\s\S]*?(?=\nasync function previousDedupeKeys)/,
+  )?.[0] || ''
+  assert.ok(loadRead)
+  assert.ok(feedRead)
+  assert.doesNotMatch(loadRead, /backfillDbCandidateReadModel/)
+  assert.doesNotMatch(feedRead, /backfillDbCandidateReadModel/)
+})
+
 test('queue runtime only verifies migrated relations instead of performing DDL', () => {
   assert.match(queueRuntime, /to_regclass/)
   assert.match(queueRuntime, /run scripts\/migrate-database\.ts before runtime/)
@@ -60,12 +83,12 @@ test('queue runtime only verifies migrated relations instead of performing DDL',
 
 test('deployment applies migrations before compatibility read-model preparation and rollout', () => {
   const migrate = deploy.indexOf('run_database_migrations')
-  const prepare = deploy.indexOf('prepare_database_schema')
+  const prepareSchema = deploy.indexOf('prepare_database_schema')
   const prepareDatabases = deploy.indexOf('prepare_databases()')
   const rollout = deploy.indexOf('up -d --no-build --remove-orphans')
 
-  assert.ok(migrate > -1 && prepare > migrate)
-  assert.ok(prepareDatabases > prepare)
+  assert.ok(migrate > -1 && prepareSchema > migrate)
+  assert.ok(prepareDatabases > prepareSchema)
   assert.ok(rollout > prepareDatabases)
   assert.match(deploy, /\.\/scripts\/migrate-database\.ts/)
 })
