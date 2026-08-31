@@ -1,5 +1,6 @@
 import { aiWorkerEnabled, requestAiWorker } from '../utils/aiWorker'
 import { FixedWindowRateLimiter } from '../utils/fixedWindowRateLimiter'
+import { requestClientIp } from '../utils/requestClientIp'
 import type { H3Event } from 'h3'
 
 type TranslationResponse = {
@@ -16,7 +17,7 @@ const translationLimiter = new FixedWindowRateLimiter({
 })
 
 function enforceRateLimit(event: H3Event) {
-  const ip = getRequestIP(event, { xForwardedFor: true }) || 'unknown'
+  const ip = requestClientIp(event)
   if (!translationLimiter.consume(ip)) {
     throw createError({ statusCode: 429, statusMessage: 'Too many translation requests' })
   }
