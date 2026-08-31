@@ -26,6 +26,7 @@ export default withNuxt(
       'server/utils/boundedTtlCache.ts',
       'server/utils/fixedWindowRateLimiter.ts',
       'server/utils/jobSourceConfig.ts',
+      'server/utils/jobSourceFetchers.ts',
       'server/utils/jobsSourceRefresh.ts',
     ],
     rules: {
