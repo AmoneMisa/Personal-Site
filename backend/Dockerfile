@@ -2,12 +2,14 @@ FROM python:3.13-slim-bookworm
 
 WORKDIR /app
 
-RUN apt-get update && apt-get install -y \
+RUN apt-get update && apt-get install -y --no-install-recommends \
   build-essential \
   libffi-dev \
   python3-dev \
   ghostscript \
   fonts-dejavu-core \
+  libreoffice-core \
+  libreoffice-writer \
   && rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt .
