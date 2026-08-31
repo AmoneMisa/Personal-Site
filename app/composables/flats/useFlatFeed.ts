@@ -22,19 +22,30 @@ export function useFlatFeed(feedOptions: { onAvailabilityChecked?: (keys: string
   const loadMoreSentinel = ref<HTMLElement | null>(null);
   const requests = useLatestRequest();
   let statisticsRequestId = 0;
+
   const polling = useFeedPolling<Record<string, string>>({
-    onWarmPoll: (params) => { void loadFeed(params, { background: true }); },
+    onWarmPoll: (params) => {
+      void loadFeed(params, { background: true });
+    },
   });
+
+  function resetFirstPageState() {
+    listings.value = [];
+    total.value = 0;
+    nextCursor.value = null;
+  }
 
   async function setStatisticsWithoutViewportJump(value: FlatStatistics) {
     if (!import.meta.client) {
       statistics.value = value;
       return;
     }
+
     const top = window.scrollY;
     const left = window.scrollX;
     statistics.value = value;
     await nextTick();
+
     requestAnimationFrame(() => {
       if (Math.abs(window.scrollY - top) > 1 || Math.abs(window.scrollX - left) > 1) {
         window.scrollTo({ top, left, behavior: "auto" });
@@ -55,40 +66,66 @@ export function useFlatFeed(feedOptions: { onAvailabilityChecked?: (keys: string
 
     try {
       const { data, error } = await safeFetch<FlatFeedResult>("/flats-feed", { params: statsParams });
-      if (requestId !== statisticsRequestId || error || !data || data.error) return;
-      if (data.statistics) await setStatisticsWithoutViewportJump(data.statistics);
+      if (requestId !== statisticsRequestId || error || !data || data.error) {
+        return;
+      }
+      if (data.statistics) {
+        await setStatisticsWithoutViewportJump(data.statistics);
+      }
     } finally {
-      if (requestId === statisticsRequestId) statisticsLoading.value = false;
+      if (requestId === statisticsRequestId) {
+        statisticsLoading.value = false;
+      }
     }
   }
 
-  async function loadFeed(params: Record<string, string>, options: { append?: boolean; background?: boolean } = {}): Promise<FlatFeedResult | undefined> {
+  async function loadFeed(
+    params: Record<string, string>,
+    options: { append?: boolean; background?: boolean } = {},
+  ): Promise<FlatFeedResult | undefined> {
     const append = !!options.append;
     const background = !!options.background;
-    if (!append && !background && !(await polling.debounceFilterRequest())) return undefined;
+
+    if (!append && !background && !(await polling.debounceFilterRequest())) {
+      return undefined;
+    }
 
     const requestId = requests.next();
     const wantsStatistics = !append && params.includeStats === "1";
     const currentStatisticsRequestId = !append ? ++statisticsRequestId : statisticsRequestId;
-    if (!append) polling.rememberWarmParams({ ...params });
+
+    if (!append) {
+      polling.rememberWarmParams({ ...params });
+    }
+
     if (!background) {
       polling.cancelWarmPoll();
-      if (append) loadingMore.value = true;
-      else loading.value = true;
+      if (append) {
+        loadingMore.value = true;
+      } else {
+        loading.value = true;
+      }
       failed.value = false;
     }
 
     // Keep the first page fast: PostgreSQL statistics are requested separately,
     // but they are always calculated over the complete filtered result set.
     const feedParams = { ...params };
-    if (wantsStatistics) delete feedParams.includeStats;
+    if (wantsStatistics) {
+      delete feedParams.includeStats;
+    }
 
     const { data, error } = await safeFetch<FlatFeedResult>("/flats-feed", { params: feedParams });
-    if (!requests.isLatest(requestId)) return undefined;
+    if (!requests.isLatest(requestId)) {
+      return undefined;
+    }
+
     if (error || !data || data.error) {
       if (!background) {
         failed.value = true;
-        if (!append) { listings.value = []; total.value = 0; nextCursor.value = null; }
+        if (!append) {
+          resetFirstPageState();
+        }
         sourceErrors.value = [];
         loading.value = false;
         loadingMore.value = false;
@@ -96,24 +133,37 @@ export function useFlatFeed(feedOptions: { onAvailabilityChecked?: (keys: string
       polling.scheduleWarmPoll(warming.value);
       return undefined;
     }
-    if (data.availabilityChecked?.length) feedOptions.onAvailabilityChecked?.(data.availabilityChecked);
+
+    if (data.availabilityChecked?.length) {
+      feedOptions.onAvailabilityChecked?.(data.availabilityChecked);
+    }
+
     if (background) {
-      if (!append) total.value = data.count ?? total.value;
+      if (!append) {
+        total.value = data.count ?? total.value;
+      }
       sourceErrors.value = data.sourceErrors || [];
-      if (data.statistics) void setStatisticsWithoutViewportJump(data.statistics);
+      if (data.statistics) {
+        void setStatisticsWithoutViewportJump(data.statistics);
+      }
       warming.value = !!data.warming;
-      if (wantsStatistics) void loadStatistics(params, currentStatisticsRequestId);
+      if (wantsStatistics) {
+        void loadStatistics(params, currentStatisticsRequestId);
+      }
       polling.scheduleWarmPoll(warming.value);
       return data;
     }
 
     nextCursor.value = data.nextCursor || null;
     const nextListings = Array.isArray(data.listings) ? data.listings : [];
+
     if (append) {
       const existingKeys = new Set(listings.value.map((item) => `${item.source}:${item.country}:${item.id}`));
       const unique = nextListings.filter((item) => {
         const key = `${item.source}:${item.country}:${item.id}`;
-        if (existingKeys.has(key)) return false;
+        if (existingKeys.has(key)) {
+          return false;
+        }
         existingKeys.add(key);
         return true;
       });
@@ -121,13 +171,23 @@ export function useFlatFeed(feedOptions: { onAvailabilityChecked?: (keys: string
     } else {
       listings.value = nextListings;
     }
-    if (!append) total.value = data.count ?? listings.value.length;
-    if (!append && data.statistics) void setStatisticsWithoutViewportJump(data.statistics);
+
+    if (!append) {
+      total.value = data.count ?? listings.value.length;
+    }
+    if (!append && data.statistics) {
+      void setStatisticsWithoutViewportJump(data.statistics);
+    }
+
     sourceErrors.value = data.sourceErrors || [];
     warming.value = !!data.warming;
     loading.value = false;
     loadingMore.value = false;
-    if (wantsStatistics) void loadStatistics(params, currentStatisticsRequestId);
+
+    if (wantsStatistics) {
+      void loadStatistics(params, currentStatisticsRequestId);
+    }
+
     polling.scheduleWarmPoll(warming.value);
     return data;
   }
@@ -137,5 +197,18 @@ export function useFlatFeed(feedOptions: { onAvailabilityChecked?: (keys: string
     requests.cancelPending();
   });
 
-  return { listings, total, loading, loadingMore, warming, failed, sourceErrors, statistics, statisticsLoading, nextCursor, loadMoreSentinel, loadFeed };
+  return {
+    listings,
+    total,
+    loading,
+    loadingMore,
+    warming,
+    failed,
+    sourceErrors,
+    statistics,
+    statisticsLoading,
+    nextCursor,
+    loadMoreSentinel,
+    loadFeed,
+  };
 }
