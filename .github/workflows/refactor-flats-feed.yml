@@ -1,0 +1,50 @@
+name: Refactor flats feed route
+
+on:
+  push:
+    branches:
+      - 'refactor/site-wide-technical-debt'
+    paths:
+      - server/flats/feedListingShape.ts
+      - .github/workflows/refactor-flats-feed.yml
+
+permissions:
+  contents: write
+
+jobs:
+  refactor:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: refactor/site-wide-technical-debt
+      - name: Extract listing shaping from route
+        shell: python
+        run: |
+          from pathlib import Path
+
+          path = Path('server/routes/flats-feed.get.ts')
+          text = path.read_text()
+          text = text.replace("import { normalizeFlatDealType, normalizeFlatPrice, normalizeFlatRoomOnly } from '../utils/flatDealType'\n", '')
+          text = text.replace("import { isPotentiallyUnsafeFlat } from '../utils/flatSafety'\n", '')
+          text = text.replace("import { canonicalCityValue } from '../../shared/locationCatalog'\n", '')
+          anchor = "import { BoundedTtlCache } from '../utils/boundedTtlCache'\n"
+          helper_import = "import {\n  ALL_FEED_SOURCES,\n  CURRENT_ALL_SOURCE_TOKENS,\n  shapeListing,\n  shapeLiveListing,\n  shapeResponse,\n} from '../flats/feedListingShape'\n"
+          if helper_import not in text:
+              text = text.replace(anchor, anchor + helper_import)
+
+          start = text.index("const ALL_FEED_SOURCES =")
+          end = text.index("/** How long a cached answer may still be served: empty ones expire quickly. */")
+          text = text[:start] + text[end:]
+          path.write_text(text)
+      - name: Commit route decomposition
+        shell: bash
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add server/routes/flats-feed.get.ts
+          if git diff --cached --quiet; then
+            exit 0
+          fi
+          git commit -m 'refactor: slim flats feed route'
+          git push origin HEAD:refactor/site-wide-technical-debt
