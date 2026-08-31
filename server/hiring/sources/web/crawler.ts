@@ -1,11 +1,8 @@
 import type { CvProfile } from '../../../../shared/contracts/hiring'
 import { emptyWebCursor, type WebCursor } from '../../../../shared/hiring/hiringCursors'
 import { blockAnchors, mergeSameCandidate, type WebCvAdapter } from './common'
+import { fetchHiringWebPage } from './http'
 
-const UA =
-  'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 '
-  + '(KHTML, like Gecko) Chrome/126.0 Safari/537.36'
-const REQUEST_TIMEOUT_MS = 25_000
 const DEFAULT_MAX_PAGES = 5
 
 export interface WebAdapterRun {
@@ -19,19 +16,6 @@ export interface WebAdapterRun {
   newestActivityAt: string | null
   oldestActivityAt: string | null
   reachedCursor: boolean
-}
-
-async function fetchPage(url: string): Promise<string> {
-  const response = await fetch(url, {
-    headers: {
-      'User-Agent': UA,
-      Accept: 'text/html,application/xhtml+xml',
-      'Accept-Language': 'ru,en;q=0.8',
-    },
-    signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
-  })
-  if (!response.ok) throw new Error(`${new URL(url).host} -> ${response.status}`)
-  return response.text()
 }
 
 export function webProfileId(url: string): string {
@@ -69,7 +53,7 @@ export async function crawlWebAdapter(
     page: number,
     options: { stopAtCursor: boolean; trackNewest: boolean },
   ): Promise<{ blocks: number; recent: number }> => {
-    const html = await fetchPage(source.pageUrl(page))
+    const html = await fetchHiringWebPage(source.pageUrl(page))
     run.pages += 1
     const blocks = blockAnchors(html, source)
     if (!blocks.length) return { blocks: 0, recent: 0 }
