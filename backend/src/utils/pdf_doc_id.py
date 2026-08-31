@@ -5,12 +5,12 @@ import uuid
 
 
 # Every public PDF route that receives a document id. `/pdf/create` is
-# intentionally absent because it creates a new server-generated UUID.
+# intentionally excluded because it creates a new server-generated UUID.
 _PDF_DOC_ROUTE_RE = re.compile(
     r"^/pdf/(?:"
     r"download|page-info|add-design-page|preview|background|text-blocks|image|"
     r"draft|save|download-result|assets"
-    r")/(?P<nested>[^/]+)(?:/|$)|^/pdf/(?P<root>[^/]+)$"
+    r")/(?P<nested>[^/]+)(?:/|$)|^/pdf/(?P<root>(?!create$)[^/]+)$"
 )
 
 
