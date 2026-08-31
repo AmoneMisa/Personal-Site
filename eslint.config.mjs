@@ -29,6 +29,7 @@ export default withNuxt(
       'server/utils/jobSourceConfig.ts',
       'server/utils/jobSourceFetchers.ts',
       'server/utils/jobsSourceRefresh.ts',
+      'server/utils/requestClientIp.ts',
       'shared/jobs/jobsPgQueue.ts',
     ],
     rules: {
