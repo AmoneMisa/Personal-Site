@@ -104,10 +104,11 @@ This document is the working execution plan for the site-wide technical audit. I
 
 ### Schema lifecycle
 
-- [ ] Remove DDL and backfills from request/runtime paths.
-- [ ] Move schema changes/backfills into versioned migrations/deploy jobs.
-- [x] Add an explicit pre-deploy schema/read-model preparation step as a transition so first user requests no longer have to be the intended migration trigger.
-- [ ] Reduce runtime DB privileges after migrations are fully externalized.
+- [x] Remove schema DDL from Jobs, Hiring and queue runtime modules; runtime now verifies migrated relations instead of creating them.
+- [x] Remove legacy Hiring read-model backfill from ordinary HTTP/read paths; the explicit deploy preparation step owns it.
+- [x] Move schema changes into checksummed versioned migrations executed before runtime rollout.
+- [x] Support separate migration-only PostgreSQL connection URLs so DDL-capable deploy roles do not have to be the same roles used by application runtime.
+- [ ] Apply reduced runtime DB grants/credentials in the production environment after the branch is deployed; repository support exists, but production grants cannot be inferred from source.
 
 **Validation:** use `EXPLAIN (ANALYZE, BUFFERS)` against staging/production-like data before claiming measured query-latency improvements. The source-level changes above reduce work structurally but are not a substitute for production plans/latency measurements.
 
@@ -170,8 +171,8 @@ Initial targets:
 - [ ] `app/pages/flat-finder/index.vue` — reduce orchestration/UI coupling without rewriting the page.
 - [ ] `server/routes/flats-feed.get.ts` — separate proxy contract, cache, compatibility shaping and request orchestration. Bounded caching is complete; responsibility split remains.
 - [ ] `server/routes/hiring-feed.get.ts` — separate HTTP parsing, query construction, presentation and compatibility logic.
-- [ ] `server/jobs/infrastructure/database.ts` — split schema/migrations, page queries, stats/facets and write concerns. Page/stat execution is split internally; module-level responsibility split remains.
-- [ ] `server/hiring/infrastructure/database.ts` — split current read model/querying from schema/backfill/write concerns.
+- [ ] `server/jobs/infrastructure/database.ts` — split page queries, stats/facets and write concerns now that runtime schema DDL has been removed.
+- [ ] `server/hiring/infrastructure/database.ts` — split deploy-only legacy backfill, read queries and write concerns now that runtime DDL/request-path backfill has been removed.
 - [ ] `server/utils/hiringNormalize.ts` — keep application orchestration while moving shared semantics upstream and source cleanup toward adapters.
 
 Rules for decomposition:
@@ -213,7 +214,8 @@ A duplicate is not automatically moved into local `shared/`: ownership rules abo
 - [ ] Standardize error/result contracts for internal fetch wrappers.
 - [ ] Standardize logging and redact sensitive values.
 - [ ] Standardize env/config validation at startup.
-- [ ] Review security headers/CSP at the actual edge configuration; do not assume repository headers are the whole production path.
+- [x] Add repository-level baseline response headers (`nosniff`, referrer policy, frame denial and a conservative Permissions-Policy).
+- [ ] Complete CSP after inventorying required script/worker/image/connect origins and review HSTS at the actual TLS-terminating edge; do not pretend repository middleware describes the whole production path.
 - [ ] Run lint, typecheck, tests, build and service-specific smoke tests.
 - [ ] Re-run god-file/duplication/tail/package-boundary inventory and close or explicitly defer every remaining item.
 
@@ -241,6 +243,7 @@ A duplicate is not automatically moved into local `shared/`: ownership rules abo
 - 2026-08-31: split Jobs page rows from analytics queries, projected analytics columns, added a normalized 60s stats cache and bounded salary-trend sampling. Runtime query plans still require `EXPLAIN (ANALYZE, BUFFERS)` on production-like data.
 - 2026-08-31: replaced Hiring full-table read-time dedupe with a maintained current-candidate read model and cached analytics.
 - 2026-08-31: added backend/frontend readiness, immutable deployment manifests, exact-revision rollback, queue lease heartbeat and queue-aware worker operational health.
-- 2026-08-31: added a deployment-time database preparation step as a transition toward proper versioned migrations; request/runtime DDL is not considered solved yet.
+- 2026-08-31: introduced checksummed deploy-time migrations for Jobs/Hiring/queue, removed runtime DDL from all three database modules, moved legacy Hiring backfill out of ordinary reads, and added optional migration-only connection URLs for future reduced runtime grants.
+- 2026-08-31: added conservative Nitro baseline security headers while leaving CSP/HSTS explicitly pending required-origin and TLS-edge review.
 - 2026-08-31: removed the local Haversine implementation in favor of `@whiteslove/geo-catalog`; recursive descendant traversal remains pending upstream PR #23/release.
 - 2026-08-31: opened parsing-lexicon PR #80 to centralize contextual zone display/alias/script/transliteration logic currently leaked into `locationLabels.ts`; consumer cleanup waits for a green published package revision.
