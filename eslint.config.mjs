@@ -18,8 +18,15 @@ export default withNuxt(
     // compressed multi-statement style. Add paths here as each area is cleaned.
     files: [
       'app/composables/flats/useFlatFeed.ts',
+      'jobs-worker/*.ts',
+      'scripts/migrate-database.ts',
+      'scripts/prepare-database-schema.ts',
       'server/routes/flats-translate.post.ts',
+      'server/routes/jobs-feed.get.ts',
+      'server/utils/boundedTtlCache.ts',
       'server/utils/fixedWindowRateLimiter.ts',
+      'server/utils/jobSourceConfig.ts',
+      'server/utils/jobsSourceRefresh.ts',
     ],
     rules: {
       'max-statements-per-line': readableControlFlow,
