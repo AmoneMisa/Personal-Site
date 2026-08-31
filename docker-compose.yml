@@ -2,7 +2,7 @@ services:
   backend:
     # Existing auxiliary site backend. Jobs/hiring do NOT use this service:
     # their API lives in Nuxt/Nitro and ingestion runs in `jobs-worker`.
-    image: ghcr.io/amonemisa/personal-site-backend:latest
+    image: ghcr.io/amonemisa/personal-site-backend:${BACKEND_IMAGE_TAG:-latest}
     restart: unless-stopped
     environment:
       BACKEND_STATE_DIR: /var/app/state/backend
@@ -18,7 +18,7 @@ services:
   job-browser-fetcher:
     # Lightweight Chrome TLS/JA3 impersonation for public job pages whose WAF
     # blocks Node fetch. Internal-only: no host port is published.
-    image: ghcr.io/amonemisa/personal-site-job-browser-fetcher:latest
+    image: ghcr.io/amonemisa/personal-site-job-browser-fetcher:${JOB_BROWSER_FETCHER_IMAGE_TAG:-latest}
     restart: unless-stopped
     environment:
       JOB_BROWSER_IMPERSONATE: ${JOB_BROWSER_IMPERSONATE:-chrome124}
@@ -75,7 +75,7 @@ services:
     # The ONE jobs/hiring worker. It directly owns scheduling, Postgres queue
     # claim/complete/fail, scraping, parsing, normalization, AI enrichment and
     # Elasticsearch indexing. No HTTP execution hop through Nuxt exists.
-    image: ghcr.io/amonemisa/personal-site-jobs-worker:latest
+    image: ghcr.io/amonemisa/personal-site-jobs-worker:${JOBS_WORKER_IMAGE_TAG:-latest}
     restart: unless-stopped
     env_file:
       - ${SITE_ENV_FILE:-./db.env}
@@ -126,7 +126,7 @@ services:
   subscription-bot:
     # Private Telegram Bot API client for apartment/job/candidate subscriptions.
     # Disabled safely until TELEGRAM_SUBSCRIPTION_BOT_ENABLED=on is set in db.env.
-    image: ghcr.io/amonemisa/personal-site-subscription-bot:latest
+    image: ghcr.io/amonemisa/personal-site-subscription-bot:${SUBSCRIPTION_BOT_IMAGE_TAG:-latest}
     restart: unless-stopped
     env_file:
       - ${SITE_ENV_FILE:-./db.env}
