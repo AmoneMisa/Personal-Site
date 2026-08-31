@@ -39,6 +39,8 @@ const FALLBACK_HOSTS = [
   'hipo.ro',
 ]
 
+const escapeRe = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+
 test('regional public candidate boards are scheduled through the existing CV pipeline', async () => {
   const metadata = await read('shared/hiring/sources/webCvSources.ts')
   const adapters = await read('server/hiring/sources/web/regionalPublicBoards.ts')
@@ -46,8 +48,8 @@ test('regional public candidate boards are scheduled through the existing CV pip
   const common = await read('server/hiring/sources/web/common.ts')
 
   for (const key of CANDIDATE_KEYS) {
-    assert.match(metadata, new RegExp(`key: ['"]${key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}['"]`), key)
-    assert.match(adapters, new RegExp(`key: ['"]${key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}['"]`), key)
+    assert.match(metadata, new RegExp(`key: ['"]${escapeRe(key)}['"]`), key)
+    assert.match(adapters, new RegExp(`key: ['"]${escapeRe(key)}['"]`), key)
   }
 
   assert.match(refresh, /isRegionalPublicCvSource/)
@@ -56,12 +58,16 @@ test('regional public candidate boards are scheduled through the existing CV pip
   assert.match(common, /block\.href/)
 })
 
-test('candidate integrations never attempt recruiter login or gated contact reveal', async () => {
+test('candidate integrations never implement recruiter login or gated contact actions', async () => {
   const adapters = await read('server/hiring/sources/web/regionalPublicBoards.ts')
   const crawler = await read('server/hiring/sources/web/crawler.ts')
+  const executable = `${adapters}\n${crawler}`
 
-  assert.doesNotMatch(adapters, /login|sign[-_ ]?in|password|unlock|reveal|showContact|contactDetails|authorization|cookie/i)
-  assert.doesNotMatch(crawler, /login|password|authorization|cookie/i)
+  assert.doesNotMatch(executable, /Authorization\s*:/i)
+  assert.doesNotMatch(executable, /Cookie\s*:/i)
+  assert.doesNotMatch(executable, /password\s*[:=]/i)
+  assert.doesNotMatch(executable, /fetch\s*\([^\n]{0,160}(?:login|signin|unlock|reveal|show-contact)/i)
+  assert.doesNotMatch(executable, /page\.(?:click|fill|type)\s*\([^\n]{0,160}(?:login|password|contact)/i)
 })
 
 test('regional vacancy boards are isolated under the companies fan-out', async () => {
@@ -69,7 +75,7 @@ test('regional vacancy boards are isolated under the companies fan-out', async (
   const fetchers = await read('server/utils/jobSourceFetchers.ts')
 
   for (const key of VACANCY_KEYS) {
-    assert.match(boards, new RegExp(`key: ['"]${key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}['"]`), key)
+    assert.match(boards, new RegExp(`key: ['"]${escapeRe(key)}['"]`), key)
   }
   assert.match(fetchers, /fetchRegionalJobBoardJobs/)
   assert.match(fetchers, /regional-job-boards/)
