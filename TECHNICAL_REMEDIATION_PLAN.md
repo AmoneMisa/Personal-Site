@@ -40,9 +40,9 @@ This document is the working execution plan for the site-wide technical audit. I
 ### PDF document IDs / filesystem boundary
 
 - [x] Validate every PDF `doc_id` as a canonical UUID before it reaches filesystem helpers.
-- [ ] Make filesystem helpers accept a validated-ID type/value rather than relying only on the HTTP boundary.
+- [x] Make filesystem helpers independently require a canonical UUID instead of relying only on the HTTP boundary.
 - [x] Require document existence before destructive delete.
-- [x] Add traversal/invalid-ID regression tests.
+- [x] Add traversal/invalid-ID regression tests, including the destructive preflight call contract.
 
 ### SVG editor XSS boundary
 
@@ -148,7 +148,7 @@ Initial hotspot: `app/utils/locationLabels.ts` currently understands Cyrillic va
 
 Audit and remove reusable local logic for:
 
-- [ ] geo hierarchy traversal (`children`/`descendants` APIs instead of consumer knowledge of ID prefixes). Upstream draft PR #23 adds `getGeoDescendants()`; consumer removal waits for a published package revision.
+- [ ] geo hierarchy traversal (`children`/`descendants` APIs instead of consumer knowledge of ID prefixes). Draft upstream PR #31 adds `getGeoDescendants(parentId, filters?)`; consumer removal waits for a published package revision.
 - [x] Reuse package distance/spatial utilities instead of the local Haversine implementation in `useDistrictZones.ts`.
 - [ ] canonical boundary/hierarchy operations;
 - [ ] reusable city/zone spatial derivation if it is not presentation-specific.
@@ -245,5 +245,6 @@ A duplicate is not automatically moved into local `shared/`: ownership rules abo
 - 2026-08-31: added backend/frontend readiness, immutable deployment manifests, exact-revision rollback, queue lease heartbeat and queue-aware worker operational health.
 - 2026-08-31: introduced checksummed deploy-time migrations for Jobs/Hiring/queue, removed runtime DDL from all three database modules, moved legacy Hiring backfill out of ordinary reads, and added optional migration-only connection URLs for future reduced runtime grants.
 - 2026-08-31: added conservative Nitro baseline security headers while leaving CSP/HSTS explicitly pending required-origin and TLS-edge review.
-- 2026-08-31: removed the local Haversine implementation in favor of `@whiteslove/geo-catalog`; recursive descendant traversal remains pending upstream PR #23/release.
+- 2026-08-31: removed the local Haversine implementation in favor of `@whiteslove/geo-catalog`; recursive descendant traversal is now implemented in draft geo-catalog PR #31 and waits for package release before consumer replacement.
 - 2026-08-31: opened parsing-lexicon PR #80 to centralize contextual zone display/alias/script/transliteration logic currently leaked into `locationLabels.ts`; consumer cleanup waits for a green published package revision.
+- 2026-08-31: hardened the PDF boundary again after CI exposed the destructive preflight call contract: filesystem path helpers now revalidate canonical UUIDs internally, janitor skips noncanonical storage entries, and backend tests cover the helper boundary.
