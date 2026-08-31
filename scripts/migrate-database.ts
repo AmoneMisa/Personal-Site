@@ -22,27 +22,35 @@ function safeSchema(value: string, fallback: string): string {
   return candidate
 }
 
+function configuredUrl(...values: Array<string | undefined>): string {
+  for (const value of values) {
+    const candidate = String(value || '').trim()
+    if (candidate) return candidate
+  }
+  return ''
+}
+
 function migrationTargets(): MigrationTarget[] {
-  const hiringUrl = String(process.env.HIRING_DATABASE_URL || '').trim()
-  const jobsUrl = String(process.env.JOBS_DATABASE_URL || hiringUrl).trim()
-  const queueUrl = String(process.env.JOBS_QUEUE_DATABASE_URL || hiringUrl).trim()
+  const runtimeHiringUrl = configuredUrl(process.env.HIRING_DATABASE_URL)
+  const runtimeJobsUrl = configuredUrl(process.env.JOBS_DATABASE_URL, runtimeHiringUrl)
+  const runtimeQueueUrl = configuredUrl(process.env.JOBS_QUEUE_DATABASE_URL, runtimeHiringUrl)
 
   return [
     {
       name: 'jobs',
-      url: jobsUrl,
+      url: configuredUrl(process.env.JOBS_MIGRATION_DATABASE_URL, runtimeJobsUrl),
       schema: safeSchema(process.env.JOBS_DB_SCHEMA || '', 'jobs'),
       directory: join(ROOT, 'jobs'),
     },
     {
       name: 'hiring',
-      url: hiringUrl,
+      url: configuredUrl(process.env.HIRING_MIGRATION_DATABASE_URL, runtimeHiringUrl),
       schema: safeSchema(process.env.HIRING_DB_SCHEMA || '', 'hiring'),
       directory: join(ROOT, 'hiring'),
     },
     {
       name: 'queue',
-      url: queueUrl,
+      url: configuredUrl(process.env.JOBS_QUEUE_MIGRATION_DATABASE_URL, runtimeQueueUrl),
       schema: safeSchema(process.env.JOBS_QUEUE_DB_SCHEMA || '', 'site_queue'),
       directory: join(ROOT, 'queue'),
     },
