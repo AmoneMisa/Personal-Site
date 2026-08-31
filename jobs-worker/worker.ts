@@ -1,5 +1,3 @@
-import { hostname } from 'node:os'
-
 import { looksSoftBlocked } from '../shared/http/browserSoftBlock'
 import { loadCursors, loadWebCursors } from '../shared/hiring/hiringCursors'
 import {
@@ -13,6 +11,7 @@ import {
 } from '../shared/jobs/jobsPgQueue'
 import { allHiringTargets, refreshHiringTarget } from './hiringRuntime'
 import { configuredSources, refreshSource } from './jobsRuntime'
+import { WORKER_HEALTH_ID, workerHealthReporter } from './workerHealthRuntime'
 
 const POLL_MS = Math.max(250, Number(process.env.JOBS_QUEUE_POLL_MS) || Number(process.env.JOBS_QUEUE_POLL_SECONDS || 1) * 1000)
 const ERROR_RETRY_MS = Math.max(1_000, Number(process.env.JOBS_QUEUE_ERROR_RETRY_MS) || 5_000)
@@ -23,7 +22,7 @@ const LEASE_EXTENSION_MS = Math.max(
   LEASE_HEARTBEAT_MS * 2,
   Number(process.env.JOBS_QUEUE_LEASE_SECONDS || 240) * 1000,
 )
-const WORKER_ID = String(process.env.JOBS_QUEUE_WORKER_ID || `${hostname()}:jobs`).slice(0, 200)
+const WORKER_ID = WORKER_HEALTH_ID
 
 let stopping = false
 let lastDispatchAt = 0
@@ -276,6 +275,7 @@ async function processOneTask() {
   const task = await claimJobsQueueTask({ workerId: WORKER_ID })
   if (!task) return false
 
+  workerHealthReporter.taskStarted(task)
   try {
     console.log(`[jobs:worker] start ${task.type} target=${task.target} attempt=${task.attempts}`)
     const result = await executeWithLeaseHeartbeat(task)
@@ -285,8 +285,10 @@ async function processOneTask() {
       result,
     })
     if (!completed) throw new Error('completion lost queue lease')
+    workerHealthReporter.taskCompleted()
     console.log(`[jobs:worker] completed ${task.type} target=${task.target}`)
   } catch (error) {
+    workerHealthReporter.taskFailed(error)
     const message = error instanceof Error ? error.message : String(error)
     try {
       const outcome = await failJobsQueueTask({
@@ -325,16 +327,19 @@ async function main() {
       if (now - lastDispatchAt >= DISPATCH_INTERVAL_MS) {
         await dispatchDueTasks()
         lastDispatchAt = Date.now()
+        workerHealthReporter.markDispatch()
       }
       if (now - lastPruneAt >= HISTORY_PRUNE_INTERVAL_MS) {
         const pruned = await pruneJobsQueueHistory()
         if (pruned) console.log(`[jobs:worker] pruned ${pruned} completed queue tasks`)
         lastPruneAt = Date.now()
+        workerHealthReporter.markPrune()
       }
 
       const processed = await processOneTask()
       if (!processed) await sleep(POLL_MS)
     } catch (error) {
+      workerHealthReporter.loopError(error)
       console.error('[jobs:worker] loop error:', error instanceof Error ? error.message : String(error))
       await sleep(ERROR_RETRY_MS)
     }
@@ -350,6 +355,7 @@ for (const signal of ['SIGTERM', 'SIGINT'] as const) {
 }
 
 main().catch((error) => {
+  workerHealthReporter.loopError(error)
   console.error('[jobs:worker] fatal:', error instanceof Error ? error.stack || error.message : String(error))
   process.exit(1)
 })
