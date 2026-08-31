@@ -10,11 +10,14 @@ export function useFlatFilters() {
   // The backend still accepts a `countries` CSV for compatibility, but the housing
   // UI is intentionally single-country. Keep the public ref array-shaped so the
   // existing route/meta contracts do not need a parallel API, while rejecting the
-  // multi-select state Nuxt UI can otherwise produce.
+  // multi-select state Nuxt UI can otherwise produce. USelectMenu emits a primitive
+  // value in single-select mode, so normalize both that runtime shape and the array
+  // shape used by route/meta restoration before collapsing to one country.
   const countries = computed<string[]>({
     get: () => selectedCountries.value,
     set: (values) => {
-      const normalized = [...new Set((values || []).map((value) => String(value).trim().toUpperCase()).filter(Boolean))];
+      const rawValues = Array.isArray(values) ? values : [values];
+      const normalized = [...new Set(rawValues.map((value) => String(value).trim().toUpperCase()).filter(Boolean))];
       if (!normalized.length) return;
       const current = selectedCountries.value[0];
       const next = normalized.find((value) => value !== current) || normalized[0];
