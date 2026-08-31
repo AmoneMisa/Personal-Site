@@ -28,6 +28,7 @@ export default withNuxt(
       'server/utils/jobSourceConfig.ts',
       'server/utils/jobSourceFetchers.ts',
       'server/utils/jobsSourceRefresh.ts',
+      'shared/jobs/jobsPgQueue.ts',
     ],
     rules: {
       'max-statements-per-line': readableControlFlow,
