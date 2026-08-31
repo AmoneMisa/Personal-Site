@@ -24,12 +24,19 @@ test("flat transport details are split into reusable mode tables", async () => {
 
 test("transport tables use three columns above 768px and two at 768px or below", async () => {
   const group = await read("app/components/flats/FlatTransportTables.vue");
-  const table = await read("app/components/flats/FlatTransportTable.vue");
 
   assert.match(group, /grid-template-columns: repeat\(3, minmax\(0, 1fr\)\)/);
   assert.match(group, /@media \(max-width: 768px\)[\s\S]*grid-template-columns: repeat\(2, minmax\(0, 1fr\)\)/);
-  assert.doesNotMatch(group, /overflow-y:\s*(?:auto|scroll)/);
-  assert.doesNotMatch(table, /overflow-y:\s*(?:auto|scroll)/);
+});
+
+test("each transport mode shows at most seven stop rows before scrolling", async () => {
+  const table = await read("app/components/flats/FlatTransportTable.vue");
+
+  assert.match(table, /--transport-row-height:\s*42px/);
+  assert.match(table, /max-height:\s*calc\(var\(--transport-row-height\) \* 7\)/);
+  assert.match(table, /overflow-y:\s*auto/);
+  assert.match(table, /overscroll-behavior:\s*contain/);
+  assert.match(table, /min-height:\s*var\(--transport-row-height\)/);
 });
 
 test("dynamic transport icons stay in the offline Nuxt icon bundle", async () => {
