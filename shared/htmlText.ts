@@ -7,11 +7,65 @@ const NAMED_HTML_ENTITIES: Readonly<Record<string, string>> = {
   nbsp: ' ',
   ndash: '–',
   mdash: '—',
+  hellip: '…',
+  middot: '·',
+  bull: '•',
+  laquo: '«',
+  raquo: '»',
+  rsquo: '’',
+  lsquo: '‘',
+  ldquo: '“',
+  rdquo: '”',
+  deg: '°',
+  auml: 'ä',
+  ouml: 'ö',
+  uuml: 'ü',
+  szlig: 'ß',
+  agrave: 'à',
+  aacute: 'á',
+  acirc: 'â',
+  atilde: 'ã',
+  aring: 'å',
+  aelig: 'æ',
+  ccedil: 'ç',
+  egrave: 'è',
+  eacute: 'é',
+  ecirc: 'ê',
+  euml: 'ë',
+  igrave: 'ì',
+  iacute: 'í',
+  icirc: 'î',
+  iuml: 'ï',
+  ntilde: 'ñ',
+  ograve: 'ò',
+  oacute: 'ó',
+  ocirc: 'ô',
+  otilde: 'õ',
+  oslash: 'ø',
+  ugrave: 'ù',
+  uacute: 'ú',
+  ucirc: 'û',
+  yacute: 'ý',
+  euro: '€',
+  pound: '£',
+  copy: '©',
+  reg: '®',
+  trade: '™',
+}
+
+const CASE_SENSITIVE_HTML_ENTITIES: Readonly<Record<string, string>> = {
+  Auml: 'Ä',
+  Ouml: 'Ö',
+  Uuml: 'Ü',
 }
 
 export function decodeHtmlEntities(value: string): string {
   return value.replace(/&(#x?[0-9a-f]+|[a-z]+);/gi, (match, entity: string) => {
-    if (!entity.startsWith('#')) return NAMED_HTML_ENTITIES[entity.toLowerCase()] ?? match
+    if (!entity.startsWith('#')) {
+      return CASE_SENSITIVE_HTML_ENTITIES[entity]
+        ?? NAMED_HTML_ENTITIES[entity.toLowerCase()]
+        ?? match
+    }
 
     const hex = entity[1]?.toLowerCase() === 'x'
     const code = Number.parseInt(entity.slice(hex ? 2 : 1), hex ? 16 : 10)
