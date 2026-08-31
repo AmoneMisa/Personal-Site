@@ -23,6 +23,13 @@ test('HTML entity decoding handles named and numeric entities without invalid co
   assert.equal(decodeHtmlEntities('bad: &#9999999999;'), 'bad: &#9999999999;')
 })
 
+test('HTML entity decoding covers punctuation, currencies, and case-sensitive Latin entities used by job boards', () => {
+  assert.equal(
+    decodeHtmlEntities('&Auml; &auml; &eacute; &hellip; &bull; &euro; &pound; &copy; &trade;'),
+    'Ä ä é … • € £ © ™',
+  )
+})
+
 test('HTML text extraction removes executable/style content and preserves readable boundaries', () => {
   assert.equal(
     stripHtml('<style>.x{display:none}</style><script>alert(1)</script><p>Hello<br>world &amp; friends</p>'),
