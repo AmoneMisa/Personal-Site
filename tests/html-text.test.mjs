@@ -10,6 +10,7 @@ import {
 } from '../server/utils/htmlText.ts'
 
 const jobsUa = await readFile(new URL('../server/utils/jobsUaSource.ts', import.meta.url), 'utf8')
+const regionalGeneral = await readFile(new URL('../server/utils/regionalGeneralEmployerSources.ts', import.meta.url), 'utf8')
 
 test('HTML entity decoding handles named and numeric entities without invalid code points', () => {
   assert.equal(decodeHtmlEntities('A&nbsp;&amp;&#33;&#x21;'), 'A &!!')
@@ -40,4 +41,11 @@ test('Jobs.ua consumes the shared HTML helpers instead of maintaining a local de
   assert.match(jobsUa, /decodeHtmlEntities as decodeEntities/)
   assert.doesNotMatch(jobsUa, /function decodeEntities\(/)
   assert.doesNotMatch(jobsUa, /function stripHtml\(/)
+})
+
+test('regional employer sources reuse shared HTML and safe URL helpers', () => {
+  assert.match(regionalGeneral, /absoluteHttpUrl as absoluteUrl, stripHtml/)
+  assert.doesNotMatch(regionalGeneral, /function decodeEntities\(/)
+  assert.doesNotMatch(regionalGeneral, /function stripHtml\(/)
+  assert.doesNotMatch(regionalGeneral, /function absoluteUrl\(/)
 })
