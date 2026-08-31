@@ -43,9 +43,11 @@ test('HH public vacancy cards map into the shared jobs contract', () => {
 
 test('HH vacancy ingestion paginates, deduplicates and identifies itself', async () => {
   const originalFetch = globalThis.fetch
+  const originalCountries = process.env.HH_JOB_COUNTRIES
   const originalAreas = process.env.HH_JOB_AREAS
   const originalPages = process.env.HH_JOB_PAGES_PER_RUN
   const originalDelay = process.env.HH_JOB_REQUEST_DELAY_MS
+  process.env.HH_JOB_COUNTRIES = 'UZ'
   process.env.HH_JOB_AREAS = '2759'
   process.env.HH_JOB_PAGES_PER_RUN = '1'
   process.env.HH_JOB_REQUEST_DELAY_MS = '0'
@@ -75,6 +77,8 @@ test('HH vacancy ingestion paginates, deduplicates and identifies itself', async
     assert.match(calls[0].headers.get('hh-user-agent') || '', /WhitesLove/u)
   } finally {
     globalThis.fetch = originalFetch
+    if (originalCountries === undefined) delete process.env.HH_JOB_COUNTRIES
+    else process.env.HH_JOB_COUNTRIES = originalCountries
     if (originalAreas === undefined) delete process.env.HH_JOB_AREAS
     else process.env.HH_JOB_AREAS = originalAreas
     if (originalPages === undefined) delete process.env.HH_JOB_PAGES_PER_RUN
