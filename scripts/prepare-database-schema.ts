@@ -1,21 +1,25 @@
 import { getJobByPublicIdDb, jobsDbEnabled } from '../server/jobs/infrastructure/database'
-import { hiringDbEnabled, loadDbCandidates } from '../server/hiring/infrastructure/database'
+import {
+  backfillDbCandidateReadModel,
+  hiringDbEnabled,
+  loadDbCandidates,
+} from '../server/hiring/infrastructure/database'
 import { jobsQueueDbEnabled, jobsQueueStats } from '../shared/jobs/jobsPgQueue'
 
 async function main() {
   const prepared: string[] = []
 
   if (jobsDbEnabled()) {
-    // A harmless impossible public-id read currently crosses the Jobs schema
-    // initialization boundary without mutating vacancy state. This is an explicit
-    // deployment preflight while runtime DDL is being extracted into migrations.
+    // Migrations own DDL. This impossible public-id lookup only verifies that the
+    // reduced-privilege runtime connection can read the migrated Jobs schema.
     await getJobByPublicIdDb('0')
     prepared.push('jobs')
   }
 
   if (hiringDbEnabled()) {
-    // Hydration also completes the maintained candidate_current read-model
-    // backfill, keeping that work out of the first production HTTP request.
+    // Legacy row hydration is an explicit deployment operation. HTTP reads never
+    // mutate old rows or rebuild the current-candidate projection anymore.
+    await backfillDbCandidateReadModel()
     await loadDbCandidates()
     prepared.push('hiring')
   }
