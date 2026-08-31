@@ -80,7 +80,7 @@ services:
     security_opt:
       - no-new-privileges:true
     healthcheck:
-      test: ["CMD", "node", "-e", "fetch('http://localhost:3000/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      test: ["CMD", "node", "-e", "fetch('http://localhost:3000/ready').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
       interval: 30s
       timeout: 5s
       retries: 3
@@ -119,6 +119,7 @@ services:
       HIRING_QUEUE_ENABLED: ${HIRING_QUEUE_ENABLED:-on}
       JOBS_QUEUE_MAX_ATTEMPTS: ${JOBS_QUEUE_MAX_ATTEMPTS:-5}
       JOBS_QUEUE_LEASE_SECONDS: ${JOBS_QUEUE_LEASE_SECONDS:-240}
+      JOBS_QUEUE_HEARTBEAT_SECONDS: ${JOBS_QUEUE_HEARTBEAT_SECONDS:-60}
       JOBS_QUEUE_RETRY_BASE_MS: ${JOBS_QUEUE_RETRY_BASE_MS:-30000}
       JOBS_QUEUE_RETRY_MAX_MS: ${JOBS_QUEUE_RETRY_MAX_MS:-300000}
       JOBS_QUEUE_POLL_SECONDS: ${JOBS_QUEUE_POLL_SECONDS:-1}
