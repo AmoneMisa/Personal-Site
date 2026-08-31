@@ -10,4 +10,4 @@ RUN npm ci --omit=dev --no-audit --no-fund
 
 COPY . .
 
-CMD ["node", "--experimental-transform-types", "--import", "./jobs-worker/alias-loader.mjs", "./jobs-worker/worker.ts"]
+CMD ["node", "--experimental-transform-types", "--import", "./jobs-worker/alias-loader.mjs", "--import", "./jobs-worker/workerHealthBootstrap.ts", "./jobs-worker/worker.ts"]
