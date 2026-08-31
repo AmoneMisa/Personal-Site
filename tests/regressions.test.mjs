@@ -1188,3 +1188,13 @@ test('hiring normalization drops source pseudo-roles and duplicate name-as-role 
   assert.deepEqual(normalizeProfessions('Без разницы я быстро учусь', ''), ['Any Role'])
   assert.equal(hiringProfessionLabel('Any Role', 'ru'), 'Любая работа')
 })
+
+
+test('profession display semantics stay in parsing-lexicon', () => {
+  const normalizeSource = readFileSync(new URL('../server/utils/hiringNormalize.ts', import.meta.url), 'utf8')
+  const lexiconSource = readFileSync(new URL('../server/utils/hiringLexicon.ts', import.meta.url), 'utf8')
+  assert.match(normalizeSource, /@whiteslove\/parsing-lexicon\/hiring-source-aliases/)
+  assert.doesNotMatch(normalizeSource, /\bPROFESSION_ACRONYMS\b/)
+  assert.doesNotMatch(normalizeSource, /\bformatProfessionCanonical\b/)
+  assert.doesNotMatch(lexiconSource, /\bDISPLAY_CANONICAL_OVERRIDES\b/)
+})
