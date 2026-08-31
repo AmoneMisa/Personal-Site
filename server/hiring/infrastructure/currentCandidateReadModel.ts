@@ -1,20 +1,5 @@
 import type { Pool, PoolClient } from 'pg'
 
-export async function ensureCurrentCandidateTable(db: Pool, schema: string): Promise<void> {
-  await db.query(`
-    CREATE TABLE IF NOT EXISTS ${schema}.candidate_current (
-      dedupe_key TEXT PRIMARY KEY,
-      candidate_id BIGINT NOT NULL UNIQUE
-        REFERENCES ${schema}.candidates(id) ON DELETE CASCADE,
-      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-    )
-  `)
-  await db.query(`
-    CREATE INDEX IF NOT EXISTS candidate_current_candidate_idx
-    ON ${schema}.candidate_current(candidate_id)
-  `)
-}
-
 export async function rebuildCurrentCandidates(
   client: Pool | PoolClient,
   schema: string,
