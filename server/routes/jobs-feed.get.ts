@@ -20,38 +20,9 @@ import { getStoredJobsSnapshot } from '../utils/jobsSnapshot'
 import { getRates, loadRates } from '../utils/currency'
 import { jobSearchKey, searchJobMatches } from '../utils/jobsElastic'
 import { keepUsaForeignerCandidate } from '../utils/jobVisaSponsorship'
+import { isJobSourceAvailable } from '../utils/jobSourceConfig'
 import { publicEntityId } from '../../shared/publicEntityId'
 import { queryJobsDb } from '../jobs/infrastructure/database'
-
-function isConfigured(source: JobSource): boolean {
-  switch (source) {
-    case 'adzuna':
-      return !!(process.env.ADZUNA_APP_ID && process.env.ADZUNA_APP_KEY)
-    case 'jooble':
-      return !!process.env.JOOBLE_KEY
-    case 'rss':
-      return process.env.RSS_DEFAULTS !== 'off' || !!process.env.RSS_FEEDS
-    case 'companies':
-      return process.env.COMPANIES_SOURCE !== 'off'
-    case 'linkedin':
-      return process.env.LINKEDIN_SOURCE !== 'off'
-    case 'facebook':
-    case 'threads':
-      return String(process.env.SOCIAL_JOB_SOURCE || 'on').toLowerCase() !== 'off'
-    case 'devkg':
-      return process.env.DEVKG_SOURCE !== 'off'
-    case 'ishgo':
-      return process.env.ISHGO_SOURCE !== 'off'
-    case 'itjobsuz':
-      return process.env.ITJOBS_UZ_SOURCE !== 'off'
-    case 'telegram':
-      return process.env.TELEGRAM_SOURCE !== 'off'
-    case 'olx':
-      return process.env.OLX_SOURCE === 'on'
-    default:
-      return true
-  }
-}
 
 const SORT_KEYS: SortKey[] = ['date', 'oldest', 'title', 'company', 'salary']
 const WORK_MODES: WorkMode[] = ['remote', 'hybrid', 'office', 'unknown']
@@ -90,12 +61,12 @@ export default defineEventHandler(async (event) => {
         'itjobsuz' as JobSource,
         'olx' as JobSource,
       ]
-  const activeSources = chosen.filter(isConfigured)
+  const activeSources = chosen.filter((source) => isJobSourceAvailable(source, 'feed'))
   const finalSources = activeSources.length
     ? activeSources
     : requested.length
       ? []
-      : FREE_SOURCES.filter(isConfigured)
+      : FREE_SOURCES.filter((source) => isJobSourceAvailable(source, 'feed'))
 
   let remote: boolean | undefined
   if (q.remote === 'true') remote = true
