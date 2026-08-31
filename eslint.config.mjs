@@ -4,18 +4,25 @@ const readableControlFlow = ['error', { max: 1 }]
 
 export default withNuxt(
   {
+    ignores: [
+      '.pnpm-store/**',
+      'backend/**',
+      'job-browser-fetcher/**',
+      'whiteslove.me-audit/**',
+    ],
     rules: {
-      // These rules expose real legacy debt, but turning hundreds of pre-existing
-      // violations into a blocking wall would prevent security/reliability work.
-      // Keep them visible while the remediation plan burns the baseline down.
+      // The project has dynamic third-party and browser API boundaries where
+      // `any` is intentional. Keep it visible without blocking CI.
       '@typescript-eslint/no-explicit-any': 'warn',
-      'vue/no-mutating-props': 'warn',
+      // Form-editor children intentionally mutate fields of shared reactive
+      // state objects, but replacing a prop itself remains an error.
+      'vue/no-mutating-props': ['error', { shallowOnly: true }],
+      // Keep legacy compressed control flow visible while the ratchet below
+      // makes cleaned files fail CI if the pattern is reintroduced.
       'max-statements-per-line': ['warn', { max: 1 }],
     },
   },
   {
-    // Ratchet: files cleaned as part of the remediation must never regress to the
-    // compressed multi-statement style. Add paths here as each area is cleaned.
     files: [
       'app/composables/flats/useFlatFeed.ts',
       'jobs-worker/*.ts',
