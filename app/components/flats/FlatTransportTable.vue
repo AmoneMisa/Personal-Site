@@ -58,6 +58,7 @@ function distanceLabel(stop: FlatTransportStop): string {
 
 <style scoped>
 .flat-transport-table {
+  --transport-row-height: 42px;
   min-width: 0;
   overflow: hidden;
   border: 1px solid var(--line, #252a4a);
@@ -85,14 +86,20 @@ function distanceLabel(stop: FlatTransportStop): string {
   color: var(--accent-pink, #e0679a);
 }
 
-.flat-transport-table__rows { min-width: 0; }
+.flat-transport-table__rows {
+  min-width: 0;
+  max-height: calc(var(--transport-row-height) * 7);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+}
 .flat-transport-table__row {
   display: grid;
   grid-template-columns: minmax(34px, auto) minmax(0, 1fr) auto;
   align-items: center;
   gap: 7px;
   min-width: 0;
-  min-height: 42px;
+  min-height: var(--transport-row-height);
   padding: 7px 9px;
   border-bottom: 1px solid var(--line, #252a4a);
 }
