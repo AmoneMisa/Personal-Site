@@ -7,6 +7,7 @@ const read = (path) => readFile(new URL(`../${path}`, import.meta.url), 'utf8')
 const runner = await read('scripts/migrate-database.ts')
 const deploy = await read('deploy.sh')
 const envExample = await read('.env.example')
+const queueRuntime = await read('shared/jobs/jobsPgQueue.ts')
 const jobs = await read('db/migrations/jobs/001_initial_read_model.sql')
 const hiring = await read('db/migrations/hiring/001_candidate_read_model.sql')
 const queue = await read('db/migrations/queue/001_queue_schema.sql')
@@ -40,6 +41,13 @@ test('migration runner can use deployment-only DDL credentials', () => {
   assert.match(runner, /runtimeJobsUrl/)
   assert.match(runner, /runtimeHiringUrl/)
   assert.match(runner, /runtimeQueueUrl/)
+})
+
+test('queue runtime only verifies migrated relations instead of performing DDL', () => {
+  assert.match(queueRuntime, /to_regclass/)
+  assert.match(queueRuntime, /run scripts\/migrate-database\.ts before runtime/)
+  assert.doesNotMatch(queueRuntime, /\bCREATE\s+(?:SCHEMA|TABLE|INDEX)\b/i)
+  assert.doesNotMatch(queueRuntime, /\bALTER\s+TABLE\b/i)
 })
 
 test('deployment applies migrations before compatibility read-model preparation and rollout', () => {
