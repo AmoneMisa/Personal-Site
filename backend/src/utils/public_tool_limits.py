@@ -23,7 +23,9 @@ def valid_index_key(key: str, country_keys: Iterable[str], valid_us_state) -> bo
 
 
 def valid_docker_repo(value: str) -> bool:
-    repo = str(value or "").strip().lower()
+    repo = str(value or "").strip()
+    if repo != repo.lower():
+        return False
     return 1 < len(repo) <= MAX_DOCKER_REPO_LENGTH and bool(_DOCKER_REPO_RE.fullmatch(repo))
 
 
