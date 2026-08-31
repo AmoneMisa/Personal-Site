@@ -7,7 +7,7 @@ from fastapi.responses import JSONResponse
 
 from .routers import pdf, convert, dockerhub, countryIndices
 from .routers.pdf import pdf_storage_cleanup_loop
-from .utils.pdf_doc_id import is_valid_pdf_doc_id, pdf_doc_id_from_path
+from .utils.pdf_doc_id import normalize_pdf_doc_id, pdf_doc_id_from_path
 
 
 @asynccontextmanager
@@ -28,11 +28,29 @@ app = FastAPI(lifespan=lifespan)
 
 
 @app.middleware("http")
-async def reject_invalid_pdf_document_ids(request: Request, call_next):
-    """Block untrusted PDF document IDs before any router filesystem helper runs."""
+async def enforce_pdf_document_boundary(request: Request, call_next):
+    """Validate PDF document IDs before any router filesystem helper runs."""
     doc_id = pdf_doc_id_from_path(request.url.path)
-    if doc_id is not None and not is_valid_pdf_doc_id(doc_id):
+    if doc_id is None:
+        return await call_next(request)
+
+    try:
+        canonical_id = normalize_pdf_doc_id(doc_id)
+    except (AttributeError, TypeError, ValueError):
         return JSONResponse(status_code=400, content={"detail": "Invalid document id"})
+
+    # Server-generated document IDs are canonical lower-case UUIDs. Reject other
+    # textual forms rather than letting equivalent UUID strings address different
+    # filesystem paths.
+    if canonical_id != doc_id:
+        return JSONResponse(status_code=400, content={"detail": "Non-canonical document id"})
+
+    # Deletion is destructive. Resolve the document before the route can touch
+    # Redis/file state so a missing target is a normal 404 rather than a blind
+    # best-effort rmtree against a caller-controlled path.
+    if request.method == "DELETE" and request.url.path == f"/pdf/{canonical_id}":
+        await pdf.ensure_doc_exists(canonical_id)
+
     return await call_next(request)
 
 
