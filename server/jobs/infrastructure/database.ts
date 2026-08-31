@@ -49,53 +49,14 @@ function ensureSchema(): Promise<void> {
   if (schemaReady) return schemaReady
   const name = schema()
   schemaReady = (async () => {
-    await db().query(`CREATE SCHEMA IF NOT EXISTS ${name}`)
-    await db().query(`
-      CREATE TABLE IF NOT EXISTS ${name}.vacancies (
-        identity_key TEXT PRIMARY KEY,
-        source TEXT NOT NULL,
-        source_id TEXT NOT NULL,
-        public_id BIGINT,
-        title TEXT NOT NULL,
-        company TEXT NOT NULL DEFAULT '',
-        location TEXT NOT NULL DEFAULT '',
-        country TEXT,
-        city TEXT,
-        posted_at TIMESTAMPTZ NOT NULL,
-        active BOOLEAN NOT NULL DEFAULT TRUE,
-        remote BOOLEAN,
-        work_mode TEXT,
-        relocation TEXT,
-        employment_kind TEXT,
-        salary_usd DOUBLE PRECISION,
-        experience_min_years DOUBLE PRECISION,
-        foreigner_friendly BOOLEAN NOT NULL DEFAULT FALSE,
-        usa_foreigner_friendly BOOLEAN NOT NULL DEFAULT FALSE,
-        no_experience BOOLEAN NOT NULL DEFAULT FALSE,
-        risk_category TEXT,
-        profession TEXT NOT NULL DEFAULT 'Other',
-        languages JSONB NOT NULL DEFAULT '[]'::jsonb,
-        language_keys TEXT[] NOT NULL DEFAULT ARRAY[]::TEXT[],
-        skills TEXT[] NOT NULL DEFAULT ARRAY[]::TEXT[],
-        search_text TEXT NOT NULL DEFAULT '',
-        sync_token TEXT NOT NULL,
-        data JSONB NOT NULL,
-        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-      )
-    `)
-    await db().query(`CREATE INDEX IF NOT EXISTS vacancies_source_id_idx ON ${name}.vacancies(source, source_id)`)
-    await db().query(`CREATE INDEX IF NOT EXISTS vacancies_public_id_idx ON ${name}.vacancies(public_id) WHERE active = TRUE`)
-    await db().query(`CREATE INDEX IF NOT EXISTS vacancies_active_posted_idx ON ${name}.vacancies(posted_at DESC, identity_key) WHERE active = TRUE`)
-    await db().query(`CREATE INDEX IF NOT EXISTS vacancies_country_posted_idx ON ${name}.vacancies(country, posted_at DESC) WHERE active = TRUE`)
-    await db().query(`CREATE INDEX IF NOT EXISTS vacancies_source_posted_idx ON ${name}.vacancies(source, posted_at DESC) WHERE active = TRUE`)
-    await db().query(`CREATE INDEX IF NOT EXISTS vacancies_city_lower_idx ON ${name}.vacancies((LOWER(city)), posted_at DESC) WHERE active = TRUE`)
-    await db().query(`CREATE INDEX IF NOT EXISTS vacancies_work_mode_idx ON ${name}.vacancies(work_mode, posted_at DESC) WHERE active = TRUE`)
-    await db().query(`CREATE INDEX IF NOT EXISTS vacancies_salary_idx ON ${name}.vacancies(salary_usd DESC) WHERE active = TRUE AND salary_usd IS NOT NULL`)
-    await db().query(`CREATE INDEX IF NOT EXISTS vacancies_skills_gin_idx ON ${name}.vacancies USING GIN(skills)`)
-    await db().query(`CREATE INDEX IF NOT EXISTS vacancies_language_keys_gin_idx ON ${name}.vacancies USING GIN(language_keys)`)
-    await db().query(`CREATE INDEX IF NOT EXISTS vacancies_data_gin_idx ON ${name}.vacancies USING GIN(data jsonb_path_ops)`)
-    await db().query(`ALTER TABLE ${name}.vacancies ADD COLUMN IF NOT EXISTS search_text TEXT NOT NULL DEFAULT ''`)
-    await db().query(`CREATE INDEX IF NOT EXISTS vacancies_search_idx ON ${name}.vacancies USING GIN(to_tsvector('simple', search_text))`)
+    const relations = await db().query(
+      'SELECT to_regclass($1)::text AS vacancies, to_regclass($2)::text AS migrations',
+      [`${name}.vacancies`, `${name}._site_migrations`],
+    )
+    const row = relations.rows[0]
+    if (!row?.vacancies || !row?.migrations) {
+      throw new Error(`Jobs schema ${name} is not migrated; run scripts/migrate-database.ts before runtime`)
+    }
   })().catch((error) => {
     schemaReady = undefined
     throw error
