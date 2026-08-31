@@ -1,4 +1,5 @@
 import type { Job } from './jobTypes'
+import { absoluteHttpUrl as absoluteUrl, stripHtml } from './htmlText'
 
 const UA =
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ' +
@@ -17,9 +18,6 @@ type ServiceFeed = {
 }
 
 export const REGIONAL_SERVICE_JOB_FEEDS: ServiceFeed[] = [
-  // Korea: local-language service searches. JobKorea exposes these as public
-  // candidate-facing result pages; each search is intentionally narrow so
-  // ordinary corporate vacancies do not swamp hospitality/service work.
   {
     label: 'JobKorea · Waitstaff',
     market: 'KR',
@@ -97,9 +95,6 @@ export const REGIONAL_SERVICE_JOB_FEEDS: ServiceFeed[] = [
     kind: 'jobkorea',
     category: 'Care / Personal service',
   },
-
-  // Uzbekistan: OLX has high-volume local service categories that complement
-  // ish-bor/ishgo and the corporate employers already ingested elsewhere.
   {
     label: 'OLX UZ · Restaurants',
     market: 'UZ',
@@ -150,40 +145,6 @@ export const REGIONAL_SERVICE_JOB_FEEDS: ServiceFeed[] = [
     category: 'Cashier',
   },
 ]
-
-function decodeEntities(value: string): string {
-  const named: Record<string, string> = {
-    amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", nbsp: ' ',
-  }
-  return value.replace(/&(#x?[0-9a-f]+|[a-z]+);/gi, (match, entity: string) => {
-    if (entity.startsWith('#')) {
-      const hex = entity[1]?.toLowerCase() === 'x'
-      const code = Number.parseInt(entity.slice(hex ? 2 : 1), hex ? 16 : 10)
-      return Number.isFinite(code) ? String.fromCodePoint(code) : match
-    }
-    return named[entity.toLowerCase()] ?? match
-  })
-}
-
-function stripHtml(value: unknown): string {
-  return decodeEntities(String(value || ''))
-    .replace(/<script\b[\s\S]*?<\/script>/gi, ' ')
-    .replace(/<style\b[\s\S]*?<\/style>/gi, ' ')
-    .replace(/<[^>]*>/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim()
-}
-
-function absoluteUrl(raw: string, base: string): string | null {
-  try {
-    const url = new URL(decodeEntities(raw), base)
-    if (!/^https?:$/.test(url.protocol)) return null
-    url.hash = ''
-    return url.toString()
-  } catch {
-    return null
-  }
-}
 
 function serviceJob(
   feed: ServiceFeed,
