@@ -6,77 +6,72 @@ import ColorsReplaceModal from "~/components/svgEditor/ColorsReplaceModal.vue";
 import StrokeEditorModal from "~/components/svgEditor/StrokeEditorModal.vue";
 import TransformEditorModal from "~/components/svgEditor/TransformEditorModal.vue";
 import CustomButton from "~/components/common/CustomButton.vue";
-
-type ParseResult =
-    | { ok: true; doc: XMLDocument; svg: SVGElement }
-    | { ok: false; errorKey: string };
+import { parseAndSanitizeSvg } from "~/utils/svgEditor/sanitizeSvg";
 
 const { t } = useI18n();
 
 const fileError = ref<string | null>(null);
 const codeError = ref<string | null>(null);
-
 const inputCode = ref<string>("");
 const normalizedCode = ref<string>("");
-
 const previewSvg = ref<string>("");
-const isReady = computed(() => (previewSvg.value || "").length > 0);
+const isReady = computed(() => previewSvg.value.length > 0);
 
 const colorsModalOpen = ref(false);
 const strokeModalOpen = ref(false);
 const transformModalOpen = ref(false);
 
-function safeTrim(v: string) {
-  return String(v || "").trim();
+function safeTrim(value: string) {
+  return String(value || "").trim();
 }
 
-function parseSvg(raw: string): ParseResult {
-  const s = safeTrim(raw);
-  if (!s) return { ok: false, errorKey: "services.svgEditor.errors.empty" };
+function errorKeyForSvg(reason: "empty" | "noSvgRoot" | "parse") {
+  if (reason === "empty") return "services.svgEditor.errors.empty";
+  if (reason === "noSvgRoot") return "services.svgEditor.errors.noSvgRoot";
+  return "services.svgEditor.errors.parse";
+}
 
-  const hasSvg = /<svg[\s>]/i.test(s);
-  if (!hasSvg) return { ok: false, errorKey: "services.svgEditor.errors.noSvgRoot" };
-
-  try {
-    const parser = new DOMParser();
-    const doc = parser.parseFromString(s, "image/svg+xml");
-    const svg = doc.documentElement as any;
-
-    const parseErr = doc.getElementsByTagName("parsererror")?.[0];
-    if (parseErr) return { ok: false, errorKey: "services.svgEditor.errors.parse" };
-    if (!svg || String(svg.tagName || "").toLowerCase() !== "svg") return { ok: false, errorKey: "services.svgEditor.errors.noSvgRoot" };
-
-    return { ok: true, doc, svg: svg as SVGElement };
-  } catch {
-    return { ok: false, errorKey: "services.svgEditor.errors.parse" };
-  }
+function parseSvg(raw: string) {
+  const result = parseAndSanitizeSvg(raw);
+  if (result.ok) return result;
+  return {
+    ok: false as const,
+    errorKey: errorKeyForSvg(result.reason),
+  };
 }
 
 function serializeSvg(svg: SVGElement) {
   return new XMLSerializer().serializeToString(svg);
 }
 
-function setPreviewFromCode(raw: string) {
-  codeError.value = null;
-  const res = parseSvg(raw);
-  if (!res.ok) {
+function commitSanitizedSvg(raw: string, showError = false): boolean {
+  const result = parseSvg(raw);
+  if (!result.ok) {
+    if (showError) codeError.value = t(result.errorKey);
     previewSvg.value = "";
     normalizedCode.value = "";
-    codeError.value = t(res.errorKey);
-    return;
+    return false;
   }
-  normalizedCode.value = serializeSvg(res.svg);
-  previewSvg.value = normalizedCode.value;
+
+  previewSvg.value = result.markup;
+  normalizedCode.value = result.markup;
+  inputCode.value = result.markup;
+  return true;
+}
+
+function setPreviewFromCode(raw: string) {
+  codeError.value = null;
+  commitSanitizedSvg(raw, true);
 }
 
 function onFiles(files: File[]) {
   fileError.value = null;
   codeError.value = null;
 
-  const f = files?.[0];
-  if (!f) return;
+  const file = files?.[0];
+  if (!file) return;
 
-  if (!/\.svg$/i.test(f.name)) {
+  if (!/\.svg$/i.test(file.name)) {
     fileError.value = t("services.svgEditor.errors.fileNotSvg");
     return;
   }
@@ -90,7 +85,7 @@ function onFiles(files: File[]) {
   reader.onerror = () => {
     fileError.value = t("services.svgEditor.errors.fileRead");
   };
-  reader.readAsText(f);
+  reader.readAsText(file);
 }
 
 function applyText() {
@@ -99,32 +94,31 @@ function applyText() {
 
 function removeNodesByTag(svg: SVGElement, tag: string) {
   const list = Array.from(svg.getElementsByTagName(tag));
-  for (const n of list) n.parentNode?.removeChild(n);
+  for (const node of list) node.parentNode?.removeChild(node);
 }
 
 function removeComments(root: Node) {
   const walker = document.createTreeWalker(root, NodeFilter.SHOW_COMMENT);
   const toRemove: Comment[] = [];
   while (walker.nextNode()) toRemove.push(walker.currentNode as Comment);
-  for (const c of toRemove) c.parentNode?.removeChild(c);
+  for (const comment of toRemove) comment.parentNode?.removeChild(comment);
 }
 
 function removeEmptyDefs(svg: SVGElement) {
   const defs = Array.from(svg.getElementsByTagName("defs"));
-  for (const d of defs) {
-    const hasChildren = Array.from(d.childNodes).some((n) => n.nodeType === 1);
-    if (!hasChildren) d.parentNode?.removeChild(d);
+  for (const item of defs) {
+    const hasChildren = Array.from(item.childNodes).some((node) => node.nodeType === 1);
+    if (!hasChildren) item.parentNode?.removeChild(item);
   }
 }
 
 function minifySvg() {
   if (!isReady.value) return;
 
-  const res = parseSvg(previewSvg.value);
-  if (!res.ok) return;
+  const result = parseSvg(previewSvg.value);
+  if (!result.ok) return;
 
-  const svg = res.svg;
-
+  const svg = result.svg;
   const savedWidth = svg.getAttribute("width");
   const savedHeight = svg.getAttribute("height");
 
@@ -140,27 +134,18 @@ function minifySvg() {
   if (savedHeight != null) svg.setAttribute("height", savedHeight);
   else svg.removeAttribute("height");
 
-  const next = serializeSvg(svg);
-  previewSvg.value = next;
-  normalizedCode.value = next;
-  inputCode.value = next;
+  commitSanitizedSvg(serializeSvg(svg));
 }
 
 function removeDimensions() {
   if (!isReady.value) return;
 
-  const res = parseSvg(previewSvg.value);
-  if (!res.ok) return;
+  const result = parseSvg(previewSvg.value);
+  if (!result.ok) return;
 
-  const svg = res.svg;
-
-  svg.removeAttribute("width");
-  svg.removeAttribute("height");
-
-  const next = serializeSvg(svg);
-  previewSvg.value = next;
-  normalizedCode.value = next;
-  inputCode.value = next;
+  result.svg.removeAttribute("width");
+  result.svg.removeAttribute("height");
+  commitSanitizedSvg(serializeSvg(result.svg));
 }
 
 type ColorUsage = {
@@ -169,154 +154,141 @@ type ColorUsage = {
   count: number;
 };
 
-function normalizeColorKey(v: string) {
-  return safeTrim(v).replace(/\s+/g, " ");
+function normalizeColorKey(value: string) {
+  return safeTrim(value).replace(/\s+/g, " ");
 }
 
-function isHardColor(v: string) {
-  const s = safeTrim(v);
-  if (!s) return false;
-  if (/^none$/i.test(s)) return false;
-  if (/^inherit$/i.test(s)) return false;
-  if (/^url\(/i.test(s)) return false;
+function isHardColor(value: string) {
+  const normalized = safeTrim(value);
+  if (!normalized) return false;
+  if (/^none$/i.test(normalized)) return false;
+  if (/^inherit$/i.test(normalized)) return false;
+  if (/^url\(/i.test(normalized)) return false;
   return true;
 }
 
 function extractColorsFromStyle(style: string) {
   const out: { prop: "fill" | "stroke"; value: string }[] = [];
-  const s = String(style || "");
-  const mFill = s.match(/(?:^|;)\s*fill\s*:\s*([^;]+)/i);
-  const mStroke = s.match(/(?:^|;)\s*stroke\s*:\s*([^;]+)/i);
-  if (mFill) out.push({ prop: "fill", value: safeTrim(mFill[1]) });
-  if (mStroke) out.push({ prop: "stroke", value: safeTrim(mStroke[1]) });
+  const source = String(style || "");
+  const fill = source.match(/(?:^|;)\s*fill\s*:\s*([^;]+)/i);
+  const stroke = source.match(/(?:^|;)\s*stroke\s*:\s*([^;]+)/i);
+  if (fill) out.push({ prop: "fill", value: safeTrim(fill[1]) });
+  if (stroke) out.push({ prop: "stroke", value: safeTrim(stroke[1]) });
   return out;
 }
 
 function collectHardColors(svgCode: string): ColorUsage[] {
-  const res = parseSvg(svgCode);
-  if (!res.ok) return [];
+  const result = parseSvg(svgCode);
+  if (!result.ok) return [];
 
-  const svg = res.svg;
   const map = new Map<string, { value: string; count: number }>();
+  const elements = [result.svg, ...Array.from(result.svg.querySelectorAll("*"))] as Element[];
 
-  const elements = [svg, ...Array.from(svg.querySelectorAll("*"))] as Element[];
-
-  for (const el of elements) {
-    const fill = el.getAttribute("fill");
+  for (const element of elements) {
+    const fill = element.getAttribute("fill");
     if (fill && isHardColor(fill)) {
-      const k = normalizeColorKey(fill);
-      map.set(k, { value: fill, count: (map.get(k)?.count || 0) + 1 });
+      const key = normalizeColorKey(fill);
+      map.set(key, { value: fill, count: (map.get(key)?.count || 0) + 1 });
     }
 
-    const stroke = el.getAttribute("stroke");
+    const stroke = element.getAttribute("stroke");
     if (stroke && isHardColor(stroke)) {
-      const k = normalizeColorKey(stroke);
-      map.set(k, { value: stroke, count: (map.get(k)?.count || 0) + 1 });
+      const key = normalizeColorKey(stroke);
+      map.set(key, { value: stroke, count: (map.get(key)?.count || 0) + 1 });
     }
 
-    const style = el.getAttribute("style");
-    if (style) {
-      for (const item of extractColorsFromStyle(style)) {
-        if (!isHardColor(item.value)) continue;
-        const k = normalizeColorKey(item.value);
-        map.set(k, { value: item.value, count: (map.get(k)?.count || 0) + 1 });
-      }
+    const style = element.getAttribute("style");
+    if (!style) continue;
+    for (const item of extractColorsFromStyle(style)) {
+      if (!isHardColor(item.value)) continue;
+      const key = normalizeColorKey(item.value);
+      map.set(key, { value: item.value, count: (map.get(key)?.count || 0) + 1 });
     }
   }
 
   return Array.from(map.entries())
-      .map(([key, v]) => ({ key, value: v.value, count: v.count }))
-      .sort((a, b) => b.count - a.count || a.key.localeCompare(b.key));
+    .map(([key, value]) => ({ key, value: value.value, count: value.count }))
+    .sort((a, b) => b.count - a.count || a.key.localeCompare(b.key));
 }
 
-function replaceColors(svgCode: string, replacements: Record<string, { mode: "color" | "currentColor"; color: string }>) {
-  const res = parseSvg(svgCode);
-  if (!res.ok) return svgCode;
+function replaceColors(
+  svgCode: string,
+  replacements: Record<string, { mode: "color" | "currentColor"; color: string }>,
+) {
+  const result = parseSvg(svgCode);
+  if (!result.ok) return svgCode;
 
-  const svg = res.svg;
-  const elements = [svg, ...Array.from(svg.querySelectorAll("*"))] as Element[];
+  const elements = [result.svg, ...Array.from(result.svg.querySelectorAll("*"))] as Element[];
 
   function mapValue(old: string) {
-    const k = normalizeColorKey(old);
-    const r = replacements[k];
-    if (!r) return null;
-    if (r.mode === "currentColor") return "currentColor";
-    return r.color;
+    const replacement = replacements[normalizeColorKey(old)];
+    if (!replacement) return null;
+    return replacement.mode === "currentColor" ? "currentColor" : replacement.color;
   }
 
   function replaceInStyle(style: string) {
-    let s = String(style || "");
-    const fillM = s.match(/(?:^|;)\s*fill\s*:\s*([^;]+)/i);
-    const strokeM = s.match(/(?:^|;)\s*stroke\s*:\s*([^;]+)/i);
+    let nextStyle = String(style || "");
+    const fill = nextStyle.match(/(?:^|;)\s*fill\s*:\s*([^;]+)/i);
+    const stroke = nextStyle.match(/(?:^|;)\s*stroke\s*:\s*([^;]+)/i);
 
-    if (fillM) {
-      const next = mapValue(safeTrim(fillM[1]));
-      if (next) s = s.replace(fillM[0], fillM[0].replace(fillM[1], ` ${next}`));
+    if (fill) {
+      const next = mapValue(safeTrim(fill[1]));
+      if (next) nextStyle = nextStyle.replace(fill[0], fill[0].replace(fill[1], ` ${next}`));
     }
-    if (strokeM) {
-      const next = mapValue(safeTrim(strokeM[1]));
-      if (next) s = s.replace(strokeM[0], strokeM[0].replace(strokeM[1], ` ${next}`));
+    if (stroke) {
+      const next = mapValue(safeTrim(stroke[1]));
+      if (next) nextStyle = nextStyle.replace(stroke[0], stroke[0].replace(stroke[1], ` ${next}`));
     }
-    return s;
+    return nextStyle;
   }
 
-  for (const el of elements) {
-    const fill = el.getAttribute("fill");
+  for (const element of elements) {
+    const fill = element.getAttribute("fill");
     if (fill) {
       const next = mapValue(fill);
-      if (next) el.setAttribute("fill", next);
+      if (next) element.setAttribute("fill", next);
     }
 
-    const stroke = el.getAttribute("stroke");
+    const stroke = element.getAttribute("stroke");
     if (stroke) {
       const next = mapValue(stroke);
-      if (next) el.setAttribute("stroke", next);
+      if (next) element.setAttribute("stroke", next);
     }
 
-    const style = el.getAttribute("style");
+    const style = element.getAttribute("style");
     if (style) {
       const nextStyle = replaceInStyle(style);
-      if (nextStyle !== style) el.setAttribute("style", nextStyle);
+      if (nextStyle !== style) element.setAttribute("style", nextStyle);
     }
   }
 
-  return serializeSvg(svg);
+  return serializeSvg(result.svg);
 }
 
 const detectedColors = computed(() => collectHardColors(previewSvg.value));
 
 function openColorsModal() {
-  if (!isReady.value) return;
-  colorsModalOpen.value = true;
+  if (isReady.value) colorsModalOpen.value = true;
 }
 
 function openStrokeModal() {
-  if (!isReady.value) return;
-  strokeModalOpen.value = true;
+  if (isReady.value) strokeModalOpen.value = true;
 }
 
 function openTransformModal() {
-  if (!isReady.value) return;
-  transformModalOpen.value = true;
+  if (isReady.value) transformModalOpen.value = true;
 }
 
 function onApplyColorReplacements(payload: { replacements: Record<string, { mode: "color" | "currentColor"; color: string }> }) {
-  const next = replaceColors(previewSvg.value, payload.replacements);
-  previewSvg.value = next;
-  normalizedCode.value = next;
-  inputCode.value = next;
+  commitSanitizedSvg(replaceColors(previewSvg.value, payload.replacements));
 }
 
 function onApplyStrokeEdits(payload: { svg: string }) {
-  previewSvg.value = payload.svg;
-  normalizedCode.value = payload.svg;
-  inputCode.value = payload.svg;
+  commitSanitizedSvg(payload.svg);
 }
 
 function onApplyTransformEdits(payload: { svg: string }) {
-  previewSvg.value = payload.svg;
-  normalizedCode.value = payload.svg;
-  inputCode.value = payload.svg;
+  commitSanitizedSvg(payload.svg);
 }
 </script>
 
@@ -329,71 +301,67 @@ function onApplyTransformEdits(payload: { svg: string }) {
             <div class="svg-editor-shell__section-title">{{ t("services.svgEditor.sections.input.title") }}</div>
 
             <file-input
-                label-key="services.svgEditor.inputs.file"
-                accept=".svg,image/svg+xml"
-                :error="fileError"
-                :max-bytes="5 * 1024 * 1024"
-                max-bytes-error-key="services.svgEditor.errors.fileTooLarge"
-                @files="onFiles"
+              label-key="services.svgEditor.inputs.file"
+              accept=".svg,image/svg+xml"
+              :error="fileError"
+              :max-bytes="5 * 1024 * 1024"
+              max-bytes-error-key="services.svgEditor.errors.fileTooLarge"
+              @files="onFiles"
             />
 
             <svg-code-textarea
-                v-model="inputCode"
-                :label-key="'services.svgEditor.inputs.code'"
-                :placeholder-key="'services.svgEditor.inputs.codePlaceholder'"
-                :error="codeError"
+              v-model="inputCode"
+              :label-key="'services.svgEditor.inputs.code'"
+              :placeholder-key="'services.svgEditor.inputs.codePlaceholder'"
+              :error="codeError"
             />
 
             <div class="svg-editor-shell__actions">
-              <custom-button
-                  type="button"
-                  :title="t('services.svgEditor.titles.apply')"
-                  @click="applyText"
-              >
+              <custom-button type="button" :title="t('services.svgEditor.titles.apply')" @click="applyText">
                 {{ t("services.svgEditor.actions.apply") }}
               </custom-button>
 
               <custom-button
-                  type="button"
-                  :disabled="!isReady"
-                  :title="t('services.svgEditor.titles.minify')"
-                  @click="minifySvg"
+                type="button"
+                :disabled="!isReady"
+                :title="t('services.svgEditor.titles.minify')"
+                @click="minifySvg"
               >
                 {{ t("services.svgEditor.actions.minify") }}
               </custom-button>
 
               <custom-button
-                  type="button"
-                  :disabled="!isReady"
-                  :title="t('services.svgEditor.titles.removeDimensions')"
-                  @click="removeDimensions"
+                type="button"
+                :disabled="!isReady"
+                :title="t('services.svgEditor.titles.removeDimensions')"
+                @click="removeDimensions"
               >
                 {{ t("services.svgEditor.actions.removeDimensions") }}
               </custom-button>
 
               <custom-button
-                  type="button"
-                  :disabled="!isReady || detectedColors.length === 0"
-                  :title="t('services.svgEditor.titles.replaceColors')"
-                  @click="openColorsModal"
+                type="button"
+                :disabled="!isReady || detectedColors.length === 0"
+                :title="t('services.svgEditor.titles.replaceColors')"
+                @click="openColorsModal"
               >
                 {{ t("services.svgEditor.actions.replaceColors") }}
               </custom-button>
 
               <custom-button
-                  type="button"
-                  :disabled="!isReady"
-                  :title="t('services.svgEditor.titles.editStroke')"
-                  @click="openStrokeModal"
+                type="button"
+                :disabled="!isReady"
+                :title="t('services.svgEditor.titles.editStroke')"
+                @click="openStrokeModal"
               >
                 {{ t("services.svgEditor.actions.editStroke") }}
               </custom-button>
 
               <custom-button
-                  type="button"
-                  :disabled="!isReady"
-                  :title="t('services.svgEditor.titles.transform')"
-                  @click="openTransformModal"
+                type="button"
+                :disabled="!isReady"
+                :title="t('services.svgEditor.titles.transform')"
+                @click="openTransformModal"
               >
                 {{ t("services.svgEditor.actions.transform") }}
               </custom-button>
@@ -418,11 +386,11 @@ function onApplyTransformEdits(payload: { svg: string }) {
             </div>
 
             <custom-input
-                :model-value="normalizedCode"
-                :label="t('services.svgEditor.outputs.normalized')"
-                :placeholder="t('services.svgEditor.outputs.normalizedPlaceholder')"
-                :readonly="true"
-                :clearable="false"
+              :model-value="normalizedCode"
+              :label="t('services.svgEditor.outputs.normalized')"
+              :placeholder="t('services.svgEditor.outputs.normalizedPlaceholder')"
+              :readonly="true"
+              :clearable="false"
             />
           </div>
         </u-card>
@@ -430,21 +398,21 @@ function onApplyTransformEdits(payload: { svg: string }) {
     </div>
 
     <colors-replace-modal
-        v-model:open="colorsModalOpen"
-        :colors="detectedColors"
-        @apply="onApplyColorReplacements"
+      v-model:open="colorsModalOpen"
+      :colors="detectedColors"
+      @apply="onApplyColorReplacements"
     />
 
     <stroke-editor-modal
-        v-model:open="strokeModalOpen"
-        :svg="previewSvg"
-        @apply="onApplyStrokeEdits"
+      v-model:open="strokeModalOpen"
+      :svg="previewSvg"
+      @apply="onApplyStrokeEdits"
     />
 
     <transform-editor-modal
-        v-model:open="transformModalOpen"
-        :svg="previewSvg"
-        @apply="onApplyTransformEdits"
+      v-model:open="transformModalOpen"
+      :svg="previewSvg"
+      @apply="onApplyTransformEdits"
     />
   </div>
 </template>
