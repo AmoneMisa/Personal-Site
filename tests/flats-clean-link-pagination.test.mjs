@@ -4,14 +4,17 @@ import test from 'node:test'
 
 const route = await readFile(new URL('../server/routes/flats-feed.get.ts', import.meta.url), 'utf8')
 const feedCache = await readFile(new URL('../server/flats/feedCache.ts', import.meta.url), 'utf8')
+const feedLookup = await readFile(new URL('../server/flats/feedLookup.ts', import.meta.url), 'utf8')
 const page = await readFile(new URL('../app/pages/flat-finder/index.vue', import.meta.url), 'utf8')
 const routeState = await readFile(new URL('../app/composables/flats/useFlatRouteState.ts', import.meta.url), 'utf8')
 
-test('flats-feed resolves a clean ?publicId= link without going through the filtered search', () => {
+test('flats-feed resolves a clean ?publicId= link before the filtered search and delegates upstream IO', () => {
   assert.match(route, /const publicIdParam = String\(upstreamParams\.get\('publicId'\) \|\| ''\)\.trim\(\)/)
   assert.match(route, /const canonicalPublicId = publicIdParam\.replace\(\/\^0\+\(\?=\\d\)\//)
-  assert.match(route, /\/api\/listing\/by-public-id\/\$\{encodeURIComponent\(canonicalPublicId\)\}/)
-  assert.match(route, /const data = \{ count: 1, listings: \[shapeListing\(result\.listing\)\] \}/)
+  assert.match(route, /const lookup = await lookupPublicListing\(canonicalPublicId\)/)
+  assert.match(route, /if \(lookup\.upstreamFailed\) setResponseStatus\(event, 502\)/)
+  assert.match(feedLookup, /\/api\/listing\/by-public-id\/\$\{encodeURIComponent\(publicId\)\}/)
+  assert.match(feedLookup, /const data = \{ count: 1, listings: \[shapeListing\(result\.listing\)\] \}/)
 
   // The publicId branch must return before the filtered-search/exactListingId
   // machinery runs, otherwise a clean link would still need listingId/source/country.
@@ -20,11 +23,11 @@ test('flats-feed resolves a clean ?publicId= link without going through the filt
   assert.ok(publicIdIndex > -1 && exactListingIndex > -1 && publicIdIndex < exactListingIndex)
 })
 
-test('a resolved ?publicId= listing delegates to a bounded TTL cache and never caches misses', () => {
-  assert.match(route, /from '\.\.\/flats\/feedCache'/)
-  assert.match(route, /const cached = getCachedPublicId\(canonicalPublicId\)/)
-  assert.match(route, /if \(cached\) return cached/)
-  assert.match(route, /cachePublicId\(canonicalPublicId, data\)/)
+test('a resolved ?publicId= listing uses a bounded TTL cache and never caches misses', () => {
+  assert.match(route, /from '\.\.\/flats\/feedLookup'/)
+  assert.match(feedLookup, /const cached = getCachedPublicId\(publicId\)/)
+  assert.match(feedLookup, /if \(cached\) return \{ data: cached, upstreamFailed: false \}/)
+  assert.match(feedLookup, /cachePublicId\(publicId, data\)/)
 
   assert.match(feedCache, /export const PUBLIC_ID_CACHE_TTL_MS = FEED_FRESH_MS/)
   assert.match(feedCache, /const PUBLIC_ID_CACHE_MAX_ENTRIES = 1_000/)
@@ -34,11 +37,10 @@ test('a resolved ?publicId= listing delegates to a bounded TTL cache and never c
 
   // Only the successful lookup branch writes to the public-id cache. A miss or
   // a 404 must return without creating a negative cache entry.
-  assert.equal((route.match(/cachePublicId\(canonicalPublicId, data\)/g) || []).length, 1)
-  assert.match(
-    route,
-    /if \(result\?\.listing\) \{[\s\S]*cachePublicId\(canonicalPublicId, data\)[\s\S]*return data[\s\S]*\}\s*return \{ count: 0, listings: \[\] \}/,
-  )
+  assert.equal((feedLookup.match(/cachePublicId\(publicId, data\)/g) || []).length, 1)
+  const hitWrite = feedLookup.indexOf('cachePublicId(publicId, data)')
+  const notFoundHandler = feedLookup.indexOf('if (status === 404)')
+  assert.ok(hitWrite > -1 && notFoundHandler > hitWrite)
 })
 
 test('flats-feed delegates bounded query caching, normalized keys, and refresh fan-out limits', () => {
