@@ -20,6 +20,19 @@ def normalize_pdf_doc_id(value: str) -> str:
     return str(parsed)
 
 
+def require_canonical_pdf_doc_id(value: str) -> str:
+    """Return ``value`` only when it is already the canonical UUID spelling.
+
+    Filesystem helpers use this stricter boundary so alternate textual UUID
+    forms cannot address a different path than the server-generated document id.
+    """
+    candidate = str(value)
+    canonical = normalize_pdf_doc_id(candidate)
+    if candidate != canonical:
+        raise ValueError("PDF document id must be a canonical UUID")
+    return canonical
+
+
 def pdf_doc_id_from_path(path: str) -> str | None:
     """Extract a PDF document id from a known public PDF route, if present."""
     match = _PDF_DOC_ROUTE_RE.match(path)
