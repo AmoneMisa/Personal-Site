@@ -24,8 +24,15 @@ test('main feed trusts persisted availability without a second blocking OLX batc
   assert.doesNotMatch(route, /\/api\/listings\/verify/)
   assert.doesNotMatch(route, /filterPersistedInactiveOlx/)
   assert.doesNotMatch(route, /AVAILABILITY_TIMEOUT_MS/)
-  assert.match(route, /PostgreSQL already excludes rows persisted with `active = FALSE`/)
   assert.match(route, /const finalize = async \(raw: any\) => withExactListingFallback/)
+  assert.match(route, /const url = `\$\{FLAT_API_URL\}\/api\/listings\?\$\{upstreamParams\}`/)
+
+  // Live verification is an explicit exact-listing branch only. The generic
+  // persisted feed must remove verifyLive before constructing its upstream URL.
+  const liveBranch = route.indexOf("if (verifyLive && exactListingId && exactSource === 'olx' && exactCountryCode)")
+  const removeFlag = route.indexOf("upstreamParams.delete('verifyLive')")
+  const feedUrl = route.indexOf('const url = `${FLAT_API_URL}/api/listings?${upstreamParams}`')
+  assert.ok(liveBranch > -1 && removeFlag > -1 && feedUrl > -1 && removeFlag < liveBranch && liveBranch < feedUrl)
 })
 
 test('client opens OLX immediately and performs explicit live verification in the background', () => {
