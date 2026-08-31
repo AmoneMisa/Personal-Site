@@ -8,7 +8,8 @@ const routeState = await readFile(new URL('../app/composables/flats/useFlatRoute
 
 test('flats-feed resolves a clean ?publicId= link without going through the filtered search', () => {
   assert.match(route, /const publicIdParam = String\(upstreamParams\.get\('publicId'\) \|\| ''\)\.trim\(\)/)
-  assert.match(route, /\/api\/listing\/by-public-id\/\$\{encodeURIComponent\(publicIdParam\)\}/)
+  assert.match(route, /const canonicalPublicId = publicIdParam\.replace\(\/\^0\+\(\?=\\d\)\//)
+  assert.match(route, /\/api\/listing\/by-public-id\/\$\{encodeURIComponent\(canonicalPublicId\)\}/)
   assert.match(route, /const data = \{ count: 1, listings: \[shapeListing\(result\.listing\)\] \}/)
 
   // The publicId branch must return before the filtered-search/exactListingId
@@ -18,19 +19,33 @@ test('flats-feed resolves a clean ?publicId= link without going through the filt
   assert.ok(publicIdIndex > -1 && exactListingIndex > -1 && publicIdIndex < exactListingIndex)
 })
 
-test('a resolved ?publicId= listing is cached briefly so a burst of opens on one shared link is one Postgres round trip', () => {
+test('a resolved ?publicId= listing uses a bounded TTL cache and never caches misses', () => {
   assert.match(route, /const PUBLIC_ID_CACHE_TTL_MS = FEED_FRESH_MS/)
-  assert.match(route, /const publicIdCache = new Map<string, \{ at: number; data: any \}>\(\)/)
-  assert.match(route, /const cached = publicIdCache\.get\(publicIdParam\)/)
-  assert.match(route, /if \(cached && Date\.now\(\) - cached\.at < PUBLIC_ID_CACHE_TTL_MS\) return cached\.data/)
-  assert.match(route, /publicIdCache\.set\(publicIdParam, \{ at: Date\.now\(\), data \}\)/)
+  assert.match(route, /const PUBLIC_ID_CACHE_MAX_ENTRIES = 1_000/)
+  assert.match(route, /const publicIdCache = new BoundedTtlCache<string, any>/)
+  assert.match(route, /maxEntries: PUBLIC_ID_CACHE_MAX_ENTRIES/)
+  assert.match(route, /defaultTtlMs: PUBLIC_ID_CACHE_TTL_MS/)
+  assert.match(route, /const cached = publicIdCache\.get\(canonicalPublicId\)/)
+  assert.match(route, /if \(cached\) return cached/)
+  assert.match(route, /publicIdCache\.set\(canonicalPublicId, data\)/)
 
   // A miss (listing not found / still ingesting) must never be cached, or a
   // newly-active listing would stay invisible until the TTL expires.
   assert.match(route, /Not-found stays uncached/)
-  const hitIndex = route.indexOf('publicIdCache.set(publicIdParam')
+  const hitIndex = route.indexOf('publicIdCache.set(canonicalPublicId')
   const notFoundCommentIndex = route.indexOf('Not-found stays uncached')
   assert.ok(hitIndex > -1 && notFoundCommentIndex > -1 && hitIndex < notFoundCommentIndex)
+})
+
+test('flats-feed bounds query cache cardinality, normalizes keys, and caps concurrent refresh fan-out', () => {
+  assert.match(route, /const FEED_CACHE_MAX_ENTRIES = 750/)
+  assert.match(route, /const MAX_INFLIGHT_REFRESHES = 64/)
+  assert.match(route, /const feedCache = new BoundedTtlCache<string, FeedCacheEntry>/)
+  assert.match(route, /function normalizedSearchKey\(params: URLSearchParams\): string/)
+  assert.match(route, /const key = normalizedSearchKey\(upstreamParams\)/)
+  assert.match(route, /const combinedKey = `combined:\$\{normalizedSearchKey\(combinedParams\)\}`/)
+  assert.match(route, /if \(feedRefreshes\.size >= MAX_INFLIGHT_REFRESHES\)/)
+  assert.match(route, /feedCache\.set\(key, entry, staleWindow\(entry\)\)/)
 })
 
 test('opening or sharing a listing prefers the bare publicId over the flat/flatSource/flatCountry triple', () => {
