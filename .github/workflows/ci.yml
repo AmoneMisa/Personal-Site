@@ -33,6 +33,9 @@ jobs:
           node --experimental-transform-types --check jobs-worker/worker.ts
           node --check jobs-worker/alias-loader.mjs
 
+      - name: Run code quality inventory
+        run: npm run audit:code
+
       - name: Run ESLint
         run: npm run lint -- --quiet
 
