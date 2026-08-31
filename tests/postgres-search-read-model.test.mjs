@@ -40,6 +40,25 @@ test('vacancy counts and analytics are computed by PostgreSQL', () => {
   assert.match(jobsDb, /salaryTrend/)
 })
 
+test('vacancy page reads are split from bounded cached analytics', () => {
+  assert.match(jobsDb, /const jobStatsCache = new BoundedTtlCache<string, JobStats>/)
+  assert.match(jobsDb, /const JOB_STATS_CACHE_TTL_MS = 60_000/)
+  assert.match(jobsDb, /function statsCacheKey\(query: JobQuery\): string/)
+  assert.match(jobsDb, /jobStatsCache\.clear\(\)/)
+  assert.match(jobsDb, /async function queryJobStats\(query: JobQuery\)/)
+  assert.match(jobsDb, /SELECT data\s+FROM \$\{schema\(\)\}\.vacancies\s+WHERE \$\{pageWhere\}/u)
+  assert.match(jobsDb, /WITH filtered_sources AS/u)
+  assert.match(jobsDb, /SELECT\s+source, country, city, posted_at, title, work_mode, relocation,/u)
+  assert.doesNotMatch(jobsDb, /WITH filtered AS MATERIALIZED \(\s*SELECT \*/u)
+})
+
+test('vacancy salary trend is bounded and stratified instead of serializing every salary row', () => {
+  assert.match(jobsDb, /const JOB_SALARY_TREND_MAX_POINTS = 750/)
+  assert.match(jobsDb, /PARTITION BY date_trunc\('day', posted_at\), COALESCE\(country, ''\), profession/u)
+  assert.match(jobsDb, /WHERE sample_rank <= 3/u)
+  assert.match(jobsDb, /LIMIT \$\{JOB_SALARY_TREND_MAX_POINTS\}/u)
+})
+
 test('candidate reads use typed indexed columns and PostgreSQL analytics', () => {
   assert.match(hiringDb, /candidates_active_activity_idx/)
   assert.match(hiringDb, /candidates_city_lower_idx[\s\S]*LOWER\(canonical_city\)/)
