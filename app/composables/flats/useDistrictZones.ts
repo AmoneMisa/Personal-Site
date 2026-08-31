@@ -1,8 +1,9 @@
 import { computed, type MaybeRefOrGetter } from "vue";
 import { toValue } from "vue";
 import {
+  convexHullPositions,
   distanceKm,
-  findGeoEntities,
+  getGeoDescendants,
   resolveLexiconGeoEntity,
   type GeoBoundaryGeometry,
   type GeoEntity,
@@ -22,7 +23,8 @@ export interface FlatMapZone {
 
 const ZONE_PALETTE = ["#e0679a", "#24a7d6", "#10b981", "#d99a0b", "#8b5cf6"];
 
-// Radius is only used for catalog entities that do not have a real polygon.
+// Radius fitting is presentation behavior: avoid overlapping fallback circles
+// when the catalog has no authoritative polygon for a particular entity.
 function fitNonOverlappingRadii(zones: FlatMapZone[], min: number, max: number): FlatMapZone[] {
   return zones.map((zone, index) => {
     if (zone.boundary) return zone;
@@ -51,33 +53,8 @@ function zoneFromEntity(entity: GeoEntity, index: number, locale: string, cityNa
   };
 }
 
-// Monotone-chain convex hull. Points are [lng, lat] pairs (GeoJSON order).
-function convexHull(points: readonly (readonly [number, number])[]): [number, number][] {
-  const sorted = [...new Map(points.map((p) => [`${p[0]},${p[1]}`, p])).values()]
-    .sort((a, b) => (a[0] - b[0]) || (a[1] - b[1]));
-  if (sorted.length < 3) return sorted.map((p) => [p[0], p[1]]);
-
-  const cross = (o: readonly number[], a: readonly number[], b: readonly number[]) =>
-    (a[0]! - o[0]!) * (b[1]! - o[1]!) - (a[1]! - o[1]!) * (b[0]! - o[0]!);
-
-  const build = (pts: readonly (readonly [number, number])[]) => {
-    const hull: [number, number][] = [];
-    for (const p of pts) {
-      while (hull.length >= 2 && cross(hull[hull.length - 2]!, hull[hull.length - 1]!, p) <= 0) hull.pop();
-      hull.push([p[0], p[1]]);
-    }
-    return hull;
-  };
-  const lower = build(sorted);
-  const upper = build([...sorted].reverse());
-  return [...lower.slice(0, -1), ...upper.slice(0, -1)];
-}
-
-// A quick geographic outline for the whole city, since the catalog has no
-// authoritative city/oblast boundary polygon of its own. Built only from
-// vertices of districts we already have real OSM boundaries for, so it is
-// grounded in verified data -- not a survey-grade city limit, just enough to
-// orient the viewer at a glance.
+// This is a presentation approximation only. The reusable convex-hull geometry
+// itself is owned by geo-catalog; the site merely decides when to render it.
 function cityHullZone(districtZones: FlatMapZone[], entity: GeoEntity | null, locale: string): FlatMapZone | null {
   if (!entity) return null;
   const points: [number, number][] = [];
@@ -86,11 +63,14 @@ function cityHullZone(districtZones: FlatMapZone[], entity: GeoEntity | null, lo
     const polygons = zone.boundary.type === "MultiPolygon" ? zone.boundary.coordinates : [zone.boundary.coordinates];
     for (const polygon of polygons) {
       const outer = polygon[0];
-      if (outer) for (const [lng, lat] of outer) points.push([lng!, lat!]);
+      if (outer) {
+        for (const [lng, lat] of outer) points.push([lng!, lat!]);
+      }
     }
   }
   if (points.length < 3) return null;
-  const hull = convexHull(points);
+  const hull = convexHullPositions(points);
+  if (hull.length < 3) return null;
   return {
     id: entity.id,
     name: entity.canonicalName,
@@ -105,8 +85,7 @@ function cityHullZone(districtZones: FlatMapZone[], entity: GeoEntity | null, lo
 
 function descendantsOf(cityId: string | null, country: string, type: GeoEntity["type"]): GeoEntity[] {
   if (!cityId) return [];
-  const prefix = `${cityId}:`;
-  return findGeoEntities({ country, type }).filter((entity) => entity.parentId === cityId || entity.id.startsWith(prefix));
+  return [...getGeoDescendants(cityId, { country, type })];
 }
 
 export interface UseDistrictZonesOptions {
@@ -129,10 +108,6 @@ export function useDistrictZones(options: UseDistrictZonesOptions) {
   const districtZones = computed<FlatMapZone[]>(() => {
     if (!country.value || !cityName.value) return [];
 
-    // District options from /flats-meta describe districts represented by current
-    // listings. They are not a complete administrative map. Prefer every canonical
-    // district that the geo catalog knows for the selected city, so map coverage is
-    // independent of current inventory and real OSM boundaries are all drawn.
     const canonical = descendantsOf(cityEntity.value?.id ?? null, country.value, "district");
     const entities = canonical.length
       ? canonical
