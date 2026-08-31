@@ -5,6 +5,7 @@ import test from 'node:test'
 const deploy = await readFile(new URL('../deploy.sh', import.meta.url), 'utf8')
 const rollback = await readFile(new URL('../rollback.sh', import.meta.url), 'utf8')
 const workflow = await readFile(new URL('../.github/workflows/deploy.yml', import.meta.url), 'utf8')
+const compose = await readFile(new URL('../docker-compose.yml', import.meta.url), 'utf8')
 const ready = await readFile(new URL('../server/routes/ready.get.ts', import.meta.url), 'utf8')
 
 test('all production services are deployed from one immutable commit revision', () => {
@@ -31,7 +32,12 @@ test('successful deployments persist a rollbackable image manifest', () => {
 
 test('deployment gates success on dependency-aware readiness', () => {
   assert.match(deploy, /http:\/\/127\.0\.0\.1:8080\/ready/)
+  assert.match(compose, /fetch\('http:\/\/localhost:3000\/ready'\)/)
   assert.match(ready, /await checkStateDirectory\(\)/)
   assert.match(ready, /await checkDatabase\(url\)/)
   assert.match(ready, /setResponseStatus\(event, 503\)/)
+})
+
+test('jobs worker lease heartbeat is configurable in production', () => {
+  assert.match(compose, /JOBS_QUEUE_HEARTBEAT_SECONDS: \$\{JOBS_QUEUE_HEARTBEAT_SECONDS:-60\}/)
 })
