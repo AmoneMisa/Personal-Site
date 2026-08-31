@@ -1,8 +1,10 @@
 import assert from 'node:assert/strict'
+import { readFile } from 'node:fs/promises'
 import test from 'node:test'
 
 import { evaluateWorkerHealth } from '../jobs-worker/workerHealth.ts'
 
+const worker = await readFile(new URL('../jobs-worker/worker.ts', import.meta.url), 'utf8')
 const now = Date.parse('2026-08-31T07:00:00.000Z')
 
 function snapshot(overrides = {}) {
@@ -46,4 +48,13 @@ test('worker health does not treat a missing snapshot as process health', () => 
     evaluateWorkerHealth(null, now, 90_000, 120_000),
     { ok: false, reason: 'missing-health-snapshot' },
   )
+})
+
+test('worker records dispatch, pruning and task lifecycle signals', () => {
+  assert.match(worker, /workerHealthReporter\.markDispatch\(\)/)
+  assert.match(worker, /workerHealthReporter\.markPrune\(\)/)
+  assert.match(worker, /workerHealthReporter\.taskStarted\(task\)/)
+  assert.match(worker, /workerHealthReporter\.taskCompleted\(\)/)
+  assert.match(worker, /workerHealthReporter\.taskFailed\(error\)/)
+  assert.match(worker, /workerHealthReporter\.loopError\(error\)/)
 })
