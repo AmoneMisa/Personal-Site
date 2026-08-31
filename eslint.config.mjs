@@ -21,6 +21,7 @@ export default withNuxt(
       'jobs-worker/*.ts',
       'scripts/migrate-database.ts',
       'scripts/prepare-database-schema.ts',
+      'server/middleware/security-headers.ts',
       'server/routes/flats-translate.post.ts',
       'server/routes/jobs-feed.get.ts',
       'server/utils/boundedTtlCache.ts',
