@@ -13,6 +13,7 @@ const jobsUa = await readFile(new URL('../server/utils/jobsUaSource.ts', import.
 const regionalGeneral = await readFile(new URL('../server/utils/regionalGeneralEmployerSources.ts', import.meta.url), 'utf8')
 const regionalService = await readFile(new URL('../server/utils/regionalServiceJobSources.ts', import.meta.url), 'utf8')
 const ishBorCrawler = await readFile(new URL('../shared/hiring/sources/ishBorCrawler.ts', import.meta.url), 'utf8')
+const aviationExpansion = await readFile(new URL('../server/utils/aviationExpansionJobs.ts', import.meta.url), 'utf8')
 
 test('HTML entity decoding handles named and numeric entities without invalid code points', () => {
   assert.equal(decodeHtmlEntities('A&nbsp;&amp;&#33;&#x21;'), 'A &!!')
@@ -58,4 +59,12 @@ test('IshBor crawler delegates URL normalization to the runtime-neutral helper',
   assert.match(ishBorCrawler, /import \{ absoluteHttpUrl \} from '\.\.\/\.\.\/htmlText'/)
   assert.match(ishBorCrawler, /return absoluteHttpUrl\(raw, base\) \|\| base/)
   assert.doesNotMatch(ishBorCrawler, /new URL\(decodeEntities\(raw\), base\)/)
+})
+
+test('aviation sources reuse shared HTML and safe URL helpers', () => {
+  assert.match(aviationExpansion, /absoluteHttpUrl as absoluteUrl, htmlLines, stripHtml/)
+  assert.doesNotMatch(aviationExpansion, /function decodeEntities\(/)
+  assert.doesNotMatch(aviationExpansion, /function stripHtml\(/)
+  assert.doesNotMatch(aviationExpansion, /function htmlLines\(/)
+  assert.doesNotMatch(aviationExpansion, /function absoluteUrl\(/)
 })
