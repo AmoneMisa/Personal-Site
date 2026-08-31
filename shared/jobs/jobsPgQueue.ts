@@ -43,56 +43,19 @@ export async function initJobsPgQueue(): Promise<void> {
   if (schemaReady) return schemaReady
   const name = schema()
   schemaReady = (async () => {
-    await db().query(`CREATE SCHEMA IF NOT EXISTS ${name}`)
-    await db().query(`
-      CREATE TABLE IF NOT EXISTS ${name}.tasks (
-        id BIGSERIAL PRIMARY KEY,
-        task_key TEXT NOT NULL UNIQUE,
-        generation TEXT NOT NULL,
-        type TEXT NOT NULL,
-        target TEXT NOT NULL,
-        priority INTEGER NOT NULL DEFAULT 0,
-        status TEXT NOT NULL DEFAULT 'pending'
-          CHECK (status IN ('pending', 'running', 'done', 'dead')),
-        attempts INTEGER NOT NULL DEFAULT 0,
-        run_after TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-        locked_by TEXT,
-        lock_token UUID,
-        locked_until TIMESTAMPTZ,
-        payload JSONB NOT NULL,
-        result JSONB,
-        last_error TEXT,
-        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-        started_at TIMESTAMPTZ,
-        finished_at TIMESTAMPTZ,
-        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-      )
-    `)
-    await db().query(`
-      CREATE TABLE IF NOT EXISTS ${name}.scheduler_state (
-        id SMALLINT PRIMARY KEY DEFAULT 1 CHECK (id = 1),
-        jobs_due_at TIMESTAMPTZ,
-        hiring_due_at TIMESTAMPTZ,
-        backfill_due_at TIMESTAMPTZ,
-        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-      )
-    `)
-    await db().query(`INSERT INTO ${name}.scheduler_state (id) VALUES (1) ON CONFLICT (id) DO NOTHING`)
-    await db().query(`
-      CREATE INDEX IF NOT EXISTS tasks_pending_idx
-      ON ${name}.tasks(priority DESC, run_after, created_at, id)
-      WHERE status = 'pending'
-    `)
-    await db().query(`
-      CREATE INDEX IF NOT EXISTS tasks_running_lease_idx
-      ON ${name}.tasks(locked_until, id)
-      WHERE status = 'running'
-    `)
-    await db().query(`
-      CREATE INDEX IF NOT EXISTS tasks_type_status_idx
-      ON ${name}.tasks(type, status, created_at)
-    `)
-    console.log(`[jobs:pg-queue] schema ${name} ready`)
+    const relations = await db().query(
+      'SELECT to_regclass($1)::text AS tasks, to_regclass($2)::text AS scheduler_state',
+      [`${name}.tasks`, `${name}.scheduler_state`],
+    )
+    const row = relations.rows[0]
+    if (!row?.tasks || !row?.scheduler_state) {
+      throw new Error(`Queue schema ${name} is not migrated; run scripts/migrate-database.ts before runtime`)
+    }
+
+    const scheduler = await db().query(`SELECT id FROM ${name}.scheduler_state WHERE id = 1`)
+    if (!scheduler.rowCount) {
+      throw new Error(`Queue schema ${name} has no scheduler_state row; re-run database migrations`)
+    }
   })().catch((error) => {
     schemaReady = undefined
     throw error
