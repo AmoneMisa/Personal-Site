@@ -6,16 +6,26 @@ import { zoneNameLabel } from '../app/utils/locationLabels.ts';
 
 const source = await readFile(new URL('../app/utils/locationLabels.ts', import.meta.url), 'utf8');
 
-// Real zone/mahalla canonical names and their translations live in
-// parsing-lexicon's geo dictionaries (and drift there, e.g. Karasu -> Qorasuv
-// transliteration renames). Personal Site must resolve labels through the
-// package's own lookups, not a second hardcoded translation table that would
-// silently fall out of sync. See AGENTS.md #39 and #77.
-test('zone labels are resolved through parsing-lexicon, not a local translation table', () => {
-  assert.match(source, /from '@whiteslove\/parsing-lexicon'/);
-  assert.match(source, /dictionaryFor\(/);
-  assert.match(source, /findCanonical\(/);
-  assert.match(source, /geographyDisplayName\(/);
+// Zone aliases, transliteration and locality suffix rules belong to the released
+// parsing-lexicon API. Personal Site should only adapt its map values/context to
+// that API, never recreate dictionary traversal or Uzbek/Russian suffix probes.
+test('zone labels are resolved through the package-owned geography zone API', () => {
+  assert.match(source, /from '@whiteslove\/parsing-lexicon\/geography-zone-display'/);
+  assert.match(source, /geographyZoneDisplayName\(value, locale, \{/);
+  assert.match(source, /country: countryCode/);
+  assert.match(source, /city: cityName/);
+
+  for (const localDomainRule of [
+    /dictionaryFor\(/,
+    /normalizedAliasKeys\(/,
+    /UZBEK_CYRILLIC_SUFFIX_RE/,
+    /NON_RUSSIAN_CYRILLIC_RE/,
+    /dictionaryCompositeBaseLabel/,
+    /massivi/,
+    /даҳаси/iu,
+  ]) {
+    assert.doesNotMatch(source, localDomainRule);
+  }
 });
 
 test('unknown zone values pass through unchanged', () => {
