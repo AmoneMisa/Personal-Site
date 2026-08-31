@@ -227,8 +227,8 @@ jobs:
               echo "Verified $service image for ${{ github.sha }}: $actual_image"
             }
 
-            verify_service_image frontend "$FRONTEND_IMAGE"
-            verify_service_image backend "$BACKEND_IMAGE"
-            verify_service_image jobs-worker "$JOBS_WORKER_IMAGE"
-            verify_service_image job-browser-fetcher "$JOB_BROWSER_FETCHER_IMAGE"
-            verify_service_image subscription-bot "$SUBSCRIPTION_BOT_IMAGE"
+            verify_service_image frontend "${{ env.FRONTEND_IMAGE }}"
+            verify_service_image backend "${{ env.BACKEND_IMAGE }}"
+            verify_service_image jobs-worker "${{ env.JOBS_WORKER_IMAGE }}"
+            verify_service_image job-browser-fetcher "${{ env.JOB_BROWSER_FETCHER_IMAGE }}"
+            verify_service_image subscription-bot "${{ env.SUBSCRIPTION_BOT_IMAGE }}"
