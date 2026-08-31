@@ -2,6 +2,7 @@ import { parseHiringSourceSalary } from '@whiteslove/parsing-lexicon/hiring-sour
 import { parseHiringActivityDate } from '@whiteslove/parsing-lexicon/hiring-temporal'
 import type { Job } from './jobTypes'
 import { detectWorkModes } from './hiringLexicon'
+import { absoluteHttpUrl, stripHtml } from './htmlText'
 
 const UA =
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ' +
@@ -88,39 +89,9 @@ export const CURATED_REMOTE_BOARDS: RemoteBoard[] = [
   },
 ]
 
-function decodeEntities(value: string): string {
-  const named: Record<string, string> = {
-    amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", nbsp: ' ', ndash: '–', mdash: '—',
-  }
-  return value.replace(/&(#x?[0-9a-f]+|[a-z]+);/gi, (match, entity: string) => {
-    if (entity.startsWith('#')) {
-      const hex = entity[1]?.toLowerCase() === 'x'
-      const code = Number.parseInt(entity.slice(hex ? 2 : 1), hex ? 16 : 10)
-      return Number.isFinite(code) ? String.fromCodePoint(code) : match
-    }
-    return named[entity.toLowerCase()] ?? match
-  })
-}
-
-function stripHtml(value: unknown): string {
-  return decodeEntities(String(value || ''))
-    .replace(/<script\b[\s\S]*?<\/script>/gi, ' ')
-    .replace(/<style\b[\s\S]*?<\/style>/gi, ' ')
-    .replace(/<br\s*\/?>/gi, ' ')
-    .replace(/<[^>]*>/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim()
-}
-
 function absoluteUrl(raw: string, base: string): string | null {
-  try {
-    const url = new URL(decodeEntities(raw), base)
-    if (url.protocol !== 'https:') return null
-    url.hash = ''
-    return url.toString()
-  } catch {
-    return null
-  }
+  const url = absoluteHttpUrl(raw, base)
+  return url?.startsWith('https://') ? url : null
 }
 
 function sourceToken(value: string): string {
