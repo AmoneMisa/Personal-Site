@@ -7,6 +7,7 @@ import {
   isIdentityEdit,
   type TransformEdit,
 } from "~/utils/svgTransform";
+import { parseAndSanitizeSvg, sanitizeSvgMarkup } from "~/utils/svgEditor/sanitizeSvg";
 
 type TransformItem = {
   id: string;
@@ -16,9 +17,8 @@ type TransformItem = {
   edit: TransformEdit;
 };
 
-const {t} = useI18n();
-
-const open = defineModel<boolean>("open", {default: false});
+const { t } = useI18n();
+const open = defineModel<boolean>("open", { default: false });
 
 const props = defineProps<{
   svg: string;
@@ -29,48 +29,41 @@ const emit = defineEmits<{
 }>();
 
 const parseError = ref<string | null>(null);
-
 const items = ref<TransformItem[]>([]);
 const selectedId = ref<string | null>(null);
-
 const moveXInput = ref<string>("0");
 const moveYInput = ref<string>("0");
 const scaleInput = ref<string>("100");
 const rotateInput = ref<string>("0");
 const fieldError = ref<string | null>(null);
 
-function safeTrim(v: string) {
-  return String(v || "").trim();
+function safeTrim(value: string) {
+  return String(value || "").trim();
+}
+
+function errorKeyForSvg(reason: "empty" | "noSvgRoot" | "parse") {
+  if (reason === "empty") return "services.svgEditor.errors.empty";
+  if (reason === "noSvgRoot") return "services.svgEditor.errors.noSvgRoot";
+  return "services.svgEditor.errors.parse";
 }
 
 function parseSvg(raw: string) {
-  const s = safeTrim(raw);
-  if (!s) return {ok: false as const, errorKey: "services.svgEditor.errors.empty"};
-  if (!/<svg[\s>]/i.test(s)) return {ok: false as const, errorKey: "services.svgEditor.errors.noSvgRoot"};
-
-  try {
-    const doc = new DOMParser().parseFromString(s, "image/svg+xml");
-    const parseErr = doc.getElementsByTagName("parsererror")?.[0];
-    if (parseErr) return {ok: false as const, errorKey: "services.svgEditor.errors.parse"};
-    const svg = doc.documentElement as any;
-    if (!svg || String(svg.tagName || "").toLowerCase() !== "svg") return {
-      ok: false as const,
-      errorKey: "services.svgEditor.errors.noSvgRoot",
-    };
-    return {ok: true as const, doc, svg: svg as SVGElement};
-  } catch {
-    return {ok: false as const, errorKey: "services.svgEditor.errors.parse"};
-  }
+  const result = parseAndSanitizeSvg(raw);
+  if (result.ok) return result;
+  return {
+    ok: false as const,
+    errorKey: errorKeyForSvg(result.reason),
+  };
 }
 
 function serialize(svg: SVGElement) {
   return new XMLSerializer().serializeToString(svg);
 }
 
-function nodeLabel(el: Element) {
-  const tag = String(el.tagName || "").toLowerCase();
-  const id = el.getAttribute("id");
-  const cls = safeTrim(el.getAttribute("class") || "");
+function nodeLabel(element: Element) {
+  const tag = String(element.tagName || "").toLowerCase();
+  const id = element.getAttribute("id");
+  const cls = safeTrim(element.getAttribute("class") || "");
   const clsPart = cls ? `.${cls.split(/\s+/g).filter(Boolean).join(".")}` : "";
   const idPart = id ? `#${id}` : "";
   return `${tag}${idPart}${clsPart}`;
@@ -78,51 +71,63 @@ function nodeLabel(el: Element) {
 
 function computeNodePath(root: Element, target: Element) {
   const path: number[] = [];
-  let cur: Element | null = target;
+  let current: Element | null = target;
 
-  while (cur && cur !== root) {
-    const parent = cur.parentElement;
+  while (current && current !== root) {
+    const parent = current.parentElement;
     if (!parent) break;
     const siblings = Array.from(parent.children);
-    path.unshift(siblings.indexOf(cur));
-    cur = parent;
+    path.unshift(siblings.indexOf(current));
+    current = parent;
   }
 
   return path;
 }
 
 function getByPath(root: Element, path: number[]) {
-  let cur: Element = root;
-  for (const idx of path) {
-    const next = cur.children.item(idx) as Element | null;
+  let current: Element = root;
+  for (const index of path) {
+    const next = current.children.item(index) as Element | null;
     if (!next) return null;
-    cur = next;
+    current = next;
   }
-  return cur;
+  return current;
 }
 
-const TRANSFORMABLE_TAGS = ["path", "rect", "circle", "ellipse", "line", "polyline", "polygon", "g", "text", "image"];
+const TRANSFORMABLE_TAGS = [
+  "path",
+  "rect",
+  "circle",
+  "ellipse",
+  "line",
+  "polyline",
+  "polygon",
+  "g",
+  "text",
+  "image",
+];
 
 function collectTransformItems(svgCode: string): TransformItem[] {
-  const res = parseSvg(svgCode);
-  if (!res.ok) return [];
+  const result = parseSvg(svgCode);
+  if (!result.ok) return [];
 
-  const svg = res.svg;
-  const els = Array.from(svg.querySelectorAll(TRANSFORMABLE_TAGS.join(","))) as Element[];
-
-  return els.map((el, i) => ({
-    id: `tf_${i}_${Math.random().toString(16).slice(2)}`,
-    label: nodeLabel(el),
-    nodePath: computeNodePath(svg, el),
-    originalTransform: el.getAttribute("transform") || "",
-    edit: {...IDENTITY_TRANSFORM_EDIT},
+  const elements = Array.from(result.svg.querySelectorAll(TRANSFORMABLE_TAGS.join(","))) as Element[];
+  return elements.map((element, index) => ({
+    id: `tf_${index}_${Math.random().toString(16).slice(2)}`,
+    label: nodeLabel(element),
+    nodePath: computeNodePath(result.svg, element),
+    originalTransform: element.getAttribute("transform") || "",
+    edit: { ...IDENTITY_TRANSFORM_EDIT },
   }));
 }
 
-// getBBox() only works on elements actually attached to the document (not a
-// detached DOMParser document), so the source SVG is mounted off-screen for
-// the moment it takes to read each element's bounding box.
+// getBBox() only works on elements attached to the document. The SVG is
+// sanitized again immediately before the off-screen mount so this helper is
+// never an alternate injection path around the editor preview boundary.
 function withMountedSvg<T>(svgCode: string, fn: (mountedRoot: SVGElement) => T): T | null {
+  const sanitized = sanitizeSvgMarkup(svgCode);
+  if (!sanitized) return null;
+
   const container = document.createElement("div");
   container.style.position = "fixed";
   container.style.left = "-99999px";
@@ -133,7 +138,7 @@ function withMountedSvg<T>(svgCode: string, fn: (mountedRoot: SVGElement) => T):
   document.body.appendChild(container);
 
   try {
-    container.innerHTML = svgCode;
+    container.innerHTML = sanitized;
     const mounted = container.querySelector("svg");
     if (!mounted) return null;
     return fn(mounted as SVGElement);
@@ -145,13 +150,13 @@ function withMountedSvg<T>(svgCode: string, fn: (mountedRoot: SVGElement) => T):
 }
 
 function bboxCenterFor(nodePath: number[]): { cx: number; cy: number } {
-  const fallback = {cx: 0, cy: 0};
+  const fallback = { cx: 0, cy: 0 };
   const center = withMountedSvg(props.svg, (mountedRoot) => {
-    const el = getByPath(mountedRoot, nodePath) as SVGGraphicsElement | null;
-    if (!el || typeof el.getBBox !== "function") return fallback;
+    const element = getByPath(mountedRoot, nodePath) as SVGGraphicsElement | null;
+    if (!element || typeof element.getBBox !== "function") return fallback;
     try {
-      const box = el.getBBox();
-      return {cx: box.x + box.width / 2, cy: box.y + box.height / 2};
+      const box = element.getBBox();
+      return { cx: box.x + box.width / 2, cy: box.y + box.height / 2 };
     } catch {
       return fallback;
     }
@@ -166,9 +171,9 @@ function resetSelection() {
 }
 
 function loadSelectedToForm() {
-  const it = items.value.find((x) => x.id === selectedId.value);
+  const item = items.value.find((candidate) => candidate.id === selectedId.value);
   fieldError.value = null;
-  if (!it) {
+  if (!item) {
     moveXInput.value = "0";
     moveYInput.value = "0";
     scaleInput.value = "100";
@@ -176,99 +181,101 @@ function loadSelectedToForm() {
     return;
   }
 
-  moveXInput.value = String(it.edit.translateX);
-  moveYInput.value = String(it.edit.translateY);
-  scaleInput.value = String(Math.round(it.edit.scale * 100));
-  rotateInput.value = String(it.edit.rotateDeg);
+  moveXInput.value = String(item.edit.translateX);
+  moveYInput.value = String(item.edit.translateY);
+  scaleInput.value = String(Math.round(item.edit.scale * 100));
+  rotateInput.value = String(item.edit.rotateDeg);
 }
 
 watch(
-    () => open.value,
-    (v) => {
-      if (!v) return;
-      parseError.value = null;
-      const res = parseSvg(props.svg);
-      if (!res.ok) {
-        items.value = [];
-        selectedId.value = null;
-        parseError.value = t(res.errorKey);
-        return;
-      }
-      items.value = collectTransformItems(props.svg);
-      resetSelection();
+  () => open.value,
+  (value) => {
+    if (!value) return;
+    parseError.value = null;
+    const result = parseSvg(props.svg);
+    if (!result.ok) {
+      items.value = [];
+      selectedId.value = null;
+      parseError.value = t(result.errorKey);
+      return;
     }
+    items.value = collectTransformItems(result.markup);
+    resetSelection();
+  },
 );
 
 watch(() => selectedId.value, loadSelectedToForm);
 
-function parseFiniteNumber(v: string): number | null {
-  const s = safeTrim(v);
-  if (!s) return 0;
-  const n = Number(s);
-  return Number.isFinite(n) ? n : null;
+function parseFiniteNumber(value: string): number | null {
+  const normalized = safeTrim(value);
+  if (!normalized) return 0;
+  const parsed = Number(normalized);
+  return Number.isFinite(parsed) ? parsed : null;
 }
 
 function saveToLocalItem() {
-  const it = items.value.find((x) => x.id === selectedId.value);
-  if (!it) return;
+  const item = items.value.find((candidate) => candidate.id === selectedId.value);
+  if (!item) return;
 
-  const tx = parseFiniteNumber(moveXInput.value);
-  const ty = parseFiniteNumber(moveYInput.value);
-  const scalePct = parseFiniteNumber(scaleInput.value);
+  const translateX = parseFiniteNumber(moveXInput.value);
+  const translateY = parseFiniteNumber(moveYInput.value);
+  const scalePercent = parseFiniteNumber(scaleInput.value);
   const rotate = parseFiniteNumber(rotateInput.value);
 
-  if (tx === null || ty === null || rotate === null) {
+  if (translateX === null || translateY === null || rotate === null) {
     fieldError.value = t("services.svgEditor.modals.transform.errors.invalidNumber");
     return;
   }
-  if (scalePct === null || scalePct <= 0) {
+  if (scalePercent === null || scalePercent <= 0) {
     fieldError.value = t("services.svgEditor.modals.transform.errors.invalidScale");
     return;
   }
 
   fieldError.value = null;
-  it.edit = {translateX: tx, translateY: ty, scale: scalePct / 100, rotateDeg: rotate};
+  item.edit = {
+    translateX,
+    translateY,
+    scale: scalePercent / 100,
+    rotateDeg: rotate,
+  };
 }
 
 function resetSelectedItem() {
-  const it = items.value.find((x) => x.id === selectedId.value);
-  if (!it) return;
-  it.edit = {...IDENTITY_TRANSFORM_EDIT};
+  const item = items.value.find((candidate) => candidate.id === selectedId.value);
+  if (!item) return;
+  item.edit = { ...IDENTITY_TRANSFORM_EDIT };
   loadSelectedToForm();
 }
 
 function buildSvgWithEdits(): string | null {
-  const res = parseSvg(props.svg);
-  if (!res.ok) return null;
+  const result = parseSvg(props.svg);
+  if (!result.ok) return null;
 
-  const svg = res.svg;
+  for (const item of items.value) {
+    if (isIdentityEdit(item.edit)) continue;
 
-  for (const it of items.value) {
-    if (isIdentityEdit(it.edit)) continue;
+    const element = getByPath(result.svg, item.nodePath);
+    if (!element) continue;
 
-    const el = getByPath(svg, it.nodePath);
-    if (!el) continue;
-
-    const {cx, cy} = bboxCenterFor(it.nodePath);
-    const next = composeTransform(it.originalTransform, it.edit, cx, cy);
-    if (next) el.setAttribute("transform", next);
-    else el.removeAttribute("transform");
+    const { cx, cy } = bboxCenterFor(item.nodePath);
+    const next = composeTransform(item.originalTransform, item.edit, cx, cy);
+    if (next) element.setAttribute("transform", next);
+    else element.removeAttribute("transform");
   }
 
-  return serialize(svg);
+  return sanitizeSvgMarkup(serialize(result.svg));
 }
 
-// Live preview so move/scale/rotate - unlike stroke or color edits - are
-// actually judged visually rather than by reading raw numbers. Each input's
-// @update:model-value already calls saveToLocalItem() before this
-// recomputes, so it.edit is current by the time buildSvgWithEdits() reads it.
-const previewSvg = computed(() => buildSvgWithEdits() ?? props.svg);
+const previewSvg = computed(() => {
+  const edited = buildSvgWithEdits();
+  return edited ?? sanitizeSvgMarkup(props.svg) ?? "";
+});
 
 function doApply() {
   saveToLocalItem();
   const next = buildSvgWithEdits();
   if (!next) return;
-  emit("apply", {svg: next});
+  emit("apply", { svg: next });
   open.value = false;
 }
 </script>
@@ -292,20 +299,20 @@ function doApply() {
 
           <div class="svg-transform-modal__list">
             <button
-                v-for="it in items"
-                :key="it.id"
-                type="button"
-                class="svg-transform-modal__item"
-                :class="{ 'svg-transform-modal__item_active': it.id === selectedId }"
-                :title="it.label"
-                @click="selectedId = it.id"
+              v-for="it in items"
+              :key="it.id"
+              type="button"
+              class="svg-transform-modal__item"
+              :class="{ 'svg-transform-modal__item_active': it.id === selectedId }"
+              :title="it.label"
+              @click="selectedId = it.id"
             >
               <span class="svg-transform-modal__item-text">{{ it.label }}</span>
             </button>
           </div>
 
           <div class="svg-transform-modal__preview">
-            <div class="svg-transform-modal__preview-inner" v-html="previewSvg"/>
+            <div class="svg-transform-modal__preview-inner" v-html="previewSvg" />
           </div>
         </div>
 
@@ -314,47 +321,47 @@ function doApply() {
 
           <div class="svg-transform-modal__row2">
             <custom-input
-                :model-value="moveXInput"
-                type="number"
-                inputmode="decimal"
-                :label="t('services.svgEditor.modals.transform.moveX')"
-                @update:model-value="moveXInput = $event; saveToLocalItem()"
+              :model-value="moveXInput"
+              type="number"
+              inputmode="decimal"
+              :label="t('services.svgEditor.modals.transform.moveX')"
+              @update:model-value="moveXInput = $event; saveToLocalItem()"
             />
             <custom-input
-                :model-value="moveYInput"
-                type="number"
-                inputmode="decimal"
-                :label="t('services.svgEditor.modals.transform.moveY')"
-                @update:model-value="moveYInput = $event; saveToLocalItem()"
+              :model-value="moveYInput"
+              type="number"
+              inputmode="decimal"
+              :label="t('services.svgEditor.modals.transform.moveY')"
+              @update:model-value="moveYInput = $event; saveToLocalItem()"
             />
           </div>
 
           <custom-input
-              :model-value="scaleInput"
-              type="number"
-              inputmode="decimal"
-              :label="t('services.svgEditor.modals.transform.scale')"
-              :placeholder="t('services.svgEditor.modals.transform.placeholders.scale')"
-              @update:model-value="scaleInput = $event; saveToLocalItem()"
+            :model-value="scaleInput"
+            type="number"
+            inputmode="decimal"
+            :label="t('services.svgEditor.modals.transform.scale')"
+            :placeholder="t('services.svgEditor.modals.transform.placeholders.scale')"
+            @update:model-value="scaleInput = $event; saveToLocalItem()"
           />
 
           <custom-input
-              :model-value="rotateInput"
-              type="number"
-              inputmode="decimal"
-              :label="t('services.svgEditor.modals.transform.rotate')"
-              :placeholder="t('services.svgEditor.modals.transform.placeholders.rotate')"
-              @update:model-value="rotateInput = $event; saveToLocalItem()"
+            :model-value="rotateInput"
+            type="number"
+            inputmode="decimal"
+            :label="t('services.svgEditor.modals.transform.rotate')"
+            :placeholder="t('services.svgEditor.modals.transform.placeholders.rotate')"
+            @update:model-value="rotateInput = $event; saveToLocalItem()"
           />
 
           <div v-if="fieldError" class="svg-transform-modal__field-error">{{ fieldError }}</div>
 
           <div class="svg-transform-modal__form-actions">
             <u-button
-                type="button"
-                variant="soft"
-                :title="t('services.svgEditor.modals.transform.titles.resetElement')"
-                @click="resetSelectedItem"
+              type="button"
+              variant="soft"
+              :title="t('services.svgEditor.modals.transform.titles.resetElement')"
+              @click="resetSelectedItem"
             >
               {{ t("services.svgEditor.modals.transform.reset") }}
             </u-button>
@@ -364,19 +371,11 @@ function doApply() {
     </div>
 
     <template #actions="{ close }">
-      <u-button
-          type="button"
-          :title="t('services.svgEditor.modals.common.close')"
-          @click="close()"
-      >
+      <u-button type="button" :title="t('services.svgEditor.modals.common.close')" @click="close()">
         {{ t("services.svgEditor.modals.common.close") }}
       </u-button>
 
-      <u-button
-          type="button"
-          :title="t('services.svgEditor.modals.common.apply')"
-          @click="doApply"
-      >
+      <u-button type="button" :title="t('services.svgEditor.modals.common.apply')" @click="doApply">
         {{ t("services.svgEditor.modals.common.apply") }}
       </u-button>
     </template>
