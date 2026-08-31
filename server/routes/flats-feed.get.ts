@@ -3,23 +3,21 @@ import {
   ALL_FEED_SOURCES,
   CURRENT_ALL_SOURCE_TOKENS,
   shapeListing,
-  shapeLiveListing,
   shapeResponse,
 } from '../flats/feedListingShape'
 import {
   FEED_FRESH_MS,
-  FEED_STALE_MS,
-  cachedFeedValues,
-  cachePublicId,
   getCachedFeed,
-  getCachedPublicId,
   normalizedSearchKey,
   refreshFeed,
   staleWindow,
 } from '../flats/feedCache'
-
-const FLAT_API_URL = process.env.FLAT_API_URL || 'http://185.5.206.229:8082'
-const EXACT_LOOKUP_TIMEOUT_MS = 8_000
+import {
+  FLAT_API_URL,
+  findCachedExactListing,
+  lookupPublicListing,
+  verifyOlxListingLive,
+} from '../flats/feedLookup'
 
 function exactCountry(params: URLSearchParams): string {
   const countries = (params.get('countries') || '')
@@ -27,22 +25,6 @@ function exactCountry(params: URLSearchParams): string {
     .map((country) => country.trim().toUpperCase())
     .filter((country) => /^[A-Z]{2}$/.test(country))
   return countries.length === 1 ? countries[0]! : ''
-}
-
-function findCachedExactListing(listingId: string, source: string, country: string): any | null {
-  const now = Date.now()
-  for (const entry of cachedFeedValues(now)) {
-    if (now - entry.at > FEED_STALE_MS) continue
-    const listings = Array.isArray(entry.data?.listings) ? entry.data.listings : []
-    const exact = listings.find((listing: any) => {
-      if (String(listing?.id ?? '') !== listingId) return false
-      if (source && String(listing?.source || '').toLowerCase() !== source) return false
-      if (country && String(listing?.country || '').toUpperCase() !== country) return false
-      return true
-    })
-    if (exact) return exact
-  }
-  return null
 }
 
 export default defineEventHandler(async (event) => {
@@ -70,25 +52,9 @@ export default defineEventHandler(async (event) => {
   if (publicIdParam && /^\d+$/.test(publicIdParam)) {
     const canonicalPublicId = publicIdParam.replace(/^0+(?=\d)/, '')
     setResponseHeader(event, 'Cache-Control', 'no-store')
-    const cached = getCachedPublicId(canonicalPublicId)
-    if (cached) return cached
-    try {
-      const result = await $fetch<any>(
-        `${FLAT_API_URL}/api/listing/by-public-id/${encodeURIComponent(canonicalPublicId)}`,
-        { timeout: EXACT_LOOKUP_TIMEOUT_MS },
-      )
-      if (result?.listing) {
-        const data = { count: 1, listings: [shapeListing(result.listing)] }
-        cachePublicId(canonicalPublicId, data)
-        return data
-      }
-      return { count: 0, listings: [] }
-    } catch (error: any) {
-      const status = Number(error?.statusCode || error?.response?.status || 0)
-      if (status === 404) return { count: 0, listings: [] }
-      setResponseStatus(event, 502)
-      return { count: 0, listings: [], error: 'Listing lookup failed' }
-    }
+    const lookup = await lookupPublicListing(canonicalPublicId)
+    if (lookup.upstreamFailed) setResponseStatus(event, 502)
+    return lookup.data
   }
 
   const exactListingId = String(upstreamParams.get('listingId') || '').trim()
@@ -99,26 +65,7 @@ export default defineEventHandler(async (event) => {
 
   if (verifyLive && exactListingId && exactSource === 'olx' && exactCountryCode) {
     setResponseHeader(event, 'Cache-Control', 'no-store')
-    try {
-      const exact = await $fetch<any>(
-        `${FLAT_API_URL}/api/listing/olx/${encodeURIComponent(exactListingId)}?country=${encodeURIComponent(exactCountryCode)}`,
-        { timeout: EXACT_LOOKUP_TIMEOUT_MS },
-      )
-      if (exact?.listing && String(exact.listing.id ?? '') === exactListingId) {
-        return {
-          count: 1,
-          listings: [shapeLiveListing(exact.listing)],
-          exactListingFallback: 'source',
-        }
-      }
-      return { count: 0, listings: [], exactListingFallback: 'source-unavailable' }
-    } catch (error: any) {
-      const status = Number(error?.statusCode || error?.response?.status || 0)
-      if (status === 404) {
-        return { count: 0, listings: [], exactListingFallback: 'source-inactive' }
-      }
-      return { count: 0, listings: [], exactListingFallback: 'source-unavailable' }
-    }
+    return verifyOlxListingLive(exactListingId, exactCountryCode)
   }
 
   const url = `${FLAT_API_URL}/api/listings?${upstreamParams}`
