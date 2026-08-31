@@ -14,6 +14,7 @@ const regionalGeneral = await readFile(new URL('../server/utils/regionalGeneralE
 const regionalService = await readFile(new URL('../server/utils/regionalServiceJobSources.ts', import.meta.url), 'utf8')
 const ishBorCrawler = await readFile(new URL('../shared/hiring/sources/ishBorCrawler.ts', import.meta.url), 'utf8')
 const aviationExpansion = await readFile(new URL('../server/utils/aviationExpansionJobs.ts', import.meta.url), 'utf8')
+const extraPublic = await readFile(new URL('../server/utils/extraPublicJobSources.ts', import.meta.url), 'utf8')
 
 test('HTML entity decoding handles named and numeric entities without invalid code points', () => {
   assert.equal(decodeHtmlEntities('A&nbsp;&amp;&#33;&#x21;'), 'A &!!')
@@ -67,4 +68,13 @@ test('aviation sources reuse shared HTML and safe URL helpers', () => {
   assert.doesNotMatch(aviationExpansion, /function stripHtml\(/)
   assert.doesNotMatch(aviationExpansion, /function htmlLines\(/)
   assert.doesNotMatch(aviationExpansion, /function absoluteUrl\(/)
+})
+
+test('public job boards reuse generic HTML mechanics while keeping Flagma row parsing local', () => {
+  assert.match(extraPublic, /absoluteHttpUrl as absoluteUrl, decodeHtmlEntities, stripHtml/)
+  assert.match(extraPublic, /function cardLines\(fragment: string\)/)
+  assert.match(extraPublic, /return decodeHtmlEntities\(fragment\)/)
+  assert.doesNotMatch(extraPublic, /function decodeEntities\(/)
+  assert.doesNotMatch(extraPublic, /function stripHtml\(/)
+  assert.doesNotMatch(extraPublic, /function absoluteUrl\(/)
 })
