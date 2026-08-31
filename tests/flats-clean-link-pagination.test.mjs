@@ -3,6 +3,7 @@ import { readFile } from 'node:fs/promises'
 import test from 'node:test'
 
 const route = await readFile(new URL('../server/routes/flats-feed.get.ts', import.meta.url), 'utf8')
+const feedCache = await readFile(new URL('../server/flats/feedCache.ts', import.meta.url), 'utf8')
 const page = await readFile(new URL('../app/pages/flat-finder/index.vue', import.meta.url), 'utf8')
 const routeState = await readFile(new URL('../app/composables/flats/useFlatRouteState.ts', import.meta.url), 'utf8')
 
@@ -19,33 +20,40 @@ test('flats-feed resolves a clean ?publicId= link without going through the filt
   assert.ok(publicIdIndex > -1 && exactListingIndex > -1 && publicIdIndex < exactListingIndex)
 })
 
-test('a resolved ?publicId= listing uses a bounded TTL cache and never caches misses', () => {
-  assert.match(route, /const PUBLIC_ID_CACHE_TTL_MS = FEED_FRESH_MS/)
-  assert.match(route, /const PUBLIC_ID_CACHE_MAX_ENTRIES = 1_000/)
-  assert.match(route, /const publicIdCache = new BoundedTtlCache<string, any>/)
-  assert.match(route, /maxEntries: PUBLIC_ID_CACHE_MAX_ENTRIES/)
-  assert.match(route, /defaultTtlMs: PUBLIC_ID_CACHE_TTL_MS/)
-  assert.match(route, /const cached = publicIdCache\.get\(canonicalPublicId\)/)
+test('a resolved ?publicId= listing delegates to a bounded TTL cache and never caches misses', () => {
+  assert.match(route, /from '\.\.\/flats\/feedCache'/)
+  assert.match(route, /const cached = getCachedPublicId\(canonicalPublicId\)/)
   assert.match(route, /if \(cached\) return cached/)
-  assert.match(route, /publicIdCache\.set\(canonicalPublicId, data\)/)
+  assert.match(route, /cachePublicId\(canonicalPublicId, data\)/)
 
-  // A miss (listing not found / still ingesting) must never be cached, or a
-  // newly-active listing would stay invisible until the TTL expires.
-  assert.match(route, /Not-found stays uncached/)
-  const hitIndex = route.indexOf('publicIdCache.set(canonicalPublicId')
-  const notFoundCommentIndex = route.indexOf('Not-found stays uncached')
-  assert.ok(hitIndex > -1 && notFoundCommentIndex > -1 && hitIndex < notFoundCommentIndex)
+  assert.match(feedCache, /export const PUBLIC_ID_CACHE_TTL_MS = FEED_FRESH_MS/)
+  assert.match(feedCache, /const PUBLIC_ID_CACHE_MAX_ENTRIES = 1_000/)
+  assert.match(feedCache, /const publicIdCache = new BoundedTtlCache<string, any>/)
+  assert.match(feedCache, /maxEntries: PUBLIC_ID_CACHE_MAX_ENTRIES/)
+  assert.match(feedCache, /defaultTtlMs: PUBLIC_ID_CACHE_TTL_MS/)
+
+  // Only the successful lookup branch writes to the public-id cache. A miss or
+  // a 404 must return without creating a negative cache entry.
+  assert.equal((route.match(/cachePublicId\(canonicalPublicId, data\)/g) || []).length, 1)
+  assert.match(
+    route,
+    /if \(result\?\.listing\) \{[\s\S]*cachePublicId\(canonicalPublicId, data\)[\s\S]*return data[\s\S]*\}\s*return \{ count: 0, listings: \[\] \}/,
+  )
 })
 
-test('flats-feed bounds query cache cardinality, normalizes keys, and caps concurrent refresh fan-out', () => {
-  assert.match(route, /const FEED_CACHE_MAX_ENTRIES = 750/)
-  assert.match(route, /const MAX_INFLIGHT_REFRESHES = 64/)
-  assert.match(route, /const feedCache = new BoundedTtlCache<string, FeedCacheEntry>/)
-  assert.match(route, /function normalizedSearchKey\(params: URLSearchParams\): string/)
+test('flats-feed delegates bounded query caching, normalized keys, and refresh fan-out limits', () => {
+  assert.match(route, /from '\.\.\/flats\/feedCache'/)
   assert.match(route, /const key = normalizedSearchKey\(upstreamParams\)/)
   assert.match(route, /const combinedKey = `combined:\$\{normalizedSearchKey\(combinedParams\)\}`/)
-  assert.match(route, /if \(feedRefreshes\.size >= MAX_INFLIGHT_REFRESHES\)/)
-  assert.match(route, /feedCache\.set\(key, entry, staleWindow\(entry\)\)/)
+  assert.match(route, /const cached = getCachedFeed\(key\)/)
+  assert.match(route, /refreshFeed\(key, url\)/)
+
+  assert.match(feedCache, /const FEED_CACHE_MAX_ENTRIES = 750/)
+  assert.match(feedCache, /const MAX_INFLIGHT_REFRESHES = 64/)
+  assert.match(feedCache, /const feedCache = new BoundedTtlCache<string, FeedCacheEntry>/)
+  assert.match(feedCache, /export function normalizedSearchKey\(params: URLSearchParams\): string/)
+  assert.match(feedCache, /if \(feedRefreshes\.size >= MAX_INFLIGHT_REFRESHES\)/)
+  assert.match(feedCache, /feedCache\.set\(key, entry, staleWindow\(entry\)\)/)
 })
 
 test('opening or sharing a listing prefers the bare publicId over the flat/flatSource/flatCountry triple', () => {
