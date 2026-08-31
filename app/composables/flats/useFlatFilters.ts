@@ -157,7 +157,7 @@ export function useFlatFilters() {
     if (quartal.value) params.quartal = quartal.value;
     if (mapArea.value) params.area = mapArea.value;
     if (propertyType.value !== "any") params.propertyType = propertyType.value;
-    if (dealType.value !== "any") params.dealType = dealType.value === "roomRent" ? "longRent" : dealType.value;
+    if (dealType.value !== "any") params.dealType = dealType.value;
     if (agency.value !== "any") params.agency = agency.value;
     if (priceMin.value != null) params.priceMin = String(priceMin.value);
     if (priceMax.value != null) params.priceMax = String(priceMax.value);
@@ -183,7 +183,7 @@ export function useFlatFilters() {
     if (metro.value) params.metro = metro.value;
     if (!saleOnly && audience.value !== "any") params.audience = audience.value;
     if (!saleOnly && petFriendly.value) params.pets = "1";
-    if (!saleOnly && (roomOnlyFilter.value || dealType.value === "roomRent")) params.roomOnly = "1";
+    if (!saleOnly && roomOnlyFilter.value) params.roomOnly = "1";
     if (onlyWithPhotos.value) params.withPhotos = "1";
     if (!saleOnly && childrenRequired.value) params.children = "1";
     if (newBuildingOnly.value) params.newBuilding = "1";
