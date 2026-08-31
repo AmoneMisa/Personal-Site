@@ -3,6 +3,7 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 
 const queue = readFileSync(new URL('../shared/jobs/jobsPgQueue.ts', import.meta.url), 'utf8')
+const queueMigration = readFileSync(new URL('../db/migrations/queue/001_queue_schema.sql', import.meta.url), 'utf8')
 const worker = readFileSync(new URL('../jobs-worker/worker.ts', import.meta.url), 'utf8')
 const jobsRuntime = readFileSync(new URL('../jobs-worker/jobsRuntime.ts', import.meta.url), 'utf8')
 const hiringAdapters = readFileSync(new URL('../jobs-worker/hiringAdapters.ts', import.meta.url), 'utf8')
@@ -18,8 +19,16 @@ const backendPdf = readFileSync(new URL('../backend/src/routers/pdf.py', import.
 const backendStateStore = readFileSync(new URL('../backend/src/utils/state_store.py', import.meta.url), 'utf8')
 
 test('jobs and hiring tasks use a durable PostgreSQL queue', () => {
-  assert.match(queue, /CREATE TABLE IF NOT EXISTS \$\{name\}\.tasks/)
-  assert.match(queue, /CHECK \(status IN \('pending', 'running', 'done', 'dead'\)\)/)
+  assert.match(queueMigration, /CREATE TABLE IF NOT EXISTS \{\{schema\}\}\.tasks/)
+  assert.match(queueMigration, /CHECK \(status IN \('pending', 'running', 'done', 'dead'\)\)/)
+  assert.match(queueMigration, /CREATE TABLE IF NOT EXISTS \{\{schema\}\}\.scheduler_state/)
+  assert.match(queueMigration, /tasks_pending_idx/)
+  assert.match(queueMigration, /tasks_running_lease_idx/)
+
+  assert.match(queue, /SELECT to_regclass\(\$1\)::text AS tasks, to_regclass\(\$2\)::text AS scheduler_state/)
+  assert.match(queue, /Queue schema \$\{name\} is not migrated/)
+  assert.doesNotMatch(queue, /CREATE\s+(?:SCHEMA|TABLE|INDEX)/i)
+  assert.doesNotMatch(queue, /ALTER\s+TABLE/i)
   assert.match(queue, /FOR UPDATE SKIP LOCKED/)
   assert.match(queue, /pg_advisory_xact_lock/)
   assert.match(queue, /priority DESC/)
