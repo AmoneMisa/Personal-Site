@@ -1,6 +1,12 @@
 import { computed, type MaybeRefOrGetter } from "vue";
 import { toValue } from "vue";
-import { findGeoEntities, resolveLexiconGeoEntity, type GeoBoundaryGeometry, type GeoEntity } from "@whiteslove/geo-catalog";
+import {
+  distanceKm,
+  findGeoEntities,
+  resolveLexiconGeoEntity,
+  type GeoBoundaryGeometry,
+  type GeoEntity,
+} from "@whiteslove/geo-catalog";
 import { zoneNameLabel } from "~/utils/locationLabels";
 
 export interface FlatMapZone {
@@ -15,17 +21,6 @@ export interface FlatMapZone {
 }
 
 const ZONE_PALETTE = ["#e0679a", "#24a7d6", "#10b981", "#d99a0b", "#8b5cf6"];
-const EARTH_RADIUS_M = 6371000;
-
-function distanceM(a: { lat: number; lng: number }, b: { lat: number; lng: number }): number {
-  const toRad = (v: number) => (v * Math.PI) / 180;
-  const dLat = toRad(b.lat - a.lat);
-  const dLng = toRad(b.lng - a.lng);
-  const sinLat = Math.sin(dLat / 2);
-  const sinLng = Math.sin(dLng / 2);
-  const h = sinLat * sinLat + Math.cos(toRad(a.lat)) * Math.cos(toRad(b.lat)) * sinLng * sinLng;
-  return 2 * EARTH_RADIUS_M * Math.asin(Math.sqrt(h));
-}
 
 // Radius is only used for catalog entities that do not have a real polygon.
 function fitNonOverlappingRadii(zones: FlatMapZone[], min: number, max: number): FlatMapZone[] {
@@ -34,7 +29,7 @@ function fitNonOverlappingRadii(zones: FlatMapZone[], min: number, max: number):
     let nearest = Infinity;
     for (let other = 0; other < zones.length; other += 1) {
       if (other === index) continue;
-      const d = distanceM(zone, zones[other]!);
+      const d = distanceKm(zone, zones[other]!) * 1000;
       if (d < nearest) nearest = d;
     }
     const neighborCap = Number.isFinite(nearest) ? (nearest / 2) * 0.9 : max;
