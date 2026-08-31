@@ -7,6 +7,7 @@ import { fetchCuratedRemoteJobs } from './curatedRemoteJobSources'
 import { fetchUsaTechCompanyJobs } from './usaTechCompanySources'
 import { fetchRegionalTechCompanyJobs } from './regionalTechCompanySources'
 import { fetchRegionalGeneralEmployerJobs } from './regionalGeneralEmployerSources'
+import { fetchRegionalJobBoardJobs } from './regionalJobBoardSources'
 import { fetchUsaVisaSponsorJobs } from './usaVisaSponsorSource'
 import { fetchSourceExpansionJobs } from './sourceExpansionJobs'
 import { fetchAviationExpansionJobs } from './aviationExpansionJobs'
@@ -58,6 +59,7 @@ async function fetchAllCompanies(query: string): Promise<Job[]> {
     { label: 'usa-tech-companies', load: () => fetchUsaTechCompanyJobs(query) },
     { label: 'regional-tech-companies', load: () => fetchRegionalTechCompanyJobs(query) },
     { label: 'regional-general-employers', load: () => fetchRegionalGeneralEmployerJobs(query) },
+    { label: 'regional-job-boards', load: () => fetchRegionalJobBoardJobs(query) },
     { label: 'usa-visa-sponsors', load: () => fetchUsaVisaSponsorJobs(query) },
     { label: 'source-expansion', load: () => fetchSourceExpansionJobs(query) },
     { label: 'aviation-expansion', load: () => fetchAviationExpansionJobs(query) },

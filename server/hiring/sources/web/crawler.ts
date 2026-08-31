@@ -1,6 +1,6 @@
 import type { CvProfile } from '../../../../shared/contracts/hiring'
 import { emptyWebCursor, type WebCursor } from '../../../../shared/hiring/hiringCursors'
-import { blockAnchors, mergeSameCandidate, type WebCvAdapter } from './common'
+import { candidateBlocks, mergeSameCandidate, type WebCvAdapter } from './common'
 import { fetchHiringWebPage } from './http'
 
 const DEFAULT_MAX_PAGES = 5
@@ -24,8 +24,11 @@ export function webProfileId(url: string): string {
     /\/resume\/([a-f0-9]{16,})/i,
     /-rr(\d+)\.html/i,
     /\/cv\/list\/([a-z0-9]{8,})/i,
+    /\/candidates\/(\d+)/i,
+    /~(\d{5,})(?:[/?#]|$)/i,
     /-(\d{5,})\.html/i,
     /\/resumes\/(\d+)/i,
+    /[#&](?:candidate|resume)=([a-z0-9-]{8,})/i,
   ]
   for (const pattern of patterns) {
     const match = url.match(pattern)
@@ -55,7 +58,7 @@ export async function crawlWebAdapter(
   ): Promise<{ blocks: number; recent: number }> => {
     const html = await fetchHiringWebPage(source.pageUrl(page))
     run.pages += 1
-    const blocks = blockAnchors(html, source)
+    const blocks = candidateBlocks(html, source, page)
     if (!blocks.length) return { blocks: 0, recent: 0 }
     run.fetched += blocks.length
 
