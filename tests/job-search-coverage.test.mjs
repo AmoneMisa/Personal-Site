@@ -5,7 +5,7 @@ import test from 'node:test'
 const coverage = await readFile(new URL('../server/utils/jobSearchCoverage.ts', import.meta.url), 'utf8')
 const linkedin = await readFile(new URL('../server/utils/linkedinSource.ts', import.meta.url), 'utf8')
 const social = await readFile(new URL('../server/utils/socialJobSources.ts', import.meta.url), 'utf8')
-const refresh = await readFile(new URL('../server/utils/jobsSourceRefresh.ts', import.meta.url), 'utf8')
+const sourceFetchers = await readFile(new URL('../server/utils/jobSourceFetchers.ts', import.meta.url), 'utf8')
 
 const oblastLabels = [
   'Вінницька область', 'Волинська область', 'Дніпропетровська область', 'Донецька область',
@@ -49,8 +49,8 @@ test('Threads jobs use bounded regional rotation and reject candidate posts thro
 })
 
 test('long-running social and LinkedIn sources are not capped at 30 seconds', () => {
-  assert.match(refresh, /LINKEDIN_SOURCE_TIMEOUT_MS/)
-  assert.match(refresh, /SOCIAL_SOURCE_TIMEOUT_MS/)
-  assert.match(refresh, /source === 'linkedin'/)
-  assert.match(refresh, /source === 'facebook' \|\| source === 'threads'/)
+  assert.match(sourceFetchers, /LINKEDIN_SOURCE_TIMEOUT_MS/)
+  assert.match(sourceFetchers, /SOCIAL_SOURCE_TIMEOUT_MS/)
+  assert.match(sourceFetchers, /source === 'linkedin'/)
+  assert.match(sourceFetchers, /source === 'facebook' \|\| source === 'threads'/)
 })
