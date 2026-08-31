@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import type { FlatMapFeedResult, FlatMapPoint } from "~/types/flats";
+import { primaryBoundaryGeometry } from "~/utils/mapBoundaryFocus";
 import type * as LeafletNS from "leaflet";
 
 // Bundled from npm (same-origin, cached, no third-party round trip) but imported
@@ -557,7 +558,8 @@ function syncSelectionFromProps(focus = false) {
 function focusZone(zone: FlatMapZone) {
   if (!map) return;
   if (zone.boundary && Leaflet) {
-    map.flyToBounds(Leaflet.geoJSON(zone.boundary as any).getBounds(), { padding: [42, 42], maxZoom: 15, duration: 0.65 });
+    const focusBoundary = primaryBoundaryGeometry(zone.boundary);
+    map.flyToBounds(Leaflet.geoJSON(focusBoundary as any).getBounds(), { padding: [42, 42], maxZoom: 15, duration: 0.65 });
   } else {
     map.flyTo([zone.lat, zone.lng], kindZoom(zone), { animate: true, duration: 0.65 });
   }
