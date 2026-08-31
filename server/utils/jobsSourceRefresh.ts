@@ -1,5 +1,6 @@
 import { useStateStore } from '~~/server/utils/stateStore'
 import { ALL_SOURCES, type Job, type JobSource } from './jobTypes'
+import { isJobSourceAvailable } from './jobSourceConfig'
 import { enrichJob } from './enrich'
 import { syncJobsSearchIndex } from './jobsElastic'
 import { syncJobsDb } from '../jobs/infrastructure/database'
@@ -188,41 +189,7 @@ const FETCHERS: Record<JobSource, (q: string) => Promise<Job[]>> = {
 let mergeLock: Promise<unknown> = Promise.resolve()
 
 export function configuredJobSources(): JobSource[] {
-  return ALL_SOURCES.filter(isConfigured)
-}
-
-function isConfigured(source: JobSource): boolean {
-  switch (source) {
-    case 'hh':
-      return process.env.HH_JOB_SOURCE !== 'off'
-    case 'adzuna':
-      return !!(process.env.ADZUNA_APP_ID && process.env.ADZUNA_APP_KEY)
-    case 'jooble':
-      return !!process.env.JOOBLE_KEY
-    case 'rss':
-      return process.env.RSS_DEFAULTS !== 'off' || !!process.env.RSS_FEEDS
-    case 'companies':
-      return process.env.COMPANIES_SOURCE !== 'off'
-    case 'linkedin':
-      return process.env.LINKEDIN_SOURCE !== 'off'
-    case 'facebook':
-    case 'threads':
-      return String(process.env.SOCIAL_JOB_SOURCE || 'on').toLowerCase() !== 'off'
-        && !!process.env.HIRING_SOCIAL_API_URL
-        && String(process.env.QUEUE_INTERNAL_KEY || '').length >= 16
-    case 'devkg':
-      return process.env.DEVKG_SOURCE !== 'off'
-    case 'ishgo':
-      return process.env.ISHGO_SOURCE !== 'off'
-    case 'itjobsuz':
-      return process.env.ITJOBS_UZ_SOURCE !== 'off'
-    case 'telegram':
-      return process.env.TELEGRAM_SOURCE !== 'off'
-    case 'olx':
-      return process.env.OLX_SOURCE === 'on'
-    default:
-      return true
-  }
+  return ALL_SOURCES.filter((source) => isJobSourceAvailable(source, 'ingestion'))
 }
 
 function dedupKey(job: Job): string {
@@ -352,7 +319,7 @@ export async function refreshJobSource(source: JobSource) {
     throw new Error(`Unknown job source ${source}`)
   }
 
-  if (!isConfigured(source)) {
+  if (!isJobSourceAvailable(source, 'ingestion')) {
     return {
       source,
       skipped: true,
