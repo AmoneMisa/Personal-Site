@@ -1,4 +1,5 @@
 import unittest
+from pathlib import Path
 
 from src.utils.pdf_doc_id import (
     is_valid_pdf_doc_id,
@@ -35,6 +36,10 @@ class PdfDocumentIdTests(unittest.TestCase):
 
     def test_does_not_treat_create_as_document_id(self):
         self.assertIsNone(pdf_doc_id_from_path("/pdf/create"))
+
+    def test_delete_preflight_resolves_document_through_state_store(self):
+        main_source = Path(__file__).parents[1].joinpath("src/main.py").read_text(encoding="utf-8")
+        self.assertIn("await pdf.ensure_doc_exists(get_state_store(), canonical_id)", main_source)
 
 
 if __name__ == "__main__":
