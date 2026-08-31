@@ -1,12 +1,7 @@
 // Durable candidate storage in the shared Postgres, in its own `hiring` schema
 // so the site's tables never collide with flat-finder's public ones.
-//
-// The filesystem-backed state store on SITE_STATE_DIR is the hot snapshot path.
-// Postgres is the durable fallback across snapshot loss, cold container restarts
-// and Telegram worker outages. Every operation is best-effort: database failures
-// must not take the candidate board down with them.
 
-import { Pool } from 'pg'
+import { Pool, type PoolClient } from 'pg'
 import { candidateFingerprint, normalizeCandidate } from '../../utils/hiringNormalize'
 import { withProfessionExperience } from '../../utils/hiringExperience'
 import type { CvProfile, HiringStatistics } from '../../../shared/contracts/hiring'
@@ -16,21 +11,34 @@ import { canonicalCityValue } from '../../../shared/locationCatalog'
 import { hiringStatisticGroupsForProfessions } from '../../../shared/hiringStatisticGroups'
 import { expandHiringProfessionFilters } from '../../../shared/hiringProfessionGroups'
 import { convertCurrency } from '../../utils/currency'
+import { BoundedTtlCache } from '../../utils/boundedTtlCache'
 import {
   publicCandidateGender,
   publicCandidateProfessionKeys,
   publicCandidateRemote,
   publicCandidateSalary,
 } from '../../utils/hiringCandidatePresentation'
+import {
+  ensureCurrentCandidateTable,
+  rebuildCurrentCandidates,
+  syncCurrentCandidateKeys,
+} from './currentCandidateReadModel'
 
 const HYDRATE_LIMIT = 5_000
 const UPSERT_BATCH = 500
 const RETENTION_MONTHS = 3
 const SCHEMA_RE = /^[a-z_][a-z0-9_]*$/i
+const HIRING_STATS_CACHE_TTL_MS = 60_000
+const HIRING_STATS_CACHE_MAX_ENTRIES = 250
 
 let pool: Pool | undefined
 let schemaReady: Promise<void> | undefined
 let candidateBackfillComplete = false
+
+const hiringStatsCache = new BoundedTtlCache<string, HiringStatistics>({
+  maxEntries: HIRING_STATS_CACHE_MAX_ENTRIES,
+  defaultTtlMs: HIRING_STATS_CACHE_TTL_MS,
+})
 
 function schema(): string {
   const raw = (process.env.HIRING_DB_SCHEMA || 'hiring').trim()
@@ -127,6 +135,7 @@ function ensureSchema(): Promise<void> {
     await db().query(`CREATE INDEX IF NOT EXISTS candidates_languages_gin_idx ON ${name}.candidates USING GIN(languages)`)
     await db().query(`CREATE INDEX IF NOT EXISTS candidates_search_idx ON ${name}.candidates USING GIN(to_tsvector('simple', search_text))`)
     await db().query(`CREATE INDEX IF NOT EXISTS candidates_dedupe_idx ON ${name}.candidates(dedupe_key, created_at DESC, id DESC) WHERE active = TRUE`)
+    await ensureCurrentCandidateTable(db(), name)
     console.log(`[hiring:db] schema ${name} ready`)
   })().catch((error) => {
     schemaReady = undefined
@@ -153,7 +162,8 @@ function candidateRow(profile: CvProfile, handle: string) {
   }
   const sourceKey = String(normalized.sourceKey || normalized.source || 'unknown').toLowerCase()
   const origin = String(normalized.origin || 'telegram').toLowerCase()
-  const professions = [...new Set([...(normalized.professions || []), normalized.role].map((value) => String(value || '').trim()).filter(Boolean))]
+  const professions = [...new Set([...(normalized.professions || []), normalized.role]
+    .map((value) => String(value || '').trim()).filter(Boolean))]
   const currency = String(normalized.currency || 'USD').trim().toUpperCase()
   return {
     source: String(normalized.source || 'telegram').toLowerCase(),
@@ -184,7 +194,11 @@ function candidateRow(profile: CvProfile, handle: string) {
     skills: [...new Set((normalized.skills || []).map((value) => value.toLocaleLowerCase('en')))],
     languages: [...new Set((normalized.languages || []).map((value) => value.toLocaleLowerCase('en')))],
     description: String(normalized.description || ''),
-    search_text: [normalized.name, ...professions, ...(normalized.previousProfessions || []), ...(normalized.features || []), ...(normalized.skills || []), normalized.city, normalized.district, normalized.description].filter(Boolean).join(' '),
+    search_text: [
+      normalized.name, ...professions, ...(normalized.previousProfessions || []),
+      ...(normalized.features || []), ...(normalized.skills || []), normalized.city,
+      normalized.district, normalized.description,
+    ].filter(Boolean).join(' '),
     dedupe_key: candidateFingerprint(normalized),
     data: normalized,
   }
@@ -255,6 +269,11 @@ const UPSERT_SQL = (name: string) => `
     dedupe_key = EXCLUDED.dedupe_key;
 `
 
+async function finishReadModelBackfill(): Promise<void> {
+  await rebuildCurrentCandidates(db(), schema())
+  candidateBackfillComplete = true
+}
+
 async function backfillCandidateReadModel(): Promise<void> {
   if (candidateBackfillComplete) return
   for (let batch = 0; batch < Math.ceil(HYDRATE_LIMIT / UPSERT_BATCH); batch += 1) {
@@ -275,7 +294,7 @@ async function backfillCandidateReadModel(): Promise<void> {
       [UPSERT_BATCH],
     )
     if (!legacy.rows.length) {
-      candidateBackfillComplete = true
+      await finishReadModelBackfill()
       return
     }
     const rows = legacy.rows.map((row) => candidateRow({
@@ -288,22 +307,26 @@ async function backfillCandidateReadModel(): Promise<void> {
     } as CvProfile, row.source_handle))
     await db().query(UPSERT_SQL(schema()), [JSON.stringify(rows)])
     if (legacy.rows.length < UPSERT_BATCH) {
-      candidateBackfillComplete = true
+      await finishReadModelBackfill()
       return
     }
   }
+  await finishReadModelBackfill()
 }
 
 export async function loadDbCandidates(): Promise<CvProfile[]> {
   if (!hiringDbEnabled()) return []
   try {
     await ensureSchema()
+    await backfillCandidateReadModel()
     const result = await db().query<{ data: CvProfile }>(
-      `SELECT data FROM ${schema()}.candidates
-       WHERE active = TRUE
-         AND created_at >= (NOW() - INTERVAL '${RETENTION_MONTHS} months')
-         AND created_at <= (NOW() + INTERVAL '48 hours')
-       ORDER BY created_at DESC, id DESC
+      `SELECT candidate.data
+       FROM ${schema()}.candidate_current current
+       JOIN ${schema()}.candidates candidate ON candidate.id = current.candidate_id
+       WHERE candidate.active = TRUE
+         AND candidate.created_at >= (NOW() - INTERVAL '${RETENTION_MONTHS} months')
+         AND candidate.created_at <= (NOW() + INTERVAL '48 hours')
+       ORDER BY candidate.created_at DESC, candidate.id DESC
        LIMIT $1;`,
       [HYDRATE_LIMIT],
     )
@@ -325,16 +348,17 @@ function queryList(params: URLSearchParams, key: string): string[] {
   return (params.get(key) || '').split(',').map((value) => value.trim()).filter(Boolean)
 }
 
-function candidateOrder(sort: string): string {
-  if (sort === 'name_asc') return `LOWER(name) ASC NULLS LAST, activity_at DESC NULLS LAST, id DESC`
-  if (sort === 'name_desc') return `LOWER(name) DESC NULLS LAST, activity_at DESC NULLS LAST, id DESC`
-  if (sort === 'experience_desc') return `experience_years DESC NULLS LAST, activity_at DESC NULLS LAST, id DESC`
-  if (sort === 'experience_asc') return `experience_years ASC NULLS LAST, activity_at DESC NULLS LAST, id DESC`
-  if (sort === 'age_desc') return `age DESC NULLS LAST, activity_at DESC NULLS LAST, id DESC`
-  if (sort === 'age_asc') return `age ASC NULLS LAST, activity_at DESC NULLS LAST, id DESC`
-  if (sort === 'salary_desc') return `COALESCE(salary_max_usd, salary_min_usd) DESC NULLS LAST, activity_at DESC NULLS LAST, id DESC`
-  if (sort === 'salary_asc') return `COALESCE(salary_min_usd, salary_max_usd) ASC NULLS LAST, activity_at DESC NULLS LAST, id DESC`
-  return `activity_at DESC NULLS LAST, created_at DESC, id DESC`
+function candidateOrder(sort: string, alias = 'candidate'): string {
+  const col = (name: string) => `${alias}.${name}`
+  if (sort === 'name_asc') return `LOWER(${col('name')}) ASC NULLS LAST, ${col('activity_at')} DESC NULLS LAST, ${col('id')} DESC`
+  if (sort === 'name_desc') return `LOWER(${col('name')}) DESC NULLS LAST, ${col('activity_at')} DESC NULLS LAST, ${col('id')} DESC`
+  if (sort === 'experience_desc') return `${col('experience_years')} DESC NULLS LAST, ${col('activity_at')} DESC NULLS LAST, ${col('id')} DESC`
+  if (sort === 'experience_asc') return `${col('experience_years')} ASC NULLS LAST, ${col('activity_at')} DESC NULLS LAST, ${col('id')} DESC`
+  if (sort === 'age_desc') return `${col('age')} DESC NULLS LAST, ${col('activity_at')} DESC NULLS LAST, ${col('id')} DESC`
+  if (sort === 'age_asc') return `${col('age')} ASC NULLS LAST, ${col('activity_at')} DESC NULLS LAST, ${col('id')} DESC`
+  if (sort === 'salary_desc') return `COALESCE(${col('salary_max_usd')}, ${col('salary_min_usd')}) DESC NULLS LAST, ${col('activity_at')} DESC NULLS LAST, ${col('id')} DESC`
+  if (sort === 'salary_asc') return `COALESCE(${col('salary_min_usd')}, ${col('salary_max_usd')}) ASC NULLS LAST, ${col('activity_at')} DESC NULLS LAST, ${col('id')} DESC`
+  return `${col('activity_at')} DESC NULLS LAST, ${col('created_at')} DESC, ${col('id')} DESC`
 }
 
 function emptyHiringStatistics(): HiringStatistics {
@@ -347,149 +371,241 @@ function emptyHiringStatistics(): HiringStatistics {
   }
 }
 
-export async function queryDbCandidates(params: URLSearchParams, offset: number, limit: number): Promise<DbCandidateFeed | null> {
+type CandidateFilter = { where: string; values: unknown[] }
+
+function candidateFilter(params: URLSearchParams, alias = 'candidate'): CandidateFilter {
+  const values: unknown[] = []
+  const add = (value: unknown) => { values.push(value); return `$${values.length}` }
+  const col = (name: string) => `${alias}.${name}`
+  const where = [
+    `${col('active')} = TRUE`,
+    `${col('created_at')} >= NOW() - INTERVAL '${RETENTION_MONTHS} months'`,
+    `${col('created_at')} <= NOW() + INTERVAL '48 hours'`,
+  ]
+  const countries = queryList(params, 'countries').map((value) => value.toUpperCase())
+  if (countries.length) where.push(`${col('country')} = ANY(${add(countries)}::text[])`)
+  const city = String(params.get('city') || '').trim()
+  if (city) where.push(`LOWER(${col('canonical_city')}) = LOWER(${add(canonicalCityValue(city))})`)
+  const remote = params.get('remote')
+  if (remote === '1' || remote === '0') where.push(`${col('remote')} = ${add(remote === '1')}`)
+  const experienceMin = Number(params.get('experienceMin'))
+  if (Number.isFinite(experienceMin) && experienceMin > 0) where.push(`${col('experience_years')} >= ${add(experienceMin)}`)
+  const ageMin = Number(params.get('ageMin'))
+  if (Number.isFinite(ageMin) && ageMin > 0) where.push(`${col('age')} >= ${add(ageMin)}`)
+  const ageMax = Number(params.get('ageMax'))
+  if (Number.isFinite(ageMax) && ageMax > 0) where.push(`${col('age')} <= ${add(ageMax)}`)
+  const salaryCurrency = String(params.get('salaryCurrency') || 'USD').trim().toUpperCase()
+  const salaryFrom = convertCurrency(Number(params.get('salaryFrom')), salaryCurrency, 'USD')
+  const salaryTo = convertCurrency(Number(params.get('salaryTo')), salaryCurrency, 'USD')
+  if (salaryFrom != null) where.push(`COALESCE(${col('salary_max_usd')}, ${col('salary_min_usd')}) >= ${add(salaryFrom)}`)
+  if (salaryTo != null) where.push(`COALESCE(${col('salary_min_usd')}, ${col('salary_max_usd')}) <= ${add(salaryTo)}`)
+  const gender = String(params.get('gender') || '').trim().toLowerCase()
+  if (gender) where.push(`${col('gender')} = ${add(gender)}`)
+  const professions = expandHiringProfessionFilters(queryList(params, 'professions'))
+  if (professions.length) where.push(`${col('professions')} && ${add(professions)}::text[]`)
+  const seniority = String(params.get('seniority') || '').trim().toLowerCase()
+  if (seniority) where.push(`${col('seniority')} = ${add(seniority)}`)
+  const skills = queryList(params, 'skills').map((value) => value.toLocaleLowerCase('en'))
+  if (skills.length) where.push(`${col('skills')} @> ${add(skills)}::text[]`)
+  const languages = queryList(params, 'languages').map((value) => value.toLocaleLowerCase('en'))
+  if (languages.length) where.push(`${col('languages')} && ${add(languages)}::text[]`)
+  const query = String(params.get('query') || '').trim()
+  if (query) where.push(`to_tsvector('simple', ${col('search_text')}) @@ plainto_tsquery('simple', ${add(query)})`)
+  const sources = queryList(params, 'sources').map((value) => value.toLowerCase())
+  if (sources.length) where.push(`(${col('source_key')} = ANY(${add(sources)}::text[]) OR ${col('origin')} = ANY(${add(sources)}::text[]))`)
+  const profileId = String(params.get('profileId') || params.get('listingId') || '').trim()
+  if (profileId) where.push(`${col('source_id')} = ${add(profileId)}`)
+  const publicId = String(params.get('publicId') || '').trim()
+  if (publicId && /^\d+$/.test(publicId)) where.push(`${col('public_id')} = ${add(publicId)}::bigint`)
+  return { where: where.join(' AND '), values }
+}
+
+function hiringStatsCacheKey(params: URLSearchParams): string {
+  const copy = new URLSearchParams(params)
+  for (const key of ['page', 'offset', 'limit', 'sort']) copy.delete(key)
+  const entries = [...copy.entries()].sort(([keyA, valueA], [keyB, valueB]) => {
+    const order = keyA.localeCompare(keyB)
+    return order || valueA.localeCompare(valueB)
+  })
+  return new URLSearchParams(entries).toString()
+}
+
+async function queryHiringStatistics(params: URLSearchParams): Promise<HiringStatistics> {
+  const cacheKey = hiringStatsCacheKey(params)
+  const cached = hiringStatsCache.get(cacheKey)
+  if (cached) return cached
+
+  const filter = candidateFilter(params)
+  const result = await db().query({
+    text: `
+      WITH filtered AS MATERIALIZED (
+        SELECT
+          candidate.gender, candidate.age, candidate.provider,
+          candidate.source_key, candidate.origin, candidate.canonical_city,
+          candidate.country, candidate.sectors, candidate.professions,
+          candidate.activity_at, candidate.salary_min_usd,
+          candidate.salary_max_usd, candidate.experience_years
+        FROM ${schema()}.candidate_current current
+        JOIN ${schema()}.candidates candidate ON candidate.id = current.candidate_id
+        WHERE ${filter.where}
+      ), platform_counts AS (
+        SELECT COALESCE(NULLIF(provider, ''), source_key, origin, 'unknown') label, COUNT(*)::int value
+        FROM filtered GROUP BY 1 ORDER BY value DESC, label ASC
+      ), location_counts AS (
+        SELECT COALESCE(NULLIF(canonical_city, ''), country, '__unknown__') label, COUNT(*)::int value
+        FROM filtered GROUP BY 1 ORDER BY value DESC, label ASC
+      ), sector_counts AS (
+        SELECT sector label, COUNT(*)::int value FROM filtered, unnest(sectors) sector
+        GROUP BY sector ORDER BY value DESC, label ASC
+      ), profession_counts AS (
+        SELECT profession label, COUNT(*)::int value FROM filtered, unnest(professions) profession
+        WHERE profession <> 'Any Role' GROUP BY profession ORDER BY value DESC, label ASC
+      ), activity_counts AS (
+        SELECT activity_at::date::text date, COUNT(*)::int value FROM filtered
+        WHERE activity_at >= NOW() - INTERVAL '60 days' AND activity_at <= NOW()
+        GROUP BY activity_at::date ORDER BY activity_at::date
+      ), salary_profession AS (
+        SELECT profession, COUNT(*)::int count,
+          MIN(LEAST(COALESCE(salary_min_usd, salary_max_usd), COALESCE(salary_max_usd, salary_min_usd)))::float8 min_usd,
+          MAX(GREATEST(COALESCE(salary_min_usd, salary_max_usd), COALESCE(salary_max_usd, salary_min_usd)))::float8 max_usd
+        FROM filtered, unnest(professions) profession
+        WHERE COALESCE(salary_min_usd, salary_max_usd) IS NOT NULL AND profession <> 'Any Role'
+        GROUP BY profession ORDER BY count DESC, max_usd DESC, profession ASC
+      ), salary_experience AS (
+        SELECT CASE
+          WHEN experience_years < 2 THEN 0 WHEN experience_years < 4 THEN 1
+          WHEN experience_years < 7 THEN 2 WHEN experience_years < 11 THEN 3 ELSE 4
+        END bucket,
+          (percentile_cont(0.5) WITHIN GROUP (
+            ORDER BY (COALESCE(salary_min_usd, salary_max_usd) + COALESCE(salary_max_usd, salary_min_usd)) / 2.0
+          ))::float8 AS median
+        FROM filtered
+        WHERE experience_years IS NOT NULL AND COALESCE(salary_min_usd, salary_max_usd) IS NOT NULL
+        GROUP BY 1
+      )
+      SELECT jsonb_build_object(
+        'genders', jsonb_build_object(
+          'female', (SELECT (COUNT(*) FILTER (WHERE gender = 'female'))::int FROM filtered),
+          'male', (SELECT (COUNT(*) FILTER (WHERE gender = 'male'))::int FROM filtered),
+          'unknown', (SELECT (COUNT(*) FILTER (WHERE gender IS NULL OR gender NOT IN ('female', 'male')))::int FROM filtered)
+        ),
+        'ages', (SELECT jsonb_agg(jsonb_build_object('label', label, 'value', value) ORDER BY ord) FROM (VALUES
+          (1, '<18', (SELECT COUNT(*)::int FROM filtered WHERE age < 18)),
+          (2, '18–24', (SELECT COUNT(*)::int FROM filtered WHERE age >= 18 AND age < 25)),
+          (3, '25–34', (SELECT COUNT(*)::int FROM filtered WHERE age >= 25 AND age < 35)),
+          (4, '35–44', (SELECT COUNT(*)::int FROM filtered WHERE age >= 35 AND age < 45)),
+          (5, '45–54', (SELECT COUNT(*)::int FROM filtered WHERE age >= 45 AND age < 55)),
+          (6, '55+', (SELECT COUNT(*)::int FROM filtered WHERE age >= 55)),
+          (7, '__unknown__', (SELECT COUNT(*)::int FROM filtered WHERE age IS NULL))
+        ) ages(ord, label, value)),
+        'platforms', COALESCE((SELECT jsonb_agg(jsonb_build_object('label', label, 'value', value)) FROM platform_counts), '[]'::jsonb),
+        'locations', COALESCE((SELECT jsonb_agg(jsonb_build_object('label', label, 'value', value)) FROM location_counts), '[]'::jsonb),
+        'sectors', COALESCE((SELECT jsonb_agg(jsonb_build_object('label', label, 'value', value)) FROM sector_counts), '[]'::jsonb),
+        'professions', COALESCE((SELECT jsonb_agg(jsonb_build_object('label', label, 'value', value)) FROM profession_counts), '[]'::jsonb),
+        'activity', COALESCE((SELECT jsonb_agg(jsonb_build_object('date', date, 'value', value)) FROM activity_counts), '[]'::jsonb),
+        'salaryByExperience', (SELECT jsonb_agg(
+          (SELECT median FROM salary_experience WHERE bucket = series.bucket) ORDER BY series.bucket
+        ) FROM generate_series(0, 4) series(bucket)),
+        'salaryByProfession', COALESCE((SELECT jsonb_agg(jsonb_build_object(
+          'profession', profession, 'count', count, 'minUsd', min_usd, 'maxUsd', max_usd
+        )) FROM salary_profession), '[]'::jsonb),
+        'salarySamples', (SELECT COUNT(*)::int FROM filtered
+          WHERE experience_years IS NOT NULL AND COALESCE(salary_min_usd, salary_max_usd) IS NOT NULL)
+      ) statistics
+    `,
+    values: filter.values,
+  })
+  const statistics = { ...emptyHiringStatistics(), ...(result.rows[0]?.statistics || {}) }
+  hiringStatsCache.set(cacheKey, statistics)
+  return statistics
+}
+
+export async function queryDbCandidates(
+  params: URLSearchParams,
+  offset: number,
+  limit: number,
+): Promise<DbCandidateFeed | null> {
   if (!hiringDbEnabled()) return null
   try {
     await ensureSchema()
     await backfillCandidateReadModel()
-    const values: unknown[] = []
-    const add = (value: unknown) => { values.push(value); return `$${values.length}` }
-    const where = [
-      'active = TRUE',
-      `created_at >= NOW() - INTERVAL '${RETENTION_MONTHS} months'`,
-      `created_at <= NOW() + INTERVAL '48 hours'`,
-    ]
-    const countries = queryList(params, 'countries').map((value) => value.toUpperCase())
-    if (countries.length) where.push(`country = ANY(${add(countries)}::text[])`)
-    const city = String(params.get('city') || '').trim()
-    if (city) where.push(`LOWER(canonical_city) = LOWER(${add(canonicalCityValue(city))})`)
-    const remote = params.get('remote')
-    if (remote === '1' || remote === '0') where.push(`remote = ${add(remote === '1')}`)
-    const experienceMin = Number(params.get('experienceMin'))
-    if (Number.isFinite(experienceMin) && experienceMin > 0) where.push(`experience_years >= ${add(experienceMin)}`)
-    const ageMin = Number(params.get('ageMin'))
-    if (Number.isFinite(ageMin) && ageMin > 0) where.push(`age >= ${add(ageMin)}`)
-    const ageMax = Number(params.get('ageMax'))
-    if (Number.isFinite(ageMax) && ageMax > 0) where.push(`age <= ${add(ageMax)}`)
-    const salaryCurrency = String(params.get('salaryCurrency') || 'USD').trim().toUpperCase()
-    const salaryFrom = convertCurrency(Number(params.get('salaryFrom')), salaryCurrency, 'USD')
-    const salaryTo = convertCurrency(Number(params.get('salaryTo')), salaryCurrency, 'USD')
-    if (salaryFrom != null) where.push(`COALESCE(salary_max_usd, salary_min_usd) >= ${add(salaryFrom)}`)
-    if (salaryTo != null) where.push(`COALESCE(salary_min_usd, salary_max_usd) <= ${add(salaryTo)}`)
-    const gender = String(params.get('gender') || '').trim().toLowerCase()
-    if (gender) where.push(`gender = ${add(gender)}`)
-    const professions = expandHiringProfessionFilters(queryList(params, 'professions'))
-    if (professions.length) where.push(`professions && ${add(professions)}::text[]`)
-    const seniority = String(params.get('seniority') || '').trim().toLowerCase()
-    if (seniority) where.push(`seniority = ${add(seniority)}`)
-    const skills = queryList(params, 'skills').map((value) => value.toLocaleLowerCase('en'))
-    if (skills.length) where.push(`skills @> ${add(skills)}::text[]`)
-    const languages = queryList(params, 'languages').map((value) => value.toLocaleLowerCase('en'))
-    if (languages.length) where.push(`languages && ${add(languages)}::text[]`)
-    const query = String(params.get('query') || '').trim()
-    if (query) where.push(`to_tsvector('simple', search_text) @@ plainto_tsquery('simple', ${add(query)})`)
-    const sources = queryList(params, 'sources').map((value) => value.toLowerCase())
-    if (sources.length) where.push(`(source_key = ANY(${add(sources)}::text[]) OR origin = ANY(${add(sources)}::text[]))`)
-    const profileId = String(params.get('profileId') || params.get('listingId') || '').trim()
-    if (profileId) where.push(`source_id = ${add(profileId)}`)
-    const publicId = String(params.get('publicId') || '').trim()
-    if (publicId && /^\d+$/.test(publicId)) where.push(`public_id = ${add(publicId)}::bigint`)
 
-    const pageLimit = add(limit)
-    const pageOffset = add(offset)
-    const result = await db().query({
-      text: `
-        WITH deduped AS MATERIALIZED (
-          SELECT * FROM (
-            SELECT candidates.*, ROW_NUMBER() OVER (PARTITION BY dedupe_key ORDER BY created_at DESC, id DESC) AS dedupe_rank
-            FROM ${schema()}.candidates candidates WHERE active = TRUE
-          ) ranked WHERE dedupe_rank = 1
-        ), filtered AS MATERIALIZED (
-          SELECT * FROM deduped WHERE ${where.filter((part) => part !== 'active = TRUE').join(' AND ')}
-        ), page_rows AS (
-          SELECT data || jsonb_build_object('publicId', public_id) AS data,
-            ROW_NUMBER() OVER (ORDER BY ${candidateOrder(String(params.get('sort') || 'recent').toLowerCase())}) AS page_order
-          FROM filtered ORDER BY ${candidateOrder(String(params.get('sort') || 'recent').toLowerCase())}
+    const pageFilter = candidateFilter(params)
+    const pageValues = [...pageFilter.values, limit, offset]
+    const pageLimit = `$${pageValues.length - 1}`
+    const pageOffset = `$${pageValues.length}`
+    const summaryFilter = candidateFilter(params)
+    const sort = String(params.get('sort') || 'recent').toLowerCase()
+
+    const [pageResult, summaryResult, statistics] = await Promise.all([
+      db().query({
+        text: `
+          SELECT candidate.data || jsonb_build_object('publicId', candidate.public_id) AS data
+          FROM ${schema()}.candidate_current current
+          JOIN ${schema()}.candidates candidate ON candidate.id = current.candidate_id
+          WHERE ${pageFilter.where}
+          ORDER BY ${candidateOrder(sort)}
           LIMIT ${pageLimit} OFFSET ${pageOffset}
-        ), platform_counts AS (
-          SELECT COALESCE(NULLIF(provider, ''), source_key, origin, 'unknown') label, COUNT(*)::int value
-          FROM filtered GROUP BY 1 ORDER BY value DESC, label ASC
-        ), location_counts AS (
-          SELECT COALESCE(NULLIF(canonical_city, ''), country, '__unknown__') label, COUNT(*)::int value
-          FROM filtered GROUP BY 1 ORDER BY value DESC, label ASC
-        ), sector_counts AS (
-          SELECT sector label, COUNT(*)::int value FROM filtered, unnest(sectors) sector
-          GROUP BY sector ORDER BY value DESC, label ASC
-        ), profession_counts AS (
-          SELECT profession label, COUNT(*)::int value FROM filtered, unnest(professions) profession
-          WHERE profession <> 'Any Role' GROUP BY profession ORDER BY value DESC, label ASC
-        ), activity_counts AS (
-          SELECT activity_at::date::text date, COUNT(*)::int value FROM filtered
-          WHERE activity_at >= NOW() - INTERVAL '60 days' AND activity_at <= NOW()
-          GROUP BY activity_at::date ORDER BY activity_at::date
-        ), salary_profession AS (
-          SELECT profession, COUNT(*)::int count,
-            MIN(LEAST(COALESCE(salary_min_usd, salary_max_usd), COALESCE(salary_max_usd, salary_min_usd)))::float8 min_usd,
-            MAX(GREATEST(COALESCE(salary_min_usd, salary_max_usd), COALESCE(salary_max_usd, salary_min_usd)))::float8 max_usd
-          FROM filtered, unnest(professions) profession
-          WHERE COALESCE(salary_min_usd, salary_max_usd) IS NOT NULL AND profession <> 'Any Role'
-          GROUP BY profession ORDER BY count DESC, max_usd DESC, profession ASC
-        ), salary_experience AS (
-          SELECT CASE WHEN experience_years < 2 THEN 0 WHEN experience_years < 4 THEN 1 WHEN experience_years < 7 THEN 2 WHEN experience_years < 11 THEN 3 ELSE 4 END bucket,
-            (percentile_cont(0.5) WITHIN GROUP (ORDER BY (COALESCE(salary_min_usd, salary_max_usd) + COALESCE(salary_max_usd, salary_min_usd)) / 2.0))::float8 AS median
-          FROM filtered WHERE experience_years IS NOT NULL AND COALESCE(salary_min_usd, salary_max_usd) IS NOT NULL
-          GROUP BY 1
-        )
-        SELECT
-          (SELECT COUNT(*)::int FROM ${schema()}.candidates WHERE active = TRUE) database_total,
-          (SELECT COUNT(*)::int FROM ${schema()}.candidates WHERE active = TRUE AND public_id IS NOT NULL AND dedupe_key IS NOT NULL) database_ready,
-          (SELECT COUNT(*)::int FROM filtered) count,
-          COALESCE((SELECT jsonb_agg(data ORDER BY page_order) FROM page_rows), '[]'::jsonb) profiles,
-          COALESCE((SELECT jsonb_object_agg(key, value) FROM (
-            SELECT key, COUNT(*)::int value
-            FROM filtered
-            CROSS JOIN LATERAL unnest(ARRAY(SELECT DISTINCT item FROM unnest(ARRAY[source_key, origin]) item WHERE item IS NOT NULL AND item <> '')) key
-            GROUP BY key
-          ) x), '{}'::jsonb) source_counts,
-          jsonb_build_object(
-            'genders', jsonb_build_object(
-              'female', (SELECT (COUNT(*) FILTER (WHERE gender = 'female'))::int FROM filtered),
-              'male', (SELECT (COUNT(*) FILTER (WHERE gender = 'male'))::int FROM filtered),
-              'unknown', (SELECT (COUNT(*) FILTER (WHERE gender IS NULL OR gender NOT IN ('female', 'male')))::int FROM filtered)
-            ),
-            'ages', (SELECT jsonb_agg(jsonb_build_object('label', label, 'value', value) ORDER BY ord) FROM (VALUES
-              (1, '<18', (SELECT COUNT(*)::int FROM filtered WHERE age < 18)),
-              (2, '18–24', (SELECT COUNT(*)::int FROM filtered WHERE age >= 18 AND age < 25)),
-              (3, '25–34', (SELECT COUNT(*)::int FROM filtered WHERE age >= 25 AND age < 35)),
-              (4, '35–44', (SELECT COUNT(*)::int FROM filtered WHERE age >= 35 AND age < 45)),
-              (5, '45–54', (SELECT COUNT(*)::int FROM filtered WHERE age >= 45 AND age < 55)),
-              (6, '55+', (SELECT COUNT(*)::int FROM filtered WHERE age >= 55)),
-              (7, '__unknown__', (SELECT COUNT(*)::int FROM filtered WHERE age IS NULL))
-            ) ages(ord, label, value)),
-            'platforms', COALESCE((SELECT jsonb_agg(jsonb_build_object('label', label, 'value', value)) FROM platform_counts), '[]'::jsonb),
-            'locations', COALESCE((SELECT jsonb_agg(jsonb_build_object('label', label, 'value', value)) FROM location_counts), '[]'::jsonb),
-            'sectors', COALESCE((SELECT jsonb_agg(jsonb_build_object('label', label, 'value', value)) FROM sector_counts), '[]'::jsonb),
-            'professions', COALESCE((SELECT jsonb_agg(jsonb_build_object('label', label, 'value', value)) FROM profession_counts), '[]'::jsonb),
-            'activity', COALESCE((SELECT jsonb_agg(jsonb_build_object('date', date, 'value', value)) FROM activity_counts), '[]'::jsonb),
-            'salaryByExperience', (SELECT jsonb_agg((SELECT median FROM salary_experience WHERE bucket = series.bucket) ORDER BY series.bucket) FROM generate_series(0, 4) series(bucket)),
-            'salaryByProfession', COALESCE((SELECT jsonb_agg(jsonb_build_object('profession', profession, 'count', count, 'minUsd', min_usd, 'maxUsd', max_usd)) FROM salary_profession), '[]'::jsonb),
-            'salarySamples', (SELECT COUNT(*)::int FROM filtered WHERE experience_years IS NOT NULL AND COALESCE(salary_min_usd, salary_max_usd) IS NOT NULL)
-          ) statistics
-      `,
-      values,
-    })
-    const row = result.rows[0]
+        `,
+        values: pageValues,
+      }),
+      db().query({
+        text: `
+          WITH filtered AS (
+            SELECT candidate.source_key, candidate.origin
+            FROM ${schema()}.candidate_current current
+            JOIN ${schema()}.candidates candidate ON candidate.id = current.candidate_id
+            WHERE ${summaryFilter.where}
+          )
+          SELECT
+            (SELECT COUNT(*)::int FROM ${schema()}.candidates WHERE active = TRUE) database_total,
+            (SELECT COUNT(*)::int FROM ${schema()}.candidates
+              WHERE active = TRUE AND public_id IS NOT NULL AND dedupe_key IS NOT NULL) database_ready,
+            (SELECT COUNT(*)::int FROM filtered) count,
+            COALESCE((SELECT jsonb_object_agg(key, value) FROM (
+              SELECT key, COUNT(*)::int value
+              FROM filtered
+              CROSS JOIN LATERAL unnest(ARRAY(
+                SELECT DISTINCT item FROM unnest(ARRAY[source_key, origin]) item
+                WHERE item IS NOT NULL AND item <> ''
+              )) key
+              GROUP BY key
+            ) x), '{}'::jsonb) source_counts
+        `,
+        values: summaryFilter.values,
+      }),
+      queryHiringStatistics(params),
+    ])
+
+    const row = summaryResult.rows[0]
     if (!row) return null
     if ((Number(row.database_total) || 0) === 0 || Number(row.database_ready) !== Number(row.database_total)) return null
     return {
-      profiles: row.profiles || [], count: Number(row.count) || 0,
-      statistics: { ...emptyHiringStatistics(), ...(row.statistics || {}) },
+      profiles: pageResult.rows.map((item) => item.data).filter(Boolean),
+      count: Number(row.count) || 0,
+      statistics,
       sourceCounts: row.source_counts || {},
     }
   } catch (error) {
     console.warn('[hiring:db] indexed read failed:', (error as Error).message)
     return null
   }
+}
+
+async function previousDedupeKeys(client: PoolClient, rows: Array<ReturnType<typeof candidateRow>>): Promise<string[]> {
+  if (!rows.length) return []
+  const identities = rows.map((row) => ({ source: row.source, country: row.country, source_id: row.source_id }))
+  const result = await client.query(
+    `SELECT candidate.dedupe_key
+     FROM ${schema()}.candidates candidate
+     JOIN jsonb_to_recordset($1::jsonb) input(source TEXT, country TEXT, source_id TEXT)
+       ON candidate.source = input.source
+      AND candidate.country = input.country
+      AND candidate.source_id = input.source_id
+     WHERE candidate.dedupe_key IS NOT NULL AND candidate.dedupe_key <> ''`,
+    [JSON.stringify(identities)],
+  )
+  return result.rows.map((row) => String(row.dedupe_key || '')).filter(Boolean)
 }
 
 export async function saveDbCandidates(
@@ -507,10 +623,26 @@ export async function saveDbCandidates(
     }
 
     const rows = [...unique.values()]
-    for (let offset = 0; offset < rows.length; offset += UPSERT_BATCH) {
-      await db().query(UPSERT_SQL(schema()), [JSON.stringify(rows.slice(offset, offset + UPSERT_BATCH))])
+    const client = await db().connect()
+    try {
+      await client.query('BEGIN')
+      const oldKeys = await previousDedupeKeys(client, rows)
+      for (let offset = 0; offset < rows.length; offset += UPSERT_BATCH) {
+        await client.query(UPSERT_SQL(schema()), [JSON.stringify(rows.slice(offset, offset + UPSERT_BATCH))])
+      }
+      await syncCurrentCandidateKeys(client, schema(), [
+        ...oldKeys,
+        ...rows.map((row) => row.dedupe_key),
+      ])
+      await client.query('COMMIT')
+    } catch (error) {
+      await client.query('ROLLBACK').catch(() => {})
+      throw error
+    } finally {
+      client.release()
     }
 
+    hiringStatsCache.clear()
     await recordDbSourceRun(diagnostic)
     return rows.length
   } catch (error) {
@@ -561,9 +693,7 @@ const SOURCE_RUNS_TTL_MS = 60_000
 let sourceRunsCache: Array<SourceRun & { lastSuccessAt?: string | null }> = []
 let sourceRunsAt = 0
 
-export async function loadDbSourceRuns(): Promise<
-  Array<SourceRun & { lastSuccessAt?: string | null }>
-> {
+export async function loadDbSourceRuns(): Promise<Array<SourceRun & { lastSuccessAt?: string | null }>> {
   if (!hiringDbEnabled()) return []
   if (Date.now() - sourceRunsAt < SOURCE_RUNS_TTL_MS) return sourceRunsCache
   try {
@@ -596,12 +726,29 @@ export async function pruneDbCandidates(): Promise<number> {
   if (!hiringDbEnabled()) return 0
   try {
     await ensureSchema()
-    const result = await db().query(
-      `DELETE FROM ${schema()}.candidates
-       WHERE created_at < (NOW() - INTERVAL '${RETENTION_MONTHS} months')
-          OR created_at > (NOW() + INTERVAL '48 hours');`,
-    )
-    return result.rowCount || 0
+    const client = await db().connect()
+    try {
+      await client.query('BEGIN')
+      const result = await client.query(
+        `DELETE FROM ${schema()}.candidates
+         WHERE created_at < (NOW() - INTERVAL '${RETENTION_MONTHS} months')
+            OR created_at > (NOW() + INTERVAL '48 hours')
+         RETURNING dedupe_key;`,
+      )
+      await syncCurrentCandidateKeys(
+        client,
+        schema(),
+        result.rows.map((row) => String(row.dedupe_key || '')).filter(Boolean),
+      )
+      await client.query('COMMIT')
+      hiringStatsCache.clear()
+      return result.rowCount || 0
+    } catch (error) {
+      await client.query('ROLLBACK').catch(() => {})
+      throw error
+    } finally {
+      client.release()
+    }
   } catch (error) {
     console.warn('[hiring:db] prune failed:', (error as Error).message)
     return 0
