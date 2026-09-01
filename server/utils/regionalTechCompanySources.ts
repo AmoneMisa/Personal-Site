@@ -2,7 +2,6 @@ import type { Job } from './jobTypes'
 import { detectWorkModes } from './hiringLexicon'
 
 const UA = 'jobFinder/1.0 (job aggregator; contact: admin@whiteslove.me)'
-const REQUEST_TIMEOUT_MS = 20_000
 
 export type RegionalCompanyCountry = 'UA' | 'RO' | 'UZ'
 export type RegionalCompanyAts = 'lever' | 'smartrecruiters'
@@ -155,10 +154,7 @@ export function mapRegionalSmartRecruitersPostings(
 async function fetchLeverCompany(company: RegionalTechCompany): Promise<Job[]> {
   const response = await fetch(
     `https://api.lever.co/v0/postings/${encodeURIComponent(company.handle)}?mode=json`,
-    {
-      headers: { 'User-Agent': UA, Accept: 'application/json' },
-      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
-    },
+    { headers: { 'User-Agent': UA, Accept: 'application/json' } },
   )
   if (!response.ok) throw new Error(`${company.label} -> ${response.status}`)
   const postings = await response.json() as LeverPosting[]
@@ -167,11 +163,8 @@ async function fetchLeverCompany(company: RegionalTechCompany): Promise<Job[]> {
 
 async function fetchSmartRecruitersCompany(company: RegionalTechCompany): Promise<Job[]> {
   const response = await fetch(
-    `https://api.smartrecruiters.com/v1/companies/${encodeURIComponent(company.handle)}/postings?limit=100`,
-    {
-      headers: { 'User-Agent': UA, Accept: 'application/json' },
-      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
-    },
+    `https://api.smartrecruiters.com/v1/companies/${encodeURIComponent(company.handle)}/postings`,
+    { headers: { 'User-Agent': UA, Accept: 'application/json' } },
   )
   if (!response.ok) throw new Error(`${company.label} -> ${response.status}`)
   const data = await response.json() as { content?: SmartRecruitersPosting[] }
@@ -184,33 +177,25 @@ async function fetchRegionalCompany(company: RegionalTechCompany): Promise<Job[]
     : fetchLeverCompany(company)
 }
 
-function filterQuery(jobs: Job[], q: string): Job[] {
-  const needle = q.trim().toLocaleLowerCase('en')
-  if (!needle) return jobs
-  return jobs.filter((job) =>
-    `${job.title} ${job.company} ${job.location} ${job.description || ''}`
-      .toLocaleLowerCase('en')
-      .includes(needle),
-  )
+function companyKey(company: RegionalTechCompany): string {
+  return `${company.country.toLowerCase()}:${company.ats}:${company.handle}`
 }
 
-export async function fetchRegionalTechCompanyJobs(q: string): Promise<Job[]> {
+export const REGIONAL_TECH_COMPANY_TARGET_PREFIX = 'regional-tech-company:'
+
+export function configuredRegionalTechCompanyTargets(): string[] {
   if (String(process.env.REGIONAL_TECH_COMPANY_SOURCE || 'on').toLowerCase() === 'off') return []
+  return REGIONAL_TECH_COMPANIES.map((company) => `${REGIONAL_TECH_COMPANY_TARGET_PREFIX}${companyKey(company)}`)
+}
 
-  const results = await Promise.allSettled(REGIONAL_TECH_COMPANIES.map(fetchRegionalCompany))
-  const jobs: Job[] = []
+export function isRegionalTechCompanyTarget(target: string): boolean {
+  return target.startsWith(REGIONAL_TECH_COMPANY_TARGET_PREFIX)
+}
 
-  results.forEach((result, index) => {
-    if (result.status === 'fulfilled') {
-      jobs.push(...result.value)
-      return
-    }
-    const company = REGIONAL_TECH_COMPANIES[index]!
-    console.warn(
-      `[jobs:regional-tech] ${company.label} failed:`,
-      result.reason instanceof Error ? result.reason.message : String(result.reason),
-    )
-  })
-
-  return filterQuery(jobs, q)
+export async function fetchRegionalTechCompanyTarget(target: string): Promise<Job[]> {
+  if (!isRegionalTechCompanyTarget(target)) throw new Error(`Unknown regional tech company target ${target}`)
+  const key = target.slice(REGIONAL_TECH_COMPANY_TARGET_PREFIX.length)
+  const company = REGIONAL_TECH_COMPANIES.find((candidate) => companyKey(candidate) === key)
+  if (!company) throw new Error(`Unknown regional tech company target ${target}`)
+  return fetchRegionalCompany(company)
 }
