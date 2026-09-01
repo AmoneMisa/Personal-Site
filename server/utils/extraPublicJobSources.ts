@@ -3,16 +3,9 @@ import type { Job, SponsorshipConfidence } from './jobTypes'
 import { detectWorkModes } from './hiringLexicon'
 import { absoluteHttpUrl as absoluteUrl, decodeHtmlEntities, stripHtml } from './htmlText'
 
-type PublicBoard = {
+export type PublicBoard = {
   label: string
   url: string
-  /**
-   * Deterministic parser for a board whose markup we know. The generic
-   * anchor/JSON-LD path stays the default for everything else — it guesses,
-   * which is fine for boards nobody has looked at, and wrong for ones we have.
-   */
-  parse?: (html: string, board: PublicBoard) => Job[]
-  detailParse?: (html: string, summary: Job) => Job | null
   /** Country the listing belongs to when the board is national. */
   country?: string
   remoteByDefault?: boolean
@@ -24,9 +17,9 @@ type PublicBoard = {
 
 export type FlagmaJobBoardDescriptor = Pick<PublicBoard, 'label' | 'url' | 'country'>
 
-// Flagma parsing is kept here as the existing source adapter, while execution
-// is owned by flagmaJobSource.ts through the durable jobs queue and shared
-// cyclic/detail crawler policy. Do not add Flagma back to PUBLIC_JOB_BOARDS.
+// Flagma parsing stays here as source-specific markup knowledge. Its execution
+// is owned by the community-board queue target and the shared cyclic/detail
+// crawler policy.
 const FLAGMA_VACANCY_LINK_RE =
   /<a\b[^>]*href="([^"]*flagma\.[a-z]{2}\/(?:ru\/)?vakansiya-[^"?#]*-rv\d+\.html)"[^>]*>([\s\S]*?)<\/a>/gi
 
@@ -151,7 +144,7 @@ export function parseFlagmaVacancyDetail(html: string, summary: Job): Job | null
   }
 }
 
-const PUBLIC_JOB_BOARDS: PublicBoard[] = [
+export const PUBLIC_JOB_BOARDS: PublicBoard[] = [
   { label: 'Remote Source', url: 'https://www.remotesource.com/jobs', remoteByDefault: true },
   { label: 'TaskFavour', url: 'https://www.taskfavour.com/jobs' },
   { label: 'Tech Leads Community', url: 'https://techleadscommunity.com/', remoteByDefault: true },
@@ -219,12 +212,6 @@ const PUBLIC_JOB_BOARDS: PublicBoard[] = [
     sponsorshipEvidence: 'Employer sponsorship history from US visa/LCA data',
   },
 ]
-
-const UA =
-  'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ' +
-  '(KHTML, like Gecko) Chrome/126.0 Safari/537.36'
-const REQUEST_TIMEOUT_MS = 12_000
-const MAX_PER_BOARD = 100
 
 function validDate(value: unknown): string {
   const time = Date.parse(String(value || ''))
@@ -359,7 +346,6 @@ function parseAnchors(html: string, board: PublicBoard): Job[] {
 
     const existing = byUrl.get(href)
     if (!existing || title.length < existing.length) byUrl.set(href, title)
-    if (byUrl.size >= MAX_PER_BOARD) break
   }
 
   const now = new Date().toISOString()
@@ -377,66 +363,8 @@ function parseAnchors(html: string, board: PublicBoard): Job[] {
   }))
 }
 
-async function fetchBoard(board: PublicBoard): Promise<Job[]> {
-  const response = await fetch(board.url, {
-    headers: {
-      'User-Agent': UA,
-      Accept: 'text/html,application/xhtml+xml',
-      'Accept-Language': 'en-US,en;q=0.9',
-    },
-    signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
-  })
-
-  if (!response.ok) throw new Error(`${board.label} -> ${response.status}`)
-  const html = await response.text()
-
+export function parsePublicBoardPage(html: string, board: PublicBoard): Job[] {
   const byUrl = new Map<string, Job>()
-  const parsed = board.parse ? board.parse(html, board) : [...parseJsonLd(html, board), ...parseAnchors(html, board)]
-  for (const job of parsed) {
-    byUrl.set(job.url, job)
-    if (byUrl.size >= MAX_PER_BOARD) break
-  }
-  const summaries = [...byUrl.values()]
-  if (!board.detailParse) return summaries
-
-  const details = await Promise.allSettled(summaries.map(async (summary) => {
-    const response = await fetch(summary.url, {
-      headers: {
-        'User-Agent': UA,
-        Accept: 'text/html,application/xhtml+xml',
-        'Accept-Language': 'ru,en;q=0.8',
-      },
-      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
-    })
-    if (!response.ok) throw new Error(`${board.label} detail -> ${response.status}`)
-    return board.detailParse!(await response.text(), summary) || summary
-  }))
-  return details.map((result, index) => result.status === 'fulfilled' ? result.value : summaries[index]!)
-}
-
-export async function fetchExtraPublicJobs(q: string): Promise<Job[]> {
-  if (process.env.PUBLIC_JOB_BOARDS_SOURCE === 'off') return []
-
-  const results = await Promise.allSettled(PUBLIC_JOB_BOARDS.map(fetchBoard))
-  const byUrl = new Map<string, Job>()
-
-  results.forEach((result, index) => {
-    const board = PUBLIC_JOB_BOARDS[index]!
-    if (result.status === 'rejected') {
-      console.warn('[jobs] public board failed:', board.label,
-        result.reason instanceof Error ? result.reason.message : String(result.reason))
-      return
-    }
-    for (const job of result.value) byUrl.set(job.url, job)
-  })
-
-  const jobs = [...byUrl.values()]
-  if (!q) return jobs
-
-  const needle = q.toLocaleLowerCase('en')
-  return jobs.filter((job) =>
-    `${job.title} ${job.company} ${job.location} ${job.description || ''}`
-      .toLocaleLowerCase('en')
-      .includes(needle),
-  )
+  for (const job of [...parseJsonLd(html, board), ...parseAnchors(html, board)]) byUrl.set(job.url, job)
+  return [...byUrl.values()]
 }
