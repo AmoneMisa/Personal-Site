@@ -15,7 +15,9 @@ export const STANDARD_JOB_BOARD_CRAWL_POLICY = Object.freeze({
   pagesPerRun: 2,
   maxPage: 10_000,
   requestDelayMs: 500,
-  requestTimeoutMs: 20_000,
+  requestTimeoutMs: 6_000,
+  concurrency: 10,
+  maxJobsPerSource: 60,
 })
 
 interface JobBoardCursor {
@@ -78,6 +80,13 @@ export interface StandardCursorJobBoardOptions {
   fetchPage: (cursor: string | null) => Promise<string>
   parsePage: (raw: string, cursor: string | null) => Job[]
   nextCursor: (raw: string) => string | null
+}
+
+export interface StandardJobBoardDetailOptions {
+  key: string
+  jobs: Job[]
+  fetchDetail: (job: Job, signal: AbortSignal) => Promise<string>
+  parseDetail: (raw: string, summary: Job) => Job | null
 }
 
 function defaultCursor(): JobBoardCursor {
@@ -164,6 +173,10 @@ function dedupe(jobs: Job[]): Job[] {
   const byKey = new Map<string, Job>()
   for (const job of jobs) byKey.set(job.url || job.id, job)
   return [...byKey.values()]
+}
+
+function standardJobs(jobs: Job[]): Job[] {
+  return dedupe(jobs).slice(0, STANDARD_JOB_BOARD_CRAWL_POLICY.maxJobsPerSource)
 }
 
 function pageSignature(jobs: Job[]): string {
@@ -261,14 +274,56 @@ export async function crawlCyclicJobBoard(options: CyclicJobBoardOptions): Promi
  * It is deliberately opinionated so adapters do not grow their own request
  * concurrency, page caps, delays or per-run item caps.
  */
-export function crawlStandardJobBoard(options: StandardJobBoardOptions): Promise<CyclicJobBoardRun> {
-  return crawlCyclicJobBoard({
+export async function crawlStandardJobBoard(options: StandardJobBoardOptions): Promise<CyclicJobBoardRun> {
+  const run = await crawlCyclicJobBoard({
     ...options,
     pagesPerRun: STANDARD_JOB_BOARD_CRAWL_POLICY.pagesPerRun,
     maxPage: STANDARD_JOB_BOARD_CRAWL_POLICY.maxPage,
     requestDelayMs: STANDARD_JOB_BOARD_CRAWL_POLICY.requestDelayMs,
     stopOnRepeatedPage: true,
   })
+  return { ...run, jobs: standardJobs(run.jobs) }
+}
+
+/**
+ * Shared bounded detail stage for boards whose list pages only expose summaries.
+ * The board supplies only transport and parsing facts; concurrency, timeout and
+ * the per-source cap stay owned by the canonical crawler policy.
+ */
+export async function enrichStandardJobBoardDetails(options: StandardJobBoardDetailOptions): Promise<Job[]> {
+  const summaries = standardJobs(options.jobs)
+  if (!summaries.length) return []
+
+  const output = [...summaries]
+  let nextIndex = 0
+
+  const worker = async () => {
+    while (true) {
+      const index = nextIndex
+      nextIndex += 1
+      if (index >= summaries.length) return
+
+      const summary = summaries[index]!
+      try {
+        const raw = await options.fetchDetail(
+          summary,
+          AbortSignal.timeout(STANDARD_JOB_BOARD_CRAWL_POLICY.requestTimeoutMs),
+        )
+        output[index] = options.parseDetail(raw, summary) || summary
+      } catch (error) {
+        console.warn(
+          `[jobs] ${options.key} detail failed ${summary.url}:`,
+          error instanceof Error ? error.message : String(error),
+        )
+      }
+    }
+  }
+
+  await Promise.all(Array.from(
+    { length: Math.min(STANDARD_JOB_BOARD_CRAWL_POLICY.concurrency, summaries.length) },
+    () => worker(),
+  ))
+  return output
 }
 
 /**
@@ -332,10 +387,11 @@ export async function crawlCursorJobBoard(options: CursorJobBoardOptions): Promi
   }
 }
 
-export function crawlStandardCursorJobBoard(options: StandardCursorJobBoardOptions): Promise<CursorJobBoardRun> {
-  return crawlCursorJobBoard({
+export async function crawlStandardCursorJobBoard(options: StandardCursorJobBoardOptions): Promise<CursorJobBoardRun> {
+  const run = await crawlCursorJobBoard({
     ...options,
     pagesPerRun: STANDARD_JOB_BOARD_CRAWL_POLICY.pagesPerRun,
     requestDelayMs: STANDARD_JOB_BOARD_CRAWL_POLICY.requestDelayMs,
   })
+  return { ...run, jobs: standardJobs(run.jobs) }
 }
