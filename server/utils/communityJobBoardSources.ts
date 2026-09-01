@@ -162,7 +162,6 @@ function targetName(key: string): string {
 }
 
 export function configuredCommunityJobBoardTargets(): string[] {
-  if (String(process.env.COMMUNITY_JOB_BOARDS_SOURCE || 'on').toLowerCase() === 'off') return []
   return [...COMMUNITY_JOB_BOARDS.map((board) => targetName(board.key)), targetName(HIMALAYAS_KEY)]
 }
 
@@ -438,7 +437,8 @@ function parseHimalayas(raw: string): Job[] {
 
   return (data.jobs || []).flatMap((item) => {
     if (!item.title) return []
-    const url = item.guid || item.applicationLink
+    const rawUrl = item.applicationLink || item.guid || ''
+    const url = /^https?:\/\//i.test(rawUrl) ? rawUrl : ''
     if (!url) return []
     const location = item.locationRestrictions?.length
       ? item.locationRestrictions.join('; ')
