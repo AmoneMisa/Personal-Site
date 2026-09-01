@@ -93,12 +93,24 @@ export function useFlatFilters() {
     mapArea.value = "";
   }
 
-  // A structured map zone is scoped by country/city/district. Clear it synchronously
-  // when that scope changes so the next request cannot combine a zone from the old
-  // location with the new selection. Synchronous clearing also keeps route restore
-  // deterministic: deserialize sets the scope first, then restores its zone value.
+  function clearCityLocationFilters() {
+    district.value = "";
+    metro.value = "";
+    metroMaxM.value = undefined;
+    nearbyKind.value = "";
+    nearbyMaxM.value = undefined;
+    query.value = "";
+  }
+
+  // Structured map zones and the rest of the location block are scoped by the
+  // selected country/city. Clear them synchronously so a debounced feed request
+  // can never combine the new city with a district, metro radius or nearby rule
+  // left over from the previous one. Route restore remains deterministic because
+  // deserialize sets country/city first and restores the dependent values after.
   watch(selectedCountries, clearMapZones, { flush: "sync" });
   watch(city, clearMapZones, { flush: "sync" });
+  watch(selectedCountries, clearCityLocationFilters, { flush: "sync" });
+  watch(city, clearCityLocationFilters, { flush: "sync" });
   watch(district, clearMapZones, { flush: "sync" });
 
   watch(dealType, (value) => {
