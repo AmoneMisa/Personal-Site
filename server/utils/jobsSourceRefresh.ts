@@ -83,6 +83,7 @@ import {
   configuredStandardJobSourceTargets,
   fetchStandardJobSourceTarget,
   isStandardJobSourceTarget,
+  sourceForStandardJobSourceTarget,
 } from './standardJobSourceTargets'
 import {
   configuredTelegramJobTargets,
@@ -216,14 +217,23 @@ function configuredCompanyTargets(): string[] {
 
 export function configuredJobRefreshTargets(): string[] {
   const directSources = configuredJobSources().filter((source) => !TARGETIZED_SOURCES.has(source))
+  const standardTargets = configuredStandardJobSourceTargets().filter((target) => {
+    const source = sourceForStandardJobSourceTarget(target)
+    return Boolean(source && isJobSourceAvailable(source, 'ingestion'))
+  })
+  const socialTargets = configuredSocialJobTargets().filter((target) => {
+    const source = sourceForSocialJobTarget(target)
+    return Boolean(source && isJobSourceAvailable(source, 'ingestion'))
+  })
+
   return [
     ...directSources,
     ...configuredCompanyTargets(),
-    ...configuredHhJobTargets(),
-    ...configuredStandardJobSourceTargets(),
-    ...configuredLinkedInJobTargets(),
-    ...configuredSocialJobTargets(),
-    ...configuredTelegramJobTargets(),
+    ...(isJobSourceAvailable('hh', 'ingestion') ? configuredHhJobTargets() : []),
+    ...standardTargets,
+    ...(isJobSourceAvailable('linkedin', 'ingestion') ? configuredLinkedInJobTargets() : []),
+    ...socialTargets,
+    ...(isJobSourceAvailable('telegram', 'ingestion') ? configuredTelegramJobTargets() : []),
   ]
 }
 
@@ -377,11 +387,13 @@ async function runJobTargetRefresh(target: string) {
   }
 
   if (isStandardJobSourceTarget(target)) {
-    const result = await fetchStandardJobSourceTarget(target)
-    if (!isJobSourceAvailable(result.source, 'ingestion')) {
-      return { target, source: result.source, skipped: true, reason: 'not_configured', fetched: 0 }
+    const source = sourceForStandardJobSourceTarget(target)
+    if (!source) throw new Error(`Unknown standard job source target ${target}`)
+    if (!isJobSourceAvailable(source, 'ingestion')) {
+      return { target, source, skipped: true, reason: 'not_configured', fetched: 0 }
     }
-    return mergeForTarget(target, result.source, result.jobs)
+    const result = await fetchStandardJobSourceTarget(target)
+    return mergeForTarget(target, source, result.jobs)
   }
 
   if (isLinkedInJobTarget(target)) {
