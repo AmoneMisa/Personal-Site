@@ -22,15 +22,11 @@ type PublicBoard = {
   sponsorshipEvidence?: string
 }
 
-// Sources collected from the community/profile links supplied for Job Finder.
-// These are public candidate-facing listings, not the social profiles themselves.
-// Each board is isolated: a block/markup change produces [] for that board only.
-// Flagma publishes vacancies alongside the resumes the hiring board already
-// reads: same card layout, "-rv<id>.html" instead of "-rr<id>.html". Low
-// volume (RO lists a few dozen), so this adds breadth rather than bulk. The UZ
-// domain answers datacenter clients with a reCAPTCHA page, and reaches this
-// parser only once the Chrome-impersonating fetcher unblocks it.
-// The whole anchor, not just its href: the vacancy title is the link text.
+export type FlagmaJobBoardDescriptor = Pick<PublicBoard, 'label' | 'url' | 'country'>
+
+// Flagma parsing is kept here as the existing source adapter, while execution
+// is owned by flagmaJobSource.ts through the durable jobs queue and shared
+// cyclic/detail crawler policy. Do not add Flagma back to PUBLIC_JOB_BOARDS.
 const FLAGMA_VACANCY_LINK_RE =
   /<a\b[^>]*href="([^"]*flagma\.[a-z]{2}\/(?:ru\/)?vakansiya-[^"?#]*-rv\d+\.html)"[^>]*>([\s\S]*?)<\/a>/gi
 
@@ -45,7 +41,7 @@ function cardLines(fragment: string): string[] {
     .filter(Boolean)
 }
 
-function parseFlagmaVacancies(html: string, board: PublicBoard): Job[] {
+export function parseFlagmaVacancies(html: string, board: FlagmaJobBoardDescriptor): Job[] {
   const jobs: Job[] = []
   const seen = new Set<string>()
   const matches = [...html.matchAll(FLAGMA_VACANCY_LINK_RE)]
@@ -156,20 +152,6 @@ export function parseFlagmaVacancyDetail(html: string, summary: Job): Job | null
 }
 
 const PUBLIC_JOB_BOARDS: PublicBoard[] = [
-  {
-    label: 'Flagma RO',
-    url: 'https://flagma.ro/ru/vacancies/',
-    country: 'RO',
-    parse: parseFlagmaVacancies,
-    detailParse: parseFlagmaVacancyDetail,
-  },
-  {
-    label: 'Flagma UZ',
-    url: 'https://flagma.uz/ru/vacancies/',
-    country: 'UZ',
-    parse: parseFlagmaVacancies,
-    detailParse: parseFlagmaVacancyDetail,
-  },
   { label: 'Remote Source', url: 'https://www.remotesource.com/jobs', remoteByDefault: true },
   { label: 'TaskFavour', url: 'https://www.taskfavour.com/jobs' },
   { label: 'Tech Leads Community', url: 'https://techleadscommunity.com/', remoteByDefault: true },
@@ -417,8 +399,6 @@ async function fetchBoard(board: PublicBoard): Promise<Job[]> {
   const summaries = [...byUrl.values()]
   if (!board.detailParse) return summaries
 
-  // Detail parsing extends this board's existing refresh. It does not create a
-  // second scheduler, cursor, state key, retry loop or source-local crawl cap.
   const details = await Promise.allSettled(summaries.map(async (summary) => {
     const response = await fetch(summary.url, {
       headers: {
