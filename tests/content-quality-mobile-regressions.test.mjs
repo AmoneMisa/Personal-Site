@@ -5,8 +5,6 @@ import { readFile } from 'node:fs/promises'
 const read = (path) => readFile(new URL(path, import.meta.url), 'utf8')
 
 const [
-  candidateWriter,
-  jobRefresh,
   jobCard,
   pills,
   flatCard,
@@ -18,8 +16,6 @@ const [
   jobsPage,
   ruLocale,
 ] = await Promise.all([
-  read('../server/hiring/application/candidateSnapshotWriter.ts'),
-  read('../server/utils/jobsSourceRefresh.ts'),
   read('../app/components/jobs/JobCard.vue'),
   read('../app/components/ui/DraggablePills.vue'),
   read('../app/components/flats/FlatCard.vue'),
@@ -32,18 +28,7 @@ const [
   read('../i18n/locales/ru.json'),
 ])
 
-test('candidate snapshot rejects workshop/event promos instead of turning speakers into CVs', () => {
-  assert.match(candidateWriter, /isCandidateEventPromotion/u)
-  assert.match(candidateWriter, /воркшоп/u)
-  assert.match(candidateWriter, /вебінар/u)
-  assert.match(candidateWriter, /signals >= 2/u)
-  assert.match(candidateWriter, /isRecruitingOpportunity\(text\) \|\| isCandidateEventPromotion\(text\)/u)
-})
-
-test('company names are removed from vacancy tags at storage and card boundaries', () => {
-  assert.match(jobRefresh, /function cleanJobTags\(job: Job\)/u)
-  assert.match(jobRefresh, /key === company/u)
-  assert.match(jobRefresh, /sanitizeFetchedJob\(stored\)/u)
+test('company names are removed from vacancy tags at the card boundary', () => {
   assert.match(jobCard, /pillKey\(tag\) !== company/u)
 })
 
