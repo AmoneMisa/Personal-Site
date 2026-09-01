@@ -27,7 +27,7 @@ export const CAREER_AXES: CareerAxisKey[] = [
 
 export type CareerQuestion = SimpleQuizQuestion<CareerAxisKey>;
 
-export const CAREER_QUIZ_ID = "career_fit_v1";
+
 
 export const careerFitQuestions: CareerQuestion[] = [
     {

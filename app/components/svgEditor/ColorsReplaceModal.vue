@@ -280,49 +280,6 @@ function doApply() {
   align-content: start;
 }
 
-.svg-colors-modal__pick {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.svg-colors-modal__pick-btn {
-  height: 38px;
-  padding: 0 12px;
-  border-radius: 999px;
-  border: 1px solid var(--line);
-  background: rgba(0, 0, 0, 0.12);
-  color: var(--ui-text);
-  font-weight: 600;
-  font-size: 12px;
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  cursor: pointer;
-}
-
-.svg-colors-modal__pick-btn:disabled {
-  opacity: 0.55;
-  cursor: not-allowed;
-}
-
-.svg-colors-modal__preview {
-  width: 42px;
-  height: 38px;
-  border-radius: 8px;
-  border: 1px solid var(--line);
-}
-
-.svg-colors-modal__preview_disabled {
-  opacity: 0.5;
-  background-image: linear-gradient(45deg, rgba(255, 255, 255, 0.10) 25%, transparent 25%),
-  linear-gradient(-45deg, rgba(255, 255, 255, 0.10) 25%, transparent 25%),
-  linear-gradient(45deg, transparent 75%, rgba(255, 255, 255, 0.10) 75%),
-  linear-gradient(-45deg, transparent 75%, rgba(255, 255, 255, 0.10) 75%);
-  background-size: 12px 12px;
-  background-position: 0 0, 0 6px, 6px -6px, -6px 0px;
-}
-
 .svg-colors-modal__picker {
   display: grid;
   grid-template-columns: 44px 1fr;

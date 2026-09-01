@@ -2,12 +2,6 @@
    Keep ATS state semantic (red/orange/yellow/green) and preserve the site's
    pink action accent. The page component remains responsible for all behavior. */
 
-.jobs .jobs__grid {
-  grid-auto-rows: auto !important;
-  align-items: start;
-  gap: 14px !important;
-}
-
 .jobs .job-card {
   --job-match-accent: rgba(148, 163, 184, 0.38);
   position: relative;
@@ -29,45 +23,6 @@
 
 /* Score changes only the colour. Every card keeps the same one-pixel,
    four-sided rounded rectangle instead of a partial gradient frame. */
-.jobs .job-card:has(.job-card__ats[style*="#f87171"]),
-.jobs .job-card:has(.job-card__ats[style*="248, 113, 113"]) { --job-match-accent: #f87171; }
-.jobs .job-card:has(.job-card__ats[style*="#fb923c"]),
-.jobs .job-card:has(.job-card__ats[style*="251, 146, 60"]) { --job-match-accent: #fb923c; }
-.jobs .job-card:has(.job-card__ats[style*="#fbbf24"]),
-.jobs .job-card:has(.job-card__ats[style*="251, 191, 36"]) { --job-match-accent: #fbbf24; }
-.jobs .job-card:has(.job-card__ats[style*="#34d399"]),
-.jobs .job-card:has(.job-card__ats[style*="52, 211, 153"]) { --job-match-accent: #34d399; }
-.jobs .job-card:has(.job-card__ats) {
-  border: 1px solid rgba(86, 96, 135, 0.34) !important;
-  border-radius: 14px !important;
-}
-
-.jobs .job-card:has(.job-card__ats)::before {
-  content: "";
-  position: absolute;
-  z-index: 2;
-  inset: -1px;
-  border-radius: inherit;
-  padding: 1px;
-  pointer-events: none;
-  background: linear-gradient(135deg, var(--job-match-accent) 0%, color-mix(in srgb, var(--job-match-accent) 58%, transparent) 22%, transparent 48%);
-  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
-  -webkit-mask-composite: xor;
-  mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
-  mask-composite: exclude;
-}
-
-.jobs .job-card:has(.job-card__ats)::after {
-  content: "";
-  position: absolute;
-  z-index: -1;
-  left: 0;
-  top: 0;
-  width: 58%;
-  height: 42%;
-  pointer-events: none;
-  background: radial-gradient(circle at 0 0, color-mix(in srgb, var(--job-match-accent) 9%, transparent), transparent 68%);
-}
 
 .jobs .job-card:hover {
   transform: translateY(-2px) !important;
@@ -77,134 +32,12 @@
     0 14px 34px rgba(4, 8, 24, 0.18) !important;
 }
 
-.jobs .job-card__head {
-  row-gap: 6px !important;
-}
-
-.jobs .job-card__title {
-  font-size: 15px !important;
-  line-height: 1.34 !important;
-  font-weight: 650 !important;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-}
-
-.jobs .job-card__actions {
-  gap: 4px !important;
-}
-
-.jobs .job-card__action {
-  width: 26px !important;
-  height: 26px !important;
-  border-radius: 7px !important;
-  border-color: rgba(91, 103, 146, 0.34) !important;
-  background: rgba(10, 15, 34, 0.18) !important;
-}
-
-.jobs .job-card__ats {
-  padding: 2px 8px !important;
-  border-radius: 7px !important;
-  font-size: 11.5px !important;
-  line-height: 1.35 !important;
-  background: color-mix(in srgb, currentColor 8%, transparent);
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, currentColor 8%, transparent);
-}
-
-.jobs .job-card__meta {
-  gap: 5px !important;
-  margin-top: 6px !important;
-  font-size: 11.5px !important;
-  line-height: 1.35;
-}
-
-.jobs .job-card__meta-row {
-  gap: 5px !important;
-}
-
-.jobs .job-card__badge {
-  padding: 1px 6px !important;
-  border-radius: 5px !important;
-  font-size: 10.5px !important;
-}
-
 /* Salary is intentionally one of the strongest information accents after the
    title and ATS score. Pink keeps it distinct from ATS semantic colors. */
-.jobs .job-card__salary {
-  padding: 0 !important;
-  border: 0 !important;
-  border-radius: 0 !important;
-  color: #f472b6 !important;
-  background: transparent !important;
-  font-size: 13px !important;
-  line-height: 1.45;
-  font-weight: 700 !important;
-  letter-spacing: 0.005em;
-}
-
-.jobs .job-card__salary_conv {
-  border: 0 !important;
-  color: #a5b4fc !important;
-  background: transparent !important;
-  font-weight: 650 !important;
-}
-
-.jobs .job-card__langs {
-  margin-top: 5px !important;
-  gap: 5px !important;
-  font-size: 11.5px !important;
-}
-
-.jobs .job-card__desc {
-  margin-top: 7px !important;
-  font-size: 12.5px !important;
-  line-height: 1.42 !important;
-  -webkit-line-clamp: 2 !important;
-}
-
-.jobs .job-card__skills,
-.jobs .job-card__tags {
-  gap: 5px !important;
-  margin-top: 7px !important;
-}
-
-.jobs .job-card__skills-label {
-  flex-basis: 100%;
-  font-size: 10.5px !important;
-  line-height: 1.25;
-  opacity: 0.66 !important;
-}
-
-.jobs .job-card__tag {
-  padding: 2px 7px !important;
-  border-radius: 6px !important;
-  font-size: 10.5px !important;
-  line-height: 1.35;
-}
-
-.jobs .job-card_seen {
-  opacity: 0.78 !important;
-}
-.jobs .job-card_seen:hover {
-  opacity: 1 !important;
-}
-.jobs .job-card_favorite {
-  border-color: rgba(224, 103, 154, 0.36) !important;
-}
 
 @media (max-width: 639px) {
-  .jobs .jobs__grid {
-    gap: 10px !important;
-  }
   .jobs .job-card {
     padding: 12px !important;
     border-radius: 11px !important;
-  }
-  .jobs .job-card__actions {
-    justify-content: flex-start !important;
-  }
-  .jobs .job-card__actions .job-card__ats {
-    margin-right: auto !important;
   }
 }

@@ -31,7 +31,7 @@ export const LIFE_VALUES: LifeValueKey[] = [
 
 export type LifeValuesQuestion = SimpleQuizQuestion<LifeValueKey>;
 
-export const LIFE_VALUES_QUIZ_ID = "life_values_v1";
+
 
 export const lifeValuesQuestions: LifeValuesQuestion[] = [
     {

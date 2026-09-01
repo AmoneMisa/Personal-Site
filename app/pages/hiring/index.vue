@@ -776,22 +776,17 @@ onBeforeUnmount(() => {
 .hiring__sort { flex: 0 0 min(280px, 42vw); min-width: 200px; }
 .hiring__count { font-size: 13px; }
 .hiring__filter-blocks { grid-column: 1 / -1; }
-.hiring__filter-blocks :deep(.search-filter-blocks__grid) { align-items: end; }
-.hiring-filter-group__grid { display: grid; grid-template-columns: 1fr; gap: 12px; align-items: end; }
+
 @include bp-up(md) {
-  .hiring-filter-group__grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .hiring-filter-group__grid_salary { grid-template-columns: minmax(0, 1.5fr) minmax(110px, .6fr); }
-  .hiring__field_wide { grid-column: span 2; }
   .hiring-filter-actions { grid-column: 1 / -1; }
 }
-.hiring__field { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
-.hiring__age-range, .hiring__salary-range { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+
 .hiring__profession-clear {
   align-self: flex-start; display: inline-flex; align-items: center; gap: 5px; padding: 2px 0; border: 0;
   background: transparent; color: var(--accent-pink); font-size: 11px; font-weight: 700; cursor: pointer;
 }
 .hiring__profession-clear:hover { text-decoration: underline; }
-.hiring__field-label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; opacity: 0.7; }
+
 .hiring__select { width: 100%; min-width: 0; }
 .hiring__select :deep(button) { width: 100%; min-width: 0; }
 .hiring__error { color: var(--ui-error, #f87171); }
@@ -800,8 +795,7 @@ onBeforeUnmount(() => {
 .hiring__sentinel { min-height: 44px; display: grid; place-items: center; }
 .hiring-modal { display: flex; flex-direction: column; gap: 12px; }
 .hiring-modal__title { margin: 0; font-size: 18px; font-weight: 700; line-height: 1.35; padding-right: 36px; }
-.hiring-modal__name { font-size: 14px; color: var(--text-muted); }
-.hiring-modal__salary { font-weight: 700; font-size: 18px; }
+
 .hiring-modal__descbox summary { cursor: pointer; font-size: 12px; font-weight: 600; opacity: 0.8; user-select: none; }
 .hiring-modal__desc { font-size: 13.5px; line-height: 1.55; white-space: pre-wrap; color: var(--text-soft, inherit); margin-top: 8px; }
 .hiring-modal__translation { display: flex; align-items: center; gap: 10px; margin-top: 14px; }
@@ -815,6 +809,5 @@ onBeforeUnmount(() => {
   .hiring__controls > :deep(button) { width: 100%; }
   .hiring__results-toolbar { align-items: stretch; flex-direction: column; }
   .hiring__sort { flex: 1 1 auto; width: 100%; min-width: 0; }
-  .hiring__age-range, .hiring__salary-range { grid-template-columns: 1fr 1fr; }
 }
 </style>

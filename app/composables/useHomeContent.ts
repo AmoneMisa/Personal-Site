@@ -6,13 +6,6 @@
 // {years}: vue-i18n reads braces as an interpolation slot and would blank it.
 import type { ComputedRef } from 'vue';
 
-export interface DropdownItem { label: string; sub: string; href: string }
-export interface SkillCard { title: string; items: string[] }
-export interface ExperienceItem { period: string; title: string; meta: string; description: string; tags: string[] }
-export interface PetProject { kind: string; title: string; description: string; linkLabel: string; href: string | null; span2?: boolean }
-export interface NavLinkT { label: string; href: string }
-export interface HeroStat { value: string; label: string }
-
 // ---- Shared structural data (locale-independent) ----
 export const CONTACTS = {
   telegram: "https://t.me/WhitesLove",
@@ -27,7 +20,7 @@ export const TOOLS = [
   "REST API", "Git", "Docker", "GitLab CI/CD", "PostgreSQL", "Jira", "Confluence",
 ];
 
-export const EMOJI = { shark: "1f988", cat: "1f63b" };
+
 
 // The homepage copy lives in i18n/locales/*.json under `home`, so a translator
 // has one place to work and the text is not split between the locale files and

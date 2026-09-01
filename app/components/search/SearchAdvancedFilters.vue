@@ -125,9 +125,6 @@ onMounted(() => {
   position: relative;
   z-index: 1;
 }
-.search-advanced-filters__panel > :deep(.search-filter-blocks) {
-  grid-column: 1 / -1;
-}
 
 @include bp-down(md) {
   .search-advanced-filters__toggle {

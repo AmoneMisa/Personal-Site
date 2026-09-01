@@ -1072,11 +1072,7 @@ onBeforeUnmount(() => {
 }
 
 @media (max-width: 900px) {
-  .underwater-2d__swimmer_shark { width: clamp(150px, 28vw, 240px); }
-  .underwater-2d__swimmer_puffer { width: clamp(78px, 16vw, 124px); }
-  .underwater-2d__swimmer_fish { width: clamp(68px, 14vw, 112px); }
-  .underwater-2d__swimmer_seahorse { width: clamp(60px, 12vw, 92px); }
-  .underwater-2d__swimmer_jelly { width: clamp(62px, 12vw, 102px); }
+
 }
 
 @media (prefers-reduced-motion: reduce) {

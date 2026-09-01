@@ -71,8 +71,8 @@ const currentFlatListing = computed<StoredFlat | null>(() => {
       ? recent.find((item) => {
           if (String(item?.id || "") !== id) return false;
           if (source && String(item?.source || "").toLowerCase() !== source) return false;
-          if (country && String(item?.country || "").toUpperCase() !== country) return false;
-          return true;
+          return !(country && String(item?.country || "").toUpperCase() !== country);
+
         })
       : recent[0]) || null;
   } catch {
@@ -437,7 +437,6 @@ function iconForRow(row: SpecRow): string {
   user-select: none;
 }
 .spec-table_flat .spec-table__toggle { flex: 0 0 auto; margin-left: auto; }
-.spec-table__toggle :deep(.u-switch) { vertical-align: middle; }
 
 .spec-table__grid {
   display: grid;

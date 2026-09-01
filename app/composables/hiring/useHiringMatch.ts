@@ -61,5 +61,5 @@ export function useHiringMatch(filters: HiringMatchFilters) {
     return true;
   }
 
-  return { canonicalSkillValues, canonicalSkillQuery, candidateMatchFilters, matchesLocally };
+  return { canonicalSkillQuery, candidateMatchFilters, matchesLocally };
 }

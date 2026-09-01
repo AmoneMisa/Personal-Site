@@ -150,12 +150,6 @@ const previewItems = computed(() => [
   min-width: 180px;
 }
 
-.email-editor-toolbar__button {
-  min-height: var(--ui-control-h-lg, 44px);
-  height: var(--ui-control-h-lg, 44px);
-  white-space: nowrap;
-}
-
 .email-editor-toolbar__fake {
   display: inline-flex;
   align-items: center;

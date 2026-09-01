@@ -38,5 +38,3 @@ export interface RecentJob {
 }
 
 export type JobAtsResult = ReturnType<typeof scoreJob>;
-export type JobStatEntry = [string, JobStats["byCountry"][string]];
-export type WorkModeStat = { key: string; n: number };

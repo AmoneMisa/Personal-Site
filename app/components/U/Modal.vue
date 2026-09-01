@@ -200,8 +200,7 @@ onBeforeUnmount(() => {
    (including the safe-area inset) so it never touches the screen edges. */
 @media (max-width: 820px) {
   .u-modal {
-    padding: 16px;
-    padding-bottom: calc(16px + env(safe-area-inset-bottom));
+    padding: 16px 16px calc(16px + env(safe-area-inset-bottom));
     align-items: center;
   }
   .u-modal__panel {
@@ -224,7 +223,9 @@ onBeforeUnmount(() => {
 
 /* Very small screens still get a gutter, just a tighter one. */
 @media (max-width: 400px) {
-  .u-modal { padding: 10px; padding-bottom: calc(10px + env(safe-area-inset-bottom)); }
+  .u-modal {
+    padding: 10px 10px calc(10px + env(safe-area-inset-bottom));
+  }
   .u-modal__panel { max-height: calc(100dvh - 20px - env(safe-area-inset-bottom)); }
   .u-modal__footer { grid-template-columns: 1fr; }
 }

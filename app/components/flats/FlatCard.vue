@@ -147,7 +147,7 @@ const emit = defineEmits<{
 .flat-card__no-photo { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 9px; height: 100%; color: var(--text-muted); font-size: 12px; background: var(--bg-panel-2); }
 .flat-card__no-photo-icon { width: 34px; height: 34px; opacity: 0.48; }
 .flat-card__deal { position: absolute; z-index: 2; top: 9px; left: 9px; max-width: calc(100% - 124px); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; font-weight: 700; line-height: 1; padding: 6px 9px; border: 1px solid rgba(224,103,154,.42); border-radius: 7px; background: #0d1128; color: var(--accent-pink); box-shadow: 0 3px 12px rgba(0,0,0,.2); }
-.flat-card__deal_sale { color: #f58ab5; border-color: rgba(245,138,181,.45); }.flat-card__deal_rent { color: #b79cff; border-color: rgba(183,156,255,.42); }.flat-card__deal_room { color: #77d9e8; border-color: rgba(119,217,232,.42); }.flat-card__deal_short { color: #f4c86a; border-color: rgba(244,200,106,.45); }
+
 .flat-card__good-price { position: absolute; z-index: 3; left: 9px; bottom: 9px; display: inline-flex; align-items: center; gap: 4px; max-width: calc(100% - 18px); padding: 5px 8px; border: 1px solid rgba(74,222,128,.42); border-radius: 999px; background: rgba(8,31,28,.86); color: #86efac; font-size: 10.5px; font-weight: 700; line-height: 1; box-shadow: 0 3px 12px rgba(0,0,0,.2); }
 .flat-card__good-price :deep(svg) { width: 12px; height: 12px; }
 .flat-card__actions { position: absolute; z-index: 3; top: 8px; right: 8px; display: flex; gap: 5px; }
@@ -159,7 +159,8 @@ const emit = defineEmits<{
 @include flat-tone-modifiers(".flat-card__price");
 .flat-card__price-conv { flex: 0 1 auto; min-width: 0; font-size: 12px; font-weight: 500; line-height: 1.35; overflow: hidden; text-overflow: ellipsis; }
 .flat-card__title { min-height: 19px; margin-top: 2px; font-size: 14px; font-weight: 650; line-height: 1.36; display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical; overflow: hidden; text-overflow: ellipsis; white-space: normal; overflow-wrap: anywhere; }.flat-card__spec { min-height: 16px; font-size: 12px; line-height: 1.35; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.flat-card__badges { min-height: 27px; margin-top: 5px; }.flat-card__badges :deep(.flat-card__badge) { border-radius: 999px; padding: 4px 7px; font-size: 10.5px; font-weight: 600; line-height: 1.15; background: rgba(255,255,255,0.05); color: var(--text-primary); }.flat-card__badges :deep(.flat-card__badge_vision) { border-color: rgba(56,189,248,.36); color: #8bdcf7; background: rgba(56,189,248,.08); }.flat-card__badges :deep(.flat-card__badge_warning) { border-color: rgba(242,184,107,.52); color: #f2b86b; background: rgba(242,184,107,.1); }
+.flat-card__badges { min-height: 27px; margin-top: 5px; }
+
 .flat-card__meta { display: flex; align-items: center; justify-content: space-between; gap: 6px 10px; margin-top: auto; padding-top: 8px; font-size: 11.5px; line-height: 1.35; }.flat-card__location { min-width: 0; display: inline-flex; align-items: center; gap: 5px; flex: 1 1 auto; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }.flat-card__meta-tail { display: inline-flex; flex: 0 0 auto; gap: 5px; white-space: nowrap; margin-left: auto; }.flat-card__src { text-transform: capitalize; opacity: 0.72; }
 .flat-card_favorite { border-color: rgba(224,103,154,0.52); }.flat-card_hidden { opacity: 0.64; border-style: dashed; }
 
@@ -175,7 +176,6 @@ const emit = defineEmits<{
   .flat-card__title { min-height: 15px; margin-top: 1px; font-size: 11.5px; line-height: 1.25; }
   .flat-card__spec { min-height: 12px; font-size: 9.5px; line-height: 1.25; }
   .flat-card__badges { min-height: 20px; margin-top: 2px; }
-  .flat-card__badges :deep(.flat-card__badge) { padding: 3px 5px; font-size: 8.5px; }
   .flat-card__meta { gap: 3px; padding-top: 2px; font-size: 8.5px; }
   .flat-card__meta-tail { gap: 2px; }
   .flat-card__location { gap: 2px; }

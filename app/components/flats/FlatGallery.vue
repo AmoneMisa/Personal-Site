@@ -297,11 +297,9 @@ onBeforeUnmount(() => window.removeEventListener("keydown", onKeydown));
   backdrop-filter: blur(5px);
 }
 .flat-gallery__more { inset: 0; display: grid; place-items: center; border-radius: inherit; background: rgba(8, 11, 26, .52); font-size: 14px; }
-.flat-gallery_count-1 { grid-template-columns: 1fr; grid-template-rows: 1fr; }
-.flat-gallery_count-2 { grid-template-columns: 1.65fr .72fr; grid-template-rows: 1fr; }
+
 .flat-gallery_count-2 .flat-gallery__item_main { grid-row: auto; }
-.flat-gallery_count-3 { grid-template-columns: 1.65fr .72fr; }
-.flat-gallery_count-4 { grid-template-columns: 1.65fr repeat(2, .72fr); }
+
 .flat-gallery_count-4 .flat-gallery__item:nth-child(4) { grid-column: 2 / -1; }
 
 /* SearchDetailsModal uses 12000 on Flat Finder so the map cannot cover it.
@@ -332,10 +330,7 @@ onBeforeUnmount(() => window.removeEventListener("keydown", onKeydown));
     grid-template-rows: repeat(4, minmax(0, 1fr));
   }
   .flat-gallery__item_main { grid-row: 1 / -1; }
-  .flat-gallery_count-1 { grid-template-columns: 1fr; grid-template-rows: 1fr; }
-  .flat-gallery_count-2 { grid-template-columns: 1.55fr .7fr; grid-template-rows: 1fr; }
   .flat-gallery_count-2 .flat-gallery__item_main { grid-row: auto; }
-  .flat-gallery_count-3, .flat-gallery_count-4 { grid-template-columns: 1.55fr .7fr; }
   .flat-gallery_count-4 .flat-gallery__item:nth-child(4) { grid-column: auto; }
   .flat-lightbox__stage { width: 92vw; height: 76vh; }
   .flat-lightbox__zoom { top: 10px; }

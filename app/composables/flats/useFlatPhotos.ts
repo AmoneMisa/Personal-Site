@@ -25,5 +25,5 @@ export function useFlatPhotos() {
     markPhotoFailed((event.currentTarget as HTMLImageElement | null)?.getAttribute("src") || null);
   }
 
-  return { failedPhotoUrls, photoCandidates, listingPhoto, visiblePhotos, markPhotoFailed, markPhotoFailedFromEvent };
+  return { failedPhotoUrls, listingPhoto, visiblePhotos, markPhotoFailedFromEvent };
 }

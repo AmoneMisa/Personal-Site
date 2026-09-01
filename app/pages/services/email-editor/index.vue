@@ -24,8 +24,4 @@ useServiceSeo("emailEditor");
   padding-bottom: 96px;
 }
 
-.email-editor__subtitle {
-  max-width: 760px;
-  font-size: 14px;
-}
 </style>

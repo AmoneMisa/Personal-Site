@@ -46,16 +46,6 @@
   align-self: center;
 }
 
-.modal-footer :deep(> button > .u-button__label) {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  margin: -1px;
-  overflow: hidden;
-  clip: rect(0, 0, 0, 0);
-  white-space: nowrap;
-}
-
 .modal-footer :deep(> button svg),
 .modal-footer :deep(> button [class*="icon"]) {
   display: block;
@@ -66,54 +56,6 @@
   min-height: 18px;
   font-size: 18px;
   line-height: 18px;
-}
-
-.modal-footer :deep(.modal-footer__primary) {
-  flex: 1 1 220px;
-  width: auto;
-  min-width: 180px;
-  min-height: 40px;
-  height: auto;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding: 8px 14px;
-  border: 1px solid var(--modal-footer-accent, var(--accent-pink, #e0679a));
-  border-radius: var(--ui-control-radius, 8px);
-  background: var(--modal-footer-accent, var(--accent-pink, #e0679a));
-  color: var(--modal-footer-accent-text, #1a0e14);
-  font-size: 13.5px;
-  font-weight: 600;
-  line-height: 1.25;
-  text-align: center;
-  text-decoration: none;
-  white-space: normal;
-  margin-left: auto;
-}
-.modal-footer :deep(.modal-footer__primary:hover) { filter: brightness(1.06); }
-
-.modal-footer :deep(.modal-footer__secondary) {
-  flex: 0 1 auto;
-  width: auto;
-  min-width: 0;
-  min-height: 40px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding: 8px 11px;
-  border: 1px solid var(--line);
-  border-radius: var(--ui-control-radius, 8px);
-  color: var(--text-primary);
-  font-size: 13px;
-  font-weight: 600;
-  line-height: 1.25;
-  text-align: center;
-  text-decoration: none;
-  white-space: normal;
-}
-.modal-footer :deep(.modal-footer__secondary:hover) {
-  border-color: rgba(224, 103, 154, 0.45);
-  color: var(--accent-pink, #e0679a);
 }
 
 @media (max-width: 520px) {
@@ -143,28 +85,5 @@
     font-size: 18px;
   }
 
-  .modal-footer :deep(> .modal-footer__primary),
-  .modal-footer :deep(> .modal-footer__secondary) {
-    min-height: 44px;
-  }
-
-  .modal-footer :deep(> .modal-footer__primary) {
-    grid-column: 4;
-    grid-row: 1;
-    min-width: 0;
-    min-height: 40px;
-    padding-inline: 8px;
-    font-size: 12px;
-    white-space: nowrap;
-    margin-left: 0;
-  }
-
-  .modal-footer :deep(> .modal-footer__secondary) {
-    grid-column: 1 / -1;
-    grid-row: 2;
-    min-height: 36px;
-    padding-block: 6px;
-    font-size: 12px;
-  }
 }
 </style>

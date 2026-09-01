@@ -74,7 +74,6 @@ export function useFileCollection(options: FileCollectionOptions = {}) {
     files,
     inputRef,
     isDragging,
-    addFiles,
     pickFromInput,
     openPicker,
     clearFiles,

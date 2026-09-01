@@ -479,8 +479,8 @@ function syncListingInUrl(listing: Listing | null) {
 function listingIdentityMatches(item: Listing, id: string, sourceName = "", countryCode = ""): boolean {
   if (item.id !== id) return false;
   if (sourceName && item.source !== sourceName) return false;
-  if (countryCode && item.country !== countryCode.toUpperCase()) return false;
-  return true;
+  return !(countryCode && item.country !== countryCode.toUpperCase());
+
 }
 function removeUnavailableListing(id: string, sourceName = "olx", countryCode = "") {
   const before = listings.value.length;
@@ -1029,7 +1029,7 @@ onBeforeUnmount(() => { modalOpen.value = false; lightboxOpen.value = false; rel
 .flats__filter-blocks :deep(.filter-section) { min-width: 0; padding: 0 16px; border: 0; border-left: 1px solid var(--line); border-radius: 0; background: transparent; }
 .flats__filter-blocks :deep(.filter-section:first-child) { padding-left: 0; border-left: 0; }
 .flats__filter-blocks :deep(.filter-section:last-child) { padding-right: 0; }
-.flats__filter-blocks :deep(.flat-filter-grid_single) { grid-template-columns: 1fr; }
+
 .quick-options { display: grid; gap: 8px; }
 .quick-options :deep(button) { width: 100%; min-height: var(--ui-control-h-md); justify-content: flex-start; height: auto; padding-block: 8px; white-space: normal; text-align: left; line-height: 1.25; }
 .flats__controls_redesign :deep(input), .flats__controls_redesign :deep(button[role="combobox"]) { background-color: var(--bg-panel-2) !important; }
@@ -1050,7 +1050,6 @@ onBeforeUnmount(() => { modalOpen.value = false; lightboxOpen.value = false; rel
   .filter-price-row__label { grid-column: 1 / -1; }
   .currency-select { grid-column: 1 / -1; }
   .price-input { min-width: 0; padding-left: 7px; gap: 3px; }
-  .price-input :deep(.price-number-input) { font-size: 12px; }
   .filter-amenities-row__label { flex: 0 0 100%; }
   .filter-amenities-row :deep(button) { flex: 1 1 auto; justify-content: center; }
   .filter-actions-row { align-items: stretch; }
@@ -1066,6 +1065,5 @@ onBeforeUnmount(() => { modalOpen.value = false; lightboxOpen.value = false; rel
 }
 @media (max-width: 390px) {
   .filter-price-row { column-gap: 3px; row-gap: 6px; }
-  .price-input :deep(.price-number-input) { font-size: 11px; }
 }
 </style>

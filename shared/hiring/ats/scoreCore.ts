@@ -301,8 +301,3 @@ export function scoreJob(profile: CvProfile, job: AtsJob): AtsResult {
   return { score: blockers.length ? Math.min(fitScore, 49) : fitScore, fitScore, eligible: blockers.length === 0, blockers, breakdown, matched: matched.slice(0, 12), missing: missing.slice(0, 12) }
 }
 
-export function scoreColor(score: number): string {
-  if (score >= 75) return '#34d399'
-  if (score >= 50) return '#fbbf24'
-  return '#f87171'
-}

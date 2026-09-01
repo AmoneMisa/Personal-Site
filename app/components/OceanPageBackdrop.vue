@@ -77,36 +77,9 @@ const hasUnderwaterLife = computed(() => (
   will-change: transform, filter;
 }
 
-.ocean-page-backdrop_reef {
-  --ocean-page-image: url("/images/easter-eggs/ocean-page-reef.webp");
-  --ocean-page-mobile-position: 66% top;
-}
-
-.ocean-page-backdrop_treasure {
-  --ocean-page-image: url("/images/easter-eggs/ocean-page-treasure.webp");
-  --ocean-page-mobile-position: 69% top;
-}
-
-.ocean-page-backdrop_home {
-  --ocean-page-image: url("/images/easter-eggs/ocean-page-home.webp");
-  --ocean-page-mobile-position: 70% top;
-}
-
-.ocean-page-backdrop_ambient {
-  background:
-    radial-gradient(circle at 82% 18%, rgba(37, 117, 221, .12), transparent 25%),
-    radial-gradient(circle at 12% 84%, rgba(138, 68, 209, .12), transparent 28%),
-    radial-gradient(circle at 58% 4%, rgba(241, 73, 157, .07), transparent 25%),
-    #070c22;
-}
-
 .ocean-page-backdrop_ambient .ocean-page-backdrop__image {
   background: none;
   animation: none;
-}
-
-.ocean-page-backdrop_has-life :deep(.underwater-2d) {
-  z-index: 1;
 }
 
 @keyframes ocean-water-breathe {
@@ -137,9 +110,6 @@ const hasUnderwaterLife = computed(() => (
     animation: none;
   }
 
-  .ocean-page-backdrop_has-life :deep(.underwater-2d__swimmer:not(.underwater-2d__swimmer_shark)) {
-    display: none !important;
-  }
 }
 
 @media (prefers-reduced-motion: reduce) {

@@ -80,16 +80,11 @@
     font-size: var(--ui-control-font);
     transition: border-color var(--ui-transition), box-shadow var(--ui-transition);
 }
-.ui-control_sm { min-height: var(--ui-control-h-sm); padding-inline: 9px; }
-.ui-control_lg { min-height: var(--ui-control-h-lg); }
 
 /* A control carrying a floating label needs a little more height than a bare
    one: the label rests on the top border, so the value below it should not sit
    tight against the edge. Shared with the textarea variant. */
 .ui-control_floating { min-height: var(--ui-floating-h-md); }
-.ui-control_floating.ui-control_sm { min-height: var(--ui-floating-h-sm); }
-.ui-control_floating.ui-control_lg { min-height: var(--ui-floating-h-lg); }
-.ui-control_disabled, .ui-control:disabled { opacity: 0.6; cursor: not-allowed; }
 
 /* Shared focus treatment: one visible, consistent ring for keyboard users on
    every control, instead of each component inventing its own. */
@@ -98,18 +93,6 @@
     outline: none;
     box-shadow: var(--ui-focus-ring);
     border-color: var(--accent-pink, #e0679a);
-}
-
-.ui-sr-only {
-    position: absolute;
-    width: 1px;
-    height: 1px;
-    padding: 0;
-    margin: -1px;
-    overflow: hidden;
-    clip: rect(0, 0, 0, 0);
-    white-space: nowrap;
-    border: 0;
 }
 
 /* Scrollbars in the site palette. Nuxt UI used to style these; without it
@@ -143,18 +126,6 @@
 .docker-search {
     padding-top: 24px !important;
     padding-bottom: 80px !important;
-}
-
-.merge__card,
-.markdown-editor__card,
-.email-editor__inner,
-.pdf__card,
-.docker-search .tabs-head,
-.converter .panel {
-    border: 1px solid var(--line) !important;
-    border-radius: 10px !important;
-    background: var(--bg-panel) !important;
-    box-shadow: none !important;
 }
 
 /* Email editor: one compact control rail and two equal work surfaces. */
@@ -209,23 +180,12 @@
     gap: 8px !important;
 }
 
-.merge__toolbar-row {
-    gap: 12px !important;
-}
-
 .merge__group {
     min-height: 58px;
     padding: 8px 10px !important;
     border: 1px solid var(--line) !important;
     background: var(--bg-panel-2) !important;
     box-shadow: none !important;
-}
-
-.merge__chip,
-.merge__btn {
-    min-height: var(--ui-control-h-md) !important;
-    height: var(--ui-control-h-md) !important;
-    border-radius: 8px !important;
 }
 
 .merge__select > button,
@@ -265,15 +225,6 @@
     padding: 16px !important;
 }
 
-.converter .panel__header {
-    gap: 16px !important;
-    margin-bottom: 16px !important;
-}
-
-.converter .panel__controls {
-    gap: 10px !important;
-}
-
 .converter .ui-pill-btn {
     padding: 0 !important;
     border: 0 !important;
@@ -291,21 +242,6 @@
     background: var(--bg-panel-2) !important;
     box-shadow: none !important;
     backdrop-filter: none !important;
-}
-
-.converter .dropzone {
-    border-radius: 10px !important;
-    background: rgba(224, 103, 154, 0.05) !important;
-}
-
-.converter .tips {
-    gap: 10px !important;
-}
-
-.converter .tip {
-    border: 1px solid var(--line) !important;
-    border-radius: 8px !important;
-    background: rgba(255, 255, 255, 0.02) !important;
 }
 
 /* Docker tag finder: compact the large empty desktop layout and use the same
@@ -404,14 +340,6 @@
 }
 
 @media (max-width: 768px) {
-    .merge__card,
-    .markdown-editor__card,
-    .email-editor__inner,
-    .pdf__card,
-    .docker-search .tabs-head,
-    .converter .panel {
-        padding: 12px !important;
-    }
 
     .email-editor-toolbar__left,
     .email-editor-toolbar__right,

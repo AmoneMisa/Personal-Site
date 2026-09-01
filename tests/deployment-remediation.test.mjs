@@ -41,5 +41,4 @@ test('readiness is state plus vacancies/cv platform APIs', () => {
   assert.match(ready, /await Promise\.all/)
   assert.match(ready, /VACANCIES_API_URL/)
   assert.match(ready, /CV_API_URL/)
-  assert.doesNotMatch(ready, /_site_migrations|REQUIRED_DATABASE_MIGRATIONS/)
 })

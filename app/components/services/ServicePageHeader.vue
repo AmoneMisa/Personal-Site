@@ -41,32 +41,13 @@ withDefaults(defineProps<{
   box-sizing: border-box;
 }
 
-.service-page-header + section,
-.service-page-header + .tabs-row {
-  border: 1px solid var(--color-border, var(--line));
-  border-radius: 14px;
-  background: var(--secondary-bg-gradient, rgba(255, 255, 255, 0.025));
-  box-shadow: var(--shadow-light, inset 0 1px 0 rgba(255, 255, 255, 0.04));
-}
-
 /* Service controls use one 44px metric. This catches direct UInput/USelectMenu
  * usage as well as the existing CustomInput/CustomButton wrappers, without
  * changing compact controls elsewhere on the site. */
-.service-page-header ~ * .ui-control,
-.service-page-header ~ * .u-select-menu__trigger,
-.service-page-header ~ * .btn,
-.service-page-header ~ * .u-button {
-  min-height: var(--ui-control-h-lg, 44px);
-}
 
 .service-page-header ~ * .btn,
 .service-page-header ~ * .u-button {
   height: var(--ui-control-h-lg, 44px);
-}
-
-.service-page-header ~ * .ui-control,
-.service-page-header ~ * .u-select-menu__trigger {
-  border-radius: var(--ui-control-radius, 8px);
 }
 
 @media (max-width: 767px) {

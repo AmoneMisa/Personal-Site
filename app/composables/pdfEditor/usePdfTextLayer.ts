@@ -302,7 +302,6 @@ export function usePdfTextLayer(options: PdfTextLayerOptions) {
   }
 
   return {
-    currentHasPdfText,
     loadEditableText,
     maybeAutoLoadText,
     refitPdfTextWidths,

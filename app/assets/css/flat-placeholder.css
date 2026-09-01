@@ -11,15 +11,6 @@
 
 /* Keep the same visual fallback in the listing modal only when the gallery has
    no usable source photos. FlatGallery owns the actual gallery class. */
-.flat-modal:not(:has(.flat-gallery))::before {
-  content: '';
-  display: block;
-  width: 100%;
-  min-height: 220px;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  background: var(--bg-panel-2) url('/svg/shark.svg') center / min(34%, 180px) auto no-repeat;
-}
 
 /* Keep the primary filter row visually detached from the divider above it. */
 .filter-primary-grid {

@@ -88,11 +88,6 @@ const monacoMode = computed(() => (ui.viewMode === "flat" ? "flat" : "json"));
   padding-bottom: 96px;
 }
 
-.merge__subtitle {
-  max-width: 760px;
-  font-size: 14px;
-}
-
 .merge__card {
   margin-top: 18px;
   padding: 16px;

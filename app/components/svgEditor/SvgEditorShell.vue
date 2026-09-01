@@ -163,8 +163,8 @@ function isHardColor(value: string) {
   if (!normalized) return false;
   if (/^none$/i.test(normalized)) return false;
   if (/^inherit$/i.test(normalized)) return false;
-  if (/^url\(/i.test(normalized)) return false;
-  return true;
+  return !/^url\(/i.test(normalized);
+
 }
 
 function extractColorsFromStyle(style: string) {
@@ -448,18 +448,6 @@ function onApplyTransformEdits(payload: { svg: string }) {
   display: flex;
   flex-wrap: wrap;
   gap: 10px;
-}
-
-.svg-editor-shell__btn {
-  height: 44px;
-  border-radius: 8px;
-  border: 1px solid var(--line);
-  background: rgba(255, 255, 255, 0.02);
-  font-weight: 600;
-}
-
-.svg-editor-shell__btn:hover {
-  filter: brightness(1.06);
 }
 
 .svg-editor-shell__preview-box {

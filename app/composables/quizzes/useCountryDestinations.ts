@@ -68,5 +68,5 @@ export function useCountryDestinations() {
     return links;
   }
 
-  return { destinationsFor, countryCodeForEntity, flatCountryCodes: computed(() => flatCountryCodes.value) };
+  return { destinationsFor, flatCountryCodes: computed(() => flatCountryCodes.value) };
 }
