@@ -54,7 +54,7 @@ function slug(value: string): string {
 }
 
 function parseSalary(value: unknown): Pick<Job, 'salaryMin' | 'salaryMax' | 'salaryCurrency'> {
-  const parsed = parseHiringSourceSalary(value)
+  const parsed = parseHiringSourceSalary(String(value || ''))
   if (!parsed || (parsed.min == null && parsed.max == null) || !parsed.currency) return {}
   return {
     salaryMin: parsed.min ?? undefined,
@@ -296,14 +296,6 @@ export function parseRssFeed(raw: string, feed: RssFeed): Job[] {
 
 async function fetchRssTarget(feed: RssFeed): Promise<Job[]> {
   return parseRssFeed(await fetchText(feed.url), feed)
-}
-
-export async function fetchConfiguredRssJobs(query = ''): Promise<Job[]> {
-  const jobs: Job[] = []
-  for (const feed of configuredRssFeeds()) jobs.push(...await fetchRssTarget(feed))
-  if (!query.trim()) return jobs
-  const needle = query.toLocaleLowerCase('en')
-  return jobs.filter((job) => `${job.title} ${job.company}`.toLocaleLowerCase('en').includes(needle))
 }
 
 // ---------- ishGO / IT-Jobs.uz ----------
