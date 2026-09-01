@@ -24,19 +24,17 @@ test('vacancy and candidate popups reuse the shared three-column grouped table',
   assert.equal((hiring.match(/<UiSpecTable/g) || []).length, 1)
 })
 
-test('all search detail popups pass a white internal public ID through the shared title', async () => {
-  const [modal, jobs, hiring, jobsFeed, hiringFeed] = await Promise.all([
+test('search detail popups prefer public IDs supplied by backend cards', async () => {
+  const [modal, jobs, hiring] = await Promise.all([
     read('app/components/search/SearchDetailsModal.vue'),
     read('app/pages/jobs/index.vue'),
     read('app/pages/hiring/index.vue'),
-    read('server/routes/jobs-feed.get.ts'),
-    read('server/routes/hiring-feed.get.ts'),
   ])
 
   assert.match(modal, /class="search-details-public-title__id"/)
   assert.match(modal, /color: #fff/)
   assert.match(jobs, /:public-id="jobPublicId\(activeJob\)"/)
   assert.match(hiring, /:public-id="candidatePublicId\(active\)"/)
-  assert.match(jobsFeed, /publicEntityId\('job', job\.source, job\.id\)/)
-  assert.match(hiringFeed, /publicEntityId\('candidate', profileSource\(profile\), profile\.country, profile\.id\)/)
+  assert.match(jobs, /job\.publicId \?\? publicEntityId\("job", job\.source, job\.id\)/)
+  assert.match(hiring, /profile\.publicId \?\? publicEntityId\("candidate", profile\.sourceKey \|\| profile\.source, profile\.country, profile\.id\)/)
 })
