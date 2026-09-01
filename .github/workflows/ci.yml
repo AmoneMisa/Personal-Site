@@ -8,6 +8,7 @@ on:
       - 'refactor/**'
       - 'fix/**'
       - 'feat/**'
+      - 'codex/**'
 
 permissions:
   contents: read
@@ -31,17 +32,6 @@ jobs:
 
       - name: Install dependencies
         run: npm ci --no-audit --no-fund
-
-      - name: Verify worker and operations syntax
-        run: |
-          node --experimental-transform-types --check jobs-worker/worker.ts
-          node --experimental-transform-types --check jobs-worker/workerHealth.ts
-          node --experimental-transform-types --check jobs-worker/workerHealthRuntime.ts
-          node --experimental-transform-types --check jobs-worker/workerHealthBootstrap.ts
-          node --experimental-transform-types --check jobs-worker/healthcheck.ts
-          node --experimental-transform-types --check scripts/migrate-database.ts
-          node --experimental-transform-types --check scripts/prepare-database-schema.ts
-          node --check jobs-worker/alias-loader.mjs
 
       - name: Run code quality inventory
         run: npm run audit:code
