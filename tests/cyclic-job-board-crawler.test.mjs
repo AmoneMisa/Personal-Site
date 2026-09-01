@@ -7,7 +7,7 @@ import test from 'node:test'
 const stateDir = await mkdtemp(join(tmpdir(), 'personal-site-job-cursors-'))
 process.env.SITE_STATE_DIR = stateDir
 
-const { crawlCyclicJobBoard } = await import('../server/utils/cyclicJobBoardCrawler.ts')
+const { crawlCyclicJobBoard, crawlCursorJobBoard } = await import('../server/utils/cyclicJobBoardCrawler.ts')
 
 function job(id) {
   return {
@@ -91,4 +91,41 @@ test('failed historical page is retried instead of being skipped', async () => {
   const second = await run()
   assert.deepEqual(second.pages, [1, 2, 3])
   assert.equal(second.nextPage, 4)
+})
+
+test('opaque cursor crawler refreshes the head and resumes a durable cursor', async () => {
+  const pages = new Map([
+    [null, { jobs: [job('cursor-head')], nextCursor: 'cursor-2' }],
+    ['cursor-2', { jobs: [job('cursor-2')], nextCursor: 'cursor-3' }],
+    ['cursor-3', { jobs: [job('cursor-3')], nextCursor: 'cursor-4' }],
+    ['cursor-4', { jobs: [job('cursor-4')], nextCursor: null }],
+  ])
+  const fetched = []
+  const run = () => crawlCursorJobBoard({
+    key: 'opaque-resume-test',
+    pagesPerRun: 1,
+    requestDelayMs: 0,
+    fetchPage: async (cursor) => {
+      fetched.push(cursor)
+      return JSON.stringify(pages.get(cursor))
+    },
+    parsePage: (raw) => JSON.parse(raw).jobs,
+    nextCursor: (raw) => JSON.parse(raw).nextCursor,
+  })
+
+  const first = await run()
+  assert.deepEqual(first.cursors, [null, 'cursor-2'])
+  assert.equal(first.nextCursor, 'cursor-3')
+  assert.equal(first.cycle, 0)
+
+  fetched.length = 0
+  const second = await run()
+  assert.deepEqual(second.cursors, [null, 'cursor-3'])
+  assert.equal(second.nextCursor, 'cursor-4')
+  assert.deepEqual(fetched, [null, 'cursor-3'])
+
+  const third = await run()
+  assert.equal(third.reachedEnd, true)
+  assert.equal(third.cycle, 1)
+  assert.equal(third.nextCursor, 'cursor-2')
 })
