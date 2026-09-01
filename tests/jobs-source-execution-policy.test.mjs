@@ -61,9 +61,10 @@ test('jobs worker schedules queue targets instead of a second aggregate refresh 
   const refresh = await readFile(new URL('../server/utils/jobsSourceRefresh.ts', import.meta.url), 'utf8')
   const directFetcher = await readFile(new URL('../server/utils/jobSourceFetchers.ts', import.meta.url), 'utf8')
 
-  assert.match(runtime, /configuredSources: configuredJobRefreshTargets/u)
-  assert.match(runtime, /refreshSource: refreshJobTarget/u)
+  assert.match(runtime, /return configuredJobRefreshTargets\(\)/u)
+  assert.match(runtime, /return refreshJobTarget\(source\)/u)
   assert.match(refresh, /TARGETIZED_SOURCES/u)
+  assert.match(refresh, /reason: 'use_queue_targets'/u)
   assert.doesNotMatch(directFetcher, /fetch(?:LinkedIn|Facebook|Threads|Companies|Hh|IshGo|ItJobsUz|Olx|Rss)\b/u)
 
   await assert.rejects(
