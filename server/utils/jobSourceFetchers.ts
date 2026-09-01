@@ -4,7 +4,6 @@ import { fetchLinkedInJobs } from './linkedinSource'
 import { fetchFacebookJobs, fetchThreadsJobs } from './socialJobSources'
 import { fetchExtraPublicJobs } from './extraPublicJobSources'
 import { fetchCuratedRemoteJobs } from './curatedRemoteJobSources'
-import { fetchCommunityJobBoardJobs } from './communityJobBoardSources'
 import { fetchUsaTechCompanyJobs } from './usaTechCompanySources'
 import { fetchRegionalTechCompanyJobs } from './regionalTechCompanySources'
 import { fetchRegionalGeneralEmployerJobs } from './regionalGeneralEmployerSources'
@@ -57,7 +56,6 @@ async function fetchAllCompanies(query: string): Promise<Job[]> {
     { label: 'companies', load: () => fetchCompanies(query) },
     { label: 'public-boards', load: () => fetchExtraPublicJobs(query) },
     { label: 'curated-remote-boards', load: () => fetchCuratedRemoteJobs(query) },
-    { label: 'community-job-boards', load: () => fetchCommunityJobBoardJobs(query) },
     { label: 'usa-tech-companies', load: () => fetchUsaTechCompanyJobs(query) },
     { label: 'regional-tech-companies', load: () => fetchRegionalTechCompanyJobs(query) },
     { label: 'regional-general-employers', load: () => fetchRegionalGeneralEmployerJobs(query) },
