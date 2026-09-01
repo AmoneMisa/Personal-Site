@@ -3,18 +3,17 @@ import {
   REMOTE_JOB_QUERIES,
   USA_RELOCATION_QUERIES,
   linkedinLocationCoverage,
-  rotatingSlice,
 } from './jobSearchCoverage'
+import {
+  crawlStandardJobBoard,
+  enrichStandardJobBoardDetails,
+} from './cyclicJobBoardCrawler'
 import { detectWorkModes } from './hiringLexicon'
 import { decodeHtmlEntities } from './htmlText'
 
-// Read-only LinkedIn collector. Search uses the public guest endpoint exposed to
-// signed-out visitors; detail pages are fetched separately so discovery stays
-// cheap and one broken detail parser cannot stop the whole source.
 const LINKEDIN_BASE_URL = 'https://www.linkedin.com'
 const LINKEDIN_SEARCH_URL =
   `${LINKEDIN_BASE_URL}/jobs-guest/jobs/api/seeMoreJobPostings/search`
-
 const BASE_LOCATIONS = [
   'Uzbekistan',
   'Ukraine',
@@ -24,19 +23,6 @@ const BASE_LOCATIONS = [
   'Romania',
   'Moldova',
 ]
-
-const REQUEST_TIMEOUT_MS = clampEnv('LINKEDIN_REQUEST_TIMEOUT_MS', 10_000, 5_000, 30_000)
-const DETAIL_TIMEOUT_MS = clampEnv('LINKEDIN_DETAIL_TIMEOUT_MS', 10_000, 5_000, 30_000)
-const FRESHNESS_DAYS = clampEnv('LINKEDIN_FRESHNESS_DAYS', 14, 1, 30)
-const MAX_PAGES = clampEnv('LINKEDIN_MAX_PAGES', 4, 1, 8)
-const REGIONAL_LOCATIONS_PER_CYCLE = clampEnv('LINKEDIN_REGIONAL_LOCATIONS_PER_CYCLE', 10, 4, 30)
-const PRIORITY_QUERIES_PER_CYCLE = clampEnv('LINKEDIN_PRIORITY_QUERIES_PER_CYCLE', 4, 2, 8)
-const LOCATION_CONCURRENCY = clampEnv('LINKEDIN_LOCATION_CONCURRENCY', 4, 1, 8)
-const DETAIL_CONCURRENCY = clampEnv('LINKEDIN_DETAIL_CONCURRENCY', 6, 1, 12)
-const DETAILS_LIMIT_PER_CYCLE = clampEnv('LINKEDIN_DETAILS_LIMIT_PER_CYCLE', 64, 0, 500)
-const PAGE_DELAY_MS = clampEnv('LINKEDIN_PAGE_DELAY_MS', 800, 0, 5_000)
-const PAGE_DELAY_BAND_MS = clampEnv('LINKEDIN_PAGE_DELAY_BAND_MS', 900, 0, 5_000)
-const FRESHNESS_SECONDS = FRESHNESS_DAYS * 24 * 60 * 60
 const UA =
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ' +
   '(KHTML, like Gecko) Chrome/126.0 Safari/537.36'
@@ -67,11 +53,6 @@ const health: LinkedInSourceHealth = {
   lastError: null,
 }
 
-function clampEnv(name: string, fallback: number, min: number, max: number): number {
-  const parsed = Number(process.env[name])
-  return Math.max(min, Math.min(max, Number.isFinite(parsed) ? parsed : fallback))
-}
-
 function csvEnv(name: string): string[] {
   return String(process.env[name] || '')
     .split(',')
@@ -91,9 +72,6 @@ export function linkedinSourceHealth(): Readonly<LinkedInSourceHealth> {
   return Object.freeze({ ...health })
 }
 
-// LinkedIn descriptions are structured prose rather than flat labels. Keep the
-// source-specific paragraph/list boundaries here, but delegate entity decoding
-// to the shared infrastructure helper so every source interprets entities alike.
 function linkedinText(value: string | undefined): string {
   if (!value) return ''
   return decodeHtmlEntities(
@@ -138,10 +116,6 @@ function attributeBlock(html: string, attribute: string, value: string): string 
 
 export type LinkedInJobAvailability = 'active' | 'closed' | 'unknown'
 
-/**
- * Only explicit, visible LinkedIn status copy is authoritative. A missing
- * button, a sign-in wall or a failed request must never retire a vacancy.
- */
 export function parseLinkedInJobAvailability(html: string): LinkedInJobAvailability {
   const visibleText = linkedinText(html)
   if (/\b(?:no longer accepting applications|applications? (?:are )?closed)\b/i.test(visibleText)
@@ -150,22 +124,6 @@ export function parseLinkedInJobAvailability(html: string): LinkedInJobAvailabil
   }
   if (/(?:подать заявку|откликнуться|apply(?: now)?|easy apply)/iu.test(visibleText)) return 'active'
   return 'unknown'
-}
-
-function configuredLocations(): string[] {
-  const configured = process.env.LINKEDIN_LOCATIONS
-  if (configured) {
-    const locations = configured.split(',').map((value) => value.trim()).filter(Boolean)
-    if (locations.length) return locations
-  }
-
-  const regional = linkedinLocationCoverage()
-    .map((place) => place.location)
-    .filter((location) => !BASE_LOCATIONS.includes(location))
-  return [
-    ...BASE_LOCATIONS,
-    ...rotatingSlice(regional, REGIONAL_LOCATIONS_PER_CYCLE, 30),
-  ]
 }
 
 function extractJobId(card: string): string | undefined {
@@ -250,8 +208,6 @@ function directApplyUrl(html: string): string | undefined {
 }
 
 export function parseLinkedInJobDetail(html: string): Partial<Job> {
-  // Guest pages use show-more-less-html__markup. Authenticated LinkedIn pages
-  // deliberately rotate CSS class names, but retain this semantic test id.
   const description = linkedinText(
     classBlock(html, 'show-more-less-html__markup')
       || attributeBlock(html, 'data-testid', 'expandable-text-box'),
@@ -264,9 +220,9 @@ export function parseLinkedInJobDetail(html: string): Partial<Job> {
   const salaryText = classText(html, 'div', 'compensation__salary')
     || classText(html, 'span', 'compensation__salary')
   const tags = [seniority, jobFunction, industries].filter((value): value is string => Boolean(value))
-
   const applyUrl = directApplyUrl(html)
   const availability = parseLinkedInJobAvailability(html)
+
   return {
     ...(description ? { description: description.slice(0, 20_000) } : {}),
     ...(employmentType ? { employmentType } : {}),
@@ -307,7 +263,8 @@ export function buildLinkedInSearchParams(
     start: String(start),
     pageNum: '0',
     sortBy: 'DD',
-    f_TPR: `r${FRESHNESS_SECONDS}`,
+    // Site-wide vacancy retention is 14 days; ask LinkedIn for the same window.
+    f_TPR: `r${14 * 24 * 60 * 60}`,
   })
   if (keywords) params.set('keywords', keywords)
   if (filters.distance !== undefined) params.set('distance', String(filters.distance))
@@ -318,7 +275,7 @@ export function buildLinkedInSearchParams(
   return params
 }
 
-async function linkedinFetch(url: string, timeoutMs: number): Promise<Response> {
+async function linkedinFetch(url: string): Promise<Response> {
   health.requests += 1
   try {
     const response = await fetch(url, {
@@ -328,7 +285,6 @@ async function linkedinFetch(url: string, timeoutMs: number): Promise<Response> 
         'Accept-Language': 'en-US,en;q=0.9',
       },
       redirect: 'follow',
-      signal: AbortSignal.timeout(timeoutMs),
     })
     if (response.status === 429) health.rateLimited += 1
     if (response.ok) {
@@ -344,175 +300,141 @@ async function linkedinFetch(url: string, timeoutMs: number): Promise<Response> 
   }
 }
 
-async function fetchPage(
-  location: string,
-  keywords: string,
-  start: number,
-  filters: LinkedInSearchFilters,
-): Promise<Job[]> {
-  const params = buildLinkedInSearchParams(location, keywords, start, filters)
-  const response = await linkedinFetch(`${LINKEDIN_SEARCH_URL}?${params}`, REQUEST_TIMEOUT_MS)
-  if (!response.ok) throw new Error(`LinkedIn ${location} start=${start} -> ${response.status}`)
-  const html = await response.text()
-  const jobs = parseLinkedInJobCards(html)
-  if (!jobs.length) health.emptyPages += 1
-  return jobs
-}
-
-async function fetchJobDetail(job: Job): Promise<Job> {
-  const jobId = job.id.replace(/^linkedin-/, '')
-  if (!/^\d+$/.test(jobId)) return job
-  health.detailRequests += 1
-  try {
-    const response = await linkedinFetch(`${LINKEDIN_BASE_URL}/jobs/view/${jobId}`, DETAIL_TIMEOUT_MS)
-    if (!response.ok || /linkedin\.com\/signup/i.test(response.url)) return job
-    const html = await response.text()
-    const detail = parseLinkedInJobDetail(html)
-    health.detailSuccesses += 1
-    if (detail.vacancyStatus === 'closed') health.closedJobs += 1
-    return {
-      ...job,
-      ...detail,
-      tags: [...new Set([...(job.tags || []), ...(detail.tags || [])])],
-      remote: job.remote || detectWorkModes(`${job.title} ${job.location} ${detail.description || ''}`).includes('remote'),
-    }
-  } catch (error) {
-    health.parseFailures += 1
-    recordError(error)
-    return job
-  }
-}
-
-async function enrichDetails(jobs: Job[]): Promise<Job[]> {
-  if (DETAILS_LIMIT_PER_CYCLE <= 0) return jobs
-  const selected = jobs.slice(0, DETAILS_LIMIT_PER_CYCLE)
-  const byId = new Map(jobs.map((job) => [job.id, job]))
-  for (let offset = 0; offset < selected.length; offset += DETAIL_CONCURRENCY) {
-    const chunk = selected.slice(offset, offset + DETAIL_CONCURRENCY)
-    const enriched = await Promise.all(chunk.map(fetchJobDetail))
-    for (const job of enriched) byId.set(job.id, job)
-  }
-  return [...byId.values()]
-}
-
-async function delayBetweenPages() {
-  if (PAGE_DELAY_MS <= 0 && PAGE_DELAY_BAND_MS <= 0) return
-  const jitter = PAGE_DELAY_BAND_MS ? Math.floor(Math.random() * PAGE_DELAY_BAND_MS) : 0
-  await new Promise((resolve) => setTimeout(resolve, PAGE_DELAY_MS + jitter))
-}
-
-async function fetchLocation(
-  location: string,
-  keywords: string,
-  {
-    maxPages = MAX_PAGES,
-    tags = [],
-    forceRemote = false,
-    remoteOnly = false,
-  }: { maxPages?: number, tags?: string[], forceRemote?: boolean, remoteOnly?: boolean } = {},
-): Promise<Job[]> {
-  const byId = new Map<string, Job>()
-  const filters = configuredFilters(remoteOnly)
-  for (let page = 0; page < maxPages; page += 1) {
-    const start = page * 25
-    if (start >= 1_000) break
-    const jobs = await fetchPage(location, keywords, start, filters)
-    if (!jobs.length) break
-    const before = byId.size
-    for (const job of jobs) {
-      byId.set(job.id, {
-        ...job,
-        remote: forceRemote || job.remote,
-        tags: [...new Set([...(job.tags || []), ...tags])],
-      })
-    }
-    if (byId.size === before) break
-    if (page + 1 < maxPages) await delayBetweenPages()
-  }
-  console.log(`[jobs:linkedin] location=${location} query=${keywords || '<all>'} jobs=${byId.size}`)
-  return [...byId.values()]
-}
-
 type SearchPass = {
   location: string
   keywords: string
-  maxPages?: number
   tags?: string[]
   forceRemote?: boolean
   remoteOnly?: boolean
 }
 
-function priorityPasses(q: string): SearchPass[] {
-  const priority = [
-    ...REMOTE_JOB_QUERIES.map((keywords) => ({
-      location: 'Worldwide',
-      keywords: q ? `${q} ${keywords}` : keywords,
-      maxPages: 2,
-      tags: ['Remote search', 'Worldwide remote'],
-      forceRemote: true,
-      remoteOnly: true,
-    })),
-    ...USA_RELOCATION_QUERIES.map((keywords) => ({
-      location: 'United States',
-      keywords: q ? `${q} ${keywords}` : keywords,
-      maxPages: 2,
-      tags: ['USA relocation search', 'Visa/relocation search'],
-      forceRemote: false,
-      remoteOnly: false,
-    })),
-  ]
-  return rotatingSlice(priority, PRIORITY_QUERIES_PER_CYCLE, 30)
-}
-
-function countryRemotePasses(q: string): SearchPass[] {
-  return [
-    { location: 'Uzbekistan', keywords: q, maxPages: 2, tags: ['Remote Uzbekistan'], forceRemote: true, remoteOnly: true },
-    { location: 'Kazakhstan', keywords: q, maxPages: 2, tags: ['Remote Kazakhstan'], forceRemote: true, remoteOnly: true },
-    { location: 'Ukraine', keywords: q, maxPages: 2, tags: ['Remote Ukraine'], forceRemote: true, remoteOnly: true },
-    { location: 'Romania', keywords: q, maxPages: 2, tags: ['Remote Romania'], forceRemote: true, remoteOnly: true },
-  ]
-}
-
-async function runPasses(passes: SearchPass[]): Promise<Job[]> {
-  const byId = new Map<string, Job>()
-  for (let offset = 0; offset < passes.length; offset += LOCATION_CONCURRENCY) {
-    const chunk = passes.slice(offset, offset + LOCATION_CONCURRENCY)
-    const settled = await Promise.allSettled(
-      chunk.map((pass) => fetchLocation(pass.location, pass.keywords, pass)),
-    )
-    settled.forEach((result, index) => {
-      const pass = chunk[index]!
-      if (result.status === 'fulfilled') {
-        for (const job of result.value) byId.set(job.id, job)
-      } else {
-        recordError(result.reason)
-        console.error(
-          `[jobs] linkedin failed (${pass.location}; ${pass.keywords || '<all>'}):`,
-          result.reason instanceof Error ? result.reason.message : String(result.reason),
-        )
-      }
-    })
+function configuredLocations(): string[] {
+  const configured = process.env.LINKEDIN_LOCATIONS
+  if (configured) {
+    const values = configured.split(',').map((value) => value.trim()).filter(Boolean)
+    if (values.length) return values
   }
-  return [...byId.values()]
+  return [...new Set([
+    ...BASE_LOCATIONS,
+    ...linkedinLocationCoverage().map((place) => place.location),
+  ])]
 }
 
-export async function fetchLinkedInJobs(q: string): Promise<Job[]> {
-  if (process.env.LINKEDIN_SOURCE === 'off') return []
-
-  const standardPasses: SearchPass[] = configuredLocations().map((location) => ({ location, keywords: q }))
-  const passes = [
-    ...standardPasses,
-    ...countryRemotePasses(q),
-    ...priorityPasses(q),
+function configuredPasses(): SearchPass[] {
+  const baseQuery = String(process.env.LINKEDIN_QUERY || '').trim()
+  const standard = configuredLocations().map((location) => ({ location, keywords: baseQuery }))
+  const countryRemote: SearchPass[] = [
+    { location: 'Uzbekistan', keywords: baseQuery, tags: ['Remote Uzbekistan'], forceRemote: true, remoteOnly: true },
+    { location: 'Kazakhstan', keywords: baseQuery, tags: ['Remote Kazakhstan'], forceRemote: true, remoteOnly: true },
+    { location: 'Ukraine', keywords: baseQuery, tags: ['Remote Ukraine'], forceRemote: true, remoteOnly: true },
+    { location: 'Romania', keywords: baseQuery, tags: ['Remote Romania'], forceRemote: true, remoteOnly: true },
   ]
-  const jobs = await runPasses(passes)
-  const byId = new Map<string, Job>()
-  for (const job of jobs) byId.set(job.id, job)
-  const unique = [...byId.values()]
-  const enriched = await enrichDetails(unique)
-  console.log(
-    `[jobs:linkedin] total=${enriched.length} details=${health.detailSuccesses}/${health.detailRequests} `
-      + `requests=${health.requests} rateLimited=${health.rateLimited}`,
-  )
-  return enriched
+  const remote = REMOTE_JOB_QUERIES.map((keywords) => ({
+    location: 'Worldwide',
+    keywords: baseQuery ? `${baseQuery} ${keywords}` : keywords,
+    tags: ['Remote search', 'Worldwide remote'],
+    forceRemote: true,
+    remoteOnly: true,
+  }))
+  const relocation = USA_RELOCATION_QUERIES.map((keywords) => ({
+    location: 'United States',
+    keywords: baseQuery ? `${baseQuery} ${keywords}` : keywords,
+    tags: ['USA relocation search', 'Visa/relocation search'],
+  }))
+  return [...standard, ...countryRemote, ...remote, ...relocation]
+}
+
+function stableToken(value: string): string {
+  let hash = 2166136261
+  for (const char of value) {
+    hash ^= char.codePointAt(0) || 0
+    hash = Math.imul(hash, 16777619) >>> 0
+  }
+  return hash.toString(36)
+}
+
+function passKey(pass: SearchPass): string {
+  return `${pass.location.toLocaleLowerCase('en').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')}-${stableToken(JSON.stringify(pass))}`
+}
+
+async function fetchSearchPage(pass: SearchPass, page: number): Promise<string> {
+  // LinkedIn's guest endpoint advances by 25 postings and rejects offsets at
+  // 1000+. That is the upstream pagination contract; traversal is crawler-owned.
+  const start = (page - 1) * 25
+  if (start >= 1_000) return ''
+  const params = buildLinkedInSearchParams(pass.location, pass.keywords, start, configuredFilters(pass.remoteOnly))
+  const response = await linkedinFetch(`${LINKEDIN_SEARCH_URL}?${params}`)
+  if (!response.ok) throw new Error(`LinkedIn ${pass.location} start=${start} -> ${response.status}`)
+  return response.text()
+}
+
+function parseSearchPage(html: string, pass: SearchPass): Job[] {
+  const jobs = parseLinkedInJobCards(html)
+  if (!jobs.length) health.emptyPages += 1
+  return jobs.map((job) => ({
+    ...job,
+    remote: pass.forceRemote === true || job.remote,
+    tags: [...new Set([...(job.tags || []), ...(pass.tags || [])])],
+  }))
+}
+
+async function fetchDetail(job: Job): Promise<string> {
+  const jobId = job.id.replace(/^linkedin-/, '')
+  if (!/^\d+$/.test(jobId)) return ''
+  health.detailRequests += 1
+  const response = await linkedinFetch(`${LINKEDIN_BASE_URL}/jobs/view/${jobId}`)
+  if (!response.ok || /linkedin\.com\/signup/i.test(response.url)) {
+    throw new Error(`LinkedIn detail ${jobId} -> ${response.status}`)
+  }
+  health.detailSuccesses += 1
+  return response.text()
+}
+
+function mergeDetail(html: string, summary: Job): Job {
+  if (!html) return summary
+  try {
+    const detail = parseLinkedInJobDetail(html)
+    if (detail.vacancyStatus === 'closed') health.closedJobs += 1
+    return {
+      ...summary,
+      ...detail,
+      tags: [...new Set([...(summary.tags || []), ...(detail.tags || [])])],
+      remote: summary.remote
+        || detectWorkModes(`${summary.title} ${summary.location} ${detail.description || ''}`).includes('remote'),
+    }
+  } catch (error) {
+    health.parseFailures += 1
+    recordError(error)
+    return summary
+  }
+}
+
+export const LINKEDIN_JOB_TARGET_PREFIX = 'linkedin-job-search:'
+
+export function configuredLinkedInJobTargets(): string[] {
+  if (process.env.LINKEDIN_SOURCE === 'off') return []
+  return configuredPasses().map((pass) => `${LINKEDIN_JOB_TARGET_PREFIX}${passKey(pass)}`)
+}
+
+export function isLinkedInJobTarget(target: string): boolean {
+  return target.startsWith(LINKEDIN_JOB_TARGET_PREFIX)
+}
+
+export async function fetchLinkedInJobTarget(target: string): Promise<Job[]> {
+  if (!isLinkedInJobTarget(target)) throw new Error(`Unknown LinkedIn job target ${target}`)
+  const key = target.slice(LINKEDIN_JOB_TARGET_PREFIX.length)
+  const pass = configuredPasses().find((candidate) => passKey(candidate) === key)
+  if (!pass) throw new Error(`Unknown LinkedIn job target ${target}`)
+
+  const run = await crawlStandardJobBoard({
+    key: `linkedin:${key}`,
+    fetchPage: (page) => fetchSearchPage(pass, page),
+    parsePage: (html) => parseSearchPage(html, pass),
+  })
+  return enrichStandardJobBoardDetails({
+    key: `linkedin:${key}`,
+    jobs: run.jobs,
+    fetchDetail,
+    parseDetail: mergeDetail,
+  })
 }
