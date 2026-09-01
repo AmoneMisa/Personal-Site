@@ -3,7 +3,6 @@ import { parseHiringActivityDate } from '@whiteslove/parsing-lexicon/hiring-temp
 import {
   crawlStandardCursorJobBoard,
   crawlStandardJobBoard,
-  STANDARD_JOB_BOARD_CRAWL_POLICY,
 } from './cyclicJobBoardCrawler'
 import { absoluteHttpUrl, stripHtml } from './htmlText'
 import { detectWorkModes } from './hiringLexicon'
@@ -379,7 +378,6 @@ async function fetchText(url: string): Promise<string> {
       Accept: 'text/html,application/xhtml+xml,application/json;q=0.9,*/*;q=0.8',
       'Accept-Language': 'en-US,en;q=0.9',
     },
-    signal: AbortSignal.timeout(STANDARD_JOB_BOARD_CRAWL_POLICY.requestTimeoutMs),
   })
   if (!response.ok) throw new Error(`${new URL(url).host} -> ${response.status}`)
   return response.text()
