@@ -1,5 +1,4 @@
 import type { FlatCardPresentation, FlatListing, FlatView } from "~/types/flats";
-import { hasMeaningfulHousingTitle } from "@whiteslove/parsing-lexicon/housing-title";
 import { locationLabel, type LocationKind } from "~/utils/locationLabels";
 import { formatRelativeDate } from "~/utils/search/relativeDate";
 
@@ -90,7 +89,7 @@ export function useFlatPresentation(options: FlatPresentationOptions) {
 
   function displayListingTitle(listing: FlatListing): string {
     const title = listing.title.replace(/\s+/g, " ").trim();
-    if (hasMeaningfulHousingTitle(title)) return title;
+    if (title) return title;
     const parts = [
       dealLabel(listing.dealType),
       listing.rooms != null ? t("roomsN", { n: listing.rooms }) : "",

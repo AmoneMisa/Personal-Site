@@ -13,19 +13,7 @@ test('specialized technical professions stay in English in Russian UI', () => {
   assert.equal(hiringProfessionLabel('DevOps Engineer', 'ru'), 'DevOps Engineer')
 })
 
-test('raw Uzbek and typo-heavy resume roles get a normalized display label', () => {
-  assert.equal(hiringProfessionLabel('iqtsodchi', 'ru'), 'Экономист')
-  assert.equal(hiringProfessionLabel('Iqtisodiy', 'ru'), 'Экономист')
-  assert.equal(hiringProfessionLabel('Logist', 'ru'), 'Логист')
-  assert.equal(hiringProfessionLabel('Ingliz tili ustoziman', 'ru'), 'Преподаватель английского')
-  assert.equal(hiringProfessionLabel('Mobilagraf ITishnik pdf faylla frontet', 'ru'), 'Frontend Developer')
-  assert.equal(hiringProfessionLabel('Farqi yo qande ish bulsa hm, bolalarga qarash menga yoqadi', 'ru'), 'Няня')
-  assert.equal(hiringProfessionLabel('Onlayn', 'ru'), 'Любая работа')
-})
-
-test('the same raw roles have useful English labels', () => {
-  assert.equal(hiringProfessionLabel('iqtisodchi', 'en'), 'Economist')
-  assert.equal(hiringProfessionLabel('Logist', 'en'), 'Logistics Specialist')
-  assert.equal(hiringProfessionLabel('Ingliz tili ustoziman', 'en'), 'English Teacher')
-  assert.equal(hiringProfessionLabel('Onlayn', 'en'), 'Any role')
+test('unknown backend values pass through without client-side interpretation', () => {
+  assert.equal(hiringProfessionLabel('Backend-owned role', 'ru'), 'Backend-owned role')
+  assert.equal(hiringProfessionLabel('Backend-owned role', 'en'), 'Backend-owned role')
 })

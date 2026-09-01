@@ -1,5 +1,3 @@
-import { normalizeSourceRole } from '@whiteslove/parsing-lexicon/hiring-source-aliases'
-
 export type HiringProfessionLocale = 'en' | 'ru'
 
 interface ProfessionLabels {
@@ -150,7 +148,5 @@ export function hiringProfessionLabel(value: string, locale: HiringProfessionLoc
   const key = String(value || '').trim()
   const canonical = HIRING_PROFESSION_LABELS[key]
   if (canonical) return canonical[locale]
-  const normalized = normalizeSourceRole(key)
-  if (!normalized) return key
-  return HIRING_PROFESSION_LABELS[normalized.label]?.[locale] || normalized.label
+  return key
 }
