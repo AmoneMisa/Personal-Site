@@ -1,51 +1,35 @@
 import type { Job, JobSource } from './jobTypes'
-import { fetchExtraTelegramJobs } from './extraTelegramJobSources'
 import { fetchLinkedInJobs } from './linkedinSource'
 import { fetchFacebookJobs, fetchThreadsJobs } from './socialJobSources'
 import {
-  fetchAdzuna,
   fetchArbeitnow,
-  fetchCompanies,
   fetchDevKg,
-  fetchIshGo,
-  fetchItJobsUz,
   fetchJobicy,
-  fetchJooble,
-  fetchOlx,
   fetchRemoteOk,
   fetchRemotive,
-  fetchRss,
-  fetchTheMuse,
-  fetchTelegram,
 } from './sources'
 
-async function fetchAllTelegram(query: string): Promise<Job[]> {
-  const [primary, extra] = await Promise.all([
-    fetchTelegram(query),
-    fetchExtraTelegramJobs(query),
-  ])
-  return [...primary, ...extra]
-}
+const targetizedSource = async (): Promise<Job[]> => []
 
 const FETCHERS: Record<JobSource, (query: string) => Promise<Job[]>> = {
   remotive: fetchRemotive,
   remoteok: fetchRemoteOk,
   arbeitnow: fetchArbeitnow,
-  themuse: fetchTheMuse,
+  themuse: targetizedSource,
   jobicy: fetchJobicy,
   hh: fetchHhJobs,
-  adzuna: fetchAdzuna,
-  jooble: fetchJooble,
-  rss: fetchRss,
-  companies: fetchCompanies,
+  adzuna: targetizedSource,
+  jooble: targetizedSource,
+  rss: targetizedSource,
+  companies: targetizedSource,
   linkedin: fetchLinkedInJobs,
   facebook: fetchFacebookJobs,
   threads: fetchThreadsJobs,
   devkg: fetchDevKg,
-  ishgo: fetchIshGo,
-  itjobsuz: fetchItJobsUz,
-  telegram: fetchAllTelegram,
-  olx: fetchOlx,
+  ishgo: targetizedSource,
+  itjobsuz: targetizedSource,
+  telegram: targetizedSource,
+  olx: targetizedSource,
 }
 
 export async function fetchJobSource(source: JobSource): Promise<Job[]> {
