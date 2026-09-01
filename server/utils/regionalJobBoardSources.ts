@@ -1,13 +1,13 @@
 import { detectHiringLocationName } from '@whiteslove/parsing-lexicon/hiring-location-fields'
 import { parseHiringSourceSalary } from '@whiteslove/parsing-lexicon/hiring-source-semantics'
 import { parseHiringActivityDate, parseHiringDayMonthDate } from '@whiteslove/parsing-lexicon/hiring-temporal'
+import { crawlStandardJobBoard } from './cyclicJobBoardCrawler'
 import type { Job } from './jobTypes'
 import { detectWorkModes } from './hiringLexicon'
 
 const UA =
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 '
   + '(KHTML, like Gecko) Chrome/126.0 Safari/537.36'
-const REQUEST_TIMEOUT_MS = 25_000
 const MAX_AGE_DAYS = 14
 const MAX_DESCRIPTION = 4_000
 
@@ -19,7 +19,6 @@ interface Board {
   root: string
   pageUrl: (page: number) => string
   detailRe: RegExp
-  maxPages?: number
   activeCatalogue?: boolean
   synthetic?: 'newjob' | 'headings'
 }
@@ -70,7 +69,6 @@ const BOARDS: Board[] = [
     detailRe: /bestjobs\.eu\/en\/(?:job|jobs)\/(?!$)[^?#]+/i,
     activeCatalogue: true,
     synthetic: 'headings',
-    maxPages: 2,
   },
   {
     key: 'hipo-ro-vacancies', label: 'Hipo.ro', country: 'RO',
@@ -131,7 +129,6 @@ async function fetchHtml(url: string): Promise<string> {
       Accept: 'text/html,application/xhtml+xml',
       'Accept-Language': 'ru,en,ro,uk;q=0.8',
     },
-    signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
   })
   if (!response.ok) throw new Error(`${new URL(url).host} -> ${response.status}`)
   return response.text()
@@ -283,41 +280,40 @@ function headingFallback(html: string, board: Board, page: number): Job[] {
   return jobs
 }
 
-async function fetchBoard(board: Board): Promise<Job[]> {
-  const byUrl = new Map<string, Job>()
-  const maxPages = Math.max(1, Math.min(5, board.maxPages || 3))
-  for (let page = 1; page <= maxPages; page += 1) {
-    const html = await fetchHtml(board.pageUrl(page))
-    let jobs = anchorJobs(html, board)
-    if (!jobs.length && board.synthetic === 'newjob') jobs = newJobFallback(html, board, page)
-    if (!jobs.length && board.synthetic === 'headings') jobs = headingFallback(html, board, page)
-    if (!jobs.length) break
-    for (const job of jobs) byUrl.set(job.url, job)
-  }
-  return [...byUrl.values()]
+function parseBoardPage(html: string, board: Board, page: number): Job[] {
+  let jobs = anchorJobs(html, board)
+  if (!jobs.length && board.synthetic === 'newjob') jobs = newJobFallback(html, board, page)
+  if (!jobs.length && board.synthetic === 'headings') jobs = headingFallback(html, board, page)
+  return jobs
 }
 
-function filterQuery(jobs: Job[], q: string): Job[] {
-  if (!q.trim()) return jobs
-  const needle = q.toLocaleLowerCase()
-  return jobs.filter((job) => `${job.title} ${job.company} ${job.location} ${job.description || ''}`.toLocaleLowerCase().includes(needle))
-}
+export const REGIONAL_JOB_BOARD_TARGET_PREFIX = 'regional-job-board:'
 
-export async function fetchRegionalJobBoardJobs(q = ''): Promise<Job[]> {
+export function configuredRegionalJobBoardTargets(): string[] {
   if (process.env.REGIONAL_JOB_BOARDS_SOURCE === 'off') return []
-  const results = await Promise.allSettled(BOARDS.map((board) => fetchBoard(board)))
-  const byUrl = new Map<string, Job>()
-  results.forEach((result, index) => {
-    if (result.status === 'rejected') {
-      console.warn(
-        `[jobs:regional-board] ${BOARDS[index]!.key} failed:`,
-        result.reason instanceof Error ? result.reason.message : String(result.reason),
-      )
-      return
-    }
-    for (const job of result.value) byUrl.set(job.url, job)
+  return BOARDS.map((board) => `${REGIONAL_JOB_BOARD_TARGET_PREFIX}${board.key}`)
+}
+
+export function isRegionalJobBoardTarget(target: string): boolean {
+  return target.startsWith(REGIONAL_JOB_BOARD_TARGET_PREFIX)
+}
+
+function boardForTarget(target: string): Board | undefined {
+  if (!isRegionalJobBoardTarget(target)) return undefined
+  const key = target.slice(REGIONAL_JOB_BOARD_TARGET_PREFIX.length)
+  return BOARDS.find((board) => board.key === key)
+}
+
+export async function fetchRegionalJobBoardTarget(target: string): Promise<Job[]> {
+  const board = boardForTarget(target)
+  if (!board) throw new Error(`Unknown regional job-board target ${target}`)
+
+  const run = await crawlStandardJobBoard({
+    key: `regional-board:${board.key}`,
+    fetchPage: (page) => fetchHtml(board.pageUrl(page)),
+    parsePage: (html, page) => parseBoardPage(html, board, page),
   })
-  return filterQuery([...byUrl.values()], q)
+  return run.jobs
 }
 
 export function regionalJobBoardKeys(): string[] {
