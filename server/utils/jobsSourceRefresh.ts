@@ -34,11 +34,26 @@ import {
   isRegionalGeneralEmployerTarget,
 } from './regionalGeneralEmployerSources'
 import {
+  configuredRegionalJobBoardTargets,
+  fetchRegionalJobBoardTarget,
+  isRegionalJobBoardTarget,
+} from './regionalJobBoardSources'
+import {
   configuredRegionalServiceJobTargets,
   fetchRegionalServiceJobTarget,
   isRegionalServiceJobTarget,
 } from './regionalServiceJobSources'
+import {
+  configuredRegionalTechCompanyTargets,
+  fetchRegionalTechCompanyTarget,
+  isRegionalTechCompanyTarget,
+} from './regionalTechCompanySources'
 import { isLikelyTelegramVacancy } from './sources'
+import {
+  configuredUsaTechCompanyTargets,
+  fetchUsaTechCompanyTarget,
+  isUsaTechCompanyTarget,
+} from './usaTechCompanySources'
 
 const STORE_KEY = 'jobs:store:v4'
 const STORE_TTL_SECONDS = 15 * 86_400
@@ -120,6 +135,9 @@ function configuredCompanySubTargets(): string[] {
     ...configuredExpandedRegionalRemoteTargets(),
     ...configuredRegionalGeneralEmployerTargets(),
     ...configuredRegionalServiceJobTargets(),
+    ...configuredUsaTechCompanyTargets(),
+    ...configuredRegionalTechCompanyTargets(),
+    ...configuredRegionalJobBoardTargets(),
     ...COMPANY_SOURCE_TARGETS.map(companySourceTarget),
   ]
 }
@@ -210,6 +228,9 @@ function isCompanyQueueTarget(target: string): boolean {
     || isExpandedRegionalRemoteTarget(target)
     || isRegionalGeneralEmployerTarget(target)
     || isRegionalServiceJobTarget(target)
+    || isUsaTechCompanyTarget(target)
+    || isRegionalTechCompanyTarget(target)
+    || isRegionalJobBoardTarget(target)
     || isCompanySourceTarget(target)
 }
 
@@ -230,6 +251,9 @@ async function fetchCompanyQueueTarget(target: string): Promise<Job[]> {
   if (isExpandedRegionalRemoteTarget(target)) return fetchExpandedRegionalRemoteTarget(target)
   if (isRegionalGeneralEmployerTarget(target)) return fetchRegionalGeneralEmployerTarget(target)
   if (isRegionalServiceJobTarget(target)) return fetchRegionalServiceJobTarget(target)
+  if (isUsaTechCompanyTarget(target)) return fetchUsaTechCompanyTarget(target)
+  if (isRegionalTechCompanyTarget(target)) return fetchRegionalTechCompanyTarget(target)
+  if (isRegionalJobBoardTarget(target)) return fetchRegionalJobBoardTarget(target)
   if (isCompanySourceTarget(target)) {
     const key = target.slice(COMPANY_SOURCE_TARGET_PREFIX.length) as CompanySourceTarget
     if (key === 'intellias') return fetchIntelliasJobs('')
