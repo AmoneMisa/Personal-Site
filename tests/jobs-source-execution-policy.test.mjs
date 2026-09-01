@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { readFile } from 'node:fs/promises'
+import { access, readFile } from 'node:fs/promises'
 import test from 'node:test'
 
 const sourceModules = [
@@ -54,4 +54,20 @@ test('shared crawler remains the only vacancy adapter traversal policy', async (
   assert.match(crawler, /crawlStandardJobBoard/u)
   assert.match(crawler, /crawlStandardCursorJobBoard/u)
   assert.match(crawler, /enrichStandardJobBoardDetails/u)
+})
+
+test('jobs worker schedules queue targets instead of a second aggregate refresh path', async () => {
+  const runtime = await readFile(new URL('../jobs-worker/jobsRuntime.ts', import.meta.url), 'utf8')
+  const refresh = await readFile(new URL('../server/utils/jobsSourceRefresh.ts', import.meta.url), 'utf8')
+  const directFetcher = await readFile(new URL('../server/utils/jobSourceFetchers.ts', import.meta.url), 'utf8')
+
+  assert.match(runtime, /configuredSources: configuredJobRefreshTargets/u)
+  assert.match(runtime, /refreshSource: refreshJobTarget/u)
+  assert.match(refresh, /TARGETIZED_SOURCES/u)
+  assert.doesNotMatch(directFetcher, /fetch(?:LinkedIn|Facebook|Threads|Companies|Hh|IshGo|ItJobsUz|Olx|Rss)\b/u)
+
+  await assert.rejects(
+    access(new URL('../server/utils/jobsStore.ts', import.meta.url)),
+    (error) => error?.code === 'ENOENT',
+  )
 })
