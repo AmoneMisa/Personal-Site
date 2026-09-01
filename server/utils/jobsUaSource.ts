@@ -1,14 +1,10 @@
 import { moneyCurrencyFromText } from '@whiteslove/parsing-lexicon/currency'
 import { detectEmploymentTypes, detectWorkModes, detectWorkSchedules } from '@whiteslove/parsing-lexicon/hiring-work-semantics'
-import { crawlCyclicJobBoard } from './cyclicJobBoardCrawler'
+import { crawlStandardJobBoard } from './cyclicJobBoardCrawler'
 import { decodeHtmlEntities as decodeEntities, stripHtml } from './htmlText'
 import type { Job } from './jobTypes'
 
 const BASE_URL = 'https://jobs.ua/vacancy'
-const REQUEST_TIMEOUT_MS = 20_000
-const DEFAULT_PAGES_PER_RUN = 8
-const DEFAULT_MAX_PAGE = 1_500
-const DEFAULT_REQUEST_DELAY_MS = 750
 const MAX_DESCRIPTION = 1_200
 
 function attribute(fragment: string, name: string): string {
@@ -23,11 +19,6 @@ function taggedContent(fragment: string, className: string): string {
     new RegExp(`<([a-z][\\w:-]*)\\b[^>]*class=["'][^"']*\\b${escaped}\\b[^"']*["'][^>]*>([\\s\\S]*?)<\\/\\1>`, 'i'),
   )
   return match?.[2] || ''
-}
-
-function integer(value: string | undefined, fallback: number, min: number, max: number): number {
-  const parsed = Number.parseInt(String(value || ''), 10)
-  return Number.isFinite(parsed) ? Math.max(min, Math.min(max, parsed)) : fallback
 }
 
 function salaryFrom(value: string): Pick<Job, 'salaryMin' | 'salaryMax' | 'salaryCurrency' | 'salaryPeriod'> {
@@ -148,7 +139,6 @@ async function fetchPage(page: number): Promise<string> {
       'Accept-Language': 'uk-UA,uk;q=0.9,en;q=0.7',
       'User-Agent': 'jobFinder/1.0 (vacancy search; contact: admin@whiteslove.me)',
     },
-    signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
   })
   if (!response.ok) throw new Error(`jobs.ua -> ${response.status}`)
   return response.text()
@@ -157,16 +147,10 @@ async function fetchPage(page: number): Promise<string> {
 export async function fetchJobsUaJobs(q: string): Promise<Job[]> {
   if (String(process.env.JOBS_UA_SOURCE || 'on').toLowerCase() === 'off') return []
 
-  const pagesPerRun = integer(process.env.JOBS_UA_PAGES_PER_RUN, DEFAULT_PAGES_PER_RUN, 1, 50)
-  const maxPage = integer(process.env.JOBS_UA_MAX_PAGE, DEFAULT_MAX_PAGE, 2, 10_000)
-  const requestDelayMs = integer(process.env.JOBS_UA_REQUEST_DELAY_MS, DEFAULT_REQUEST_DELAY_MS, 0, 10_000)
-  const run = await crawlCyclicJobBoard({
+  const run = await crawlStandardJobBoard({
     key: 'jobs-ua',
-    pagesPerRun,
-    maxPage,
     fetchPage,
     parsePage: (html) => parseJobsUaVacancies(html),
-    requestDelayMs,
   })
 
   if (!q.trim()) return run.jobs
