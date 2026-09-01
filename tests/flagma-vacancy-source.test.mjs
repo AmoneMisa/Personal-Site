@@ -1,6 +1,15 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { parseFlagmaVacancyDetail } from '../server/utils/extraPublicJobSources.ts'
+import {
+  parseFlagmaVacancies,
+  parseFlagmaVacancyDetail,
+} from '../server/utils/extraPublicJobSources.ts'
+import {
+  FLAGMA_JOB_BOARDS,
+  FLAGMA_JOB_BOARD_TARGET_PREFIX,
+  configuredFlagmaJobBoardTargets,
+  isFlagmaJobBoardTarget,
+} from '../server/utils/flagmaJobSource.ts'
 
 const summary = {
   id: 'flagma-22245',
@@ -35,6 +44,31 @@ const detailHtml = `
   <div class="desc-bottom">Номер вакансии: 22245</div>
   <script>adsbygoogle.push({ navigation: true })</script>
 </body></html>`
+
+test('Flagma has one durable jobs-worker queue target per national board', () => {
+  const targets = configuredFlagmaJobBoardTargets()
+  assert.deepEqual(targets, [
+    `${FLAGMA_JOB_BOARD_TARGET_PREFIX}ro`,
+    `${FLAGMA_JOB_BOARD_TARGET_PREFIX}uz`,
+  ])
+  assert.equal(targets.length, FLAGMA_JOB_BOARDS.length)
+  assert.ok(targets.every((target) => isFlagmaJobBoardTarget(target)))
+})
+
+test('Flagma list parser reads vacancy cards for the shared crawler', () => {
+  const html = `
+  <article>
+    <a href="https://flagma.uz/ru/vakansiya-operator-chata-udalyonno-rv22245.html">Оператор чата (удалённо)</a>
+    <div>OydinYo‘l, ООО | Ташкент, UZ</div>
+    <div>в Ташкенте, удаленно</div>
+  </article>`
+  const jobs = parseFlagmaVacancies(html, FLAGMA_JOB_BOARDS[1])
+  assert.equal(jobs.length, 1)
+  assert.equal(jobs[0].id, 'flagma-22245')
+  assert.equal(jobs[0].title, 'Оператор чата (удалённо)')
+  assert.equal(jobs[0].remote, true)
+  assert.match(jobs[0].url, /-rv22245\.html$/)
+})
 
 test('Flagma detail parser reads authoritative vacancy fields without related cards or ads', () => {
   const job = parseFlagmaVacancyDetail(detailHtml, summary)
