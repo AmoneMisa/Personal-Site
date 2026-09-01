@@ -26,6 +26,11 @@ import {
   fetchExpandedRegionalRemoteTarget,
   isExpandedRegionalRemoteTarget,
 } from './expandedRegionalRemoteSources'
+import {
+  configuredHhJobTargets,
+  fetchHhJobTarget,
+  isHhJobTarget,
+} from './hhJobSource'
 import { fetchIntelliasJobs } from './intelliasJobs'
 import { isJobSourceAvailable } from './jobSourceConfig'
 import { fetchJobSource } from './jobSourceFetchers'
@@ -99,6 +104,7 @@ const COMPANY_SOURCE_TARGETS = ['intellias', 'jobs-ua'] as const
 const TARGETIZED_SOURCES = new Set<JobSource>([
   'companies',
   'themuse',
+  'hh',
   'adzuna',
   'jooble',
   'rss',
@@ -199,6 +205,7 @@ export function configuredJobRefreshTargets(): string[] {
   return [
     ...directSources,
     ...configuredCompanyTargets(),
+    ...configuredHhJobTargets(),
     ...configuredStandardJobSourceTargets(),
     ...configuredTelegramJobTargets(),
   ]
@@ -298,6 +305,7 @@ function isCompanyQueueTarget(target: string): boolean {
 function isKnownRefreshTarget(target: string): boolean {
   return isKnownJobSource(target)
     || isCompanyQueueTarget(target)
+    || isHhJobTarget(target)
     || isStandardJobSourceTarget(target)
     || isTelegramJobTarget(target)
 }
@@ -341,6 +349,13 @@ async function runJobTargetRefresh(target: string) {
       return { target, source: 'companies' as const, skipped: true, reason: 'not_configured', fetched: 0 }
     }
     return mergeForTarget(target, 'companies', await fetchCompanyQueueTarget(target))
+  }
+
+  if (isHhJobTarget(target)) {
+    if (!isJobSourceAvailable('hh', 'ingestion')) {
+      return { target, source: 'hh' as const, skipped: true, reason: 'not_configured', fetched: 0 }
+    }
+    return mergeForTarget(target, 'hh', await fetchHhJobTarget(target))
   }
 
   if (isStandardJobSourceTarget(target)) {
