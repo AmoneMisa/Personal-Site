@@ -26,4 +26,6 @@ db.env
 
 /app/generated/prisma
 
+whiteslove.me-audit
+
 Personal Site.iml
