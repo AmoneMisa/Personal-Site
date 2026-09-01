@@ -1,4 +1,3 @@
-import { COMMUNITY_JOB_BOARDS } from '../server/utils/communityJobBoardSources'
 import { looksSoftBlocked } from '../shared/http/browserSoftBlock'
 import { loadCursors, loadWebCursors } from '../shared/hiring/hiringCursors'
 import {
@@ -11,7 +10,7 @@ import {
   pruneJobsQueueHistory,
 } from '../shared/jobs/jobsPgQueue'
 import { allHiringTargets, refreshHiringTarget } from './hiringRuntime'
-import { configuredSources, refreshSource } from './jobsRuntime'
+import { communityJobBoardHosts, configuredSources, refreshSource } from './jobsRuntime'
 import { WORKER_HEALTH_ID, workerHealthReporter } from './workerHealthRuntime'
 
 const POLL_MS = Math.max(250, Number(process.env.JOBS_QUEUE_POLL_MS) || Number(process.env.JOBS_QUEUE_POLL_SECONDS || 1) * 1000)
@@ -94,16 +93,8 @@ function installJobBrowserFallback() {
     'visajobfinder.com',
     'migratemate.co',
     'gcsservices.careers.microsoft.com',
+    ...communityJobBoardHosts(),
   ])
-  for (const board of COMMUNITY_JOB_BOARDS) {
-    try {
-      hosts.add(normalizedHost(new URL(board.url).hostname))
-    } catch {
-      // Registry URLs are constants; an invalid one should fail its own source,
-      // not prevent the worker from starting.
-    }
-  }
-  hosts.add('himalayas.app')
   for (const raw of String(process.env.JOB_BROWSER_ALLOWED_HOSTS || '').split(',')) {
     const host = normalizedHost(raw.trim())
     if (host) hosts.add(host)
