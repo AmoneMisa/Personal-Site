@@ -6,7 +6,6 @@ import { absoluteHttpUrl as absoluteUrl, htmlLines, stripHtml } from './htmlText
 const UA =
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ' +
   '(KHTML, like Gecko) Chrome/126.0 Safari/537.36'
-const REQUEST_TIMEOUT_MS = 20_000
 const MAX_AGE_DAYS = 14
 const MAX_DESCRIPTION = 4_000
 
@@ -17,7 +16,6 @@ async function fetchHtml(url: string): Promise<string> {
       Accept: 'text/html,application/xhtml+xml',
       'Accept-Language': 'en,ru,ro;q=0.8',
     },
-    signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
   })
   if (!response.ok) throw new Error(`${new URL(url).host} -> ${response.status}`)
   return response.text()
@@ -69,16 +67,6 @@ function makeJob(input: {
   }
 }
 
-function filterQuery(jobs: Job[], q: string): Job[] {
-  if (!q.trim()) return jobs
-  const needle = q.toLocaleLowerCase('ru')
-  return jobs.filter((job) =>
-    `${job.title} ${job.company} ${job.location} ${job.description || ''}`
-      .toLocaleLowerCase('ru')
-      .includes(needle),
-  )
-}
-
 async function fetchAirAstana(): Promise<Job[]> {
   const roots = [
     'https://job.airastana.com/en/Home',
@@ -92,7 +80,7 @@ async function fetchAirAstana(): Promise<Job[]> {
       root = candidate
       if (html) break
     } catch {
-      // Try the alternate locale before failing the isolated loader.
+      // Try the alternate locale before failing the isolated source target.
     }
   }
   if (!html) throw new Error('Air Astana career portal unavailable')
@@ -117,8 +105,6 @@ async function fetchAirAstana(): Promise<Job[]> {
     }))
   }
 
-  // The homepage can render the latest-jobs table without links in some
-  // deployments. Preserve those active rows rather than silently returning 0.
   if (!out.size) {
     const lines = htmlLines(html)
     const marker = lines.findIndex((line) => /(?:latest jobs|последние вакансии|jobs)/iu.test(line))
@@ -257,32 +243,32 @@ async function fetchRyanair(): Promise<Job[]> {
   )
 }
 
-type Loader = { label: string; load: () => Promise<Job[]> }
+type Loader = { key: string; load: () => Promise<Job[]> }
 
-export async function fetchAviationExpansionJobs(q: string): Promise<Job[]> {
+const AVIATION_LOADERS: Loader[] = [
+  { key: 'air-astana', load: fetchAirAstana },
+  { key: 'bucharest-airports', load: fetchBucharestAirports },
+  { key: 'cluj-airport', load: fetchClujAirport },
+  { key: 'tarom', load: fetchTarom },
+  { key: 'wizz-air', load: fetchWizzAir },
+  { key: 'ryanair', load: fetchRyanair },
+]
+
+export const AVIATION_JOB_TARGET_PREFIX = 'aviation-job:'
+
+export function configuredAviationJobTargets(): string[] {
   if (process.env.AVIATION_JOBS_SOURCE === 'off') return []
+  return AVIATION_LOADERS.map((loader) => `${AVIATION_JOB_TARGET_PREFIX}${loader.key}`)
+}
 
-  const loaders: Loader[] = [
-    { label: 'air-astana', load: fetchAirAstana },
-    { label: 'bucharest-airports', load: fetchBucharestAirports },
-    { label: 'cluj-airport', load: fetchClujAirport },
-    { label: 'tarom', load: fetchTarom },
-    { label: 'wizz-air', load: fetchWizzAir },
-    { label: 'ryanair', load: fetchRyanair },
-  ]
+export function isAviationJobTarget(target: string): boolean {
+  return target.startsWith(AVIATION_JOB_TARGET_PREFIX)
+}
 
-  const results = await Promise.allSettled(loaders.map(({ load }) => load()))
-  const byUrl = new Map<string, Job>()
-  results.forEach((result, index) => {
-    if (result.status === 'rejected') {
-      console.warn(
-        `[jobs:aviation] ${loaders[index]!.label} failed:`,
-        result.reason instanceof Error ? result.reason.message : String(result.reason),
-      )
-      return
-    }
-    for (const job of result.value) byUrl.set(job.url, job)
-  })
-
-  return filterQuery([...byUrl.values()], q)
+export async function fetchAviationJobTarget(target: string): Promise<Job[]> {
+  if (!isAviationJobTarget(target)) throw new Error(`Unknown aviation target ${target}`)
+  const key = target.slice(AVIATION_JOB_TARGET_PREFIX.length)
+  const loader = AVIATION_LOADERS.find((candidate) => candidate.key === key)
+  if (!loader) throw new Error(`Unknown aviation target ${target}`)
+  return loader.load()
 }
