@@ -1,5 +1,4 @@
 import type { Job, JobSource } from './jobTypes'
-import { fetchFacebookJobs, fetchThreadsJobs } from './socialJobSources'
 import {
   fetchArbeitnow,
   fetchDevKg,
@@ -22,8 +21,8 @@ const FETCHERS: Record<JobSource, (query: string) => Promise<Job[]>> = {
   rss: targetizedSource,
   companies: targetizedSource,
   linkedin: targetizedSource,
-  facebook: fetchFacebookJobs,
-  threads: fetchThreadsJobs,
+  facebook: targetizedSource,
+  threads: targetizedSource,
   devkg: fetchDevKg,
   ishgo: targetizedSource,
   itjobsuz: targetizedSource,
