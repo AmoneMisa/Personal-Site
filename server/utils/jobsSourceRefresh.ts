@@ -1,5 +1,10 @@
 import { useStateStore } from '~~/server/utils/stateStore'
 import { syncJobsDb } from '../jobs/infrastructure/database'
+import {
+  configuredCommunityJobBoardTargets,
+  fetchCommunityJobBoardTarget,
+  isCommunityJobBoardTarget,
+} from './communityJobBoardSources'
 import { enrichJob } from './enrich'
 import { isJobSourceAvailable } from './jobSourceConfig'
 import { fetchJobSource } from './jobSourceFetchers'
@@ -78,6 +83,18 @@ let mergeLock: Promise<unknown> = Promise.resolve()
 
 export function configuredJobSources(): JobSource[] {
   return ALL_SOURCES.filter((source) => isJobSourceAvailable(source, 'ingestion'))
+}
+
+/**
+ * Queue targets are intentionally more granular than the public JobSource enum.
+ * Registry-style vacancy boards are individual targets so the durable queue and
+ * shared crawler own pacing/retries instead of a source adapter launching its
+ * own fan-out inside the broad `companies` source.
+ */
+export function configuredJobRefreshTargets(): string[] {
+  const sources = configuredJobSources()
+  if (!sources.includes('companies')) return sources
+  return [...sources, ...configuredCommunityJobBoardTargets()]
 }
 
 function dedupKey(job: Job): string {
@@ -172,50 +189,60 @@ async function mergeFetchedSource(source: JobSource, jobs: Job[]) {
 // after 150s, but the crawl keeps running, and the queue then retries the same
 // source. Several full crawls of the same boards end up in flight at once,
 // each holding its pages in memory — which is how this process reached a 4GB
-// heap and was killed. One refresh per source at a time; a second caller
+// heap and was killed. One refresh per queue target at a time; a second caller
 // waits for the first instead of starting another.
-const inFlight = new Map<JobSource, Promise<unknown>>()
+const inFlight = new Map<string, Promise<unknown>>()
 
-export async function refreshJobSource(source: JobSource) {
-  if (!ALL_SOURCES.includes(source)) {
-    throw new Error(`Unknown job source ${source}`)
-  }
-
-  if (!isJobSourceAvailable(source, 'ingestion')) {
-    return {
-      source,
-      skipped: true,
-      reason: 'not_configured',
-      fetched: 0,
-    }
-  }
-
-  if (inFlight.has(source)) {
-    // Answer at once rather than holding the caller open behind a crawl it
-    // will time out on anyway: the retry that follows would only add another
-    // waiting request to the pile.
-    console.log(`[jobs] ${source} refresh already running; skipping this request`)
-    return { source, skipped: true, reason: 'already_running', fetched: 0 }
-  }
-
-  const started = runJobSourceRefresh(source)
-  inFlight.set(source, started)
-  try {
-    return await started
-  } finally {
-    inFlight.delete(source)
-  }
+function isKnownJobSource(value: string): value is JobSource {
+  return ALL_SOURCES.includes(value as JobSource)
 }
 
-async function runJobSourceRefresh(source: JobSource) {
-  const jobs = await fetchJobSource(source)
-
-  // Fetching is parallel; mutation of the shared persistent store is serialized.
+async function mergeForTarget(target: string, source: JobSource, jobs: Job[]) {
   const operation = mergeLock.then(
     () => mergeFetchedSource(source, jobs),
     () => mergeFetchedSource(source, jobs),
   )
-
   mergeLock = operation.catch(() => {})
-  return await operation
+  const result = await operation
+  return { target, ...result }
+}
+
+async function runJobTargetRefresh(target: string) {
+  if (isCommunityJobBoardTarget(target)) {
+    if (!isJobSourceAvailable('companies', 'ingestion')) {
+      return { target, source: 'companies' as const, skipped: true, reason: 'not_configured', fetched: 0 }
+    }
+    const jobs = await fetchCommunityJobBoardTarget(target)
+    return mergeForTarget(target, 'companies', jobs)
+  }
+
+  if (!isKnownJobSource(target)) throw new Error(`Unknown job refresh target ${target}`)
+  if (!isJobSourceAvailable(target, 'ingestion')) {
+    return { target, source: target, skipped: true, reason: 'not_configured', fetched: 0 }
+  }
+  const jobs = await fetchJobSource(target)
+  return mergeForTarget(target, target, jobs)
+}
+
+export async function refreshJobTarget(target: string) {
+  if (!isCommunityJobBoardTarget(target) && !isKnownJobSource(target)) {
+    throw new Error(`Unknown job refresh target ${target}`)
+  }
+
+  if (inFlight.has(target)) {
+    console.log(`[jobs] ${target} refresh already running; skipping this request`)
+    return { target, skipped: true, reason: 'already_running', fetched: 0 }
+  }
+
+  const started = runJobTargetRefresh(target)
+  inFlight.set(target, started)
+  try {
+    return await started
+  } finally {
+    inFlight.delete(target)
+  }
+}
+
+export async function refreshJobSource(source: JobSource) {
+  return refreshJobTarget(source)
 }
