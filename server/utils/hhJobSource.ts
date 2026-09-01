@@ -185,10 +185,3 @@ export async function fetchHhJobTarget(target: string): Promise<Job[]> {
   })
   return run.jobs
 }
-
-/** Compatibility helper. Production ingestion schedules each HH area separately. */
-export async function fetchHhJobs(_query = ''): Promise<Job[]> {
-  const jobs: Job[] = []
-  for (const target of configuredHhJobTargets()) jobs.push(...await fetchHhJobTarget(target))
-  return jobs
-}
