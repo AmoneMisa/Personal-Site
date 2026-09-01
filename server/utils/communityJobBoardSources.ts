@@ -3,7 +3,9 @@ import { parseHiringActivityDate } from '@whiteslove/parsing-lexicon/hiring-temp
 import {
   crawlStandardCursorJobBoard,
   crawlStandardJobBoard,
+  enrichStandardJobBoardDetails,
 } from './cyclicJobBoardCrawler'
+import { parseFlagmaVacancies, parseFlagmaVacancyDetail } from './extraPublicJobSources'
 import { absoluteHttpUrl, stripHtml } from './htmlText'
 import { detectWorkModes } from './hiringLexicon'
 import type { Job } from './jobTypes'
@@ -18,10 +20,13 @@ type CommunityBoard = {
   key: string
   label: string
   url: string
+  country?: string
   remoteByDefault?: boolean
   directEmployer?: boolean
   allowExternalJobLinks?: boolean
   pageUrl?: (page: number) => string
+  parsePage?: (html: string, board: CommunityBoard, pageUrl: string) => Job[]
+  detailParse?: (html: string, summary: Job) => Job | null
 }
 
 function queryPage(base: string, page: number, parameter = 'page'): string {
@@ -38,6 +43,11 @@ function offsetPage(base: string, page: number, parameter: string, step: number)
   return url.toString()
 }
 
+function flagmaPage(base: string, page: number): string {
+  if (page <= 1) return base
+  return `${base.replace(/\/+$/, '')}/page-${page}/`
+}
+
 /**
  * Candidate-facing sources supplied for Job Finder that are not already owned
  * by a dedicated adapter. Every paginated board below is executed as its own
@@ -45,6 +55,26 @@ function offsetPage(base: string, page: number, parameter: string, step: number)
  * fan-out, concurrency pool, timeout policy or per-run item cap here.
  */
 export const COMMUNITY_JOB_BOARDS: CommunityBoard[] = [
+  // Regional boards with source-specific deterministic parsers
+  {
+    key: 'flagma-ro',
+    label: 'Flagma RO',
+    url: 'https://flagma.ro/ru/vacancies/',
+    country: 'RO',
+    pageUrl: (page) => flagmaPage('https://flagma.ro/ru/vacancies/', page),
+    parsePage: (html, board) => parseFlagmaVacancies(html, board),
+    detailParse: parseFlagmaVacancyDetail,
+  },
+  {
+    key: 'flagma-uz',
+    label: 'Flagma UZ',
+    url: 'https://flagma.uz/ru/vacancies/',
+    country: 'UZ',
+    pageUrl: (page) => flagmaPage('https://flagma.uz/ru/vacancies/', page),
+    parsePage: (html, board) => parseFlagmaVacancies(html, board),
+    detailParse: parseFlagmaVacancyDetail,
+  },
+
   // General boards
   { key: 'indeed', label: 'Indeed', url: 'https://www.indeed.com/jobs', pageUrl: (page) => offsetPage('https://www.indeed.com/jobs', page, 'start', 10) },
   { key: 'glassdoor', label: 'Glassdoor', url: 'https://www.glassdoor.com/Job/jobs.htm' },
@@ -392,13 +422,23 @@ async function crawlBoard(board: CommunityBoard): Promise<Job[]> {
     },
     parsePage: (html, page) => {
       const url = board.pageUrl ? board.pageUrl(page) : queryPage(board.url, page)
-      return parseBoardPage(html, board, url)
+      return board.parsePage ? board.parsePage(html, board, url) : parseBoardPage(html, board, url)
     },
   })
+
+  const jobs = board.detailParse
+    ? await enrichStandardJobBoardDetails({
+        key: `community:${board.key}`,
+        jobs: run.jobs,
+        fetchDetail: (job) => fetchText(job.url),
+        parseDetail: board.detailParse,
+      })
+    : run.jobs
+
   console.log(
     `[jobs] ${board.label} pages=${run.pages.join(',')} next=${run.nextPage} cycle=${run.cycle}`,
   )
-  return run.jobs
+  return jobs
 }
 
 type HimalayasJob = {
