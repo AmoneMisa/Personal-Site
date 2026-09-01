@@ -1,11 +1,10 @@
 import { XMLParser } from 'fast-xml-parser'
 import { parseHiringActivityDate } from '@whiteslove/parsing-lexicon/hiring-temporal'
-import { crawlCyclicJobBoard } from './cyclicJobBoardCrawler'
+import { crawlStandardJobBoard } from './cyclicJobBoardCrawler'
 import { extractSalaryFromText } from './enrich'
 import { detectLexiconCity, detectWorkModes } from './hiringLexicon'
 import type { Job } from './jobTypes'
 
-const REQUEST_TIMEOUT_MS = 25_000
 const MAX_DESCRIPTION = 2_400
 const MAX_AGE_MS = 14 * 86_400_000
 const USER_AGENT = 'jobFinder/1.0 (vacancy search; contact: admin@whiteslove.me)'
@@ -77,8 +76,6 @@ export const DOU_CATEGORIES = [
   'Військова справа',
 ] as const
 
-// Used only when a board's category index cannot be read. These are broad
-// source-facing discovery terms, deliberately spanning non-IT work as well.
 const WORK_UA_FALLBACK_SEARCHES = [
   'IT',
   'адміністрація',
@@ -144,11 +141,6 @@ type CrawlBoardStream = {
   pageUrl: (page: number) => string
 }
 
-function integer(value: string | undefined, fallback: number, min: number, max: number): number {
-  const parsed = Number.parseInt(String(value || ''), 10)
-  return Number.isFinite(parsed) ? Math.max(min, Math.min(max, parsed)) : fallback
-}
-
 function decodeEntities(value: string): string {
   return value
     .replace(/&nbsp;|&#160;/gi, ' ')
@@ -194,7 +186,6 @@ async function fetchText(url: string): Promise<string> {
       'Accept-Language': 'uk-UA,uk;q=0.9,en;q=0.7',
       'User-Agent': USER_AGENT,
     },
-    signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
   })
   if (!response.ok) throw new Error(`${new URL(url).host} -> ${response.status}`)
   return response.text()
@@ -205,14 +196,6 @@ function sourceTerms(value: string | undefined, defaults: readonly string[]): st
   return (raw ? raw.split(',') : [...defaults])
     .map((item) => item.trim())
     .filter(Boolean)
-}
-
-function queryMatches(job: Job, q: string): boolean {
-  const needle = q.trim().toLocaleLowerCase('uk')
-  if (!needle) return true
-  return `${job.title} ${job.company} ${job.location} ${job.description || ''}`
-    .toLocaleLowerCase('uk')
-    .includes(needle)
 }
 
 function canonicalUrl(raw: string, base: string): string {
@@ -244,21 +227,6 @@ function recentPostedAt(text: string, fallback = new Date()): string | null {
   return new Date(time).toISOString()
 }
 
-function dedupe(jobs: Job[]): Job[] {
-  const byUrl = new Map<string, Job>()
-  for (const job of jobs) {
-    const key = job.url || job.id
-    if (!byUrl.has(key)) byUrl.set(key, job)
-  }
-  return [...byUrl.values()]
-}
-
-function dedupeStreams(streams: CrawlBoardStream[]): CrawlBoardStream[] {
-  const byKey = new Map<string, CrawlBoardStream>()
-  for (const stream of streams) if (!byKey.has(stream.key)) byKey.set(stream.key, stream)
-  return [...byKey.values()]
-}
-
 function streamKey(value: string): string {
   return value
     .normalize('NFKC')
@@ -268,22 +236,7 @@ function streamKey(value: string): string {
     .slice(0, 100) || 'default'
 }
 
-async function mapLimited<T, R>(items: T[], concurrency: number, worker: (item: T) => Promise<R>): Promise<R[]> {
-  const results = new Array<R>(items.length)
-  let next = 0
-  const runners = Array.from({ length: Math.min(Math.max(1, concurrency), items.length) }, async () => {
-    while (true) {
-      const index = next++
-      if (index >= items.length) return
-      results[index] = await worker(items[index]!)
-    }
-  })
-  await Promise.all(runners)
-  return results
-}
-
-async function parseRssFeed(url: string, tag: string, idPrefix: string): Promise<Job[]> {
-  const xml = await fetchText(url)
+function parseRssXml(xml: string, url: string, tag: string, idPrefix: string): Job[] {
   const parsed = new XMLParser({ ignoreAttributes: false }).parse(xml)
   const rawItems = parsed?.rss?.channel?.item || parsed?.feed?.entry || []
   const items = Array.isArray(rawItems) ? rawItems : [rawItems]
@@ -327,31 +280,6 @@ async function parseRssFeed(url: string, tag: string, idPrefix: string): Promise
   }
 
   return out
-}
-
-export async function fetchDouJobs(q: string): Promise<Job[]> {
-  if (String(process.env.DOU_SOURCE || 'on').toLowerCase() === 'off') return []
-
-  const categories = sourceTerms(process.env.DOU_JOB_CATEGORIES, DOU_CATEGORIES)
-  const concurrency = integer(process.env.DOU_CATEGORY_CONCURRENCY, 6, 1, 12)
-  const results = await mapLimited(categories, concurrency, async (category) => {
-    try {
-      const params = new URLSearchParams({ category })
-      return await parseRssFeed(
-        `https://jobs.dou.ua/vacancies/feeds/?${params.toString()}`,
-        `DOU · ${category}`,
-        `companies-dou-${streamKey(category)}`,
-      )
-    } catch (error) {
-      console.warn(
-        `[jobs] DOU category "${category}" failed:`,
-        error instanceof Error ? error.message : String(error),
-      )
-      return []
-    }
-  })
-
-  return dedupe(results.flat()).filter((job) => queryMatches(job, q))
 }
 
 function searchCardRanges(html: string, pattern: RegExp): Array<{ href: string; id: string; inner: string; index: number }> {
@@ -413,42 +341,6 @@ export function parseDjinniPage(html: string, now = new Date()): Job[] {
   }
 
   return jobs
-}
-
-export async function fetchDjinniJobs(q: string): Promise<Job[]> {
-  if (String(process.env.DJINNI_SOURCE || 'on').toLowerCase() === 'off') return []
-
-  const [rssResult, crawlResult] = await Promise.allSettled([
-    parseRssFeed(
-      process.env.DJINNI_RSS_URL || 'https://djinni.co/jobs/rss/',
-      'Djinni',
-      'companies-djinni-rss',
-    ),
-    crawlCyclicJobBoard({
-      key: 'djinni:all-jobs',
-      pagesPerRun: integer(process.env.DJINNI_PAGES_PER_RUN, 12, 1, 50),
-      maxPage: integer(process.env.DJINNI_MAX_PAGE, 600, 2, 2_000),
-      fetchPage: (page) => fetchText(page === 1 ? 'https://djinni.co/jobs/' : `https://djinni.co/jobs/?page=${page}`),
-      parsePage: (html) => parseDjinniPage(html),
-      requestDelayMs: integer(process.env.DJINNI_REQUEST_DELAY_MS, 250, 0, 5_000),
-    }),
-  ])
-
-  const jobs: Job[] = []
-  if (rssResult.status === 'fulfilled') jobs.push(...rssResult.value)
-  else console.warn('[jobs] Djinni RSS failed:', rssResult.reason instanceof Error ? rssResult.reason.message : String(rssResult.reason))
-
-  if (crawlResult.status === 'fulfilled') {
-    jobs.push(...crawlResult.value.jobs)
-    console.log(
-      `[jobs] Djinni coverage pages=${crawlResult.value.pages.join(',')} `
-      + `next=${crawlResult.value.nextPage} cycle=${crawlResult.value.cycle}`,
-    )
-  } else {
-    console.warn('[jobs] Djinni crawl failed:', crawlResult.reason instanceof Error ? crawlResult.reason.message : String(crawlResult.reason))
-  }
-
-  return dedupe(jobs).filter((job) => queryMatches(job, q))
 }
 
 export function parseWorkUaPage(html: string, stream: string, now = new Date()): Job[] {
@@ -588,20 +480,6 @@ export function parseRobotaUaProfessionalStreams(html: string): PublicBoardStrea
   return [...streams.values()]
 }
 
-function workUaCategoryStream(stream: PublicBoardStream): CrawlBoardStream {
-  return {
-    key: `category:${stream.key}`,
-    label: stream.label,
-    pageUrl: (page) => {
-      const url = new URL(stream.baseUrl)
-      url.searchParams.set('days', '14')
-      url.searchParams.set('sort', 'publication')
-      if (page > 1) url.searchParams.set('page', String(page))
-      return url.toString()
-    },
-  }
-}
-
 function workUaSearchStream(term: string): CrawlBoardStream {
   return {
     key: `search:${streamKey(term)}`,
@@ -617,14 +495,6 @@ function workUaSearchStream(term: string): CrawlBoardStream {
   }
 }
 
-function robotaUaCategoryStream(stream: PublicBoardStream): CrawlBoardStream {
-  return {
-    key: `category:${stream.key}`,
-    label: stream.label,
-    pageUrl: (page) => page > 1 ? `${stream.baseUrl}?page=${page}` : stream.baseUrl,
-  }
-}
-
 function robotaUaSearchStream(slug: string): CrawlBoardStream {
   const key = streamKey(slug)
   const baseUrl = `https://robota.ua/zapros/${encodeURIComponent(slug)}/ukraine`
@@ -635,127 +505,90 @@ function robotaUaSearchStream(slug: string): CrawlBoardStream {
   }
 }
 
-async function fetchBoardStreams(options: {
-  boardKey: string
-  streams: CrawlBoardStream[]
-  pagesPerRun: number
-  maxPage: number
-  concurrency: number
-  requestDelayMs: number
-  parser: (html: string, stream: string) => Job[]
-}): Promise<Job[]> {
-  const streams = dedupeStreams(options.streams)
-  const runs = await mapLimited(streams, options.concurrency, async (stream) => {
-    try {
-      return await crawlCyclicJobBoard({
-        key: `${options.boardKey}:${stream.key}`,
-        pagesPerRun: options.pagesPerRun,
-        maxPage: options.maxPage,
-        fetchPage: (page) => fetchText(stream.pageUrl(page)),
-        parsePage: (html) => options.parser(html, stream.label),
-        requestDelayMs: options.requestDelayMs,
-      })
-    } catch (error) {
-      console.warn(
-        `[jobs] ${options.boardKey} stream "${stream.label}" failed:`,
-        error instanceof Error ? error.message : String(error),
-      )
-      return null
-    }
-  })
+export const UKRAINE_JOB_TARGET_PREFIX = 'ukraine-job-source:'
 
-  const successful = runs.filter((run): run is NonNullable<typeof run> => Boolean(run))
-  const pages = successful.reduce((sum, run) => sum + run.pages.length, 0)
-  const cycles = successful.filter((run) => run.reachedEnd).length
-  const jobs = dedupe(successful.flatMap((run) => run.jobs))
-  console.log(
-    `[jobs] ${options.boardKey} coverage streams=${streams.length} pages=${pages} `
-    + `jobs=${jobs.length} completedCycles=${cycles}`,
-  )
-  return jobs
+function douCategories(): string[] {
+  return sourceTerms(process.env.DOU_JOB_CATEGORIES, DOU_CATEGORIES)
 }
 
-async function discoverWorkUaStreams(): Promise<CrawlBoardStream[]> {
-  let discovered: PublicBoardStream[] = []
-  try {
-    discovered = parseWorkUaCategoryIndex(await fetchText('https://www.work.ua/jobs/by-category/'))
-  } catch (error) {
-    console.warn('[jobs] Work.ua category discovery failed:', error instanceof Error ? error.message : String(error))
+function workUaStreams(): CrawlBoardStream[] {
+  return sourceTerms(process.env.WORK_UA_SEARCH_STREAMS, WORK_UA_FALLBACK_SEARCHES).map(workUaSearchStream)
+}
+
+function robotaUaStreams(): CrawlBoardStream[] {
+  return sourceTerms(process.env.ROBOTA_UA_SEARCH_STREAMS, ROBOTA_UA_FALLBACK_SEARCHES).map(robotaUaSearchStream)
+}
+
+export function configuredUkraineJobTargets(): string[] {
+  const targets: string[] = []
+  if (String(process.env.DOU_SOURCE || 'on').toLowerCase() !== 'off') {
+    targets.push(...douCategories().map((category) => `${UKRAINE_JOB_TARGET_PREFIX}dou-${streamKey(category)}`))
   }
-
-  const extras = sourceTerms(process.env.WORK_UA_SEARCH_STREAMS, [])
-  const streams = discovered.map(workUaCategoryStream)
-  streams.push(...extras.map(workUaSearchStream))
-
-  if (!streams.length) {
-    streams.push(...WORK_UA_FALLBACK_SEARCHES.map(workUaSearchStream))
+  if (String(process.env.DJINNI_SOURCE || 'on').toLowerCase() !== 'off') {
+    targets.push(`${UKRAINE_JOB_TARGET_PREFIX}djinni-rss`, `${UKRAINE_JOB_TARGET_PREFIX}djinni-board`)
   }
-
-  return dedupeStreams(streams)
-}
-
-async function discoverRobotaUaStreams(): Promise<CrawlBoardStream[]> {
-  let discovered: PublicBoardStream[] = []
-  try {
-    discovered = parseRobotaUaProfessionalStreams(await fetchText('https://robota.ua/'))
-  } catch (error) {
-    console.warn('[jobs] robota.ua professional-sphere discovery failed:', error instanceof Error ? error.message : String(error))
+  if (String(process.env.WORK_UA_SOURCE || 'on').toLowerCase() !== 'off') {
+    targets.push(...workUaStreams().map((stream) => `${UKRAINE_JOB_TARGET_PREFIX}work-ua-${streamKey(stream.label)}`))
   }
-
-  const extras = sourceTerms(process.env.ROBOTA_UA_SEARCH_STREAMS, [])
-  const streams = discovered.map(robotaUaCategoryStream)
-  streams.push(...extras.map(robotaUaSearchStream))
-
-  if (!streams.length) {
-    streams.push(...ROBOTA_UA_FALLBACK_SEARCHES.map(robotaUaSearchStream))
+  if (String(process.env.ROBOTA_UA_SOURCE || 'on').toLowerCase() !== 'off') {
+    targets.push(...robotaUaStreams().map((stream) => `${UKRAINE_JOB_TARGET_PREFIX}robota-ua-${streamKey(stream.label)}`))
   }
-
-  return dedupeStreams(streams)
+  return [...new Set(targets)]
 }
 
-export async function fetchWorkUaJobs(q: string): Promise<Job[]> {
-  if (String(process.env.WORK_UA_SOURCE || 'on').toLowerCase() === 'off') return []
-  const jobs = await fetchBoardStreams({
-    boardKey: 'work-ua',
-    streams: await discoverWorkUaStreams(),
-    pagesPerRun: integer(process.env.WORK_UA_PAGES_PER_RUN, 2, 1, 20),
-    maxPage: integer(process.env.WORK_UA_MAX_PAGE, 2_000, 2, 10_000),
-    concurrency: integer(process.env.WORK_UA_CONCURRENCY, 3, 1, 8),
-    requestDelayMs: integer(process.env.WORK_UA_REQUEST_DELAY_MS, 500, 0, 10_000),
-    parser: parseWorkUaPage,
-  })
-  return jobs.filter((job) => queryMatches(job, q))
+export function isUkraineJobTarget(target: string): boolean {
+  return target.startsWith(UKRAINE_JOB_TARGET_PREFIX)
 }
 
-export async function fetchRobotaUaJobs(q: string): Promise<Job[]> {
-  if (String(process.env.ROBOTA_UA_SOURCE || 'on').toLowerCase() === 'off') return []
-  const jobs = await fetchBoardStreams({
-    boardKey: 'robota-ua',
-    streams: await discoverRobotaUaStreams(),
-    pagesPerRun: integer(process.env.ROBOTA_UA_PAGES_PER_RUN, 2, 1, 20),
-    maxPage: integer(process.env.ROBOTA_UA_MAX_PAGE, 2_000, 2, 10_000),
-    concurrency: integer(process.env.ROBOTA_UA_CONCURRENCY, 3, 1, 8),
-    requestDelayMs: integer(process.env.ROBOTA_UA_REQUEST_DELAY_MS, 500, 0, 10_000),
-    parser: parseRobotaUaPage,
-  })
-  return jobs.filter((job) => queryMatches(job, q))
+async function fetchDouTarget(key: string): Promise<Job[]> {
+  const category = douCategories().find((item) => streamKey(item) === key)
+  if (!category) throw new Error(`Unknown DOU category ${key}`)
+  const params = new URLSearchParams({ category })
+  const url = `https://jobs.dou.ua/vacancies/feeds/?${params.toString()}`
+  return parseRssXml(await fetchText(url), url, `DOU · ${category}`, `companies-dou-${streamKey(category)}`)
 }
 
-export async function fetchUkraineBoardJobs(q: string): Promise<Job[]> {
-  const loaders = [
-    { label: 'dou', load: () => fetchDouJobs(q) },
-    { label: 'djinni', load: () => fetchDjinniJobs(q) },
-    { label: 'work.ua', load: () => fetchWorkUaJobs(q) },
-    { label: 'robota.ua', load: () => fetchRobotaUaJobs(q) },
-  ]
-  const results = await Promise.allSettled(loaders.map(({ load }) => load()))
-  const jobs: Job[] = []
-  results.forEach((result, index) => {
-    if (result.status === 'fulfilled') jobs.push(...result.value)
-    else console.warn(
-      `[jobs] ${loaders[index]!.label} failed:`,
-      result.reason instanceof Error ? result.reason.message : String(result.reason),
-    )
+async function fetchDjinniBoardTarget(): Promise<Job[]> {
+  const run = await crawlStandardJobBoard({
+    key: 'ukraine:djinni',
+    fetchPage: (page) => fetchText(page === 1 ? 'https://djinni.co/jobs/' : `https://djinni.co/jobs/?page=${page}`),
+    parsePage: (html) => parseDjinniPage(html),
   })
-  return dedupe(jobs)
+  return run.jobs
+}
+
+async function fetchWorkUaTarget(key: string): Promise<Job[]> {
+  const stream = workUaStreams().find((item) => streamKey(item.label) === key)
+  if (!stream) throw new Error(`Unknown Work.ua stream ${key}`)
+  const run = await crawlStandardJobBoard({
+    key: `ukraine:work-ua:${stream.key}`,
+    fetchPage: (page) => fetchText(stream.pageUrl(page)),
+    parsePage: (html) => parseWorkUaPage(html, stream.label),
+  })
+  return run.jobs
+}
+
+async function fetchRobotaUaTarget(key: string): Promise<Job[]> {
+  const stream = robotaUaStreams().find((item) => streamKey(item.label) === key)
+  if (!stream) throw new Error(`Unknown Robota.ua stream ${key}`)
+  const run = await crawlStandardJobBoard({
+    key: `ukraine:robota-ua:${stream.key}`,
+    fetchPage: (page) => fetchText(stream.pageUrl(page)),
+    parsePage: (html) => parseRobotaUaPage(html, stream.label),
+  })
+  return run.jobs
+}
+
+export async function fetchUkraineJobTarget(target: string): Promise<Job[]> {
+  if (!isUkraineJobTarget(target)) throw new Error(`Unknown Ukraine job target ${target}`)
+  const key = target.slice(UKRAINE_JOB_TARGET_PREFIX.length)
+  if (key.startsWith('dou-')) return fetchDouTarget(key.slice('dou-'.length))
+  if (key === 'djinni-rss') {
+    const url = process.env.DJINNI_RSS_URL || 'https://djinni.co/jobs/rss/'
+    return parseRssXml(await fetchText(url), url, 'Djinni', 'companies-djinni-rss')
+  }
+  if (key === 'djinni-board') return fetchDjinniBoardTarget()
+  if (key.startsWith('work-ua-')) return fetchWorkUaTarget(key.slice('work-ua-'.length))
+  if (key.startsWith('robota-ua-')) return fetchRobotaUaTarget(key.slice('robota-ua-'.length))
+  throw new Error(`Unknown Ukraine job target ${target}`)
 }
