@@ -7,7 +7,11 @@ import test from 'node:test'
 const stateDir = await mkdtemp(join(tmpdir(), 'hh-job-cursor-'))
 const originalStateDir = process.env.SITE_STATE_DIR
 process.env.SITE_STATE_DIR = stateDir
-const { fetchHhJobs, mapHhVacancy } = await import('../server/utils/hhJobSource.ts')
+const {
+  configuredHhJobTargets,
+  fetchHhJobTarget,
+  mapHhVacancy,
+} = await import('../server/utils/hhJobSource.ts')
 
 test.after(async () => {
   if (originalStateDir === undefined) delete process.env.SITE_STATE_DIR
@@ -41,16 +45,12 @@ test('HH public vacancy cards map into the shared jobs contract', () => {
   assert.equal(job.description, 'Node.js и PostgreSQL')
 })
 
-test('HH vacancy ingestion paginates, deduplicates and identifies itself', async () => {
+test('HH exposes each configured area as its own shared-crawler queue target', async () => {
   const originalFetch = globalThis.fetch
   const originalCountries = process.env.HH_JOB_COUNTRIES
   const originalAreas = process.env.HH_JOB_AREAS
-  const originalPages = process.env.HH_JOB_PAGES_PER_RUN
-  const originalDelay = process.env.HH_JOB_REQUEST_DELAY_MS
   process.env.HH_JOB_COUNTRIES = 'UZ'
   process.env.HH_JOB_AREAS = '2759'
-  process.env.HH_JOB_PAGES_PER_RUN = '1'
-  process.env.HH_JOB_REQUEST_DELAY_MS = '0'
   const calls = []
 
   globalThis.fetch = async (input, init) => {
@@ -65,15 +65,17 @@ test('HH vacancy ingestion paginates, deduplicates and identifies itself', async
       employer: { name: 'Example' },
       area: { name: 'Ташкент' },
     })
-    return Response.json({ items: page === 0 ? [item('1')] : [item('1'), item('2')], pages: 2 })
+    return Response.json({ items: page === 0 ? [item('1')] : [item('1'), item('2')] })
   }
 
   try {
-    const jobs = await fetchHhJobs()
+    assert.deepEqual(configuredHhJobTargets(), ['hh-job-source:uz:area-2759'])
+    const jobs = await fetchHhJobTarget('hh-job-source:uz:area-2759')
     assert.deepEqual(jobs.map((job) => job.id), ['hh-1', 'hh-2'])
     assert.equal(calls.length, 2)
     assert.equal(calls[0].url.searchParams.get('host'), 'hh.uz')
     assert.equal(calls[0].url.searchParams.get('area'), '2759')
+    assert.equal(calls[0].url.searchParams.get('per_page'), '100')
     assert.match(calls[0].headers.get('hh-user-agent') || '', /WhitesLove/u)
   } finally {
     globalThis.fetch = originalFetch
@@ -81,9 +83,5 @@ test('HH vacancy ingestion paginates, deduplicates and identifies itself', async
     else process.env.HH_JOB_COUNTRIES = originalCountries
     if (originalAreas === undefined) delete process.env.HH_JOB_AREAS
     else process.env.HH_JOB_AREAS = originalAreas
-    if (originalPages === undefined) delete process.env.HH_JOB_PAGES_PER_RUN
-    else process.env.HH_JOB_PAGES_PER_RUN = originalPages
-    if (originalDelay === undefined) delete process.env.HH_JOB_REQUEST_DELAY_MS
-    else process.env.HH_JOB_REQUEST_DELAY_MS = originalDelay
   }
 })
