@@ -2,7 +2,6 @@ import type { Job, JobSource } from './jobTypes'
 import { fetchExtraTelegramJobs } from './extraTelegramJobSources'
 import { fetchLinkedInJobs } from './linkedinSource'
 import { fetchFacebookJobs, fetchThreadsJobs } from './socialJobSources'
-import { fetchUkraineBoardJobs } from './ukraineJobSources'
 import {
   fetchAdzuna,
   fetchArbeitnow,
@@ -28,27 +27,6 @@ async function fetchAllTelegram(query: string): Promise<Job[]> {
   return [...primary, ...extra]
 }
 
-async function fetchAllCompanies(query: string): Promise<Job[]> {
-  const loaders = [
-    { label: 'companies', load: () => fetchCompanies(query) },
-    { label: 'ua-boards', load: () => fetchUkraineBoardJobs(query) },
-  ]
-
-  const results = await Promise.allSettled(loaders.map(({ load }) => load()))
-  const jobs: Job[] = []
-  results.forEach((result, index) => {
-    if (result.status === 'fulfilled') {
-      jobs.push(...result.value)
-      return
-    }
-    console.warn(
-      `[jobs] ${loaders[index]!.label} sub-source failed:`,
-      result.reason instanceof Error ? result.reason.message : String(result.reason),
-    )
-  })
-  return jobs
-}
-
 const FETCHERS: Record<JobSource, (query: string) => Promise<Job[]>> = {
   remotive: fetchRemotive,
   remoteok: fetchRemoteOk,
@@ -59,7 +37,7 @@ const FETCHERS: Record<JobSource, (query: string) => Promise<Job[]>> = {
   adzuna: fetchAdzuna,
   jooble: fetchJooble,
   rss: fetchRss,
-  companies: fetchAllCompanies,
+  companies: fetchCompanies,
   linkedin: fetchLinkedInJobs,
   facebook: fetchFacebookJobs,
   threads: fetchThreadsJobs,
