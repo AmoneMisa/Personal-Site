@@ -3,7 +3,6 @@ import { fetchExtraTelegramJobs } from './extraTelegramJobSources'
 import { fetchLinkedInJobs } from './linkedinSource'
 import { fetchFacebookJobs, fetchThreadsJobs } from './socialJobSources'
 import { fetchSourceExpansionJobs } from './sourceExpansionJobs'
-import { fetchAviationExpansionJobs } from './aviationExpansionJobs'
 import { fetchUkraineBoardJobs } from './ukraineJobSources'
 import {
   fetchAdzuna,
@@ -34,7 +33,6 @@ async function fetchAllCompanies(query: string): Promise<Job[]> {
   const loaders = [
     { label: 'companies', load: () => fetchCompanies(query) },
     { label: 'source-expansion', load: () => fetchSourceExpansionJobs(query) },
-    { label: 'aviation-expansion', load: () => fetchAviationExpansionJobs(query) },
     { label: 'ua-boards', load: () => fetchUkraineBoardJobs(query) },
   ]
 
