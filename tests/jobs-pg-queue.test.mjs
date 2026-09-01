@@ -36,6 +36,8 @@ test('jobs and hiring tasks use a durable PostgreSQL queue', () => {
   assert.match(queue, /run_after/)
   assert.match(queue, /scheduler_state/)
   assert.match(queue, /ON CONFLICT \(task_key\) DO NOTHING/)
+  assert.match(queue, /active\.status IN \('pending', 'running'\)/)
+  assert.match(queue, /LOWER\(active\.target\) = LOWER\(\$4\)/)
 })
 
 test('one TypeScript worker owns queue transitions and ingestion through local runtime boundaries', () => {
@@ -50,7 +52,8 @@ test('one TypeScript worker owns queue transitions and ingestion through local r
   assert.doesNotMatch(worker, /JOBS_FRONTEND_URL|JOBS_BACKEND_URL|JOBS_API_URL/)
   assert.match(worker, /\.\.\/shared\/jobs\/jobsPgQueue/)
 
-  assert.match(jobsRuntime, /refreshJobSource/)
+  assert.match(jobsRuntime, /configuredJobRefreshTargets/)
+  assert.match(jobsRuntime, /refreshJobTarget/)
   assert.match(hiringAdapters, /refreshHiringChannel/)
   assert.match(hiringAdapters, /refreshHiringWebSource/)
   assert.match(hiringAdapters, /refreshHiringSocialSource/)
