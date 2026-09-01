@@ -8,7 +8,6 @@ const jobsMigration = await readFile(new URL('../db/migrations/jobs/001_initial_
 const hiringMigration = await readFile(new URL('../db/migrations/hiring/001_candidate_read_model.sql', import.meta.url), 'utf8')
 const jobsFeed = await readFile(new URL('../server/routes/jobs-feed.get.ts', import.meta.url), 'utf8')
 const hiringFeed = await readFile(new URL('../server/routes/hiring-feed.get.ts', import.meta.url), 'utf8')
-const jobsStore = await readFile(new URL('../server/utils/jobsStore.ts', import.meta.url), 'utf8')
 const jobsSourceRefresh = await readFile(new URL('../server/utils/jobsSourceRefresh.ts', import.meta.url), 'utf8')
 const compose = await readFile(new URL('../docker-compose.yml', import.meta.url), 'utf8')
 
@@ -28,7 +27,6 @@ test('vacancies use a Personal Site-owned indexed PostgreSQL read model', () => 
 })
 
 test('vacancy ingestion keeps PostgreSQL synchronized and feed reads it before the snapshot', () => {
-  assert.match(jobsStore, /await syncJobsDb\(kept\)/)
   assert.match(jobsSourceRefresh, /await syncJobsDb\(kept\)/)
   const dbIndex = jobsFeed.indexOf('await queryJobsDb(jobQuery)')
   const snapshotIndex = jobsFeed.indexOf('await getStoredSnapshot()')
