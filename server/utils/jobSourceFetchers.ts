@@ -2,9 +2,6 @@ import type { Job, JobSource } from './jobTypes'
 import { fetchExtraTelegramJobs } from './extraTelegramJobSources'
 import { fetchLinkedInJobs } from './linkedinSource'
 import { fetchFacebookJobs, fetchThreadsJobs } from './socialJobSources'
-import { fetchUsaTechCompanyJobs } from './usaTechCompanySources'
-import { fetchRegionalTechCompanyJobs } from './regionalTechCompanySources'
-import { fetchRegionalJobBoardJobs } from './regionalJobBoardSources'
 import { fetchUsaVisaSponsorJobs } from './usaVisaSponsorSource'
 import { fetchSourceExpansionJobs } from './sourceExpansionJobs'
 import { fetchAviationExpansionJobs } from './aviationExpansionJobs'
@@ -37,9 +34,6 @@ async function fetchAllTelegram(query: string): Promise<Job[]> {
 async function fetchAllCompanies(query: string): Promise<Job[]> {
   const loaders = [
     { label: 'companies', load: () => fetchCompanies(query) },
-    { label: 'usa-tech-companies', load: () => fetchUsaTechCompanyJobs(query) },
-    { label: 'regional-tech-companies', load: () => fetchRegionalTechCompanyJobs(query) },
-    { label: 'regional-job-boards', load: () => fetchRegionalJobBoardJobs(query) },
     { label: 'usa-visa-sponsors', load: () => fetchUsaVisaSponsorJobs(query) },
     { label: 'source-expansion', load: () => fetchSourceExpansionJobs(query) },
     { label: 'aviation-expansion', load: () => fetchAviationExpansionJobs(query) },
