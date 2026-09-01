@@ -1,15 +1,14 @@
+import { crawlStandardJobBoard } from './cyclicJobBoardCrawler'
 import type { Job } from './jobTypes'
 import { absoluteHttpUrl as absoluteUrl, stripHtml } from './htmlText'
 
 const UA =
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ' +
   '(KHTML, like Gecko) Chrome/126.0 Safari/537.36'
-const REQUEST_TIMEOUT_MS = 15_000
-const MAX_PER_FEED = 120
 
-type ServiceMarket = 'KR' | 'UZ'
+export type ServiceMarket = 'KR' | 'UZ'
 
-type ServiceFeed = {
+export type ServiceFeed = {
   label: string
   market: ServiceMarket
   url: string
@@ -172,7 +171,7 @@ export function parseJobKoreaServicePage(html: string, feed: ServiceFeed): Job[]
   const re = /<a\b[^>]*href=["']([^"']*\/Recruit\/GI_Read\/\d+[^"']*)["'][^>]*>([\s\S]*?)<\/a>/gi
   let match: RegExpExecArray | null
 
-  while ((match = re.exec(html)) && byUrl.size < MAX_PER_FEED) {
+  while ((match = re.exec(html))) {
     const url = absoluteUrl(match[1]!, feed.url)
     if (!url || byUrl.has(url)) continue
     const title = stripHtml(match[2])
@@ -190,7 +189,7 @@ export function parseOlxUzServicePage(html: string, feed: ServiceFeed): Job[] {
   const re = /<a\b[^>]*href=["']([^"']*\/d\/obyavlenie\/[^"']+)["'][^>]*>([\s\S]*?)<\/a>/gi
   let match: RegExpExecArray | null
 
-  while ((match = re.exec(html)) && byUrl.size < MAX_PER_FEED) {
+  while ((match = re.exec(html))) {
     const url = absoluteUrl(match[1]!, feed.url)
     if (!url || byUrl.has(url)) continue
     const title = stripHtml(match[2])
@@ -202,49 +201,49 @@ export function parseOlxUzServicePage(html: string, feed: ServiceFeed): Job[] {
   return [...byUrl.values()]
 }
 
-async function fetchFeed(feed: ServiceFeed): Promise<Job[]> {
+function feedKey(feed: ServiceFeed): string {
+  return `${feed.market.toLowerCase()}-${feed.label.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')}`
+}
+
+export const REGIONAL_SERVICE_JOB_TARGET_PREFIX = 'regional-service-job:'
+
+export function configuredRegionalServiceJobTargets(): string[] {
+  if (String(process.env.REGIONAL_SERVICE_JOB_SOURCE || 'on').toLowerCase() === 'off') return []
+  return REGIONAL_SERVICE_JOB_FEEDS.map((feed) => `${REGIONAL_SERVICE_JOB_TARGET_PREFIX}${feedKey(feed)}`)
+}
+
+export function isRegionalServiceJobTarget(target: string): boolean {
+  return target.startsWith(REGIONAL_SERVICE_JOB_TARGET_PREFIX)
+}
+
+function feedForTarget(target: string): ServiceFeed | undefined {
+  if (!isRegionalServiceJobTarget(target)) return undefined
+  const key = target.slice(REGIONAL_SERVICE_JOB_TARGET_PREFIX.length)
+  return REGIONAL_SERVICE_JOB_FEEDS.find((feed) => feedKey(feed) === key)
+}
+
+async function fetchFeedPage(feed: ServiceFeed): Promise<string> {
   const response = await fetch(feed.url, {
     headers: {
       'User-Agent': UA,
       Accept: 'text/html,application/xhtml+xml',
       'Accept-Language': feed.market === 'KR' ? 'ko-KR,ko;q=0.9,en;q=0.7' : 'ru-RU,ru;q=0.9,uz;q=0.8,en;q=0.6',
     },
-    signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
   })
   if (!response.ok) throw new Error(`${feed.label} -> ${response.status}`)
-  const html = await response.text()
-  return feed.kind === 'jobkorea'
-    ? parseJobKoreaServicePage(html, feed)
-    : parseOlxUzServicePage(html, feed)
+  return response.text()
 }
 
-function filterQuery(jobs: Job[], q: string): Job[] {
-  const needle = q.trim().toLocaleLowerCase('en')
-  if (!needle) return jobs
-  return jobs.filter((job) =>
-    `${job.title} ${job.company} ${job.location} ${(job.tags || []).join(' ')}`
-      .toLocaleLowerCase('en')
-      .includes(needle),
-  )
-}
+export async function fetchRegionalServiceJobTarget(target: string): Promise<Job[]> {
+  const feed = feedForTarget(target)
+  if (!feed) throw new Error(`Unknown regional service target ${target}`)
 
-export async function fetchRegionalServiceJobs(q: string): Promise<Job[]> {
-  if (String(process.env.REGIONAL_SERVICE_JOB_SOURCE || 'on').toLowerCase() === 'off') return []
-
-  const results = await Promise.allSettled(REGIONAL_SERVICE_JOB_FEEDS.map(fetchFeed))
-  const byUrl = new Map<string, Job>()
-
-  results.forEach((result, index) => {
-    const feed = REGIONAL_SERVICE_JOB_FEEDS[index]!
-    if (result.status === 'fulfilled') {
-      for (const job of result.value) byUrl.set(job.url, job)
-      return
-    }
-    console.warn(
-      `[jobs:regional-service] ${feed.label} failed:`,
-      result.reason instanceof Error ? result.reason.message : String(result.reason),
-    )
+  const run = await crawlStandardJobBoard({
+    key: `regional-service:${feedKey(feed)}`,
+    fetchPage: () => fetchFeedPage(feed),
+    parsePage: (html) => feed.kind === 'jobkorea'
+      ? parseJobKoreaServicePage(html, feed)
+      : parseOlxUzServicePage(html, feed),
   })
-
-  return filterQuery([...byUrl.values()], q)
+  return run.jobs
 }
