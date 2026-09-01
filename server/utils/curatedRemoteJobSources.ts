@@ -4,15 +4,9 @@ import type { Job } from './jobTypes'
 import { detectWorkModes } from './hiringLexicon'
 import { absoluteHttpUrl, stripHtml } from './htmlText'
 
-const UA =
-  'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ' +
-  '(KHTML, like Gecko) Chrome/126.0 Safari/537.36'
-const REQUEST_TIMEOUT_MS = 25_000
 const MAX_DESCRIPTION = 4_000
-const MAX_PER_BOARD = 120
-const SKIP_THE_DRIVE_CATEGORY_LIMIT = 24
 
-type RemoteBoardKey =
+export type RemoteBoardKey =
   | 'remote-co'
   | 'flexjobs'
   | 'simplyhired'
@@ -22,7 +16,7 @@ type RemoteBoardKey =
   | 'virtual-vocations'
   | 'skip-the-drive'
 
-type RemoteBoard = {
+export type RemoteBoard = {
   key: RemoteBoardKey
   label: string
   listUrl: string
@@ -265,7 +259,6 @@ function parseAnchors(html: string, board: RemoteBoard, baseUrl = board.listUrl)
     if (seen.has(anchor.url)) continue
     seen.add(anchor.url)
     unique.push(anchor)
-    if (unique.length >= MAX_PER_BOARD) break
   }
 
   return unique.map((anchor, index) => {
@@ -290,77 +283,11 @@ export function parseCuratedRemoteBoardHtml(html: string, key: RemoteBoardKey, b
   const board = CURATED_REMOTE_BOARDS.find((item) => item.key === key)
   if (!board) return []
   const byUrl = new Map<string, Job>()
-  for (const job of [...parseJsonLd(html, board), ...parseAnchors(html, board, baseUrl)]) {
-    byUrl.set(job.url, job)
-    if (byUrl.size >= MAX_PER_BOARD) break
-  }
+  for (const job of [...parseJsonLd(html, board), ...parseAnchors(html, board, baseUrl)]) byUrl.set(job.url, job)
   return [...byUrl.values()]
 }
 
-async function fetchText(url: string): Promise<string> {
-  const response = await fetch(url, {
-    headers: {
-      'User-Agent': UA,
-      Accept: 'text/html,application/xhtml+xml,application/json;q=0.9,*/*;q=0.8',
-      'Accept-Language': 'en-US,en;q=0.9',
-    },
-    signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
-  })
-  if (!response.ok) throw new Error(`${new URL(url).host} -> ${response.status}`)
-  return response.text()
-}
-
-function discoverSkipTheDriveCategories(html: string): string[] {
-  const urls = new Set<string>()
-  for (const match of html.matchAll(/<a\b[^>]*href=["']([^"']+)["'][^>]*>/gi)) {
-    const href = absoluteUrl(match[1]!, 'https://www.skipthedrive.com/')
-    if (!href) continue
-    const url = new URL(href)
-    if (!/^\/job-category\/remote-[^/]+-jobs\/?$/i.test(url.pathname)) continue
-    urls.add(href)
-    if (urls.size >= SKIP_THE_DRIVE_CATEGORY_LIMIT) break
-  }
-  return [...urls]
-}
-
-async function mapSettledLimited<T, R>(items: T[], concurrency: number, task: (item: T) => Promise<R>): Promise<R[]> {
-  const out: R[] = []
-  let cursor = 0
-  const workers = Array.from({ length: Math.min(concurrency, items.length) }, async () => {
-    while (cursor < items.length) {
-      const index = cursor++
-      try {
-        out.push(await task(items[index]!))
-      } catch {
-        // One category/page failing must not discard the rest of the board.
-      }
-    }
-  })
-  await Promise.all(workers)
-  return out
-}
-
-async function fetchHtmlBoard(board: RemoteBoard): Promise<Job[]> {
-  const html = await fetchText(board.listUrl)
-  const byUrl = new Map<string, Job>()
-  for (const job of parseCuratedRemoteBoardHtml(html, board.key, board.listUrl)) byUrl.set(job.url, job)
-
-  if (board.key === 'skip-the-drive') {
-    const categories = discoverSkipTheDriveCategories(html)
-    const pages = await mapSettledLimited(categories, 5, async (url) => ({ url, html: await fetchText(url) }))
-    for (const page of pages) {
-      for (const job of parseCuratedRemoteBoardHtml(page.html, board.key, page.url)) {
-        byUrl.set(job.url, job)
-        if (byUrl.size >= MAX_PER_BOARD) break
-      }
-      if (byUrl.size >= MAX_PER_BOARD) break
-    }
-  }
-
-  return [...byUrl.values()].slice(0, MAX_PER_BOARD)
-}
-
-type WorkingNomadsItem = {
+export type WorkingNomadsItem = {
   url?: string
   title?: string
   description?: string
@@ -390,46 +317,5 @@ export function parseWorkingNomadsItems(items: WorkingNomadsItem[]): Job[] {
       tags: [item.category_name || '', ...tags].filter(Boolean),
     })
     return job ? [job] : []
-  }).slice(0, MAX_PER_BOARD)
-}
-
-async function fetchWorkingNomads(): Promise<Job[]> {
-  const raw = await fetchText('https://www.workingnomads.com/api/exposed_jobs/')
-  const parsed = JSON.parse(raw) as WorkingNomadsItem[]
-  return parseWorkingNomadsItems(Array.isArray(parsed) ? parsed : [])
-}
-
-function filterQuery(jobs: Job[], q: string): Job[] {
-  const needle = q.trim().toLocaleLowerCase('en')
-  if (!needle) return jobs
-  return jobs.filter((job) =>
-    `${job.title} ${job.company} ${job.location} ${job.description || ''}`
-      .toLocaleLowerCase('en')
-      .includes(needle),
-  )
-}
-
-export async function fetchCuratedRemoteJobs(q: string): Promise<Job[]> {
-  if (String(process.env.CURATED_REMOTE_JOB_SOURCES || 'on').toLowerCase() === 'off') return []
-
-  const loaders = CURATED_REMOTE_BOARDS.map((board) => ({
-    board,
-    load: board.key === 'working-nomads' ? fetchWorkingNomads : () => fetchHtmlBoard(board),
-  }))
-  const results = await Promise.allSettled(loaders.map(({ load }) => load()))
-  const byUrl = new Map<string, Job>()
-
-  results.forEach((result, index) => {
-    const board = loaders[index]!.board
-    if (result.status === 'rejected') {
-      console.warn(
-        `[jobs:curated-remote] ${board.label} failed:`,
-        result.reason instanceof Error ? result.reason.message : String(result.reason),
-      )
-      return
-    }
-    for (const job of result.value) byUrl.set(job.url, job)
   })
-
-  return filterQuery([...byUrl.values()], q)
 }
