@@ -47,8 +47,8 @@ test('standard crawler policy is centralized rather than source-local', () => {
     pagesPerRun: 2,
     maxPage: 10_000,
     requestDelayMs: 500,
-    requestTimeoutMs: 6_000,
-    concurrency: 10,
-    maxJobsPerSource: 60,
   })
+  assert.equal('requestTimeoutMs' in STANDARD_JOB_BOARD_CRAWL_POLICY, false)
+  assert.equal('concurrency' in STANDARD_JOB_BOARD_CRAWL_POLICY, false)
+  assert.equal('maxJobsPerSource' in STANDARD_JOB_BOARD_CRAWL_POLICY, false)
 })
