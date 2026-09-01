@@ -82,46 +82,6 @@ export function wrapShareText(value: unknown, maxChars = 34, maxLines = 3): stri
   return lines
 }
 
-export async function findSharedJob(id: string): Promise<any | null> {
-  const wanted = String(id || '').trim()
-  if (!wanted) return null
-  const cached = cacheGet(`job:${wanted}`)
-  if (cached) return cached.value
-
-  try {
-    // Jobs API lives directly in Nuxt. Read the same persisted snapshot instead
-    // of making a loopback HTTP call, but keep ingestion modules out of SSR.
-    const { getStoredJobsSnapshot } = await import('./jobsSnapshot')
-    const jobs = await getStoredJobsSnapshot()
-    const found = jobs.find((job) => job.id === wanted || job.url === wanted) || null
-    return cacheSet(`job:${wanted}`, found)
-  } catch {
-    return null
-  }
-}
-
-export async function findSharedCandidate(id: string): Promise<any | null> {
-  const wanted = String(id || '').trim()
-  if (!wanted) return null
-  const cached = cacheGet(`candidate:${wanted}`)
-  if (cached) return cached.value
-
-  try {
-    const [{ getStoredCvProfilesSnapshot }, { getStoredWebCvProfiles }] = await Promise.all([
-      import('./hiringSnapshot'),
-      import('./hiringWebStore'),
-    ])
-    const [stored, web] = await Promise.all([
-      getStoredCvProfilesSnapshot(),
-      getStoredWebCvProfiles(),
-    ])
-    const found = [...stored, ...web].find((profile) => profile.id === wanted || profile.url === wanted) || null
-    return cacheSet(`candidate:${wanted}`, found)
-  } catch {
-    return null
-  }
-}
-
 export async function findSharedFlat(id: string, source = '', country = ''): Promise<any | null> {
   const wanted = String(id || '').trim()
   if (!wanted) return null
