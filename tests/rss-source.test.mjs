@@ -44,9 +44,9 @@ test('We Work Remotely RSS vacancies stay remote without relying on title text',
   }
 })
 
-test('default RSS sources include each official service-oriented WWR category', async () => {
+test('default RSS targets include each official service-oriented WWR category', async () => {
   const source = await import('node:fs/promises').then((fs) =>
-    fs.readFile(new URL('../server/utils/sources.ts', import.meta.url), 'utf8'),
+    fs.readFile(new URL('../server/utils/standardJobSourceTargets.ts', import.meta.url), 'utf8'),
   )
 
   assert.match(source, /remote-customer-support-jobs\.rss/)
