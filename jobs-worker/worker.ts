@@ -1,3 +1,4 @@
+import { COMMUNITY_JOB_BOARDS } from '../server/utils/communityJobBoardSources'
 import { looksSoftBlocked } from '../shared/http/browserSoftBlock'
 import { loadCursors, loadWebCursors } from '../shared/hiring/hiringCursors'
 import {
@@ -94,6 +95,15 @@ function installJobBrowserFallback() {
     'migratemate.co',
     'gcsservices.careers.microsoft.com',
   ])
+  for (const board of COMMUNITY_JOB_BOARDS) {
+    try {
+      hosts.add(normalizedHost(new URL(board.url).hostname))
+    } catch {
+      // Registry URLs are constants; an invalid one should fail its own source,
+      // not prevent the worker from starting.
+    }
+  }
+  hosts.add('himalayas.app')
   for (const raw of String(process.env.JOB_BROWSER_ALLOWED_HOSTS || '').split(',')) {
     const host = normalizedHost(raw.trim())
     if (host) hosts.add(host)
