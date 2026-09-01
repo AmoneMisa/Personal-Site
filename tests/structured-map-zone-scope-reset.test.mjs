@@ -10,3 +10,15 @@ test("structured map zones are cleared when their location scope changes", () =>
   assert.match(source, /watch\(city, clearMapZones, \{ flush: "sync" \}\)/);
   assert.match(source, /watch\(district, clearMapZones, \{ flush: "sync" \}\)/);
 });
+
+test("city changes clear every city-scoped location filter before the next request", () => {
+  assert.match(source, /function clearCityLocationFilters\(\)/);
+  assert.match(source, /district\.value = ""/);
+  assert.match(source, /metro\.value = ""/);
+  assert.match(source, /metroMaxM\.value = undefined/);
+  assert.match(source, /nearbyKind\.value = ""/);
+  assert.match(source, /nearbyMaxM\.value = undefined/);
+  assert.match(source, /query\.value = ""/);
+  assert.match(source, /watch\(selectedCountries, clearCityLocationFilters, \{ flush: "sync" \}\)/);
+  assert.match(source, /watch\(city, clearCityLocationFilters, \{ flush: "sync" \}\)/);
+});
