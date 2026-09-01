@@ -1,9 +1,7 @@
+import { crawlStandardJobBoard } from './cyclicJobBoardCrawler'
 import type { Job } from './jobTypes'
 
 const API = 'https://career.intellias.com/wp-json/wp/v2/vacancy'
-const PAGE_SIZE = 100
-const MAX_PAGES = 3
-const REQUEST_TIMEOUT_MS = 20_000
 
 interface IntelliasVacancy {
   id?: number
@@ -82,9 +80,10 @@ function toJob(item: IntelliasVacancy): Job | null {
   }
 }
 
-async function fetchPage(page: number): Promise<IntelliasVacancy[]> {
+async function fetchPage(page: number): Promise<string> {
   const params = new URLSearchParams({
-    per_page: String(PAGE_SIZE),
+    // per_page is an upstream WordPress API shape, not a local crawl cap.
+    per_page: '100',
     page: String(page),
     status: 'publish',
     orderby: 'modified',
@@ -95,28 +94,40 @@ async function fetchPage(page: number): Promise<IntelliasVacancy[]> {
       Accept: 'application/json',
       'User-Agent': 'jobFinder/1.0 (job aggregator; contact: admin@whiteslove.me)',
     },
-    signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
   })
+  // WordPress returns 400 when a historical page is past the end. Present it
+  // to the shared crawler as an empty page so it can close and rotate the cycle.
+  if (response.status === 400 && page > 1) return '[]'
   if (!response.ok) throw new Error(`career.intellias.com -> ${response.status}`)
-  return response.json() as Promise<IntelliasVacancy[]>
+  return response.text()
+}
+
+function parsePage(raw: string): Job[] {
+  let items: IntelliasVacancy[]
+  try {
+    const parsed = JSON.parse(raw) as unknown
+    items = Array.isArray(parsed) ? parsed as IntelliasVacancy[] : []
+  } catch {
+    return []
+  }
+  return items.flatMap((item) => {
+    const job = toJob(item)
+    return job ? [job] : []
+  })
 }
 
 export async function fetchIntelliasJobs(q: string): Promise<Job[]> {
   if (process.env.INTELLIAS_SOURCE === 'off') return []
 
-  const jobs: Job[] = []
-  for (let page = 1; page <= MAX_PAGES; page++) {
-    const items = await fetchPage(page)
-    for (const item of items) {
-      const job = toJob(item)
-      if (job) jobs.push(job)
-    }
-    if (items.length < PAGE_SIZE) break
-  }
+  const run = await crawlStandardJobBoard({
+    key: 'intellias',
+    fetchPage,
+    parsePage: (raw) => parsePage(raw),
+  })
 
-  if (!q.trim()) return jobs
+  if (!q.trim()) return run.jobs
   const needle = q.toLocaleLowerCase('en')
-  return jobs.filter((job) =>
+  return run.jobs.filter((job) =>
     `${job.title} ${job.company} ${job.location} ${(job.tags || []).join(' ')}`
       .toLocaleLowerCase('en')
       .includes(needle),
