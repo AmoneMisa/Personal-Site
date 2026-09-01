@@ -53,7 +53,17 @@ import {
   fetchRegionalTechCompanyTarget,
   isRegionalTechCompanyTarget,
 } from './regionalTechCompanySources'
+import {
+  configuredSourceExpansionTargets,
+  fetchSourceExpansionTarget,
+  isSourceExpansionTarget,
+} from './sourceExpansionJobs'
 import { isLikelyTelegramVacancy } from './sources'
+import {
+  configuredUkraineJobTargets,
+  fetchUkraineJobTarget,
+  isUkraineJobTarget,
+} from './ukraineJobSources'
 import {
   configuredUsaTechCompanyTargets,
   fetchUsaTechCompanyTarget,
@@ -150,6 +160,8 @@ function configuredCompanySubTargets(): string[] {
     ...configuredRegionalJobBoardTargets(),
     ...configuredAviationJobTargets(),
     ...configuredUsaVisaSponsorTargets(),
+    ...configuredSourceExpansionTargets(),
+    ...configuredUkraineJobTargets(),
     ...COMPANY_SOURCE_TARGETS.map(companySourceTarget),
   ]
 }
@@ -245,6 +257,8 @@ function isCompanyQueueTarget(target: string): boolean {
     || isRegionalJobBoardTarget(target)
     || isAviationJobTarget(target)
     || isUsaVisaSponsorTarget(target)
+    || isSourceExpansionTarget(target)
+    || isUkraineJobTarget(target)
     || isCompanySourceTarget(target)
 }
 
@@ -270,6 +284,8 @@ async function fetchCompanyQueueTarget(target: string): Promise<Job[]> {
   if (isRegionalJobBoardTarget(target)) return fetchRegionalJobBoardTarget(target)
   if (isAviationJobTarget(target)) return fetchAviationJobTarget(target)
   if (isUsaVisaSponsorTarget(target)) return fetchUsaVisaSponsorTarget(target)
+  if (isSourceExpansionTarget(target)) return fetchSourceExpansionTarget(target)
+  if (isUkraineJobTarget(target)) return fetchUkraineJobTarget(target)
   if (isCompanySourceTarget(target)) {
     const key = target.slice(COMPANY_SOURCE_TARGET_PREFIX.length) as CompanySourceTarget
     if (key === 'intellias') return fetchIntelliasJobs('')
