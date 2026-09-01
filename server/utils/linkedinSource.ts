@@ -49,6 +49,7 @@ export type LinkedInSourceHealth = {
   emptyPages: number
   detailRequests: number
   detailSuccesses: number
+  closedJobs: number
   lastSuccessAt: string | null
   lastError: string | null
 }
@@ -61,6 +62,7 @@ const health: LinkedInSourceHealth = {
   emptyPages: 0,
   detailRequests: 0,
   detailSuccesses: 0,
+  closedJobs: 0,
   lastSuccessAt: null,
   lastError: null,
 }
@@ -123,6 +125,31 @@ function classBlock(html: string, className: string): string {
     new RegExp(`<([a-z0-9]+)[^>]*class=["'][^"']*${escaped}[^"']*["'][^>]*>([\\s\\S]*?)<\\/\\1>`, 'i'),
   )
   return match?.[2] || ''
+}
+
+function attributeBlock(html: string, attribute: string, value: string): string {
+  const escapedAttribute = attribute.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  const escapedValue = value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  const match = html.match(
+    new RegExp(`<([a-z0-9]+)[^>]*${escapedAttribute}=["'][^"']*${escapedValue}[^"']*["'][^>]*>([\\s\\S]*?)<\\/\\1>`, 'i'),
+  )
+  return match?.[2] || ''
+}
+
+export type LinkedInJobAvailability = 'active' | 'closed' | 'unknown'
+
+/**
+ * Only explicit, visible LinkedIn status copy is authoritative. A missing
+ * button, a sign-in wall or a failed request must never retire a vacancy.
+ */
+export function parseLinkedInJobAvailability(html: string): LinkedInJobAvailability {
+  const visibleText = linkedinText(html)
+  if (/\b(?:no longer accepting applications|applications? (?:are )?closed)\b/i.test(visibleText)
+    || /(?:заявки на эту вакансию больше не принимаются|при[её]м заявок (?:заверш[её]н|закрыт)|вакансия закрыта)/iu.test(visibleText)) {
+    return 'closed'
+  }
+  if (/(?:подать заявку|откликнуться|apply(?: now)?|easy apply)/iu.test(visibleText)) return 'active'
+  return 'unknown'
 }
 
 function configuredLocations(): string[] {
@@ -223,7 +250,12 @@ function directApplyUrl(html: string): string | undefined {
 }
 
 export function parseLinkedInJobDetail(html: string): Partial<Job> {
-  const description = linkedinText(classBlock(html, 'show-more-less-html__markup'))
+  // Guest pages use show-more-less-html__markup. Authenticated LinkedIn pages
+  // deliberately rotate CSS class names, but retain this semantic test id.
+  const description = linkedinText(
+    classBlock(html, 'show-more-less-html__markup')
+      || attributeBlock(html, 'data-testid', 'expandable-text-box'),
+  )
   const criteria = criteriaFromDetail(html)
   const seniority = criteria.get('seniority level')
   const employmentType = criteria.get('employment type')
@@ -233,11 +265,14 @@ export function parseLinkedInJobDetail(html: string): Partial<Job> {
     || classText(html, 'span', 'compensation__salary')
   const tags = [seniority, jobFunction, industries].filter((value): value is string => Boolean(value))
 
+  const applyUrl = directApplyUrl(html)
+  const availability = parseLinkedInJobAvailability(html)
   return {
     ...(description ? { description: description.slice(0, 20_000) } : {}),
     ...(employmentType ? { employmentType } : {}),
     ...(tags.length ? { tags } : {}),
-    ...(directApplyUrl(html) ? { applyUrl: directApplyUrl(html) } : {}),
+    ...(applyUrl ? { applyUrl } : {}),
+    ...(availability === 'closed' ? { vacancyStatus: 'closed' } : {}),
     ...parseSalaryText(salaryText),
   }
 }
@@ -331,8 +366,10 @@ async function fetchJobDetail(job: Job): Promise<Job> {
   try {
     const response = await linkedinFetch(`${LINKEDIN_BASE_URL}/jobs/view/${jobId}`, DETAIL_TIMEOUT_MS)
     if (!response.ok || /linkedin\.com\/signup/i.test(response.url)) return job
-    const detail = parseLinkedInJobDetail(await response.text())
+    const html = await response.text()
+    const detail = parseLinkedInJobDetail(html)
     health.detailSuccesses += 1
+    if (detail.vacancyStatus === 'closed') health.closedJobs += 1
     return {
       ...job,
       ...detail,

@@ -211,6 +211,7 @@ const HAS_DUTIES = /обязанност|обов'?язк|responsibilit|what\s+y
 const HAS_PRODUCT = /продукт|product|платформ|сервис|сервіс|service|приложени|застосунок|\bapp\b|систем|клиентам\s+(?:банка|компании)|индустри|industry|проект|project/i
 const VAGUE_TITLE = /^(?:менеджер|специалист|спеціаліст|сотрудник|співробітник|оператор|консультант|помощник|помічник|ассистент|manager|specialist|operator|assistant|consultant|employee|staff)$/i
 const GENERIC_DUTY = /общение\s+с\s+клиентами|спілкування\s+з\s+клієнтами|работа\s+с\s+клиентами|communication\s+with\s+clients|прием\s+звонков|ответы\s+на\s+сообщения/i
+const PROFESSIONAL_DUTY_ACTION = /\b(?:develop|deploy|maintain|analy[sz]e|prepare|identify|improve|build|integrate|support|design|implement|manage|monitor|optimi[sz]e|create|lead|test|review|coordinate|deliver)(?:s|ed|ing)?\b/gi
 const EARNINGS_FOCUS = /(?:доход|заработок|заработная\s+плата|зарплата|дохід|заробіток|earnings|income)/gi
 const WORK_WORDS = /(?:задач|обязанн|проект|разработ|клиент|продукт|команд|опыт|навык|обов|розроб|досвід|навич|task|project|develop|team|skill|experience)/gi
 
@@ -319,7 +320,12 @@ export function classifySuspicion(input: {
   }
 
   const suspicionReasons: string[] = []
+  const professionalDutyActions = description.match(PROFESSIONAL_DUTY_ACTION)?.length || 0
+  // Direct-employer snippets frequently omit a "Responsibilities" heading but
+  // still enumerate concrete work. Do not turn a truncated, substantive card
+  // into two vagueness signals merely because that heading is absent.
   const hasDuties = HAS_DUTIES.test(text)
+    || (description.length >= 140 && !VAGUE_TITLE.test(title) && professionalDutyActions >= 2)
   const longEnough = description.length >= 200
 
   if (!hasDuties && description.length < 400) suspicionReasons.push('no-responsibilities')

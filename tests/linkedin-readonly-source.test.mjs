@@ -4,6 +4,7 @@ import test from 'node:test'
 import {
   buildLinkedInSearchParams,
   parseLinkedInJobCards,
+  parseLinkedInJobAvailability,
   parseLinkedInJobDetail,
 } from '../server/utils/linkedinSource.ts'
 import { linkedinVoyagerConfigured } from '../server/hiring/sources/linkedinVoyager.ts'
@@ -96,6 +97,43 @@ test('LinkedIn detail parser enriches description, criteria, apply URL and salar
   assert.equal(detail.salaryCurrency, 'USD')
   assert.equal(detail.salaryMin, 95000)
   assert.equal(detail.salaryMax, 125000)
+})
+
+test('LinkedIn authenticated detail uses semantic markup instead of rotating CSS classes', () => {
+  const html = `
+    <main aria-label="Основной контент">
+      <div id="JobDetails_ManageJobBanner_4459449783"></div>
+      <h2 class="rotating-a1b2">Об этой вакансии</h2>
+      <p class="rotating-c3d4">
+        <span data-testid="expandable-text-box">Why Join Exadel<br><br>Build Azure and .NET services.</span>
+      </p>
+      <button class="rotating-e5f6">Подать заявку</button>
+    </main>`
+
+  const detail = parseLinkedInJobDetail(html)
+  assert.equal(detail.description, 'Why Join Exadel\nBuild Azure and .NET services.')
+  assert.equal(detail.vacancyStatus, undefined)
+  assert.equal(parseLinkedInJobAvailability(html), 'active')
+})
+
+test('LinkedIn explicit closed notices produce a background-removal tombstone', () => {
+  for (const notice of [
+    'Заявки на эту вакансию больше не принимаются',
+    'No longer accepting applications',
+  ]) {
+    const html = `<main><div>${notice}</div></main>`
+    assert.equal(parseLinkedInJobAvailability(html), 'closed')
+    assert.equal(parseLinkedInJobDetail(html).vacancyStatus, 'closed')
+  }
+
+  assert.equal(parseLinkedInJobAvailability('<main>Страница временно недоступна</main>'), 'unknown')
+  assert.equal(parseLinkedInJobDetail('<main>Страница временно недоступна</main>').vacancyStatus, undefined)
+})
+
+test('job refresh removes explicit closed-vacancy tombstones immediately', async () => {
+  const source = await readFile(new URL('../server/utils/jobsSourceRefresh.ts', import.meta.url), 'utf8')
+  assert.match(source, /job\.vacancyStatus === 'closed'/)
+  assert.match(source, /byKey\.delete\(dedupKey\(job\)\)/)
 })
 
 test('Voyager people transport is opt-in and requires user-provided session material', () => {

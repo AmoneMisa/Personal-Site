@@ -91,3 +91,20 @@ test('translation pending jobs have a GET proxy to the AI worker result endpoint
   assert.match(translateGet, /isAiWorkerTransientError/u)
   assert.match(translateGet, /status: 'pending'/u)
 })
+
+test('vacancy and candidate dialogs translate through the private AI worker proxy', async () => {
+  const [jobs, hiring, translation, postRoute, getRoute] = await Promise.all([
+    read('../app/pages/jobs/index.vue'),
+    read('../app/pages/hiring/index.vue'),
+    read('../app/composables/search/useTextTranslation.ts'),
+    read('../server/routes/content-translate.post.ts'),
+    read('../server/routes/content-translate.get.ts'),
+  ])
+  assert.match(jobs, /useTextTranslation\(activeJob/)
+  assert.match(hiring, /useTextTranslation\(active,/)
+  assert.match(translation, /safeFetch<TranslationResult>\('\/content-translate'/)
+  assert.match(postRoute, /kind: 'translation'/)
+  assert.match(postRoute, /vacancy-description/)
+  assert.match(postRoute, /candidate-description/)
+  assert.match(getRoute, /\/ai\/result\//)
+})

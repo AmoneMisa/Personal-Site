@@ -24,6 +24,7 @@ import { useSavedCollections } from "~/composables/search/useSavedCollections";
 import { useInfiniteFeed } from "~/composables/search/useInfiniteFeed";
 import { ANY_SELECT_VALUE, useNullableSelect } from "~/composables/search/useNullableSelect";
 import { useShareLink } from "~/composables/search/useShareLink";
+import { useTextTranslation } from "~/composables/search/useTextTranslation";
 import { regionalSearchCountry } from "~/utils/search/regionalCountry";
 import type {
   HiringCvProfile as CvProfile,
@@ -37,6 +38,7 @@ import {
   hiringProfessionFilterLabel,
 } from "~~/shared/hiringProfessionGroups";
 import { publicEntityId } from "~~/shared/publicEntityId";
+import { canonicalCityValue } from "~~/shared/locationCatalog";
 
 // Hiring board — CV/resume profiles from candidates looking for work.
 // Auto-routed at /hiring. UI follows /flat-finder; data from /hiring-feed.
@@ -52,7 +54,10 @@ const route = useRoute();
 const router = useRouter();
 const defaultCountry = ref("UA");
 const professionLocale = computed(() => hiringProfessionLocale(locale.value));
-const cityLabel = (value?: string | null) => locationLabel(value, String(locale.value), "city");
+const cityLabel = (value?: string | null) => value
+  ? locationLabel(canonicalCityValue(value), String(locale.value), "city")
+  : "";
+const countryLabel = (value?: string | null) => locationLabel(value, String(locale.value), "country");
 const candidatePublicId = (profile: CvProfile | null) => profile
   ? profile.publicId ?? publicEntityId("candidate", profile.sourceKey || profile.source, profile.country, profile.id)
   : null;
@@ -361,6 +366,14 @@ function setView(next: string) { view.value = next as HiringView; }
 
 const active = ref<CvProfile | null>(null);
 const modalOpen = ref(false);
+const {
+  translatedText: translatedCandidateDescription,
+  translating: translatingCandidateDescription,
+  translationFailed: candidateTranslationFailed,
+  canTranslate: canTranslateCandidate,
+  prepareTranslation: prepareCandidateTranslation,
+  translate: translateCandidateDescription,
+} = useTextTranslation(active, locale, (profile) => `${profile.source}:${profile.id}`, "candidate-description");
 
 function openCv(profile: CvProfile) {
   active.value = profile;
@@ -458,7 +471,7 @@ const specRows = computed<CandidateSpecRow[]>(() => {
     row("identity", t("specExperience"), profile.experienceYears != null ? experienceLabel(profile.experienceYears) : t("notSpecified"), profile.experienceYears == null, "i-lucide-history"),
 
     row("location", t("specCity"), profile.city ? cityLabel(profile.city) : t("notSpecified"), !profile.city, "i-lucide-map-pinned"),
-    row("location", t("specCountry"), strOr(meta.value.find((c) => c.code === profile.country)?.name || profile.country), !profile.country, "i-lucide-map"),
+    row("location", t("specCountry"), profile.country ? countryLabel(profile.country) : t("notSpecified"), !profile.country, "i-lucide-map"),
 
     row("preferences", t("specSalary"), salaryLabel(profile) || t("notSpecified"), profile.salaryMin == null && profile.salaryMax == null, "i-lucide-banknote"),
     row("preferences", t("specRemote"), fmtBool(profile.remote), profile.remote == null, "i-lucide-laptop"),
@@ -580,6 +593,7 @@ watch(modalOpen, (isOpen) => {
   active.value = null;
   void syncActiveCvQuery(null);
 });
+watch([active, locale], ([profile]) => prepareCandidateTranslation(profile));
 // A link that names a profile should open it, whether the page is mounting
 // for the first time or the query changed underneath one that is already up.
 watch(() => queryString(route.query.adv), (publicId, previous) => {
@@ -704,7 +718,17 @@ onBeforeUnmount(() => {
       <template #body>
         <div v-if="active" class="hiring-modal">
           <UiSpecTable :rows="specRows" :hide-empty-label="t('hideEmpty')" :empty-value="t('notSpecified')" />
-          <details v-if="active.description" class="hiring-modal__descbox" open>
+          <div v-if="active.description && canTranslateCandidate" class="hiring-modal__translation">
+            <u-button type="button" variant="outline" color="neutral" size="sm" icon="i-lucide-languages" :loading="translatingCandidateDescription" @click="translateCandidateDescription">
+              {{ translatingCandidateDescription ? t("translatingDescription") : t("translateDescription") }}
+            </u-button>
+            <span v-if="candidateTranslationFailed" class="hiring-modal__translation-error">{{ t("translationFailed") }}</span>
+          </div>
+          <section v-if="translatedCandidateDescription" class="hiring-modal__translated">
+            <h4>{{ t("translatedDescription") }}</h4>
+            <p class="hiring-modal__desc">{{ translatedCandidateDescription }}</p>
+          </section>
+          <details v-if="active.description" class="hiring-modal__descbox" :open="!translatedCandidateDescription">
             <summary>{{ t("cvBody") }}</summary>
             <p class="hiring-modal__desc">{{ capitalizeFirst(active.description) }}</p>
           </details>
@@ -780,6 +804,10 @@ onBeforeUnmount(() => {
 .hiring-modal__salary { font-weight: 700; font-size: 18px; }
 .hiring-modal__descbox summary { cursor: pointer; font-size: 12px; font-weight: 600; opacity: 0.8; user-select: none; }
 .hiring-modal__desc { font-size: 13.5px; line-height: 1.55; white-space: pre-wrap; color: var(--text-soft, inherit); margin-top: 8px; }
+.hiring-modal__translation { display: flex; align-items: center; gap: 10px; margin-top: 14px; }
+.hiring-modal__translation-error { color: #f29ab6; font-size: 12px; }
+.hiring-modal__translated { margin-top: 10px; padding: 12px; border: 1px solid var(--line, #252a4a); border-radius: 10px; background: var(--bg-panel-2, #171c3a); }
+.hiring-modal__translated h4 { margin: 0 0 8px; font-size: 13px; }
 .hiring-modal__tags { display: flex; flex-wrap: wrap; gap: 6px; }
 .hiring-modal__tag { font-size: 11px; padding: 2px 8px; border-radius: 6px; border: 1px solid var(--line); color: var(--ui-text-muted); }
 @include bp-down(md) {

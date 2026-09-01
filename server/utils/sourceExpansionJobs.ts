@@ -200,6 +200,53 @@ function parseIshkopPage(html: string, location: string): Job[] {
   return out
 }
 
+function ishkopClassBlock(html: string, className: string): string {
+  const escaped = className.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  return html.match(
+    new RegExp(`<([a-z0-9]+)[^>]*class=["'][^"']*\\b${escaped}\\b[^"']*["'][^>]*>([\\s\\S]*?)<\\/\\1>`, 'iu'),
+  )?.[2] || ''
+}
+
+export function parseIshkopVacancyDetail(html: string, fallbackUrl: string): Job | null {
+  const title = stripHtml(
+    html.match(/<div\b[^>]*class=["'][^"']*\btitle-wrap\b[^"']*["'][^>]*>[\s\S]*?<h1\b[^>]*>([\s\S]*?)<\/h1>/iu)?.[1],
+  )
+  if (!title || title.length > 240) return null
+
+  const company = stripHtml(ishkopClassBlock(html, 'company-wrap')) || 'Ishkop employer'
+  const location = stripHtml(
+    html.match(/<span\b[^>]*id=["']spnLocation["'][^>]*>([\s\S]*?)<\/span>/iu)?.[1],
+  ) || 'Uzbekistan'
+  const description = htmlLines(
+    html.match(
+      /<div\b[^>]*class=["'][^"']*\bsection-title\b[^"']*["'][^>]*>\s*Описание вакансии\s*<\/div>\s*<div\b[^>]*class=["'][^"']*\btext\b[^"']*["'][^>]*>([\s\S]*?)<\/div>\s*<div\b[^>]*class=["'][^"']*\bsection-title\b/iu,
+    )?.[1] || '',
+  ).join('\n')
+  if (description.length < 40) return null
+
+  const employmentType = stripHtml(
+    html.match(/<td\b[^>]*class=["'][^"']*\bname\b[^"']*\bjobtype\b[^"']*["'][^>]*>[\s\S]*?<\/td>\s*<td\b[^>]*class=["'][^"']*\bvalue\b[^"']*["'][^>]*>([\s\S]*?)<\/td>/iu)?.[1],
+  ) || undefined
+  const addedText = stripHtml(
+    html.match(/<div\b[^>]*class=["'][^"']*\bsource\b[^"']*["'][^>]*>([\s\S]*?)<\/div>/iu)?.[1],
+  )
+  const postedAt = parseHiringActivityDate(addedText) || undefined
+  const canonicalUrl = html.match(/<meta\b[^>]*property=["']og:url["'][^>]*content=["']([^"']+)["'][^>]*>/iu)?.[1]
+
+  return makeJob({
+    label: 'Ishkop.uz',
+    title,
+    company,
+    location,
+    url: canonicalUrl ? absoluteUrl(canonicalUrl, fallbackUrl) : fallbackUrl,
+    postedAt,
+    description,
+    employmentType,
+    tags: ['Uzbekistan'],
+    employerType: 'board',
+  })
+}
+
 async function fetchIshkop(): Promise<Job[]> {
   const pages = await Promise.allSettled(
     ISHKOP_CITY_ROUTES.map(async ([label, city]) => {
@@ -207,7 +254,22 @@ async function fetchIshkop(): Promise<Job[]> {
       return parseIshkopPage(await fetchHtml(url), label)
     }),
   )
-  return pages.flatMap((result) => result.status === 'fulfilled' ? result.value : [])
+  const byUrl = new Map<string, Job>()
+  for (const result of pages) {
+    if (result.status !== 'fulfilled') continue
+    for (const job of result.value) byUrl.set(job.url, job)
+  }
+
+  // This is the detail stage of the existing Ishkop source refresh, not a
+  // second crawler or scheduler. Discovery, retries and lifecycle remain owned
+  // by the current jobs-worker source task.
+  const summaries = [...byUrl.values()]
+  const details = await Promise.allSettled(summaries.map(async (summary) => (
+    parseIshkopVacancyDetail(await fetchHtml(summary.url), summary.url) || summary
+  )))
+  return details.map((result, index) => (
+    result.status === 'fulfilled' ? result.value : summaries[index]!
+  ))
 }
 
 interface IshBorSummary { url: string; title: string; text: string }
@@ -336,7 +398,50 @@ async function fetchMuk(): Promise<Job[]> {
       employerType: 'direct',
     }))
   }
-  return out
+
+  // Detail enrichment remains part of the existing MUK source refresh. The
+  // jobs-worker queue, fetch policy, merge and stale lifecycle stay unchanged.
+  const details = await Promise.allSettled(out.map(async (summary) => (
+    parseMukVacancyDetail(await fetchHtml(summary.url), summary.url, summary) || summary
+  )))
+  return details.map((result, index) => result.status === 'fulfilled' ? result.value : out[index]!)
+}
+
+export function parseMukVacancyDetail(html: string, url: string, summary?: Job): Job | null {
+  const title = stripHtml(
+    html.match(/<div\b[^>]*class=["'][^"']*\bnews-title\b[^"']*["'][^>]*>[\s\S]*?<h[1-4]\b[^>]*>([\s\S]*?)<\/h[1-4]>/iu)?.[1],
+  )
+  const rawLocation = stripHtml(
+    html.match(/<div\b[^>]*class=["'][^"']*\bnews-info_left\b[^"']*["'][^>]*>([\s\S]*?)<\/div>/iu)?.[1],
+  )
+  const bodyStart = html.search(/<div\b[^>]*class=["'][^"']*\bnews-body\b[^"']*["'][^>]*>/iu)
+  const footerStart = bodyStart >= 0
+    ? html.slice(bodyStart).search(/<div\b[^>]*id=["']footer["'][^>]*>/iu)
+    : -1
+  const body = bodyStart >= 0
+    ? html.slice(bodyStart, footerStart >= 0 ? bodyStart + footerStart : html.length)
+    : ''
+  const description = htmlLines(body).join('\n')
+
+  if (!title || title.length > 240 || description.length < 40) return null
+  if (!/(?:требования|обязанности|requirements|responsibilities|вимоги|обов'язки)/iu.test(description)) return null
+
+  const countryCode = detectCountryCodeFromText(rawLocation || summary?.location || '')
+  const location = countryCode
+    ? geographyDisplayName(countryCode, 'en', 'country')
+    : rawLocation || summary?.location || 'See listing'
+
+  return makeJob({
+    label: 'MUK',
+    title,
+    company: 'MUK',
+    location,
+    url,
+    postedAt: summary?.postedAt,
+    description,
+    tags: countryCode ? [countryCode] : summary?.tags,
+    employerType: 'direct',
+  })
 }
 
 async function fetchTegen(): Promise<Job[]> {
@@ -365,28 +470,82 @@ async function fetchTegen(): Promise<Job[]> {
   return out
 }
 
+function isUzbekistanAirwaysVacancyTitle(title: string): boolean {
+  if (title.length < 5 || title.length > 300) return false
+  return !/^(?:ESG(?:\s|$)|Путешествие по Узбекистану|Рекомендации по заполнению резюме|Резюме|Оказание услуг(?:\s|$))/iu.test(title)
+}
+
+export function parseUzbekistanAirwaysVacancyPage(html: string): Job[] {
+  const root = 'https://corp.uzairways.com/ru/vacancy'
+  // Drupal renders navigation and press-center links with the same /ru/node/N
+  // shape as vacancies. Only links after the view heading belong to the actual
+  // vacancy list; stop before the pager/contact/footer area.
+  const headingIndex = html.search(/Текущие(?:\s|&nbsp;)+вакансии/iu)
+  if (headingIndex < 0) return []
+  const afterHeading = html.slice(headingIndex)
+  const endIndex = afterHeading.search(/class=["'][^"']*(?:pager|view-footer)[^"']*["']|Единый(?:\s|&nbsp;)+контакт-центр/iu)
+  const vacancySection = afterHeading.slice(0, endIndex >= 0 ? endIndex : afterHeading.length)
+  const byUrl = new Map<string, Job>()
+
+  for (const match of vacancySection.matchAll(/<a\b[^>]*href=["']([^"']*\/ru\/node\/\d+)["'][^>]*>([\s\S]*?)<\/a>/gi)) {
+    const title = stripHtml(match[2])
+    if (!isUzbekistanAirwaysVacancyTitle(title)) continue
+    const url = absoluteUrl(match[1]!, root)
+    byUrl.set(url, makeJob({
+      label: 'Uzbekistan Airways',
+      title,
+      company: 'Uzbekistan Airways',
+      location: 'Uzbekistan',
+      url,
+      tags: ['Uzbekistan', 'Airline', 'Aviation'],
+      employerType: 'direct',
+    }))
+  }
+  return [...byUrl.values()]
+}
+
+export function parseUzbekistanAirwaysVacancyDetail(html: string, url: string): Job | null {
+  const titleMatch = /<h1\b[^>]*class=["'][^"']*\bpage-heading\b[^"']*["'][^>]*>([\s\S]*?)<\/h1>/iu.exec(html)
+  const title = stripHtml(titleMatch?.[1])
+  if (!isUzbekistanAirwaysVacancyTitle(title)) return null
+
+  // The Drupal template puts the node body in the full-width column of the
+  // final page__row. Scoping to that column avoids breadcrumbs, menus, ESG,
+  // press-center links and the contact-center footer present on every node.
+  const bodyMatches = [...html.matchAll(/<div\b[^>]*class=["'][^"']*\bcol-sm-12\b[^"']*\bcol-md-4\b[^"']*\bcol-xl-12\b[^"']*["'][^>]*>([\s\S]*?)<\/div>\s*<\/div>/giu)]
+  const description = bodyMatches
+    .map((match) => htmlLines(match[1]).join('\n'))
+    .filter((text) => /(?:обязанности|требования|условия|работодатель|резюме|ваканси|должностн)/iu.test(text))
+    .sort((a, b) => b.length - a.length)[0] || ''
+  if (description.length < 40) return null
+
+  const location = description.split('\n').find((line) => Boolean(detectHiringLocationName(line, 'UZ')))
+    || 'Uzbekistan'
+  return makeJob({
+    label: 'Uzbekistan Airways',
+    title,
+    company: 'Uzbekistan Airways',
+    location,
+    url,
+    description,
+    tags: ['Uzbekistan', 'Airline', 'Aviation'],
+    employerType: 'direct',
+  })
+}
+
 async function fetchUzbekistanAirways(): Promise<Job[]> {
   const root = 'https://corp.uzairways.com/ru/vacancy'
   const pages = await Promise.allSettled([0, 1, 2].map((page) => fetchHtml(page ? `${root}?page=${page}` : root)))
   const byUrl = new Map<string, Job>()
   for (const result of pages) {
     if (result.status !== 'fulfilled') continue
-    for (const match of result.value.matchAll(/<a\b[^>]*href=["']([^"']*\/ru\/node\/\d+)["'][^>]*>([\s\S]*?)<\/a>/gi)) {
-      const title = stripHtml(match[2])
-      if (title.length < 5 || title.length > 300) continue
-      const url = absoluteUrl(match[1]!, root)
-      byUrl.set(url, makeJob({
-        label: 'Uzbekistan Airways',
-        title,
-        company: 'Uzbekistan Airways',
-        location: 'Uzbekistan',
-        url,
-        tags: ['Uzbekistan', 'Airline', 'Aviation'],
-        employerType: 'direct',
-      }))
-    }
+    for (const job of parseUzbekistanAirwaysVacancyPage(result.value)) byUrl.set(job.url, job)
   }
-  return [...byUrl.values()]
+  const summaries = [...byUrl.values()]
+  const details = await Promise.allSettled(summaries.map(async (summary) => (
+    parseUzbekistanAirwaysVacancyDetail(await fetchHtml(summary.url), summary.url)
+  )))
+  return details.flatMap((result) => result.status === 'fulfilled' && result.value ? [result.value] : [])
 }
 
 async function fetchCentrumAir(): Promise<Job[]> {
@@ -422,30 +581,37 @@ async function fetchCentrumAir(): Promise<Job[]> {
   return out
 }
 
-function qanotTitle(line: string): boolean {
-  if (line.length < 5 || line.length > 180) return false
-  if (/^(?:requirements?|candidate requirements|documents?|company|location|salary|how to apply|selection|we offer|key responsibilities)/iu.test(line)) return false
-  return /flight attendant|captain|co-?pilot|first officer|dispatcher|specialist|engineer|mechanic|call center|operator|manager|pilot/iu.test(line)
+function conciseQanotTitle(value: string): string {
+  if (/FEMALE flight attendant/iu.test(value)) return 'Flight Attendant'
+  if (/position of captain.*co-pilot.*Airbus/iu.test(value)) return 'Captain / First Officer — Airbus A320/A321/A330'
+  if (/Call Center Operator/iu.test(value)) return 'Call Center Operator'
+  return value.replace(/^Position:\s*/iu, '').trim()
 }
 
-async function fetchQanotSharq(): Promise<Job[]> {
+export function parseQanotSharqHtml(html: string): Job[] {
   const root = 'https://www.qanotsharq.com/en/vacancy'
-  const html = await fetchHtml(root)
-  const lines = htmlLines(html)
-  const titles = new Map<string, number>()
-  lines.forEach((line, index) => {
-    if (qanotTitle(line)) titles.set(line, index)
-  })
-  // The first two announcements use sentence-like headings rather than heading
-  // elements, so normalize them to concise role names.
-  if (lines.some((line) => /FEMALE flight attendant/iu.test(line))) titles.set('Flight Attendant', 0)
-  if (lines.some((line) => /position of captain.*co-pilot.*Airbus/iu.test(line))) titles.set('Captain / First Officer — Airbus A320/A321/A330', 0)
+  const headingPattern = /<span\b[^>]*class=["'][^"']*\btext-semibold\b[^"']*["'][^>]*>([\s\S]*?)<\/span>/giu
+  const headings = [...html.matchAll(headingPattern)]
+  const jobs: Job[] = []
 
-  const ordered = [...titles.entries()].sort((a, b) => a[1] - b[1])
-  return ordered.slice(0, 30).map(([title, index], i) => {
-    const nextIndex = ordered[i + 1]?.[1] ?? Math.min(lines.length, index + 35)
-    const description = lines.slice(index, Math.min(nextIndex, index + 40)).join('\n')
-    return makeJob({
+  for (let index = 0; index < headings.length && jobs.length < 30; index += 1) {
+    const heading = headings[index]!
+    const rawTitle = stripHtml(heading[1])
+    const segmentStart = heading.index ?? 0
+    const segmentEnd = headings[index + 1]?.index ?? html.length
+    const segment = html.slice(segmentStart, segmentEnd)
+    const bodyStart = /<div\b[^>]*class=["'][^"']*\bbody-content\b[^"']*["'][^>]*>/iu.exec(segment)
+    if (!rawTitle || !bodyStart || bodyStart.index == null) continue
+
+    const contentStart = bodyStart.index + bodyStart[0].length
+    const afterStart = segment.slice(contentStart)
+    const submitButton = /<button\b[^>]*>[\s\S]*?Submit Resume/iu.exec(afterStart)
+    const bodyHtml = afterStart.slice(0, submitButton?.index ?? afterStart.length)
+    const description = htmlLines(bodyHtml).join('\n')
+    if (!description) continue
+
+    const title = conciseQanotTitle(rawTitle)
+    jobs.push(makeJob({
       label: 'Qanot Sharq',
       title,
       company: 'Qanot Sharq Airlines',
@@ -454,8 +620,14 @@ async function fetchQanotSharq(): Promise<Job[]> {
       description,
       tags: ['Uzbekistan', 'Airline', 'Aviation'],
       employerType: 'direct',
-    })
-  })
+    }))
+  }
+  return jobs
+}
+
+async function fetchQanotSharq(): Promise<Job[]> {
+  const root = 'https://www.qanotsharq.com/en/vacancy'
+  return parseQanotSharqHtml(await fetchHtml(root))
 }
 
 interface MicrosoftResponse {

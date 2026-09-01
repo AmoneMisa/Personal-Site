@@ -2741,7 +2741,47 @@ exists or should exist.
 
 ---
 
-# 78. Final architecture principle
+# 78. Extend existing crawlers; do not invent parallel обходы
+
+Before adding any crawler, polling loop, background sweep, source-specific
+schedule, recheck limit, cursor store, or retry queue:
+
+1. Search for the existing source adapter, durable jobs-worker task, scheduler,
+   queue target, pagination/cursor policy, refresh cadence, and stale/lastSeen
+   handling.
+2. Extend that existing execution path when it already owns the source or the
+   lifecycle being changed.
+3. Reuse its timeout, concurrency, retry, cursor, observability, persistence,
+   and availability semantics instead of adding source-local equivalents.
+4. Add a new crawler/execution loop only when no existing owner can support the
+   requirement. Document the search performed, the architectural owner, and why
+   extending the current path is impossible.
+
+Forbidden examples:
+
+```text
+new source-local setInterval when jobs-worker already schedules the source
+new *_RECHECK_LIMIT loop when the normal source refresh/detail stage can verify it
+new cursor/state key when the shared crawler policy already persists progress
+new background sweep in a Nitro route or UI component
+parallel parser/fetcher created only to avoid modifying the existing adapter
+```
+
+For jobs/hiring, the default path is:
+
+```text
+existing jobs-worker queue task
+    → existing source adapter / shared crawler policy
+    → existing merge + lastSeen/stale lifecycle
+```
+
+If the existing architecture is inadequate, improve that architecture rather
+than bypassing it. A local shortcut is not acceptable merely because it is
+faster to implement.
+
+---
+
+# 79. Final architecture principle
 
 Do not turn Personal Site into an integration dumping ground.
 

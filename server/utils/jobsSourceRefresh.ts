@@ -141,6 +141,12 @@ async function mergeFetchedSource(source: JobSource, jobs: Job[]) {
   }
 
   for (const job of jobs) {
+    // Source detail checks may return a closed-vacancy tombstone. Remove the
+    // previously stored row immediately; do not wait for the generic stale TTL.
+    if (job.vacancyStatus === 'closed' || job.hiringKind === 'closed_vacancy') {
+      byKey.delete(dedupKey(job))
+      continue
+    }
     const enriched = enrichJob(sanitizeFetchedJob(job))
     const key = dedupKey(enriched)
     const previous = byKey.get(key)

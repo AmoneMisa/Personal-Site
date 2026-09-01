@@ -504,6 +504,12 @@ async function performJobStoreRefresh(): Promise<RefreshSummary> {
       // can resume in the same event-loop turn. Yield after every vacancy so a
       // cold refresh never starves page, filter, or icon requests.
       for (const job of jobs) {
+        // Explicit source status is stronger than the four-day unseen grace
+        // period. It is produced only after a successful detail-page check.
+        if (job.vacancyStatus === 'closed' || job.hiringKind === 'closed_vacancy') {
+          byKey.delete(dedupKey(job))
+          continue
+        }
         const enriched = enrichJob(job)
         const key = dedupKey(enriched)
         const previous = byKey.get(key)

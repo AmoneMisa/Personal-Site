@@ -12,6 +12,7 @@ type PublicBoard = {
    * which is fine for boards nobody has looked at, and wrong for ones we have.
    */
   parse?: (html: string, board: PublicBoard) => Job[]
+  detailParse?: (html: string, summary: Job) => Job | null
   /** Country the listing belongs to when the board is national. */
   country?: string
   remoteByDefault?: boolean
@@ -107,18 +108,67 @@ function parseFlagmaVacancies(html: string, board: PublicBoard): Job[] {
   return jobs
 }
 
+export function parseFlagmaVacancyDetail(html: string, summary: Job): Job | null {
+  const canonical = absoluteUrl(
+    html.match(/<link\b[^>]*rel=["']canonical["'][^>]*href=["']([^"']+)["'][^>]*>/iu)?.[1] || summary.url,
+    summary.url,
+  )
+  const heading = stripHtml(
+    html.match(/<h1\b[^>]*>([\s\S]*?)<\/h1>/iu)?.[1] || '',
+  )
+  const title = stripHtml(
+    html.match(/["']title["']\s*:\s*["']([^"']+)["']/iu)?.[1] || heading,
+  )
+  const description = stripHtml(
+    html.match(/<div\b[^>]*id=["']description-text["'][^>]*>([\s\S]*?)<\/div>\s*<\/div>\s*<\/div>/iu)?.[1] || '',
+  )
+  if (!canonical || !title || title.length > 240 || description.length < 40) return null
+
+  const company = stripHtml(
+    html.match(/<div\b[^>]*id=["']company-title["'][^>]*>[\s\S]*?<a\b[^>]*>[\s\S]*?<span\b[^>]*>([\s\S]*?)<\/span>/iu)?.[1] || '',
+  ) || summary.company
+  const location = stripHtml(
+    html.match(/<span\b[^>]*class=["'][^"']*\bterr\b[^"']*["'][^>]*>([\s\S]*?)<\/span>/iu)?.[1] || '',
+  ) || summary.location
+  const datePosted = html.match(/["']datePosted["']\s*:\s*["']([^"']+)["']/iu)?.[1]
+  const salaryValue = Number(
+    html.match(/itemprop=["']value["'][^>]*content=["']([\d.]+)["']/iu)?.[1],
+  )
+  const salaryCurrency = html.match(/itemprop=["']currency["'][^>]*content=["']([^"']+)["']/iu)?.[1]
+  const employmentType = html.match(/["']employmentType["']\s*:\s*["']([^"']+)["']/iu)?.[1]
+  const semanticText = `${title}\n${location}\n${description}`
+
+  return {
+    ...summary,
+    id: `flagma-${canonical.match(/-rv(\d+)\.html/i)?.[1] || summary.id.replace(/^flagma-/, '')}`,
+    title,
+    company,
+    location,
+    url: canonical,
+    remote: detectWorkModes(semanticText).includes('remote'),
+    postedAt: validDate(datePosted || summary.postedAt),
+    employmentType: employmentType || summary.employmentType,
+    description: description.slice(0, 4_000),
+    salaryMin: Number.isFinite(salaryValue) && salaryValue > 0 ? salaryValue : summary.salaryMin,
+    salaryMax: Number.isFinite(salaryValue) && salaryValue > 0 ? salaryValue : summary.salaryMax,
+    salaryCurrency: salaryCurrency?.toUpperCase() || summary.salaryCurrency,
+  }
+}
+
 const PUBLIC_JOB_BOARDS: PublicBoard[] = [
   {
     label: 'Flagma RO',
     url: 'https://flagma.ro/ru/vacancies/',
     country: 'RO',
     parse: parseFlagmaVacancies,
+    detailParse: parseFlagmaVacancyDetail,
   },
   {
     label: 'Flagma UZ',
     url: 'https://flagma.uz/ru/vacancies/',
     country: 'UZ',
     parse: parseFlagmaVacancies,
+    detailParse: parseFlagmaVacancyDetail,
   },
   { label: 'Remote Source', url: 'https://www.remotesource.com/jobs', remoteByDefault: true },
   { label: 'TaskFavour', url: 'https://www.taskfavour.com/jobs' },
@@ -364,7 +414,24 @@ async function fetchBoard(board: PublicBoard): Promise<Job[]> {
     byUrl.set(job.url, job)
     if (byUrl.size >= MAX_PER_BOARD) break
   }
-  return [...byUrl.values()]
+  const summaries = [...byUrl.values()]
+  if (!board.detailParse) return summaries
+
+  // Detail parsing extends this board's existing refresh. It does not create a
+  // second scheduler, cursor, state key, retry loop or source-local crawl cap.
+  const details = await Promise.allSettled(summaries.map(async (summary) => {
+    const response = await fetch(summary.url, {
+      headers: {
+        'User-Agent': UA,
+        Accept: 'text/html,application/xhtml+xml',
+        'Accept-Language': 'ru,en;q=0.8',
+      },
+      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+    })
+    if (!response.ok) throw new Error(`${board.label} detail -> ${response.status}`)
+    return board.detailParse!(await response.text(), summary) || summary
+  }))
+  return details.map((result, index) => result.status === 'fulfilled' ? result.value : summaries[index]!)
 }
 
 export async function fetchExtraPublicJobs(q: string): Promise<Job[]> {

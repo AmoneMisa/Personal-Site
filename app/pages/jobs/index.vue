@@ -26,6 +26,7 @@ import { useSavedCollections } from "~/composables/search/useSavedCollections";
 import { useInfiniteFeed } from "~/composables/search/useInfiniteFeed";
 import { ANY_SELECT_VALUE, useNullableSelect } from "~/composables/search/useNullableSelect";
 import { useShareLink } from "~/composables/search/useShareLink";
+import { useTextTranslation } from "~/composables/search/useTextTranslation";
 import { queryString } from "~/utils/queryParams";
 import { publicEntityId } from "~~/shared/publicEntityId";
 
@@ -122,6 +123,14 @@ const {
 } = useJobFeed(usdRates);
 const activeJob = ref<Job | null>(null);
 const jobModalOpen = ref(false);
+const {
+  translatedText: translatedJobDescription,
+  translating: translatingJobDescription,
+  translationFailed: jobTranslationFailed,
+  canTranslate: canTranslateJob,
+  prepareTranslation: prepareJobTranslation,
+  translate: translateJobDescription,
+} = useTextTranslation(activeJob, locale, (job) => `${job.source}:${job.id}`, "vacancy-description");
 const {
   copied: shareCopied,
   copiedKey: shareCopiedJobId,
@@ -676,6 +685,7 @@ watch(jobModalOpen, (isOpen) => {
   activeJob.value = null;
   syncJobInUrl(null);
 });
+watch([activeJob, locale], ([job]) => prepareJobTranslation(job));
 // A link that names a posting should open it, whether the page is mounting
 // for the first time or the query changed underneath one that is already up.
 watch(() => queryString(route.query.adv), (publicId, previous) => {
@@ -833,7 +843,20 @@ onBeforeUnmount(() => {
             </span>
           </div>
           <UiSpecTable :rows="vacRows" :hide-empty-label="t('hideEmpty')" :empty-value="t('notSpecified')" />
-          <p v-if="activeJob.description" class="job-modal__desc">{{ capitalizeFirst(activeJob.description) }}</p>
+          <div v-if="activeJob.description && canTranslateJob" class="job-modal__translation">
+            <u-button type="button" variant="outline" color="neutral" size="sm" icon="i-lucide-languages" :loading="translatingJobDescription" @click="translateJobDescription">
+              {{ translatingJobDescription ? t("translatingDescription") : t("translateDescription") }}
+            </u-button>
+            <span v-if="jobTranslationFailed" class="job-modal__translation-error">{{ t("translationFailed") }}</span>
+          </div>
+          <section v-if="translatedJobDescription" class="job-modal__translated">
+            <h4>{{ t("translatedDescription") }}</h4>
+            <p class="job-modal__desc">{{ translatedJobDescription }}</p>
+          </section>
+          <details v-if="activeJob.description" class="job-modal__original" :open="!translatedJobDescription">
+            <summary>{{ t("origDescription") }}</summary>
+            <p class="job-modal__desc">{{ capitalizeFirst(activeJob.description) }}</p>
+          </details>
           <p v-else class="text-muted">{{ t("noDescription") }}</p>
           <div v-if="activeJob.skills?.length || activeJob.niceToHave?.length" class="job-modal__tags">
             <span v-for="s in activeJob.skills" :key="s" class="job-modal__tag job-modal__tag_skill">{{ s }}</span>
@@ -947,6 +970,12 @@ onBeforeUnmount(() => {
   font-size: 13.5px; line-height: 1.55; white-space: pre-wrap;
   color: var(--text-soft, inherit); max-height: 52vh; overflow-y: auto;
 }
+.job-modal__translation { display: flex; align-items: center; gap: 10px; margin-top: 14px; }
+.job-modal__translation-error { color: #f29ab6; font-size: 12px; }
+.job-modal__translated { margin-top: 10px; padding: 12px; border: 1px solid var(--line, #252a4a); border-radius: 10px; background: var(--bg-panel-2, #171c3a); }
+.job-modal__translated h4 { margin: 0 0 8px; font-size: 13px; }
+.job-modal__original { margin-top: 10px; }
+.job-modal__original summary { cursor: pointer; font-size: 12px; font-weight: 600; opacity: .8; }
 .job-modal__tags {
   display: flex;
   flex-wrap: wrap;

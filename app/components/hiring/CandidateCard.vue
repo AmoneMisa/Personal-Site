@@ -3,6 +3,8 @@ import type { HiringCvProfile } from '~/types/hiring'
 import { formatRelativeDate } from '~/utils/search/relativeDate'
 import SearchMatchBadge from '~/components/search/SearchMatchBadge.vue'
 import { locationLabel } from '~/utils/locationLabels'
+import { capitalizeFirst } from '~/utils/text'
+import { canonicalCityValue } from '~~/shared/locationCatalog'
 import {
   scoreHiringCandidate,
   tagMatchesHiringFilters,
@@ -115,7 +117,7 @@ const metadata = computed(() => {
     items.push({
       key: 'city',
       icon: 'i-lucide-map-pin',
-      value: locationLabel(props.profile.city, String(locale.value), 'city'),
+      value: locationLabel(canonicalCityValue(props.profile.city), String(locale.value), 'city'),
       title: t('filterLocation'),
     })
   }
@@ -154,7 +156,7 @@ function timeAgo(iso: string | null): string {
 }
 
 const sourceLabel = computed(() => props.profile.sourceLabel || props.profile.source)
-const dateLabel = computed(() => timeAgo(props.profile.createdAt))
+const dateLabel = computed(() => capitalizeFirst(timeAgo(props.profile.createdAt)))
 
 function openCard() {
   emit('open')
