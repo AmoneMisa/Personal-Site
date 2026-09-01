@@ -63,7 +63,17 @@ import {
   fetchSourceExpansionTarget,
   isSourceExpansionTarget,
 } from './sourceExpansionJobs'
-import { isLikelyTelegramVacancy } from './sources'
+import {
+  configuredStandardJobSourceTargets,
+  fetchStandardJobSourceTarget,
+  isStandardJobSourceTarget,
+} from './standardJobSourceTargets'
+import {
+  configuredTelegramJobTargets,
+  fetchTelegramJobTarget,
+  isTelegramJobTarget,
+} from './telegramJobTargets'
+import { isLikelyTelegramVacancy } from './telegramVacancyClassifier'
 import {
   configuredUkraineJobTargets,
   fetchUkraineJobTarget,
@@ -86,6 +96,17 @@ const MAX_AGE_DAYS = 14
 const STALE_DAYS = 4
 const COMPANY_SOURCE_TARGET_PREFIX = 'company-source:'
 const COMPANY_SOURCE_TARGETS = ['intellias', 'jobs-ua'] as const
+const TARGETIZED_SOURCES = new Set<JobSource>([
+  'companies',
+  'themuse',
+  'adzuna',
+  'jooble',
+  'rss',
+  'ishgo',
+  'itjobsuz',
+  'telegram',
+  'olx',
+])
 
 type StoredJob = Job & {
   lastSeen: string
@@ -152,7 +173,8 @@ function isCompanySourceTarget(target: string): target is `${typeof COMPANY_SOUR
   return COMPANY_SOURCE_TARGETS.includes(target.slice(COMPANY_SOURCE_TARGET_PREFIX.length) as CompanySourceTarget)
 }
 
-function configuredCompanySubTargets(): string[] {
+function configuredCompanyTargets(): string[] {
+  if (!isJobSourceAvailable('companies', 'ingestion')) return []
   return [
     ...configuredCoreCompanyTargets(),
     ...configuredCommunityJobBoardTargets(),
@@ -173,9 +195,13 @@ function configuredCompanySubTargets(): string[] {
 }
 
 export function configuredJobRefreshTargets(): string[] {
-  const sources = configuredJobSources()
-  if (!sources.includes('companies')) return sources
-  return [...sources.filter((source) => source !== 'companies'), ...configuredCompanySubTargets()]
+  const directSources = configuredJobSources().filter((source) => !TARGETIZED_SOURCES.has(source))
+  return [
+    ...directSources,
+    ...configuredCompanyTargets(),
+    ...configuredStandardJobSourceTargets(),
+    ...configuredTelegramJobTargets(),
+  ]
 }
 
 function dedupKey(job: Job): string {
@@ -269,6 +295,13 @@ function isCompanyQueueTarget(target: string): boolean {
     || isCompanySourceTarget(target)
 }
 
+function isKnownRefreshTarget(target: string): boolean {
+  return isKnownJobSource(target)
+    || isCompanyQueueTarget(target)
+    || isStandardJobSourceTarget(target)
+    || isTelegramJobTarget(target)
+}
+
 async function mergeForTarget(target: string, source: JobSource, jobs: Job[]) {
   const operation = mergeLock.then(
     () => mergeFetchedSource(source, jobs),
@@ -310,21 +343,33 @@ async function runJobTargetRefresh(target: string) {
     return mergeForTarget(target, 'companies', await fetchCompanyQueueTarget(target))
   }
 
+  if (isStandardJobSourceTarget(target)) {
+    const result = await fetchStandardJobSourceTarget(target)
+    if (!isJobSourceAvailable(result.source, 'ingestion')) {
+      return { target, source: result.source, skipped: true, reason: 'not_configured', fetched: 0 }
+    }
+    return mergeForTarget(target, result.source, result.jobs)
+  }
+
+  if (isTelegramJobTarget(target)) {
+    if (!isJobSourceAvailable('telegram', 'ingestion')) {
+      return { target, source: 'telegram' as const, skipped: true, reason: 'not_configured', fetched: 0 }
+    }
+    return mergeForTarget(target, 'telegram', await fetchTelegramJobTarget(target))
+  }
+
   if (!isKnownJobSource(target)) throw new Error(`Unknown job refresh target ${target}`)
-  if (target === 'companies') {
-    return { target, source: target, skipped: true, reason: 'use_company_queue_targets', fetched: 0 }
+  if (TARGETIZED_SOURCES.has(target)) {
+    return { target, source: target, skipped: true, reason: 'use_queue_targets', fetched: 0 }
   }
   if (!isJobSourceAvailable(target, 'ingestion')) {
     return { target, source: target, skipped: true, reason: 'not_configured', fetched: 0 }
   }
-  const jobs = await fetchJobSource(target)
-  return mergeForTarget(target, target, jobs)
+  return mergeForTarget(target, target, await fetchJobSource(target))
 }
 
 export async function refreshJobTarget(target: string) {
-  if (!isCompanyQueueTarget(target) && !isKnownJobSource(target)) {
-    throw new Error(`Unknown job refresh target ${target}`)
-  }
+  if (!isKnownRefreshTarget(target)) throw new Error(`Unknown job refresh target ${target}`)
   if (inFlight.has(target)) {
     console.log(`[jobs] ${target} refresh already running; skipping this request`)
     return { target, skipped: true, reason: 'already_running', fetched: 0 }
