@@ -5,25 +5,27 @@ import test from 'node:test'
 const route = await readFile(new URL('../server/routes/hiring-feed.get.ts', import.meta.url), 'utf8')
 const page = await readFile(new URL('../app/pages/hiring/index.vue', import.meta.url), 'utf8')
 const routeState = await readFile(new URL('../app/composables/hiring/useHiringRouteState.ts', import.meta.url), 'utf8')
+const preview = await readFile(new URL('../server/plugins/share-preview.ts', import.meta.url), 'utf8')
 
-test('hiring-feed matches a clean ?publicId= link against the already-stamped snapshot field', () => {
-  assert.match(route, /const publicId = params\.get\('publicId'\)/)
-  assert.match(route, /if \(publicId && String\(profile\.publicId \?\? ''\) !== publicId\) return false/)
-  // matchesFilters must run over the normalized (publicId-stamped) snapshot.
-  assert.match(route, /publicId: publicEntityId\('candidate', profileSource\(profile\), profile\.country, profile\.id\)/)
-  assert.match(route, /profiles\.filter\(\(profile\) => matchesFilters\(profile, params\)\)/)
+test('hiring-feed delegates publicId/profileId filtering to backend-platform', () => {
+  assert.match(route, /requirePlatformGet\(event, 'cv', '\/hiring-feed'\)/)
+  assert.doesNotMatch(route, /hiringSnapshot|matchesFilters|publicEntityId/)
 })
 
 test('opening or sharing a candidate prefers the bare publicId over the cv/cvSource/cvCountry triple', () => {
   assert.match(page, /async function openSharedCvByPublicId/)
   assert.match(page, /function activeCvQuery\(profile: CvProfile\): Record<string, string> \{\s*\n\s*return \{ adv: String\(candidatePublicId\(profile\)\) \};/)
   assert.match(page, /function makeCvShareLink\(profile: CvProfile\): string \{\s*\n\s*const resolved = router\.resolve\(\{ path: route\.path, query: activeCvQuery\(profile\) \}\);/)
-
   assert.match(page, /watch\(\(\) => queryString\(route\.query\.adv\)/)
   assert.match(page, /void openSharedCvByPublicId\(publicId\)/)
-  // Legacy triple-param links must still resolve.
   assert.match(page, /watch\(\(\) => queryString\(route\.query\.cv\)/)
   assert.match(page, /async function openSharedCv\(id: string, sourceName = "", countryCode = "", attempt = 0\)/)
+})
+
+test('SSR preview understands the clean ?adv= candidate link', () => {
+  assert.match(preview, /const publicId = queryValue\(query\.adv\)\.trim\(\)/)
+  assert.match(preview, /findPlatformSharedCandidate\(id, Boolean\(publicId\), source, country\)/)
+  assert.match(preview, /meta\.url = cleanEntityUrl\(pathname, publicId\)/)
 })
 
 test('closing a profile preserves the ?page= scroll bookmark instead of wiping it', () => {
@@ -41,9 +43,6 @@ test('a deep-linked ?page=n restores loaded results before the URL is resynced t
   assert.match(page, /async function syncPageInUrl\(pageNumber: number\)/)
   assert.match(page, /async function restoreToPage\(targetPage: number\)/)
   assert.match(page, /if \(!background && !pageRestoring\.value\) await syncPageInUrl\(currentPageNumber\(\)\)/)
-  // The page-bookmark write and syncQueryParams() both call router.replace;
-  // sequencing them (await, page before filters) prevents whichever fires
-  // second from racing the other and clobbering it.
   assert.match(page, /await syncPageInUrl\(currentPageNumber\(\)\);\s*\n[\s\S]*?if \(!append && !background\) await syncQueryParams\(\);/)
 
   const mountedStart = page.indexOf('onMounted(async () => {')
