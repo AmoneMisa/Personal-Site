@@ -44,9 +44,9 @@ test('frontend alone joins the backend platform network', async () => {
   assert.match(compose, /CV_API_URL:.*cv-api:4011/)
   assert.match(compose, /- backend-platform/)
   assert.match(compose, /name: whiteslove-backend-platform/)
-  assert.doesNotMatch(compose, /^  jobs-worker:/m)
-  assert.doesNotMatch(compose, /^  job-browser-fetcher:/m)
-  assert.doesNotMatch(compose, /^  subscription-bot:/m)
+  assert.doesNotMatch(compose, /^ {2}jobs-worker:/m)
+  assert.doesNotMatch(compose, /^ {2}job-browser-fetcher:/m)
+  assert.doesNotMatch(compose, /^ {2}subscription-bot:/m)
 })
 
 test('site readiness checks platform APIs instead of domain databases', async () => {
