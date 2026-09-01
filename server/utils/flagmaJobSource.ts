@@ -1,7 +1,6 @@
 import {
   crawlStandardJobBoard,
   enrichStandardJobBoardDetails,
-  STANDARD_JOB_BOARD_CRAWL_POLICY,
 } from './cyclicJobBoardCrawler'
 import {
   parseFlagmaVacancies,
@@ -56,14 +55,13 @@ function pageUrl(board: FlagmaBoard, page: number): string {
   return `${board.url.replace(/\/+$/, '')}/page-${page}/`
 }
 
-async function fetchText(url: string, signal: AbortSignal): Promise<string> {
+async function fetchText(url: string): Promise<string> {
   const response = await fetch(url, {
     headers: {
       'User-Agent': UA,
       Accept: 'text/html,application/xhtml+xml',
       'Accept-Language': 'ru,en;q=0.8',
     },
-    signal,
   })
   if (!response.ok) throw new Error(`${new URL(url).host} -> ${response.status}`)
   return response.text()
@@ -72,17 +70,14 @@ async function fetchText(url: string, signal: AbortSignal): Promise<string> {
 async function crawlFlagmaBoard(board: FlagmaBoard): Promise<Job[]> {
   const run = await crawlStandardJobBoard({
     key: `flagma:${board.key}`,
-    fetchPage: (page) => fetchText(
-      pageUrl(board, page),
-      AbortSignal.timeout(STANDARD_JOB_BOARD_CRAWL_POLICY.requestTimeoutMs),
-    ),
+    fetchPage: (page) => fetchText(pageUrl(board, page)),
     parsePage: (html) => parseFlagmaVacancies(html, board),
   })
 
   const jobs = await enrichStandardJobBoardDetails({
     key: `flagma:${board.key}`,
     jobs: run.jobs,
-    fetchDetail: (job, signal) => fetchText(job.url, signal),
+    fetchDetail: (job) => fetchText(job.url),
     parseDetail: parseFlagmaVacancyDetail,
   })
 
