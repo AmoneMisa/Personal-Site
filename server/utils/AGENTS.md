@@ -47,6 +47,16 @@ MAX_PER_BOARD = 60
 
 or equivalent local constants.
 
+The current canonical common vacancy limits live **only** in `STANDARD_JOB_BOARD_CRAWL_POLICY`:
+
+```text
+concurrency = 10
+requestTimeoutMs = 6000
+maxJobsPerSource = 60
+```
+
+If these values need to change, change the shared policy and its tests. Never copy the values into a source adapter or create a source-local equivalent.
+
 If an upstream contract genuinely requires an exception, document the reason next to the override and keep the exception as narrow as possible. "This source was easier to implement separately" is not a valid reason.
 
 ## Queue granularity
