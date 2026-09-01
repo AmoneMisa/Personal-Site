@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto'
 import { existsSync, promises as fs } from 'node:fs'
 import path from 'node:path'
 
-const ROOTS = ['app', 'server', 'shared', 'jobs-worker', 'subscription-bot', 'backend/src']
+const ROOTS = ['app', 'server', 'shared', 'backend/src']
 const SOURCE_EXTENSIONS = new Set(['.ts', '.js', '.mjs', '.vue', '.py', '.scss', '.css'])
 const SKIP_SEGMENTS = new Set(['node_modules', '.nuxt', '.output', 'dist', 'coverage', 'public'])
 const GOD_FILE_LINES = 500
@@ -27,9 +27,7 @@ async function walk(root) {
 }
 
 function normalizeDuplicateLine(line) {
-  return line
-    .trim()
-    .replace(/\s+/g, ' ')
+  return line.trim().replace(/\s+/g, ' ')
 }
 
 function duplicateFingerprint(lines) {
@@ -52,9 +50,7 @@ for (const file of files) {
   metrics.push({ file, lines: lines.length, bytes: Buffer.byteLength(source) })
 
   lines.forEach((line, index) => {
-    if (TAIL_RE.test(line)) {
-      tails.push({ file, line: index + 1, text: line.trim().slice(0, 240) })
-    }
+    if (TAIL_RE.test(line)) tails.push({ file, line: index + 1, text: line.trim().slice(0, 240) })
   })
 
   for (let index = 0; index <= lines.length - DUPLICATE_WINDOW_LINES; index += 1) {
@@ -70,9 +66,7 @@ for (const file of files) {
 const largest = [...metrics]
   .sort((a, b) => b.lines - a.lines || b.bytes - a.bytes)
   .slice(0, 40)
-
 const godCandidates = largest.filter((item) => item.lines >= GOD_FILE_LINES)
-
 const duplicates = [...duplicateWindows.values()]
   .filter((locations) => new Set(locations.map((item) => item.file)).size > 1)
   .map((locations) => ({
@@ -82,13 +76,11 @@ const duplicates = [...duplicateWindows.values()]
   .sort((a, b) => b.locations.length - a.locations.length)
   .slice(0, 50)
 
-const report = {
+console.log(JSON.stringify({
   scannedFiles: files.length,
   godFileThresholdLines: GOD_FILE_LINES,
   largest,
   godCandidates,
   tails,
   literalDuplicateWindows: duplicates,
-}
-
-console.log(JSON.stringify(report, null, 2))
+}, null, 2))
