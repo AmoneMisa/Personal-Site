@@ -5,22 +5,54 @@ import {
   fetchCommunityJobBoardTarget,
   isCommunityJobBoardTarget,
 } from './communityJobBoardSources'
+import {
+  configuredCuratedRemoteJobBoardTargets,
+  fetchCuratedRemoteJobBoardTarget,
+  isCuratedRemoteJobBoardTarget,
+} from './curatedRemoteJobBoardTargets'
 import { enrichJob } from './enrich'
+import {
+  configuredExpandedRegionalRemoteTargets,
+  fetchExpandedRegionalRemoteTarget,
+  isExpandedRegionalRemoteTarget,
+} from './expandedRegionalRemoteSources'
+import { fetchIntelliasJobs } from './intelliasJobs'
 import { isJobSourceAvailable } from './jobSourceConfig'
 import { fetchJobSource } from './jobSourceFetchers'
 import { syncJobsSearchIndex } from './jobsElastic'
-import { ALL_SOURCES, type Job, type JobSource } from './jobTypes'
+import type { Job, JobSource } from './jobTypes'
+import { ALL_SOURCES } from './jobTypes'
+import { fetchJobsUaJobs } from './jobsUaSource'
+import {
+  configuredPublicJobBoardTargets,
+  fetchPublicJobBoardTarget,
+  isPublicJobBoardTarget,
+} from './publicJobBoardTargets'
+import {
+  configuredRegionalGeneralEmployerTargets,
+  fetchRegionalGeneralEmployerTarget,
+  isRegionalGeneralEmployerTarget,
+} from './regionalGeneralEmployerSources'
+import {
+  configuredRegionalServiceJobTargets,
+  fetchRegionalServiceJobTarget,
+  isRegionalServiceJobTarget,
+} from './regionalServiceJobSources'
 import { isLikelyTelegramVacancy } from './sources'
 
 const STORE_KEY = 'jobs:store:v4'
 const STORE_TTL_SECONDS = 15 * 86_400
 const MAX_AGE_DAYS = 14
 const STALE_DAYS = 4
+const COMPANY_SOURCE_TARGET_PREFIX = 'company-source:'
+const COMPANY_SOURCE_TARGETS = ['intellias', 'jobs-ua'] as const
 
 type StoredJob = Job & {
   lastSeen: string
   ai?: unknown
 }
+
+type CompanySourceTarget = typeof COMPANY_SOURCE_TARGETS[number]
 
 function normalizedTagKey(value: string): string {
   return value.normalize('NFKC').replace(/[^\p{L}\p{N}+#.]+/gu, ' ').trim().toLocaleLowerCase('en')
@@ -71,10 +103,31 @@ export function configuredJobSources(): JobSource[] {
   return ALL_SOURCES.filter((source) => isJobSourceAvailable(source, 'ingestion'))
 }
 
+function companySourceTarget(key: CompanySourceTarget): string {
+  return `${COMPANY_SOURCE_TARGET_PREFIX}${key}`
+}
+
+function isCompanySourceTarget(target: string): target is `${typeof COMPANY_SOURCE_TARGET_PREFIX}${CompanySourceTarget}` {
+  if (!target.startsWith(COMPANY_SOURCE_TARGET_PREFIX)) return false
+  return COMPANY_SOURCE_TARGETS.includes(target.slice(COMPANY_SOURCE_TARGET_PREFIX.length) as CompanySourceTarget)
+}
+
+function configuredCompanySubTargets(): string[] {
+  return [
+    ...configuredCommunityJobBoardTargets(),
+    ...configuredPublicJobBoardTargets(),
+    ...configuredCuratedRemoteJobBoardTargets(),
+    ...configuredExpandedRegionalRemoteTargets(),
+    ...configuredRegionalGeneralEmployerTargets(),
+    ...configuredRegionalServiceJobTargets(),
+    ...COMPANY_SOURCE_TARGETS.map(companySourceTarget),
+  ]
+}
+
 export function configuredJobRefreshTargets(): string[] {
   const sources = configuredJobSources()
   if (!sources.includes('companies')) return sources
-  return [...sources, ...configuredCommunityJobBoardTargets()]
+  return [...sources, ...configuredCompanySubTargets()]
 }
 
 function dedupKey(job: Job): string {
@@ -150,6 +203,16 @@ function isKnownJobSource(value: string): value is JobSource {
   return ALL_SOURCES.includes(value as JobSource)
 }
 
+function isCompanyQueueTarget(target: string): boolean {
+  return isCommunityJobBoardTarget(target)
+    || isPublicJobBoardTarget(target)
+    || isCuratedRemoteJobBoardTarget(target)
+    || isExpandedRegionalRemoteTarget(target)
+    || isRegionalGeneralEmployerTarget(target)
+    || isRegionalServiceJobTarget(target)
+    || isCompanySourceTarget(target)
+}
+
 async function mergeForTarget(target: string, source: JobSource, jobs: Job[]) {
   const operation = mergeLock.then(
     () => mergeFetchedSource(source, jobs),
@@ -160,13 +223,27 @@ async function mergeForTarget(target: string, source: JobSource, jobs: Job[]) {
   return { target, ...result }
 }
 
+async function fetchCompanyQueueTarget(target: string): Promise<Job[]> {
+  if (isCommunityJobBoardTarget(target)) return fetchCommunityJobBoardTarget(target)
+  if (isPublicJobBoardTarget(target)) return fetchPublicJobBoardTarget(target)
+  if (isCuratedRemoteJobBoardTarget(target)) return fetchCuratedRemoteJobBoardTarget(target)
+  if (isExpandedRegionalRemoteTarget(target)) return fetchExpandedRegionalRemoteTarget(target)
+  if (isRegionalGeneralEmployerTarget(target)) return fetchRegionalGeneralEmployerTarget(target)
+  if (isRegionalServiceJobTarget(target)) return fetchRegionalServiceJobTarget(target)
+  if (isCompanySourceTarget(target)) {
+    const key = target.slice(COMPANY_SOURCE_TARGET_PREFIX.length) as CompanySourceTarget
+    if (key === 'intellias') return fetchIntelliasJobs('')
+    if (key === 'jobs-ua') return fetchJobsUaJobs('')
+  }
+  throw new Error(`Unknown company queue target ${target}`)
+}
+
 async function runJobTargetRefresh(target: string) {
-  if (isCommunityJobBoardTarget(target)) {
+  if (isCompanyQueueTarget(target)) {
     if (!isJobSourceAvailable('companies', 'ingestion')) {
       return { target, source: 'companies' as const, skipped: true, reason: 'not_configured', fetched: 0 }
     }
-    const jobs = await fetchCommunityJobBoardTarget(target)
-    return mergeForTarget(target, 'companies', jobs)
+    return mergeForTarget(target, 'companies', await fetchCompanyQueueTarget(target))
   }
 
   if (!isKnownJobSource(target)) throw new Error(`Unknown job refresh target ${target}`)
@@ -178,7 +255,7 @@ async function runJobTargetRefresh(target: string) {
 }
 
 export async function refreshJobTarget(target: string) {
-  if (!isCommunityJobBoardTarget(target) && !isKnownJobSource(target)) {
+  if (!isCompanyQueueTarget(target) && !isKnownJobSource(target)) {
     throw new Error(`Unknown job refresh target ${target}`)
   }
   if (inFlight.has(target)) {
