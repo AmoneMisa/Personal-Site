@@ -11,6 +11,11 @@ import {
   isCommunityJobBoardTarget,
 } from './communityJobBoardSources'
 import {
+  configuredCoreCompanyTargets,
+  fetchCoreCompanyTarget,
+  isCoreCompanyTarget,
+} from './coreCompanyJobTargets'
+import {
   configuredCuratedRemoteJobBoardTargets,
   fetchCuratedRemoteJobBoardTarget,
   isCuratedRemoteJobBoardTarget,
@@ -149,6 +154,7 @@ function isCompanySourceTarget(target: string): target is `${typeof COMPANY_SOUR
 
 function configuredCompanySubTargets(): string[] {
   return [
+    ...configuredCoreCompanyTargets(),
     ...configuredCommunityJobBoardTargets(),
     ...configuredPublicJobBoardTargets(),
     ...configuredCuratedRemoteJobBoardTargets(),
@@ -169,7 +175,7 @@ function configuredCompanySubTargets(): string[] {
 export function configuredJobRefreshTargets(): string[] {
   const sources = configuredJobSources()
   if (!sources.includes('companies')) return sources
-  return [...sources, ...configuredCompanySubTargets()]
+  return [...sources.filter((source) => source !== 'companies'), ...configuredCompanySubTargets()]
 }
 
 function dedupKey(job: Job): string {
@@ -246,7 +252,8 @@ function isKnownJobSource(value: string): value is JobSource {
 }
 
 function isCompanyQueueTarget(target: string): boolean {
-  return isCommunityJobBoardTarget(target)
+  return isCoreCompanyTarget(target)
+    || isCommunityJobBoardTarget(target)
     || isPublicJobBoardTarget(target)
     || isCuratedRemoteJobBoardTarget(target)
     || isExpandedRegionalRemoteTarget(target)
@@ -273,6 +280,7 @@ async function mergeForTarget(target: string, source: JobSource, jobs: Job[]) {
 }
 
 async function fetchCompanyQueueTarget(target: string): Promise<Job[]> {
+  if (isCoreCompanyTarget(target)) return fetchCoreCompanyTarget(target)
   if (isCommunityJobBoardTarget(target)) return fetchCommunityJobBoardTarget(target)
   if (isPublicJobBoardTarget(target)) return fetchPublicJobBoardTarget(target)
   if (isCuratedRemoteJobBoardTarget(target)) return fetchCuratedRemoteJobBoardTarget(target)
@@ -303,6 +311,9 @@ async function runJobTargetRefresh(target: string) {
   }
 
   if (!isKnownJobSource(target)) throw new Error(`Unknown job refresh target ${target}`)
+  if (target === 'companies') {
+    return { target, source: target, skipped: true, reason: 'use_company_queue_targets', fetched: 0 }
+  }
   if (!isJobSourceAvailable(target, 'ingestion')) {
     return { target, source: target, skipped: true, reason: 'not_configured', fetched: 0 }
   }
