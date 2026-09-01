@@ -2,10 +2,12 @@ import {
   buildCandidateShareMeta,
   buildFlatShareMeta,
   buildJobShareMeta,
-  findSharedCandidate,
   findSharedFlat,
-  findSharedJob,
 } from '../utils/sharePreview'
+import {
+  findPlatformSharedCandidate,
+  findPlatformSharedJob,
+} from '../utils/backendPlatformShareLookup'
 import { renderShareOgPng, type ShareOgCard, type ShareOgKind } from '../utils/shareOgImage'
 
 const FALLBACK: Record<ShareOgKind, ShareOgCard> = {
@@ -49,13 +51,13 @@ export default defineEventHandler(async (event) => {
   let card = FALLBACK[kind]
 
   if (kind === 'job' && id) {
-    const job = await findSharedJob(id)
+    const job = await findPlatformSharedJob(id)
     if (job) {
       const meta = buildJobShareMeta(job, id)
       card = { kind, title: meta.title, description: meta.description }
     }
   } else if (kind === 'candidate' && id) {
-    const candidate = await findSharedCandidate(id)
+    const candidate = await findPlatformSharedCandidate(id, false, source, country)
     if (candidate) {
       const meta = buildCandidateShareMeta(candidate, id, source, country)
       card = { kind, title: meta.title, description: meta.description }
