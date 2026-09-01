@@ -7,7 +7,6 @@ import { HIRING_FACEBOOK_GROUPS } from '../../shared/hiring/sources/facebookGrou
 import {
   REMOTE_JOB_QUERIES,
   USA_RELOCATION_QUERIES,
-  rotatingSlice,
   threadsJobCoverage,
 } from './jobSearchCoverage'
 import {
@@ -27,7 +26,6 @@ type Target = {
   region?: string
   target?: string
   query?: string
-  limit?: number
 }
 
 type SocialItem = {
@@ -40,85 +38,44 @@ type SocialItem = {
 
 type SocialResponse = {
   ok?: boolean
-  count?: number
   items?: SocialItem[]
   error?: string
 }
 
-const FACEBOOK_REQUEST_TIMEOUT_MS = Math.max(
-  30_000,
-  Math.min(170_000, Number(process.env.FACEBOOK_JOB_REQUEST_TIMEOUT_MS) || 90_000),
-)
-const THREADS_REQUEST_TIMEOUT_MS = Math.max(
-  60_000,
-  Math.min(170_000, Number(process.env.THREADS_JOB_REQUEST_TIMEOUT_MS) || 150_000),
-)
-const THREADS_REGIONAL_QUERIES_PER_CYCLE = Math.max(
-  4,
-  Math.min(24, Number(process.env.THREADS_JOB_REGIONAL_QUERIES_PER_CYCLE) || 8),
-)
-const THREADS_PRIORITY_QUERIES_PER_CYCLE = Math.max(
-  2,
-  Math.min(8, Number(process.env.THREADS_JOB_PRIORITY_QUERIES_PER_CYCLE) || 4),
-)
-const FACEBOOK_CONCURRENCY = Math.max(
-  1,
-  Math.min(8, Number(process.env.FACEBOOK_JOB_CONCURRENCY) || 4),
-)
 const MAX_AGE_MS = 14 * 24 * 60 * 60 * 1000
 
-// Discovery targets are source policy, not language semantics.
-const FACEBOOK_TARGETS: Target[] = [
-  ...HIRING_FACEBOOK_GROUPS.map((group) => ({
-    ...group,
-    key: group.key.replace(/^facebook-/, 'fb-'),
-    platform: 'facebook' as const,
-    limit: group.country === 'UZ' ? 80 : 60,
-  })),
-]
+const FACEBOOK_TARGETS: Target[] = HIRING_FACEBOOK_GROUPS.map((group) => ({
+  ...group,
+  key: group.key.replace(/^facebook-/, 'fb-'),
+  platform: 'facebook' as const,
+}))
 
-function priorityThreadsTargets(): Target[] {
+function threadsTargets(): Target[] {
   const remote = REMOTE_JOB_QUERIES.map((query, index) => ({
     key: `threads-remote-${index}`,
     platform: 'threads' as const,
     country: 'REMOTE',
     query,
-    limit: 30,
   }))
   const usa = USA_RELOCATION_QUERIES.map((query, index) => ({
     key: `threads-usa-relocation-${index}`,
     platform: 'threads' as const,
     country: 'US',
     query,
-    limit: 30,
   }))
-  return [...remote, ...usa]
-}
-
-function regionalThreadsTargets(): Target[] {
-  return threadsJobCoverage().map((target) => ({
+  const regional = threadsJobCoverage().map((target) => ({
     key: target.key,
     platform: 'threads' as const,
     country: target.country,
     city: target.city,
     region: target.region,
     query: target.query,
-    limit: 30,
   }))
+  return [...remote, ...usa, ...regional]
 }
 
-function threadsTargetsForCycle(): Target[] {
-  const priority = rotatingSlice(
-    priorityThreadsTargets(),
-    THREADS_PRIORITY_QUERIES_PER_CYCLE,
-    30,
-  )
-  const regional = rotatingSlice(
-    regionalThreadsTargets(),
-    THREADS_REGIONAL_QUERIES_PER_CYCLE,
-    30,
-  )
-  return [...priority, ...regional]
+function allTargets(): Target[] {
+  return [...FACEBOOK_TARGETS, ...threadsTargets()]
 }
 
 function validDate(value: string | null | undefined): string | null {
@@ -210,15 +167,13 @@ async function fetchTarget(target: Target): Promise<Job[]> {
   if (key.length < 16) throw new Error('QUEUE_INTERNAL_KEY is not configured')
 
   const payload = target.platform === 'facebook'
-    ? { source: 'facebook', target: target.target, limit: target.limit || 60 }
-    : { source: 'threads', mode: 'search', query: target.query, limit: target.limit || 30 }
-  const timeoutMs = target.platform === 'threads' ? THREADS_REQUEST_TIMEOUT_MS : FACEBOOK_REQUEST_TIMEOUT_MS
+    ? { source: 'facebook', target: target.target }
+    : { source: 'threads', mode: 'search', query: target.query }
 
   const response = await fetch(endpoint, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'x-queue-key': key },
     body: JSON.stringify(payload),
-    signal: AbortSignal.timeout(timeoutMs),
   })
   const body = await response.json().catch(() => ({})) as SocialResponse
   if (!response.ok || body.ok === false) {
@@ -232,34 +187,32 @@ async function fetchTarget(target: Target): Promise<Job[]> {
   return jobs
 }
 
-async function fetchPlatform(targets: Target[], platform: Platform): Promise<Job[]> {
-  if (String(process.env.SOCIAL_JOB_SOURCE || 'on').toLowerCase() === 'off') return []
-  const byUrl = new Map<string, Job>()
-
-  if (platform === 'threads') {
-    for (const target of targets) {
-      try {
-        for (const job of await fetchTarget(target)) byUrl.set(job.url, job)
-      } catch (error) {
-        console.warn(`[jobs:${platform}] ${target.key} failed:`, error instanceof Error ? error.message : String(error))
-      }
-    }
-    return [...byUrl.values()]
-  }
-
-  for (let offset = 0; offset < targets.length; offset += FACEBOOK_CONCURRENCY) {
-    const batch = targets.slice(offset, offset + FACEBOOK_CONCURRENCY)
-    const settled = await Promise.allSettled(batch.map((target) => fetchTarget(target)))
-    settled.forEach((result, index) => {
-      if (result.status === 'fulfilled') {
-        for (const job of result.value) byUrl.set(job.url, job)
-        return
-      }
-      console.warn(`[jobs:${platform}] ${batch[index]?.key || 'target'} failed:`, result.reason instanceof Error ? result.reason.message : String(result.reason))
-    })
-  }
-  return [...byUrl.values()]
+function targetName(target: Target): string {
+  return `${SOCIAL_JOB_TARGET_PREFIX}${target.platform}:${target.key}`
 }
 
-export const fetchFacebookJobs = (_q = '') => fetchPlatform(FACEBOOK_TARGETS, 'facebook')
-export const fetchThreadsJobs = (_q = '') => fetchPlatform(threadsTargetsForCycle(), 'threads')
+export const SOCIAL_JOB_TARGET_PREFIX = 'social-job-source:'
+
+export function configuredSocialJobTargets(): string[] {
+  if (String(process.env.SOCIAL_JOB_SOURCE || 'on').toLowerCase() === 'off') return []
+  return allTargets().map(targetName)
+}
+
+export function isSocialJobTarget(target: string): boolean {
+  return target.startsWith(SOCIAL_JOB_TARGET_PREFIX)
+}
+
+function configForTarget(target: string): Target | undefined {
+  if (!isSocialJobTarget(target)) return undefined
+  return allTargets().find((candidate) => targetName(candidate) === target)
+}
+
+export function sourceForSocialJobTarget(target: string): 'facebook' | 'threads' | null {
+  return configForTarget(target)?.platform || null
+}
+
+export async function fetchSocialJobTarget(target: string): Promise<Job[]> {
+  const config = configForTarget(target)
+  if (!config) throw new Error(`Unknown social job target ${target}`)
+  return fetchTarget(config)
+}
