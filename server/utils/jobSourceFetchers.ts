@@ -17,7 +17,7 @@ const FETCHERS: Record<JobSource, (query: string) => Promise<Job[]>> = {
   arbeitnow: fetchArbeitnow,
   themuse: targetizedSource,
   jobicy: fetchJobicy,
-  hh: fetchHhJobs,
+  hh: targetizedSource,
   adzuna: targetizedSource,
   jooble: targetizedSource,
   rss: targetizedSource,
