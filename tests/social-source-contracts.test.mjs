@@ -9,11 +9,13 @@ const hiring = await readFile(new URL('../server/hiring/sources/socialRefresh.ts
 const linkedin = await readFile(new URL('../server/hiring/sources/linkedInRefresh.ts', import.meta.url), 'utf8')
 const envExample = await readFile(new URL('../.env.example', import.meta.url), 'utf8')
 
-test('Threads vacancy discovery uses the shared keyword-search contract', () => {
-  assert.match(jobs, /source:\s*'threads',\s*mode:\s*'search',\s*query:/)
-  assert.match(jobs, /THREADS_REQUEST_TIMEOUT_MS/)
-  assert.match(jobs, /if \(platform === 'threads'\)/)
-  assert.match(jobs, /for \(const target of targets\)/)
+test('Threads vacancy discovery uses one durable target per shared search query', () => {
+  assert.match(jobs, /source:\s*'threads',\s*mode:\s*'search',\s*query:\s*target\.query/)
+  assert.match(jobs, /threadsJobCoverage\(\)/)
+  assert.match(jobs, /configuredSocialJobTargets/)
+  assert.match(jobs, /return fetchTarget\(config\)/)
+  assert.doesNotMatch(jobs, /THREADS_REQUEST_TIMEOUT_MS/)
+  assert.doesNotMatch(jobs, /Promise\.all(?:Settled)?/)
 })
 
 test('candidate social discovery uses the same Threads search proxy', () => {
@@ -27,9 +29,12 @@ test('LinkedIn candidate discovery requests the dedicated public candidate mode'
   assert.match(linkedin, /scope:\s*target\.scope/)
 })
 
-test('Facebook group discovery uses bounded batches', () => {
-  assert.match(jobs, /FACEBOOK_CONCURRENCY/u)
-  assert.match(jobs, /targets\.slice\(offset, offset \+ FACEBOOK_CONCURRENCY\)/u)
+test('Facebook group discovery exposes every group as its own durable target', () => {
+  assert.match(jobs, /HIRING_FACEBOOK_GROUPS\.map/)
+  assert.match(jobs, /platform:\s*'facebook' as const/)
+  assert.match(jobs, /return allTargets\(\)\.map\(targetName\)/)
+  assert.doesNotMatch(jobs, /FACEBOOK_CONCURRENCY/)
+  assert.doesNotMatch(jobs, /targets\.slice\(/)
 })
 
 test('verified Facebook groups cover the supplied Uzbekistan and Romania markets', () => {
