@@ -39,6 +39,11 @@ import type { Job, JobSource } from './jobTypes'
 import { ALL_SOURCES } from './jobTypes'
 import { fetchJobsUaJobs } from './jobsUaSource'
 import {
+  configuredLinkedInJobTargets,
+  fetchLinkedInJobTarget,
+  isLinkedInJobTarget,
+} from './linkedinSource'
+import {
   configuredPublicJobBoardTargets,
   fetchPublicJobBoardTarget,
   isPublicJobBoardTarget,
@@ -108,6 +113,7 @@ const TARGETIZED_SOURCES = new Set<JobSource>([
   'adzuna',
   'jooble',
   'rss',
+  'linkedin',
   'ishgo',
   'itjobsuz',
   'telegram',
@@ -207,6 +213,7 @@ export function configuredJobRefreshTargets(): string[] {
     ...configuredCompanyTargets(),
     ...configuredHhJobTargets(),
     ...configuredStandardJobSourceTargets(),
+    ...configuredLinkedInJobTargets(),
     ...configuredTelegramJobTargets(),
   ]
 }
@@ -307,6 +314,7 @@ function isKnownRefreshTarget(target: string): boolean {
     || isCompanyQueueTarget(target)
     || isHhJobTarget(target)
     || isStandardJobSourceTarget(target)
+    || isLinkedInJobTarget(target)
     || isTelegramJobTarget(target)
 }
 
@@ -364,6 +372,13 @@ async function runJobTargetRefresh(target: string) {
       return { target, source: result.source, skipped: true, reason: 'not_configured', fetched: 0 }
     }
     return mergeForTarget(target, result.source, result.jobs)
+  }
+
+  if (isLinkedInJobTarget(target)) {
+    if (!isJobSourceAvailable('linkedin', 'ingestion')) {
+      return { target, source: 'linkedin' as const, skipped: true, reason: 'not_configured', fetched: 0 }
+    }
+    return mergeForTarget(target, 'linkedin', await fetchLinkedInJobTarget(target))
   }
 
   if (isTelegramJobTarget(target)) {
