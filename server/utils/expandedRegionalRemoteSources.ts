@@ -2,12 +2,11 @@ import type { Job } from './jobTypes'
 import { detectWorkModes } from './hiringLexicon'
 
 const UA = 'jobFinder/1.0 (job aggregator; contact: admin@whiteslove.me)'
-const REQUEST_TIMEOUT_MS = 20_000
 
-type TargetMarket = 'UA' | 'RO' | 'UZ' | 'US' | 'CA' | 'CY' | 'KG' | 'KZ' | 'CN' | 'JP' | 'KR' | 'REMOTE'
-type BoardProvider = 'lever' | 'greenhouse'
+export type TargetMarket = 'UA' | 'RO' | 'UZ' | 'US' | 'CA' | 'CY' | 'KG' | 'KZ' | 'CN' | 'JP' | 'KR' | 'REMOTE'
+export type BoardProvider = 'lever' | 'greenhouse'
 
-type RegionalBoardTarget = {
+export type RegionalBoardTarget = {
   provider?: BoardProvider
   handle: string
   label: string
@@ -192,7 +191,6 @@ export function mapExpandedGreenhousePostings(postings: GreenhousePosting[], tar
 async function fetchLeverBoard(handle: string): Promise<LeverPosting[]> {
   const response = await fetch(`https://api.lever.co/v0/postings/${encodeURIComponent(handle)}?mode=json`, {
     headers: { 'User-Agent': UA, Accept: 'application/json' },
-    signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
   })
   if (!response.ok) throw new Error(`${handle} -> ${response.status}`)
   const postings = await response.json() as LeverPosting[]
@@ -202,62 +200,47 @@ async function fetchLeverBoard(handle: string): Promise<LeverPosting[]> {
 async function fetchGreenhouseBoard(handle: string): Promise<GreenhousePosting[]> {
   const response = await fetch(`https://boards-api.greenhouse.io/v1/boards/${encodeURIComponent(handle)}/jobs?content=true`, {
     headers: { 'User-Agent': UA, Accept: 'application/json' },
-    signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
   })
   if (!response.ok) throw new Error(`${handle} -> ${response.status}`)
   const body = await response.json() as { jobs?: GreenhousePosting[] }
   return Array.isArray(body.jobs) ? body.jobs : []
 }
 
-function filterQuery(jobs: Job[], q: string): Job[] {
-  const needle = q.trim().toLocaleLowerCase('en')
-  if (!needle) return jobs
-  return jobs.filter((job) =>
-    `${job.title} ${job.company} ${job.location} ${job.description || ''}`
-      .toLocaleLowerCase('en')
-      .includes(needle),
-  )
-}
-
 function boardKey(target: RegionalBoardTarget): string {
   return `${target.provider || 'lever'}:${target.handle}`
 }
 
-export async function fetchExpandedRegionalRemoteJobs(q: string): Promise<Job[]> {
+export const EXPANDED_REGIONAL_REMOTE_TARGET_PREFIX = 'expanded-regional-remote:'
+
+export function configuredExpandedRegionalRemoteTargets(): string[] {
   if (String(process.env.EXPANDED_REGIONAL_REMOTE_SOURCE || 'on').toLowerCase() === 'off') return []
+  return [...new Set(EXPANDED_REGIONAL_REMOTE_COMPANIES.map((target) =>
+    `${EXPANDED_REGIONAL_REMOTE_TARGET_PREFIX}${boardKey(target)}`,
+  ))]
+}
 
-  const boards = [...new Map(EXPANDED_REGIONAL_REMOTE_COMPANIES.map((target) => [boardKey(target), target])).values()]
-  const fetched = await Promise.allSettled(boards.map(async (target) => ({
-    key: boardKey(target),
-    provider: target.provider || 'lever',
-    postings: target.provider === 'greenhouse'
-      ? await fetchGreenhouseBoard(target.handle)
-      : await fetchLeverBoard(target.handle),
-  })))
-  const postingByBoard = new Map<string, { provider: BoardProvider; postings: LeverPosting[] | GreenhousePosting[] }>()
+export function isExpandedRegionalRemoteTarget(target: string): boolean {
+  return target.startsWith(EXPANDED_REGIONAL_REMOTE_TARGET_PREFIX)
+}
 
-  fetched.forEach((result, index) => {
-    const target = boards[index]!
-    const key = boardKey(target)
-    if (result.status === 'fulfilled') {
-      postingByBoard.set(key, { provider: result.value.provider, postings: result.value.postings })
-      return
-    }
-    console.warn(
-      `[jobs:expanded-regional-remote] ${key} failed:`,
-      result.reason instanceof Error ? result.reason.message : String(result.reason),
-    )
-  })
+export async function fetchExpandedRegionalRemoteTarget(target: string): Promise<Job[]> {
+  if (!isExpandedRegionalRemoteTarget(target)) throw new Error(`Unknown expanded regional target ${target}`)
+  const key = target.slice(EXPANDED_REGIONAL_REMOTE_TARGET_PREFIX.length)
+  const markets = EXPANDED_REGIONAL_REMOTE_COMPANIES.filter((candidate) => boardKey(candidate) === key)
+  const board = markets[0]
+  if (!board) throw new Error(`Unknown expanded regional target ${target}`)
 
-  const deduped = new Map<string, Job>()
-  for (const target of EXPANDED_REGIONAL_REMOTE_COMPANIES) {
-    const board = postingByBoard.get(boardKey(target))
-    if (!board) continue
-    const jobs = board.provider === 'greenhouse'
-      ? mapExpandedGreenhousePostings(board.postings as GreenhousePosting[], target)
-      : mapExpandedLeverPostings(board.postings as LeverPosting[], target)
-    for (const job of jobs) deduped.set(job.url || job.id, job)
+  const provider = board.provider || 'lever'
+  const postings = provider === 'greenhouse'
+    ? await fetchGreenhouseBoard(board.handle)
+    : await fetchLeverBoard(board.handle)
+  const byUrl = new Map<string, Job>()
+
+  for (const market of markets) {
+    const jobs = provider === 'greenhouse'
+      ? mapExpandedGreenhousePostings(postings as GreenhousePosting[], market)
+      : mapExpandedLeverPostings(postings as LeverPosting[], market)
+    for (const job of jobs) byUrl.set(job.url || job.id, job)
   }
-
-  return filterQuery([...deduped.values()], q)
+  return [...byUrl.values()]
 }
