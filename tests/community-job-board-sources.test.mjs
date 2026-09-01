@@ -47,6 +47,8 @@ test('standard crawler policy is centralized rather than source-local', () => {
     pagesPerRun: 2,
     maxPage: 10_000,
     requestDelayMs: 500,
-    requestTimeoutMs: 20_000,
+    requestTimeoutMs: 6_000,
+    concurrency: 10,
+    maxJobsPerSource: 60,
   })
 })
