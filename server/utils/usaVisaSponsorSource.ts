@@ -1,13 +1,11 @@
 import { detectUsLocation } from '@whiteslove/parsing-lexicon/hiring-source-semantics'
 import { detectWorkModes } from '@whiteslove/parsing-lexicon/hiring-work-semantics'
+import { crawlStandardJobBoard } from './cyclicJobBoardCrawler'
 import type { Job } from './jobTypes'
 
 const REPO = 'NotifyYouInc/2026-H1B-Sponsor-Jobs'
 const API = `https://api.github.com/repos/${REPO}`
 const RAW = `https://raw.githubusercontent.com/${REPO}`
-const REQUEST_TIMEOUT_MS = 12_000
-const DEFAULT_MAX_JOBS = 80
-const DEFAULT_RECENT_COMMITS = 2
 
 interface GitHubCommitRef {
   sha: string
@@ -23,6 +21,11 @@ interface GitHubCommitDetail {
   files?: GitHubCommitFile[]
 }
 
+type HydratedJobFile = {
+  filename: string
+  markdown: string
+}
+
 function headers(accept = 'application/vnd.github+json'): Record<string, string> {
   const token = process.env.USA_VISA_GITHUB_TOKEN?.trim()
   return {
@@ -34,19 +37,13 @@ function headers(accept = 'application/vnd.github+json'): Record<string, string>
 }
 
 async function fetchJson<T>(url: string): Promise<T> {
-  const response = await fetch(url, {
-    headers: headers(),
-    signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
-  })
+  const response = await fetch(url, { headers: headers() })
   if (!response.ok) throw new Error(`GitHub H1B feed -> ${response.status}`)
   return response.json() as Promise<T>
 }
 
 async function fetchText(url: string): Promise<string> {
-  const response = await fetch(url, {
-    headers: { 'User-Agent': 'whiteslove-job-finder/1.0' },
-    signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
-  })
+  const response = await fetch(url, { headers: { 'User-Agent': 'whiteslove-job-finder/1.0' } })
   if (!response.ok) throw new Error(`GitHub H1B raw -> ${response.status}`)
   return response.text()
 }
@@ -103,70 +100,67 @@ function parseJob(markdown: string, filename: string): Job | null {
   }
 }
 
-function maxJobs(): number {
-  const parsed = Number.parseInt(process.env.USA_VISA_GITHUB_MAX_JOBS || '', 10)
-  return Number.isFinite(parsed) && parsed > 0 ? Math.min(parsed, 200) : DEFAULT_MAX_JOBS
-}
-
-function recentCommits(): number {
-  const parsed = Number.parseInt(process.env.USA_VISA_GITHUB_RECENT_COMMITS || '', 10)
-  return Number.isFinite(parsed) && parsed > 0 ? Math.min(parsed, 5) : DEFAULT_RECENT_COMMITS
-}
-
-async function recentJobFiles(limit: number): Promise<{ sha: string, filename: string }[]> {
-  const commits = await fetchJson<GitHubCommitRef[]>(`${API}/commits?per_page=${recentCommits()}`)
-  const seen = new Set<string>()
-  const files: { sha: string, filename: string }[] = []
+async function fetchCommitPage(page: number): Promise<string> {
+  // per_page is the upstream GitHub API page shape. Historical traversal and
+  // page rotation are owned by crawlStandardJobBoard.
+  const commits = await fetchJson<GitHubCommitRef[]>(`${API}/commits?per_page=100&page=${page}`)
+  const files = new Map<string, HydratedJobFile>()
 
   for (const commit of commits) {
     if (!commit?.sha) continue
     const detail = await fetchJson<GitHubCommitDetail>(`${API}/commits/${encodeURIComponent(commit.sha)}`)
-
     for (const file of detail.files || []) {
-      if (file.status === 'removed') continue
-      if (!/^jobs\/[^/]+\.md$/i.test(file.filename)) continue
-      if (file.filename.endsWith('/.gitkeep')) continue
-      if (seen.has(file.filename)) continue
-
-      seen.add(file.filename)
-      files.push({ sha: detail.sha || commit.sha, filename: file.filename })
-      if (files.length >= limit) return files
+      if (file.status === 'removed' || !/^jobs\/[^/]+\.md$/i.test(file.filename) || file.filename.endsWith('/.gitkeep')) continue
+      if (files.has(file.filename)) continue
+      const encodedPath = file.filename.split('/').map(encodeURIComponent).join('/')
+      try {
+        const markdown = await fetchText(`${RAW}/${encodeURIComponent(detail.sha || commit.sha)}/${encodedPath}`)
+        files.set(file.filename, { filename: file.filename, markdown })
+      } catch (error) {
+        console.warn(
+          `[jobs:h1b] ${file.filename} failed:`,
+          error instanceof Error ? error.message : String(error),
+        )
+      }
     }
   }
 
-  return files
+  return JSON.stringify([...files.values()])
 }
 
-async function loadFile(file: { sha: string, filename: string }): Promise<Job | null> {
-  const encodedPath = file.filename.split('/').map(encodeURIComponent).join('/')
-  const markdown = await fetchText(`${RAW}/${encodeURIComponent(file.sha)}/${encodedPath}`)
-  return parseJob(markdown, file.filename)
-}
-
-export async function fetchUsaVisaSponsorJobs(q: string): Promise<Job[]> {
-  if (process.env.USA_VISA_SPONSOR_SOURCE === 'off') return []
-
+function parseCommitPage(raw: string): Job[] {
+  let files: HydratedJobFile[]
   try {
-    const files = await recentJobFiles(maxJobs())
-    const results = await Promise.allSettled(files.map(loadFile))
-    const byUrl = new Map<string, Job>()
-
-    for (const result of results) {
-      if (result.status !== 'fulfilled' || !result.value) continue
-      byUrl.set(result.value.url, result.value)
-    }
-
-    const jobs = [...byUrl.values()]
-    if (!q) return jobs
-
-    const needle = q.toLocaleLowerCase('en')
-    return jobs.filter((job) =>
-      `${job.title} ${job.company} ${job.location} ${job.description || ''}`
-        .toLocaleLowerCase('en')
-        .includes(needle),
-    )
-  } catch (error) {
-    console.warn('[jobs] USA H1B sponsor feed failed:', error instanceof Error ? error.message : String(error))
+    const parsed = JSON.parse(raw) as unknown
+    files = Array.isArray(parsed) ? parsed as HydratedJobFile[] : []
+  } catch {
     return []
   }
+
+  const byUrl = new Map<string, Job>()
+  for (const file of files) {
+    const job = parseJob(file.markdown, file.filename)
+    if (job) byUrl.set(job.url, job)
+  }
+  return [...byUrl.values()]
+}
+
+export const USA_VISA_SPONSOR_TARGET = 'usa-visa-sponsor:h1b-github'
+
+export function configuredUsaVisaSponsorTargets(): string[] {
+  return process.env.USA_VISA_SPONSOR_SOURCE === 'off' ? [] : [USA_VISA_SPONSOR_TARGET]
+}
+
+export function isUsaVisaSponsorTarget(target: string): boolean {
+  return target === USA_VISA_SPONSOR_TARGET
+}
+
+export async function fetchUsaVisaSponsorTarget(target: string): Promise<Job[]> {
+  if (!isUsaVisaSponsorTarget(target)) throw new Error(`Unknown USA visa sponsor target ${target}`)
+  const run = await crawlStandardJobBoard({
+    key: 'usa-visa-sponsor:h1b-github',
+    fetchPage: fetchCommitPage,
+    parsePage: (raw) => parseCommitPage(raw),
+  })
+  return run.jobs
 }
