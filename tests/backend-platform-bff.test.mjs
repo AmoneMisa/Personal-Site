@@ -5,12 +5,14 @@ import test from 'node:test'
 const read = (path) => readFile(new URL(path, import.meta.url), 'utf8')
 
 test('jobs and hiring public routes delegate to isolated platform domains', async () => {
-  const [jobs, hiring, meta] = await Promise.all([
+  const [jobs, vacancy, hiring, meta] = await Promise.all([
     read('../server/routes/jobs-feed.get.ts'),
+    read('../server/routes/jobs-vacancy.get.ts'),
     read('../server/routes/hiring-feed.get.ts'),
     read('../server/routes/hiring-meta.get.ts'),
   ])
   assert.match(jobs, /requirePlatformGet\(event, 'vacancies', '\/jobs-feed'\)/)
+  assert.match(vacancy, /requirePlatformGet\(event, 'vacancies', '\/jobs-vacancy'\)/)
   assert.match(hiring, /requirePlatformGet\(event, 'cv', '\/hiring-feed'\)/)
   assert.match(meta, /requirePlatformGet\(event, 'cv', '\/hiring-meta'\)/)
 })
@@ -20,6 +22,20 @@ test('platform proxy preserves query parameters and fails closed without configu
   assert.match(proxy, /upstream\.search = incoming\.search/)
   assert.match(proxy, /backend is not configured/)
   assert.match(proxy, /X-Backend-Platform/)
+})
+
+test('SSR workforce share lookup calls backend platform instead of local snapshots', async () => {
+  const lookup = await read('../server/utils/backendPlatformShareLookup.ts')
+  const plugin = await read('../server/plugins/share-preview.ts')
+  const image = await read('../server/routes/share-og.png.get.ts')
+  assert.match(lookup, /VACANCIES_API_URL/)
+  assert.match(lookup, /CV_API_URL/)
+  assert.match(lookup, /'\/jobs-vacancy'/)
+  assert.match(lookup, /'\/hiring-feed'/)
+  assert.match(plugin, /findPlatformSharedJob/)
+  assert.match(plugin, /findPlatformSharedCandidate/)
+  assert.match(image, /findPlatformSharedJob/)
+  assert.match(image, /findPlatformSharedCandidate/)
 })
 
 test('frontend alone joins the backend platform network', async () => {
