@@ -1,10 +1,9 @@
-import { configuredJobSources, refreshJobSource } from '../server/utils/jobsSourceRefresh'
-import type { JobSource } from '../shared/contracts/jobs'
+import { configuredJobRefreshTargets, refreshJobTarget } from '../server/utils/jobsSourceRefresh'
 
-export function configuredSources(): JobSource[] {
-  return configuredJobSources()
+export function configuredSources(): string[] {
+  return configuredJobRefreshTargets()
 }
 
 export async function refreshSource(source: string) {
-  return refreshJobSource(source as JobSource)
+  return refreshJobTarget(source)
 }
