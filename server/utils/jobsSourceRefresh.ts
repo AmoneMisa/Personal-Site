@@ -6,6 +6,11 @@ import {
   isCommunityJobBoardTarget,
 } from './communityJobBoardSources'
 import { enrichJob } from './enrich'
+import {
+  configuredFlagmaJobBoardTargets,
+  fetchFlagmaJobBoardTarget,
+  isFlagmaJobBoardTarget,
+} from './flagmaJobSource'
 import { isJobSourceAvailable } from './jobSourceConfig'
 import { fetchJobSource } from './jobSourceFetchers'
 import { syncJobsSearchIndex } from './jobsElastic'
@@ -94,7 +99,11 @@ export function configuredJobSources(): JobSource[] {
 export function configuredJobRefreshTargets(): string[] {
   const sources = configuredJobSources()
   if (!sources.includes('companies')) return sources
-  return [...sources, ...configuredCommunityJobBoardTargets()]
+  return [
+    ...sources,
+    ...configuredCommunityJobBoardTargets(),
+    ...configuredFlagmaJobBoardTargets(),
+  ]
 }
 
 function dedupKey(job: Job): string {
@@ -214,11 +223,13 @@ async function mergeForTarget(target: string, source: JobSource, jobs: Job[]) {
 }
 
 async function runJobTargetRefresh(target: string) {
-  if (isCommunityJobBoardTarget(target)) {
+  if (isCommunityJobBoardTarget(target) || isFlagmaJobBoardTarget(target)) {
     if (!isJobSourceAvailable('companies', 'ingestion')) {
       return { target, source: 'companies' as const, skipped: true, reason: 'not_configured', fetched: 0 }
     }
-    const jobs = await fetchCommunityJobBoardTarget(target)
+    const jobs = isFlagmaJobBoardTarget(target)
+      ? await fetchFlagmaJobBoardTarget(target)
+      : await fetchCommunityJobBoardTarget(target)
     return mergeForTarget(target, 'companies', jobs)
   }
 
@@ -231,7 +242,11 @@ async function runJobTargetRefresh(target: string) {
 }
 
 export async function refreshJobTarget(target: string) {
-  if (!isCommunityJobBoardTarget(target) && !isKnownJobSource(target)) {
+  if (
+    !isCommunityJobBoardTarget(target)
+    && !isFlagmaJobBoardTarget(target)
+    && !isKnownJobSource(target)
+  ) {
     throw new Error(`Unknown job refresh target ${target}`)
   }
 
