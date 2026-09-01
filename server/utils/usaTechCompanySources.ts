@@ -3,18 +3,15 @@ import type { Job } from './jobTypes'
 import { detectWorkModes } from './hiringLexicon'
 
 const UA = 'jobFinder/1.0 (job aggregator; contact: admin@whiteslove.me)'
-const REQUEST_TIMEOUT_MS = 20_000
 const MAX_DESCRIPTION = 12_000
 
-type GreenhouseCompany = {
+export type GreenhouseCompany = {
   handle: string
   label: string
 }
 
 // Additional US-focused technology employers with public Greenhouse Job Board
-// API feeds. These intentionally live outside sources.ts's broad default seed
-// list so the USA expansion can be disabled independently without changing the
-// public `companies` source contract or the UI source selector.
+// API feeds. Each employer is scheduled as its own durable jobs queue target.
 export const USA_TECH_GREENHOUSE_COMPANIES: GreenhouseCompany[] = [
   { handle: 'okta', label: 'Okta' },
   { handle: 'snowflake', label: 'Snowflake' },
@@ -113,43 +110,28 @@ export function mapUsGreenhouseJobs(
 async function fetchCompany(company: GreenhouseCompany): Promise<Job[]> {
   const response = await fetch(
     `https://boards-api.greenhouse.io/v1/boards/${encodeURIComponent(company.handle)}/jobs?content=true`,
-    {
-      headers: { 'User-Agent': UA, Accept: 'application/json' },
-      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
-    },
+    { headers: { 'User-Agent': UA, Accept: 'application/json' } },
   )
   if (!response.ok) throw new Error(`${company.label} -> ${response.status}`)
   const payload = await response.json() as { jobs?: GreenhouseJob[] }
   return mapUsGreenhouseJobs(company, Array.isArray(payload.jobs) ? payload.jobs : [])
 }
 
-function filterQuery(jobs: Job[], q: string): Job[] {
-  const needle = q.trim().toLocaleLowerCase('en')
-  if (!needle) return jobs
-  return jobs.filter((job) =>
-    `${job.title} ${job.company} ${job.location} ${job.description || ''}`
-      .toLocaleLowerCase('en')
-      .includes(needle),
-  )
+export const USA_TECH_COMPANY_TARGET_PREFIX = 'usa-tech-company:'
+
+export function configuredUsaTechCompanyTargets(): string[] {
+  if (String(process.env.USA_TECH_COMPANY_SOURCE || 'on').toLowerCase() === 'off') return []
+  return USA_TECH_GREENHOUSE_COMPANIES.map((company) => `${USA_TECH_COMPANY_TARGET_PREFIX}${company.handle}`)
 }
 
-export async function fetchUsaTechCompanyJobs(q: string): Promise<Job[]> {
-  if (String(process.env.USA_TECH_COMPANY_SOURCE || 'on').toLowerCase() === 'off') return []
+export function isUsaTechCompanyTarget(target: string): boolean {
+  return target.startsWith(USA_TECH_COMPANY_TARGET_PREFIX)
+}
 
-  const results = await Promise.allSettled(USA_TECH_GREENHOUSE_COMPANIES.map(fetchCompany))
-  const byUrl = new Map<string, Job>()
-
-  results.forEach((result, index) => {
-    const company = USA_TECH_GREENHOUSE_COMPANIES[index]!
-    if (result.status === 'rejected') {
-      console.warn(
-        `[jobs:usa-tech] ${company.label} failed:`,
-        result.reason instanceof Error ? result.reason.message : String(result.reason),
-      )
-      return
-    }
-    for (const job of result.value) byUrl.set(job.url, job)
-  })
-
-  return filterQuery([...byUrl.values()], q)
+export async function fetchUsaTechCompanyTarget(target: string): Promise<Job[]> {
+  if (!isUsaTechCompanyTarget(target)) throw new Error(`Unknown USA tech company target ${target}`)
+  const handle = target.slice(USA_TECH_COMPANY_TARGET_PREFIX.length)
+  const company = USA_TECH_GREENHOUSE_COMPANIES.find((candidate) => candidate.handle === handle)
+  if (!company) throw new Error(`Unknown USA tech company target ${target}`)
+  return fetchCompany(company)
 }
