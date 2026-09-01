@@ -6,6 +6,7 @@ const coverage = await readFile(new URL('../server/utils/jobSearchCoverage.ts', 
 const linkedin = await readFile(new URL('../server/utils/linkedinSource.ts', import.meta.url), 'utf8')
 const social = await readFile(new URL('../server/utils/socialJobSources.ts', import.meta.url), 'utf8')
 const sourceFetchers = await readFile(new URL('../server/utils/jobSourceFetchers.ts', import.meta.url), 'utf8')
+const sourceRefresh = await readFile(new URL('../server/utils/jobsSourceRefresh.ts', import.meta.url), 'utf8')
 
 const oblastLabels = [
   'Вінницька область', 'Волинська область', 'Дніпропетровська область', 'Донецька область',
@@ -31,26 +32,35 @@ test('priority job coverage includes worldwide remote and USA relocation', () =>
   assert.match(coverage, /H-1B sponsorship/)
 })
 
-test('LinkedIn paginates public guest search and rotates regional coverage', () => {
-  assert.match(linkedin, /page \* 25/)
-  assert.match(linkedin, /LINKEDIN_MAX_PAGES/)
+test('LinkedIn regional coverage is split into durable shared-crawler targets', () => {
+  assert.match(linkedin, /crawlStandardJobBoard/)
   assert.match(linkedin, /linkedinLocationCoverage/)
   assert.match(linkedin, /USA_RELOCATION_QUERIES/)
-  assert.match(linkedin, /countryRemotePasses/)
+  assert.match(linkedin, /configuredLinkedInJobTargets/)
+  assert.match(linkedin, /fetchLinkedInJobTarget/)
+  assert.doesNotMatch(linkedin, /LINKEDIN_MAX_PAGES/)
+  assert.doesNotMatch(linkedin, /LINKEDIN_SOURCE_TIMEOUT_MS/)
 })
 
-test('Threads jobs use bounded regional rotation and reject candidate posts through shared hiring semantics', () => {
-  assert.match(social, /THREADS_JOB_REGIONAL_QUERIES_PER_CYCLE/)
-  assert.match(social, /THREADS_JOB_PRIORITY_QUERIES_PER_CYCLE/)
+test('Threads jobs expose every coverage query as a queue target and use shared hiring semantics', () => {
+  assert.match(social, /threadsJobCoverage\(\)/)
+  assert.match(social, /REMOTE_JOB_QUERIES\.map/)
+  assert.match(social, /USA_RELOCATION_QUERIES\.map/)
+  assert.match(social, /configuredSocialJobTargets/)
   assert.match(social, /classifySharedHiringMessage\(text\)/)
   assert.match(social, /detectHiringIntent\(text\)/)
+  assert.doesNotMatch(social, /THREADS_JOB_(?:REGIONAL|PRIORITY)_QUERIES_PER_CYCLE/)
   assert.doesNotMatch(social, /const CANDIDATE_RE\s*=/)
   assert.match(social, /fetched=\$\{items\.length\} recent=\$\{recent\} classified=\$\{jobs\.length\}/)
 })
 
-test('long-running social and LinkedIn sources are not capped at 30 seconds', () => {
-  assert.match(sourceFetchers, /LINKEDIN_SOURCE_TIMEOUT_MS/)
-  assert.match(sourceFetchers, /SOCIAL_SOURCE_TIMEOUT_MS/)
-  assert.match(sourceFetchers, /source === 'linkedin'/)
-  assert.match(sourceFetchers, /source === 'facebook' \|\| source === 'threads'/)
+test('LinkedIn and social ingestion is queue-targeted without source-level timeout wrappers', () => {
+  assert.match(sourceFetchers, /linkedin:\s*targetizedSource/)
+  assert.match(sourceFetchers, /facebook:\s*targetizedSource/)
+  assert.match(sourceFetchers, /threads:\s*targetizedSource/)
+  assert.doesNotMatch(sourceFetchers, /TIMEOUT(?:_MS)?/)
+  assert.match(sourceRefresh, /configuredLinkedInJobTargets/)
+  assert.match(sourceRefresh, /configuredSocialJobTargets/)
+  assert.match(sourceRefresh, /fetchLinkedInJobTarget/)
+  assert.match(sourceRefresh, /fetchSocialJobTarget/)
 })
