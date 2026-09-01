@@ -13,12 +13,7 @@ function schema(): string {
 }
 
 function databaseUrl(): string {
-  return String(
-    process.env.SUBSCRIPTIONS_DATABASE_URL
-      || process.env.HIRING_DATABASE_URL
-      || process.env.JOBS_QUEUE_DATABASE_URL
-      || '',
-  ).trim()
+  return String(process.env.SUBSCRIPTIONS_DATABASE_URL || '').trim()
 }
 
 function db(): Pool {
