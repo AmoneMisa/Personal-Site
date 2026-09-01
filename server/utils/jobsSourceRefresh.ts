@@ -1,6 +1,11 @@
 import { useStateStore } from '~~/server/utils/stateStore'
 import { syncJobsDb } from '../jobs/infrastructure/database'
 import {
+  configuredAviationJobTargets,
+  fetchAviationJobTarget,
+  isAviationJobTarget,
+} from './aviationExpansionJobs'
+import {
   configuredCommunityJobBoardTargets,
   fetchCommunityJobBoardTarget,
   isCommunityJobBoardTarget,
@@ -54,6 +59,11 @@ import {
   fetchUsaTechCompanyTarget,
   isUsaTechCompanyTarget,
 } from './usaTechCompanySources'
+import {
+  configuredUsaVisaSponsorTargets,
+  fetchUsaVisaSponsorTarget,
+  isUsaVisaSponsorTarget,
+} from './usaVisaSponsorSource'
 
 const STORE_KEY = 'jobs:store:v4'
 const STORE_TTL_SECONDS = 15 * 86_400
@@ -138,6 +148,8 @@ function configuredCompanySubTargets(): string[] {
     ...configuredUsaTechCompanyTargets(),
     ...configuredRegionalTechCompanyTargets(),
     ...configuredRegionalJobBoardTargets(),
+    ...configuredAviationJobTargets(),
+    ...configuredUsaVisaSponsorTargets(),
     ...COMPANY_SOURCE_TARGETS.map(companySourceTarget),
   ]
 }
@@ -231,6 +243,8 @@ function isCompanyQueueTarget(target: string): boolean {
     || isUsaTechCompanyTarget(target)
     || isRegionalTechCompanyTarget(target)
     || isRegionalJobBoardTarget(target)
+    || isAviationJobTarget(target)
+    || isUsaVisaSponsorTarget(target)
     || isCompanySourceTarget(target)
 }
 
@@ -254,6 +268,8 @@ async function fetchCompanyQueueTarget(target: string): Promise<Job[]> {
   if (isUsaTechCompanyTarget(target)) return fetchUsaTechCompanyTarget(target)
   if (isRegionalTechCompanyTarget(target)) return fetchRegionalTechCompanyTarget(target)
   if (isRegionalJobBoardTarget(target)) return fetchRegionalJobBoardTarget(target)
+  if (isAviationJobTarget(target)) return fetchAviationJobTarget(target)
+  if (isUsaVisaSponsorTarget(target)) return fetchUsaVisaSponsorTarget(target)
   if (isCompanySourceTarget(target)) {
     const key = target.slice(COMPANY_SOURCE_TARGET_PREFIX.length) as CompanySourceTarget
     if (key === 'intellias') return fetchIntelliasJobs('')
