@@ -70,16 +70,21 @@ test('candidate integrations never implement recruiter login or gated contact ac
   assert.doesNotMatch(executable, /page\.(?:click|fill|type)\s*\([^\n]{0,160}(?:login|password|contact)/i)
 })
 
-test('regional vacancy boards are isolated under the companies fan-out', async () => {
+test('regional vacancy boards are independent durable queue targets', async () => {
   const boards = await read('server/utils/regionalJobBoardSources.ts')
+  const refresh = await read('server/utils/jobsSourceRefresh.ts')
   const fetchers = await read('server/utils/jobSourceFetchers.ts')
 
   for (const key of VACANCY_KEYS) {
     assert.match(boards, new RegExp(`key: ['"]${escapeRe(key)}['"]`), key)
   }
-  assert.match(fetchers, /fetchRegionalJobBoardJobs/)
-  assert.match(fetchers, /regional-job-boards/)
-  assert.match(boards, /Promise\.allSettled/)
+  assert.match(boards, /configuredRegionalJobBoardTargets/)
+  assert.match(boards, /fetchRegionalJobBoardTarget/)
+  assert.match(boards, /crawlStandardJobBoard/)
+  assert.doesNotMatch(boards, /Promise\.all(?:Settled)?/)
+  assert.match(refresh, /configuredRegionalJobBoardTargets/)
+  assert.match(refresh, /fetchRegionalJobBoardTarget/)
+  assert.doesNotMatch(fetchers, /fetchRegionalJobBoardJobs/)
 })
 
 test('HH public API covers UZ, KZ and KG without changing the UZ stable id', async () => {
