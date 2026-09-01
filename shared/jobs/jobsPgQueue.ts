@@ -78,7 +78,15 @@ async function insertSeeds(client: PoolClient, generation: string, seeds: QueueS
     const result = await client.query(
       `INSERT INTO ${name}.tasks (
          task_key, generation, type, target, priority, payload
-       ) VALUES ($1, $2, $3, $4, $5, $6::jsonb)
+       )
+       SELECT $1, $2, $3, $4, $5, $6::jsonb
+       WHERE NOT EXISTS (
+         SELECT 1
+         FROM ${name}.tasks AS active
+         WHERE active.type = $3
+           AND LOWER(active.target) = LOWER($4)
+           AND active.status IN ('pending', 'running')
+       )
        ON CONFLICT (task_key) DO NOTHING
        RETURNING id`,
       [taskKey, generation, seed.type, seed.target, seed.priority, JSON.stringify(seed.payload)],
