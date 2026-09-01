@@ -69,6 +69,12 @@ import {
   isRegionalTechCompanyTarget,
 } from './regionalTechCompanySources'
 import {
+  configuredSocialJobTargets,
+  fetchSocialJobTarget,
+  isSocialJobTarget,
+  sourceForSocialJobTarget,
+} from './socialJobSources'
+import {
   configuredSourceExpansionTargets,
   fetchSourceExpansionTarget,
   isSourceExpansionTarget,
@@ -114,6 +120,8 @@ const TARGETIZED_SOURCES = new Set<JobSource>([
   'jooble',
   'rss',
   'linkedin',
+  'facebook',
+  'threads',
   'ishgo',
   'itjobsuz',
   'telegram',
@@ -214,6 +222,7 @@ export function configuredJobRefreshTargets(): string[] {
     ...configuredHhJobTargets(),
     ...configuredStandardJobSourceTargets(),
     ...configuredLinkedInJobTargets(),
+    ...configuredSocialJobTargets(),
     ...configuredTelegramJobTargets(),
   ]
 }
@@ -315,6 +324,7 @@ function isKnownRefreshTarget(target: string): boolean {
     || isHhJobTarget(target)
     || isStandardJobSourceTarget(target)
     || isLinkedInJobTarget(target)
+    || isSocialJobTarget(target)
     || isTelegramJobTarget(target)
 }
 
@@ -379,6 +389,15 @@ async function runJobTargetRefresh(target: string) {
       return { target, source: 'linkedin' as const, skipped: true, reason: 'not_configured', fetched: 0 }
     }
     return mergeForTarget(target, 'linkedin', await fetchLinkedInJobTarget(target))
+  }
+
+  if (isSocialJobTarget(target)) {
+    const source = sourceForSocialJobTarget(target)
+    if (!source) throw new Error(`Unknown social job target ${target}`)
+    if (!isJobSourceAvailable(source, 'ingestion')) {
+      return { target, source, skipped: true, reason: 'not_configured', fetched: 0 }
+    }
+    return mergeForTarget(target, source, await fetchSocialJobTarget(target))
   }
 
   if (isTelegramJobTarget(target)) {
