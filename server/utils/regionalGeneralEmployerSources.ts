@@ -1,12 +1,9 @@
+import { crawlStandardJobBoard } from './cyclicJobBoardCrawler'
 import type { Job } from './jobTypes'
 import { detectWorkModes } from './hiringLexicon'
-import { fetchExpandedRegionalRemoteJobs } from './expandedRegionalRemoteSources'
-import { fetchRegionalServiceJobs } from './regionalServiceJobSources'
 import { absoluteHttpUrl as absoluteUrl, stripHtml } from './htmlText'
 
 const UA = 'jobFinder/1.0 (job aggregator; contact: admin@whiteslove.me)'
-const REQUEST_TIMEOUT_MS = 20_000
-const MAX_PER_EMPLOYER = 140
 
 export type RegionalGeneralEmployer = {
   label: string
@@ -112,7 +109,7 @@ export function parseRegionalEmployerPage(html: string, employer: RegionalGenera
 
   const anchorRe = /<a\b[^>]*href=["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>/gi
   let anchor: RegExpExecArray | null
-  while ((anchor = anchorRe.exec(html)) && byUrl.size < MAX_PER_EMPLOYER) {
+  while ((anchor = anchorRe.exec(html))) {
     const url = absoluteUrl(anchor[1]!, employer.url)
     if (!url || !acceptedUrl(url, employer) || byUrl.has(url)) continue
     const title = stripHtml(anchor[2])
@@ -133,53 +130,50 @@ export function parseRegionalEmployerPage(html: string, employer: RegionalGenera
     })
   }
 
-  return [...byUrl.values()].slice(0, MAX_PER_EMPLOYER)
+  return [...byUrl.values()]
 }
 
-async function fetchEmployer(employer: RegionalGeneralEmployer): Promise<Job[]> {
+function employerKey(employer: RegionalGeneralEmployer): string {
+  return `${employer.country.toLowerCase()}-${employer.label.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')}`
+}
+
+export const REGIONAL_GENERAL_EMPLOYER_TARGET_PREFIX = 'regional-general-employer:'
+
+export function configuredRegionalGeneralEmployerTargets(): string[] {
+  if (String(process.env.REGIONAL_GENERAL_EMPLOYER_SOURCE || 'on').toLowerCase() === 'off') return []
+  return REGIONAL_GENERAL_EMPLOYERS.map((employer) => `${REGIONAL_GENERAL_EMPLOYER_TARGET_PREFIX}${employerKey(employer)}`)
+}
+
+export function isRegionalGeneralEmployerTarget(target: string): boolean {
+  return target.startsWith(REGIONAL_GENERAL_EMPLOYER_TARGET_PREFIX)
+}
+
+function employerForTarget(target: string): RegionalGeneralEmployer | undefined {
+  if (!isRegionalGeneralEmployerTarget(target)) return undefined
+  const key = target.slice(REGIONAL_GENERAL_EMPLOYER_TARGET_PREFIX.length)
+  return REGIONAL_GENERAL_EMPLOYERS.find((employer) => employerKey(employer) === key)
+}
+
+async function fetchEmployerPage(employer: RegionalGeneralEmployer): Promise<string> {
   const response = await fetch(employer.url, {
-    headers: { 'User-Agent': UA, Accept: 'text/html,application/xhtml+xml', 'Accept-Language': 'en,ru,uk,ro,uz;q=0.8' },
-    signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+    headers: {
+      'User-Agent': UA,
+      Accept: 'text/html,application/xhtml+xml',
+      'Accept-Language': 'en,ru,uk,ro,uz;q=0.8',
+    },
   })
   if (!response.ok) throw new Error(`${employer.label} -> ${response.status}`)
-  return parseRegionalEmployerPage(await response.text(), employer)
+  return response.text()
 }
 
-function filterQuery(jobs: Job[], q: string): Job[] {
-  const needle = q.trim().toLocaleLowerCase('en')
-  if (!needle) return jobs
-  return jobs.filter((job) => `${job.title} ${job.company} ${job.location} ${job.description || ''}`.toLocaleLowerCase('en').includes(needle))
-}
+export async function fetchRegionalGeneralEmployerTarget(target: string): Promise<Job[]> {
+  const employer = employerForTarget(target)
+  if (!employer) throw new Error(`Unknown regional general employer target ${target}`)
 
-export async function fetchRegionalGeneralEmployerJobs(q: string): Promise<Job[]> {
-  if (String(process.env.REGIONAL_GENERAL_EMPLOYER_SOURCE || 'on').toLowerCase() === 'off') return []
-
-  const [results, expanded, serviceJobs] = await Promise.all([
-    Promise.allSettled(REGIONAL_GENERAL_EMPLOYERS.map(fetchEmployer)),
-    fetchExpandedRegionalRemoteJobs(q).catch((error) => {
-      console.warn(
-        '[jobs:regional-general] expanded regional/remote feeds failed:',
-        error instanceof Error ? error.message : String(error),
-      )
-      return [] as Job[]
-    }),
-    fetchRegionalServiceJobs(q).catch((error) => {
-      console.warn(
-        '[jobs:regional-general] regional service feeds failed:',
-        error instanceof Error ? error.message : String(error),
-      )
-      return [] as Job[]
-    }),
-  ])
-
-  const jobs: Job[] = []
-  results.forEach((result, index) => {
-    if (result.status === 'fulfilled') jobs.push(...result.value)
-    else console.warn(
-      `[jobs:regional-general] ${REGIONAL_GENERAL_EMPLOYERS[index]!.label} failed:`,
-      result.reason instanceof Error ? result.reason.message : String(result.reason),
-    )
+  const run = await crawlStandardJobBoard({
+    key: `regional-general:${employerKey(employer)}`,
+    fetchPage: () => fetchEmployerPage(employer),
+    parsePage: (html) => parseRegionalEmployerPage(html, employer),
   })
-
-  return filterQuery([...jobs, ...expanded, ...serviceJobs], q)
+  return run.jobs
 }
