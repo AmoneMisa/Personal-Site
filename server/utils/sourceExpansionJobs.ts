@@ -3,13 +3,16 @@ import { geographyDisplayName } from '@whiteslove/parsing-lexicon/geography-disp
 import { detectHiringLocationName } from '@whiteslove/parsing-lexicon/hiring-location-fields'
 import { parseHiringSourceSalary } from '@whiteslove/parsing-lexicon/hiring-source-semantics'
 import { parseHiringActivityDate } from '@whiteslove/parsing-lexicon/hiring-temporal'
+import {
+  crawlStandardJobBoard,
+  enrichStandardJobBoardDetails,
+} from './cyclicJobBoardCrawler'
 import type { Job } from './jobTypes'
 import { detectWorkModes } from './hiringLexicon'
 
 const UA =
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ' +
   '(KHTML, like Gecko) Chrome/126.0 Safari/537.36'
-const REQUEST_TIMEOUT_MS = 20_000
 const MAX_AGE_DAYS = 14
 const MAX_DESCRIPTION = 4_000
 
@@ -62,19 +65,17 @@ async function fetchHtml(url: string): Promise<string> {
       Accept: 'text/html,application/xhtml+xml',
       'Accept-Language': 'ru,en;q=0.8',
     },
-    signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
   })
   if (!response.ok) throw new Error(`${new URL(url).host} -> ${response.status}`)
   return response.text()
 }
 
-async function fetchJson<T>(url: string): Promise<T> {
+async function fetchJsonText(url: string): Promise<string> {
   const response = await fetch(url, {
     headers: { 'User-Agent': UA, Accept: 'application/json' },
-    signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
   })
   if (!response.ok) throw new Error(`${new URL(url).host} -> ${response.status}`)
-  return response.json() as Promise<T>
+  return response.text()
 }
 
 function jobId(label: string, url: string): string {
@@ -82,11 +83,12 @@ function jobId(label: string, url: string): string {
   return `companies-${label.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-${token}`
 }
 
-
 function isRecent(date: string | null | undefined): boolean {
   if (!date) return false
   const time = Date.parse(date)
-  return Number.isFinite(time) && time >= Date.now() - MAX_AGE_DAYS * 86_400_000 && time <= Date.now() + 48 * 60 * 60 * 1000
+  return Number.isFinite(time)
+    && time >= Date.now() - MAX_AGE_DAYS * 86_400_000
+    && time <= Date.now() + 48 * 60 * 60 * 1000
 }
 
 function salary(text: string): Pick<Job, 'salaryMin' | 'salaryMax' | 'salaryCurrency'> {
@@ -128,29 +130,18 @@ function makeJob(input: {
   }
 }
 
-function filterQuery(jobs: Job[], q: string): Job[] {
-  if (!q.trim()) return jobs
-  const needle = q.toLocaleLowerCase('ru')
-  return jobs.filter((job) =>
-    `${job.title} ${job.company} ${job.location} ${job.description || ''}`
-      .toLocaleLowerCase('ru')
-      .includes(needle),
-  )
-}
-
-// Source routing matrix: Cyrillic city slugs are part of Ishkop URLs, not semantic detection.
-const ISHKOP_CITY_ROUTES: Array<[string, string]> = [
-  ['Tashkent', 'Ташкент'],
-  ['Samarkand', 'Самарканд'],
-  ['Bukhara', 'Бухара'],
-  ['Fergana', 'Фергана'],
-  ['Andijan', 'Андижан'],
-  ['Namangan', 'Наманган'],
-  ['Nukus', 'Нукус'],
-  ['Navoi', 'Навои'],
-  ['Urgench', 'Ургенч'],
-  ['Qarshi', 'Карши'],
-]
+const ISHKOP_CITY_ROUTES = [
+  ['tashkent', 'Tashkent', 'Ташкент'],
+  ['samarkand', 'Samarkand', 'Самарканд'],
+  ['bukhara', 'Bukhara', 'Бухара'],
+  ['fergana', 'Fergana', 'Фергана'],
+  ['andijan', 'Andijan', 'Андижан'],
+  ['namangan', 'Namangan', 'Наманган'],
+  ['nukus', 'Nukus', 'Нукус'],
+  ['navoi', 'Navoi', 'Навои'],
+  ['urgench', 'Urgench', 'Ургенч'],
+  ['qarshi', 'Qarshi', 'Карши'],
+] as const
 
 function likelyCompany(lines: string[], title: string): string {
   const index = lines.findIndex((line) => line === title || line.includes(title))
@@ -247,38 +238,13 @@ export function parseIshkopVacancyDetail(html: string, fallbackUrl: string): Job
   })
 }
 
-async function fetchIshkop(): Promise<Job[]> {
-  const pages = await Promise.allSettled(
-    ISHKOP_CITY_ROUTES.map(async ([label, city]) => {
-      const url = `https://ishkop.uz/${encodeURIComponent('вакансии')}/${encodeURIComponent(city)}`
-      return parseIshkopPage(await fetchHtml(url), label)
-    }),
-  )
-  const byUrl = new Map<string, Job>()
-  for (const result of pages) {
-    if (result.status !== 'fulfilled') continue
-    for (const job of result.value) byUrl.set(job.url, job)
-  }
-
-  // This is the detail stage of the existing Ishkop source refresh, not a
-  // second crawler or scheduler. Discovery, retries and lifecycle remain owned
-  // by the current jobs-worker source task.
-  const summaries = [...byUrl.values()]
-  const details = await Promise.allSettled(summaries.map(async (summary) => (
-    parseIshkopVacancyDetail(await fetchHtml(summary.url), summary.url) || summary
-  )))
-  return details.map((result, index) => (
-    result.status === 'fulfilled' ? result.value : summaries[index]!
-  ))
-}
-
 interface IshBorSummary { url: string; title: string; text: string }
 
 function ishBorSummaries(html: string): IshBorSummary[] {
   const base = 'https://ish-bor.uz/ru/ishlar'
   const matches = [...html.matchAll(/<a\b[^>]*href=["']([^"']*\/ru\/ishlar\/id\/\d+[^"']*)["'][^>]*>([\s\S]*?)<\/a>/gi)]
   const unique = new Map<string, IshBorSummary>()
-  for (let i = 0; i < matches.length && unique.size < 24; i++) {
+  for (let i = 0; i < matches.length; i++) {
     const match = matches[i]!
     const title = stripHtml(match[2])
     if (title.length < 2 || /подробнее/iu.test(title)) continue
@@ -290,21 +256,8 @@ function ishBorSummaries(html: string): IshBorSummary[] {
   return [...unique.values()]
 }
 
-async function fetchIshBor(): Promise<Job[]> {
-  const listUrl = 'https://ish-bor.uz/ru/ishlar'
-  const summaries = ishBorSummaries(await fetchHtml(listUrl))
-  const results = await Promise.allSettled(summaries.map(async (summary) => {
-    let detailText = summary.text
-    let postedAt: string | null = null
-    try {
-      const detail = await fetchHtml(summary.url)
-      detailText = htmlLines(detail).join('\n')
-      postedAt = parseHiringActivityDate(detailText)
-    } catch {
-      // Presence on the current first page is still a strong active-listing
-      // signal. A detail-page failure must not discard the whole board.
-    }
-    if (postedAt && !isRecent(postedAt)) return null
+function parseIshBorPage(html: string): Job[] {
+  return ishBorSummaries(html).map((summary) => {
     const lines = summary.text.split('\n').filter(Boolean)
     const location = lines.find((line) => Boolean(detectHiringLocationName(line, 'UZ'))) || 'Uzbekistan'
     return {
@@ -314,18 +267,25 @@ async function fetchIshBor(): Promise<Job[]> {
         company: 'ish-bor.uz employer',
         location,
         url: summary.url,
-        postedAt: postedAt || new Date().toISOString(),
-        description: detailText,
+        description: summary.text,
         tags: ['Uzbekistan'],
         employerType: 'board',
       }),
-      ...salary(`${summary.text}\n${detailText}`),
+      ...salary(summary.text),
     }
-  }))
-  return results
-    .filter((result): result is PromiseFulfilledResult<Job | null> => result.status === 'fulfilled')
-    .map((result) => result.value)
-    .filter((job): job is Job => job !== null)
+  })
+}
+
+function parseIshBorDetail(html: string, summary: Job): Job | null {
+  const detailText = htmlLines(html).join('\n')
+  const postedAt = parseHiringActivityDate(detailText)
+  if (postedAt && !isRecent(postedAt)) return null
+  return {
+    ...summary,
+    postedAt: postedAt || summary.postedAt,
+    description: stripHtml(detailText).slice(0, MAX_DESCRIPTION) || summary.description,
+    ...salary(`${summary.description || ''}\n${detailText}`),
+  }
 }
 
 function parseIshPlusPage(html: string, pageUrl: string): Job[] {
@@ -365,26 +325,13 @@ function parseIshPlusPage(html: string, pageUrl: string): Job[] {
   return out
 }
 
-async function fetchIshPlus(): Promise<Job[]> {
-  const pages = await Promise.allSettled(
-    [1, 2, 3, 4].map(async (page) => {
-      const url = `https://ishplus.uz/vacancies?lang=ru&page=${page}`
-      return parseIshPlusPage(await fetchHtml(url), url)
-    }),
-  )
-  return pages.flatMap((result) => result.status === 'fulfilled' ? result.value : [])
-}
-
-async function fetchMuk(): Promise<Job[]> {
+function parseMukPage(html: string): Job[] {
   const url = 'https://muk.group/ru/vacancies/'
-  const html = await fetchHtml(url)
   const out: Job[] = []
   for (const match of html.matchAll(/<a\b[^>]*href=["']([^"']*\/ru\/vacancies\/\d+\/?)["'][^>]*>([\s\S]*?)<\/a>/gi)) {
     const raw = stripHtml(match[2])
     const countryCode = detectCountryCodeFromText(raw)
     if (!countryCode) continue
-    // MUK prefixes each card title with one country label; the label semantics
-    // come from parsing-lexicon, while removing the source-specific first field stays local.
     const title = raw.replace(/^\S+\s+/u, '').trim()
     if (title.length < 3) continue
     out.push(makeJob({
@@ -398,13 +345,7 @@ async function fetchMuk(): Promise<Job[]> {
       employerType: 'direct',
     }))
   }
-
-  // Detail enrichment remains part of the existing MUK source refresh. The
-  // jobs-worker queue, fetch policy, merge and stale lifecycle stay unchanged.
-  const details = await Promise.allSettled(out.map(async (summary) => (
-    parseMukVacancyDetail(await fetchHtml(summary.url), summary.url, summary) || summary
-  )))
-  return details.map((result, index) => result.status === 'fulfilled' ? result.value : out[index]!)
+  return out
 }
 
 export function parseMukVacancyDetail(html: string, url: string, summary?: Job): Job | null {
@@ -444,15 +385,13 @@ export function parseMukVacancyDetail(html: string, url: string, summary?: Job):
   })
 }
 
-async function fetchTegen(): Promise<Job[]> {
+function parseTegenPage(html: string): Job[] {
   const url = 'https://tegen.uz/vacancy/'
-  const html = await fetchHtml(url)
   const headings = [...html.matchAll(/<h[4-6]\b[^>]*>([\s\S]*?)<\/h[4-6]>/gi)]
   const out: Job[] = []
   for (let i = 0; i < headings.length; i++) {
     const title = stripHtml(headings[i]![1])
-    if (!title || /вакансии в tegen|карьера в tegen/iu.test(title)) continue
-    if (title.length > 180) continue
+    if (!title || /вакансии в tegen|карьера в tegen/iu.test(title) || title.length > 180) continue
     const start = headings[i]!.index || 0
     const end = headings[i + 1]?.index ?? html.length
     const description = htmlLines(html.slice(start, end)).join('\n')
@@ -477,9 +416,6 @@ function isUzbekistanAirwaysVacancyTitle(title: string): boolean {
 
 export function parseUzbekistanAirwaysVacancyPage(html: string): Job[] {
   const root = 'https://corp.uzairways.com/ru/vacancy'
-  // Drupal renders navigation and press-center links with the same /ru/node/N
-  // shape as vacancies. Only links after the view heading belong to the actual
-  // vacancy list; stop before the pager/contact/footer area.
   const headingIndex = html.search(/Текущие(?:\s|&nbsp;)+вакансии/iu)
   if (headingIndex < 0) return []
   const afterHeading = html.slice(headingIndex)
@@ -509,9 +445,6 @@ export function parseUzbekistanAirwaysVacancyDetail(html: string, url: string): 
   const title = stripHtml(titleMatch?.[1])
   if (!isUzbekistanAirwaysVacancyTitle(title)) return null
 
-  // The Drupal template puts the node body in the full-width column of the
-  // final page__row. Scoping to that column avoids breadcrumbs, menus, ESG,
-  // press-center links and the contact-center footer present on every node.
   const bodyMatches = [...html.matchAll(/<div\b[^>]*class=["'][^"']*\bcol-sm-12\b[^"']*\bcol-md-4\b[^"']*\bcol-xl-12\b[^"']*["'][^>]*>([\s\S]*?)<\/div>\s*<\/div>/giu)]
   const description = bodyMatches
     .map((match) => htmlLines(match[1]).join('\n'))
@@ -533,24 +466,8 @@ export function parseUzbekistanAirwaysVacancyDetail(html: string, url: string): 
   })
 }
 
-async function fetchUzbekistanAirways(): Promise<Job[]> {
-  const root = 'https://corp.uzairways.com/ru/vacancy'
-  const pages = await Promise.allSettled([0, 1, 2].map((page) => fetchHtml(page ? `${root}?page=${page}` : root)))
-  const byUrl = new Map<string, Job>()
-  for (const result of pages) {
-    if (result.status !== 'fulfilled') continue
-    for (const job of parseUzbekistanAirwaysVacancyPage(result.value)) byUrl.set(job.url, job)
-  }
-  const summaries = [...byUrl.values()]
-  const details = await Promise.allSettled(summaries.map(async (summary) => (
-    parseUzbekistanAirwaysVacancyDetail(await fetchHtml(summary.url), summary.url)
-  )))
-  return details.flatMap((result) => result.status === 'fulfilled' && result.value ? [result.value] : [])
-}
-
-async function fetchCentrumAir(): Promise<Job[]> {
+function parseCentrumAirPage(html: string): Job[] {
   const root = 'https://centrum-air.com/en/vacancies'
-  const html = await fetchHtml(root)
   const start = html.search(/Open positions/i)
   const end = html.search(/Career from the inside/i)
   const section = html.slice(Math.max(0, start), end > start ? end : html.length)
@@ -594,7 +511,7 @@ export function parseQanotSharqHtml(html: string): Job[] {
   const headings = [...html.matchAll(headingPattern)]
   const jobs: Job[] = []
 
-  for (let index = 0; index < headings.length && jobs.length < 30; index += 1) {
+  for (let index = 0; index < headings.length; index += 1) {
     const heading = headings[index]!
     const rawTitle = stripHtml(heading[1])
     const segmentStart = heading.index ?? 0
@@ -625,11 +542,6 @@ export function parseQanotSharqHtml(html: string): Job[] {
   return jobs
 }
 
-async function fetchQanotSharq(): Promise<Job[]> {
-  const root = 'https://www.qanotsharq.com/en/vacancy'
-  return parseQanotSharqHtml(await fetchHtml(root))
-}
-
 interface MicrosoftResponse {
   operationResult?: {
     result?: {
@@ -644,36 +556,28 @@ interface MicrosoftResponse {
           subDiscipline?: string
         }
       }>
-      totalJobs?: number
     }
   }
 }
 
-async function fetchMicrosoft(): Promise<Job[]> {
-  const endpoint = 'https://gcsservices.careers.microsoft.com/search/api/v1/search'
+function parseMicrosoftPage(raw: string): Job[] {
+  let data: MicrosoftResponse
+  try { data = JSON.parse(raw) as MicrosoftResponse } catch { return [] }
   const out: Job[] = []
-  for (let page = 1; page <= 3; page++) {
-    const params = new URLSearchParams({ l: 'en_us', pg: String(page), pgSz: '100', o: String((page - 1) * 100), flt: 'true' })
-    const data = await fetchJson<MicrosoftResponse>(`${endpoint}?${params}`)
-    const jobs = data.operationResult?.result?.jobs || []
-    for (const item of jobs) {
-      if (!item.jobId || !item.title) continue
-      const location = item.properties?.locations?.join('; ') || 'See listing'
-      const url = `https://jobs.careers.microsoft.com/global/en/job/${item.jobId}`
-      out.push(makeJob({
-        label: 'Microsoft',
-        title: item.title,
-        company: 'Microsoft',
-        location,
-        url,
-        description: item.description,
-        employmentType: item.properties?.employmentType,
-        tags: [item.properties?.discipline || '', item.properties?.subDiscipline || ''].filter(Boolean),
-        employerType: 'direct',
-      }))
-    }
-    const total = Number(data.operationResult?.result?.totalJobs || 0)
-    if (!jobs.length || page * 100 >= total) break
+  for (const item of data.operationResult?.result?.jobs || []) {
+    if (!item.jobId || !item.title) continue
+    const location = item.properties?.locations?.join('; ') || 'See listing'
+    out.push(makeJob({
+      label: 'Microsoft',
+      title: item.title,
+      company: 'Microsoft',
+      location,
+      url: `https://jobs.careers.microsoft.com/global/en/job/${item.jobId}`,
+      description: item.description,
+      employmentType: item.properties?.employmentType,
+      tags: [item.properties?.discipline || '', item.properties?.subDiscipline || ''].filter(Boolean),
+      employerType: 'direct',
+    }))
   }
   return out
 }
@@ -691,42 +595,36 @@ interface SmartRecruitersResponse {
   }>
 }
 
-async function fetchUbisoft(): Promise<Job[]> {
+function parseUbisoftPage(raw: string): Job[] {
+  let data: SmartRecruitersResponse
+  try { data = JSON.parse(raw) as SmartRecruitersResponse } catch { return [] }
   const out: Job[] = []
-  for (const offset of [0, 100]) {
-    const data = await fetchJson<SmartRecruitersResponse>(
-      `https://api.smartrecruiters.com/v1/companies/Ubisoft2/postings?limit=100&offset=${offset}`,
-    )
-    const items = data.content || []
-    for (const item of items) {
-      if (!item.id || !item.name) continue
-      const postedAt = item.releasedDate ? new Date(item.releasedDate).toISOString() : new Date().toISOString()
-      if (!isRecent(postedAt)) continue
-      const location = item.location?.fullLocation
-        || [item.location?.city, item.location?.country].filter(Boolean).join(', ')
-        || 'See listing'
-      const job = makeJob({
-        label: 'Ubisoft',
-        title: item.name,
-        company: item.company?.name || 'Ubisoft',
-        location,
-        url: `https://jobs.smartrecruiters.com/Ubisoft2/${item.id}`,
-        postedAt,
-        employmentType: item.typeOfEmployment?.label,
-        tags: [item.function?.label || '', item.industry?.label || ''].filter(Boolean),
-        employerType: 'direct',
-      })
-      if (item.location?.remote === true) job.remote = true
-      out.push(job)
-    }
-    if (items.length < 100) break
+  for (const item of data.content || []) {
+    if (!item.id || !item.name) continue
+    const postedAt = item.releasedDate ? new Date(item.releasedDate).toISOString() : new Date().toISOString()
+    if (!isRecent(postedAt)) continue
+    const location = item.location?.fullLocation
+      || [item.location?.city, item.location?.country].filter(Boolean).join(', ')
+      || 'See listing'
+    const job = makeJob({
+      label: 'Ubisoft',
+      title: item.name,
+      company: item.company?.name || 'Ubisoft',
+      location,
+      url: `https://jobs.smartrecruiters.com/Ubisoft2/${item.id}`,
+      postedAt,
+      employmentType: item.typeOfEmployment?.label,
+      tags: [item.function?.label || '', item.industry?.label || ''].filter(Boolean),
+      employerType: 'direct',
+    })
+    if (item.location?.remote === true) job.remote = true
+    out.push(job)
   }
   return out
 }
 
-async function fetchEa(): Promise<Job[]> {
+function parseEaPage(html: string): Job[] {
   const root = 'https://jobs.ea.com/en_US/careers/SearchJobs/'
-  const html = await fetchHtml(root)
   const out: Job[] = []
   const seen = new Set<string>()
   for (const match of html.matchAll(/<a\b[^>]*href=["']([^"']*\/careers\/JobDetail\/[^"']+)["'][^>]*>([\s\S]*?)<\/a>/gi)) {
@@ -748,43 +646,30 @@ async function fetchEa(): Promise<Job[]> {
   return out
 }
 
-async function fetchEpam(): Promise<Job[]> {
-  const countryPages: Array<[string, string]> = [
-    ['Romania', 'https://careers.epam.com/en/jobs/romania'],
-    ['Kazakhstan', 'https://careers.epam.com/en/jobs/kazakhstan'],
-    ['Ukraine', 'https://careers.epam.com/en/jobs/ukraine'],
-  ]
-  const results = await Promise.allSettled(countryPages.map(async ([country, url]) => {
-    const html = await fetchHtml(url)
-    const jobs: Job[] = []
-    const seen = new Set<string>()
-    for (const match of html.matchAll(/<a\b[^>]*href=["']([^"']*\/en\/vacancy\/[^"']+)["'][^>]*>([\s\S]*?)<\/a>/gi)) {
-      const title = stripHtml(match[2])
-      if (title.length < 3 || title.length > 220) continue
-      const href = absoluteUrl(match[1]!, url)
-      if (seen.has(href)) continue
-      seen.add(href)
-      jobs.push(makeJob({
-        label: 'EPAM',
-        title,
-        company: 'EPAM',
-        location: country,
-        url: href,
-        tags: ['IT'],
-        employerType: 'direct',
-      }))
-    }
-    return jobs
-  }))
-  return results.flatMap((result) => result.status === 'fulfilled' ? result.value : [])
+function parseEpamPage(html: string, country: string, pageUrl: string): Job[] {
+  const jobs: Job[] = []
+  const seen = new Set<string>()
+  for (const match of html.matchAll(/<a\b[^>]*href=["']([^"']*\/en\/vacancy\/[^"']+)["'][^>]*>([\s\S]*?)<\/a>/gi)) {
+    const title = stripHtml(match[2])
+    if (title.length < 3 || title.length > 220) continue
+    const href = absoluteUrl(match[1]!, pageUrl)
+    if (seen.has(href)) continue
+    seen.add(href)
+    jobs.push(makeJob({
+      label: 'EPAM',
+      title,
+      company: 'EPAM',
+      location: country,
+      url: href,
+      tags: ['IT'],
+      employerType: 'direct',
+    }))
+  }
+  return jobs
 }
 
-async function fetchJobsHorecaRo(): Promise<Job[]> {
-  // The public site describes the matching service, but job cards may be loaded
-  // dynamically. Parse only explicit public job-detail links when present; an
-  // empty result is intentional and safer than inventing postings from forms.
+function parseJobsHorecaPage(html: string): Job[] {
   const root = 'https://jobshoreca.ro/'
-  const html = await fetchHtml(root)
   const out: Job[] = []
   for (const match of html.matchAll(/<a\b[^>]*href=["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>/gi)) {
     const href = absoluteUrl(match[1]!, root)
@@ -804,42 +689,171 @@ async function fetchJobsHorecaRo(): Promise<Job[]> {
   return out
 }
 
-type Loader = { label: string; load: () => Promise<Job[]> }
+export const SOURCE_EXPANSION_TARGET_PREFIX = 'source-expansion:'
 
-export async function fetchSourceExpansionJobs(q: string): Promise<Job[]> {
+const STATIC_SOURCE_TARGETS = [
+  'ish-bor',
+  'ishplus',
+  'muk',
+  'tegen',
+  'uzbekistan-airways',
+  'centrum-air',
+  'qanot-sharq',
+  'microsoft',
+  'ubisoft',
+  'ea',
+  'epam-romania',
+  'epam-kazakhstan',
+  'epam-ukraine',
+  'jobs-horeca-ro',
+] as const
+
+export function configuredSourceExpansionTargets(): string[] {
   if (process.env.SOURCE_EXPANSION_JOBS === 'off') return []
-
-  const loaders: Loader[] = [
-    { label: 'ishkop', load: fetchIshkop },
-    { label: 'ish-bor', load: fetchIshBor },
-    { label: 'ishplus', load: fetchIshPlus },
-    { label: 'muk', load: fetchMuk },
-    { label: 'tegen', load: fetchTegen },
-    { label: 'uzbekistan-airways', load: fetchUzbekistanAirways },
-    { label: 'centrum-air', load: fetchCentrumAir },
-    { label: 'qanot-sharq', load: fetchQanotSharq },
-    { label: 'microsoft', load: fetchMicrosoft },
-    { label: 'ubisoft', load: fetchUbisoft },
-    { label: 'ea', load: fetchEa },
-    { label: 'epam', load: fetchEpam },
-    { label: 'jobs-horeca-ro', load: fetchJobsHorecaRo },
+  return [
+    ...ISHKOP_CITY_ROUTES.map(([key]) => `${SOURCE_EXPANSION_TARGET_PREFIX}ishkop-${key}`),
+    ...STATIC_SOURCE_TARGETS.map((key) => `${SOURCE_EXPANSION_TARGET_PREFIX}${key}`),
   ]
+}
 
-  const results = await Promise.allSettled(loaders.map(({ load }) => load()))
-  const byUrl = new Map<string, Job>()
-  results.forEach((result, index) => {
-    if (result.status === 'rejected') {
-      console.warn(
-        `[jobs:source-expansion] ${loaders[index]!.label} failed:`,
-        result.reason instanceof Error ? result.reason.message : String(result.reason),
-      )
-      return
-    }
-    for (const job of result.value) {
-      if (!job.title || !job.url) continue
-      byUrl.set(job.url, job)
-    }
+export function isSourceExpansionTarget(target: string): boolean {
+  return target.startsWith(SOURCE_EXPANSION_TARGET_PREFIX)
+}
+
+async function crawlSingleHtmlTarget(key: string, url: string, parsePage: (html: string) => Job[]): Promise<Job[]> {
+  const run = await crawlStandardJobBoard({
+    key: `source-expansion:${key}`,
+    fetchPage: () => fetchHtml(url),
+    parsePage: (html) => parsePage(html),
   })
+  return run.jobs
+}
 
-  return filterQuery([...byUrl.values()], q)
+async function fetchIshkopTarget(key: string): Promise<Job[]> {
+  const route = ISHKOP_CITY_ROUTES.find(([routeKey]) => routeKey === key)
+  if (!route) throw new Error(`Unknown Ishkop city target ${key}`)
+  const [, label, city] = route
+  const url = `https://ishkop.uz/${encodeURIComponent('вакансии')}/${encodeURIComponent(city)}`
+  const run = await crawlStandardJobBoard({
+    key: `source-expansion:ishkop-${key}`,
+    fetchPage: () => fetchHtml(url),
+    parsePage: (html) => parseIshkopPage(html, label),
+  })
+  return enrichStandardJobBoardDetails({
+    key: `source-expansion:ishkop-${key}`,
+    jobs: run.jobs,
+    fetchDetail: (job) => fetchHtml(job.url),
+    parseDetail: (html, summary) => parseIshkopVacancyDetail(html, summary.url) || summary,
+  })
+}
+
+async function fetchIshBorTarget(): Promise<Job[]> {
+  const listUrl = 'https://ish-bor.uz/ru/ishlar'
+  const run = await crawlStandardJobBoard({
+    key: 'source-expansion:ish-bor',
+    fetchPage: () => fetchHtml(listUrl),
+    parsePage: (html) => parseIshBorPage(html),
+  })
+  return enrichStandardJobBoardDetails({
+    key: 'source-expansion:ish-bor',
+    jobs: run.jobs,
+    fetchDetail: (job) => fetchHtml(job.url),
+    parseDetail: (html, summary) => parseIshBorDetail(html, summary),
+  })
+}
+
+async function fetchIshPlusTarget(): Promise<Job[]> {
+  const run = await crawlStandardJobBoard({
+    key: 'source-expansion:ishplus',
+    fetchPage: (page) => fetchHtml(`https://ishplus.uz/vacancies?lang=ru&page=${page}`),
+    parsePage: (html, page) => parseIshPlusPage(html, `https://ishplus.uz/vacancies?lang=ru&page=${page}`),
+  })
+  return run.jobs
+}
+
+async function fetchMukTarget(): Promise<Job[]> {
+  const run = await crawlStandardJobBoard({
+    key: 'source-expansion:muk',
+    fetchPage: () => fetchHtml('https://muk.group/ru/vacancies/'),
+    parsePage: (html) => parseMukPage(html),
+  })
+  return enrichStandardJobBoardDetails({
+    key: 'source-expansion:muk',
+    jobs: run.jobs,
+    fetchDetail: (job) => fetchHtml(job.url),
+    parseDetail: (html, summary) => parseMukVacancyDetail(html, summary.url, summary) || summary,
+  })
+}
+
+async function fetchUzbekistanAirwaysTarget(): Promise<Job[]> {
+  const root = 'https://corp.uzairways.com/ru/vacancy'
+  const run = await crawlStandardJobBoard({
+    key: 'source-expansion:uzbekistan-airways',
+    fetchPage: (page) => fetchHtml(page === 1 ? root : `${root}?page=${page - 1}`),
+    parsePage: (html) => parseUzbekistanAirwaysVacancyPage(html),
+  })
+  return enrichStandardJobBoardDetails({
+    key: 'source-expansion:uzbekistan-airways',
+    jobs: run.jobs,
+    fetchDetail: (job) => fetchHtml(job.url),
+    parseDetail: (html, summary) => parseUzbekistanAirwaysVacancyDetail(html, summary.url) || summary,
+  })
+}
+
+async function fetchMicrosoftTarget(): Promise<Job[]> {
+  const endpoint = 'https://gcsservices.careers.microsoft.com/search/api/v1/search'
+  const run = await crawlStandardJobBoard({
+    key: 'source-expansion:microsoft',
+    fetchPage: (page) => {
+      // pgSz is the upstream API page shape; page traversal belongs to the shared crawler.
+      const params = new URLSearchParams({ l: 'en_us', pg: String(page), pgSz: '100', o: String((page - 1) * 100), flt: 'true' })
+      return fetchJsonText(`${endpoint}?${params}`)
+    },
+    parsePage: (raw) => parseMicrosoftPage(raw),
+  })
+  return run.jobs
+}
+
+async function fetchUbisoftTarget(): Promise<Job[]> {
+  const run = await crawlStandardJobBoard({
+    key: 'source-expansion:ubisoft',
+    fetchPage: (page) => {
+      // limit is the upstream SmartRecruiters page size, not a local item cap.
+      const offset = (page - 1) * 100
+      return fetchJsonText(`https://api.smartrecruiters.com/v1/companies/Ubisoft2/postings?limit=100&offset=${offset}`)
+    },
+    parsePage: (raw) => parseUbisoftPage(raw),
+  })
+  return run.jobs
+}
+
+async function fetchEpamTarget(key: string): Promise<Job[]> {
+  const configs: Record<string, [string, string]> = {
+    'epam-romania': ['Romania', 'https://careers.epam.com/en/jobs/romania'],
+    'epam-kazakhstan': ['Kazakhstan', 'https://careers.epam.com/en/jobs/kazakhstan'],
+    'epam-ukraine': ['Ukraine', 'https://careers.epam.com/en/jobs/ukraine'],
+  }
+  const config = configs[key]
+  if (!config) throw new Error(`Unknown EPAM target ${key}`)
+  const [country, url] = config
+  return crawlSingleHtmlTarget(key, url, (html) => parseEpamPage(html, country, url))
+}
+
+export async function fetchSourceExpansionTarget(target: string): Promise<Job[]> {
+  if (!isSourceExpansionTarget(target)) throw new Error(`Unknown source expansion target ${target}`)
+  const key = target.slice(SOURCE_EXPANSION_TARGET_PREFIX.length)
+  if (key.startsWith('ishkop-')) return fetchIshkopTarget(key.slice('ishkop-'.length))
+  if (key === 'ish-bor') return fetchIshBorTarget()
+  if (key === 'ishplus') return fetchIshPlusTarget()
+  if (key === 'muk') return fetchMukTarget()
+  if (key === 'tegen') return crawlSingleHtmlTarget(key, 'https://tegen.uz/vacancy/', parseTegenPage)
+  if (key === 'uzbekistan-airways') return fetchUzbekistanAirwaysTarget()
+  if (key === 'centrum-air') return crawlSingleHtmlTarget(key, 'https://centrum-air.com/en/vacancies', parseCentrumAirPage)
+  if (key === 'qanot-sharq') return crawlSingleHtmlTarget(key, 'https://www.qanotsharq.com/en/vacancy', parseQanotSharqHtml)
+  if (key === 'microsoft') return fetchMicrosoftTarget()
+  if (key === 'ubisoft') return fetchUbisoftTarget()
+  if (key === 'ea') return crawlSingleHtmlTarget(key, 'https://jobs.ea.com/en_US/careers/SearchJobs/', parseEaPage)
+  if (key.startsWith('epam-')) return fetchEpamTarget(key)
+  if (key === 'jobs-horeca-ro') return crawlSingleHtmlTarget(key, 'https://jobshoreca.ro/', parseJobsHorecaPage)
+  throw new Error(`Unknown source expansion target ${target}`)
 }
