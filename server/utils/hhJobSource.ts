@@ -1,15 +1,11 @@
 import type { Job } from './jobTypes'
-import { crawlCyclicJobBoard } from './cyclicJobBoardCrawler'
+import { crawlStandardJobBoard } from './cyclicJobBoardCrawler'
 
 const API_URL = 'https://api.hh.ru/vacancies'
 const USER_AGENT = 'WhitesLove-Hiring-Aggregator/1.0 (admin@whiteslove.me)'
-const PER_PAGE = 100
-const DEFAULT_PAGES_PER_RUN = 4
-const HH_MAX_PAGE = 20
-const MAX_ATTEMPTS = 4
 
 type HhCountry = 'UZ' | 'KZ' | 'KG'
-interface HhTarget {
+export interface HhTarget {
   country: HhCountry
   area: string
   host: string
@@ -46,12 +42,9 @@ interface HhVacancy {
 
 interface HhVacancyPage {
   items?: HhVacancy[]
-  pages?: number
 }
 
-const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
-
-function configuredTargets(): HhTarget[] {
+export function configuredHhAreas(): HhTarget[] {
   const countries = String(process.env.HH_JOB_COUNTRIES || 'UZ,KZ,KG')
     .split(',')
     .map((value) => value.trim().toUpperCase())
@@ -59,10 +52,7 @@ function configuredTargets(): HhTarget[] {
   const enabled = new Set(countries)
   const targets = STANDARD_TARGETS.filter((target) => enabled.has(target.country))
 
-  // Backwards-compatible supplemental Uzbekistan area IDs. The old deployment
-  // value `2759` remains harmless while KZ/KG standard targets are enabled by
-  // HH_JOB_COUNTRIES, so existing production env files do not suppress the new
-  // countries accidentally.
+  // Supplemental area IDs are source configuration, not execution policy.
   const extraAreas = String(process.env.HH_JOB_AREAS || '')
     .split(',')
     .map((value) => value.trim())
@@ -80,13 +70,8 @@ function configuredTargets(): HhTarget[] {
   return targets
 }
 
-function pagesPerRun(): number {
-  return Math.max(1, Math.min(19, Number(process.env.HH_JOB_PAGES_PER_RUN) || DEFAULT_PAGES_PER_RUN))
-}
-
 function dateFrom(): string {
-  const days = Math.max(1, Math.min(14, Number(process.env.HH_JOB_MAX_AGE_DAYS) || 14))
-  return new Date(Date.now() - days * 86_400_000).toISOString()
+  return new Date(Date.now() - 14 * 86_400_000).toISOString()
 }
 
 function isRemote(item: HhVacancy): boolean {
@@ -136,70 +121,74 @@ export function mapHhVacancy(item: HhVacancy, target: HhTarget = STANDARD_TARGET
   }
 }
 
-async function fetchPage(target: HhTarget, page: number): Promise<HhVacancyPage> {
+async function fetchPage(target: HhTarget, crawlerPage: number): Promise<string> {
   const params = new URLSearchParams({
     host: target.host,
     area: target.area,
-    page: String(page),
-    per_page: String(PER_PAGE),
+    page: String(crawlerPage - 1),
+    // HH documents 100 as the maximum API page size. This is pagination shape,
+    // not a source-local run/item cap; traversal belongs to the shared crawler.
+    per_page: '100',
     order_by: 'publication_time',
     date_from: dateFrom(),
   })
   const query = String(process.env.HH_JOB_QUERY || '').trim()
   if (query) params.set('text', query)
 
-  let backoffMs = 500
-  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
-    let response: Response | undefined
-    try {
-      response = await fetch(`${API_URL}?${params}`, {
-        headers: {
-          'User-Agent': USER_AGENT,
-          'HH-User-Agent': USER_AGENT,
-          Accept: 'application/json',
-        },
-        signal: AbortSignal.timeout(15_000),
-      })
-    } catch (error) {
-      if (attempt === MAX_ATTEMPTS) throw error
-    }
-    if (response?.ok) return await response.json() as HhVacancyPage
-    if (response && response.status !== 429 && response.status < 500) {
-      throw new Error(`api.hh.ru (${target.host}) -> ${response.status}`)
-    }
-    if (response && attempt === MAX_ATTEMPTS) throw new Error(`api.hh.ru (${target.host}) -> ${response.status}`)
-    const retryAfter = Number(response?.headers.get('retry-after'))
-    await wait(Number.isFinite(retryAfter) && retryAfter > 0 ? retryAfter * 1_000 : backoffMs)
-    backoffMs = Math.min(backoffMs * 2, 8_000)
-  }
-  return { items: [], pages: 0 }
+  const response = await fetch(`${API_URL}?${params}`, {
+    headers: {
+      'User-Agent': USER_AGENT,
+      'HH-User-Agent': USER_AGENT,
+      Accept: 'application/json',
+    },
+  })
+  // HH returns 400 when the requested page is outside the available range.
+  // Present that upstream terminal condition as an empty page to the crawler.
+  if (response.status === 400 && crawlerPage > 1) return JSON.stringify({ items: [] })
+  if (!response.ok) throw new Error(`api.hh.ru (${target.host}) -> ${response.status}`)
+  return response.text()
 }
 
-/** Public HH-family vacancy ingestion for Uzbekistan, Kazakhstan and Kyrgyzstan. */
+function parsePage(raw: string, target: HhTarget): Job[] {
+  let data: HhVacancyPage
+  try { data = JSON.parse(raw) as HhVacancyPage } catch { return [] }
+  return (data.items || [])
+    .map((item) => mapHhVacancy(item, target))
+    .filter((job): job is Job => Boolean(job))
+}
+
+function targetKey(target: HhTarget): string {
+  return `${target.country.toLowerCase()}:area-${target.area}`
+}
+
+export const HH_JOB_TARGET_PREFIX = 'hh-job-source:'
+
+export function configuredHhJobTargets(): string[] {
+  if (process.env.HH_JOB_SOURCE === 'off') return []
+  return configuredHhAreas().map((target) => `${HH_JOB_TARGET_PREFIX}${targetKey(target)}`)
+}
+
+export function isHhJobTarget(target: string): boolean {
+  return target.startsWith(HH_JOB_TARGET_PREFIX)
+}
+
+export async function fetchHhJobTarget(target: string): Promise<Job[]> {
+  if (!isHhJobTarget(target)) throw new Error(`Unknown HH job target ${target}`)
+  const key = target.slice(HH_JOB_TARGET_PREFIX.length)
+  const config = configuredHhAreas().find((candidate) => targetKey(candidate) === key)
+  if (!config) throw new Error(`Unknown HH job target ${target}`)
+
+  const run = await crawlStandardJobBoard({
+    key: `hh:${targetKey(config)}`,
+    fetchPage: (page) => fetchPage(config, page),
+    parsePage: (raw) => parsePage(raw, config),
+  })
+  return run.jobs
+}
+
+/** Compatibility helper. Production ingestion schedules each HH area separately. */
 export async function fetchHhJobs(_query = ''): Promise<Job[]> {
-  const byId = new Map<string, Job>()
-  for (const target of configuredTargets()) {
-    let availablePages = HH_MAX_PAGE
-    const run = await crawlCyclicJobBoard({
-      key: `hh-${target.country.toLowerCase()}-area-${target.area}`,
-      pagesPerRun: pagesPerRun(),
-      maxPage: HH_MAX_PAGE,
-      fetchPage: async (crawlerPage) => {
-        if (crawlerPage > availablePages) return JSON.stringify({ items: [], pages: availablePages })
-        const data = await fetchPage(target, crawlerPage - 1)
-        availablePages = Math.max(1, Math.min(HH_MAX_PAGE, Number(data.pages) || 1))
-        return JSON.stringify(data)
-      },
-      parsePage: (raw) => {
-        const data = JSON.parse(raw) as HhVacancyPage
-        return (data.items || []).map((item) => mapHhVacancy(item, target)).filter((job): job is Job => Boolean(job))
-      },
-      requestDelayMs: Math.max(0, Math.min(5_000, Number(process.env.HH_JOB_REQUEST_DELAY_MS) || 250)),
-    })
-    for (const job of run.jobs) byId.set(job.id, job)
-    console.log(
-      `[jobs] ${target.label} area=${target.area} pages=${run.pages.join(',')} next=${run.nextPage} cycle=${run.cycle}`,
-    )
-  }
-  return [...byId.values()]
+  const jobs: Job[] = []
+  for (const target of configuredHhJobTargets()) jobs.push(...await fetchHhJobTarget(target))
+  return jobs
 }
