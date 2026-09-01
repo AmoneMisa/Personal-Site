@@ -5,11 +5,10 @@ import {
   parseFlagmaVacancyDetail,
 } from '../server/utils/extraPublicJobSources.ts'
 import {
-  FLAGMA_JOB_BOARDS,
-  FLAGMA_JOB_BOARD_TARGET_PREFIX,
-  configuredFlagmaJobBoardTargets,
-  isFlagmaJobBoardTarget,
-} from '../server/utils/flagmaJobSource.ts'
+  COMMUNITY_JOB_BOARDS,
+  COMMUNITY_JOB_BOARD_TARGET_PREFIX,
+  configuredCommunityJobBoardTargets,
+} from '../server/utils/communityJobBoardSources.ts'
 
 const summary = {
   id: 'flagma-22245',
@@ -45,14 +44,11 @@ const detailHtml = `
   <script>adsbygoogle.push({ navigation: true })</script>
 </body></html>`
 
-test('Flagma has one durable jobs-worker queue target per national board', () => {
-  const targets = configuredFlagmaJobBoardTargets()
-  assert.deepEqual(targets, [
-    `${FLAGMA_JOB_BOARD_TARGET_PREFIX}ro`,
-    `${FLAGMA_JOB_BOARD_TARGET_PREFIX}uz`,
-  ])
-  assert.equal(targets.length, FLAGMA_JOB_BOARDS.length)
-  assert.ok(targets.every((target) => isFlagmaJobBoardTarget(target)))
+test('Flagma is registered as normal durable community-board targets', () => {
+  const targets = configuredCommunityJobBoardTargets()
+  assert.ok(targets.includes(`${COMMUNITY_JOB_BOARD_TARGET_PREFIX}flagma-ro`))
+  assert.ok(targets.includes(`${COMMUNITY_JOB_BOARD_TARGET_PREFIX}flagma-uz`))
+  assert.equal(COMMUNITY_JOB_BOARDS.filter((board) => board.key.startsWith('flagma-')).length, 2)
 })
 
 test('Flagma list parser reads vacancy cards for the shared crawler', () => {
@@ -62,7 +58,9 @@ test('Flagma list parser reads vacancy cards for the shared crawler', () => {
     <div>OydinYo‘l, ООО | Ташкент, UZ</div>
     <div>в Ташкенте, удаленно</div>
   </article>`
-  const jobs = parseFlagmaVacancies(html, FLAGMA_JOB_BOARDS[1])
+  const board = COMMUNITY_JOB_BOARDS.find((item) => item.key === 'flagma-uz')
+  assert.ok(board)
+  const jobs = parseFlagmaVacancies(html, board)
   assert.equal(jobs.length, 1)
   assert.equal(jobs[0].id, 'flagma-22245')
   assert.equal(jobs[0].title, 'Оператор чата (удалённо)')
