@@ -4,7 +4,6 @@
 import { XMLParser } from 'fast-xml-parser'
 import type { Job } from './jobTypes'
 import { detectWorkModes } from './hiringLexicon'
-import { fetchConfiguredRssJobs } from './standardJobSourceTargets'
 
 const UA = 'jobFinder/1.0 (job aggregator; contact: admin@whiteslove.me)'
 
@@ -191,12 +190,6 @@ export async function fetchDevKg(q: string): Promise<Job[]> {
   return jobs.filter((job) =>
     `${job.title} ${job.company} ${job.description || ''}`.toLocaleLowerCase('ru').includes(needle),
   )
-}
-
-// Compatibility helper used by parser tests and ad-hoc calls. Production
-// ingestion schedules each configured RSS feed as its own durable queue target.
-export async function fetchRss(q: string): Promise<Job[]> {
-  return fetchConfiguredRssJobs(q)
 }
 
 export { isLikelyTelegramVacancy } from './telegramVacancyClassifier'
