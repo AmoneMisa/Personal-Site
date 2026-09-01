@@ -25,7 +25,7 @@ For an upstream API that exposes an opaque cursor use:
 crawlStandardCursorJobBoard(...)
 ```
 
-The standard crawler policy owns the common values for pages-per-run, maximum traversal range, inter-request delay, request timeout, durable cursor state, page-1 refresh, historical-page rotation, repeated-page termination, and retry/resume behavior.
+The shared crawler owns traversal, pacing, durable cursor state, page-1 refresh, historical-page rotation, repeated-page termination, retry/resume behavior, and any execution controls that exist in the common crawler implementation.
 
 A source adapter may describe only source-specific facts needed to access and parse that source, for example:
 
@@ -37,7 +37,7 @@ source-specific DOM structure
 job URL recognition
 ```
 
-It must not silently replace shared crawler policy with values such as:
+It must not introduce values such as:
 
 ```text
 FETCH_CONCURRENCY = 10
@@ -45,19 +45,11 @@ REQUEST_TIMEOUT_MS = 6000
 MAX_PER_BOARD = 60
 ```
 
-or equivalent local constants.
+or equivalent source-local/global constants merely to make one source work.
 
-The current canonical common vacancy limits live **only** in `STANDARD_JOB_BOARD_CRAWL_POLICY`:
+If the shared crawler does not currently define a concurrency limit, timeout, item cap, retry rule or similar execution control, a source integration must **not invent one**. Improve the shared crawler only when there is a system-wide requirement for that behavior; do not add a number because a particular board was easier to implement that way.
 
-```text
-concurrency = 10
-requestTimeoutMs = 6000
-maxJobsPerSource = 60
-```
-
-If these values need to change, change the shared policy and its tests. Never copy the values into a source adapter or create a source-local equivalent.
-
-If an upstream contract genuinely requires an exception, document the reason next to the override and keep the exception as narrow as possible. "This source was easier to implement separately" is not a valid reason.
+If an upstream contract genuinely requires an exception, document the upstream requirement next to the narrow exception. "This source was easier to implement separately" is not a valid reason.
 
 ## Queue granularity
 
