@@ -5,12 +5,11 @@ import test from 'node:test'
 const route = await readFile(new URL('../server/routes/jobs-vacancy.get.ts', import.meta.url), 'utf8')
 const page = await readFile(new URL('../app/pages/jobs/index.vue', import.meta.url), 'utf8')
 const routeState = await readFile(new URL('../app/composables/jobs/useJobRouteState.ts', import.meta.url), 'utf8')
+const preview = await readFile(new URL('../server/plugins/share-preview.ts', import.meta.url), 'utf8')
 
-test('jobs-vacancy resolves a clean ?publicId= link by rehashing the snapshot', () => {
-  assert.match(route, /const publicId = String\(query\.publicId \?\? ''\)\.trim\(\)/)
-  assert.match(route, /jobs\.find\(\(job\) => String\(publicEntityId\('job', job\.source, job\.id\)\) === publicId\)/)
-  // The id-based lookup must still work for legacy ?job=<id> links.
-  assert.match(route, /jobs\.find\(\(job\) => job\.id === id \|\| job\.url === id\)/)
+test('jobs-vacancy delegates id and publicId lookups to backend-platform', () => {
+  assert.match(route, /requirePlatformGet\(event, 'vacancies', '\/jobs-vacancy'\)/)
+  assert.doesNotMatch(route, /jobsSnapshot|getJobByPublicIdDb|publicEntityId/)
 })
 
 test('jobs page now shares vue-router state with flats/hiring instead of raw window.history', () => {
@@ -26,11 +25,15 @@ test('opening or sharing a job prefers the bare publicId over the legacy ?job=<i
   assert.match(page, /function syncJobInUrl\(job: Job \| null\)/)
   assert.match(page, /query\.adv = String\(jobPublicId\(job\)\)/)
   assert.match(page, /const query = \{ adv: String\(publicEntityId\("job", job\.source, job\.id\)\) \};/)
-
   assert.match(page, /watch\(\(\) => queryString\(route\.query\.adv\)/)
   assert.match(page, /void openSharedJobByPublicId\(publicId\)/)
-  // Legacy links must still resolve.
   assert.match(page, /watch\(\(\) => queryString\(route\.query\.job\)/)
+})
+
+test('SSR preview understands the clean ?adv= vacancy link', () => {
+  assert.match(preview, /const publicId = queryValue\(query\.adv\)\.trim\(\)/)
+  assert.match(preview, /findPlatformSharedJob\(id, Boolean\(publicId\)\)/)
+  assert.match(preview, /meta\.url = cleanEntityUrl\(pathname, publicId\)/)
 })
 
 test('the job route state preserves adv/job/page across debounced filter syncs', () => {
@@ -43,9 +46,6 @@ test('a deep-linked ?page=n restores loaded pages before the URL is resynced', (
   assert.match(page, /async function syncPageInUrl\(pageNumber: number\)/)
   assert.match(page, /async function restoreToPage\(targetPage: number\)/)
   assert.match(page, /if \(!options\.background && !pageRestoring\.value\) await syncPageInUrl\(page\.value\)/)
-  // The page-bookmark write and persistState() both call router.replace;
-  // sequencing them (await, page before filters) prevents whichever fires
-  // second from racing the other and clobbering it.
   assert.match(page, /await syncPageInUrl\(page\.value\);\s*\n[\s\S]*?if \(!options\.append && !options\.background\) await persistState\(\);/)
 
   const mountedStart = page.indexOf('onMounted(async () => {')
