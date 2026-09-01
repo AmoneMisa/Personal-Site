@@ -1,16 +1,23 @@
 import {
+  SHARE_SITE_URL,
   buildCandidateShareMeta,
   buildFlatShareMeta,
   buildJobShareMeta,
   escapeXml,
-  findSharedCandidate,
   findSharedFlat,
-  findSharedJob,
 } from '../utils/sharePreview'
+import {
+  findPlatformSharedCandidate,
+  findPlatformSharedJob,
+} from '../utils/backendPlatformShareLookup'
 import { removeExistingSocialMeta } from '../utils/shareHead'
 
 function queryValue(value: unknown): string {
   return Array.isArray(value) ? String(value[0] ?? '') : String(value ?? '')
+}
+
+function cleanEntityUrl(pathname: string, publicId: string): string {
+  return `${SHARE_SITE_URL}${pathname}?adv=${encodeURIComponent(publicId)}`
 }
 
 export default defineNitroPlugin((nitroApp) => {
@@ -34,19 +41,28 @@ export default defineNitroPlugin((nitroApp) => {
       // fallback renderer when item data is temporarily unavailable.
       meta = buildFlatShareMeta(flat || {}, id, source, country, pathname)
     } else if (pathname === '/jobs' || pathname === '/en/jobs') {
-      const id = queryValue(query.job).trim()
+      const publicId = queryValue(query.adv).trim()
+      const legacyId = queryValue(query.job).trim()
+      const id = publicId || legacyId
       if (!id) return
 
-      const job = await findSharedJob(id)
-      meta = buildJobShareMeta(job || {}, id, pathname)
+      const job = await findPlatformSharedJob(id, Boolean(publicId))
+      meta = buildJobShareMeta(job || {}, String(job?.id || id), pathname)
+      if (publicId) meta.url = cleanEntityUrl(pathname, publicId)
     } else if (pathname === '/hiring' || pathname === '/en/hiring') {
-      const id = queryValue(query.cv).trim()
+      const publicId = queryValue(query.adv).trim()
+      const legacyId = queryValue(query.cv).trim()
+      const id = publicId || legacyId
       if (!id) return
 
       const source = queryValue(query.cvSource).trim().toLowerCase()
       const country = queryValue(query.cvCountry).trim().toUpperCase()
-      const candidate = await findSharedCandidate(id)
-      meta = buildCandidateShareMeta(candidate || {}, id, source, country, pathname)
+      const candidate = await findPlatformSharedCandidate(id, Boolean(publicId), source, country)
+      const candidateId = String(candidate?.id || id)
+      const candidateSource = String(candidate?.sourceKey || candidate?.source || source)
+      const candidateCountry = String(candidate?.country || country)
+      meta = buildCandidateShareMeta(candidate || {}, candidateId, candidateSource, candidateCountry, pathname)
+      if (publicId) meta.url = cleanEntityUrl(pathname, publicId)
     }
 
     if (!meta) return
@@ -59,8 +75,6 @@ export default defineNitroPlugin((nitroApp) => {
       `<meta property="og:description" content="${escapeXml(meta.description)}">`,
       `<meta property="og:url" content="${escapeXml(meta.url)}">`,
       `<meta property="og:image" content="${escapeXml(meta.image)}">`,
-      // Every share image comes from the same renderer, so format and dimensions
-      // are stable enough for Telegram, LinkedIn and Twitter/X to trust.
       `<meta property="og:image:secure_url" content="${escapeXml(meta.image)}">`,
       `<meta property="og:image:type" content="${escapeXml(meta.imageType)}">`,
       '<meta property="og:image:width" content="1200">',
