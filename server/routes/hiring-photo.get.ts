@@ -1,6 +1,7 @@
 // GET /hiring-photo?path=/api/tg-photo/<channel>/<id> — proxy Telegram photos
 // through the flat-finder backend (same transport as /flats-photo).
-const FLAT_API_URL = process.env.FLAT_API_URL || 'http://185.5.206.229:8082'
+import { FLAT_API_URL } from '../flats/feedLookup'
+
 const TG_PHOTO_RE = /^\/api\/tg-photo\/[A-Za-z0-9_]{3,64}\/\d+$/
 
 export default defineEventHandler(async (event) => {

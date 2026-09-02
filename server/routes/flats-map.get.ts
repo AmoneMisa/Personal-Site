@@ -1,6 +1,6 @@
 import { canonicalMetroValue } from '../utils/tashkentMetroLabels'
+import { FLAT_API_URL } from '../flats/feedLookup'
 
-const FLAT_API_URL = process.env.FLAT_API_URL || 'http://185.5.206.229:8082'
 const MAP_TIMEOUT_MS = 55_000
 const MAP_CACHE_MS = 30_000
 const ALL_FEED_SOURCES = ['olx', 'telegram', 'facebook', 'threads'] as const

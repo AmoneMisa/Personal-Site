@@ -7,7 +7,7 @@
 // — previously the station labels were localized here, so the dropdown *value*
 // itself changed with the request locale. Inbound legacy/localized filter values
 // are still canonicalized in flats-feed, so old links and presets keep working.
-const FLAT_API_URL = process.env.FLAT_API_URL || 'http://185.5.206.229:8082'
+import { FLAT_API_URL } from '../flats/feedLookup'
 
 export default defineEventHandler(async (event) => {
   try {

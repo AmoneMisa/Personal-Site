@@ -1,5 +1,6 @@
+import { FLAT_API_URL } from '../flats/feedLookup'
+
 export const SHARE_SITE_URL = (process.env.PUBLIC_SITE_URL || 'https://whiteslove.me').replace(/\/$/, '')
-const FLAT_API_URL = process.env.FLAT_API_URL || 'http://185.5.206.229:8082'
 const VALID_FLAT_SOURCES = new Set(['olx', 'telegram'])
 
 // Social crawlers abandon a preview after only a few seconds (Telegram is the
