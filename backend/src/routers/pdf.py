@@ -195,6 +195,38 @@ async def ensure_doc_exists(r, doc_id: str):
         raise HTTPException(404, "Document not found or expired")
 
 
+PREVIEW_DPI_MIN = 72
+PREVIEW_DPI_MAX = 220
+
+
+def clamp_preview_dpi(dpi: int) -> int:
+    return max(PREVIEW_DPI_MIN, min(PREVIEW_DPI_MAX, dpi))
+
+
+async def resolve_render_source(r, doc_id: str, page: int, dpi: int) -> tuple[str, int]:
+    """
+    Shared validation for preview/background/text-blocks rendering: clamps dpi
+    to the raster range the client overlays, confirms the doc and its source
+    PDF exist, and checks the requested page is in range.
+    Returns (source_pdf_path, clamped_dpi).
+    """
+    dpi = clamp_preview_dpi(dpi)
+    await ensure_doc_exists(r, doc_id)
+
+    src = source_path(doc_id)
+    if not os.path.exists(src):
+        raise HTTPException(404, "Source PDF not found")
+
+    total = _safe_pdf_num_pages(src)
+    if total <= 0:
+        raise HTTPException(500, "Unable to read PDF")
+
+    if page < 1 or page > total:
+        raise HTTPException(400, "Invalid page number")
+
+    return src, dpi
+
+
 # ----------------------------
 # Schemas
 # ----------------------------
@@ -393,25 +425,8 @@ async def add_design_page_route(doc_id: str):
 
 @router.get("/preview/{doc_id}/{page}")
 async def preview(doc_id: str, page: int, dpi: int = 144):
-    # clamp dpi
-    if dpi < 72:
-        dpi = 72
-    if dpi > 220:
-        dpi = 220
-
     r = get_state_store()
-    await ensure_doc_exists(r, doc_id)
-
-    src = source_path(doc_id)
-    if not os.path.exists(src):
-        raise HTTPException(404, "Source PDF not found")
-
-    total = _safe_pdf_num_pages(src)
-    if total <= 0:
-        raise HTTPException(500, "Unable to read PDF")
-
-    if page < 1 or page > total:
-        raise HTTPException(400, "Invalid page number")
+    src, dpi = await resolve_render_source(r, doc_id, page, dpi)
 
     os.makedirs(preview_folder(doc_id), exist_ok=True)
     out_png = preview_path(doc_id, page, dpi)
@@ -431,25 +446,8 @@ async def preview(doc_id: str, page: int, dpi: int = 144):
 
 @router.get("/background/{doc_id}/{page}")
 async def background(doc_id: str, page: int, dpi: int = 144):
-    # clamp dpi to match the preview raster the client overlays
-    if dpi < 72:
-        dpi = 72
-    if dpi > 220:
-        dpi = 220
-
     r = get_state_store()
-    await ensure_doc_exists(r, doc_id)
-
-    src = source_path(doc_id)
-    if not os.path.exists(src):
-        raise HTTPException(404, "Source PDF not found")
-
-    total = _safe_pdf_num_pages(src)
-    if total <= 0:
-        raise HTTPException(500, "Unable to read PDF")
-
-    if page < 1 or page > total:
-        raise HTTPException(400, "Invalid page number")
+    src, dpi = await resolve_render_source(r, doc_id, page, dpi)
 
     os.makedirs(preview_folder(doc_id), exist_ok=True)
     out_png = os.path.join(preview_folder(doc_id), f"bg_p{page}_dpi{dpi}.png")
@@ -469,25 +467,8 @@ async def background(doc_id: str, page: int, dpi: int = 144):
 
 @router.get("/text-blocks/{doc_id}/{page}")
 async def text_blocks(doc_id: str, page: int, dpi: int = 144):
-    # clamp dpi to match the preview raster the client overlays
-    if dpi < 72:
-        dpi = 72
-    if dpi > 220:
-        dpi = 220
-
     r = get_state_store()
-    await ensure_doc_exists(r, doc_id)
-
-    src = source_path(doc_id)
-    if not os.path.exists(src):
-        raise HTTPException(404, "Source PDF not found")
-
-    total = _safe_pdf_num_pages(src)
-    if total <= 0:
-        raise HTTPException(500, "Unable to read PDF")
-
-    if page < 1 or page > total:
-        raise HTTPException(400, "Invalid page number")
+    src, dpi = await resolve_render_source(r, doc_id, page, dpi)
 
     try:
         # extraction is sync CPU/IO work -> keep it off the event loop
