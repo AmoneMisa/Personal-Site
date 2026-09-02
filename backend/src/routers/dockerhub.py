@@ -59,15 +59,7 @@ def pick_best_for_base(base: str, tags: List[str]) -> str:
     # 2) иначе ищем самый "общий": без patch и без version-хвоста после q
     #    пример: предпочтём 17-alpine над 17.0.18-alpine3.23
     def score(t: str):
-        p = parse_tag(t)  # у тебя уже есть parse_tag выше
-        spec = 0
-        if p:
-            spec += 1 if p["minor"] is not None else 0
-            spec += 1 if p["patch"] is not None else 0
-            spec += 1 if p["variant_ver"] is not None else 0
-        else:
-            spec = 10
-        return (spec, t)
+        return (tag_specificity(parse_tag(t), unparsed=10), t)
 
     return sorted(tags, key=score)[0]
 
@@ -193,6 +185,21 @@ def parse_tag(tag: str):
     }
 
 
+def tag_specificity(parsed: Optional[Dict[str, Any]], unparsed: int = 0) -> int:
+    """
+    How many optional version components a parsed tag carries (minor, patch,
+    variant_ver) — lower means a more general tag ("17-alpine" over
+    "17.0.18-alpine3.23"). `unparsed` is returned when parsing failed.
+    """
+    if not parsed:
+        return unparsed
+    return sum([
+        1 if parsed["minor"] is not None else 0,
+        1 if parsed["patch"] is not None else 0,
+        1 if parsed["variant_ver"] is not None else 0,
+    ])
+
+
 def is_more_general(a: str, b: str) -> bool:
     """
     True если a "общей" чем b (меньше деталей).
@@ -201,14 +208,7 @@ def is_more_general(a: str, b: str) -> bool:
     if not pa or not pb:
         return False
 
-    def spec(p):
-        return sum([
-            1 if p["minor"] is not None else 0,
-            1 if p["patch"] is not None else 0,
-            1 if p["variant_ver"] is not None else 0,
-        ])
-
-    return spec(pa) < spec(pb)
+    return tag_specificity(pa) < tag_specificity(pb)
 
 
 def pick_best(names: List[str], major: int, variant: Optional[str]) -> (Optional[str], List[str], str):
@@ -243,15 +243,7 @@ def pick_best(names: List[str], major: int, variant: Optional[str]) -> (Optional
 
     # 4) Иначе: выбираем “самый общий” среди кандидатов
     #    (то есть без patch и без variant_ver если возможно)
-    def specificity(t: str):
-        p = parse_tag(t)
-        return sum([
-            1 if p["minor"] is not None else 0,
-            1 if p["patch"] is not None else 0,
-            1 if p["variant_ver"] is not None else 0,
-        ])
-
-    candidates_sorted = sorted(candidates, key=lambda x: (specificity(x), x))
+    candidates_sorted = sorted(candidates, key=lambda x: (tag_specificity(parse_tag(x)), x))
     best = candidates_sorted[0]
     return best, candidates_sorted[:10], "picked_most_general_available"
 
