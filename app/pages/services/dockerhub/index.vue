@@ -474,6 +474,11 @@ const {
   padding-bottom: 96px;
 }
 
+.docker-search__subtitle {
+  max-width: 720px;
+  font-size: 14px;
+}
+
 .docker-search__controls {
   margin: 28px 0 22px;
   display: grid;

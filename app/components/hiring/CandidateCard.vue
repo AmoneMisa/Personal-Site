@@ -272,7 +272,46 @@ function openCard() {
   border-color: rgba(113, 137, 217, 0.48);
   outline: none;
 }
-
+.hiring-card_match-high {
+  --match-color: #34d399;
+  --match-border: rgba(52, 211, 153, 0.72);
+  --match-soft: rgba(52, 211, 153, 0.10);
+  --match-soft-border: rgba(52, 211, 153, 0.34);
+  border-color: var(--match-border);
+  box-shadow: inset 0 0 0 1px rgba(52, 211, 153, 0.07);
+}
+.hiring-card_match-medium {
+  --match-color: #fbbf24;
+  --match-border: rgba(251, 191, 36, 0.72);
+  --match-soft: rgba(251, 191, 36, 0.10);
+  --match-soft-border: rgba(251, 191, 36, 0.34);
+  border-color: var(--match-border);
+  box-shadow: inset 0 0 0 1px rgba(251, 191, 36, 0.07);
+}
+.hiring-card_match-low {
+  --match-color: #fb7a45;
+  --match-border: rgba(251, 122, 69, 0.72);
+  --match-soft: rgba(251, 122, 69, 0.10);
+  --match-soft-border: rgba(251, 122, 69, 0.34);
+  border-color: var(--match-border);
+  box-shadow: inset 0 0 0 1px rgba(251, 122, 69, 0.07);
+}
+.hiring-card_match-high:hover,
+.hiring-card_match-high:focus-visible,
+.hiring-card_match-medium:hover,
+.hiring-card_match-medium:focus-visible,
+.hiring-card_match-low:hover,
+.hiring-card_match-low:focus-visible {
+  border-color: var(--match-color);
+  box-shadow: inset 0 0 0 1px var(--match-soft-border), 0 8px 22px rgba(0, 0, 0, 0.14);
+}
+.hiring-card_favorite:not(.hiring-card_match-high):not(.hiring-card_match-medium):not(.hiring-card_match-low) {
+  border-color: rgba(113, 137, 217, 0.52);
+}
+.hiring-card_hidden {
+  opacity: 0.64;
+  border-style: dashed;
+}
 .hiring-card__actions {
   position: absolute;
   top: 11px;

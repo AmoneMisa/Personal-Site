@@ -1,1 +1,28 @@
+export default defineNuxtPlugin((nuxtApp) => {
+  const i18n = nuxtApp.$i18n as any
+  const merge = i18n?.mergeLocaleMessage?.bind(i18n)
+    || i18n?.global?.mergeLocaleMessage?.bind(i18n.global)
+  if (!merge) return
 
+  merge('en', { jobs: {
+    seniorityIntern: 'Intern', seniorityStaff: 'Staff', seniorityPrincipal: 'Principal', seniorityHead: 'Head', seniorityDirector: 'Director', seniorityVp: 'VP', seniorityChief: 'Chief',
+    empProject: 'Project work', empFreelance: 'Freelance', empVolunteer: 'Volunteer', empSeasonal: 'Seasonal',
+    scheduleShift: 'Shift work', scheduleFlexible: 'Flexible schedule', scheduleDay: 'Day shift', scheduleNight: 'Night shift', scheduleRotational: 'Rotational schedule',
+    contractEmployment: 'Employment contract', contractCivil: 'Civil contract', contractFreelance: 'Freelance', contractContractor: 'Contractor', contractB2b: 'B2B',
+    requirementRequired: 'Required', requirementPreferred: 'Preferred', requirementNotRequired: 'Not required', skillPrototyping: 'Prototyping',
+    languageEnglish: 'English', languageRussian: 'Russian', languageUkrainian: 'Ukrainian', languageRomanian: 'Romanian', languageUzbek: 'Uzbek', languageKazakh: 'Kazakh',
+    languagePolish: 'Polish', languageGeorgian: 'Georgian', languageGerman: 'German', languageFrench: 'French', languageSpanish: 'Spanish', languageChinese: 'Chinese', languageJapanese: 'Japanese', languageBelarusian: 'Belarusian',
+    languagePortuguese: 'Portuguese', languageItalian: 'Italian', languageKorean: 'Korean', languageTurkish: 'Turkish', languageArabic: 'Arabic', languageDutch: 'Dutch', languageCzech: 'Czech', languageSlovak: 'Slovak', languageHungarian: 'Hungarian', languageBulgarian: 'Bulgarian', languageSerbian: 'Serbian', languageCroatian: 'Croatian', languageGreek: 'Greek', languageSwedish: 'Swedish', languageNorwegian: 'Norwegian', languageDanish: 'Danish', languageFinnish: 'Finnish', languageEstonian: 'Estonian', languageLatvian: 'Latvian', languageLithuanian: 'Lithuanian', languageArmenian: 'Armenian', languageAzerbaijani: 'Azerbaijani', languageKyrgyz: 'Kyrgyz', languageTajik: 'Tajik', languageHindi: 'Hindi', languageHebrew: 'Hebrew',
+  } })
+
+  merge('ru', { jobs: {
+    seniorityIntern: 'Стажёр', seniorityStaff: 'Staff-инженер', seniorityPrincipal: 'Principal-инженер', seniorityHead: 'Руководитель направления', seniorityDirector: 'Директор', seniorityVp: 'Вице-президент', seniorityChief: 'Руководитель высшего уровня',
+    empProject: 'Проектная работа', empFreelance: 'Фриланс', empVolunteer: 'Волонтёрство', empSeasonal: 'Сезонная работа',
+    scheduleShift: 'Сменный график', scheduleFlexible: 'Гибкий график', scheduleDay: 'Дневная смена', scheduleNight: 'Ночная смена', scheduleRotational: 'Вахтовый график',
+    contractEmployment: 'Трудовой договор', contractCivil: 'Гражданско-правовой договор', contractFreelance: 'Фриланс', contractContractor: 'Подрядчик', contractB2b: 'B2B',
+    requirementRequired: 'Обязательно', requirementPreferred: 'Желательно', requirementNotRequired: 'Не обязательно', skillPrototyping: 'Прототипирование',
+    languageEnglish: 'Английский', languageRussian: 'Русский', languageUkrainian: 'Украинский', languageRomanian: 'Румынский', languageUzbek: 'Узбекский', languageKazakh: 'Казахский',
+    languagePolish: 'Польский', languageGeorgian: 'Грузинский', languageGerman: 'Немецкий', languageFrench: 'Французский', languageSpanish: 'Испанский', languageChinese: 'Китайский', languageJapanese: 'Японский', languageBelarusian: 'Белорусский',
+    languagePortuguese: 'Португальский', languageItalian: 'Итальянский', languageKorean: 'Корейский', languageTurkish: 'Турецкий', languageArabic: 'Арабский', languageDutch: 'Нидерландский', languageCzech: 'Чешский', languageSlovak: 'Словацкий', languageHungarian: 'Венгерский', languageBulgarian: 'Болгарский', languageSerbian: 'Сербский', languageCroatian: 'Хорватский', languageGreek: 'Греческий', languageSwedish: 'Шведский', languageNorwegian: 'Норвежский', languageDanish: 'Датский', languageFinnish: 'Финский', languageEstonian: 'Эстонский', languageLatvian: 'Латышский', languageLithuanian: 'Литовский', languageArmenian: 'Армянский', languageAzerbaijani: 'Азербайджанский', languageKyrgyz: 'Кыргызский', languageTajik: 'Таджикский', languageHindi: 'Хинди', languageHebrew: 'Иврит',
+  } })
+})

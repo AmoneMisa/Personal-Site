@@ -91,7 +91,7 @@ function stopDrag(event: PointerEvent) {
   user-select: none;
 }
 .draggable-pills__rail::-webkit-scrollbar { display: none; }
-
+.draggable-pills__rail.is-dragging { cursor: grabbing; }
 .draggable-pills__pill,
 .draggable-pills__more {
   flex: 0 0 auto;

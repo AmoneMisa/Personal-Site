@@ -49,7 +49,8 @@ function close() {
 }
 
 function apply() {
-  color.value = buildOutputString();
+  const out = buildOutputString();
+  color.value = out;
   emit("apply");
 }
 
@@ -185,9 +186,9 @@ function hslToRgb(h: number, s: number, l: number) {
   const x = c * (1 - Math.abs(((h / 60) % 2) - 1));
   const m = l - c / 2;
 
-  let r1: number;
-  let g1: number;
-  let b1: number;
+  let r1 = 0;
+  let g1 = 0;
+  let b1 = 0;
 
   if (h >= 0 && h < 60) [r1, g1, b1] = [c, x, 0];
   else if (h >= 60 && h < 120) [r1, g1, b1] = [x, c, 0];

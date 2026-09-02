@@ -5,6 +5,10 @@ export interface SelectOption<T extends string = string> {
   disabled?: boolean;
 }
 
+export type SearchSavedView = "active" | "favorites" | "recent" | "hidden";
+
+export type SearchResultAction = "share" | "source" | "favorite" | "hide" | "restore";
+
 export type SearchMatchTier = "good" | "warning" | "bad";
 
 export type SearchFilterValue = string | number | boolean | string[] | null | undefined;

@@ -71,7 +71,7 @@ onMounted(async () => {
 
   try {
     const status = await $fetch<{ enabled: boolean }>('/subscription-status')
-    available.value = status.enabled
+    available.value = status.enabled === true
   } catch {
     available.value = false
   }
@@ -177,6 +177,19 @@ async function subscribe() {
 /* ATS adds a score badge to the same row as four card actions. Keeping all of
    that beside the title squeezed long vacancy names into a very narrow column.
    Give ATS cards a full-width title row, then put score + actions underneath. */
+:global(.job-card__head:has(.job-card__ats)) {
+  grid-template-columns: minmax(0, 1fr);
+  align-items: start;
+}
+
+:global(.job-card__head:has(.job-card__ats) .job-card__actions) {
+  width: 100%;
+  justify-self: stretch;
+}
+
+:global(.job-card__head:has(.job-card__ats) .job-card__ats) {
+  margin-right: auto;
+}
 
 .search-actions {
   position: fixed;

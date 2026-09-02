@@ -1,4 +1,4 @@
-import { canonicalCityValue } from '#shared/locationCatalog.ts'
+import { canonicalCityValue } from '../../shared/locationCatalog'
 
 export const ALL_FEED_SOURCES = ['olx', 'telegram', 'facebook', 'threads'] as const
 export const CURRENT_ALL_SOURCE_TOKENS = [...ALL_FEED_SOURCES, 'custom'] as const

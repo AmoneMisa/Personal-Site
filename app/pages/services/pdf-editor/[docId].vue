@@ -711,6 +711,13 @@ function downloadSource() {
   touch-action: none;
 }
 
+.pdf__stage :deep(.lower-canvas),
+.pdf__stage :deep(.upper-canvas) {
+  position: absolute;
+  inset: 0;
+  touch-action: none;
+}
+
 .pdf__preview {
   width: 100%;
   height: auto;

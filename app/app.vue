@@ -22,8 +22,8 @@ const route = useRoute();
 // Map i18n codes -> Open Graph locale format. og:locale must follow the page's
 // actual language (was hardcoded to ru_RU on every route, incl. English), and
 // the other enabled locales are advertised as alternates.
-
-computed(() =>
+const OG_LOCALE: Record<string, string> = {ru: 'ru_RU', en: 'en_US', kk: 'kk_KZ'};
+const activeCodes = computed(() =>
     (locales.value ?? []).map((l: any) => (typeof l === 'string' ? l : l.code))
 );
 
@@ -44,6 +44,12 @@ useSeoMeta({
   ogImageHeight: 630,
   ogImageType: "image/png",
   ogImageAlt: "WhitesLove — portfolio, services and search tools",
+  ogUrl: () => `${SITE_URL}${route.path === '/' ? '' : route.path}` || SITE_URL,
+  ogLocale: () => OG_LOCALE[locale.value] ?? 'ru_RU',
+  ogLocaleAlternate: () => activeCodes.value
+      .filter((c) => c !== locale.value)
+      .map((c) => OG_LOCALE[c])
+      .filter(Boolean),
   twitterCard: () => t('seo.common.twitterCard'),
   twitterImage: DEFAULT_OG_IMAGE,
   twitterImageAlt: "WhitesLove — portfolio, services and search tools"

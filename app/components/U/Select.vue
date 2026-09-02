@@ -70,4 +70,8 @@ function update(value: unknown) {
   min-width: 0;
 }
 
+.u-select :deep(.u-select-menu),
+.u-select :deep(.u-select-menu__trigger) {
+  width: 100%;
+}
 </style>

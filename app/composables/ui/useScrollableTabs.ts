@@ -54,5 +54,5 @@ export function useScrollableTabs(triggerSelector = ".tabs__trigger") {
 
   onBeforeUnmount(() => window.removeEventListener("resize", handleResize));
 
-  return {scrollRef, indicatorRef, activeIndex, select};
+  return {scrollRef, indicatorRef, activeIndex, select, ensureVisible};
 }

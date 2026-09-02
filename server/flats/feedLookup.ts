@@ -73,8 +73,8 @@ export function findCachedExactListing(listingId: string, source: string, countr
     const exact = listings.find((listing: any) => {
       if (String(listing?.id ?? '') !== listingId) return false
       if (source && String(listing?.source || '').toLowerCase() !== source) return false
-      return !(country && String(listing?.country || '').toUpperCase() !== country);
-
+      if (country && String(listing?.country || '').toUpperCase() !== country) return false
+      return true
     })
     if (exact) return exact
   }

@@ -64,6 +64,11 @@ function jellyMoodSrc(creature: CreaturePreset, mood: "sleep" | "play" | "angry"
   will-change: transform;
 }
 
+.aquarium-pet-sprite_shark { aspect-ratio: 320 / 198; animation: aquarium-shark-swim var(--body-duration) cubic-bezier(.45,.05,.55,.95) infinite; }
+.aquarium-pet-sprite_puffer { aspect-ratio: 240 / 148; animation: aquarium-puffer-breathe var(--body-duration) ease-in-out infinite; }
+.aquarium-pet-sprite_fish { aspect-ratio: 3 / 2; animation: aquarium-fish-swim var(--body-duration) cubic-bezier(.45,.05,.55,.95) infinite; }
+.aquarium-pet-sprite_seahorse { aspect-ratio: 140 / 240; transform-origin: 52% 46%; animation: aquarium-seahorse-drift var(--body-duration) cubic-bezier(.45,.05,.55,.95) infinite; }
+.aquarium-pet-sprite_jelly { transform-origin: 50% 30%; animation: aquarium-jelly-body var(--body-duration) ease-in-out infinite; }
 .underwater-2d__swimmer_jelly-blue .aquarium-pet-sprite { aspect-ratio: 105 / 120; }
 .underwater-2d__swimmer_jelly-pink .aquarium-pet-sprite { aspect-ratio: 120 / 109; }
 
@@ -112,6 +117,13 @@ function jellyMoodSrc(creature: CreaturePreset, mood: "sleep" | "play" | "angry"
 .underwater-2d__swimmer_blue-fish[data-behavior="flee"] .aquarium-pet-sprite__expression_panic,
 .underwater-2d__swimmer_clownfish[data-behavior="panic"] .aquarium-pet-sprite__expression_panic,
 .underwater-2d__swimmer_clownfish[data-behavior="flee"] .aquarium-pet-sprite__expression_panic { opacity: 1; }
+
+.underwater-2d__swimmer[data-mood="sleep"] .aquarium-pet-sprite__jelly-base,
+.underwater-2d__swimmer[data-mood="play"] .aquarium-pet-sprite__jelly-base,
+.underwater-2d__swimmer[data-mood="angry"] .aquarium-pet-sprite__jelly-base { opacity: 0; }
+.underwater-2d__swimmer[data-mood="sleep"] .aquarium-pet-sprite__jelly-mood_sleep,
+.underwater-2d__swimmer[data-mood="play"] .aquarium-pet-sprite__jelly-mood_play,
+.underwater-2d__swimmer[data-mood="angry"] .aquarium-pet-sprite__jelly-mood_angry { opacity: 1; }
 
 @keyframes aquarium-shark-swim { 0%, 100% { transform: translateY(-2px) rotate(-.7deg); } 50% { transform: translateY(2px) rotate(.7deg); } }
 @keyframes aquarium-fish-swim { 0%, 100% { transform: translateY(-2px) rotate(-1.3deg) scaleX(.985); } 50% { transform: translateY(2px) rotate(1.3deg) scaleX(1.015); } }

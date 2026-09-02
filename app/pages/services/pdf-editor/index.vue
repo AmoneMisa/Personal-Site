@@ -163,6 +163,11 @@ async function createDoc() {
   padding-bottom: 96px;
 }
 
+.pdf__subtitle {
+  max-width: 760px;
+  font-size: 14px;
+}
+
 .pdf__grid {
   margin-top: 28px;
   display: grid;

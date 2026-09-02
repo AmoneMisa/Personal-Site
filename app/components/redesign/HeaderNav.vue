@@ -283,6 +283,7 @@ const mobileOpen = ref(false);
   display: none;
   flex-direction: column;
   gap: 4px;
+  padding: 12px 32px 20px;
   border-top: 1px solid var(--line);
   background: rgba(13, 17, 40, 0.98);
   /* The panel now lists the dropdown destinations too, so it can be taller than
@@ -291,7 +292,7 @@ const mobileOpen = ref(false);
   max-height: calc(100dvh - 72px);
   overflow-y: auto;
   overscroll-behavior: contain;
-  padding: 12px 32px calc(20px + env(safe-area-inset-bottom));
+  padding-bottom: calc(20px + env(safe-area-inset-bottom));
 }
 .site-header__mobile-link {
   padding: 10px 0;

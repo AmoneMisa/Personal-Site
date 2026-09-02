@@ -17,7 +17,7 @@ const emit = defineEmits<{ (e: "update:modelValue", value: number): void }>();
 
 const active = ref(props.modelValue ?? props.defaultIndex ?? 0);
 watch(() => props.modelValue, (value) => {
-  if (value !== active.value) active.value = value;
+  if (typeof value === "number" && value !== active.value) active.value = value;
 });
 
 function select(index: number) {

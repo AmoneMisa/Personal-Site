@@ -462,6 +462,23 @@ watch(
   align-items: end;
 }
 
+.svg-stroke-modal__pick {
+  height: 44px;
+  width: 44px;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.02);
+  color: var(--ui-text);
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+}
+
+.svg-stroke-modal__pick:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
 .svg-stroke-modal__form-actions {
   display: flex;
   justify-content: flex-end;

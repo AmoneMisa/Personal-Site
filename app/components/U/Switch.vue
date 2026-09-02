@@ -29,6 +29,7 @@ const emit = defineEmits<{ (e: "update:modelValue", value: boolean): void }>();
 
 <style scoped>
 .u-switch { position: relative; display: inline-flex; align-items: center; flex: none; }
+.u-switch_disabled { opacity: 0.55; }
 
 /* The input covers the control so clicks and focus land on it, while the track
    below provides the appearance. */

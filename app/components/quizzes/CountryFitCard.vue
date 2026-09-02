@@ -565,6 +565,23 @@ const priceColumns = computed(() => {
   line-height: 1;
 }
 
+.indices__grid {
+  display: grid;
+  gap: 10px;
+}
+
+.indices__grid.cols-1 {
+  grid-template-columns: 1fr;
+}
+
+.indices__grid.cols-2 {
+  grid-template-columns: 1fr 1fr;
+}
+
+.indices__grid.cols-3 {
+  grid-template-columns: 1fr 1fr 1fr;
+}
+
 .indices__col {
   min-width: 0;
 }

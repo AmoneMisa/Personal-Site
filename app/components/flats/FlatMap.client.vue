@@ -616,7 +616,8 @@ function renderDistrictZones() {
 }
 
 function renderZoneShapes(layerGroup: any, zones: FlatMapZone[], kind: ZoneKind, style: Record<string, unknown>) {
-  if (!layerGroup || !Leaflet) return;
+  const L = Leaflet;
+  if (!layerGroup || !L) return;
   layerGroup.clearLayers();
   for (const zone of zones) {
     renderZoneShape(layerGroup, zone, kind, { ...style, color: zone.color, fillColor: zone.color, className: "flat-zone-shape" });
@@ -728,7 +729,8 @@ function renderAmenities() {
 }
 
 function renderAreaZones() {
-  if (!zoneAreaLayer || !Leaflet) return;
+  const L = Leaflet;
+  if (!zoneAreaLayer || !L) return;
   zoneAreaLayer.clearLayers();
   if (!showAreas.value) return;
   for (const zone of props.areaZones || []) {
@@ -960,7 +962,15 @@ onBeforeUnmount(() => {
 // Clicking a district/microdistrict/area shape gives its SVG path DOM focus;
 // the browser's default focus outline is a rectangle around the shape's
 // bounding box, not its actual outline, which reads as a stray square.
-
+.flat-map :deep(.leaflet-interactive) { outline: none; }
+.flat-map :deep(.flat-zone-shape) {
+  transition: fill-opacity .15s ease, stroke-opacity .15s ease, stroke-width .15s ease;
+  cursor: pointer;
+}
+.flat-map :deep(.flat-zone-shape:hover) { fill-opacity: .4 !important; stroke-width: 3.5px; }
+.flat-map :deep(.flat-zone-shape_dim) { filter: grayscale(0.85); transition: filter .15s ease, fill-opacity .15s ease, stroke-opacity .15s ease; }
+.flat-map :deep(.flat-zone-shape_dim:hover) { filter: grayscale(0.4); }
+:deep(.flat-zone-label_dim) { opacity: .55; filter: grayscale(0.85); }
 .flat-map {
   width: 100%;
   height: 420px;
@@ -988,6 +998,11 @@ onBeforeUnmount(() => {
   width: 16px; height: 16px; border-radius: 50%;
   background: #e0679a; border: 2px solid #fff; box-sizing: border-box;
   box-shadow: 0 1px 4px rgba(0,0,0,0.4);
+}
+:deep(.flat-cluster_multi) {
+  width: 32px; height: 32px;
+  color: #fff; font-size: 13px; font-weight: 700;
+  background: rgba(224,103,154,0.92);
 }
 
 .flat-radial { position: fixed; inset: 0; z-index: 9000; }
@@ -1027,6 +1042,19 @@ onBeforeUnmount(() => {
 .flat-radial__thumb-empty { display: block; width: 60%; height: 60%; margin: 20% auto; object-fit: contain; opacity: 0.4; }
 .flat-radial__price { padding: 4px 6px; font-size: 12px; font-weight: 600; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
+:deep(.flat-zone-label-wrap) { pointer-events: none; }
+:deep(.flat-zone-label) {
+  display: inline-block; transform: translate(-50%, -50%);
+  padding: 3px 8px; border: 1.5px solid; border-radius: 999px;
+  background: rgba(13,17,40,0.92); color: var(--text-primary, #fff);
+  font-size: 11px; font-weight: 700; white-space: nowrap; pointer-events: none;
+}
+:deep(.flat-zone-marker) {
+  display: block; width: 12px; height: 12px; border: 2px solid #fff;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.5); cursor: pointer;
+}
+:deep(.flat-zone-marker_circle) { border-radius: 50%; }
+:deep(.flat-zone-marker_square) { border-radius: 2px; }
 :deep(.flat-amenity-marker) {
   display: grid; place-items: center; width: 22px; height: 22px; box-sizing: border-box;
   border: 2px solid #fff; border-radius: 50%; background: var(--amenity-color); color: #fff;
@@ -1034,6 +1062,7 @@ onBeforeUnmount(() => {
 }
 
 :deep(.leaflet-container) { background: var(--bg-panel); font-family: inherit; }
+:deep(.leaflet-popup-content) { font-size: 13px; }
 
 @include bp-down(sm) {
   .flat-map-shell_full { padding: 0; }

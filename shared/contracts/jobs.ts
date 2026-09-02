@@ -32,7 +32,17 @@ export type WorkSchedule =
 export type ProbationKind = 'probation' | 'noProbation' | 'paidProbation' | 'unpaidProbation'
 export type ExperienceRequirement = 'noExperience' | 'experienceRequired'
 
-
+export const EMPLOYMENT_KINDS: EmploymentKind[] = [
+  'fulltime',
+  'parttime',
+  'contract',
+  'project',
+  'freelance',
+  'internship',
+  'temporary',
+  'volunteer',
+  'seasonal',
+]
 
 export interface LanguageReq {
   language: string
@@ -129,6 +139,61 @@ export type JobSource =
   | 'telegram'
   | 'olx'
 
+export const FREE_SOURCES: JobSource[] = [
+  'remotive',
+  'remoteok',
+  'arbeitnow',
+  'themuse',
+  'jobicy',
+  'hh',
+  'devkg',
+  'telegram',
+  'linkedin',
+  'facebook',
+  'threads',
+]
+
+export const OPTIONAL_SOURCES: JobSource[] = [
+  'adzuna',
+  'jooble',
+  'rss',
+  'companies',
+  'ishgo',
+  'itjobsuz',
+  'olx',
+]
+
+export const ALL_SOURCES: JobSource[] = [...FREE_SOURCES, ...OPTIONAL_SOURCES]
+
+export type SortKey = 'date' | 'oldest' | 'title' | 'company' | 'salary'
+
+export interface JobQuery {
+  q: string
+  location: string
+  remote?: boolean
+  sources: JobSource[]
+  sort: SortKey
+  maxAgeDays: number
+  salaryMin?: number
+  page: number
+  pageSize: number
+  countries: string[]
+  cities: string[]
+  includeRu?: boolean
+  includeBy?: boolean
+  workMode?: WorkMode
+  relocation?: Relocation
+  employmentKind?: EmploymentKind
+  hasSalary?: boolean
+  maxExperienceYears?: number
+  foreignerFriendly?: boolean
+  hideRiskyIndustries?: boolean
+  noExperience?: boolean
+  language?: string
+  languageLevel?: string
+  excludeLanguages: string[]
+  skills: string[]
+}
 
 export interface SalaryStat {
   count: number

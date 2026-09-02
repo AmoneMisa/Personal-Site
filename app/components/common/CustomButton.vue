@@ -49,4 +49,49 @@ const uiVariant = computed(() => resolved.value === 'ghost' ? 'ghost' : 'solid')
   transition: 0.2s ease;
 }
 
+:global(.btn_primary) {
+  color: #1a0e14 !important;
+  border: 1px solid transparent;
+  background: var(--accent-pink);
+}
+
+.btn_primary:hover {
+  filter: brightness(1.06);
+}
+
+.btn_black {
+  color: var(--text-primary) !important;
+  border: 1px solid var(--line);
+  background: var(--bg-panel);
+}
+
+.btn_black:hover {
+  border-color: var(--accent-pink);
+}
+
+.btn_secondary {
+  color: var(--text-primary);
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--line);
+}
+
+.btn_secondary:hover {
+  border-color: var(--accent-pink);
+}
+
+.btn_ghost {
+  color: var(--text-primary);
+  padding: 0;
+  height: auto;
+  border-radius: 8px;
+}
+
+.btn_ghost:hover {
+  color: var(--accent-pink);
+}
+
+.btn_link {
+  color: var(--accent-pink);
+  padding: 0 !important;
+}
 </style>

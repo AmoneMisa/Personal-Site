@@ -337,6 +337,7 @@ onBeforeUnmount(() => {
 }
 /* Focus shows on the outline; the shared ring would sit outside it and read as
    a second border. */
+.u-select-menu_floating:focus-within { box-shadow: none; }
 .u-select-menu_floating:focus-within .u-select-menu__outline {
   border-width: 2px;
   border-color: var(--accent-pink, #e0679a);
@@ -412,7 +413,9 @@ onBeforeUnmount(() => {
   border: 1px solid var(--ui-control-border);
   color: var(--accent-pink, #e0679a);
 }
-
+.u-select-menu__choice_radio { border-radius: 50%; }
+.u-select-menu__choice_checkbox { border-radius: 4px; }
+.u-select-menu__choice_selected { border-color: var(--accent-pink, #e0679a); }
 .u-select-menu__radio-dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
 .u-select-menu__option-label { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .u-select-menu__check { flex: none; font-size: 0.85em; }

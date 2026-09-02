@@ -21,9 +21,11 @@
 /* flex / grid */
 .flex-col { flex-direction: column; }
 .flex-row { flex-direction: row; }
-.flex-1 { flex: 1 1 0; }
+.flex-1 { flex: 1 1 0%; }
 .grid-cols-1 { grid-template-columns: repeat(1, minmax(0, 1fr)); }
-
+.grid-cols-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.grid-cols-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.grid-cols-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 .items-center { align-items: center; }
 .items-start { align-items: flex-start; }
 .justify-center { justify-content: center; }
@@ -65,8 +67,11 @@
 
 /* sizing */
 .w-full { width: 100%; }
-
+.max-w-xl { max-width: 36rem; }
+.max-w-2xl { max-width: 42rem; }
+.max-w-3xl { max-width: 48rem; }
 .max-w-6xl { max-width: 72rem; }
+.max-w-\[600px\] { max-width: 600px; }
 
 /* typography */
 .text-xs { font-size: 0.75rem; line-height: 1rem; }
@@ -115,14 +120,18 @@
    characters in CSS selectors. */
 @media (min-width: 640px) {
   .sm\:grid-cols-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-
+  .sm\:max-w-xl { max-width: 36rem; }
+  .sm\:max-w-2xl { max-width: 42rem; }
+  .sm\:max-w-3xl { max-width: 48rem; }
 }
 @media (min-width: 768px) {
+  .md\:grid-cols-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .md\:grid-cols-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .md\:flex-row { flex-direction: row; }
 }
 @media (min-width: 1024px) {
   .lg\:grid-cols-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .lg\:grid-cols-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 }
 @media (min-width: 1280px) {
   .xl\:grid-cols-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
@@ -131,9 +140,11 @@
 /* Arbitrary values used by the quiz pages. */
 .border-\[var\(--line\)\] { border: 1px solid var(--line); }
 .border-\[var\(--ui-border\)\] { border: 1px solid var(--ui-border); }
-
+.bg-\[rgba\(255\,255\,255\,0\.02\)\] { background-color: rgba(255, 255, 255, 0.02); }
+.bg-\[rgba\(255\,255\,255\,0\.03\)\] { background-color: rgba(255, 255, 255, 0.03); }
 .bg-\[rgba\(224\,103\,154\,0\.12\)\] { background-color: rgba(224, 103, 154, 0.12); }
 .border-\[rgba\(224\,103\,154\,0\.35\)\] { border: 1px solid rgba(224, 103, 154, 0.35); }
+.hover\:brightness-\[1\.05\]:hover { filter: brightness(1.05); }
 
 .bg-error { background-color: var(--color-error, #ef4444); }
 /* Non-standard but used by the converter layout; keep the intent. */

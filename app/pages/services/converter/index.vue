@@ -3,7 +3,6 @@ import CustomButton from "~/components/common/CustomButton.vue";
 import { useServiceSeo } from "~/composables/services/useServiceSeo";
 import {formatFileSize} from "~/utils/files";
 import {useConverterState} from "~/composables/converter/useConverterState";
-import PageHeader from "~/components/common/PageHeader.vue";
 
 const {t} = useI18n();
 

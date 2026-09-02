@@ -180,8 +180,10 @@ const floated = computed(() => floating.value && (focused.value || hasValue.valu
    Only the label and the notch move, and both move by transform alone, so the
    animation never reflows the field or the form around it. */
 
+.u-input_floating { position: relative; }
 /* The fieldset paints the border now; leaving .ui-control's on as well would
    draw two. Kept transparent rather than removed so the box size is unchanged. */
+.u-input.u-input_floating { border-color: transparent; }
 
 .u-input__label {
   position: absolute;
@@ -248,6 +250,7 @@ const floated = computed(() => floating.value && (focused.value || hasValue.valu
 /* Focus is shown by the outline itself. .ui-control's shared ring is a box-shadow
    drawn outside the wrapper, so on this variant it landed just beyond the
    fieldset's border and read as a second, detached outline. */
+.u-input.u-input_floating:focus-within { box-shadow: none; }
 .u-input_floating:focus-within .u-input__outline {
   /* Absolutely positioned, so the extra width grows inward and moves nothing. */
   border-width: 2px;

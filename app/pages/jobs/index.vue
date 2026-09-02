@@ -919,7 +919,7 @@ onBeforeUnmount(() => {
 
 .jobs__controls { margin: 16px 0 20px; display: grid; gap: 12px; grid-template-columns: 1fr; }
 .jobs__row { grid-column: 1 / -1; display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
-
+.jobs__remote { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 700; }
 .jobs__results-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
 .jobs__results-toolbar .jobs__error,
 .jobs__results-toolbar .jobs__count,
@@ -935,11 +935,23 @@ onBeforeUnmount(() => {
 @keyframes jobs-warming { to { opacity: 0.35; } }
 .jobs__filter-blocks { grid-column: 1 / -1; }
 .jobs__grid :deep(.job-card) { height: 100%; min-height: 0; }
-
+.jobs__grid :deep(.job-card__footer) { margin-top: 12px; padding-top: 0; }
+.jobs__grid :deep(.job-card__salary-separator) { display: none; }
+.jobs__filter-blocks :deep(.search-filter-blocks__grid) { align-items: end; }
+.jobs-filter-group__grid { display: grid; grid-template-columns: 1fr; gap: 12px; align-items: end; }
+.jobs-filter-group__flags { display: flex; flex-wrap: wrap; gap: 14px 24px; align-items: center; }
+.jobs__field { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
+.jobs__field-label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; opacity: 0.7; }
+.jobs__field_inline { align-self: center; min-height: var(--ui-control-h-md); }
 @include bp-up(md) {
+  .jobs-filter-group__grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .jobs-filter-group__grid_salary { grid-template-columns: minmax(0, 1.4fr) minmax(110px, .7fr) minmax(130px, .8fr); }
+  .jobs-filter-group__grid_salary .jobs__field_inline { grid-column: 1 / -1; }
+  .jobs__field_wide { grid-column: span 2; }
   .jobs-filter-actions { grid-column: 1 / -1; }
 }
 @include bp-up(xl) {
+  .jobs-filter-group__grid_location { grid-template-columns: minmax(180px, .8fr) minmax(0, 1.6fr); }
 }
 @include bp-down(sm) {
   .jobs__results-toolbar { align-items: stretch; flex-direction: column; }

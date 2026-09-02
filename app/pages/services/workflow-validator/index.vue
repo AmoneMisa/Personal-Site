@@ -241,7 +241,9 @@ function onPick(event: Event) {
   padding: 10px 12px; border: 1px solid var(--line); border-left-width: 3px; border-radius: 8px;
   background: rgba(255, 255, 255, .02);
 }
-
+.wfv__issue_error { border-left-color: #ef4444; }
+.wfv__issue_warning { border-left-color: #facc15; }
+.wfv__issue_info { border-left-color: #67e8f9; }
 .wfv__issue-icon { margin-top: 2px; }
 .wfv__issue_error .wfv__issue-icon { color: #ef4444; }
 .wfv__issue_warning .wfv__issue-icon { color: #facc15; }

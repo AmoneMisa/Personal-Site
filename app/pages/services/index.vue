@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { useServiceSeo } from "~/composables/services/useServiceSeo";
-import PageHeader from "~/components/common/PageHeader.vue";
 
 const { t } = useI18n();
 const localePath = useLocalePath();

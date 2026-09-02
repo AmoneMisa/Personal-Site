@@ -73,6 +73,11 @@ onBeforeUnmount(() => {
   will-change: transform, opacity;
 }
 
+.header-crab_normal { animation: header-crab-scamper 26s linear 3s infinite; }
+.header-crab_fleeing { animation: header-crab-flee-left .82s cubic-bezier(.55,.02,.9,.45) forwards; }
+.header-crab_falling { animation: header-crab-fall 1.18s cubic-bezier(.32,.02,.82,.42) forwards; }
+.header-crab_cooldown { opacity: 0; animation: none; }
+
 .header-crab__sprite {
   position: absolute;
   inset: 0;

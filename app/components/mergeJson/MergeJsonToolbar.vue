@@ -235,6 +235,26 @@ function onDownload() {
   padding-top: 2px;
 }
 
+.merge__btn,
+.merge__chip {
+  min-height: var(--ui-control-h-lg, 44px);
+  height: var(--ui-control-h-lg, 44px);
+}
+
+.merge__btn_ghost {
+  padding-inline: 8px;
+}
+
+.merge__chip {
+  padding: 0 12px;
+  border-radius: 8px;
+}
+
+.merge__chip_active {
+  border-color: var(--accent-pink) !important;
+  background: rgba(224, 103, 154, 0.16) !important;
+}
+
 .merge__select {
   min-width: 0;
   width: 100%;
@@ -259,6 +279,10 @@ function onDownload() {
   font-size: 11px;
   font-weight: 600;
   color: var(--text-muted);
+}
+
+.merge__download {
+  min-width: 140px;
 }
 
 @media (max-width: 1100px) {

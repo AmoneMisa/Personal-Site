@@ -37,7 +37,7 @@ const workerKey = process.env.AI_WORKER_KEY || ''
 const requestTimeoutMs = Math.max(10_000, Number(process.env.AI_WORKER_REQUEST_TIMEOUT_MS) || 0)
 const proxyRequestRetries = Math.max(0, Number(process.env.AI_WORKER_PROXY_RETRIES) || 1)
 const pollIntervalMs = Math.max(1_000, Number(process.env.AI_WORKER_POLL_MS) || 5_000)
-Math.max(1, Number(process.env.AI_WORKER_MAX_PENDING) || 60);
+const maxQueued = Math.max(1, Number(process.env.AI_WORKER_MAX_PENDING) || 60)
 const submitConcurrency = Math.max(1, Number(process.env.AI_WORKER_SUBMIT_CONCURRENCY) || 4)
 
 const queue: AiTask<unknown>[] = []
@@ -66,6 +66,13 @@ function stable(value: unknown): string {
       .join(',')}}`
   }
   return JSON.stringify(value)
+}
+
+export function aiFingerprint(kind: AiKind, rawText: string, knownFacts: Record<string, unknown>): string {
+  return createHash('sha256')
+    .update(`${kind}\0${rawText.replace(/\s+/g, ' ').trim()}\0${stable(knownFacts)}`)
+    .digest('hex')
+    .slice(0, 24)
 }
 
 export function aiWorkerEnabled(): boolean {
@@ -203,3 +210,13 @@ function pump() {
   }
 }
 
+export function scheduleAiExtraction<T>(task: Omit<AiTask<T>, 'fingerprint'> & { fingerprint?: string }): boolean {
+  if (!aiWorkerEnabled() || !task.rawText.trim()) return false
+  const fingerprint = task.fingerprint || aiFingerprint(task.kind, task.rawText, task.knownFacts)
+  if (scheduled.has(fingerprint) || queue.length + pending.size + activeSubmissions >= maxQueued) return false
+
+  scheduled.add(fingerprint)
+  queue.push({ ...task, fingerprint } as AiTask<unknown>)
+  pump()
+  return true
+}
