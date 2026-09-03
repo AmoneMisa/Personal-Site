@@ -123,6 +123,7 @@
     "done": "Готово",
     "mapExpand": "На весь экран",
     "mapCollapse": "Закрыть",
+    "mapScrollHint": "Кликните по карте, чтобы приблизить",
     "cityLayer": "Город",
     "districtsLayer": "Районы",
     "microdistrictsLayer": "Микрорайоны",

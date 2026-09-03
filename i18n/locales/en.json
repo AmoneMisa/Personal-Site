@@ -124,6 +124,7 @@
     "drawArea": "Draw area",
     "mapExpand": "Full screen",
     "mapCollapse": "Close",
+    "mapScrollHint": "Click the map to zoom",
     "cityLayer": "City",
     "districtsLayer": "Districts",
     "microdistrictsLayer": "Microdistricts",

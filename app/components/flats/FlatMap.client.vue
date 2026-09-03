@@ -56,6 +56,7 @@ const props = defineProps<{
   drawHint?: string;
   expandLabel?: string;
   collapseLabel?: string;
+  scrollHintLabel?: string;
   districtZones?: FlatMapZone[];
   microdistrictMarkers?: FlatMapZone[];
   quartalMarkers?: FlatMapZone[];
@@ -103,6 +104,7 @@ const DETAIL_QUERY_KEYS = new Set(["flat", "flatSource", "flatCountry", "shared"
 const el = ref<HTMLElement | null>(null);
 const failed = ref(false);
 const drawing = ref(false);
+const scrollActive = ref(false);
 const area = ref<Array<{ lat: number; lng: number }>>([]);
 const radial = ref<{ x: number; y: number; items: FlatPoint[]; page: number } | null>(null);
 const expanded = ref(false);
@@ -220,6 +222,7 @@ let lastFitSig = "";
 
 async function setExpanded(value: boolean) {
   expanded.value = value;
+  scrollActive.value = false;
   if (import.meta.client) document.body.style.overflow = value ? "hidden" : "";
   // Wheel-zoom stays off while the map is embedded inline so scrolling the page
   // over it doesn't get hijacked; once expanded to full screen it no longer
@@ -234,6 +237,22 @@ async function setExpanded(value: boolean) {
 
 function toggleExpanded() {
   void setExpanded(!expanded.value);
+}
+
+// Inline, scroll-wheel zoom stays off (see setExpanded above) so page-scroll never
+// gets hijacked. A click "activates" it for as long as the cursor stays over the
+// map, mirroring the pattern embedded map widgets use to stay scroll-friendly
+// while still letting an engaged user zoom without reaching for the buttons.
+function activateScroll() {
+  if (expanded.value || scrollActive.value) return;
+  scrollActive.value = true;
+  map?.scrollWheelZoom?.enable();
+}
+
+function deactivateScroll() {
+  if (expanded.value) return;
+  scrollActive.value = false;
+  map?.scrollWheelZoom?.disable();
 }
 
 function closeRadial() {
@@ -490,6 +509,7 @@ function stopLayerClick(event: any) {
 }
 
 function handleLayerClick(event: any, action: () => void) {
+  activateScroll();
   stopLayerClick(event);
   if (addDrawPoint(event)) return;
   action();
@@ -786,7 +806,17 @@ onMounted(async () => {
   }
   if (!el.value) return;
   try {
-    map = L.map(el.value, { scrollWheelZoom: false, zoomSnap: 0.5 }).setView([41.31, 69.24], 5);
+    // preferCanvas: the district/microdistrict/quartal/metro/amenity layers can add
+    // up to hundreds of vector shapes at once; canvas repaints them far cheaper than
+    // SVG DOM nodes while dragging or zooming, which is where panning felt laggiest.
+    // zoomSnap below 1 lets flyTo/fitBounds and the +/- controls settle on fractional
+    // zoom levels instead of hard integer steps, so zoom transitions read as continuous.
+    map = L.map(el.value, {
+      scrollWheelZoom: false,
+      zoomSnap: 0.25,
+      zoomDelta: 0.5,
+      preferCanvas: true,
+    }).setView([41.31, 69.24], 5);
   } catch {
     failed.value = true;
     return;
@@ -810,9 +840,11 @@ onMounted(async () => {
   shoppingMallLayer = L.layerGroup().addTo(map);
   parkLayer = L.layerGroup().addTo(map);
   map.on("click", (event: any) => {
+    activateScroll();
     if (addDrawPoint(event)) return;
     closeRadial();
   });
+  el.value.addEventListener("mouseleave", deactivateScroll);
   map.on("zoomend", renderMarkers);
   map.on("movestart", closeRadial);
   map.on("zoomstart", closeRadial);
@@ -844,6 +876,7 @@ onBeforeUnmount(() => {
   window.removeEventListener("keydown", onKeydown);
   window.removeEventListener("scroll", closeRadial);
   window.removeEventListener("flat-map-focus", onMapFocus as EventListener);
+  el.value?.removeEventListener("mouseleave", deactivateScroll);
   document.body.style.overflow = "";
   map?.remove?.();
   map = null;
@@ -866,6 +899,7 @@ onBeforeUnmount(() => {
   <Teleport to="body" :disabled="!expanded">
     <div v-show="!failed" class="flat-map-shell" :class="{ 'flat-map-shell_full': expanded }">
       <div ref="el" class="flat-map" />
+      <div v-if="!expanded" v-show="!scrollActive" class="flat-map__scroll-hint">{{ props.scrollHintLabel || "Click the map to zoom" }}</div>
 
       <div class="flat-map__tools">
         <button
@@ -992,17 +1026,28 @@ onBeforeUnmount(() => {
   padding: 7px 10px; border: 1px solid var(--line); border-radius: 6px;
   background: rgba(13,17,40,0.94); color: var(--text-primary); font-size: 12px;
 }
+.flat-map__scroll-hint {
+  position: absolute; z-index: 400; left: 50%; top: 12px; transform: translateX(-50%);
+  padding: 6px 10px; border: 1px solid var(--line); border-radius: 6px;
+  background: rgba(13,17,40,0.88); color: var(--text-primary); font-size: 12px;
+  pointer-events: none; opacity: 0; transition: opacity 0.18s ease;
+}
+.flat-map-shell:hover .flat-map__scroll-hint { opacity: 1; }
 
 :deep(.flat-cluster) {
   display: flex; align-items: center; justify-content: center;
   width: 16px; height: 16px; border-radius: 50%;
   background: #e0679a; border: 2px solid #fff; box-sizing: border-box;
   box-shadow: 0 1px 4px rgba(0,0,0,0.4);
+  animation: flat-cluster-in 0.2s ease backwards;
 }
 :deep(.flat-cluster_multi) {
   width: 32px; height: 32px;
   color: #fff; font-size: 13px; font-weight: 700;
   background: rgba(224,103,154,0.92);
+}
+@keyframes flat-cluster-in {
+  from { opacity: 0; transform: scale(0.45); }
 }
 
 .flat-radial { position: fixed; inset: 0; z-index: 9000; }
