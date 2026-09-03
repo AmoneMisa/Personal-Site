@@ -28,6 +28,7 @@ const nearbyTranslationKeys: Record<string, string> = {
   "Yangi Choshtepa": "nearbyYangiChoshtepa",
   "Sergeli Car Bazaar": "nearbySergeliCarBazaar",
   Park: "nearbyPark",
+  Playground: "nearbyPlayground",
   "Bus stop": "nearbyBusStop",
   Clinic: "nearbyClinic",
   School: "nearbySchool",
@@ -41,6 +42,8 @@ const nearbyTranslationKeys: Record<string, string> = {
   Television: "amenityTelevision",
   "Bed linen": "amenityBedLinen",
   Towels: "amenityTowels",
+  courtyard: "amenityCourtyard",
+  gazebo: "amenityGazebo",
 };
 
 const nearbyRuLabels: Record<string, string> = {
