@@ -14,7 +14,9 @@ const page = await readFile(
 test('map remains mounted when the active filters return no listings', () => {
   assert.match(page, /<section class="flats__map-wrap"><flat-map/u);
   assert.doesNotMatch(page, /<section v-if="listings\.length" class="flats__map-wrap"/u);
-  assert.match(source, /watch\(\(\) => route\.query, \(\) => \{ void loadFullMapFeed\(\); \}/u);
+  // The map keeps its own feed in step with the filters. Keyed off the params
+  // it actually sends, so opening a listing or paging does not refetch it.
+  assert.match(source, /watch\(\(\) => new URLSearchParams\(normalizedRouteQuery\(\)\)\.toString\(\), \(\) => \{ void loadFullMapFeed\(\); \}\)/u);
 });
 
 test('metro proximity rings consume clicks instead of falling through to districts', () => {

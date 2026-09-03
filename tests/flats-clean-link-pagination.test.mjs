@@ -92,5 +92,11 @@ test('a deep-linked ?page=n restores loaded results before the URL is resynced t
   const mountedStart = page.indexOf('onMounted(async () => {')
   const mountedEnd = page.indexOf('\nwatch(modalOpen', mountedStart)
   const mounted = page.slice(mountedStart, mountedEnd)
-  assert.match(mounted, /await load\(false\);\s*\n\s*if \(requestedPage > 1\) await restoreToPage\(requestedPage\);\s*\n\s*pageRestoring\.value = false;/)
+  // Meta and the first feed page are issued together: meta only fills the
+  // select option lists, so awaiting it first put a whole round trip in front
+  // of the listings for nothing.
+  assert.match(mounted, /const metaReady = loadMeta\(\);\s*\n\s*const feedReady = load\(false\);/)
+  // ...but the first page must still be complete before restoreToPage appends
+  // to it, and pageRestoring must outlive both.
+  assert.match(mounted, /await feedReady;\s*\n\s*if \(requestedPage > 1\) await restoreToPage\(requestedPage\);\s*\n\s*pageRestoring\.value = false;/)
 })

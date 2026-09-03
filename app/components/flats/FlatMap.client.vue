@@ -1106,8 +1106,17 @@ onMounted(async () => {
 // anything it depends on changes, so a deep traversal of every point on every
 // check only costs time.
 watch(renderedPoints, () => { renderMarkers(); fitToPoints(); });
-watch(() => route.query, () => { void loadFullMapFeed(); }, { deep: true });
-watch(() => [props.districtZones, props.microdistrictMarkers, props.quartalMarkers, props.metroStations, props.universityZones, props.shoppingMallZones, props.parkZones, props.areaZones, props.cityZone], () => syncSelectionFromProps(false), { deep: true });
+// Watched as the normalized key, not the query object: route.query is replaced
+// wholesale on navigation, so a deep traversal only added cost, and keying on
+// what loadFullMapFeed actually sends means listing-detail params cannot
+// trigger a refetch at all.
+watch(() => new URLSearchParams(normalizedRouteQuery()).toString(), () => { void loadFullMapFeed(); });
+// NOT deep. These props are computeds that rebuild their arrays, so identity is
+// already the signal. Traversing them meant walking every coordinate of every
+// district, microdistrict and local-area boundary on each reactive tick -- with
+// a full city catalog loaded that is hundreds of thousands of nested reads, and
+// it blocked the main thread for about a second after every filter change.
+watch(() => [props.districtZones, props.microdistrictMarkers, props.quartalMarkers, props.metroStations, props.universityZones, props.shoppingMallZones, props.parkZones, props.areaZones, props.cityZone], () => syncSelectionFromProps(false));
 watch(
   () => [props.selectedDistrict, props.selectedMicrodistrict, props.selectedQuartal, props.selectedArea, selectedMetros.value.join(","), props.selectedMetroRadiusM, props.metroBearingFrom, props.metroBearingTo],
   (next, previous) => {
@@ -1116,10 +1125,12 @@ watch(
   },
 );
 watch([showDistricts, showMicrodistricts, showQuartals, showMetro, showUniversities, showShoppingMalls, showParks, showAreas, showCity], renderAllZoneLayers);
+// The callback already compares by id, so nothing here needed a deep traversal
+// of the city hull polygon either.
 watch(() => props.cityZone, (zone, previous) => {
   if (!zone || zone.id === previous?.id || !map) return;
   focusZone(zone);
-}, { deep: true });
+});
 
 onBeforeUnmount(() => {
   mapFeedSequence += 1;

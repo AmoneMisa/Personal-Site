@@ -8,6 +8,12 @@ const WARM_POLL_INTERVAL_MS = 1800;
 export interface FeedPollingOptions<Params> {
   /** Re-issued in the background while the upstream reports itself still warming. */
   onWarmPoll: (params: Params) => void;
+  /**
+   * Overrides FILTER_REQUEST_DEBOUNCE_MS. Pass 0 from a feed whose page already
+   * debounces its filter interactions: two debounces in series just add their
+   * delays, and the user waits out both before the request even starts.
+   */
+  filterDebounceMs?: number;
 }
 
 /**
@@ -20,6 +26,7 @@ export interface FeedPollingOptions<Params> {
  * by id), and collapsing them would be a behaviour change, not a refactor.
  */
 export function useFeedPolling<Params>(options: FeedPollingOptions<Params>) {
+  const filterDebounceMs = options.filterDebounceMs ?? FILTER_REQUEST_DEBOUNCE_MS;
   let warmTimer: ReturnType<typeof setTimeout> | undefined;
   let warmParams: Params | null = null;
   let filterDebounceTimer: ReturnType<typeof setTimeout> | undefined;
@@ -32,13 +39,16 @@ export function useFeedPolling<Params>(options: FeedPollingOptions<Params>) {
   function debounceFilterRequest(): Promise<boolean> {
     if (filterDebounceTimer) clearTimeout(filterDebounceTimer);
     filterDebounceResolve?.(false);
+    // Not merely a zero-length timer: a caller that debounces upstream should
+    // reach the network in this tick, without yielding to the event loop first.
+    if (!filterDebounceMs) return Promise.resolve(true);
     return new Promise((resolve) => {
       filterDebounceResolve = resolve;
       filterDebounceTimer = setTimeout(() => {
         filterDebounceTimer = undefined;
         filterDebounceResolve = undefined;
         resolve(true);
-      }, FILTER_REQUEST_DEBOUNCE_MS);
+      }, filterDebounceMs);
     });
   }
 

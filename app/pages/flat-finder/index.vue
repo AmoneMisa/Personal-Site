@@ -94,7 +94,7 @@ const { isFresh: isAvailabilityFresh, markFresh: markAvailabilityFresh, forget: 
 
 const {
   listings, total, loading, loadingMore, failed, sourceErrors, statistics,
-  nextCursor, loadMoreSentinel, loadFeed,
+  nextCursor, loadMoreSentinel, loadFeed, isFeedCached,
 } = useFlatFeed({ onAvailabilityChecked: markAvailabilityFresh });
 const { listingPhoto, visiblePhotos, markPhotoFailedFromEvent } = useFlatPhotos();
 const view = ref<FlatView>("active");
@@ -477,9 +477,19 @@ async function syncPageInUrl(page: number) {
   else delete query.page;
   await router.replace({ query });
 }
-async function load(append = false, background = false) {
-  const params = buildFeedParams({
+/** The exact params a plain (non-append) reload would send right now. */
+function currentFeedParams(): Record<string, string> {
+  return buildFeedParams({
     limit: PAGE_SIZE,
+    append: false,
+    loadedCount: 0,
+    nextCursor: null,
+    sources: SOURCES,
+  });
+}
+async function load(append = false, background = false, limit = PAGE_SIZE) {
+  const params = buildFeedParams({
+    limit,
     append,
     loadedCount: listings.value.length,
     nextCursor: nextCursor.value,
@@ -500,10 +510,15 @@ async function load(append = false, background = false) {
   if (import.meta.client && !pageRestoring.value && view.value === "active") await syncPageInUrl(currentPageNumber());
   if (!append) await syncQueryParams();
 }
+// Restoring `?page=5` used to be four sequential round trips, each waiting on
+// the last. The feed route caps a page at 60 listings, so ask for as much as it
+// will give per request and only loop for whatever is still missing.
+const MAX_FEED_LIMIT = 60;
 async function restoreToPage(targetPage: number) {
   let guard = 0;
   while (hasMore.value && listings.value.length < targetPage * PAGE_SIZE && guard < 50) {
-    await load(true, false);
+    const missing = targetPage * PAGE_SIZE - listings.value.length;
+    await load(true, false, Math.min(MAX_FEED_LIMIT, Math.max(PAGE_SIZE, missing)));
     guard += 1;
   }
 }
@@ -513,7 +528,15 @@ async function restoreToPage(targetPage: number) {
 // seconds — so the earlier ones were paid for and thrown away. Long enough to
 // swallow a burst of clicks, short enough not to feel unresponsive.
 const FILTER_DEBOUNCE_MS = 350;
-function scheduleLoad(delay = FILTER_DEBOUNCE_MS) { if (loadTimer) clearTimeout(loadTimer); loadTimer = setTimeout(() => { loadTimer = undefined; void load(false); }, delay); }
+function scheduleLoad(delay = FILTER_DEBOUNCE_MS) {
+  if (loadTimer) clearTimeout(loadTimer);
+  // The debounce exists to protect the server from combinations it has not
+  // answered before. One it *has* answered, and that this browser still holds,
+  // costs nothing to re-apply -- so undoing a filter, or stepping back to a
+  // combination tried a moment ago, lands immediately instead of after 350ms.
+  const wait = delay && isFeedCached(currentFeedParams()) ? 0 : delay;
+  loadTimer = setTimeout(() => { loadTimer = undefined; void load(false); }, wait);
+}
 function clearSearch() { query.value = ""; scheduleLoad(0); }
 function selectSource(v: string) { if (source.value === v) return; source.value = v; scheduleLoad(); }
 function resetFilters() {
@@ -860,9 +883,16 @@ onMounted(async () => {
   const requestedPage = Math.max(1, Math.trunc(Number(queryString(route.query.page))) || 1);
   defaultCountry.value = regionalSearchCountry();
   if (!queryString(route.query.countries)) countries.value = [defaultCountry.value];
-  loadPersonalState(); applyQueryParams(route.query); void loadRates(); await loadMeta(); await nextTick(); restoring.value = false;
+  loadPersonalState(); applyQueryParams(route.query); void loadRates();
+  // The first feed request does not depend on /flats-meta: the country is
+  // already resolved above, and meta only fills the select option lists (its
+  // own default-country branch is a no-op once countries is non-empty). Running
+  // them in series put a whole round trip in front of the listings for nothing.
+  const metaReady = loadMeta();
+  const feedReady = load(false);
+  await metaReady; await nextTick(); restoring.value = false;
   if (queryString(route.query.shared) === "1") { showAdvanced.value = true; sharedLinkOpened.value = true; shareModalOpen.value = true; }
-  await load(false);
+  await feedReady;
   if (requestedPage > 1) await restoreToPage(requestedPage);
   pageRestoring.value = false;
   if (sharedAdvId) await openSharedListingByPublicId(sharedAdvId);

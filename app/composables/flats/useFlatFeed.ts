@@ -8,6 +8,19 @@ import { useFeedPolling } from "~/composables/search/useFeedPolling";
 // parameter, and the two used to collide. The inner one shadowed this, so
 // `options.onAvailabilityChecked?.()` inside loadFeed silently resolved to
 // undefined and the availability cache was never refreshed from feed responses.
+// A first page the browser has already been given. The Nuxt route caches
+// upstream responses too, but it answers with `Cache-Control: no-store`, so
+// without this every re-visited filter combination still costs a full round
+// trip -- and toggling a checkbox off and back on is the commonest thing a
+// person does while narrowing a search.
+const FEED_CACHE_TTL_MS = 60_000;
+const FEED_CACHE_MAX_ENTRIES = 40;
+
+/** Stable regardless of the order buildFeedParams happened to insert keys in. */
+export function feedCacheKey(params: Record<string, string>): string {
+  return new URLSearchParams([...Object.entries(params)].sort(([a], [b]) => a.localeCompare(b))).toString();
+}
+
 export function useFlatFeed(feedOptions: { onAvailabilityChecked?: (keys: string[]) => void } = {}) {
   const listings = ref<FlatListing[]>([]);
   const total = ref(0);
@@ -22,11 +35,55 @@ export function useFlatFeed(feedOptions: { onAvailabilityChecked?: (keys: string
   const loadMoreSentinel = ref<HTMLElement | null>(null);
   const requests = useLatestRequest();
   let statisticsRequestId = 0;
+  const responseCache = new Map<string, { at: number; data: FlatFeedResult }>();
+
+  function readFeedCache(params: Record<string, string>): FlatFeedResult | undefined {
+    const entry = responseCache.get(feedCacheKey(params));
+    if (!entry) return undefined;
+    if (Date.now() - entry.at > FEED_CACHE_TTL_MS) {
+      responseCache.delete(feedCacheKey(params));
+      return undefined;
+    }
+    return entry.data;
+  }
+
+  /** Lets the page skip its own filter debounce for an answer already in hand. */
+  function isFeedCached(params: Record<string, string>): boolean {
+    return readFeedCache(params) !== undefined;
+  }
+
+  function writeFeedCache(params: Record<string, string>, data: FlatFeedResult) {
+    // A still-warming upstream response is a placeholder, not an answer.
+    if (data.warming) return;
+    const key = feedCacheKey(params);
+    responseCache.delete(key);
+    responseCache.set(key, { at: Date.now(), data });
+    // Insertion-ordered, so the oldest key is the first one out.
+    while (responseCache.size > FEED_CACHE_MAX_ENTRIES) {
+      const oldest = responseCache.keys().next().value;
+      if (oldest === undefined) break;
+      responseCache.delete(oldest);
+    }
+  }
+
+  /** Paints a cached first page. Mirrors the non-append branch of loadFeed. */
+  function applyFirstPage(data: FlatFeedResult) {
+    nextCursor.value = data.nextCursor || null;
+    listings.value = Array.isArray(data.listings) ? data.listings : [];
+    total.value = data.count ?? listings.value.length;
+    sourceErrors.value = data.sourceErrors || [];
+    warming.value = !!data.warming;
+    if (data.statistics) void setStatisticsWithoutViewportJump(data.statistics);
+  }
 
   const polling = useFeedPolling<Record<string, string>>({
     onWarmPoll: (params) => {
       void loadFeed(params, { background: true });
     },
+    // The flat-finder page debounces every filter interaction itself, at a
+    // longer interval chosen for its own uncached-query costs. Keeping this
+    // second one only added its delay to that one before anything was sent.
+    filterDebounceMs: 0,
   });
 
   function resetFirstPageState() {
@@ -85,6 +142,22 @@ export function useFlatFeed(feedOptions: { onAvailabilityChecked?: (keys: string
   ): Promise<FlatFeedResult | undefined> {
     const append = !!options.append;
     const background = !!options.background;
+
+    // Cache hit: paint now, then revalidate behind the result. The visitor sees
+    // the previous answer to this exact question immediately instead of a
+    // spinner, and a changed upstream still lands a moment later.
+    if (!append && !background) {
+      const cached = readFeedCache(params);
+      if (cached) {
+        requests.next();
+        applyFirstPage(cached);
+        loading.value = false;
+        loadingMore.value = false;
+        failed.value = false;
+        void loadFeed(params, { background: true });
+        return cached;
+      }
+    }
 
     // Show the pending state before the debounce, not after it. The filter
     // debounce here stacks on top of the page's own one, so the results grid
@@ -148,6 +221,7 @@ export function useFlatFeed(feedOptions: { onAvailabilityChecked?: (keys: string
     if (background) {
       if (!append) {
         total.value = data.count ?? total.value;
+        writeFeedCache(params, data);
       }
       sourceErrors.value = data.sourceErrors || [];
       if (data.statistics) {
@@ -190,6 +264,7 @@ export function useFlatFeed(feedOptions: { onAvailabilityChecked?: (keys: string
     warming.value = !!data.warming;
     loading.value = false;
     loadingMore.value = false;
+    if (!append) writeFeedCache(params, data);
 
     if (wantsStatistics) {
       void loadStatistics(params, currentStatisticsRequestId);
@@ -217,5 +292,6 @@ export function useFlatFeed(feedOptions: { onAvailabilityChecked?: (keys: string
     nextCursor,
     loadMoreSentinel,
     loadFeed,
+    isFeedCached,
   };
 }
