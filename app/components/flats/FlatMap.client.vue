@@ -152,6 +152,33 @@ const showCity = ref(true);
 const selectedDistrictName = ref<string | null>(null);
 let mapFeedSequence = 0;
 let lastMapFeedKey = "";
+// Mirrors the feed's own client cache (useFlatFeed): a re-visited filter
+// combination -- most commonly a checkbox toggled off and back on -- repaints
+// the pins immediately instead of waiting on a network round trip, even though
+// the server itself answers it from its own 30s cache.
+const MAP_FEED_CACHE_TTL_MS = 60_000;
+const MAP_FEED_CACHE_MAX_ENTRIES = 40;
+const mapFeedCache = new Map<string, { at: number; points: FlatPoint[] }>();
+
+function readMapFeedCache(key: string): FlatPoint[] | undefined {
+  const entry = mapFeedCache.get(key);
+  if (!entry) return undefined;
+  if (Date.now() - entry.at > MAP_FEED_CACHE_TTL_MS) {
+    mapFeedCache.delete(key);
+    return undefined;
+  }
+  return entry.points;
+}
+
+function writeMapFeedCache(key: string, points: FlatPoint[]) {
+  mapFeedCache.delete(key);
+  mapFeedCache.set(key, { at: Date.now(), points });
+  while (mapFeedCache.size > MAP_FEED_CACHE_MAX_ENTRIES) {
+    const oldest = mapFeedCache.keys().next().value;
+    if (oldest === undefined) break;
+    mapFeedCache.delete(oldest);
+  }
+}
 
 function pointKey(point: Pick<FlatPoint, "id" | "source" | "country">): string {
   return `${point.source || ""}:${point.country || ""}:${point.id}`;
@@ -174,6 +201,20 @@ function normalizedRouteQuery(): Record<string, string> {
   return query;
 }
 
+function shapeMapPoints(data: FlatMapFeedResult | undefined): FlatPoint[] {
+  return (data?.mapPoints || [])
+    .filter((point) => Number.isFinite(Number(point.lat)) && Number.isFinite(Number(point.lng)))
+    .map((point) => ({
+      id: String(point.id),
+      source: point.source,
+      country: point.country,
+      lat: Number(point.lat),
+      lng: Number(point.lng),
+      title: point.title || "",
+      priceLabel: fallbackPriceLabel(point),
+    }));
+}
+
 async function loadFullMapFeed() {
   if (!import.meta.client) return;
   const query = normalizedRouteQuery();
@@ -181,23 +222,25 @@ async function loadFullMapFeed() {
   if (key === lastMapFeedKey && remotePoints.value.length) return;
   lastMapFeedKey = key;
   const sequence = ++mapFeedSequence;
+
+  const cached = readMapFeedCache(key);
+  if (cached) {
+    // Paint the held answer now, then quietly confirm it is still current. A
+    // network error on the revalidation leaves the cached pins on screen
+    // rather than clearing them -- see the catch below.
+    remotePoints.value = cached;
+  }
+
   try {
     const data = await $fetch<FlatMapFeedResult>("/flats-map", { query });
     if (sequence !== mapFeedSequence) return;
-    remotePoints.value = (data?.mapPoints || [])
-      .filter((point) => Number.isFinite(Number(point.lat)) && Number.isFinite(Number(point.lng)))
-      .map((point) => ({
-        id: String(point.id),
-        source: point.source,
-        country: point.country,
-        lat: Number(point.lat),
-        lng: Number(point.lng),
-        title: point.title || "",
-        priceLabel: fallbackPriceLabel(point),
-      }));
+    const points = shapeMapPoints(data);
+    remotePoints.value = points;
+    writeMapFeedCache(key, points);
   } catch {
-    // The already-loaded page points remain a complete fallback when the compact
-    // map request is unavailable; never take the map down with the secondary feed.
+    // The already-loaded page points (or the cached pins painted above) remain
+    // a complete fallback when the compact map request is unavailable; never
+    // take the map down with the secondary feed.
   }
 }
 

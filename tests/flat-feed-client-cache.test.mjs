@@ -61,3 +61,19 @@ test('map watchers do not deep-traverse zone boundaries on every tick', async ()
   // the URL cannot trigger a refetch at all.
   assert.match(map, /watch\(\(\) => new URLSearchParams\(normalizedRouteQuery\(\)\)\.toString\(\), \(\) => \{ void loadFullMapFeed\(\); \}\)/);
 });
+
+test('the map feed is cached client-side too, and revalidated behind the paint', async () => {
+  const map = await readFile(new URL('../app/components/flats/FlatMap.client.vue', import.meta.url), 'utf8');
+  assert.match(map, /const cached = readMapFeedCache\(key\);/);
+  assert.match(map, /remotePoints\.value = cached;/);
+  // The fetch still runs after a cache hit -- this is stale-while-revalidate,
+  // not stale-instead-of-fetching.
+  assert.match(map, /const data = await \$fetch<FlatMapFeedResult>\("\/flats-map", \{ query \}\);/);
+  assert.match(map, /writeMapFeedCache\(key, points\);/);
+  // A network failure must not wipe pins the cache already supplied.
+  assert.match(map, /the cached pins painted above\) remain/);
+});
+
+test('the URL sync that drives the map does not lag an already-painted list', () => {
+  assert.match(page, /scheduleQuerySync\(isFeedCached\(currentFeedParams\(\)\) \? 0 : undefined\)/);
+});

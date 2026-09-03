@@ -919,7 +919,15 @@ const restoring = ref(true);
 // listing them all again here and forgetting one.
 watch(
     () => JSON.stringify(currentFilterQuery()),
-    () => { if (!restoring.value) scheduleQuerySync(); },
+    () => {
+      if (restoring.value) return;
+      // The map watches route.query, not the filters directly, so its refetch
+      // rides on this sync landing. Left at the default 180ms, an already-cached
+      // filter combination painted the list instantly but left the map markers
+      // stale for up to 180ms behind it -- matching load()'s own skip keeps the
+      // two in step instead of one trailing the other for no reason.
+      scheduleQuerySync(isFeedCached(currentFeedParams()) ? 0 : undefined);
+    },
 );
 // Metro/microdistrict/quartal/area selections are finer-grained than district, so
 // whichever one the user picks (from the map or these filter dropdowns) should
