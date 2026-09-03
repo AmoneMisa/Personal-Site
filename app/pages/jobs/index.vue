@@ -551,6 +551,7 @@ const vacRows = computed<VacancySpecRow[]>(() => {
   });
   const rows = [
     row("overview", t("vCompany"), vStr(j.company), "i-lucide-building-2"),
+    row("overview", t("vEmployerType"), employerTypeLabel(j.employerType) || t("notSpecified"), "i-lucide-shield-check"),
     row("overview", t("vSource"), jobSourceLabel(j.source), "i-lucide-external-link"),
     row("overview", t("vPublished"), timeAgo(j.postedAt), "i-lucide-calendar-days"),
     row("overview", t("vDeadline"), vStr(j.deadline), "i-lucide-calendar-clock"),
@@ -812,35 +813,9 @@ onBeforeUnmount(() => {
     <SearchDetailsModal v-model:open="jobModalOpen" :title="activeJob?.title || ''" :public-id="jobPublicId(activeJob)">
       <template #body>
         <div v-if="activeJob" class="job-modal">
-          <div class="job-modal__meta text-muted">
-            <span class="job-card__company">{{ activeJob.company }}</span>
-            <span class="job-card__dot">·</span>
-            <span>{{ activeJob.location }}</span>
-            <span class="job-card__dot">·</span>
-            <span>{{ timeAgo(activeJob.postedAt) }}</span>
-            <span v-if="employerTypeLabel(activeJob.employerType)" class="job-card__badge job-card__badge_source">{{ employerTypeLabel(activeJob.employerType) }}</span>
-          </div>
           <div class="job-modal__badges">
-            <span v-if="empLabel(activeJob.employmentKind)" class="job-card__badge job-card__badge_mode">{{ empLabel(activeJob.employmentKind) }}</span>
-            <span v-if="modeLabel(activeJob.workMode)" class="job-card__badge">{{ modeLabel(activeJob.workMode) }}</span>
-            <span v-else-if="activeJob.remote" class="job-card__badge">{{ t("remote") }}</span>
-            <span v-if="seniorityLabel(activeJob.seniority)" class="job-card__badge job-card__badge_seniority">{{ seniorityLabel(activeJob.seniority) }}</span>
-            <span v-if="activeJob.managementRole" class="job-card__badge job-card__badge_management">{{ t("management") }}</span>
             <span v-if="isToday(activeJob.postedAt)" class="job-card__badge job-card__badge_new">{{ t("newToday") }}</span>
-            <span v-if="activeJob.experienceMinYears !== undefined && activeJob.experienceMinYears > 0" class="job-card__badge job-card__badge_exp">{{ t("experienceYears", { n: activeJob.experienceMinYears }) }}</span>
-            <span v-if="activeJob.foreignerFriendly" class="job-card__badge job-card__badge_visa">{{ t("cardForeigner") }}</span>
             <span v-if="activeJob.suspicious" class="job-card__badge job-card__badge_suspicious" :title="suspicionHint(activeJob)">⚠ {{ t("suspicious") }}</span>
-            <span v-if="activeJob.relocation === 'offered'" class="job-card__badge job-card__badge_reloc">{{ t("cardReloc") }}</span>
-            <span v-if="formatSalary(activeJob)" class="job-card__badge job-card__badge_salary">{{ t("salaryDisclosed") }}</span>
-            <span v-if="activeJob.salaryNegotiable" class="job-card__badge job-card__badge_salary">{{ t("salaryNegotiable") }}</span>
-            <span v-if="formatSalary(activeJob)" class="job-card__salary">{{ formatSalary(activeJob) }}</span>
-            <span v-if="convertedSalary(activeJob)" class="job-card__salary job-card__salary_conv">{{ convertedSalary(activeJob) }}</span>
-          </div>
-          <div v-if="activeJob.languages && activeJob.languages.length" class="job-card__langs text-muted job-modal__langs">
-            <u-icon name="i-lucide-languages" class="job-card__lang-icon" />
-            <span v-for="l in activeJob.languages" :key="l.language" class="job-card__lang">
-              {{ l.language }}<template v-if="l.level"> ({{ l.level }})</template>
-            </span>
           </div>
           <UiSpecTable :rows="vacRows" :hide-empty-label="t('hideEmpty')" :empty-value="t('notSpecified')" />
           <div v-if="activeJob.description && canTranslateJob" class="job-modal__translation">

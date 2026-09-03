@@ -710,7 +710,7 @@ onBeforeUnmount(() => {
 
     </UiResultsLoader>
 
-    <SearchDetailsModal v-model:open="modalOpen" :title="active?.name || active?.role || t('notSpecified')" :public-id="candidatePublicId(active)">
+    <SearchDetailsModal v-model:open="modalOpen" :title="active?.role || t('notSpecified')" :public-id="candidatePublicId(active)">
       <template #title>
         <h2 class="hiring-modal__title">{{ active?.name || active?.role || t("notSpecified") }}</h2>
         <p v-if="active?.name && active?.role" class="hiring-modal__role">{{ active.role }}</p>
