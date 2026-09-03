@@ -3,6 +3,7 @@ import type { useFlatFilters } from "~/composables/flats/useFlatFilters";
 import type { FlatSort } from "~/types/flats";
 import { queryBoolean, queryString } from "~/utils/queryParams";
 import { useSearchRouteState } from "../search/useSearchRouteState";
+import { normalizeBearing } from "~/composables/flats/useMetroProximity";
 
 const FLAT_SORTS: FlatSort[] = ["newest", "oldest", "priceAsc", "priceDesc", "titleAsc", "titleDesc"];
 const SOCIAL_FLAT_SOURCES = ["facebook", "threads"];
@@ -26,7 +27,7 @@ export function useFlatRouteState(options: {
       commissionPercentMin, commissionPercentMax, sort, priceMin, priceMax, displayCurrency, roomsMin,
       roomsMax, bedroomsMin, bedroomsMax, areaMin, areaMax, pricePerSqmMin, pricePerSqmMax,
       metroMaxM, nearbyKind, nearbyMaxM, floorMin, floorMax, totalFloorsMin, totalFloorsMax,
-      yearMin, yearMax, maxAgeDays, query, source,
+      yearMin, yearMax, maxAgeDays, query, source, metroBearingFrom, metroBearingTo,
     } = filters;
     if (countries.value.length) q.countries = countries.value[0]!;
     if (city.value) q.city = city.value;
@@ -34,7 +35,12 @@ export function useFlatRouteState(options: {
     if (microdistrict.value) q.microdistrict = microdistrict.value;
     if (quartal.value) q.quartal = quartal.value;
     if (mapArea.value) q.area = mapArea.value;
-    if (metro.value) q.metro = metro.value;
+    if (metro.value.length) q.metro = metro.value.join(",");
+    // Both ends or neither: half an arc is not a filter, and writing one alone
+    // would restore as a wedge of undefined width.
+    if (metroBearingFrom.value != null && metroBearingTo.value != null) {
+      q.metroArc = `${Math.round(metroBearingFrom.value)},${Math.round(metroBearingTo.value)}`;
+    }
     if (propertyType.value !== "any") q.propertyType = propertyType.value;
     if (dealType.value !== "any") q.dealType = dealType.value;
     if (agency.value !== "any") q.agency = agency.value;
@@ -87,7 +93,16 @@ export function useFlatRouteState(options: {
     filters.dealType.value = ["sale", "longRent", "roomRent", "shortRent"].includes(queryString(params.dealType)) ? queryString(params.dealType) : "any";
     filters.agency.value = ["owner", "agency"].includes(queryString(params.agency)) ? queryString(params.agency) : "any";
     filters.audience.value = ["women", "men", "family"].includes(queryString(params.audience)) ? queryString(params.audience) : "any";
-    filters.metro.value = queryString(params.metro);
+    filters.metro.value = queryString(params.metro)
+      .split(",")
+      .map((station) => station.trim())
+      .filter(Boolean);
+    const arc = queryString(params.metroArc).split(",");
+    const arcFrom = Number(arc[0]);
+    const arcTo = Number(arc[1]);
+    const arcValid = arc.length === 2 && Number.isFinite(arcFrom) && Number.isFinite(arcTo);
+    filters.metroBearingFrom.value = arcValid ? normalizeBearing(arcFrom) : undefined;
+    filters.metroBearingTo.value = arcValid ? normalizeBearing(arcTo) : undefined;
     filters.petFriendly.value = queryBoolean(params.pets);
     filters.roomOnlyFilter.value = queryBoolean(params.roomOnly);
     filters.onlyWithPhotos.value = queryBoolean(params.withPhotos);

@@ -2,6 +2,13 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import type { FlatMapFeedResult, FlatMapPoint } from "~/types/flats";
 import { primaryBoundaryGeometry } from "~/utils/mapBoundaryFocus";
+import {
+  bearingBetween,
+  destinationPoint,
+  metresBetween,
+  normalizeBearing,
+  sectorPolygon,
+} from "~/composables/flats/useMetroProximity";
 import type * as LeafletNS from "leaflet";
 
 // Bundled from npm (same-origin, cached, no third-party round trip) but imported
@@ -70,8 +77,10 @@ const props = defineProps<{
   selectedMicrodistrict?: string;
   selectedQuartal?: string;
   selectedArea?: string;
-  selectedMetro?: string;
+  selectedMetros?: string[];
   selectedMetroRadiusM?: number;
+  metroBearingFrom?: number;
+  metroBearingTo?: number;
   districtsLabel?: string;
   microdistrictsLabel?: string;
   quartalsLabel?: string;
@@ -81,12 +90,22 @@ const props = defineProps<{
   parksLabel?: string;
   areasLabel?: string;
   cityLabel?: string;
+  metroRadiusHandleLabel?: string;
+  metroArcHandleLabel?: string;
 }>();
 
 const emit = defineEmits<{
-  (e: "select", id: string): void;
+  // The source travels with the id: listing ids are only unique per source, so
+  // an id alone can resolve to a different advert than the marker that was clicked.
+  (e: "select", identity: { id: string; source?: string }): void;
   (e: "area-change", points: Array<{ lat: number; lng: number }>): void;
   (e: "zone-select", payload: { kind: ZoneKind; name: string; radiusM?: number }): void;
+  // Metro is multi-select, so it toggles one station rather than replacing the
+  // selection the way the single-value zone kinds do.
+  (e: "metro-toggle", name: string): void;
+  // Emitted once per drag, on release: dragging re-renders locally at 60fps and
+  // only the settled value is worth a feed request.
+  (e: "metro-shape", shape: { radiusM: number; bearingFrom?: number; bearingTo?: number }): void;
 }>();
 
 const route = useRoute();
@@ -99,7 +118,18 @@ const ZOOM_CLUSTER_THRESHOLD = 1;
 const CLUSTER_ZOOM_MAX = 19;
 const RADIAL_PAGE_SIZE = 9;
 const FOCUS_ZOOM = 18;
-const DETAIL_QUERY_KEYS = new Set(["flat", "flatSource", "flatCountry", "shared"]);
+// Shown only while no station is chosen, as a hint of the usual walking bands.
+// Once a station is picked the shape becomes free-form and these stop mattering.
+const METRO_PRESET_RINGS = [[1000, "#8b5cf6", .055], [500, "#22c55e", .08], [200, "#f59e0b", .13]] as const;
+const DEFAULT_METRO_RADIUS_M = 500;
+const METRO_MIN_RADIUS_M = 100;
+const METRO_MAX_RADIUS_M = 5000;
+// Query keys that describe *what is open on top of* the results, not which
+// results exist. The map feed must ignore them: `adv`/`flat` are written by
+// syncListingInUrl every time a listing is opened, and `page` by the infinite
+// scroll bookmark, so counting them would refetch and rebuild every marker
+// (and flash the layer) on a click that changed no filter at all.
+const DETAIL_QUERY_KEYS = new Set(["adv", "flat", "flatSource", "flatCountry", "shared", "page"]);
 
 const el = ref<HTMLElement | null>(null);
 const failed = ref(false);
@@ -205,6 +235,18 @@ const radialPageLabel = computed(() => {
   return `${current.page + 1}/${radialPageCount.value}`;
 });
 
+const selectedMetros = computed(() => props.selectedMetros || []);
+
+// While a handle is held, the draft values win over the props so the wedge
+// tracks the pointer without a round trip through the parent and the feed.
+// Cleared on release, which is also when the parent is told the settled shape.
+const draftRadiusM = ref<number | null>(null);
+const draftBearingFrom = ref<number | null>(null);
+const draftBearingTo = ref<number | null>(null);
+const shapeRadiusM = computed(() => draftRadiusM.value ?? props.selectedMetroRadiusM ?? DEFAULT_METRO_RADIUS_M);
+const shapeBearingFrom = computed(() => draftBearingFrom.value ?? props.metroBearingFrom ?? null);
+const shapeBearingTo = computed(() => draftBearingTo.value ?? props.metroBearingTo ?? null);
+
 let map: any = null;
 let layer: any = null;
 let areaLayer: any = null;
@@ -219,6 +261,12 @@ let parkLayer: any = null;
 let zoneAreaLayer: any = null;
 let cityLayer: any = null;
 let lastFitSig = "";
+let metroShapePath: any = null;
+let metroShapeStation: FlatMapZone | null = null;
+let metroRadiusHandle: any = null;
+let metroFromHandle: any = null;
+let metroToHandle: any = null;
+let draggingMetroHandle: any = null;
 
 async function setExpanded(value: boolean) {
   expanded.value = value;
@@ -285,23 +333,42 @@ function onKeydown(event: KeyboardEvent) {
 interface Cluster { lat: number; lng: number; items: FlatPoint[] }
 
 function clusterPoints(): Cluster[] {
-  const clusters: Array<{ x: number; y: number; latSum: number; lngSum: number; items: FlatPoint[] }> = [];
+  // Same greedy "join the first cluster within CLUSTER_PX" rule as before, but
+  // candidates come from a CLUSTER_PX grid instead of the whole cluster list.
+  // Comparing every point against every cluster made this quadratic, and it runs
+  // on every zoomend and every feed change — with a few hundred markers that was
+  // the pause you felt after releasing a zoom.
+  type Cell = { x: number; y: number; latSum: number; lngSum: number; items: FlatPoint[] };
+  const clusters: Cell[] = [];
+  const grid = new Map<string, Cell[]>();
   for (const p of renderedPoints.value) {
     if (!Number.isFinite(p.lat) || !Number.isFinite(p.lng)) continue;
     const pt = map.latLngToContainerPoint([p.lat, p.lng]);
-    let placed = false;
-    for (const c of clusters) {
-      const dx = c.x - pt.x;
-      const dy = c.y - pt.y;
-      if (dx * dx + dy * dy <= CLUSTER_PX * CLUSTER_PX) {
-        c.items.push(p);
-        c.latSum += p.lat;
-        c.lngSum += p.lng;
-        placed = true;
-        break;
+    const cellX = Math.floor(pt.x / CLUSTER_PX);
+    const cellY = Math.floor(pt.y / CLUSTER_PX);
+    let placed: Cell | undefined;
+    // A cluster within CLUSTER_PX can only sit in this cell or one touching it.
+    for (let dx = -1; dx <= 1 && !placed; dx++) {
+      for (let dy = -1; dy <= 1 && !placed; dy++) {
+        for (const c of grid.get(`${cellX + dx}:${cellY + dy}`) || []) {
+          const ox = c.x - pt.x;
+          const oy = c.y - pt.y;
+          if (ox * ox + oy * oy <= CLUSTER_PX * CLUSTER_PX) { placed = c; break; }
+        }
       }
     }
-    if (!placed) clusters.push({ x: pt.x, y: pt.y, latSum: p.lat, lngSum: p.lng, items: [p] });
+    if (placed) {
+      placed.items.push(p);
+      placed.latSum += p.lat;
+      placed.lngSum += p.lng;
+      continue;
+    }
+    const created: Cell = { x: pt.x, y: pt.y, latSum: p.lat, lngSum: p.lng, items: [p] };
+    clusters.push(created);
+    const key = `${cellX}:${cellY}`;
+    const bucket = grid.get(key);
+    if (bucket) bucket.push(created);
+    else grid.set(key, [created]);
   }
   return clusters.map((c) => ({
     lat: c.latSum / c.items.length,
@@ -390,7 +457,7 @@ function openPoint(point: FlatPoint) {
   closeRadial();
   const loaded = props.points.some((candidate) => candidate.id === point.id && (!point.source || candidate.source === point.source));
   if (loaded) {
-    emit("select", point.id);
+    emit("select", { id: point.id, source: point.source });
     return;
   }
   if (!point.source || !point.country) return;
@@ -520,10 +587,13 @@ function selectedName(kind: ZoneKind): string {
   if (kind === "microdistrict") return props.selectedMicrodistrict || "";
   if (kind === "quartal") return props.selectedQuartal || "";
   if (kind === "area") return props.selectedArea || "";
-  return props.selectedMetro || "";
+  // Metro is the one multi-select kind. The single name is only what the map
+  // focuses and anchors the shared radius/arc shape on: the first chosen station.
+  return selectedMetros.value[0] || "";
 }
 
 function isZoneSelected(kind: ZoneKind, name: string): boolean {
+  if (kind === "metro") return selectedMetros.value.includes(name);
   return selectedName(kind) === name;
 }
 
@@ -545,7 +615,7 @@ function emitZoneSelect(kind: ZoneKind, name: string, radiusM?: number) {
 
 function selectedZoneFromProps(): { kind: ZoneKind; zone: FlatMapZone } | null {
   const groups: Array<[ZoneKind, FlatMapZone[] | undefined, string | undefined]> = [
-    ["metro", props.metroStations, props.selectedMetro],
+    ["metro", props.metroStations, selectedMetros.value[0]],
     ["area", props.areaZones, props.selectedArea],
     ["quartal", props.quartalMarkers, props.selectedQuartal],
     ["microdistrict", props.microdistrictMarkers, props.selectedMicrodistrict],
@@ -668,35 +738,210 @@ function nearestMetroStation(point: { lat: number; lng: number }): FlatMapZone |
   return nearest;
 }
 
+function metroToggle(station: FlatMapZone) {
+  closeRadial();
+  if (!isZoneSelected("metro", station.name)) focusZone(station);
+  emit("metro-toggle", station.name);
+}
+
+/** The preset rings, drawn only while nothing is selected yet (discovery mode). */
+function renderMetroPresetRings(station: FlatMapZone) {
+  const L = Leaflet;
+  for (const [radius, color, opacity] of METRO_PRESET_RINGS) {
+    const ring = L.circle([station.lat, station.lng], {
+      radius,
+      color,
+      weight: 1.25,
+      opacity: .75,
+      fillColor: color,
+      fillOpacity: opacity,
+      bubblingMouseEvents: false,
+    }).addTo(metroLayer);
+    ring.bindTooltip(`${station.label} · ${radius} m`, { direction: "top" });
+    ring.on("click", (event: any) => handleLayerClick(event, () => {
+      const point = eventLatLng(event);
+      const nearest = point ? nearestMetroStation(point) : station;
+      if (!nearest) return;
+      focusZone(nearest);
+      // Clicking a preset ring says both things at once: this station, this far.
+      emit("metro-toggle", nearest.name);
+      emit("metro-shape", { radiusM: radius });
+    }));
+  }
+}
+
+function metroShapeTooltip(): string {
+  const from = shapeBearingFrom.value;
+  const to = shapeBearingTo.value;
+  const distance = `${Math.round(shapeRadiusM.value)} m`;
+  if (from == null || to == null) return distance;
+  return `${distance} · ${Math.round(from)}°–${Math.round(to)}°`;
+}
+
+/** Where each handle sits: the radius grip on the arc midpoint, the wedge grips on its edges. */
+function handleBearing(kind: "radius" | "from" | "to"): number {
+  const from = shapeBearingFrom.value;
+  const to = shapeBearingTo.value;
+  if (from == null || to == null) return kind === "from" ? 270 : kind === "to" ? 90 : 0;
+  if (kind === "from") return from;
+  if (kind === "to") return to;
+  return normalizeBearing(from + normalizeBearing(to - from) / 2);
+}
+
+/** Redraws the wedge in place, cheap enough to run on every drag frame. */
+function refreshMetroShape() {
+  if (!metroShapePath || !metroShapeStation) return;
+  const outline = sectorPolygon(
+    metroShapeStation,
+    shapeRadiusM.value,
+    shapeBearingFrom.value ?? undefined,
+    shapeBearingTo.value ?? undefined,
+  ).map((point) => [point.lat, point.lng]);
+  metroShapePath.setLatLngs(outline);
+  metroShapePath.setTooltipContent?.(metroShapeTooltip());
+  const handles: Array<[any, "radius" | "from" | "to"]> = [
+    [metroRadiusHandle, "radius"],
+    [metroFromHandle, "from"],
+    [metroToHandle, "to"],
+  ];
+  for (const [handle, kind] of handles) {
+    // Never fight the grip the pointer is holding.
+    if (!handle || handle === draggingMetroHandle) continue;
+    const at = destinationPoint(metroShapeStation, handleBearing(kind), shapeRadiusM.value);
+    handle.setLatLng([at.lat, at.lng]);
+  }
+}
+
+function makeMetroHandle(station: FlatMapZone, kind: "radius" | "from" | "to") {
+  const L = Leaflet;
+  const at = destinationPoint(station, handleBearing(kind), shapeRadiusM.value);
+  const handle = L.marker([at.lat, at.lng], {
+    draggable: true,
+    keyboard: false,
+    zIndexOffset: 600,
+    icon: L.divIcon({
+      className: "flat-metro-handle-wrap",
+      html: `<span class="flat-metro-handle flat-metro-handle_${kind}"></span>`,
+      iconSize: [18, 18],
+      iconAnchor: [9, 9],
+    }),
+  });
+  handle.bindTooltip(
+    kind === "radius"
+      ? props.metroRadiusHandleLabel || "Drag to set distance"
+      : props.metroArcHandleLabel || "Drag to set direction",
+    { direction: "top" },
+  );
+
+  handle.on("dragstart", () => { draggingMetroHandle = handle; });
+
+  handle.on("drag", () => {
+    const point = handle.getLatLng();
+    const target = { lat: point.lat, lng: point.lng };
+    if (kind === "radius") {
+      // Snapped to 10 m: the filter itself is exact, but a radius that reads
+      // "783 m" in a shared URL is noise dressed up as precision.
+      const metres = metresBetween(station, target);
+      draftRadiusM.value = Math.max(
+        METRO_MIN_RADIUS_M,
+        Math.min(METRO_MAX_RADIUS_M, Math.round(metres / 10) * 10),
+      );
+    } else {
+      // Opening the arc from a full circle anchors the opposite edge 180 degrees
+      // away, so the first drag yields a half-plane rather than a zero-width
+      // sliver that would match nothing.
+      const bearing = normalizeBearing(Math.round(bearingBetween(station, target)));
+      const from = shapeBearingFrom.value;
+      const to = shapeBearingTo.value;
+      if (kind === "from") {
+        draftBearingFrom.value = bearing;
+        draftBearingTo.value = to ?? normalizeBearing(bearing + 180);
+      } else {
+        draftBearingTo.value = bearing;
+        draftBearingFrom.value = from ?? normalizeBearing(bearing - 180);
+      }
+    }
+    refreshMetroShape();
+  });
+
+  handle.on("dragend", () => {
+    draggingMetroHandle = null;
+    // One emit per drag, on release: the shape re-renders locally at pointer
+    // speed, but only the settled value is worth a feed request.
+    emit("metro-shape", {
+      radiusM: shapeRadiusM.value,
+      bearingFrom: shapeBearingFrom.value ?? undefined,
+      bearingTo: shapeBearingTo.value ?? undefined,
+    });
+    draftRadiusM.value = null;
+    draftBearingFrom.value = null;
+    draftBearingTo.value = null;
+  });
+
+  handle.addTo(metroLayer);
+  return handle;
+}
+
+/**
+ * The chosen stations share one shape -- same radius, same arc -- because they
+ * express a single rule ("within 780 m, west side"), so the drag handles are
+ * attached to the first station only. Three grips on every station would be a
+ * thicket, and moving one would have to move the rest anyway.
+ */
+function renderMetroSelection(stations: FlatMapZone[]) {
+  const L = Leaflet;
+  const primary = stations[0];
+  if (!primary) return;
+  metroShapeStation = primary;
+  for (const station of stations) {
+    const outline = L.polygon(
+      sectorPolygon(
+        station,
+        shapeRadiusM.value,
+        shapeBearingFrom.value ?? undefined,
+        shapeBearingTo.value ?? undefined,
+      ).map((point) => [point.lat, point.lng]),
+      {
+        color: "#e0679a",
+        weight: 2,
+        opacity: .95,
+        fillColor: "#e0679a",
+        fillOpacity: .14,
+        bubblingMouseEvents: false,
+      },
+    ).addTo(metroLayer);
+    outline.bindTooltip(`${station.label} · ${metroShapeTooltip()}`, { direction: "top" });
+    outline.on("click", (event: any) => handleLayerClick(event, () => metroToggle(station)));
+    if (station === primary) metroShapePath = outline;
+  }
+  metroRadiusHandle = makeMetroHandle(primary, "radius");
+  metroFromHandle = makeMetroHandle(primary, "from");
+  metroToHandle = makeMetroHandle(primary, "to");
+}
+
 function renderMetro() {
   const L = Leaflet;
   if (!metroLayer || !L) return;
   metroLayer.clearLayers();
+  metroShapePath = null;
+  metroShapeStation = null;
+  metroRadiusHandle = null;
+  metroFromHandle = null;
+  metroToHandle = null;
+  draggingMetroHandle = null;
   if (!showMetro.value) return;
-  for (const station of props.metroStations || []) {
-    const stationSelected = isZoneSelected("metro", station.name);
-    for (const [radius, color, opacity] of [[1000, "#8b5cf6", .055], [500, "#22c55e", .08], [200, "#f59e0b", .13]] as const) {
-      const radiusSelected = stationSelected && Number(props.selectedMetroRadiusM) === radius;
-      const ring = L.circle([station.lat, station.lng], {
-        radius,
-        color,
-        weight: radiusSelected ? 3 : 1.25,
-        opacity: radiusSelected ? 1 : .75,
-        fillColor: color,
-        fillOpacity: radiusSelected ? Math.min(.24, opacity + .11) : opacity,
-        bubblingMouseEvents: false,
-      }).addTo(metroLayer);
-      ring.bindTooltip(`${station.label} · ${radius} m`, { direction: "top" });
-      if (radiusSelected) ring.openTooltip?.();
-      ring.on("click", (event: any) => handleLayerClick(event, () => {
-        const point = eventLatLng(event);
-        const nearest = point ? nearestMetroStation(point) : station;
-        if (!nearest) return;
-        const togglingOff = isZoneSelected("metro", nearest.name) && Number(props.selectedMetroRadiusM) === radius;
-        if (!togglingOff) focusZone(nearest);
-        emitZoneSelect("metro", nearest.name, radius);
-      }));
-    }
+
+  const stations = props.metroStations || [];
+  const chosen = stations.filter((station) => isZoneSelected("metro", station.name));
+  // Once stations are chosen the other ~30 stop being drawn. Their overlapping
+  // rings are what made the map unreadable, and they are no longer part of the
+  // question being asked; clearing the selection brings them all back.
+  const visible = chosen.length ? chosen : stations;
+  if (chosen.length) renderMetroSelection(chosen);
+
+  for (const station of visible) {
+    const stationSelected = chosen.length > 0;
+    if (!stationSelected) renderMetroPresetRings(station);
     const marker = L.circleMarker([station.lat, station.lng], {
       radius: stationSelected ? 8 : 6,
       color: "#fff",
@@ -705,12 +950,14 @@ function renderMetro() {
       fillOpacity: 1,
       bubblingMouseEvents: false,
     });
-    marker.bindTooltip(`${station.label} · 200 / 500 / 1000 m`, { direction: "top" });
+    marker.bindTooltip(
+      stationSelected
+        ? `${station.label} · ${metroShapeTooltip()}`
+        : `${station.label} · 200 / 500 / 1000 m`,
+      { direction: "top" },
+    );
     if (stationSelected) marker.openTooltip?.();
-    marker.on("click", (event: any) => handleLayerClick(event, () => {
-      if (!stationSelected) focusZone(station);
-      emitZoneSelect("metro", station.name);
-    }));
+    marker.on("click", (event: any) => handleLayerClick(event, () => metroToggle(station)));
     marker.addTo(metroLayer);
   }
 }
@@ -855,11 +1102,14 @@ onMounted(async () => {
   else fitToPoints();
 });
 
-watch(renderedPoints, () => { renderMarkers(); fitToPoints(); }, { deep: true });
+// Not deep: renderedPoints rebuilds its array (and so changes identity) whenever
+// anything it depends on changes, so a deep traversal of every point on every
+// check only costs time.
+watch(renderedPoints, () => { renderMarkers(); fitToPoints(); });
 watch(() => route.query, () => { void loadFullMapFeed(); }, { deep: true });
 watch(() => [props.districtZones, props.microdistrictMarkers, props.quartalMarkers, props.metroStations, props.universityZones, props.shoppingMallZones, props.parkZones, props.areaZones, props.cityZone], () => syncSelectionFromProps(false), { deep: true });
 watch(
-  () => [props.selectedDistrict, props.selectedMicrodistrict, props.selectedQuartal, props.selectedArea, props.selectedMetro, props.selectedMetroRadiusM],
+  () => [props.selectedDistrict, props.selectedMicrodistrict, props.selectedQuartal, props.selectedArea, selectedMetros.value.join(","), props.selectedMetroRadiusM, props.metroBearingFrom, props.metroBearingTo],
   (next, previous) => {
     const changed = next.some((value, index) => value !== previous?.[index]);
     if (changed) syncSelectionFromProps(Boolean(selectedZoneFromProps()));
@@ -922,8 +1172,11 @@ onBeforeUnmount(() => {
         <button v-if="cityZone?.boundary" type="button" class="flat-map__tool" :class="{ 'flat-map__tool_active': showCity }" @click="showCity = !showCity">
           <span>{{ props.cityLabel || "City" }}</span>
         </button>
-        <button v-if="districtZones?.length" type="button" class="flat-map__tool flat-map__tool_active" @click="showMicrodistricts = !showMicrodistricts">
-          <span>{{ showMicrodistricts ? `${props.districtsLabel || 'Districts'} + ${props.microdistrictsLabel || 'Microdistricts'}` : (props.districtsLabel || 'Districts') }}</span>
+        <button v-if="districtZones?.length" type="button" class="flat-map__tool" :class="{ 'flat-map__tool_active': showDistricts }" @click="showDistricts = !showDistricts">
+          <span>{{ props.districtsLabel || "Districts" }}</span>
+        </button>
+        <button v-if="microdistrictMarkers?.length" type="button" class="flat-map__tool" :class="{ 'flat-map__tool_active': showMicrodistricts }" @click="showMicrodistricts = !showMicrodistricts">
+          <span>{{ props.microdistrictsLabel || "Microdistricts" }}</span>
         </button>
         <button v-if="quartalMarkers?.length" type="button" class="flat-map__tool" :class="{ 'flat-map__tool_active': showQuartals }" @click="showQuartals = !showQuartals">
           <span>{{ props.quartalsLabel || "Quartals" }}</span>
@@ -1048,6 +1301,25 @@ onBeforeUnmount(() => {
 }
 @keyframes flat-cluster-in {
   from { opacity: 0; transform: scale(0.45); }
+}
+
+/* Drag grips for the metro shape. Sized for a fingertip rather than the 8px the
+   dot itself needs: the wrapper is the 18px hit area, the dot inside is what
+   you see. */
+:deep(.flat-metro-handle-wrap) { cursor: grab; }
+:deep(.flat-metro-handle-wrap:active) { cursor: grabbing; }
+:deep(.flat-metro-handle) {
+  display: block; width: 14px; height: 14px; margin: 2px; border-radius: 50%;
+  background: #fff; border: 3px solid #e0679a; box-sizing: border-box;
+  box-shadow: 0 1px 5px rgba(0,0,0,0.45);
+}
+/* The distance grip is round, the two arc grips are diamonds, so which one is
+   under the finger is obvious without reading a tooltip. */
+:deep(.flat-metro-handle_from), :deep(.flat-metro-handle_to) {
+  border-radius: 3px; transform: rotate(45deg); border-color: #8b5cf6;
+}
+@media (pointer: coarse) {
+  :deep(.flat-metro-handle) { width: 18px; height: 18px; margin: 0; }
 }
 
 .flat-radial { position: fixed; inset: 0; z-index: 9000; }

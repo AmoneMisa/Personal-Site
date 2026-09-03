@@ -16,8 +16,10 @@ test("country and city changes clear only location-scoped filters", () => {
 
   for (const pattern of [
     /district\.value = ""/,
-    /metro\.value = ""/,
+    /metro\.value = \[\]/,
     /metroMaxM\.value = undefined/,
+    /metroBearingFrom\.value = undefined/,
+    /metroBearingTo\.value = undefined/,
     /nearbyKind\.value = ""/,
     /nearbyMaxM\.value = undefined/,
     /query\.value = ""/,

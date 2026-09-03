@@ -49,10 +49,11 @@ export function useFlatMeta(options: FlatMetaOptions) {
     { label: options.t("districtAny"), value: "__any__" },
     ...districtOptions.value.map((district) => ({ label: options.locationLabel(district, "district"), value: district })),
   ]);
-  const metroItems = computed<SelectOption[]>(() => [
-    { label: options.t("metroAny"), value: "__any__" },
-    ...metroOptions.value.map((metro) => ({ label: options.locationLabel(metro, "metro"), value: metro })),
-  ]);
+  // No "any" sentinel: metro is a multi-select, where an empty selection already
+  // means every station, and an "Any" chip sitting among the chosen ones reads
+  // as a contradiction.
+  const metroItems = computed<SelectOption[]>(() =>
+    metroOptions.value.map((metro) => ({ label: options.locationLabel(metro, "metro"), value: metro })));
 
   async function loadMeta() {
     const { data } = await safeFetch<FlatCountryMeta[]>("/flats-meta");

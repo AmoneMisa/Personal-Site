@@ -1,6 +1,16 @@
 <script setup lang="ts">
 import { safeFetch } from "~/utils/safeFetch";
 import { metroLabelWithAlias, locationLabel, zoneNameLabel, type LocationKind } from "~/utils/locationLabels";
+import {
+  applyMetroProximity,
+  arcForCompassPoint,
+  compassPointFor,
+  COMPASS_ORDER,
+  DEFAULT_METRO_RADIUS_M,
+  normalizeBearing,
+  type CompassPoint,
+  type MetroProximity,
+} from "~/composables/flats/useMetroProximity";
 import FlatMap from "~/components/flats/FlatMap.client.vue";
 import FlatCard from "~/components/flats/FlatCard.vue";
 import SearchResultGrid from "~/components/search/SearchResultGrid.vue";
@@ -76,7 +86,7 @@ const {
   noElevatorOnly, noDepositOnly, communalIncludedOnly, noCommissionOnly,
   tvOnly, microwaveOnly, ovenOnly, bidetOnly, walkInClosetOnly, bathtubOnly, showerOnly, euroLayoutOnly, sort,
   metro, priceMin, priceMax, roomsMin,
-  metroMaxM, nearbyKind,
+  metroMaxM, metroBearingFrom, metroBearingTo, nearbyKind,
   displayCurrency, query, source, showAdvanced, buildFeedParams, resetValues: resetFilterValues,
 } = flatFilters;
 const rates = ref<Record<string, number>>({ USD: 1 });
@@ -180,6 +190,7 @@ const {
 const {
   districtZones, microdistrictMarkers, quartalMarkers, metroStations,
   universityZones, shoppingMallZones, parkZones, areaZones, cityZone,
+  districtForPoint,
 } = useDistrictZones({
   countries,
   city,
@@ -187,17 +198,52 @@ const {
   locale: () => String(locale.value),
 });
 
-function onZoneSelect({ kind, name, radiusM }: { kind: "district" | "microdistrict" | "quartal" | "area" | "metro"; name: string; radiusM?: number }) {
+function onZoneSelect({ kind, name }: { kind: "district" | "microdistrict" | "quartal" | "area" | "metro"; name: string; radiusM?: number }) {
   if (kind === "district") district.value = name;
   else if (kind === "microdistrict") microdistrict.value = name;
   else if (kind === "quartal") quartal.value = name;
   else if (kind === "area") mapArea.value = name;
-  else {
-    metro.value = name;
-    if (!name) metroMaxM.value = undefined;
-    else if (radiusM != null) metroMaxM.value = radiusM;
+  scheduleLoad(0);
+}
+
+/** Metro is multi-select: a click adds or removes one station. */
+function onMetroToggle(name: string) {
+  if (!name) return;
+  const next = metro.value.includes(name)
+    ? metro.value.filter((station) => station !== name)
+    : [...metro.value, name];
+  metro.value = next;
+  if (!next.length) {
+    // The radius and the arc only mean something relative to a station.
+    metroMaxM.value = undefined;
+    metroBearingFrom.value = undefined;
+    metroBearingTo.value = undefined;
+  } else if (metroMaxM.value == null) {
+    metroMaxM.value = DEFAULT_METRO_RADIUS_M;
   }
   scheduleLoad(0);
+}
+
+/** One settled drag of the radius or arc handles. */
+function onMetroShape({ radiusM, bearingFrom, bearingTo }: { radiusM: number; bearingFrom?: number; bearingTo?: number }) {
+  metroMaxM.value = Math.round(radiusM);
+  metroBearingFrom.value = bearingFrom == null ? undefined : Math.round(bearingFrom);
+  metroBearingTo.value = bearingTo == null ? undefined : Math.round(bearingTo);
+  scheduleLoad(0);
+}
+
+function clearMetroFilter() {
+  metro.value = [];
+  metroMaxM.value = undefined;
+  metroBearingFrom.value = undefined;
+  metroBearingTo.value = undefined;
+  scheduleLoad();
+}
+
+function clearMetroArc() {
+  metroBearingFrom.value = undefined;
+  metroBearingTo.value = undefined;
+  scheduleLoad();
 }
 
 const SOURCES = ["olx", "telegram"];
@@ -212,7 +258,57 @@ const nearbyKindItems = computed<Item[]>(() => [
   { label: t("nearbyKindAny"), value: ANY_SELECT_VALUE },
   ...NEARBY_KINDS.map((kind) => ({ value: kind, label: t(`nearbyKind_${kind}`) })),
 ]);
+// Sentinel for an arc that came from a drag and matches none of the eight
+// compass slices. Shown so the select never lies about the active filter, but
+// never selectable back into -- you get a custom arc by dragging, not by picking.
+const METRO_CUSTOM_ARC_VALUE = "__custom__";
 const nearbyKindSel = useNullableSelect(nearbyKind);
+const metroChipLabel = computed(() => metro.value.map((name) => metroLabelWithAlias(name, locale.value) || name).join(", "));
+// The arc is normally set by dragging the wedge handles. This mirror of it keeps
+// the filter reachable without a pointer, and gives the chip something readable:
+// a dragged arc that is not one of the eight slices still shows its degrees.
+const metroDirectionSel = computed<string>({
+  get: () => {
+    if (metroBearingFrom.value == null || metroBearingTo.value == null) return ANY_SELECT_VALUE;
+    const point = compassPointFor(metroBearingFrom.value, metroBearingTo.value);
+    // Compared with a degree of slack, not exactly: the compass slices fall on
+    // half-degrees (247.5-292.5 for west) and the query string carries whole
+    // degrees, so an exact test would demote "West side" to a custom arc the
+    // first time the filter came back from a URL.
+    const preset = arcForCompassPoint(point);
+    const apart = (a: number, b: number) => Math.abs(((normalizeBearing(a - b) + 180) % 360) - 180);
+    const matches = apart(preset.from, metroBearingFrom.value) <= 1
+      && apart(preset.to, metroBearingTo.value) <= 1;
+    return matches ? point : METRO_CUSTOM_ARC_VALUE;
+  },
+  set: (value) => {
+    if (value === METRO_CUSTOM_ARC_VALUE) return;
+    if (!value || value === ANY_SELECT_VALUE) {
+      metroBearingFrom.value = undefined;
+      metroBearingTo.value = undefined;
+      return;
+    }
+    const arc = arcForCompassPoint(value as CompassPoint);
+    metroBearingFrom.value = arc.from;
+    metroBearingTo.value = arc.to;
+  },
+});
+const metroArcLabel = computed(() => {
+  if (metroBearingFrom.value == null || metroBearingTo.value == null) return "";
+  const point = compassPointFor(metroBearingFrom.value, metroBearingTo.value);
+  const named = t(`compass_${point}`);
+  return metroDirectionSel.value === METRO_CUSTOM_ARC_VALUE
+    ? `${named} (${Math.round(metroBearingFrom.value)}°–${Math.round(metroBearingTo.value)}°)`
+    : named;
+});
+const metroDirectionItems = computed<Item[]>(() => [
+  { label: t("metroDirectionAny"), value: ANY_SELECT_VALUE },
+  ...COMPASS_ORDER.map((point) => ({ value: point, label: t(`compass_${point}`) })),
+  // Only offered once a drag has produced one, and never selectable back into.
+  ...(metroDirectionSel.value === METRO_CUSTOM_ARC_VALUE
+    ? [{ value: METRO_CUSTOM_ARC_VALUE, label: metroArcLabel.value }]
+    : []),
+]);
 const CURRENCY_PRIORITY = ["USD", "EUR", "UZS", "KZT", "UAH", "RON", "GBP", "KGS", "TJS", "TMT", "PLN"];
 const currencyItems = computed<Item[]>(() => {
   const keys = Object.keys(rates.value).filter((c) => /^[A-Z]{3}$/.test(c) && rates.value[c]! > 0);
@@ -239,7 +335,6 @@ const sortItems = computed<Item[]>(() => [
   { value: "titleDesc", label: extraLabels.value.titleDesc },
 ]);
 const districtSel = useNullableSelect(district);
-const metroSel = useNullableSelect(metro);
 const microdistrictSel = useNullableSelect(microdistrict);
 const quartalSel = useNullableSelect(quartal);
 const mapAreaSel = useNullableSelect(mapArea);
@@ -273,13 +368,15 @@ const flatAdvancedFilterBlocks = useFlatFilterBlocks({
   t,
   filters: flatFilters,
   districtSelect: districtSel,
-  metroSelect: metroSel,
+  metroSelect: metro,
   microdistrictSelect: microdistrictSel,
   quartalSelect: quartalSel,
   areaSelect: mapAreaSel,
   nearbyKindSelect: nearbyKindSel,
   districtItems,
   metroItems,
+  metroDirectionSelect: metroDirectionSel,
+  metroDirectionItems,
   microdistrictItems,
   quartalItems,
   areaItems,
@@ -304,11 +401,31 @@ watch(showAdvanced, (value) => {
   try { localStorage.setItem("flats:showAdvanced", value ? "1" : "0"); } catch { /* noop */ }
 });
 
-const activeListings = computed(() => applyDrawnArea(listings.value.filter((item) => !hiddenIds.value.has(item.id))));
+/**
+ * The station coordinates the arc/radius filter measures from. Sourced from the
+ * same catalog the map draws, so the browser filter and the drawn wedge can
+ * never disagree about where a station is.
+ */
+const metroProximity = computed<MetroProximity>(() => ({
+  stations: metro.value
+    .map((name) => metroStations.value.find((station) => station.name === name))
+    .filter((station): station is NonNullable<typeof station> => !!station)
+    .map((station) => ({ name: station.name, lat: station.lat, lng: station.lng })),
+  maxM: metro.value.length > 1 ? metroMaxM.value : undefined,
+  bearingFrom: metroBearingFrom.value,
+  bearingTo: metroBearingTo.value,
+}));
+// Two client-side location filters, applied in the same place: the freehand
+// polygon and the metro radius/arc. Both narrow what the feed already returned.
+// The radius is only re-checked here when several stations are selected --
+// with one station the server already applied metroMaxM, and re-filtering on
+// coordinates the feed may not carry would drop listings the server kept.
+const narrowToArea = (items: Listing[]) => applyMetroProximity(applyDrawnArea(items), metroProximity.value);
+const activeListings = computed(() => narrowToArea(listings.value.filter((item) => !hiddenIds.value.has(item.id))));
 const displayedListings = computed(() => {
-  if (view.value === "favorites") return applyDrawnArea(favorites.value);
-  if (view.value === "recent") return applyDrawnArea(recent.value);
-  if (view.value === "hidden") return applyDrawnArea(hidden.value);
+  if (view.value === "favorites") return narrowToArea(favorites.value);
+  if (view.value === "recent") return narrowToArea(recent.value);
+  if (view.value === "hidden") return narrowToArea(hidden.value);
   return activeListings.value;
 });
 const hasMore = computed(() => view.value === "active" && listings.value.length < total.value);
@@ -565,7 +682,11 @@ function releaseStuckScrollLock() {
   if (body.style.position === "fixed") { const top = body.style.top; body.style.removeProperty("position"); body.style.removeProperty("top"); body.style.removeProperty("width"); const offset = Math.abs(parseInt(top || "0", 10)) || 0; if (offset) window.scrollTo(0, offset); }
   body.style.removeProperty("padding-right"); document.documentElement.style.removeProperty("overflow");
 }
-function openById(id: string) { const found = displayedListings.value.find((l) => l.id === id); if (found) void openListing(found); }
+function openById({ id, source: sourceName }: { id: string; source?: string }) {
+  const found = displayedListings.value.find((l) => l.id === id && (!sourceName || l.source === sourceName))
+    || displayedListings.value.find((l) => l.id === id);
+  if (found) void openListing(found);
+}
 function convert(amount: number, from: string, to: string): number | undefined {
   return convertCurrency(amount, from || "USD", to || "USD", rates.value);
 }
@@ -770,8 +891,26 @@ watch(
     () => JSON.stringify(currentFilterQuery()),
     () => { if (!restoring.value) scheduleQuerySync(); },
 );
-watch(city, () => { if (restoring.value) return; district.value = ""; microdistrict.value = ""; quartal.value = ""; mapArea.value = ""; metro.value = ""; query.value = ""; });
-watch(countries, () => { if (restoring.value) return; district.value = ""; microdistrict.value = ""; quartal.value = ""; mapArea.value = ""; metro.value = ""; city.value = ""; query.value = ""; });
+// Metro/microdistrict/quartal/area selections are finer-grained than district, so
+// whichever one the user picks (from the map or these filter dropdowns) should
+// drag the district selector along with it instead of leaving a stale, unrelated
+// district shown next to it.
+watch([metro, microdistrict, quartal, mapArea], ([nextMetro, nextMicrodistrict, nextQuartal, nextArea], previous) => {
+  if (restoring.value) return;
+  const [prevMetro, prevMicrodistrict, prevQuartal, prevArea] = previous || [];
+  let zone: { lat: number; lng: number } | undefined;
+  // Only the first station drags the district selector along: several stations
+  // can straddle several districts, and there is no single right answer then.
+  if (nextMetro.length && nextMetro[0] !== prevMetro?.[0]) zone = metroStations.value.find((z) => z.name === nextMetro[0]);
+  else if (nextMicrodistrict && nextMicrodistrict !== prevMicrodistrict) zone = microdistrictMarkers.value.find((z) => z.name === nextMicrodistrict);
+  else if (nextQuartal && nextQuartal !== prevQuartal) zone = quartalMarkers.value.find((z) => z.name === nextQuartal);
+  else if (nextArea && nextArea !== prevArea) zone = areaZones.value.find((z) => z.name === nextArea);
+  if (!zone) return;
+  const nextDistrict = districtForPoint(zone);
+  if (nextDistrict && nextDistrict !== district.value) district.value = nextDistrict;
+});
+watch(city, () => { if (restoring.value) return; district.value = ""; microdistrict.value = ""; quartal.value = ""; mapArea.value = ""; metro.value = []; query.value = ""; });
+watch(countries, () => { if (restoring.value) return; district.value = ""; microdistrict.value = ""; quartal.value = ""; mapArea.value = ""; metro.value = []; city.value = ""; query.value = ""; });
 onBeforeUnmount(() => { modalOpen.value = false; lightboxOpen.value = false; releaseStuckScrollLock(); if (loadTimer) clearTimeout(loadTimer); if (sharedListingTimer) clearTimeout(sharedListingTimer); cancelTranslation(); });
 </script>
 
@@ -859,6 +998,8 @@ onBeforeUnmount(() => { modalOpen.value = false; lightboxOpen.value = false; rel
             <button v-if="microdistrict" type="button" class="filter-chip" @click="microdistrict = ''; scheduleLoad()">{{ t("microdistrictsLayer") }}: {{ zoneNameLabel(microdistrict, locale) }} <span>×</span></button>
             <button v-if="quartal" type="button" class="filter-chip" @click="quartal = ''; scheduleLoad()">{{ t("quartalsLayer") }}: {{ zoneNameLabel(quartal, locale) }} <span>×</span></button>
             <button v-if="mapArea" type="button" class="filter-chip" @click="mapArea = ''; scheduleLoad()">{{ t("areasLayer") }}: {{ zoneNameLabel(mapArea, locale) }} <span>×</span></button>
+            <button v-if="metro.length" type="button" class="filter-chip" @click="clearMetroFilter()">{{ t("metro") }}: {{ metroChipLabel }} <span>×</span></button>
+            <button v-if="metroArcLabel" type="button" class="filter-chip" @click="clearMetroArc()">{{ t("metroDirection") }}: {{ metroArcLabel }} <span>×</span></button>
             <button v-if="roomsMin != null" type="button" class="filter-chip" @click="roomsMin = undefined; scheduleLoad()">{{ roomsMin }}+ {{ t('roomsChip') }} <span>×</span></button>
             <button v-if="petFriendly" type="button" class="filter-chip" @click="petFriendly = false; scheduleLoad()"><u-icon name="i-lucide-paw-print" /> {{ t('pets') }} <span>×</span></button>
             <button v-if="noElevatorOnly" type="button" class="filter-chip" @click="noElevatorOnly = false; scheduleLoad()">{{ t('noElevator') }} <span>×</span></button>
@@ -892,7 +1033,7 @@ onBeforeUnmount(() => { modalOpen.value = false; lightboxOpen.value = false; rel
       <UiSortSelect class="flats__sort" v-model="sort" :items="sortItems" :label="extraLabels.sort" @update:model-value="scheduleLoad(0)" />
     </div>
     <FlatsStatsPanel v-if="view === 'active' && statistics" :statistics="statistics" :display-currency="displayCurrency" :convert="convert" />
-<section class="flats__map-wrap"><flat-map :points="mapPoints" :draw-label="t('drawArea')" :done-label="t('done')" :clear-label="t('clearArea')" :draw-hint="t('drawHint')" :expand-label="t('mapExpand')" :collapse-label="t('mapCollapse')" :scroll-hint-label="t('mapScrollHint')" :district-zones="districtZones" :microdistrict-markers="microdistrictMarkers" :quartal-markers="quartalMarkers" :metro-stations="metroStations" :university-zones="universityZones" :shopping-mall-zones="shoppingMallZones" :park-zones="parkZones" :area-zones="areaZones" :city-zone="cityZone" :selected-district="district" :selected-microdistrict="microdistrict" :selected-quartal="quartal" :selected-area="mapArea" :selected-metro="metro" :selected-metro-radius-m="metroMaxM" :districts-label="t('districtsLayer')" :microdistricts-label="t('microdistrictsLayer')" :quartals-label="t('quartalsLayer')" :metro-label="t('metro')" :universities-label="t('universitiesLayer')" :shopping-malls-label="t('shoppingMallsLayer')" :parks-label="t('parksLayer')" :areas-label="t('areasLayer')" :city-label="t('cityLayer')" @select="openById" @area-change="drawnArea = $event" @zone-select="onZoneSelect" /></section>
+<section class="flats__map-wrap"><flat-map :points="mapPoints" :draw-label="t('drawArea')" :done-label="t('done')" :clear-label="t('clearArea')" :draw-hint="t('drawHint')" :expand-label="t('mapExpand')" :collapse-label="t('mapCollapse')" :scroll-hint-label="t('mapScrollHint')" :district-zones="districtZones" :microdistrict-markers="microdistrictMarkers" :quartal-markers="quartalMarkers" :metro-stations="metroStations" :university-zones="universityZones" :shopping-mall-zones="shoppingMallZones" :park-zones="parkZones" :area-zones="areaZones" :city-zone="cityZone" :selected-district="district" :selected-microdistrict="microdistrict" :selected-quartal="quartal" :selected-area="mapArea" :selected-metros="metro" :selected-metro-radius-m="metroMaxM" :metro-bearing-from="metroBearingFrom" :metro-bearing-to="metroBearingTo" :metro-radius-handle-label="t('metroRadiusHandle')" :metro-arc-handle-label="t('metroArcHandle')" :districts-label="t('districtsLayer')" :microdistricts-label="t('microdistrictsLayer')" :quartals-label="t('quartalsLayer')" :metro-label="t('metro')" :universities-label="t('universitiesLayer')" :shopping-malls-label="t('shoppingMallsLayer')" :parks-label="t('parksLayer')" :areas-label="t('areasLayer')" :city-label="t('cityLayer')" @select="openById" @area-change="drawnArea = $event" @zone-select="onZoneSelect" @metro-toggle="onMetroToggle" @metro-shape="onMetroShape" /></section>
 
     <SearchResultGrid>
       <FlatCard

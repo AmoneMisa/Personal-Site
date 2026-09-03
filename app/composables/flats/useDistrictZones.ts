@@ -147,8 +147,26 @@ export function useDistrictZones(options: UseDistrictZonesOptions) {
 
   const cityZone = computed<FlatMapZone | null>(() => cityHullZone(districtZones.value, cityEntity.value, locale.value));
 
+  // Districts are the only zone level with authoritative boundaries covering the
+  // whole city, so "which district is this point in" is approximated as "which
+  // district center is nearest" -- consistent with how districtZones itself falls
+  // back to a fitted radius when a polygon isn't available.
+  function districtForPoint(point: { lat: number; lng: number }): string | null {
+    let nearest: FlatMapZone | null = null;
+    let nearestDistance = Infinity;
+    for (const zone of districtZones.value) {
+      const distance = distanceKm(point, zone);
+      if (distance < nearestDistance) {
+        nearestDistance = distance;
+        nearest = zone;
+      }
+    }
+    return nearest?.name ?? null;
+  }
+
   return {
     districtZones, microdistrictMarkers, quartalMarkers, metroStations,
     universityZones, shoppingMallZones, parkZones, areaZones, cityZone,
+    districtForPoint,
   };
 }

@@ -61,7 +61,15 @@ export function useFlatFilters() {
   const commissionPercentMax = ref<number>();
   const sort = ref<FlatSort>("newest");
   const audience = ref("any");
-  const metro = ref("");
+  // Several stations can be picked at once; the filter reads as a union
+  // ("near any of these"). Kept array-shaped even for one station so the map,
+  // the select and the URL all speak the same shape.
+  const metro = ref<string[]>([]);
+  // Directional restriction around the selected stations, in degrees clockwise
+  // from north (270 = due west). Both unset means the whole circle. Evaluated
+  // in the browser -- see useMetroProximity for why.
+  const metroBearingFrom = ref<number>();
+  const metroBearingTo = ref<number>();
   const priceMin = ref<number>();
   const priceMax = ref<number>();
   const roomsMin = ref<number>();
@@ -95,8 +103,10 @@ export function useFlatFilters() {
 
   function clearCityLocationFilters() {
     district.value = "";
-    metro.value = "";
+    metro.value = [];
     metroMaxM.value = undefined;
+    metroBearingFrom.value = undefined;
+    metroBearingTo.value = undefined;
     nearbyKind.value = "";
     nearbyMaxM.value = undefined;
     query.value = "";
@@ -185,7 +195,6 @@ export function useFlatFilters() {
     if (areaMax.value != null) params.areaMax = String(areaMax.value);
     if (!rentOnly && pricePerSqmMin.value != null) params.pricePerSqmMin = String(pricePerSqmMin.value);
     if (!rentOnly && pricePerSqmMax.value != null) params.pricePerSqmMax = String(pricePerSqmMax.value);
-    if (metroMaxM.value != null) params.metroMaxM = String(metroMaxM.value);
     if (nearbyKind.value) params.nearbyKind = nearbyKind.value;
     if (nearbyMaxM.value != null) params.nearbyMaxM = String(nearbyMaxM.value);
     if (floorMin.value != null) params.floorMin = String(floorMin.value);
@@ -195,7 +204,15 @@ export function useFlatFilters() {
     if (yearMin.value != null) params.yearMin = String(yearMin.value);
     if (yearMax.value != null) params.yearMax = String(yearMax.value);
     if (maxAgeDays.value != null) params.maxAgeDays = String(maxAgeDays.value);
-    if (metro.value) params.metro = metro.value;
+    // Upstream understands exactly one station plus a plain radius, and has no
+    // notion of a compass arc. One station is still narrowed server-side, arc or
+    // not (the arc only ever removes more). Several stations have no upstream
+    // representation at all, so nothing metro-related is sent and the whole
+    // union is resolved in the browser instead of being half-applied here.
+    if (metro.value.length === 1) {
+      params.metro = metro.value[0]!;
+      if (metroMaxM.value != null) params.metroMaxM = String(metroMaxM.value);
+    }
     if (!saleOnly && audience.value !== "any") params.audience = audience.value;
     if (!saleOnly && petFriendly.value) params.pets = "1";
     if (!saleOnly && roomOnlyFilter.value) params.roomOnly = "1";
@@ -239,7 +256,7 @@ export function useFlatFilters() {
     city.value = "";
     district.value = "";
     clearMapZones();
-    metro.value = "";
+    metro.value = [];
     propertyType.value = "any";
     dealType.value = "any";
     agency.value = "any";
@@ -284,6 +301,8 @@ export function useFlatFilters() {
     pricePerSqmMin.value = undefined;
     pricePerSqmMax.value = undefined;
     metroMaxM.value = undefined;
+    metroBearingFrom.value = undefined;
+    metroBearingTo.value = undefined;
     nearbyKind.value = "";
     nearbyMaxM.value = undefined;
     floorMin.value = undefined;
@@ -306,6 +325,7 @@ export function useFlatFilters() {
     commissionPercentMin, commissionPercentMax, sort, audience, metro, priceMin, priceMax, roomsMin, roomsMax,
     bedroomsMin, bedroomsMax, areaMin, areaMax, pricePerSqmMin, pricePerSqmMax, metroMaxM,
     nearbyKind, nearbyMaxM, floorMin, floorMax, totalFloorsMin, totalFloorsMax, yearMin, yearMax,
-    maxAgeDays, displayCurrency, query, source, showAdvanced, buildFeedParams, resetValues,
+    maxAgeDays, displayCurrency, query, source, showAdvanced, metroBearingFrom, metroBearingTo,
+    buildFeedParams, resetValues,
   };
 }

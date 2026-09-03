@@ -20,7 +20,8 @@ test('map remains mounted when the active filters return no listings', () => {
 test('metro proximity rings consume clicks instead of falling through to districts', () => {
   assert.ok(source.includes('ring.on("click", (event: any) => handleLayerClick(event'));
   assert.ok(source.includes('bubblingMouseEvents: false'));
-  assert.ok(source.includes('emitZoneSelect("metro", nearest.name, radius);'));
+  assert.ok(source.includes('emit("metro-toggle", nearest.name);'));
+  assert.ok(source.includes('emit("metro-shape", { radiusM: radius });'));
 });
 
 test('draw mode consumes clicks on interactive map overlays before their normal action', () => {

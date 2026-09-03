@@ -8,13 +8,15 @@ export function useFlatFilterBlocks(options: {
   t: (key: string) => string;
   filters: ReturnType<typeof useFlatFilters>;
   districtSelect: Model<string>;
-  metroSelect: Model<string>;
+  metroSelect: Model<string[]>;
+  metroDirectionSelect: Model<string>;
   microdistrictSelect: Model<string>;
   quartalSelect: Model<string>;
   areaSelect: Model<string>;
   nearbyKindSelect: Model<string>;
   districtItems: OptionSource;
   metroItems: OptionSource;
+  metroDirectionItems: OptionSource;
   microdistrictItems: OptionSource;
   quartalItems: OptionSource;
   areaItems: OptionSource;
@@ -66,8 +68,11 @@ export function useFlatFilterBlocks(options: {
         { id: "microdistrict", control: "select", label: options.t("microdistrictsLayer"), value: options.microdistrictSelect.value, options: options.microdistrictItems.value, hidden: !options.hasMicrodistricts(), onUpdate: update(options.microdistrictSelect), onCommit: commit },
         { id: "quartal", control: "select", label: options.t("quartalsLayer"), value: options.quartalSelect.value, options: options.quartalItems.value, hidden: !options.hasQuartals(), onUpdate: update(options.quartalSelect), onCommit: commit },
         { id: "area", control: "select", label: options.t("areasLayer"), value: options.areaSelect.value, options: options.areaItems.value, hidden: !options.hasAreas(), onUpdate: update(options.areaSelect), onCommit: commit },
-        { id: "metro", control: "select", label: options.t("metro"), value: options.metroSelect.value, options: options.metroItems.value, hidden: !options.hasMetro(), onUpdate: update(options.metroSelect), onCommit: commit },
-        { id: "metro-distance", control: "number", label: options.t("metroWithin"), value: metroMaxM.value, min: 0, step: 100, inputmode: "numeric", onUpdate: update(metroMaxM), onCommit: commit },
+        { id: "metro", control: "multi-select", label: options.t("metro"), value: options.metroSelect.value, options: options.metroItems.value, placeholder: options.t("metroAny"), searchable: true, hidden: !options.hasMetro(), onUpdate: update(options.metroSelect), onCommit: commit },
+        // The map's drag handles are the primary way to set these two; here they
+        // are again for keyboard use and for typing an exact figure like 780.
+        { id: "metro-direction", control: "select", label: options.t("metroDirection"), value: options.metroDirectionSelect.value, options: options.metroDirectionItems.value, hidden: !options.hasMetro() || !options.metroSelect.value.length, onUpdate: update(options.metroDirectionSelect), onCommit: commit },
+        { id: "metro-distance", control: "number", label: options.t("metroWithin"), value: metroMaxM.value, min: 0, step: 10, inputmode: "numeric", onUpdate: update(metroMaxM), onCommit: commit },
         { id: "nearby-kind", control: "select", label: options.t("nearbyKind"), value: options.nearbyKindSelect.value, options: options.nearbyKindItems.value, onUpdate: update(options.nearbyKindSelect), onCommit: commit },
         { id: "nearby-distance", control: "number", label: options.t("nearbyWithin"), value: nearbyMaxM.value, min: 0, step: 100, inputmode: "numeric", onUpdate: update(nearbyMaxM), onCommit: commit },
       ],

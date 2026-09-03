@@ -86,8 +86,15 @@ export function useFlatFeed(feedOptions: { onAvailabilityChecked?: (keys: string
     const append = !!options.append;
     const background = !!options.background;
 
-    if (!append && !background && !(await polling.debounceFilterRequest())) {
-      return undefined;
+    // Show the pending state before the debounce, not after it. The filter
+    // debounce here stacks on top of the page's own one, so the results grid
+    // used to sit there looking settled for half a second after a click before
+    // the first skeleton appeared. A superseded call leaves the flag alone:
+    // the call that superseded it is still loading.
+    if (!append && !background) {
+      loading.value = true;
+      failed.value = false;
+      if (!(await polling.debounceFilterRequest())) return undefined;
     }
 
     const requestId = requests.next();

@@ -14,8 +14,11 @@ test("structured map zones are cleared when their location scope changes", () =>
 test("city changes clear every city-scoped location filter before the next request", () => {
   assert.match(source, /function clearCityLocationFilters\(\)/);
   assert.match(source, /district\.value = ""/);
-  assert.match(source, /metro\.value = ""/);
+  assert.match(source, /metro\.value = \[\]/);
   assert.match(source, /metroMaxM\.value = undefined/);
+  // The arc is scoped to the stations it is measured from.
+  assert.match(source, /metroBearingFrom\.value = undefined/);
+  assert.match(source, /metroBearingTo\.value = undefined/);
   assert.match(source, /nearbyKind\.value = ""/);
   assert.match(source, /nearbyMaxM\.value = undefined/);
   assert.match(source, /query\.value = ""/);
