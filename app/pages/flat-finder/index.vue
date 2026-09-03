@@ -766,7 +766,7 @@ const specRows = computed<FlatSpecRow[]>(() => {
 
     row("location", t("specCity"), strOr(locName(l.city, "city"))),
     row("location", t("specDistrict"), strOr(locName(l.district, "district"))),
-    row("location", t("specKvartal"), strOr(zoneNameLabel(l.area || l.kvartal, locale.value))),
+    row("location", t("specKvartal"), strOr(zoneNameLabel(l.area || l.kvartal, locale.value, l.country, l.city))),
     row("location", t("specMetro"), strOr(metroLabelWithAlias(l.metro, locale.value))),
     row("location", t("specTram"), transportListOr(l, "tram"), true),
     row("location", t("specBus"), transportListOr(l, "bus"), true),
@@ -995,9 +995,9 @@ onBeforeUnmount(() => { modalOpen.value = false; lightboxOpen.value = false; rel
         <UiFilterFooter class="filter-actions-row" :reset-label="t('reset')" @reset="resetFilters">
           <div class="active-filter-chips">
             <button v-if="district" type="button" class="filter-chip" @click="district = ''; scheduleLoad()">{{ t("district") }}: {{ locName(district, 'district') }} <span>×</span></button>
-            <button v-if="microdistrict" type="button" class="filter-chip" @click="microdistrict = ''; scheduleLoad()">{{ t("microdistrictsLayer") }}: {{ zoneNameLabel(microdistrict, locale) }} <span>×</span></button>
-            <button v-if="quartal" type="button" class="filter-chip" @click="quartal = ''; scheduleLoad()">{{ t("quartalsLayer") }}: {{ zoneNameLabel(quartal, locale) }} <span>×</span></button>
-            <button v-if="mapArea" type="button" class="filter-chip" @click="mapArea = ''; scheduleLoad()">{{ t("areasLayer") }}: {{ zoneNameLabel(mapArea, locale) }} <span>×</span></button>
+            <button v-if="microdistrict" type="button" class="filter-chip" @click="microdistrict = ''; scheduleLoad()">{{ t("microdistrictsLayer") }}: {{ zoneNameLabel(microdistrict, locale, countries[0], city) }} <span>×</span></button>
+            <button v-if="quartal" type="button" class="filter-chip" @click="quartal = ''; scheduleLoad()">{{ t("quartalsLayer") }}: {{ zoneNameLabel(quartal, locale, countries[0], city) }} <span>×</span></button>
+            <button v-if="mapArea" type="button" class="filter-chip" @click="mapArea = ''; scheduleLoad()">{{ t("areasLayer") }}: {{ zoneNameLabel(mapArea, locale, countries[0], city) }} <span>×</span></button>
             <button v-if="metro.length" type="button" class="filter-chip" @click="clearMetroFilter()">{{ t("metro") }}: {{ metroChipLabel }} <span>×</span></button>
             <button v-if="metroArcLabel" type="button" class="filter-chip" @click="clearMetroArc()">{{ t("metroDirection") }}: {{ metroArcLabel }} <span>×</span></button>
             <button v-if="roomsMin != null" type="button" class="filter-chip" @click="roomsMin = undefined; scheduleLoad()">{{ roomsMin }}+ {{ t('roomsChip') }} <span>×</span></button>
