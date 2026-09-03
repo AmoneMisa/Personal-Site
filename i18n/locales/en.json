@@ -162,6 +162,7 @@
     "loadingMore": "Loading more listings…",
     "metro": "Metro",
     "metroAny": "Any metro",
+    "mapFitResults": "Frame all results",
     "metroDirection": "Direction from metro",
     "metroDirectionAny": "Any direction",
     "metroRadiusHandle": "Drag to set the distance",

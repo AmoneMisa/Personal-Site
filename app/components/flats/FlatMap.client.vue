@@ -92,6 +92,7 @@ const props = defineProps<{
   cityLabel?: string;
   metroRadiusHandleLabel?: string;
   metroArcHandleLabel?: string;
+  fitResultsLabel?: string;
 }>();
 
 const emit = defineEmits<{
@@ -122,6 +123,9 @@ const FOCUS_ZOOM = 18;
 // Once a station is picked the shape becomes free-form and these stop mattering.
 const METRO_PRESET_RINGS = [[1000, "#8b5cf6", .055], [500, "#22c55e", .08], [200, "#f59e0b", .13]] as const;
 const DEFAULT_METRO_RADIUS_M = 500;
+// The invisible click disc under each station dot. Sized for a fingertip
+// rather than for the 6px the dot itself draws.
+const METRO_MARKER_HIT_RADIUS = 14;
 const METRO_MIN_RADIUS_M = 100;
 const METRO_MAX_RADIUS_M = 5000;
 // Query keys that describe *what is open on top of* the results, not which
@@ -570,6 +574,29 @@ function fitToPoints() {
   }
 }
 
+/**
+ * The manual "frame my results" action behind the toolbar button. Unlike
+ * fitToPoints it ignores the signature guard and a focused pin: those exist
+ * to stop the *automatic* fit from fighting a deliberate view, which is
+ * exactly what someone pressing this is asking to override. Panning away
+ * from the results was otherwise one-way -- the automatic fit only runs when
+ * the result set itself changes.
+ */
+function fitToPointsNow() {
+  if (!map) return;
+  const bounds: [number, number][] = [];
+  for (const p of renderedPoints.value) {
+    if (Number.isFinite(p.lat) && Number.isFinite(p.lng)) bounds.push([p.lat, p.lng]);
+  }
+  if (!bounds.length) return;
+  focusedPoint.value = null;
+  renderFocusedPoint();
+  map.fitBounds(bounds, { padding: [30, 30], maxZoom: 16 });
+  // Let the automatic fit run again for the next result set rather than
+  // treating this manual framing as the one already applied.
+  lastFitSig = "";
+}
+
 function renderArea() {
   const L = Leaflet;
   if (!areaLayer || !L) return;
@@ -976,21 +1003,36 @@ function renderMetro() {
 
   const stations = props.metroStations || [];
   const chosen = stations.filter((station) => isZoneSelected("metro", station.name));
-  // Once stations are chosen the other ~30 stop being drawn. Their overlapping
-  // rings are what made the map unreadable, and they are no longer part of the
-  // question being asked; clearing the selection brings them all back.
-  const visible = chosen.length ? chosen : stations;
-  if (chosen.length) renderMetroSelection(chosen);
+  // Every station keeps its dot. It was the three overlapping rings across
+  // ~30 stations that made the map unreadable, not the dots -- and drawing
+  // only the chosen ones would leave no way to add a second station by
+  // clicking the map at all. Unchosen ones just recede.
+  const anyChosen = chosen.length > 0;
+  if (anyChosen) renderMetroSelection(chosen);
 
-  for (const station of visible) {
-    const stationSelected = chosen.length > 0;
-    if (!stationSelected) renderMetroPresetRings(station);
+  for (const station of stations) {
+    const stationSelected = isZoneSelected("metro", station.name);
+    if (!anyChosen) renderMetroPresetRings(station);
+
+    const select = (event: any) => handleLayerClick(event, () => metroToggle(station));
+    // A 6px dot is a 6px click target, which on a touch screen is a coin
+    // toss. This invisible disc under it takes the click instead, without
+    // making the visible marker any bigger.
+    const hitTarget = L.circleMarker([station.lat, station.lng], {
+      radius: METRO_MARKER_HIT_RADIUS,
+      opacity: 0,
+      fillOpacity: 0,
+      bubblingMouseEvents: false,
+    }).addTo(metroLayer);
+    hitTarget.on("click", select);
+
     const marker = L.circleMarker([station.lat, station.lng], {
       radius: stationSelected ? 8 : 6,
       color: "#fff",
       weight: stationSelected ? 3 : 2,
+      opacity: anyChosen && !stationSelected ? 0.5 : 1,
       fillColor: stationSelected ? "#e0679a" : "#2563eb",
-      fillOpacity: 1,
+      fillOpacity: anyChosen && !stationSelected ? 0.45 : 1,
       bubblingMouseEvents: false,
     });
     marker.bindTooltip(
@@ -1000,7 +1042,7 @@ function renderMetro() {
       { direction: "top" },
     );
     if (stationSelected) marker.openTooltip?.();
-    marker.on("click", (event: any) => handleLayerClick(event, () => metroToggle(station)));
+    marker.on("click", select);
     marker.addTo(metroLayer);
   }
 }
@@ -1215,6 +1257,10 @@ onBeforeUnmount(() => {
         >
           {{ expanded ? "×" : "⤢" }}
           <span>{{ expanded ? (props.collapseLabel || "Close") : (props.expandLabel || "Full screen") }}</span>
+        </button>
+        <button v-if="renderedPoints.length" type="button" class="flat-map__tool" @click="fitToPointsNow">
+          ⊙
+          <span>{{ props.fitResultsLabel || "Frame results" }}</span>
         </button>
         <button type="button" class="flat-map__tool" :class="{ 'flat-map__tool_active': drawing }" @click="toggleDrawing">
           {{ drawing ? "✓" : "⌁" }}

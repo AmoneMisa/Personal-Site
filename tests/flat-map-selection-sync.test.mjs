@@ -36,9 +36,29 @@ test("the radius and arc handles report one settled shape per drag", () => {
   assert.match(pageSource, /function onMetroShape\(/);
 });
 
-test("only the chosen stations are drawn once a selection exists", () => {
-  assert.match(mapSource, /const visible = chosen\.length \? chosen : stations/);
-  assert.match(mapSource, /if \(!stationSelected\) renderMetroPresetRings\(station\)/);
+test("a selection hides the other stations' rings, not the stations", () => {
+  // Drawing only the chosen ones would leave no way to add a second station
+  // by clicking the map; it was the overlapping rings that made it
+  // unreadable, so only those go.
+  assert.match(mapSource, /for \(const station of stations\)/);
+  assert.match(mapSource, /if \(!anyChosen\) renderMetroPresetRings\(station\)/);
+  assert.match(mapSource, /anyChosen && !stationSelected \? 0\.45 : 1/);
+});
+
+test("station dots carry a touch-sized hit target", () => {
+  // A 6px circleMarker is a 6px click target; the invisible disc under it
+  // is what actually takes the click.
+  assert.match(mapSource, /const METRO_MARKER_HIT_RADIUS = 14/);
+  assert.match(mapSource, /radius: METRO_MARKER_HIT_RADIUS,\s+opacity: 0,\s+fillOpacity: 0,/);
+  assert.match(mapSource, /hitTarget\.on\("click", select\)/);
+});
+
+test("the map can be framed back onto the results by hand", () => {
+  assert.match(mapSource, /function fitToPointsNow\(\)/);
+  // Must override the guards the automatic fit uses, or the button would
+  // silently do nothing in exactly the cases it is needed.
+  assert.match(mapSource, /lastFitSig = "";/);
+  assert.match(mapSource, /@click="fitToPointsNow"/);
 });
 
 test("selected geography keeps its label visible until the second click", () => {
