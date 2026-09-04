@@ -5,15 +5,31 @@ and its small FastAPI helper backend. Jobs, hiring, crawler execution, browser
 fetching and the Telegram subscription worker live in the separate
 `AmoneMisa/whiteslove.me-backend-platform` repository.
 
+## What is on the site
+
+| Area | What it is |
+| --- | --- |
+| `/`, `/about`, `/projects`, `/cv` | Portfolio: introduction, work, and CV. |
+| `/services` | Service pages, one per offering. |
+| `/flat-finder` | Apartment search over the Flat Finder backend: filtered list plus a Leaflet map with metro-proximity shapes. The heaviest UI in the repo. |
+| `/jobs`, `/hiring` | Vacancy and candidate browsing, proxied to the backend platform. |
+| `/quizzes` | Self-contained interactive quizzes. |
+
+All display text lives in `i18n/` locale files rather than in components.
+
 ## Repository layout
 
 ```text
 Personal-Site/
 ├── app/                 Nuxt pages, components and composables
 ├── server/              Nitro BFF/proxy routes and site-only server utilities
-├── backend/             FastAPI helper API
-├── i18n/                locale files
+├── shared/              types and helpers used by both app and server
+├── backend/             FastAPI helper API (document/media tools)
+├── i18n/                locale files — the source of all display text
+├── quizzData/           quiz question sets
+├── scripts/             build and maintenance scripts
 ├── public/              static assets
+├── docs/                site documentation
 ├── tests/               UI/BFF/site regression coverage
 ├── Dockerfile           Nuxt production image
 ├── docker-compose.yml   frontend + helper backend
@@ -22,6 +38,22 @@ Personal-Site/
 
 The previous `Personal-Site-Backend` repository was imported as a Git subtree,
 so its history remains available here.
+
+## The FastAPI helper
+
+`backend/` is a small, stateless tool API for work Node is a poor fit for. It
+holds no database, no auth and no site content — it converts and generates, and
+nothing more.
+
+| Prefix | Purpose |
+| --- | --- |
+| `/convert` | File and document conversion. |
+| `/pdf` | PDF composition and rendering. |
+| `/indices` | Country index data. |
+| `/dockerhub` | Docker Hub image statistics. |
+
+It stays private on the default Compose network; the browser never calls it
+directly.
 
 ## Backend boundaries
 
@@ -40,16 +72,21 @@ backend-platform crawler/worker infrastructure.
 
 ## Local development
 
-Requires Node.js 24 LTS, matching production.
+Requires Node.js 24 LTS, matching the Dockerfile and CI.
 
 ```bash
 npm install
 npm run dev
+npm test          # UI/BFF/site regression suite
+npm run lint      # eslint . (--fix to apply)
 ```
 
 Copy `.env.example` to `.env` for server-side integrations. To exercise jobs or
 hiring locally, point `VACANCIES_API_URL` and `CV_API_URL` at a running backend
 platform.
+
+Flat Finder pages need the Flat Finder API reachable; without it the list and
+map render empty rather than failing loudly.
 
 ## Docker
 
