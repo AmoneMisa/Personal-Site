@@ -11,7 +11,7 @@ export default defineEventHandler(async (event) => {
     return await requestAiWorker(`/ai/result/${encodeURIComponent(key)}`)
   } catch (error) {
     // The browser used to interpret a single 502/504/timeout while polling as a
-    // terminal translation failure. The BullMQ/Ollama job can still be running,
+    // terminal translation failure. The queued inference job can still be running,
     // so keep the UI in its pending state and let the next poll recover.
     if (isAiWorkerTransientError(error)) return { status: 'pending', key }
     throw error
