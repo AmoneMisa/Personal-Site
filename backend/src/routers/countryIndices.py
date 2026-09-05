@@ -111,6 +111,17 @@ WB_INDICATORS: Dict[str, str] = {
 }
 
 # -------------------------------------------------
+# WHO Global Health Observatory (free, no key, odata.org-style API) — a
+# second free source alongside World Bank/Census. Reuses the "oecd" field
+# in country_codes.json as an iso3 code (that's what it already stores,
+# despite the name) since GHO's SpatialDim also takes iso3.
+# -------------------------------------------------
+WHO_INDICATORS: Dict[str, str] = {
+    "road_traffic_death_rate_per_100k": "RS_198",
+    "uhc_service_coverage_index": "UHC_INDEX_REPORTED",
+}
+
+# -------------------------------------------------
 # US Census ACS (states) — works without API key
 # -------------------------------------------------
 US_STATE_FIPS: Dict[str, str] = {
@@ -304,6 +315,72 @@ def normalize_wb(latest_by_code: Dict[str, Optional[float]]) -> NormalizedDTO:
         out.governance = round1((sum(governance_parts) / len(governance_parts)) * 10.0)
 
     return out
+
+
+# -------------------------------------------------
+# WHO Global Health Observatory
+# -------------------------------------------------
+async def who_fetch_indicator(client: httpx.AsyncClient, iso3: str, indicator: str) -> Any:
+    url = f"https://ghoapi.azureedge.net/api/{indicator}"
+    r = await client.get(
+        url,
+        params={"$filter": f"SpatialDim eq '{iso3}'", "$orderby": "TimeDim desc", "$top": 5},
+        timeout=25,
+    )
+    r.raise_for_status()
+    return r.json()
+
+
+def who_extract_latest_value(raw: Any) -> Tuple[Optional[float], Optional[str]]:
+    rows = raw.get("value") if isinstance(raw, dict) else None
+    if not isinstance(rows, list):
+        return None, None
+
+    # prefer rows with no sex breakdown (Dim1 is null) or the combined-sex row;
+    # $orderby=TimeDim desc already puts the latest year first.
+    candidates = [r for r in rows if isinstance(r, dict) and r.get("Dim1") in (None, "SEX_BTSX")] or rows
+
+    for row in candidates:
+        if not isinstance(row, dict):
+            continue
+        val = safe_float(row.get("NumericValue"))
+        date = str(row.get("TimeDim")) if row.get("TimeDim") is not None else None
+        if val is not None:
+            return val, date
+
+    return None, None
+
+
+def normalize_who(latest_by_code: Dict[str, Optional[float]]) -> Dict[str, Optional[float]]:
+    out: Dict[str, Optional[float]] = {}
+
+    road = latest_by_code.get(WHO_INDICATORS["road_traffic_death_rate_per_100k"])
+    if road is not None:
+        # ~2 (safest) .. 35 (worst) deaths per 100k => 10..0
+        out["roadSafety01"] = clamp01(1.0 - ((road - 2.0) / (35.0 - 2.0)))
+
+    uhc = latest_by_code.get(WHO_INDICATORS["uhc_service_coverage_index"])
+    if uhc is not None:
+        # already 0..100
+        out["uhcCoverage01"] = clamp01(uhc / 100.0)
+
+    return out
+
+
+def merge_who_into_wb(normalized: NormalizedDTO, who: Dict[str, Optional[float]]) -> None:
+    road = who.get("roadSafety01")
+    if road is not None:
+        normalized.safety = round1(
+            road * 10.0 if normalized.safety is None else ((normalized.safety / 10.0 + road) / 2.0) * 10.0
+        )
+
+    uhc = who.get("uhcCoverage01")
+    if uhc is not None:
+        normalized.healthcareAccess = round1(
+            uhc * 10.0
+            if normalized.healthcareAccess is None
+            else ((normalized.healthcareAccess / 10.0 + uhc) / 2.0) * 10.0
+        )
 
 
 # -------------------------------------------------
@@ -531,6 +608,35 @@ async def build_bundle(key: str, include_raw: bool) -> BundleDTO:
 
             if include_raw:
                 raw_out["worldbank"] = wb_raw
+
+            iso3 = (COUNTRY_CODES.get(key) or {}).get("oecd")
+
+            if iso3:
+                who_codes = list(WHO_INDICATORS.values())
+
+                who_raw_list = await asyncio.gather(
+                    *(who_fetch_indicator(client, iso3, code) for code in who_codes),
+                    return_exceptions=True
+                )
+
+                who_latest_by_code: Dict[str, Optional[float]] = {}
+                who_raw: Dict[str, Any] = {}
+
+                for code, raw in zip(who_codes, who_raw_list):
+                    if isinstance(raw, Exception) or raw is None:
+                        val, date = None, None
+                    else:
+                        val, date = who_extract_latest_value(raw)
+
+                    who_latest_by_code[code] = val
+
+                    if include_raw:
+                        who_raw[code] = {"latestValue": val, "latestDate": date}
+
+                merge_who_into_wb(normalized, normalize_who(who_latest_by_code))
+
+                if include_raw:
+                    raw_out["who"] = who_raw
 
     bundle = BundleDTO(
         key=key,

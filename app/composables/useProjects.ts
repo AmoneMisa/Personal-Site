@@ -5,6 +5,7 @@ export interface ProjectItem {
   name: string;
   stack: string;
   href: string | null;
+  downloadHref?: string;
   description: string;
 }
 export interface ProjectGroup {
@@ -17,6 +18,7 @@ interface RawItem {
   name: string;
   stack: string;
   href: string;
+  downloadHref?: string;
 }
 // Group titles and item descriptions live in i18n/locales/*.json under
 // `projects`; what stays here is the structure and the things that are the
@@ -97,13 +99,15 @@ const GROUPS: RawGroup[] = [
         "id": "rustic-price-converter",
         "name": "Rustic Price Converter",
         "stack": "Kotlin (native Android)",
-        "href": "https://github.com/AmoneMisa/RusticPriceConvertor"
+        "href": "https://github.com/AmoneMisa/RusticPriceConvertor",
+        "downloadHref": "/files/RusticPriceConvertor_v1.0_WhitesLove.apk"
       },
       {
         "id": "flat-finder",
         "name": "Flat Finder",
         "stack": "Dart · Flutter",
-        "href": "https://github.com/AmoneMisa/flat-finder"
+        "href": "https://github.com/AmoneMisa/flat-finder",
+        "downloadHref": "/files/FlatFinder_v1.1_WhitesLove.apk"
       }
     ]
   },
@@ -190,6 +194,7 @@ export function useProjects() {
         name: nameFor(it),
         stack: it.stack,
         href: it.href,
+        downloadHref: it.downloadHref,
         description: t(`projects.descriptions.${it.id}`),
       })),
     }))

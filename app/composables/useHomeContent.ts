@@ -124,6 +124,12 @@ export interface HomeContent {
       href: string;
     }[];
     contactsTitle: string;
+    appsTitle: string;
+    apps: {
+      label: string;
+      sub: string;
+      href: string;
+    }[];
     copyright: string;
     motto: string;
   };

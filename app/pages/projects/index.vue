@@ -12,6 +12,7 @@ const chrome = computed(() => ({
   title: t("projects.title"),
   subtitle: t("projects.subtitle"),
   open: t("projects.open"),
+  download: t("projects.download"),
   soon: t("projects.soon"),
 }));
 
@@ -21,16 +22,52 @@ function resolveHref(href: string) {
 function isExternal(href: string | null) {
   return !!href && href.startsWith("http");
 }
+function tagsFor(stack: string) {
+  return stack.split("·").map((tag) => tag.trim()).filter(Boolean);
+}
+
+const SITE_URL = "https://whiteslove.me";
 
 useSeoMeta({
   title: () => t("projects.seoTitle"),
   description: () => chrome.value.subtitle,
+  keywords: () => Array.from(new Set(groups.value.flatMap((g) => g.items.flatMap((p) => tagsFor(p.stack))))).join(", "),
   ogType: "website",
   ogTitle: () => chrome.value.title,
   ogDescription: () => chrome.value.subtitle,
   twitterTitle: () => chrome.value.title,
   twitterDescription: () => chrome.value.subtitle,
 });
+
+// ItemList schema so search engines can index the catalog as a structured
+// list of creative works, not just a wall of anchor tags.
+useHead(() => ({
+  script: [
+    {
+      type: "application/ld+json",
+      innerHTML: JSON.stringify({
+        "@context": "https://schema.org",
+        "@type": "ItemList",
+        name: chrome.value.title,
+        description: chrome.value.subtitle,
+        itemListElement: groups.value.flatMap((group) =>
+          group.items.map((p, i) => ({
+            "@type": "ListItem",
+            position: i + 1,
+            item: {
+              "@type": "SoftwareSourceCode",
+              name: p.name,
+              description: p.description,
+              programmingLanguage: p.stack,
+              ...(p.href ? {codeRepository: p.href} : {}),
+              ...(p.downloadHref ? {downloadUrl: `${SITE_URL}${p.downloadHref}`} : {}),
+            },
+          }))
+        ),
+      }),
+    },
+  ],
+}));
 </script>
 
 <template>
@@ -51,18 +88,28 @@ useSeoMeta({
           <div class="projects-page__grid">
             <article v-for="p in group.items" :key="p.name" class="projects-page__card">
               <div>
-                <div class="projects-page__stack mono">{{ p.stack }}</div>
+                <div class="projects-page__tags">
+                  <span v-for="tag in tagsFor(p.stack)" :key="tag" class="projects-page__tag mono">{{ tag }}</span>
+                </div>
                 <h3 class="projects-page__card-title">{{ p.name }}</h3>
                 <p class="projects-page__description">{{ p.description }}</p>
               </div>
-              <a
-                  v-if="p.href"
-                  class="projects-page__link mono"
-                  :href="resolveHref(p.href)"
-                  :target="isExternal(p.href) ? '_blank' : undefined"
-                  :rel="isExternal(p.href) ? 'noopener noreferrer' : undefined"
-              >{{ isExternal(p.href) ? "GitHub" : chrome.open }} →</a>
-              <span v-else class="projects-page__link projects-page__link_muted mono">{{ chrome.soon }}</span>
+              <div class="projects-page__actions">
+                <a
+                    v-if="p.href"
+                    class="projects-page__link mono"
+                    :href="resolveHref(p.href)"
+                    :target="isExternal(p.href) ? '_blank' : undefined"
+                    :rel="isExternal(p.href) ? 'noopener noreferrer' : undefined"
+                >{{ isExternal(p.href) ? "GitHub" : chrome.open }} →</a>
+                <span v-else-if="!p.downloadHref" class="projects-page__link projects-page__link_muted mono">{{ chrome.soon }}</span>
+                <a
+                    v-if="p.downloadHref"
+                    class="projects-page__link projects-page__link_accent mono"
+                    :href="p.downloadHref"
+                    download
+                >{{ chrome.download }} ↓</a>
+              </div>
             </article>
           </div>
         </div>
@@ -121,10 +168,19 @@ useSeoMeta({
   gap: 14px;
   min-height: 168px;
 }
-.projects-page__stack {
-  font-size: 11px;
-  color: var(--text-muted);
+.projects-page__tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
   margin-bottom: 12px;
+}
+.projects-page__tag {
+  font-size: 10.5px;
+  color: var(--text-muted);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 3px 9px;
+  white-space: nowrap;
 }
 .projects-page__card-title {
   font-size: 16px;
@@ -137,8 +193,13 @@ useSeoMeta({
   color: var(--text-muted);
   line-height: 1.55;
 }
-.projects-page__link {
+.projects-page__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
   margin-top: 14px;
+}
+.projects-page__link {
   font-size: 12.5px;
   color: var(--text-muted);
   align-self: flex-start;
@@ -148,6 +209,9 @@ a.projects-page__link:hover {
 }
 .projects-page__link_muted {
   opacity: 0.65;
+}
+.projects-page__link_accent {
+  color: var(--accent-pink);
 }
 .projects-page__back-link {
   font-size: 13px;

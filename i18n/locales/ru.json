@@ -2589,11 +2589,6 @@
         "petTitle": "Pet-проекты",
         "pet": [
           {
-            "label": "Каталог инструментов",
-            "sub": "Vue.js / Nuxt.js сервисы",
-            "href": "/services"
-          },
-          {
             "label": "i18n Properties Manager",
             "sub": "Electron.js · работа с Freemarker",
             "href": "https://github.com/AmoneMisa/i18nPropertiesManager"
@@ -2610,11 +2605,6 @@
             "label": "Квизы",
             "sub": "все тесты и подборки",
             "href": "/quizzes"
-          },
-          {
-            "label": "Подбор страны",
-            "sub": "квиз: куда переехать",
-            "href": "/quizzes/country-fit"
           },
           {
             "label": "Поиск вакансий",
@@ -2844,6 +2834,19 @@
         }
       ],
       "contactsTitle": "Контакты",
+      "appsTitle": "Мобильные приложения",
+      "apps": [
+        {
+          "label": "Flat Finder",
+          "sub": "Android APK · Flutter",
+          "href": "/files/FlatFinder_v1.1_WhitesLove.apk"
+        },
+        {
+          "label": "Rustic Price Converter",
+          "sub": "Android APK · Kotlin",
+          "href": "/files/RusticPriceConvertor_v1.0_WhitesLove.apk"
+        }
+      ],
       "copyright": "Kubai Marharyta. Front-end Developer. 2026 ©",
       "motto": "Selachii nunquam dormiunt"
     }
@@ -3023,6 +3026,7 @@
     "title": "Проекты",
     "subtitle": "Полный список — от рабочего стека до десктопа, ботов и игровых модов. Сгруппировано по типу, ближе к стеку — выше.",
     "open": "Открыть",
+    "download": "Скачать APK",
     "soon": "Скоро",
     "seoTitle": "Проекты — Маргарита Кубай",
     "backHome": "На главную",

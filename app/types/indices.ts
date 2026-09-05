@@ -18,6 +18,7 @@ export type CountryIndicesBundle = {
     raw: Partial<{
         worldbank: Record<string, WBSeries>; // indicatorId -> series
         oecd: Record<string, any>;           // datasetKey -> raw
+        who: Record<string, any>;            // indicatorCode -> {latestValue, latestDate}
     }>;
 
     normalized: CountryIndicesNormalized;

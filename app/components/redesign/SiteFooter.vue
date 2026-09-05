@@ -29,6 +29,11 @@ const contactLinks = computed(() =>
 function isExternal(href: string) {
   return href.startsWith("http");
 }
+// Direct APK downloads, not store links: FlatFinder/RusticPriceConverter
+// aren't published to Google Play, they're hosted straight off /public/files.
+function isDownload(href: string) {
+  return href.endsWith(".apk");
+}
 </script>
 
 <template>
@@ -55,6 +60,25 @@ function isExternal(href: string) {
               >{{ l.label }}</a>
             </div>
           </nav>
+
+          <div class="site-footer__apps">
+            <h6 class="site-footer__column-title mono">{{ f.appsTitle }}</h6>
+            <div class="site-footer__apps-row">
+              <a
+                v-for="app in f.apps"
+                :key="app.label"
+                class="site-footer__app-link"
+                :href="isDownload(app.href) ? app.href : resolveHref(app.href)"
+                :download="isDownload(app.href) ? '' : undefined"
+              >
+                <u-icon name="i-lucide-smartphone" class="site-footer__app-icon" aria-hidden="true" />
+                <span>
+                  <span class="site-footer__app-label">{{ app.label }}</span>
+                  <span class="site-footer__app-sub">{{ app.sub }}</span>
+                </span>
+              </a>
+            </div>
+          </div>
 
           <div class="site-footer__contacts">
             <h6 class="site-footer__column-title mono">{{ f.contactsTitle }}</h6>
@@ -129,8 +153,51 @@ function isExternal(href: string) {
 }
 
 .site-footer__nav,
+.site-footer__apps,
 .site-footer__contacts {
   min-width: 0;
+}
+
+.site-footer__apps-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.site-footer__app-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  padding: 8px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--text-muted);
+  transition: border-color 0.15s, color 0.15s;
+}
+
+.site-footer__app-link:hover {
+  border-color: var(--accent-pink);
+  color: var(--text-primary);
+}
+
+.site-footer__app-icon {
+  width: 18px;
+  height: 18px;
+  flex: 0 0 18px;
+  color: currentColor;
+}
+
+.site-footer__app-label {
+  display: block;
+  font-size: 13px;
+  color: var(--text-primary);
+}
+
+.site-footer__app-sub {
+  display: block;
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 1px;
 }
 
 .site-footer__nav-grid {

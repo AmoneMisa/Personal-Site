@@ -2589,11 +2589,6 @@
         "petTitle": "Pet projects",
         "pet": [
           {
-            "label": "Tools catalog",
-            "sub": "Vue.js / Nuxt.js services",
-            "href": "/services"
-          },
-          {
             "label": "i18n Properties Manager",
             "sub": "Electron.js · Freemarker files",
             "href": "https://github.com/AmoneMisa/i18nPropertiesManager"
@@ -2610,11 +2605,6 @@
             "label": "Quizzes",
             "sub": "all quizzes and guides",
             "href": "/quizzes"
-          },
-          {
-            "label": "Country fit",
-            "sub": "quiz: where to relocate",
-            "href": "/quizzes/country-fit"
           },
           {
             "label": "Job finder",
@@ -2844,6 +2834,19 @@
         }
       ],
       "contactsTitle": "Contacts",
+      "appsTitle": "Mobile apps",
+      "apps": [
+        {
+          "label": "Flat Finder",
+          "sub": "Android APK · Flutter",
+          "href": "/files/FlatFinder_v1.1_WhitesLove.apk"
+        },
+        {
+          "label": "Rustic Price Converter",
+          "sub": "Android APK · Kotlin",
+          "href": "/files/RusticPriceConvertor_v1.0_WhitesLove.apk"
+        }
+      ],
       "copyright": "Kubai Marharyta. Front-end Developer. 2026 ©",
       "motto": "Selachii nunquam dormiunt"
     }
@@ -3023,6 +3026,7 @@
     "title": "Projects",
     "subtitle": "The full list — from my work stack to desktop apps, bots and game mods. Grouped by type, most-relevant first.",
     "open": "Open",
+    "download": "Download APK",
     "soon": "Coming soon",
     "seoTitle": "Projects — Marharyta Kubai",
     "backHome": "Back to home",
