@@ -32,10 +32,13 @@ export interface FlatTransportStop {
   name: string;
   mode: string;
   distanceM: number;
+  walkingDistanceM?: number | null;
+  walkingDurationMin?: number | null;
   routeRefs: string[];
   geoEntityId?: string | null;
   osm?: { type?: string; id?: number } | null;
   source?: string | null;
+  walkingSource?: string | null;
 }
 
 export interface FlatPerPersonPrice extends FlatMoneyAmount {
@@ -59,6 +62,8 @@ export interface FlatListing {
   region?: string | null;
   microdistrict?: string | null;
   metro?: string | null;
+  metroWalkingDistanceM?: number | null;
+  metroWalkingDurationMin?: number | null;
   nearbyMetro?: FlatTransportStop[];
   nearbyTransport?: FlatTransportStop[];
   address?: string | null;

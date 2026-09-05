@@ -728,11 +728,34 @@ const strOr = (v?: string | null) => (v ? v : t("notSpecified"));
 const listOr = (v?: string[] | null) => (v && v.length ? v.join(", ") : t("notSpecified"));
 const nearbyListOr = (values?: string[] | null) => values?.length ? values.map(nearbyItemLabel).join(", ") : t("notSpecified");
 const amenitiesListOr = (values?: string[] | null) => values?.length ? values.map(nearbyItemLabel).join(", ") : t("notSpecified");
+const walkingDistanceLabel = (meters: number) => {
+  if (meters < 1000) return `${Math.round(meters)} ${String(locale.value).startsWith("ru") ? "м" : "m"}`;
+  const km = meters / 1000;
+  const value = Number.isInteger(km) ? km.toFixed(0) : km.toFixed(1);
+  return `${value} ${String(locale.value).startsWith("ru") ? "км" : "km"}`;
+};
+const metroSpecValue = (listing: Listing) => {
+  const name = metroLabelWithAlias(listing.metro, locale.value);
+  if (!name) return t("notSpecified");
+  const distance = listing.metroWalkingDistanceM;
+  if (distance == null) return name;
+  const parts = [name, `🚶 ${walkingDistanceLabel(distance)}`];
+  if (listing.metroWalkingDurationMin != null) {
+    parts.push(`${Math.round(listing.metroWalkingDurationMin)} ${String(locale.value).startsWith("ru") ? "мин" : "min"}`);
+  }
+  return parts.join(" · ");
+};
 const transportListOr = (listing: Listing, mode: string) => {
   const stops = listing.nearbyTransport?.filter((stop) => stop.mode === mode) || [];
   if (!stops.length) return t("notSpecified");
   return stops.map((stop) => {
     const routes = stop.routeRefs?.length ? ` · ${stop.routeRefs.join(", ")}` : "";
+    if (stop.walkingDistanceM != null) {
+      const minutes = stop.walkingDurationMin == null
+        ? ""
+        : ` · ${Math.round(stop.walkingDurationMin)} ${String(locale.value).startsWith("ru") ? "мин" : "min"}`;
+      return `${stop.name}${routes} · 🚶 ${walkingDistanceLabel(stop.walkingDistanceM)}${minutes}`;
+    }
     return `${stop.name}${routes} · ${Math.round(stop.distanceM)} m`;
   }).join(", ");
 };
@@ -790,7 +813,7 @@ const specRows = computed<FlatSpecRow[]>(() => {
     row("location", t("specCity"), strOr(locName(l.city, "city"))),
     row("location", t("specDistrict"), strOr(locName(l.district, "district"))),
     row("location", t("specKvartal"), strOr(zoneNameLabel(l.area || l.kvartal, locale.value, l.country, l.city))),
-    row("location", t("specMetro"), strOr(metroLabelWithAlias(l.metro, locale.value))),
+    row("location", t("specMetro"), metroSpecValue(l)),
     row("location", t("specTram"), transportListOr(l, "tram"), true),
     row("location", t("specBus"), transportListOr(l, "bus"), true),
     row("location", t("specTrolleybus"), transportListOr(l, "trolleybus"), true),
