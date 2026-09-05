@@ -1,14 +1,14 @@
 import { computed, type MaybeRefOrGetter } from "vue";
 import { toValue } from "vue";
-import {
-  convexHullPositions,
-  distanceKm,
-  getGeoDescendants,
-  resolveLexiconGeoEntity,
-  type GeoBoundaryGeometry,
-  type GeoEntity,
-} from "@whiteslove/geo-catalog";
+// Pure geometry helpers: imported from the /spatial subpath (not the package
+// root) so bundlers don't pull in catalog.js, which decrypts geo-catalog's
+// data with node:fs/node:url and cannot run in the browser. Entity lookups
+// themselves go through useGeoCityCatalog, which fetches already-resolved
+// data from the server instead.
+import { convexHullPositions, distanceKm } from "@whiteslove/geo-catalog/spatial";
+import type { GeoBoundaryGeometry, GeoEntity } from "@whiteslove/geo-catalog";
 import { zoneNameLabel } from "~/utils/locationLabels";
+import { useGeoCityCatalog } from "./useGeoCityCatalog";
 
 export interface FlatMapZone {
   id: string;
@@ -83,11 +83,6 @@ function cityHullZone(districtZones: FlatMapZone[], entity: GeoEntity | null, lo
   };
 }
 
-function descendantsOf(cityId: string | null, country: string, type: GeoEntity["type"]): GeoEntity[] {
-  if (!cityId) return [];
-  return [...getGeoDescendants(cityId, { country, type })];
-}
-
 export interface UseDistrictZonesOptions {
   countries: MaybeRefOrGetter<string[]>;
   city: MaybeRefOrGetter<string>;
@@ -100,46 +95,45 @@ export function useDistrictZones(options: UseDistrictZonesOptions) {
   const cityName = computed(() => toValue(options.city));
   const locale = computed(() => toValue(options.locale));
 
-  const cityEntity = computed(() => {
-    if (!country.value || !cityName.value) return null;
-    return resolveLexiconGeoEntity({ country: country.value, type: "city", canonical: cityName.value });
-  });
+  const { cityEntity, descendants, resolvedDistricts } = useGeoCityCatalog(country, cityName, options.districtOptions);
+
+  function descendantsOf(type: GeoEntity["type"]): GeoEntity[] {
+    return descendants.value.filter((entity) => entity.type === type);
+  }
 
   const districtZones = computed<FlatMapZone[]>(() => {
     if (!country.value || !cityName.value) return [];
 
-    const canonical = descendantsOf(cityEntity.value?.id ?? null, country.value, "district");
+    const canonical = descendantsOf("district");
     const entities = canonical.length
       ? canonical
-      : toValue(options.districtOptions)
-          .map((name) => resolveLexiconGeoEntity({ country: country.value, city: cityName.value, type: "district", canonical: name }))
-          .filter((entity): entity is GeoEntity => Boolean(entity));
+      : resolvedDistricts.value.filter((entity): entity is GeoEntity => Boolean(entity));
     const zones = entities.map((entity, index) => zoneFromEntity(entity, index, locale.value, cityName.value));
     return fitNonOverlappingRadii(zones, 350, 1800);
   });
 
-  const microdistrictMarkers = computed<FlatMapZone[]>(() => descendantsOf(cityEntity.value?.id ?? null, country.value, "microdistrict")
+  const microdistrictMarkers = computed<FlatMapZone[]>(() => descendantsOf("microdistrict")
     .map((entity, index) => zoneFromEntity(entity, index, locale.value, cityName.value)));
 
-  const quartalMarkers = computed<FlatMapZone[]>(() => descendantsOf(cityEntity.value?.id ?? null, country.value, "mahalla")
+  const quartalMarkers = computed<FlatMapZone[]>(() => descendantsOf("mahalla")
     .map((entity, index) => zoneFromEntity(entity, index, locale.value, cityName.value)));
 
-  const metroStations = computed<FlatMapZone[]>(() => descendantsOf(cityEntity.value?.id ?? null, country.value, "metro")
+  const metroStations = computed<FlatMapZone[]>(() => descendantsOf("metro")
     .map((entity, index) => zoneFromEntity(entity, index, locale.value, cityName.value)));
 
-  const universityZones = computed<FlatMapZone[]>(() => descendantsOf(cityEntity.value?.id ?? null, country.value, "poi.university")
+  const universityZones = computed<FlatMapZone[]>(() => descendantsOf("poi.university")
     .map((entity, index) => ({ ...zoneFromEntity(entity, index, locale.value, cityName.value), color: "#38bdf8" })));
 
-  const shoppingMallZones = computed<FlatMapZone[]>(() => descendantsOf(cityEntity.value?.id ?? null, country.value, "poi.shopping_mall")
+  const shoppingMallZones = computed<FlatMapZone[]>(() => descendantsOf("poi.shopping_mall")
     .map((entity, index) => ({ ...zoneFromEntity(entity, index, locale.value, cityName.value), color: "#f97316" })));
 
-  const parkZones = computed<FlatMapZone[]>(() => descendantsOf(cityEntity.value?.id ?? null, country.value, "poi.park")
+  const parkZones = computed<FlatMapZone[]>(() => descendantsOf("poi.park")
     .map((entity, index) => ({ ...zoneFromEntity(entity, index, locale.value, cityName.value), color: "#22c55e" })));
 
   const areaZones = computed<FlatMapZone[]>(() => {
     const entities = [
-      ...descendantsOf(cityEntity.value?.id ?? null, country.value, "local_area"),
-      ...descendantsOf(cityEntity.value?.id ?? null, country.value, "development_area"),
+      ...descendantsOf("local_area"),
+      ...descendantsOf("development_area"),
     ];
     const zones = entities.map((entity, index) => zoneFromEntity(entity, index, locale.value, cityName.value));
     return fitNonOverlappingRadii(zones, 150, 700);

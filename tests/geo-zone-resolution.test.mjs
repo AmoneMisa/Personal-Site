@@ -5,6 +5,9 @@ import { readFile } from 'node:fs/promises';
 const source = await readFile(new URL('../app/composables/flats/useFlatFilters.ts', import.meta.url), 'utf8');
 
 test('map zones resolve through the canonical city entity', () => {
-  assert.match(source, /resolveLexiconGeoEntity/);
-  assert.match(source, /entity\.parentId === cityEntity\.id/);
+  // geo-catalog's encrypted data only decrypts server-side, so resolution now
+  // goes through useGeoCityCatalog (which calls the server) instead of a
+  // direct resolveLexiconGeoEntity import — see server/routes/flats-geo-city.get.ts.
+  assert.match(source, /useGeoCityCatalog/);
+  assert.match(source, /geoDescendants\.value\.find/);
 });

@@ -1,6 +1,6 @@
 import { computed, ref, watch } from "vue";
-import { findGeoEntities, resolveLexiconGeoEntity } from "@whiteslove/geo-catalog";
 import type { FlatSort } from "~/types/flats";
+import { useGeoCityCatalog } from "./useGeoCityCatalog";
 
 const SOCIAL_LISTING_SOURCES = ["facebook", "threads", "custom"];
 const MAP_ZONE_TYPES = new Set(["microdistrict", "mahalla", "local_area", "development_area"]);
@@ -142,16 +142,18 @@ export function useFlatFilters() {
   // and convert them into structured filters before a feed request is built. This also
   // keeps shared URLs explicit (`microdistrict=`, `quartal=`, `area=`) instead of
   // accidentally routing a map click through Elasticsearch/full-text search.
+  // Descendants are already scoped to the city by the server (see useGeoCityCatalog),
+  // so no extra parentId check is needed here.
+  const countryCode = computed(() => countries.value[0] || "");
+  const { cityEntity, descendants: geoDescendants } = useGeoCityCatalog(countryCode, city);
   watch(query, (value) => {
     const name = value.trim();
     const country = countries.value[0];
     if (!name || !country || !city.value) return;
-    const cityEntity = resolveLexiconGeoEntity({ country, type: "city", canonical: city.value });
-    if (!cityEntity) return;
-    const match = findGeoEntities({ country }).find((entity) =>
+    if (!cityEntity.value) return;
+    const match = geoDescendants.value.find((entity) =>
       MAP_ZONE_TYPES.has(entity.type)
-      && entity.canonicalName.toLocaleLowerCase() === name.toLocaleLowerCase()
-      && (entity.parentId === cityEntity.id || entity.id.startsWith(`${cityEntity.id}:`)),
+      && entity.canonicalName.toLocaleLowerCase() === name.toLocaleLowerCase(),
     );
     if (!match) return;
 
