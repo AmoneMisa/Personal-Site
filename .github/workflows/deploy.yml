@@ -19,6 +19,7 @@ env:
 jobs:
   verify:
     runs-on: ubuntu-latest
+    environment: Production
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -40,6 +41,8 @@ jobs:
 
       - name: Run application tests
         run: npm test
+        env:
+          GEO_CATALOG_DECRYPTION_KEY: ${{ secrets.GEO_CATALOG_DECRYPTION_KEY }}
 
       - name: Build Nuxt application
         run: npm run build
