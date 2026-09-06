@@ -4,9 +4,9 @@ import type { FlatSort } from "~/types/flats";
 import { queryBoolean, queryString } from "~/utils/queryParams";
 import { useSearchRouteState } from "../search/useSearchRouteState";
 import { normalizeBearing } from "~/composables/flats/useMetroProximity";
+import { SOCIAL_FLAT_SOURCES } from "~/composables/flats/flatSources";
 
 const FLAT_SORTS: FlatSort[] = ["newest", "oldest", "priceAsc", "priceDesc", "titleAsc", "titleDesc"];
-const SOCIAL_FLAT_SOURCES = ["facebook", "threads"];
 
 export function useFlatRouteState(options: {
   router: Router;

@@ -1,52 +1,36 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFile } from 'node:fs/promises';
+import { createFlatLocationLabeler } from '../app/utils/flats/locationLabels.ts';
 
-import { zoneNameLabel } from '../app/utils/locationLabels.ts';
+const label = createFlatLocationLabeler([{
+  code: 'UZ', name: 'Backend country label', cities: ['City A', 'City B', 'City C'],
+  cityLabels: { 'City A': 'Backend city label' },
+  locations: {
+    'City A': { districts: ['Central'], districtLabels: { Central: 'A center' }, microdistrictLabels: { 'Zone-7': 'Backend zone 7' } },
+    'City B': { districts: ['Central'], districtLabels: { Central: 'B center' } },
+    'City C': { districts: ['Central'] },
+  },
+}]);
 
-const source = await readFile(new URL('../app/utils/locationLabels.ts', import.meta.url), 'utf8');
+test('flat labels use backend translations without changing canonical filter values', () => {
+  assert.equal(label('UZ', 'country'), 'Backend country label');
+  assert.equal(label('City A', 'city', 'UZ'), 'Backend city label');
+  assert.equal(label('Zone-7', 'microdistrict', 'UZ', 'City A'), 'Backend zone 7');
+  assert.equal(label('Zone-7', 'any', 'UZ', 'City A'), 'Backend zone 7');
+});
 
-// Zone aliases, transliteration and locality suffix rules belong to the released
-// parsing-lexicon API. Personal Site should only adapt its map values/context to
-// that API, never recreate dictionary traversal or Uzbek/Russian suffix probes.
-test('zone labels are resolved through the package-owned geography zone API', () => {
-  assert.match(source, /from '@whiteslove\/parsing-lexicon\/geography-zone-display'/);
-  assert.match(source, /geographyZoneDisplayName\(value, locale, \{/);
-  assert.match(source, /country: countryCode/);
-  assert.match(source, /city: cityName/);
+test('same-name locations cannot borrow a different city or country translation', () => {
+  assert.equal(label('Central', 'district', 'UZ', 'City A'), 'A center');
+  assert.equal(label('Central', 'district', 'UZ', 'City B'), 'B center');
+  assert.equal(label('Central', 'district', 'UZ', 'City C'), 'Central');
+  assert.equal(label('Central', 'district', 'UA', 'City A'), 'Central');
+  assert.equal(label('Central', 'district', 'UZ'), 'Central');
+  assert.equal(label('Central', 'district'), 'Central');
+});
 
-  for (const localDomainRule of [
-    /dictionaryFor\(/,
-    /normalizedAliasKeys\(/,
-    /UZBEK_CYRILLIC_SUFFIX_RE/,
-    /NON_RUSSIAN_CYRILLIC_RE/,
-    /dictionaryCompositeBaseLabel/,
-    /massivi/,
-    /даҳаси/iu,
-  ]) {
-    assert.doesNotMatch(source, localDomainRule);
+test('missing labels stay raw; no aliases, transliteration, or suffix rules are reconstructed', () => {
+  for (const value of ['Tashkent', 'Umid', 'Zzzblah-7A', 'central']) {
+    assert.equal(label(value, 'any', 'UZ', 'City A'), value);
   }
-});
-
-test('unknown zone values pass through unchanged', () => {
-  const unknown = 'Zzz-Definitely-Not-A-Real-Zone';
-  assert.equal(zoneNameLabel(unknown, 'ru', 'UZ', 'Tashkent'), unknown);
-  assert.equal(zoneNameLabel(unknown, 'en', 'UZ', 'Tashkent'), unknown);
-});
-
-test('numbered/composite zones preserve their canonical suffix when the base is unrecognized', () => {
-  assert.equal(zoneNameLabel('Zzzblah-7', 'ru', 'UZ', 'Tashkent'), 'Zzzblah-7');
-  assert.equal(zoneNameLabel('Zzzblah-7A', 'en', 'UZ', 'Tashkent'), 'Zzzblah-7A');
-});
-
-test('empty/nullish values pass through as-is', () => {
-  assert.equal(zoneNameLabel('', 'ru', 'UZ', 'Tashkent'), '');
-  assert.equal(zoneNameLabel(null, 'ru', 'UZ', 'Tashkent'), '');
-  assert.equal(zoneNameLabel(undefined, 'ru', 'UZ', 'Tashkent'), '');
-});
-
-test('a recognized mahalla is actually translated for Russian UI (without pinning the exact lexicon spelling)', () => {
-  const translated = zoneNameLabel('Umid', 'ru', 'UZ', 'Tashkent');
-  assert.notEqual(translated, 'Umid');
-  assert.ok(translated.length > 0);
+  for (const value of ['', null, undefined]) assert.equal(label(value), '');
 });

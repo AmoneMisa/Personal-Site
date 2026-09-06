@@ -1,11 +1,12 @@
 <script setup lang="ts">
-import { locationLabel, type LocationKind } from "~/utils/locationLabels";
+import type { FlatLocationLabeler } from "~/utils/flats/locationLabels";
 import type { FlatPriceBandKey, FlatStatistics, FlatStatsDealKey, FlatStatsGeoDimension, FlatStatsGeoRow } from "~/types/flats";
 
 const props = defineProps<{
   statistics: FlatStatistics;
   displayCurrency: string;
   convert: (amount: number, from: string, to: string) => number | undefined;
+  locationLabel: FlatLocationLabeler;
 }>();
 const { t: translate, locale } = useI18n();
 const t = (key: string, params: Record<string, unknown> = {}) => translate(`flats.${key}`, params);
@@ -125,8 +126,7 @@ function percent(value: number): string { return `${Math.round(value / total.val
 function dealLabel(key: string): string { if (key === "sale") return t("dtSale"); if (key === "shortRent") return t("dtShortRent"); if (key === "roomRent") return t("dtRoomRent"); return t("dtLongRent"); }
 function geoLabel(key: FlatStatsGeoDimension): string { return t(`statsGeo${key.charAt(0).toUpperCase()}${key.slice(1)}`); }
 function displayGeoLabel(value: string, dimension: FlatStatsGeoDimension): string {
-  const kind: LocationKind = dimension === "country" ? "country" : dimension === "city" ? "city" : dimension === "metro" ? "metro" : "district";
-  return locationLabel(value, locale.value, kind);
+  return props.locationLabel(value, dimension);
 }
 </script>
 

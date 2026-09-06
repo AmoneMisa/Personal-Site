@@ -17,9 +17,15 @@ export function useSearchRouteState(options: SearchRouteStateOptions) {
   }
 
   async function sync() {
-    await options.router.replace({
-      query: { ...options.serialize(), ...(options.preserve?.() || {}) },
-    });
+    try {
+      await options.router.replace({
+        query: { ...options.serialize(), ...(options.preserve?.() || {}) },
+      });
+    } catch {
+      // A newer route update can supersede this debounced navigation. The
+      // current filter state remains authoritative, so there is nothing for
+      // this helper to recover from.
+    }
   }
 
   function schedule(delay = options.debounceMs ?? 180) {

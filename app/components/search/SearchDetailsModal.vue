@@ -1,10 +1,12 @@
 <script setup lang="ts">
 import type { FlatListing } from "~/types/flats";
+import type { FlatLocationLabeler } from "~/utils/flats/locationLabels";
 import { useFlatDetailsTitle } from "~/composables/flats/useFlatDetailsTitle";
 
 const props = withDefaults(defineProps<{
   title: string;
   flatListing?: FlatListing | null;
+  flatLocationLabel?: FlatLocationLabeler;
   /** USD-converted price of flatListing. The modal has no exchange rates of its own. */
   flatPriceUsd?: number | null;
   publicId?: number | string | null;
@@ -24,6 +26,7 @@ const activeFlatListing = computed(() => isFlatFinder.value ? props.flatListing 
 const { text: flatTitleText, idTone: flatIdTone } = useFlatDetailsTitle({
   listing: activeFlatListing,
   priceUsd: computed(() => props.flatPriceUsd),
+  locationLabel: (...args) => props.flatLocationLabel?.(...args) ?? String(args[0] ?? ""),
 });
 const flatGoodPrice = computed(() => activeFlatListing.value?.marketComparison?.goodPrice === true);
 const flatGoodPriceLabel = computed(() => String(locale.value).toLowerCase().startsWith("en") ? "Good price" : "Хорошая цена");

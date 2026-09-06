@@ -1,5 +1,5 @@
 import type { FlatCardPresentation, FlatListing, FlatView } from "~/types/flats";
-import { locationLabel, type LocationKind } from "~/utils/locationLabels";
+import type { FlatLocationLabeler, FlatLocationKind } from "~/utils/flats/locationLabels";
 import { formatRelativeDate } from "~/utils/search/relativeDate";
 
 type Translate = (key: string, params?: Record<string, unknown>) => string;
@@ -7,6 +7,7 @@ type Translate = (key: string, params?: Record<string, unknown>) => string;
 interface FlatPresentationOptions {
   t: Translate;
   getLocale: () => string;
+  getLocationLabel: FlatLocationLabeler;
   getDisplayCurrency: () => string;
   getView: () => FlatView;
   getDealType: () => string;
@@ -18,15 +19,6 @@ interface FlatPresentationOptions {
 }
 
 const nearbyTranslationKeys: Record<string, string> = {
-  "Bobur Park": "nearbyBoburPark",
-  "Alay Bazaar": "nearbyAlayBazaar",
-  Darkhan: "nearbyDarkhan",
-  Novomoskovskaya: "nearbyNovomoskovskaya",
-  "Farhod Bazaar": "nearbyFarhodBazaar",
-  "Nizami Pedagogical University": "nearbyNizamiUniversity",
-  "World Languages University": "nearbyWorldLanguagesUniversity",
-  "Yangi Choshtepa": "nearbyYangiChoshtepa",
-  "Sergeli Car Bazaar": "nearbySergeliCarBazaar",
   Park: "nearbyPark",
   Playground: "nearbyPlayground",
   "Bus stop": "nearbyBusStop",
@@ -46,13 +38,6 @@ const nearbyTranslationKeys: Record<string, string> = {
   gazebo: "amenityGazebo",
 };
 
-const nearbyRuLabels: Record<string, string> = {
-  "Sergili Car Market": "Сергелийский авторынок",
-  "Sergili Farmers Market": "Сергелийский дехканский рынок",
-  "Turon Avto": "Туран Авто",
-  "Sergeli Car Bazaar": "Сергелийский авторынок",
-};
-
 const semanticListingTags = new Set([
   "for sale", "sale", "long term rent", "rent", "short term rent", "daily rent", "room rent", "room only",
   "agency", "owner", "no commission", "commission",
@@ -61,14 +46,15 @@ const semanticListingTags = new Set([
 export function useFlatPresentation(options: FlatPresentationOptions) {
   const { t } = options;
   const route = useRoute();
-  const locName = (value: string | null | undefined, kind: LocationKind = "any") =>
-    locationLabel(value, options.getLocale(), kind);
+  const locName = (value: string | null | undefined, kind: FlatLocationKind = "any", listing?: FlatListing) =>
+    options.getLocationLabel(value, kind, listing?.country || "", listing?.city || "");
   const selectedDistrict = () => options.getDistrict?.() || String(route.query.district || "");
   const selectedMetro = () => options.getMetro?.() || String(route.query.metro || "");
   const hasFineGeoFilter = () => Boolean(
     selectedMetro()
     || route.query.microdistrict
-    || route.query.kvartal
+    || route.query.quartal
+    || route.query.area
     || route.query.residenceComplex
     || route.query.residence_complex,
   );
@@ -102,10 +88,9 @@ export function useFlatPresentation(options: FlatPresentationOptions) {
     return parts.join(" · ") || t("listingFallbackTitle");
   }
 
-  function nearbyItemLabel(value: string): string {
+  function nearbyItemLabel(value: string, listing?: FlatListing): string {
     const key = nearbyTranslationKeys[value];
     if (key) return t(key);
-    if (options.getLocale().toLowerCase().startsWith("ru") && nearbyRuLabels[value]) return nearbyRuLabels[value]!;
 
     const normalized = value.trim().toLowerCase().replace(/[_-]+/g, " ").replace(/\s+/g, " ");
     const direct: Record<string, string> = {
@@ -145,7 +130,7 @@ export function useFlatPresentation(options: FlatPresentationOptions) {
     };
     const directKey = direct[normalized];
     if (directKey) return t(directKey);
-    return locName(value, "any");
+    return locName(value, "any", listing);
   }
 
   function audienceBadgeLabel(listing: FlatListing): string {
@@ -187,15 +172,15 @@ export function useFlatPresentation(options: FlatPresentationOptions) {
     const rooms = listing.rooms != null ? t("roomsN", { n: listing.rooms }) : "";
     if (hasFineGeoFilter()) return rooms;
 
-    const microdistrict = locName(listing.microdistrict || listing.kvartal, "any");
+    const microdistrict = locName(listing.microdistrict || listing.kvartal, "any", listing);
     const residenceComplex = listing.residenceComplex?.trim() || "";
-    const metro = locName(listing.metro, "metro");
+    const metro = locName(listing.metro, "metro", listing);
 
     if (selectedDistrict()) {
       return metro || microdistrict || residenceComplex || rooms;
     }
 
-    return locName(listing.district, "district") || metro || microdistrict || residenceComplex || rooms;
+    return locName(listing.district, "district", listing) || metro || microdistrict || residenceComplex || rooms;
   }
 
   function badgeData(listing: FlatListing): { values: string[]; visionLabels: string[] } {
@@ -242,7 +227,7 @@ export function useFlatPresentation(options: FlatPresentationOptions) {
     for (const tag of listing.tags || []) {
       const normalized = tag.trim().toLowerCase().replace(/[_-]+/g, " ").replace(/\s+/g, " ");
       if (semanticListingTags.has(normalized)) continue;
-      const label = nearbyItemLabel(tag).trim();
+      const label = nearbyItemLabel(tag, listing).trim();
       if (label) push(label);
     }
 
@@ -279,8 +264,8 @@ export function useFlatPresentation(options: FlatPresentationOptions) {
     if (listing.floor != null) specification.push(listing.totalFloors != null ? `${listing.floor}/${listing.totalFloors} ${t("floorAbbr")}` : `${listing.floor} ${t("floorAbbr")}`);
     const badgeResult = badgeData(listing);
     const cardLocation = [...new Set([
-      locName(listing.city, "city"),
-      locName(listing.district, "district"),
+      locName(listing.city, "city", listing),
+      locName(listing.district, "district", listing),
     ].filter(Boolean))].join(", ");
     const priceComparison = goodPriceData(listing);
 

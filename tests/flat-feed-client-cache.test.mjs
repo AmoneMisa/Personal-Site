@@ -23,7 +23,7 @@ test('a cached first page is painted before the network, then revalidated', () =
   assert.match(feed, /const cached = readFeedCache\(params\);/);
   assert.match(feed, /applyFirstPage\(cached\);/);
   // Still checks upstream behind the paint, so a stale answer self-corrects.
-  assert.match(feed, /void loadFeed\(params, \{ background: true \}\);/);
+  assert.match(feed, /void loadFeed\(params, \{ background: true, warmPoll: true \}\);/);
   // Only the first page is cacheable; appended pages depend on cursor/offset.
   assert.match(feed, /if \(!append\) writeFeedCache\(params, data\);/);
 });
@@ -59,7 +59,7 @@ test('map watchers do not deep-traverse zone boundaries on every tick', async ()
   assert.doesNotMatch(map, /\{ deep: true \}/);
   // The map feed keys off what it actually sends, so listing-detail params in
   // the URL cannot trigger a refetch at all.
-  assert.match(map, /watch\(\(\) => new URLSearchParams\(normalizedRouteQuery\(\)\)\.toString\(\), \(\) => \{ void loadFullMapFeed\(\); \}\)/);
+  assert.match(map, /watch\(\(\) => stableQueryKey\(normalizedRouteQuery\(\)\), \(\) => \{\s*preserveCamera = true;\s*void loadFullMapFeed\(\);\s*\}\)/);
 });
 
 test('the map feed is cached client-side too, and revalidated behind the paint', async () => {

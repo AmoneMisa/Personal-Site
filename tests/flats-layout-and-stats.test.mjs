@@ -36,8 +36,8 @@ test('flat cards stay equal within a row and use the target compact desktop/mobi
 
 test('flat card footer shows only city and district, without metro duplication', () => {
   assert.match(presentation, /const cardLocation = \[\.\.\.new Set\(\[/u)
-  assert.match(presentation, /locName\(listing\.city, "city"\)/u)
-  assert.match(presentation, /locName\(listing\.district, "district"\)/u)
+  assert.match(presentation, /locName\(listing\.city, "city", listing\)/u)
+  assert.match(presentation, /locName\(listing\.district, "district", listing\)/u)
   assert.doesNotMatch(presentation, /cardLocation[\s\S]{0,220}listing\.metro/u)
   assert.match(presentation, /location: cardLocation/u)
 })
@@ -50,7 +50,7 @@ test('flat card context badge follows ownership and geography filters', () => {
   assert.match(presentation, /route\.query\.microdistrict/u)
   assert.match(presentation, /route\.query\.residenceComplex/u)
   assert.match(presentation, /if \(selectedDistrict\(\)\)[\s\S]*?return metro \|\| microdistrict \|\| residenceComplex \|\| rooms/u)
-  assert.match(presentation, /return locName\(listing\.district, "district"\) \|\| metro \|\| microdistrict \|\| residenceComplex \|\| rooms/u)
+  assert.match(presentation, /return locName\(listing\.district, "district", listing\) \|\| metro \|\| microdistrict \|\| residenceComplex \|\| rooms/u)
 })
 
 test('good price badge consumes the database market comparison and stays pinned to the photo corner', () => {

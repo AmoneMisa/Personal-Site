@@ -16,7 +16,7 @@ test('map remains mounted when the active filters return no listings', () => {
   assert.doesNotMatch(page, /<section v-if="listings\.length" class="flats__map-wrap"/u);
   // The map keeps its own feed in step with the filters. Keyed off the params
   // it actually sends, so opening a listing or paging does not refetch it.
-  assert.match(source, /watch\(\(\) => new URLSearchParams\(normalizedRouteQuery\(\)\)\.toString\(\), \(\) => \{ void loadFullMapFeed\(\); \}\)/u);
+  assert.match(source, /watch\(\(\) => stableQueryKey\(normalizedRouteQuery\(\)\), \(\) => \{\s+preserveCamera = true;\s+void loadFullMapFeed\(\);\s+\}\)/u);
 });
 
 test('metro proximity rings consume clicks instead of falling through to districts', () => {

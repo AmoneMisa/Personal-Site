@@ -6,7 +6,10 @@ import {
 } from './feedCache'
 import { shapeListing, shapeLiveListing } from './feedListingShape'
 
-export const FLAT_API_URL = process.env.FLAT_API_URL || 'http://185.5.206.229:8082'
+// Flat Finder is a separate internal service. Keep the Docker service name as
+// the local default; production deployments can override it explicitly, but
+// must never fall back to an embedded public HTTP address.
+export const FLAT_API_URL = process.env.FLAT_API_URL || 'http://flat-finder-backend:4000'
 export const EXACT_LOOKUP_TIMEOUT_MS = 8_000
 
 type PublicListingLookupResult = {

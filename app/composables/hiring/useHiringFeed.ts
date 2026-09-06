@@ -34,7 +34,7 @@ export function useHiringFeed() {
       failed.value = false;
     }
 
-    const { data, error } = await safeFetch<HiringFeedResult>("/hiring-feed", { params });
+    const { data, error } = await safeFetch<HiringFeedResult>("/hiring-feed", { params, signal: requests.signal() });
     if (!requests.isLatest(requestId)) return undefined;
     if (error || !data || data.error) {
       if (!background) {

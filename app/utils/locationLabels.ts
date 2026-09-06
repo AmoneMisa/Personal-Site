@@ -4,9 +4,7 @@ import {
 } from '@whiteslove/parsing-lexicon'
 import {
   geographyDisplayName,
-  geographyMetroLabelWithAlias,
 } from '@whiteslove/parsing-lexicon/geography-display'
-import { geographyZoneDisplayName } from '@whiteslove/parsing-lexicon/geography-zone-display'
 
 export type LocationKind = 'country' | 'city' | 'district' | 'metro' | 'any'
 
@@ -41,23 +39,4 @@ export function locationLabel(
   return raw && exact === raw
     ? geographyDisplayName(value, locale, 'any')
     : exact
-}
-
-export function metroLabelWithAlias(value: string | null | undefined, locale: string): string {
-  return geographyMetroLabelWithAlias(value, locale)
-}
-
-// Canonical map-zone values remain owned by geo-catalog and are kept unchanged
-// for routing/filtering. All multilingual alias, transliteration and locality-
-// suffix presentation rules are owned by parsing-lexicon.
-export function zoneNameLabel(
-  value: string | null | undefined,
-  locale: string,
-  countryCode = '',
-  cityName = '',
-): string {
-  return geographyZoneDisplayName(value, locale, {
-    country: countryCode,
-    city: cityName,
-  })
 }

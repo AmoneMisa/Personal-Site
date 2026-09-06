@@ -1,5 +1,3 @@
-import { canonicalCityValue } from '../../shared/locationCatalog'
-
 export const ALL_FEED_SOURCES = ['olx', 'telegram', 'facebook', 'threads'] as const
 export const CURRENT_ALL_SOURCE_TOKENS = [...ALL_FEED_SOURCES, 'custom'] as const
 const SOCIAL_FEED_SOURCES = new Set(['telegram', 'facebook', 'threads'])
@@ -78,7 +76,7 @@ function socialDedupeKey(listing: any): string | null {
   const normalizedArea = Number.isFinite(areaSqm) ? Math.round(areaSqm * 2) / 2 : ''
   return [
     String(listing?.country || '').toUpperCase(),
-    canonicalCityValue(String(listing?.city || '')).toLowerCase(),
+    String(listing?.city || '').trim(),
     String(listing?.dealType || ''),
     String(listing?.propertyType || ''),
     String(listing?.price ?? ''),

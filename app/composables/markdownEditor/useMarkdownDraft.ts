@@ -1,4 +1,4 @@
-import {watch, type Ref} from "vue";
+import {onBeforeUnmount, watch, type Ref} from "vue";
 import {readStoredValue, writeStoredValue} from "~/utils/browserStorage";
 import type {MarkdownPlatform} from "~/utils/markdownEditor/platformFormatters";
 
@@ -21,6 +21,8 @@ type DraftOptions = {
 };
 
 export function useMarkdownDraft(options: DraftOptions) {
+  let saveTimer: ReturnType<typeof setTimeout> | undefined;
+
   function save() {
     writeStoredValue<DraftState>(options.storageKey, {
       input: options.input.value,
@@ -28,6 +30,14 @@ export function useMarkdownDraft(options: DraftOptions) {
       viewMode: options.viewMode.value,
       spellcheckEnabled: options.spellcheckEnabled.value,
     });
+  }
+
+  function scheduleSave() {
+    if (saveTimer) clearTimeout(saveTimer);
+    saveTimer = setTimeout(() => {
+      saveTimer = undefined;
+      save();
+    }, 300);
   }
 
   function load() {
@@ -52,9 +62,15 @@ export function useMarkdownDraft(options: DraftOptions) {
     if (options.input.value.length > options.maxLength) {
       options.input.value = options.input.value.slice(0, options.maxLength);
     }
+    scheduleSave();
+  });
+  watch([options.platform, options.viewMode, options.spellcheckEnabled], scheduleSave);
+
+  onBeforeUnmount(() => {
+    if (saveTimer) clearTimeout(saveTimer);
+    saveTimer = undefined;
     save();
   });
-  watch([options.platform, options.viewMode, options.spellcheckEnabled], save);
 
   return {load};
 }

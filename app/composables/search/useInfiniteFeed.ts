@@ -13,6 +13,7 @@ interface InfiniteFeedOptions {
 
 export function useInfiniteFeed(options: InfiniteFeedOptions) {
   let observer: IntersectionObserver | undefined;
+  let loadingFromObserver = false;
 
   function observe(element: HTMLElement | null) {
     if (element) observer?.observe(element);
@@ -20,11 +21,16 @@ export function useInfiniteFeed(options: InfiniteFeedOptions) {
 
   function setup() {
     observer?.disconnect();
+    if (typeof IntersectionObserver === "undefined") return;
     observer = new IntersectionObserver((entries) => {
       if (!entries.some((entry) => entry.isIntersecting)) return;
       if (!toValue(options.hasMore) || toValue(options.loading)) return;
       if (options.canLoad !== undefined && !toValue(options.canLoad)) return;
-      void options.loadMore();
+      if (loadingFromObserver) return;
+      loadingFromObserver = true;
+      Promise.resolve(options.loadMore()).finally(() => {
+        loadingFromObserver = false;
+      });
     }, {
       rootMargin: options.rootMargin ?? "400px 0px",
       threshold: options.threshold,

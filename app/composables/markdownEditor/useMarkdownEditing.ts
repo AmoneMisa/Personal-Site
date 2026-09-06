@@ -1,4 +1,5 @@
 import {nextTick, onBeforeUnmount, onMounted, ref, type Ref} from "vue";
+import {sanitizeMarkdownUrl} from "~/utils/markdownEditor/platformFormatters";
 
 export function useMarkdownEditing(
   input: Ref<string>,
@@ -150,7 +151,7 @@ export function useMarkdownEditing(
   async function insertLinkConfirmed() {
     const text = (linkText.value || input.value.slice(linkSelection.start, linkSelection.end) || "link").trim();
     const url = linkUrl.value.trim();
-    if (!url) return;
+    if (!url || !sanitizeMarkdownUrl(url)) return;
     const snippet = `[${text}](${url})`;
     input.value = input.value.slice(0, linkSelection.start) + snippet + input.value.slice(linkSelection.end);
     linkOpen.value = false;

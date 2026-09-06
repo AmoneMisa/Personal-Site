@@ -27,6 +27,12 @@ const props = withDefaults(defineProps<{
 
 const tag = computed(() => (props.to || props.href ? "a" : "button"));
 const isDisabled = computed(() => props.disabled || props.loading);
+
+function preventDisabledLink(event: MouseEvent) {
+  if (!isDisabled.value || tag.value !== "a") return;
+  event.preventDefault();
+  event.stopPropagation();
+}
 </script>
 
 <template>
@@ -39,6 +45,8 @@ const isDisabled = computed(() => props.disabled || props.loading);
       :disabled="tag === 'button' ? isDisabled : undefined"
       :aria-busy="loading || undefined"
       :aria-disabled="tag === 'a' && isDisabled ? 'true' : undefined"
+      :tabindex="tag === 'a' && isDisabled ? -1 : undefined"
+      @click="preventDisabledLink"
   >
     <!-- The spinner replaces the leading icon so the label never shifts. -->
     <span v-if="loading" class="u-button__spinner" aria-hidden="true" />

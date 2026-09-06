@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { safeFetch } from "~/utils/safeFetch";
-import { metroLabelWithAlias, locationLabel, zoneNameLabel, type LocationKind } from "~/utils/locationLabels";
 import {
   applyMetroProximity,
   arcForCompassPoint,
@@ -78,7 +77,7 @@ useSeoMeta({
 // What "Reset filters" selects. An empty list means every country, so a cleared
 // form needs a real choice rather than the absence of one.
 const defaultCountry = ref("UA");
-const flatFilters = useFlatFilters();
+const flatFilters = useFlatFilters({ locale: () => String(locale.value) });
 const {
   countries, city, district, microdistrict, quartal, mapArea, dealType, agency, petFriendly, roomOnlyFilter,
   onlyWithPhotos, childrenRequired, newBuildingOnly, dishwasherOnly, airConditionerOnly,
@@ -98,24 +97,6 @@ const {
 } = useFlatFeed({ onAvailabilityChecked: markAvailabilityFresh });
 const { listingPhoto, visiblePhotos, markPhotoFailedFromEvent } = useFlatPhotos();
 const view = ref<FlatView>("active");
-const {
-  presentCard,
-  displayListingTitle,
-  priceLabel,
-  convertedLabel,
-  nearbyItemLabel,
-  dealLabel,
-  ptLabel,
-} = useFlatPresentation({
-  t,
-  getLocale: () => String(locale.value),
-  getDisplayCurrency: () => displayCurrency.value,
-  getView: () => view.value,
-  getDealType: () => dealType.value,
-  getRoomOnly: () => roomOnlyFilter.value,
-  getAgency: () => agency.value,
-  convert,
-});
 const {
   favorites,
   hidden,
@@ -170,7 +151,6 @@ const viewTabs = computed(() => [
   { value: "hidden", label: t("hidden"), count: hidden.value.length },
 ]);
 
-const locName = (value: string | null | undefined, kind: LocationKind = "any") => locationLabel(value, locale.value, kind);
 const {
   districtOptions,
   metroOptions,
@@ -178,25 +158,64 @@ const {
   cityItems,
   districtItems,
   metroItems,
+  labelFor,
   loadMeta,
 } = useFlatMeta({
   countries,
   city,
   t,
-  locationLabel: (value, kind) => locName(value, kind),
+  locale: () => String(locale.value),
   preferredCountry: () => defaultCountry.value,
+});
+
+const locName = (value: string | null | undefined, kind: "country" | "city" | "district" | "metro" | "any" = "any") =>
+  labelFor(value, kind);
+const {
+  presentCard,
+  displayListingTitle,
+  priceLabel,
+  convertedLabel,
+  nearbyItemLabel,
+  dealLabel,
+  ptLabel,
+} = useFlatPresentation({
+  t,
+  getLocale: () => String(locale.value),
+  getLocationLabel: (value, kind = "any", countryCode = "", cityName = "") => kind === "any"
+    ? zoneLabel(value, countryCode, cityName)
+    : labelFor(value, kind, countryCode, cityName),
+  getDisplayCurrency: () => displayCurrency.value,
+  getView: () => view.value,
+  getDealType: () => dealType.value,
+  getRoomOnly: () => roomOnlyFilter.value,
+  getAgency: () => agency.value,
+  convert,
 });
 
 const {
   districtZones, microdistrictMarkers, quartalMarkers, metroStations,
   universityZones, shoppingMallZones, parkZones, areaZones, cityZone,
-  districtForPoint,
+  allZones: allGeoZones,
 } = useDistrictZones({
   countries,
   city,
-  districtOptions,
   locale: () => String(locale.value),
 });
+const zoneLabels = computed(() => {
+  const labels = new Map<string, string | null>();
+  for (const zone of allGeoZones.value) {
+    labels.set(zone.name, labels.has(zone.name) && labels.get(zone.name) !== zone.label ? null : zone.label);
+  }
+  return labels;
+});
+const zoneLabel = (value: string | null | undefined, countryCode = countries.value[0] || "", cityName = city.value) => {
+  const raw = String(value ?? "").trim();
+  if (!raw) return "";
+  const scoped = countryCode === countries.value[0] && cityName === city.value;
+  return (scoped ? zoneLabels.value.get(raw) : undefined)
+    || labelFor(raw, "any", countryCode, cityName)
+    || raw;
+};
 
 function onZoneSelect({ kind, name }: { kind: "district" | "microdistrict" | "quartal" | "area" | "metro"; name: string; radiusM?: number }) {
   if (kind === "district") district.value = name;
@@ -263,7 +282,7 @@ const nearbyKindItems = computed<Item[]>(() => [
 // never selectable back into -- you get a custom arc by dragging, not by picking.
 const METRO_CUSTOM_ARC_VALUE = "__custom__";
 const nearbyKindSel = useNullableSelect(nearbyKind);
-const metroChipLabel = computed(() => metro.value.map((name) => metroLabelWithAlias(name, locale.value) || name).join(", "));
+const metroChipLabel = computed(() => metro.value.map((name) => zoneLabel(name)).join(", "));
 // The arc is normally set by dragging the wedge handles. This mirror of it keeps
 // the filter reachable without a pointer, and gives the chip something readable:
 // a dragged arc that is not one of the eight slices still shows its degrees.
@@ -338,7 +357,8 @@ const districtSel = useNullableSelect(district);
 const microdistrictSel = useNullableSelect(microdistrict);
 const quartalSel = useNullableSelect(quartal);
 const mapAreaSel = useNullableSelect(mapArea);
-// Options come straight from the geo catalog (the same zones the map draws),
+// Options come from Flat Finder's canonical district-zones response (the same
+// zones the map draws),
 // not from /flats-meta -- there's no per-listing aggregation for these finer
 // levels yet, so the list can include zones with no current listings.
 const zoneItems = (zones: { name: string; label: string }[]): Item[] =>
@@ -726,8 +746,9 @@ const fmtBool = (v?: boolean | null) => (v === true ? t("yes") : v === false ? t
 const numOr = (v?: number | null, unit = "") => (v != null ? `${v}${unit ? " " + unit : ""}` : t("notSpecified"));
 const strOr = (v?: string | null) => (v ? v : t("notSpecified"));
 const listOr = (v?: string[] | null) => (v && v.length ? v.join(", ") : t("notSpecified"));
-const nearbyListOr = (values?: string[] | null) => values?.length ? values.map(nearbyItemLabel).join(", ") : t("notSpecified");
-const amenitiesListOr = (values?: string[] | null) => values?.length ? values.map(nearbyItemLabel).join(", ") : t("notSpecified");
+const nearbyListOr = (values?: string[] | null) => values?.length
+  ? values.map((value) => nearbyItemLabel(value, active.value || undefined)).join(", ") : t("notSpecified");
+const amenitiesListOr = nearbyListOr;
 const walkingDistanceLabel = (meters: number) => {
   if (meters < 1000) return `${Math.round(meters)} ${String(locale.value).startsWith("ru") ? "м" : "m"}`;
   const km = meters / 1000;
@@ -735,7 +756,7 @@ const walkingDistanceLabel = (meters: number) => {
   return `${value} ${String(locale.value).startsWith("ru") ? "км" : "km"}`;
 };
 const metroSpecValue = (listing: Listing) => {
-  const name = metroLabelWithAlias(listing.metro, locale.value);
+  const name = zoneLabel(listing.metro, listing.country || countries.value[0] || "", listing.city || city.value);
   if (!name) return t("notSpecified");
   const distance = listing.metroWalkingDistanceM;
   if (distance == null) return name;
@@ -810,9 +831,9 @@ const specRows = computed<FlatSpecRow[]>(() => {
     row("property", t("specCondition"), conditionLabel(l.condition)),
     row("property", t("specComplex"), strOr(l.residenceComplex), true),
 
-    row("location", t("specCity"), strOr(locName(l.city, "city"))),
-    row("location", t("specDistrict"), strOr(locName(l.district, "district"))),
-    row("location", t("specKvartal"), strOr(zoneNameLabel(l.area || l.kvartal, locale.value, l.country, l.city))),
+    row("location", t("specCity"), strOr(labelFor(l.city, "city", l.country || "", l.city || ""))),
+    row("location", t("specDistrict"), strOr(labelFor(l.district, "district", l.country || "", l.city || ""))),
+    row("location", t("specKvartal"), strOr(zoneLabel(l.area || l.kvartal, l.country, l.city))),
     row("location", t("specMetro"), metroSpecValue(l)),
     row("location", t("specTram"), transportListOr(l, "tram"), true),
     row("location", t("specBus"), transportListOr(l, "bus"), true),
@@ -952,24 +973,6 @@ watch(
       scheduleQuerySync(isFeedCached(currentFeedParams()) ? 0 : undefined);
     },
 );
-// Metro/microdistrict/quartal/area selections are finer-grained than district, so
-// whichever one the user picks (from the map or these filter dropdowns) should
-// drag the district selector along with it instead of leaving a stale, unrelated
-// district shown next to it.
-watch([metro, microdistrict, quartal, mapArea], ([nextMetro, nextMicrodistrict, nextQuartal, nextArea], previous) => {
-  if (restoring.value) return;
-  const [prevMetro, prevMicrodistrict, prevQuartal, prevArea] = previous || [];
-  let zone: { lat: number; lng: number } | undefined;
-  // Only the first station drags the district selector along: several stations
-  // can straddle several districts, and there is no single right answer then.
-  if (nextMetro.length && nextMetro[0] !== prevMetro?.[0]) zone = metroStations.value.find((z) => z.name === nextMetro[0]);
-  else if (nextMicrodistrict && nextMicrodistrict !== prevMicrodistrict) zone = microdistrictMarkers.value.find((z) => z.name === nextMicrodistrict);
-  else if (nextQuartal && nextQuartal !== prevQuartal) zone = quartalMarkers.value.find((z) => z.name === nextQuartal);
-  else if (nextArea && nextArea !== prevArea) zone = areaZones.value.find((z) => z.name === nextArea);
-  if (!zone) return;
-  const nextDistrict = districtForPoint(zone);
-  if (nextDistrict && nextDistrict !== district.value) district.value = nextDistrict;
-});
 watch(city, () => { if (restoring.value) return; district.value = ""; microdistrict.value = ""; quartal.value = ""; mapArea.value = ""; metro.value = []; query.value = ""; });
 watch(countries, () => { if (restoring.value) return; district.value = ""; microdistrict.value = ""; quartal.value = ""; mapArea.value = ""; metro.value = []; city.value = ""; query.value = ""; });
 onBeforeUnmount(() => { modalOpen.value = false; lightboxOpen.value = false; releaseStuckScrollLock(); if (loadTimer) clearTimeout(loadTimer); if (sharedListingTimer) clearTimeout(sharedListingTimer); cancelTranslation(); });
@@ -1056,9 +1059,9 @@ onBeforeUnmount(() => { modalOpen.value = false; lightboxOpen.value = false; rel
         <UiFilterFooter class="filter-actions-row" :reset-label="t('reset')" @reset="resetFilters">
           <div class="active-filter-chips">
             <button v-if="district" type="button" class="filter-chip" @click="district = ''; scheduleLoad()">{{ t("district") }}: {{ locName(district, 'district') }} <span>×</span></button>
-            <button v-if="microdistrict" type="button" class="filter-chip" @click="microdistrict = ''; scheduleLoad()">{{ t("microdistrictsLayer") }}: {{ zoneNameLabel(microdistrict, locale, countries[0], city) }} <span>×</span></button>
-            <button v-if="quartal" type="button" class="filter-chip" @click="quartal = ''; scheduleLoad()">{{ t("quartalsLayer") }}: {{ zoneNameLabel(quartal, locale, countries[0], city) }} <span>×</span></button>
-            <button v-if="mapArea" type="button" class="filter-chip" @click="mapArea = ''; scheduleLoad()">{{ t("areasLayer") }}: {{ zoneNameLabel(mapArea, locale, countries[0], city) }} <span>×</span></button>
+            <button v-if="microdistrict" type="button" class="filter-chip" @click="microdistrict = ''; scheduleLoad()">{{ t("microdistrictsLayer") }}: {{ zoneLabel(microdistrict) }} <span>×</span></button>
+            <button v-if="quartal" type="button" class="filter-chip" @click="quartal = ''; scheduleLoad()">{{ t("quartalsLayer") }}: {{ zoneLabel(quartal) }} <span>×</span></button>
+            <button v-if="mapArea" type="button" class="filter-chip" @click="mapArea = ''; scheduleLoad()">{{ t("areasLayer") }}: {{ zoneLabel(mapArea) }} <span>×</span></button>
             <button v-if="metro.length" type="button" class="filter-chip" @click="clearMetroFilter()">{{ t("metro") }}: {{ metroChipLabel }} <span>×</span></button>
             <button v-if="metroArcLabel" type="button" class="filter-chip" @click="clearMetroArc()">{{ t("metroDirection") }}: {{ metroArcLabel }} <span>×</span></button>
             <button v-if="roomsMin != null" type="button" class="filter-chip" @click="roomsMin = undefined; scheduleLoad()">{{ roomsMin }}+ {{ t('roomsChip') }} <span>×</span></button>
@@ -1093,7 +1096,7 @@ onBeforeUnmount(() => { modalOpen.value = false; lightboxOpen.value = false; rel
       <p class="flats__count text-muted">{{ t("found", { n: view === 'active' ? total : displayedListings.length }) }}</p>
       <UiSortSelect class="flats__sort" v-model="sort" :items="sortItems" :label="extraLabels.sort" @update:model-value="scheduleLoad(0)" />
     </div>
-    <FlatsStatsPanel v-if="view === 'active' && statistics" :statistics="statistics" :display-currency="displayCurrency" :convert="convert" />
+    <FlatsStatsPanel v-if="view === 'active' && statistics" :statistics="statistics" :display-currency="displayCurrency" :convert="convert" :location-label="(value, kind) => labelFor(value, kind)" />
 <section class="flats__map-wrap"><flat-map :points="mapPoints" :draw-label="t('drawArea')" :done-label="t('done')" :clear-label="t('clearArea')" :draw-hint="t('drawHint')" :expand-label="t('mapExpand')" :collapse-label="t('mapCollapse')" :scroll-hint-label="t('mapScrollHint')" :district-zones="districtZones" :microdistrict-markers="microdistrictMarkers" :quartal-markers="quartalMarkers" :metro-stations="metroStations" :university-zones="universityZones" :shopping-mall-zones="shoppingMallZones" :park-zones="parkZones" :area-zones="areaZones" :city-zone="cityZone" :selected-district="district" :selected-microdistrict="microdistrict" :selected-quartal="quartal" :selected-area="mapArea" :selected-metros="metro" :selected-metro-radius-m="metroMaxM" :metro-bearing-from="metroBearingFrom" :metro-bearing-to="metroBearingTo" :metro-radius-handle-label="t('metroRadiusHandle')" :metro-arc-handle-label="t('metroArcHandle')" :fit-results-label="t('mapFitResults')" :districts-label="t('districtsLayer')" :microdistricts-label="t('microdistrictsLayer')" :quartals-label="t('quartalsLayer')" :metro-label="t('metro')" :universities-label="t('universitiesLayer')" :shopping-malls-label="t('shoppingMallsLayer')" :parks-label="t('parksLayer')" :areas-label="t('areasLayer')" :city-label="t('cityLayer')" @select="openById" @area-change="drawnArea = $event" @zone-select="onZoneSelect" @metro-toggle="onMetroToggle" @metro-shape="onMetroShape" /></section>
 
     <SearchResultGrid>
@@ -1121,7 +1124,7 @@ onBeforeUnmount(() => { modalOpen.value = false; lightboxOpen.value = false; rel
 
     </UiResultsLoader>
 
-    <SearchDetailsModal v-model:open="modalOpen" :title="modalTitle(active)" :flat-listing="active" :flat-price-usd="activePriceUsd" :dismissible="!lightboxOpen">
+    <SearchDetailsModal v-model:open="modalOpen" :title="modalTitle(active)" :flat-listing="active" :flat-location-label="labelFor" :flat-price-usd="activePriceUsd" :dismissible="!lightboxOpen">
       <template #title><h2 class="flat-modal__title">{{ modalTitle(active) }}</h2></template>
       <template #body><div v-if="active" class="flat-modal"><FlatGallery v-model:lightbox-open="lightboxOpen" :photos="visiblePhotos(active)" :title="modalTitle(active)" :viewer-label="t('photoViewer')" :previous-label="t('previousPhoto')" :next-label="t('nextPhoto')" :close-label="t('closePhoto')" @photo-error="markPhotoFailedFromEvent" /><div v-if="checkingListingKey === listingKey(active)" class="flat-modal__verification" role="status" aria-live="polite"><u-icon name="i-lucide-loader-circle" class="flat-modal__verification-icon" /><span>{{ t("checkingListing") }}</span></div><UiSpecTable :rows="specRows" :hide-empty-label="t('hideEmpty')" :empty-value="t('notSpecified')"><template #header><div class="flat-modal__price">{{ priceLabel(active) }}<span v-if="convertedLabel(active)" class="flat-modal__price-conv"> ({{ convertedLabel(active) }})</span><span v-if="dealLabel(active.dealType)" class="flat-modal__deal"> · {{ dealLabel(active.dealType) }}</span><span v-if="active.roomOnly" class="flat-modal__deal"> · {{ t("roomShare") }}</span></div></template></UiSpecTable><div v-if="active.description && descriptionNeedsTranslation" class="flat-modal__translation"><u-button type="button" variant="outline" color="neutral" size="sm" icon="i-lucide-languages" :loading="translatingDescription" @click="translateActiveDescription">{{ translatingDescription ? t("translatingDescription") : t("translateDescription") }}</u-button><span v-if="translationFailed" class="flat-modal__translation-error">{{ t("translationFailed") }}</span></div><section v-if="translatedDescription" class="flat-modal__translated"><h4 class="flat-modal__translated-title">{{ t("translatedDescription") }}</h4><p class="flat-modal__desc">{{ translatedDescription }}</p></section><details v-if="active.description" class="flat-modal__descbox"><summary>{{ t("origDescription") }}</summary><p class="flat-modal__desc">{{ capitalizeFirst(active.description) }}</p></details><div v-if="active.tags && active.tags.length" class="flat-modal__tags"><span v-for="tag in active.tags" :key="tag" class="flat-modal__tag">{{ nearbyItemLabel(tag) }}</span></div></div></template>
       <template #footer><UiModalFooter v-if="active"><u-button variant="outline" color="neutral" icon="i-lucide-heart" @click="toggleFavorite(active)">{{ isFavorite(active.id) ? t("removeFavorite") : t("addFavorite") }}</u-button><u-button variant="outline" color="neutral" :icon="isHidden(active.id) ? 'i-lucide-eye' : 'i-lucide-eye-off'" @click="toggleHidden(active)">{{ isHidden(active.id) ? t("restoreListing") : t("hideListing") }}</u-button><u-button variant="outline" color="neutral" :icon="shareCopied ? 'i-lucide-check' : 'i-lucide-share-2'" @click="shareFlat(active)">{{ shareCopied ? t("shareCopied") : t("share") }}</u-button><a class="modal-footer__primary" :href="active.url" target="_blank" rel="noopener noreferrer">{{ t("open") }} →</a></UiModalFooter></template>

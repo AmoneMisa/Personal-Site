@@ -23,7 +23,7 @@ type IndicesBundle = {
   key: string;
   updatedAtISO: string;
   normalized: IndicesNormalized;
-  raw?: any;
+  raw?: unknown;
 };
 
 type BundlesResponse = { items: IndicesBundle[] };
@@ -36,9 +36,12 @@ const {t} = useI18n();
 const route = useRoute();
 const router = useRouter();
 
-function encodeProfileToParam(profile: any) {
-  const json = JSON.stringify(profile);
-  return btoa(unescape(encodeURIComponent(json)))
+function encodeProfileToParam(profile: unknown) {
+  const json = JSON.stringify(profile) ?? "null";
+  const bytes = new TextEncoder().encode(json);
+  let binary = "";
+  for (const byte of bytes) binary += String.fromCharCode(byte);
+  return btoa(binary)
       .replaceAll("+", "-")
       .replaceAll("/", "_")
       .replaceAll("=", "");
@@ -47,7 +50,9 @@ function encodeProfileToParam(profile: any) {
 function decodeProfileFromParam(s: string) {
   const padded = s + "===".slice((s.length + 3) % 4);
   const b64 = padded.replaceAll("-", "+").replaceAll("_", "/");
-  const json = decodeURIComponent(escape(atob(b64)));
+  const binary = atob(b64);
+  const bytes = Uint8Array.from(binary, (character) => character.charCodeAt(0));
+  const json = new TextDecoder().decode(bytes);
   return JSON.parse(json);
 }
 
@@ -166,10 +171,13 @@ watch(selectedCountries, scheduleQueryUpdate, {deep: true});
 // Indices cache
 // --------------------
 const indicesMap = ref<Record<string, IndicesBundle | undefined>>({});
-const indicesLoading = ref(false);
+const activeIndexRequests = ref(0);
+const indicesLoading = computed(() => activeIndexRequests.value > 0);
 
 const loaded = new Set<string>();
 const pending = new Set<string>();
+const retryAfter = new Map<string, number>();
+const INDEX_RETRY_DELAY_MS = 30_000;
 
 async function fetchBundles(keys: string[]) {
   const res = await $fetch<BundlesResponse>("/api/indices/bundles", {
@@ -180,26 +188,34 @@ async function fetchBundles(keys: string[]) {
   for (const b of res.items ?? []) {
     indicesMap.value[b.key] = b;
     loaded.add(b.key);
+    retryAfter.delete(b.key);
   }
 
-  for (const k of keys) loaded.add(k);
+  const returned = new Set((res.items ?? []).map((bundle) => bundle.key));
+  for (const k of keys) {
+    if (!returned.has(k)) retryAfter.set(k, Date.now() + INDEX_RETRY_DELAY_MS);
+  }
 }
 
 async function ensureIndices(keys: string[]) {
   const uniq = Array.from(new Set(keys)).filter(Boolean);
-  const toLoad = uniq.filter((k) => !loaded.has(k) && !pending.has(k));
+  const now = Date.now();
+  const toLoad = uniq.filter((k) => !loaded.has(k)
+    && !pending.has(k)
+    && (!retryAfter.has(k) || (retryAfter.get(k) ?? 0) <= now));
   if (!toLoad.length) return;
 
   toLoad.forEach((k) => pending.add(k));
-  indicesLoading.value = true;
+  activeIndexRequests.value += 1;
 
   try {
     await fetchBundles(toLoad);
   } catch (e) {
+    toLoad.forEach((key) => retryAfter.set(key, Date.now() + INDEX_RETRY_DELAY_MS));
     console.error("Failed to fetch indices bundles:", e);
   } finally {
     toLoad.forEach((k) => pending.delete(k));
-    indicesLoading.value = false;
+    activeIndexRequests.value = Math.max(0, activeIndexRequests.value - 1);
   }
 }
 

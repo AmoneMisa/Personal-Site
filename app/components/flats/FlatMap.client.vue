@@ -2,6 +2,9 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import type { FlatMapFeedResult, FlatMapPoint } from "~/types/flats";
 import { primaryBoundaryGeometry } from "~/utils/mapBoundaryFocus";
+import { stableQueryKey } from "~/utils/stableQueryKey";
+import { mapText, districtLabel, amenityMarker } from "~/utils/flats/mapContent";
+import type { FlatGeoZone as FlatMapZone } from "~~/shared/contracts/flatGeo";
 import {
   bearingBetween,
   destinationPoint,
@@ -40,17 +43,6 @@ interface MapFocusDetail {
   country?: string;
   lat: number;
   lng: number;
-}
-
-interface FlatMapZone {
-  id: string;
-  name: string;
-  label: string;
-  lat: number;
-  lng: number;
-  radiusM: number;
-  color: string;
-  boundary?: { type: "Polygon" | "MultiPolygon"; coordinates: unknown };
 }
 
 type ZoneKind = "district" | "microdistrict" | "quartal" | "area" | "metro";
@@ -171,6 +163,8 @@ function readMapFeedCache(key: string): FlatPoint[] | undefined {
     mapFeedCache.delete(key);
     return undefined;
   }
+  mapFeedCache.delete(key);
+  mapFeedCache.set(key, entry);
   return entry.points;
 }
 
@@ -222,7 +216,7 @@ function shapeMapPoints(data: FlatMapFeedResult | undefined): FlatPoint[] {
 async function loadFullMapFeed() {
   if (!import.meta.client) return;
   const query = normalizedRouteQuery();
-  const key = new URLSearchParams(query).toString();
+  const key = stableQueryKey(query);
   if (key === lastMapFeedKey && remotePoints.value.length) return;
   lastMapFeedKey = key;
   const sequence = ++mapFeedSequence;
@@ -250,7 +244,11 @@ async function loadFullMapFeed() {
 
 const renderedPoints = computed<FlatPoint[]>(() => {
   const merged = new Map<string, FlatPoint>();
+  const remoteByIdentity = new Map<string, FlatPoint>();
   for (const point of remotePoints.value) merged.set(pointKey(point), point);
+  for (const point of remotePoints.value) {
+    remoteByIdentity.set(`${point.source || ""}:${point.id}`, point);
+  }
   // Loaded cards win: they contain localized titles, converted prices and photos.
   for (const point of props.points) {
     const exactKey = pointKey(point);
@@ -258,7 +256,7 @@ const renderedPoints = computed<FlatPoint[]>(() => {
       merged.set(exactKey, point);
       continue;
     }
-    const remote = remotePoints.value.find((candidate) => candidate.id === point.id && candidate.source === point.source);
+    const remote = remoteByIdentity.get(`${point.source || ""}:${point.id}`);
     merged.set(remote ? pointKey(remote) : exactKey, { ...remote, ...point });
   }
   return [...merged.values()];
@@ -308,12 +306,17 @@ let parkLayer: any = null;
 let zoneAreaLayer: any = null;
 let cityLayer: any = null;
 let lastFitSig = "";
+// Initial card/map responses may frame the results until the user chooses a
+// view or changes filters. Later feed refreshes must preserve that view.
+let preserveCamera = false;
 let metroShapePath: any = null;
 let metroShapeStation: FlatMapZone | null = null;
 let metroRadiusHandle: any = null;
 let metroFromHandle: any = null;
 let metroToHandle: any = null;
 let draggingMetroHandle: any = null;
+let expandedSizeTimers: ReturnType<typeof setTimeout>[] = [];
+let focusTimer: number | undefined;
 
 async function setExpanded(value: boolean) {
   expanded.value = value;
@@ -326,8 +329,11 @@ async function setExpanded(value: boolean) {
   else map?.scrollWheelZoom?.disable();
   await nextTick();
   requestAnimationFrame(() => map?.invalidateSize());
-  setTimeout(() => map?.invalidateSize(), 260);
-  setTimeout(() => map?.invalidateSize(), 600);
+  expandedSizeTimers.forEach((timer) => clearTimeout(timer));
+  expandedSizeTimers = [
+    setTimeout(() => map?.invalidateSize(), 260),
+    setTimeout(() => map?.invalidateSize(), 600),
+  ];
 }
 
 function toggleExpanded() {
@@ -471,13 +477,16 @@ function focusOnPoint(detail: MapFocusDetail) {
   const lat = Number(detail?.lat);
   const lng = Number(detail?.lng);
   if (!Number.isFinite(lat) || !Number.isFinite(lng) || Math.abs(lat) > 90 || Math.abs(lng) > 180) return;
+  preserveCamera = true;
   focusedPoint.value = { ...detail, lat, lng };
   renderFocusedPoint();
 
   const shell = el.value?.closest(".flat-map-shell") as HTMLElement | null;
   shell?.scrollIntoView({ behavior: "smooth", block: "center" });
   if (!map) return;
-  window.setTimeout(() => {
+  if (focusTimer) clearTimeout(focusTimer);
+  focusTimer = window.setTimeout(() => {
+    focusTimer = undefined;
     map?.invalidateSize?.();
     map?.flyTo?.([lat, lng], FOCUS_ZOOM, { animate: true, duration: 0.75 });
     renderFocusedPoint();
@@ -520,8 +529,10 @@ function openPoint(point: FlatPoint) {
 
 function openCluster(c: Cluster) {
   const L = Leaflet;
-  if (c.items.length === 1) {
-    openPoint(c.items[0]);
+  if (!L || !map || !c.items.length) return;
+  const onlyPoint = c.items.length === 1 ? c.items[0] : undefined;
+  if (onlyPoint) {
+    openPoint(onlyPoint);
     return;
   }
   // A formed cluster's on-screen spread is small by construction (that's why the
@@ -562,7 +573,7 @@ function slotStyle(i: number, n: number) {
 }
 
 function fitToPoints() {
-  if (!map || focusedPoint.value) return;
+  if (!map || focusedPoint.value || preserveCamera || props.cityZone || selectedZoneFromProps()) return;
   const bounds: [number, number][] = [];
   for (const p of renderedPoints.value) {
     if (Number.isFinite(p.lat) && Number.isFinite(p.lng)) bounds.push([p.lat, p.lng]);
@@ -589,11 +600,11 @@ function fitToPointsNow() {
     if (Number.isFinite(p.lat) && Number.isFinite(p.lng)) bounds.push([p.lat, p.lng]);
   }
   if (!bounds.length) return;
+  preserveCamera = true;
   focusedPoint.value = null;
   renderFocusedPoint();
   map.fitBounds(bounds, { padding: [30, 30], maxZoom: 16 });
-  // Let the automatic fit run again for the next result set rather than
-  // treating this manual framing as the one already applied.
+  // This explicit action owns the camera even when another feed arrives.
   lastFitSig = "";
 }
 
@@ -602,7 +613,7 @@ function renderArea() {
   if (!areaLayer || !L) return;
   areaLayer.clearLayers();
   if (area.value.length >= 2) {
-    const points = area.value.map((point) => [point.lat, point.lng]);
+    const points = area.value.map((point): [number, number] => [point.lat, point.lng]);
     if (area.value.length >= 3) {
       L.polygon(points, { color: "#e0679a", weight: 2, fillColor: "#e0679a", fillOpacity: 0.16 }).addTo(areaLayer);
     } else {
@@ -717,6 +728,7 @@ function syncSelectionFromProps(focus = false) {
 
 function focusZone(zone: FlatMapZone) {
   if (!map) return;
+  preserveCamera = true;
   if (zone.boundary && Leaflet) {
     const focusBoundary = primaryBoundaryGeometry(zone.boundary);
     map.flyToBounds(Leaflet.geoJSON(focusBoundary as any).getBounds(), { padding: [42, 42], maxZoom: 15, duration: 0.65 });
@@ -733,6 +745,7 @@ function kindZoom(zone: FlatMapZone): number {
 // back to an approximated circle (sized upstream to avoid overlap) when it doesn't.
 function renderZoneShape(layerGroup: any, zone: FlatMapZone, kind: ZoneKind, style: Record<string, unknown>) {
   const L = Leaflet;
+  if (!L || !layerGroup) return null;
   const selected = isZoneSelected(kind, zone.name);
   const baseWeight = Number(style.weight ?? 2);
   const baseFillOpacity = Number(style.fillOpacity ?? 0.16);
@@ -746,13 +759,13 @@ function renderZoneShape(layerGroup: any, zone: FlatMapZone, kind: ZoneKind, sty
   if (zone.boundary) {
     const shape = L.geoJSON(zone.boundary as any, { style: () => selectedStyle, bubblingMouseEvents: false }).addTo(layerGroup);
     shape.on("click", onClick);
-    shape.bindTooltip(zone.label, { direction: "top" });
+    shape.bindTooltip(mapText(zone.label), { direction: "top" });
     if (selected) shape.openTooltip?.();
     return shape;
   }
   const circle = L.circle([zone.lat, zone.lng], { radius: zone.radiusM, ...selectedStyle, bubblingMouseEvents: false }).addTo(layerGroup);
   circle.on("click", onClick);
-  circle.bindTooltip(zone.label, { direction: "top" });
+  circle.bindTooltip(mapText(zone.label), { direction: "top" });
   if (selected) circle.openTooltip?.();
   return circle;
 }
@@ -768,7 +781,7 @@ function renderDistrictZones() {
     renderZoneShape(districtLayer, zone, "district", { color: zone.color, weight: 2.5, opacity: dimmed ? 0.5 : 0.9, fillColor: zone.color, fillOpacity: dimmed ? 0.08 : 0.22, className });
     const label = L.divIcon({
       className: "flat-zone-label-wrap",
-      html: `<span class="flat-zone-label${dimmed ? " flat-zone-label_dim" : ""}" style="border-color:${zone.color}">${zone.label}</span>`,
+      html: districtLabel(zone.label, zone.color, dimmed),
       iconSize: [0, 0],
     });
     L.marker([zone.lat, zone.lng], { icon: label, interactive: false }).addTo(districtLayer);
@@ -817,6 +830,7 @@ function metroToggle(station: FlatMapZone) {
 /** The preset rings, drawn only while nothing is selected yet (discovery mode). */
 function renderMetroPresetRings(station: FlatMapZone) {
   const L = Leaflet;
+  if (!L || !metroLayer) return;
   for (const [radius, color, opacity] of METRO_PRESET_RINGS) {
     const ring = L.circle([station.lat, station.lng], {
       radius,
@@ -827,7 +841,7 @@ function renderMetroPresetRings(station: FlatMapZone) {
       fillOpacity: opacity,
       bubblingMouseEvents: false,
     }).addTo(metroLayer);
-    ring.bindTooltip(`${station.label} · ${radius} m`, { direction: "top" });
+    ring.bindTooltip(mapText(`${station.label} · ${radius} m`), { direction: "top" });
     ring.on("click", (event: any) => handleLayerClick(event, () => {
       const point = eventLatLng(event);
       const nearest = point ? nearestMetroStation(point) : station;
@@ -884,6 +898,7 @@ function refreshMetroShape() {
 
 function makeMetroHandle(station: FlatMapZone, kind: "radius" | "from" | "to") {
   const L = Leaflet;
+  if (!L) return null;
   const at = destinationPoint(station, handleBearing(kind), shapeRadiusM.value);
   const handle = L.marker([at.lat, at.lng], {
     draggable: true,
@@ -897,9 +912,9 @@ function makeMetroHandle(station: FlatMapZone, kind: "radius" | "from" | "to") {
     }),
   });
   handle.bindTooltip(
-    kind === "radius"
+    mapText(kind === "radius"
       ? props.metroRadiusHandleLabel || "Drag to set distance"
-      : props.metroArcHandleLabel || "Drag to set direction",
+      : props.metroArcHandleLabel || "Drag to set direction"),
     { direction: "top" },
   );
 
@@ -961,7 +976,7 @@ function makeMetroHandle(station: FlatMapZone, kind: "radius" | "from" | "to") {
 function renderMetroSelection(stations: FlatMapZone[]) {
   const L = Leaflet;
   const primary = stations[0];
-  if (!primary) return;
+  if (!primary || !L || !metroLayer) return;
   metroShapeStation = primary;
   for (const station of stations) {
     const outline = L.polygon(
@@ -980,7 +995,7 @@ function renderMetroSelection(stations: FlatMapZone[]) {
         bubblingMouseEvents: false,
       },
     ).addTo(metroLayer);
-    outline.bindTooltip(`${station.label} · ${metroShapeTooltip()}`, { direction: "top" });
+    outline.bindTooltip(mapText(`${station.label} · ${metroShapeTooltip()}`), { direction: "top" });
     outline.on("click", (event: any) => handleLayerClick(event, () => metroToggle(station)));
     if (station === primary) metroShapePath = outline;
   }
@@ -1036,9 +1051,9 @@ function renderMetro() {
       bubblingMouseEvents: false,
     });
     marker.bindTooltip(
-      stationSelected
+      mapText(stationSelected
         ? `${station.label} · ${metroShapeTooltip()}`
-        : `${station.label} · 200 / 500 / 1000 m`,
+        : `${station.label} · 200 / 500 / 1000 m`),
       { direction: "top" },
     );
     if (stationSelected) marker.openTooltip?.();
@@ -1058,17 +1073,17 @@ function renderAmenityLayer(layerGroup: any, zones: FlatMapZone[], visible: bool
         style: () => ({ color: zone.color, weight: 2, opacity: .95, fillColor: zone.color, fillOpacity: .2, className: "flat-zone-shape" }),
         bubblingMouseEvents: false,
       }).addTo(layerGroup);
-      shape.bindTooltip(zone.label, { direction: "top" });
+      shape.bindTooltip(mapText(zone.label), { direction: "top" });
       shape.on("click", (event: any) => handleLayerClick(event, () => focusZone(zone)));
       continue;
     }
     const icon = L.divIcon({
       className: "flat-amenity-marker-wrap",
-      html: `<span class="flat-amenity-marker" style="--amenity-color:${zone.color}">${symbol}</span>`,
+      html: amenityMarker(symbol, zone.color),
       iconSize: [24, 24], iconAnchor: [12, 12],
     });
     const marker = L.marker([zone.lat, zone.lng], { icon, bubblingMouseEvents: false });
-    marker.bindTooltip(zone.label, { direction: "top", offset: [0, -11] });
+    marker.bindTooltip(mapText(zone.label), { direction: "top", offset: [0, -11] });
     marker.on("click", (event: any) => handleLayerClick(event, () => focusZone(zone)));
     marker.addTo(layerGroup);
   }
@@ -1087,7 +1102,7 @@ function renderAreaZones() {
   if (!showAreas.value) return;
   for (const zone of props.areaZones || []) {
     const shape = renderZoneShape(zoneAreaLayer, zone, "area", { color: zone.color, weight: 2, dashArray: "6 5", fillColor: zone.color, fillOpacity: 0.14 });
-    if (!zone.boundary) shape.bindTooltip(zone.label, { direction: "top" });
+    if (!zone.boundary) shape?.bindTooltip(mapText(zone.label), { direction: "top" });
   }
 }
 
@@ -1195,7 +1210,10 @@ watch(renderedPoints, () => { renderMarkers(); fitToPoints(); });
 // wholesale on navigation, so a deep traversal only added cost, and keying on
 // what loadFullMapFeed actually sends means listing-detail params cannot
 // trigger a refetch at all.
-watch(() => new URLSearchParams(normalizedRouteQuery()).toString(), () => { void loadFullMapFeed(); });
+watch(() => stableQueryKey(normalizedRouteQuery()), () => {
+  preserveCamera = true;
+  void loadFullMapFeed();
+});
 // NOT deep. These props are computeds that rebuild their arrays, so identity is
 // already the signal. Traversing them meant walking every coordinate of every
 // district, microdistrict and local-area boundary on each reactive tick -- with
@@ -1206,7 +1224,9 @@ watch(
   () => [props.selectedDistrict, props.selectedMicrodistrict, props.selectedQuartal, props.selectedArea, selectedMetros.value.join(","), props.selectedMetroRadiusM, props.metroBearingFrom, props.metroBearingTo],
   (next, previous) => {
     const changed = next.some((value, index) => value !== previous?.[index]);
-    if (changed) syncSelectionFromProps(Boolean(selectedZoneFromProps()));
+    const previousMetros = String(previous?.[4] || "").split(",").filter(Boolean);
+    const removedMetro = previousMetros.some((name) => !selectedMetros.value.includes(name));
+    if (changed) syncSelectionFromProps(!removedMetro && Boolean(selectedZoneFromProps()));
   },
 );
 watch([showDistricts, showMicrodistricts, showQuartals, showMetro, showUniversities, showShoppingMalls, showParks, showAreas, showCity], renderAllZoneLayers);
@@ -1219,6 +1239,10 @@ watch(() => props.cityZone, (zone, previous) => {
 
 onBeforeUnmount(() => {
   mapFeedSequence += 1;
+  expandedSizeTimers.forEach((timer) => clearTimeout(timer));
+  expandedSizeTimers = [];
+  if (focusTimer) clearTimeout(focusTimer);
+  focusTimer = undefined;
   window.removeEventListener("keydown", onKeydown);
   window.removeEventListener("scroll", closeRadial);
   window.removeEventListener("flat-map-focus", onMapFocus as EventListener);
@@ -1239,11 +1263,14 @@ onBeforeUnmount(() => {
   zoneAreaLayer = null;
   cityLayer = null;
 });
+function preserveUserCamera() {
+  preserveCamera = true;
+}
 </script>
 
 <template>
   <Teleport to="body" :disabled="!expanded">
-    <div v-show="!failed" class="flat-map-shell" :class="{ 'flat-map-shell_full': expanded }">
+    <div v-show="!failed" class="flat-map-shell" :class="{ 'flat-map-shell_full': expanded }" @pointerdown.capture="preserveUserCamera" @wheel.capture.passive="preserveUserCamera" @keydown.capture="preserveUserCamera">
       <div ref="el" class="flat-map" />
       <div v-if="!expanded" v-show="!scrollActive" class="flat-map__scroll-hint">{{ props.scrollHintLabel || "Click the map to zoom" }}</div>
 

@@ -1,24 +1,11 @@
 export function useClipboard() {
   async function copyText(value: string): Promise<boolean> {
-    if (!import.meta.client) return false;
-    if (navigator.clipboard?.writeText && window.isSecureContext) {
-      try {
-        await navigator.clipboard.writeText(value);
-        return true;
-      } catch { /* fall through to the legacy copy path */ }
-    }
-
-    const field = document.createElement("textarea");
-    field.value = value;
-    field.setAttribute("readonly", "");
-    field.style.position = "fixed";
-    field.style.opacity = "0";
-    document.body.appendChild(field);
-    field.select();
+    if (typeof window === "undefined" || !window.isSecureContext || !navigator.clipboard?.writeText) return false;
     try {
-      return document.execCommand("copy");
-    } finally {
-      field.remove();
+      await navigator.clipboard.writeText(value);
+      return true;
+    } catch {
+      return false;
     }
   }
 

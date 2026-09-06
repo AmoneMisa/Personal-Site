@@ -156,7 +156,7 @@ export interface FlatMapFeedResult {
   count: number;
   mapPoints: FlatMapPoint[];
   mapPointsTruncated?: boolean;
-  mapPointLimit?: number;
+  mapPointLimit?: number | null;
   queryMs?: number;
   stale?: boolean;
   error?: string;
@@ -240,7 +240,19 @@ export interface FlatCountryMeta {
   name: string;
   currency: string;
   cities?: string[];
-  locations?: Record<string, { districts?: string[]; metro?: string[] }>;
+  cityLabels?: Record<string, string>;
+  locations?: Record<string, {
+    districts?: string[];
+    districtLabels?: Record<string, string>;
+    metro?: string[];
+    metroLabels?: Record<string, string>;
+    microdistricts?: string[];
+    microdistrictLabels?: Record<string, string>;
+    quartals?: string[];
+    quartalLabels?: Record<string, string>;
+    areas?: string[];
+    areaLabels?: Record<string, string>;
+  }>;
 }
 
 export interface FlatCardPresentation {

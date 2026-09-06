@@ -1,11 +1,16 @@
-import { computed, ref, watch } from "vue";
+import { computed, ref, toValue, watch, type MaybeRefOrGetter } from "vue";
 import type { FlatSort } from "~/types/flats";
 import { useGeoCityCatalog } from "./useGeoCityCatalog";
+import { SOCIAL_FLAT_SOURCES } from "./flatSources";
+import { districtForZone } from "~/utils/flats/zoneHierarchy";
 
-const SOCIAL_LISTING_SOURCES = ["facebook", "threads", "custom"];
 const MAP_ZONE_TYPES = new Set(["microdistrict", "mahalla", "local_area", "development_area"]);
 
-export function useFlatFilters() {
+export interface UseFlatFiltersOptions {
+  locale?: MaybeRefOrGetter<string>;
+}
+
+export function useFlatFilters(options: UseFlatFiltersOptions = {}) {
   const selectedCountries = ref<string[]>([]);
   // The backend still accepts a `countries` CSV for compatibility, but the housing
   // UI is intentionally single-country. Keep the public ref array-shaped so the
@@ -21,7 +26,7 @@ export function useFlatFilters() {
       if (!normalized.length) return;
       const current = selectedCountries.value[0];
       const next = normalized.find((value) => value !== current) || normalized[0];
-      selectedCountries.value = [next];
+      if (next) selectedCountries.value = [next];
     },
   });
   const city = ref("");
@@ -121,7 +126,6 @@ export function useFlatFilters() {
   watch(city, clearMapZones, { flush: "sync" });
   watch(selectedCountries, clearCityLocationFilters, { flush: "sync" });
   watch(city, clearCityLocationFilters, { flush: "sync" });
-  watch(district, clearMapZones, { flush: "sync" });
 
   watch(dealType, (value) => {
     if (value === "sale") {
@@ -145,22 +149,46 @@ export function useFlatFilters() {
   // Descendants are already scoped to the city by the server (see useGeoCityCatalog),
   // so no extra parentId check is needed here.
   const countryCode = computed(() => countries.value[0] || "");
-  const { cityEntity, descendants: geoDescendants } = useGeoCityCatalog(countryCode, city);
+  const geoLocale = computed(() => String(toValue(options.locale) || ""));
+  const { allZones: geoZones } = useGeoCityCatalog(countryCode, city, geoLocale);
+  const zonesById = computed(() => new Map(geoZones.value.map((zone) => [zone.id, zone])));
+  const fineSelections = [
+    { value: microdistrict, types: new Set(["microdistrict"]) },
+    { value: quartal, types: new Set(["mahalla"]) },
+    { value: mapArea, types: new Set(["local_area", "development_area"]) },
+  ];
+  const parentDistrict = (selection: typeof fineSelections[number]) => {
+    const zone = geoZones.value.find((zone) => zone.name === selection.value.value && selection.types.has(zone.type));
+    return zone ? districtForZone(zone, zonesById.value) : null;
+  };
+  watch([district, zonesById], ([name]) => {
+    if (!name) return; // Removing a district restriction does not invalidate a finer filter.
+    for (const selection of fineSelections) {
+      const parent = parentDistrict(selection);
+      if (selection.value.value && parent && parent !== name) selection.value.value = "";
+    }
+  }, { flush: "sync" });
+  watch(fineSelections.map((selection) => selection.value), (next, previous) => {
+    const changed = fineSelections.find((_, index) => next[index] && next[index] !== previous[index]);
+    const parent = changed ? parentDistrict(changed) : null;
+    if (parent) district.value = parent;
+  }, { flush: "sync" });
+  // Metro proximity can cross district borders, including for a single station.
+  // Do not silently narrow its radius/union to the station's administrative parent.
   watch(query, (value) => {
     const name = value.trim();
     const country = countries.value[0];
     if (!name || !country || !city.value) return;
-    if (!cityEntity.value) return;
-    const match = geoDescendants.value.find((entity) =>
+    const match = geoZones.value.find((entity) =>
       MAP_ZONE_TYPES.has(entity.type)
-      && entity.canonicalName.toLocaleLowerCase() === name.toLocaleLowerCase(),
+      && entity.name.toLocaleLowerCase() === name.toLocaleLowerCase(),
     );
     if (!match) return;
 
     clearMapZones();
-    if (match.type === "microdistrict") microdistrict.value = match.canonicalName;
-    else if (match.type === "mahalla") quartal.value = match.canonicalName;
-    else mapArea.value = match.canonicalName;
+    if (match.type === "microdistrict") microdistrict.value = match.name;
+    else if (match.type === "mahalla") quartal.value = match.name;
+    else mapArea.value = match.name;
     query.value = "";
   }, { flush: "sync" });
 
@@ -248,7 +276,7 @@ export function useFlatFilters() {
     }
     params.sort = sort.value;
     if (query.value.trim()) params.query = query.value.trim();
-    const defaultSources = [...new Set([...options.sources, ...SOCIAL_LISTING_SOURCES])];
+    const defaultSources = [...new Set([...options.sources, ...SOCIAL_FLAT_SOURCES])];
     params.sources = source.value || defaultSources.join(",");
     if (!options.append) params.includeStats = "1";
     return params;

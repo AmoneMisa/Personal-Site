@@ -37,7 +37,7 @@ export function useJobFeed(usdRates: Ref<Record<string, number>>) {
       failed.value = false;
     }
 
-    const { data, error } = await safeFetch<JobResult>("/jobs-feed", { params });
+    const { data, error } = await safeFetch<JobResult>("/jobs-feed", { params, signal: requests.signal() });
     if (!requests.isLatest(requestId)) return undefined;
     if (error || !data) {
       if (!background) {

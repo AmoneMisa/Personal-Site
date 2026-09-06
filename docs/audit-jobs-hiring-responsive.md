@@ -168,7 +168,7 @@ drift rather than intent; jobs is the odd one out of the three.
 
 ## 4. Verification
 
-- `npm test` — 316 passing.
+- `npm test` — 224 passing.
 - `/jobs`, `/hiring`, `/flat-finder`, `/quizzes/country-fit`,
   `/services/workflow-validator` each load with zero console errors in a fresh tab.
 - A11y fix confirmed by inspecting the computed accessible name at 375px.

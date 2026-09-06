@@ -1,5 +1,31 @@
 export type MarkdownPlatform = "telegram" | "whatsapp" | "tiktok";
 
+const SAFE_LINK_PROTOCOLS = new Set(["http:", "https:", "mailto:"]);
+
+function decodeEscapedUrl(value: string): string {
+  return value
+    .replace(/&amp;/g, "&")
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">");
+}
+
+/** Returns the escaped URL only when it is safe to place in an href. */
+export function sanitizeMarkdownUrl(value: string): string | null {
+  const decoded = decodeEscapedUrl(value);
+  if (!decoded || Array.from(decoded).some((character) => character <= " " || character.charCodeAt(0) === 127)) {
+    return null;
+  }
+
+  try {
+    const parsed = new URL(decoded);
+    return SAFE_LINK_PROTOCOLS.has(parsed.protocol) ? value : null;
+  } catch {
+    return null;
+  }
+}
+
 export function stripAllMarkdown(raw: string) {
   return raw
     .replace(/```([\s\S]*?)```/g, "$1")
@@ -43,7 +69,12 @@ function renderTelegram(markdown: string) {
   return escapeHtml(markdown)
     .replace(/```([\s\S]*?)```/g, (_match, code) => `<pre class="pv-pre"><code>${escapeHtml(code)}</code></pre>`)
     .replace(/`([^`]+)`/g, `<code class="pv-code">$1</code>`)
-    .replace(/\[([^\]]+)\]\(([^)]+)\)/g, `<a class="pv-link" href="$2" target="_blank" rel="noreferrer noopener">$1</a>`)
+    .replace(/\[([^\]]+)\]\(([^)]+)\)/g, (_match, label, href) => {
+      const safeHref = sanitizeMarkdownUrl(href);
+      return safeHref
+        ? `<a class="pv-link" href="${safeHref}" target="_blank" rel="noreferrer noopener">${label}</a>`
+        : `${label} (${href})`;
+    })
     .replace(/\|\|([\s\S]*?)\|\|/g, `<span class="pv-spoiler">$1</span>`)
     .replace(/\*\*([\s\S]*?)\*\*/g, "<b>$1</b>")
     .replace(/__([\s\S]*?)__/g, "<u>$1</u>")
@@ -68,15 +99,31 @@ export function renderPlatformPreview(markdown: string, platform: MarkdownPlatfo
   return escapeHtml(stripAllMarkdown(markdown)).replace(/\n/g, "<br/>");
 }
 
-export function highlightLanguageMatches(html: string, matches: any[]) {
+type LanguageToolMatch = {
+  offset?: number;
+  length?: number;
+  rule?: { category?: { id?: string } };
+};
+
+export function highlightLanguageMatches(html: string, matches: LanguageToolMatch[]) {
   const text = html.replace(/<[^>]+>/g, "");
   let result = "";
   let lastIndex = 0;
 
-  for (const match of matches) {
-    const start = match.offset;
-    const end = match.offset + match.length;
-    const category = match.rule?.category?.id || "";
+  const validMatches = matches
+    .map((match) => ({
+      start: Number(match.offset),
+      length: Number(match.length),
+      category: String(match.rule?.category?.id || ""),
+    }))
+    .filter((match) => Number.isFinite(match.start) && Number.isFinite(match.length) && match.length > 0)
+    .sort((left, right) => left.start - right.start);
+
+  for (const match of validMatches) {
+    const start = Math.max(lastIndex, Math.min(text.length, match.start));
+    const end = Math.max(start, Math.min(text.length, start + match.length));
+    if (start >= end) continue;
+    const category = match.category;
     let className = "lt-error-generic";
 
     if (category.includes("TYPOS")) className = "lt-error-typo";

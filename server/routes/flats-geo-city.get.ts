@@ -1,85 +1,52 @@
-// GET /flats-geo-city — same-origin BFF adapter over the Flat Finder backend.
-// Canonical geo entities, coordinates, boundaries and hierarchy are owned by
-// backend-platform. Personal Site must not load geo-catalog directly.
+// GET /flats-geo-city — website-facing adapter over Flat Finder's canonical
+// district-zones contract. Geo entities, boundaries and localized labels belong
+// to the Flat Finder backend; Personal Site must not decrypt or rebuild them.
+import type { FlatGeoZonesResponse } from '~~/shared/contracts/flatGeo'
 import { FLAT_API_URL } from '../flats/feedLookup'
 
-type BackendZone = {
-  id?: string
-  parentId?: string | null
-  type?: string
-  name?: string
-  label?: string
-  lat?: number
-  lng?: number
-  radiusM?: number
-  boundary?: unknown
-}
+const GEO_TIMEOUT_MS = 15_000
 
-function asEntity(zone: BackendZone | null | undefined, country: string) {
-  if (!zone?.id || !zone?.name || !Number.isFinite(zone.lat) || !Number.isFinite(zone.lng)) return null
-  return {
-    id: zone.id,
-    parentId: zone.parentId ?? null,
-    type: zone.type || '',
-    country,
-    canonicalName: zone.name,
-    label: zone.label || zone.name,
-    center: { lat: Number(zone.lat), lng: Number(zone.lng) },
-    accuracyM: Number.isFinite(zone.radiusM) ? Number(zone.radiusM) : 0,
-    boundary: zone.boundary || undefined,
-  }
-}
-
-function decodedList(value: unknown): string[] {
-  return String(value || '')
-    .split(',')
-    .map((item) => {
-      try { return decodeURIComponent(item).trim() } catch { return item.trim() }
-    })
-    .filter(Boolean)
+const EMPTY_RESPONSE: FlatGeoZonesResponse = {
+  districtZones: [],
+  microdistrictMarkers: [],
+  quartalMarkers: [],
+  areaZones: [],
+  metroStations: [],
+  parks: [],
+  shoppingMalls: [],
+  universities: [],
+  cityZone: null,
 }
 
 export default defineEventHandler(async (event) => {
   const query = getQuery(event)
   const country = String(query.country || '').trim().toUpperCase()
   const city = String(query.city || '').trim()
-  const locale = String(query.locale || '').trim()
-  const districtNames = decodedList(query.districts)
+  const locale = String(query.locale || '').trim().slice(0, 16)
 
   if (!country || !city) {
-    return { city: null, descendants: [], resolvedDistricts: [] }
+    return EMPTY_RESPONSE
+  }
+
+  if (!/^[A-Z]{2}$/.test(country) || !/^[\p{L}\p{N} .,'’'&()/-]{1,120}$/u.test(city)) {
+    throw createError({ statusCode: 400, statusMessage: 'Invalid geo request' })
   }
 
   const params = new URLSearchParams({ country, city })
-  if (locale) params.set('locale', locale)
+  if (/^[A-Za-z_-]+$/.test(locale)) params.set('locale', locale)
 
+  setResponseHeader(event, 'Cache-Control', 'private, max-age=300')
   try {
-    const zones = await $fetch<any>(`${FLAT_API_URL}/api/district-zones?${params}`, { timeout: 15_000 })
-    const groups = [
-      zones?.districtZones,
-      zones?.microdistrictMarkers,
-      zones?.quartalMarkers,
-      zones?.areaZones,
-      zones?.metroStations,
-      zones?.parks,
-      zones?.shoppingMalls,
-      zones?.universities,
-    ]
-    const descendants = groups
-      .flatMap((items) => Array.isArray(items) ? items : [])
-      .map((zone) => asEntity(zone, country))
-      .filter(Boolean)
-    const cityEntity = asEntity(zones?.cityZone, country)
-    const districts = descendants.filter((entity: any) => entity.type === 'district')
-    const resolvedDistricts = districtNames.map((name) =>
-      districts.find((entity: any) => entity.canonicalName.toLocaleLowerCase() === name.toLocaleLowerCase()) || null,
+    return await $fetch<FlatGeoZonesResponse>(
+      `${FLAT_API_URL}/api/district-zones?${params.toString()}`,
+      { timeout: GEO_TIMEOUT_MS },
     )
-
-    setResponseHeader(event, 'Cache-Control', 'private, max-age=300')
-    return { city: cityEntity, descendants, resolvedDistricts }
-  } catch {
+  } catch (error) {
     setResponseHeader(event, 'Cache-Control', 'no-store')
-    setResponseStatus(event, 502)
-    return { city: null, descendants: [], resolvedDistricts: [] }
+    throw createError({
+      statusCode: 502,
+      statusMessage: 'Flat Finder geo data is unavailable',
+      cause: error,
+    })
   }
 })

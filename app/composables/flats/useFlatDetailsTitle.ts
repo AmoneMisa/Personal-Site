@@ -1,6 +1,6 @@
 import type { ComputedRef } from "vue";
 import type { FlatListing } from "~/types/flats";
-import { locationLabel } from "~/utils/locationLabels";
+import type { FlatLocationLabeler } from "~/utils/flats/locationLabels";
 import { flatPriceTone, type FlatPriceTone } from "~/utils/flats/priceTone";
 
 /**
@@ -14,6 +14,7 @@ import { flatPriceTone, type FlatPriceTone } from "~/utils/flats/priceTone";
 export function useFlatDetailsTitle(options: {
   listing: ComputedRef<FlatListing | null>;
   priceUsd: ComputedRef<number | null | undefined>;
+  locationLabel: FlatLocationLabeler;
 }) {
   const { locale } = useI18n();
 
@@ -28,7 +29,7 @@ export function useFlatDetailsTitle(options: {
     return english ? "Listing" : "Объявление";
   });
 
-  const cityLabel = computed(() => locationLabel(options.listing.value?.city, String(locale.value), "city"));
+  const cityLabel = computed(() => options.locationLabel(options.listing.value?.city, "city", options.listing.value?.country || "", options.listing.value?.city || ""));
 
   const text = computed(() => [dealLabel.value, cityLabel.value].filter(Boolean).join(", "));
 

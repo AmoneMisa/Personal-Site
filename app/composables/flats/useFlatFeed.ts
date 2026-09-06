@@ -1,6 +1,7 @@
 import { nextTick, ref } from "vue";
 import type { FlatFeedResult, FlatListing, FlatStatistics } from "~/types/flats";
 import { safeFetch } from "~/utils/safeFetch";
+import { stableQueryKey } from "~/utils/stableQueryKey";
 import { useLatestRequest } from "~/composables/search/useLatestRequest";
 import { useFeedPolling } from "~/composables/search/useFeedPolling";
 
@@ -18,7 +19,7 @@ const FEED_CACHE_MAX_ENTRIES = 40;
 
 /** Stable regardless of the order buildFeedParams happened to insert keys in. */
 export function feedCacheKey(params: Record<string, string>): string {
-  return new URLSearchParams([...Object.entries(params)].sort(([a], [b]) => a.localeCompare(b))).toString();
+  return stableQueryKey(params);
 }
 
 export function useFlatFeed(feedOptions: { onAvailabilityChecked?: (keys: string[]) => void } = {}) {
@@ -38,12 +39,17 @@ export function useFlatFeed(feedOptions: { onAvailabilityChecked?: (keys: string
   const responseCache = new Map<string, { at: number; data: FlatFeedResult }>();
 
   function readFeedCache(params: Record<string, string>): FlatFeedResult | undefined {
-    const entry = responseCache.get(feedCacheKey(params));
+    const key = feedCacheKey(params);
+    const entry = responseCache.get(key);
     if (!entry) return undefined;
     if (Date.now() - entry.at > FEED_CACHE_TTL_MS) {
-      responseCache.delete(feedCacheKey(params));
+      responseCache.delete(key);
       return undefined;
     }
+    // Map insertion order is used for eviction, so a read must promote the
+    // entry or this is FIFO rather than the intended LRU cache.
+    responseCache.delete(key);
+    responseCache.set(key, entry);
     return entry.data;
   }
 
@@ -78,7 +84,7 @@ export function useFlatFeed(feedOptions: { onAvailabilityChecked?: (keys: string
 
   const polling = useFeedPolling<Record<string, string>>({
     onWarmPoll: (params) => {
-      void loadFeed(params, { background: true });
+      void loadFeed(params, { background: true, warmPoll: true });
     },
     // The flat-finder page debounces every filter interaction itself, at a
     // longer interval chosen for its own uncached-query costs. Keeping this
@@ -112,7 +118,7 @@ export function useFlatFeed(feedOptions: { onAvailabilityChecked?: (keys: string
 
   async function loadStatistics(params: Record<string, string>, requestId: number) {
     statisticsLoading.value = true;
-    const statsParams = {
+    const statsParams: Record<string, string> = {
       ...params,
       includeStats: "1",
       statsOnly: "1",
@@ -138,10 +144,11 @@ export function useFlatFeed(feedOptions: { onAvailabilityChecked?: (keys: string
 
   async function loadFeed(
     params: Record<string, string>,
-    options: { append?: boolean; background?: boolean } = {},
+    options: { append?: boolean; background?: boolean; warmPoll?: boolean } = {},
   ): Promise<FlatFeedResult | undefined> {
     const append = !!options.append;
     const background = !!options.background;
+    const warmPoll = !!options.warmPoll;
 
     // Cache hit: paint now, then revalidate behind the result. The visitor sees
     // the previous answer to this exact question immediately instead of a
@@ -195,7 +202,7 @@ export function useFlatFeed(feedOptions: { onAvailabilityChecked?: (keys: string
       delete feedParams.includeStats;
     }
 
-    const { data, error } = await safeFetch<FlatFeedResult>("/flats-feed", { params: feedParams });
+    const { data, error } = await safeFetch<FlatFeedResult>("/flats-feed", { params: feedParams, signal: requests.signal() });
     if (!requests.isLatest(requestId)) {
       return undefined;
     }
@@ -228,7 +235,7 @@ export function useFlatFeed(feedOptions: { onAvailabilityChecked?: (keys: string
         void setStatisticsWithoutViewportJump(data.statistics);
       }
       warming.value = !!data.warming;
-      if (wantsStatistics) {
+      if (wantsStatistics && !warmPoll) {
         void loadStatistics(params, currentStatisticsRequestId);
       }
       polling.scheduleWarmPoll(warming.value);

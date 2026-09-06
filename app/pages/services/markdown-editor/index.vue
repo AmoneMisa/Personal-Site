@@ -2,7 +2,7 @@
 import CustomButton from "~/components/common/CustomButton.vue";
 import { useServiceSeo } from "~/composables/services/useServiceSeo";
 import type {TabsItem} from "#ui/components/Tabs.vue";
-import {nextTick, onMounted} from "vue";
+import {nextTick, onBeforeUnmount, onMounted, watch} from "vue";
 import Modal from "~/components/common/Modal.vue";
 import {checkTextWithLanguageTool} from "~/composables/useLanguageTool";
 import {useScrollableTabs} from "~/composables/ui/useScrollableTabs";
@@ -74,6 +74,8 @@ const outputText = computed(() => {
 });
 const checking = ref(false);
 const checkResult = ref(null);
+let checkRequestId = 0;
+let checkController: AbortController | undefined;
 
 const highlightedPreview = computed(() => {
   if (!checkResult.value || !checkResult.value.matches?.length) return null;
@@ -96,18 +98,26 @@ async function copyOutput() {
 }
 
 async function checkOutput() {
-  if (!outputText.value) return
+  const text = outputText.value;
+  if (!text) return;
 
+  checkController?.abort();
+  const controller = new AbortController();
+  checkController = controller;
+  const requestId = ++checkRequestId;
   checking.value = true
   checkResult.value = null
 
   try {
     const lang = locale.value.startsWith('ru') ? 'ru' : 'en'
-    checkResult.value = await checkTextWithLanguageTool(outputText.value, lang)
+    const result = await checkTextWithLanguageTool(text, lang, {signal: controller.signal});
+    if (requestId === checkRequestId && text === outputText.value) {
+      checkResult.value = result;
+    }
   } catch (e) {
-    console.error(e)
+    if (!(e instanceof Error && e.name === "AbortError")) console.error(e)
   } finally {
-    checking.value = false
+    if (requestId === checkRequestId) checking.value = false
   }
 }
 
@@ -132,6 +142,19 @@ onMounted(async () => {
   loadDraft();
   await import("emoji-picker-element");
   await nextTick();
+});
+
+watch(outputText, () => {
+  if (!checkController) return;
+  checkController.abort();
+  checkController = undefined;
+  checkRequestId += 1;
+  checking.value = false;
+  checkResult.value = null;
+});
+
+onBeforeUnmount(() => {
+  checkController?.abort();
 });
 </script>
 
