@@ -1,4 +1,3 @@
-import { canonicalMetroValue } from '../utils/tashkentMetroLabels'
 import { FLAT_API_URL } from '../flats/feedLookup'
 
 const MAP_TIMEOUT_MS = 55_000
@@ -26,8 +25,8 @@ function normalizeUpstreamParams(incoming: URL): URLSearchParams {
   if (legacyAllSources) params.delete('sources')
   else if (rawSources.length) params.set('sources', rawSources.join(','))
 
-  const metro = params.get('metro')
-  if (metro) params.set('metro', canonicalMetroValue(metro))
+  // Do not canonicalize geography here. The backend owns aliases, canonical
+  // station identity, radius/arc membership and map/list consistency.
   return params
 }
 

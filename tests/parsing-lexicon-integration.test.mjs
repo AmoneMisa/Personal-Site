@@ -2,12 +2,10 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 
 import { canonicalCityValue } from '../shared/locationCatalog.ts'
-import { canonicalMetroValue } from '../server/utils/tashkentMetroLabels.ts'
 import { capitalizeFirst } from '../app/utils/text.ts'
 
-test('lexicon-backed adapters keep stable consumer fallback contracts', () => {
+test('non-housing lexicon adapters keep stable consumer fallback contracts', () => {
   assert.equal(canonicalCityValue('  Exampleville  '), 'Exampleville')
-  assert.equal(canonicalMetroValue('Example Station'), 'Example Station')
 })
 
 test('candidate relative-date labels start with a capital letter', () => {

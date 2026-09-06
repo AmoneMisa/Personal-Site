@@ -1,5 +1,21 @@
 import { computed, ref, watch, toValue, type MaybeRefOrGetter } from "vue";
-import type { GeoEntity } from "@whiteslove/geo-catalog";
+
+export interface GeoBoundaryGeometry {
+  type: "Polygon" | "MultiPolygon";
+  coordinates: number[][][] | number[][][][];
+}
+
+export interface GeoEntity {
+  id: string;
+  parentId?: string | null;
+  type: string;
+  country: string;
+  canonicalName: string;
+  label?: string;
+  center: { lat: number; lng: number };
+  accuracyM?: number | null;
+  boundary?: GeoBoundaryGeometry;
+}
 
 interface GeoCityCatalogResponse {
   city: GeoEntity | null;
@@ -9,16 +25,13 @@ interface GeoCityCatalogResponse {
 
 const EMPTY_RESPONSE: GeoCityCatalogResponse = { city: null, descendants: [], resolvedDistricts: [] };
 
-// geo-catalog's encrypted data can only be decrypted server-side (see
-// server/routes/flats-geo-city.get.ts), so this composable fetches already-resolved
-// entities instead of importing @whiteslove/geo-catalog's catalog functions directly
-// — that import would drag the Node-only decryption path into the client bundle.
-// The map itself only renders client-side, so a plain $fetch (rather than useFetch's
-// SSR payload machinery) costs nothing here.
+// Personal Site never reads the geo packages directly. This composable consumes
+// the site's BFF route, which is a thin adapter over backend-platform's geo API.
 export function useGeoCityCatalog(
   country: MaybeRefOrGetter<string>,
   city: MaybeRefOrGetter<string>,
   districtNames: MaybeRefOrGetter<string[]> = [],
+  locale: MaybeRefOrGetter<string> = "",
 ) {
   const data = ref<GeoCityCatalogResponse>(EMPTY_RESPONSE);
 
@@ -35,6 +48,7 @@ export function useGeoCityCatalog(
           country: countryValue,
           city: cityValue,
           districts: toValue(districtNames).map((name) => encodeURIComponent(name)).join(","),
+          locale: toValue(locale),
         },
       });
     } catch {
@@ -43,7 +57,12 @@ export function useGeoCityCatalog(
   }
 
   watch(
-    [() => toValue(country), () => toValue(city), () => toValue(districtNames).join("|")],
+    [
+      () => toValue(country),
+      () => toValue(city),
+      () => toValue(districtNames).join("|"),
+      () => toValue(locale),
+    ],
     refresh,
     { immediate: true },
   );

@@ -1,4 +1,3 @@
-import { canonicalMetroValue } from '../utils/tashkentMetroLabels'
 import {
   ALL_FEED_SOURCES,
   CURRENT_ALL_SOURCE_TOKENS,
@@ -43,10 +42,10 @@ export default defineEventHandler(async (event) => {
   const allSourcesRequest = legacyAllSources || currentAllSources
   const requestedSources = allSourcesRequest ? [] : rawRequestedSources
 
+  // Forward canonical or legacy geography exactly as the client supplied it.
+  // backend-platform owns geo canonicalization and result membership.
   const upstreamParams = new URLSearchParams(incoming.searchParams)
   if (allSourcesRequest) upstreamParams.delete('sources')
-  const metro = upstreamParams.get('metro')
-  if (metro) upstreamParams.set('metro', canonicalMetroValue(metro))
 
   const publicIdParam = String(upstreamParams.get('publicId') || '').trim()
   if (publicIdParam && /^\d+$/.test(publicIdParam)) {

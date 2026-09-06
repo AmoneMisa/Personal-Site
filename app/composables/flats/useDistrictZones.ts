@@ -1,14 +1,6 @@
 import { computed, type MaybeRefOrGetter } from "vue";
 import { toValue } from "vue";
-// Pure geometry helpers: imported from the /spatial subpath (not the package
-// root) so bundlers don't pull in catalog.js, which decrypts geo-catalog's
-// data with node:fs/node:url and cannot run in the browser. Entity lookups
-// themselves go through useGeoCityCatalog, which fetches already-resolved
-// data from the server instead.
-import { convexHullPositions, distanceKm } from "@whiteslove/geo-catalog/spatial";
-import type { GeoBoundaryGeometry, GeoEntity } from "@whiteslove/geo-catalog";
-import { zoneNameLabel } from "~/utils/locationLabels";
-import { useGeoCityCatalog } from "./useGeoCityCatalog";
+import { useGeoCityCatalog, type GeoBoundaryGeometry, type GeoEntity } from "./useGeoCityCatalog";
 
 export interface FlatMapZone {
   id: string;
@@ -22,9 +14,21 @@ export interface FlatMapZone {
 }
 
 const ZONE_PALETTE = ["#e0679a", "#24a7d6", "#10b981", "#d99a0b", "#8b5cf6"];
+const EARTH_RADIUS_KM = 6371;
 
-// Radius fitting is presentation behavior: avoid overlapping fallback circles
-// when the catalog has no authoritative polygon for a particular entity.
+function distanceKm(a: { lat: number; lng: number }, b: { lat: number; lng: number }): number {
+  const toRad = (value: number) => (value * Math.PI) / 180;
+  const dLat = toRad(b.lat - a.lat);
+  const dLng = toRad(b.lng - a.lng);
+  const sinLat = Math.sin(dLat / 2);
+  const sinLng = Math.sin(dLng / 2);
+  const h = sinLat * sinLat
+    + Math.cos(toRad(a.lat)) * Math.cos(toRad(b.lat)) * sinLng * sinLng;
+  return 2 * EARTH_RADIUS_KM * Math.asin(Math.sqrt(h));
+}
+
+// Radius fitting is presentation-only. Canonical centers/boundaries come from
+// the backend and are never inferred or canonicalized in the browser.
 function fitNonOverlappingRadii(zones: FlatMapZone[], min: number, max: number): FlatMapZone[] {
   return zones.map((zone, index) => {
     if (zone.boundary) return zone;
@@ -40,46 +44,16 @@ function fitNonOverlappingRadii(zones: FlatMapZone[], min: number, max: number):
   });
 }
 
-function zoneFromEntity(entity: GeoEntity, index: number, locale: string, cityName: string): FlatMapZone {
+function zoneFromEntity(entity: GeoEntity, index: number): FlatMapZone {
   return {
     id: entity.id,
     name: entity.canonicalName,
-    label: zoneNameLabel(entity.canonicalName, locale, entity.country, cityName),
+    label: entity.label || entity.canonicalName,
     lat: entity.center.lat,
     lng: entity.center.lng,
     radiusM: entity.accuracyM || 400,
     color: ZONE_PALETTE[index % ZONE_PALETTE.length]!,
     boundary: entity.boundary,
-  };
-}
-
-// This is a presentation approximation only. The reusable convex-hull geometry
-// itself is owned by geo-catalog; the site merely decides when to render it.
-function cityHullZone(districtZones: FlatMapZone[], entity: GeoEntity | null, locale: string): FlatMapZone | null {
-  if (!entity) return null;
-  const points: [number, number][] = [];
-  for (const zone of districtZones) {
-    if (!zone.boundary) continue;
-    const polygons = zone.boundary.type === "MultiPolygon" ? zone.boundary.coordinates : [zone.boundary.coordinates];
-    for (const polygon of polygons) {
-      const outer = polygon[0];
-      if (outer) {
-        for (const [lng, lat] of outer) points.push([lng!, lat!]);
-      }
-    }
-  }
-  if (points.length < 3) return null;
-  const hull = convexHullPositions(points);
-  if (hull.length < 3) return null;
-  return {
-    id: entity.id,
-    name: entity.canonicalName,
-    label: zoneNameLabel(entity.canonicalName, locale, entity.country, entity.canonicalName),
-    lat: entity.center.lat,
-    lng: entity.center.lng,
-    radiusM: 0,
-    color: "#f4f4f5",
-    boundary: { type: "Polygon", coordinates: [[...hull, hull[0]!]] },
   };
 }
 
@@ -95,56 +69,44 @@ export function useDistrictZones(options: UseDistrictZonesOptions) {
   const cityName = computed(() => toValue(options.city));
   const locale = computed(() => toValue(options.locale));
 
-  const { cityEntity, descendants, resolvedDistricts } = useGeoCityCatalog(country, cityName, options.districtOptions);
+  const { cityEntity, descendants, resolvedDistricts } = useGeoCityCatalog(
+    country,
+    cityName,
+    options.districtOptions,
+    locale,
+  );
 
-  function descendantsOf(type: GeoEntity["type"]): GeoEntity[] {
+  function descendantsOf(type: string): GeoEntity[] {
     return descendants.value.filter((entity) => entity.type === type);
   }
 
   const districtZones = computed<FlatMapZone[]>(() => {
     if (!country.value || !cityName.value) return [];
-
     const canonical = descendantsOf("district");
     const entities = canonical.length
       ? canonical
       : resolvedDistricts.value.filter((entity): entity is GeoEntity => Boolean(entity));
-    const zones = entities.map((entity, index) => zoneFromEntity(entity, index, locale.value, cityName.value));
-    return fitNonOverlappingRadii(zones, 350, 1800);
+    return fitNonOverlappingRadii(entities.map(zoneFromEntity), 350, 1800);
   });
 
-  const microdistrictMarkers = computed<FlatMapZone[]>(() => descendantsOf("microdistrict")
-    .map((entity, index) => zoneFromEntity(entity, index, locale.value, cityName.value)));
-
-  const quartalMarkers = computed<FlatMapZone[]>(() => descendantsOf("mahalla")
-    .map((entity, index) => zoneFromEntity(entity, index, locale.value, cityName.value)));
-
-  const metroStations = computed<FlatMapZone[]>(() => descendantsOf("metro")
-    .map((entity, index) => zoneFromEntity(entity, index, locale.value, cityName.value)));
-
+  const microdistrictMarkers = computed<FlatMapZone[]>(() => descendantsOf("microdistrict").map(zoneFromEntity));
+  const quartalMarkers = computed<FlatMapZone[]>(() => descendantsOf("mahalla").map(zoneFromEntity));
+  const metroStations = computed<FlatMapZone[]>(() => descendantsOf("metro").map(zoneFromEntity));
   const universityZones = computed<FlatMapZone[]>(() => descendantsOf("poi.university")
-    .map((entity, index) => ({ ...zoneFromEntity(entity, index, locale.value, cityName.value), color: "#38bdf8" })));
-
+    .map((entity, index) => ({ ...zoneFromEntity(entity, index), color: "#38bdf8" })));
   const shoppingMallZones = computed<FlatMapZone[]>(() => descendantsOf("poi.shopping_mall")
-    .map((entity, index) => ({ ...zoneFromEntity(entity, index, locale.value, cityName.value), color: "#f97316" })));
-
+    .map((entity, index) => ({ ...zoneFromEntity(entity, index), color: "#f97316" })));
   const parkZones = computed<FlatMapZone[]>(() => descendantsOf("poi.park")
-    .map((entity, index) => ({ ...zoneFromEntity(entity, index, locale.value, cityName.value), color: "#22c55e" })));
+    .map((entity, index) => ({ ...zoneFromEntity(entity, index), color: "#22c55e" })));
+  const areaZones = computed<FlatMapZone[]>(() => fitNonOverlappingRadii([
+    ...descendantsOf("local_area"),
+    ...descendantsOf("development_area"),
+  ].map(zoneFromEntity), 150, 700));
 
-  const areaZones = computed<FlatMapZone[]>(() => {
-    const entities = [
-      ...descendantsOf("local_area"),
-      ...descendantsOf("development_area"),
-    ];
-    const zones = entities.map((entity, index) => zoneFromEntity(entity, index, locale.value, cityName.value));
-    return fitNonOverlappingRadii(zones, 150, 700);
-  });
+  const cityZone = computed<FlatMapZone | null>(() => cityEntity.value
+    ? { ...zoneFromEntity(cityEntity.value, 0), color: "#f4f4f5" }
+    : null);
 
-  const cityZone = computed<FlatMapZone | null>(() => cityHullZone(districtZones.value, cityEntity.value, locale.value));
-
-  // Districts are the only zone level with authoritative boundaries covering the
-  // whole city, so "which district is this point in" is approximated as "which
-  // district center is nearest" -- consistent with how districtZones itself falls
-  // back to a fitted radius when a polygon isn't available.
   function districtForPoint(point: { lat: number; lng: number }): string | null {
     let nearest: FlatMapZone | null = null;
     let nearestDistance = Infinity;

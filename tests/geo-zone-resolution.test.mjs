@@ -2,12 +2,16 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 
-const source = await readFile(new URL('../app/composables/flats/useFlatFilters.ts', import.meta.url), 'utf8');
+const filtersSource = await readFile(new URL('../app/composables/flats/useFlatFilters.ts', import.meta.url), 'utf8');
+const catalogSource = await readFile(new URL('../app/composables/flats/useGeoCityCatalog.ts', import.meta.url), 'utf8');
+const bffSource = await readFile(new URL('../server/routes/flats-geo-city.get.ts', import.meta.url), 'utf8');
 
-test('map zones resolve through the canonical city entity', () => {
-  // geo-catalog's encrypted data only decrypts server-side, so resolution now
-  // goes through useGeoCityCatalog (which calls the server) instead of a
-  // direct resolveLexiconGeoEntity import — see server/routes/flats-geo-city.get.ts.
-  assert.match(source, /useGeoCityCatalog/);
-  assert.match(source, /geoDescendants\.value\.find/);
+test('Flat Finder geo catalog is backend-owned end to end', () => {
+  assert.match(filtersSource, /useGeoCityCatalog/);
+  assert.match(filtersSource, /geoDescendants\.value\.find/);
+  assert.match(catalogSource, /\$fetch<GeoCityCatalogResponse>\("\/flats-geo-city"/);
+  assert.doesNotMatch(catalogSource, /@whiteslove\/geo-catalog/);
+  assert.match(bffSource, /FLAT_API_URL/);
+  assert.match(bffSource, /\/api\/district-zones/);
+  assert.doesNotMatch(bffSource, /@whiteslove\/(?:geo-catalog|parsing-lexicon)/);
 });
