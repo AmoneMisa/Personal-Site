@@ -14,7 +14,8 @@ import {
   sectorPolygon,
 } from '~/composables/flats/useMetroProximity.ts';
 
-// Novza, Tashkent — the worked example: "near Novza, west side, within 780 m".
+// Novza, Tashkent — geometry remains useful for drawing/editing the map overlay;
+// result membership itself is decided in PostgreSQL before count/pagination.
 const NOVZA = { name: 'Novza', lat: 41.2920278, lng: 69.2233417 };
 
 function at(bearing, metres) {
@@ -36,11 +37,10 @@ test('an arc is the clockwise sweep, so it may straddle north', () => {
   assert.equal(bearingWithinArc(350, 340, 20), true);
   assert.equal(bearingWithinArc(19, 340, 20), true);
   assert.equal(bearingWithinArc(180, 340, 20), false);
-  // Handles that have not been separated yet must not reject everything.
   assert.equal(bearingWithinArc(123, 90, 90), true);
 });
 
-test('a west wedge keeps west listings and drops the rest', () => {
+test('legacy post-filter shim never changes backend membership', () => {
   const listings = [
     { id: 'west-inside', ...at(270, 600) },
     { id: 'west-edge', ...at(255, 770) },
@@ -53,32 +53,30 @@ test('a west wedge keeps west listings and drops the rest', () => {
     maxM: 780,
     bearingFrom: 252,
     bearingTo: 288,
-  }).map((item) => item.id);
-  assert.deepEqual(kept, ['west-inside', 'west-edge']);
+  });
+  assert.equal(kept, listings);
 });
 
-test('several stations are a union, not an intersection', () => {
+test('multi-station membership is not recomputed in the browser', () => {
   const other = { name: 'Other', lat: 41.31, lng: 69.28 };
   const listings = [
     { id: 'by-novza', ...at(270, 300) },
     { id: 'by-other', lat: other.lat + 0.001, lng: other.lng },
-    { id: 'by-neither', lat: 41.35, lng: 69.35 },
+    { id: 'server-authoritative-third', lat: 41.35, lng: 69.35 },
   ];
-  const kept = applyMetroProximity(listings, { stations: [NOVZA, other], maxM: 800 }).map((item) => item.id);
-  assert.deepEqual(kept.sort(), ['by-novza', 'by-other']);
+  assert.equal(applyMetroProximity(listings, { stations: [NOVZA, other], maxM: 800 }), listings);
 });
 
-test('listings without usable coordinates are kept, not silently dropped', () => {
+test('missing coordinates are a backend concern, not a browser-side drop', () => {
   const listings = [
     { id: 'no-coords', lat: null, lng: null },
     { id: 'nan', lat: Number.NaN, lng: 69.2 },
     { id: 'far-east', ...at(90, 5000) },
   ];
-  const kept = applyMetroProximity(listings, { stations: [NOVZA], maxM: 780 }).map((item) => item.id);
-  assert.deepEqual(kept, ['no-coords', 'nan']);
+  assert.equal(applyMetroProximity(listings, { stations: [NOVZA], maxM: 780 }), listings);
 });
 
-test('an inert filter passes every listing through untouched', () => {
+test('an inert overlay is recognized without changing results', () => {
   const listings = [{ id: 'a', ...at(90, 9000) }];
   assert.equal(metroProximityIsEmpty({ stations: [] }), true);
   assert.equal(metroProximityIsEmpty({ stations: [NOVZA] }), true);
