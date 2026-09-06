@@ -5,6 +5,7 @@ on:
     branches: [master]
   push:
     branches:
+      - develop
       - 'refactor/**'
       - 'fix/**'
       - 'feat/**'
