@@ -1,15 +1,12 @@
 import type { FlatListing } from "~/types/flats";
 
 /**
- * Metro proximity as a *client-side* filter: "within N metres of any selected
- * station, and only in this compass arc".
+ * Metro geometry helpers for rendering and editing map overlays.
  *
- * The upstream flat API understands a single `metro` station plus a plain
- * `metroMaxM` radius and nothing else — there is no bearing or multi-station
- * parameter — so the directional wedge and the union over several stations are
- * evaluated here, against listings the feed already returned. buildFeedParams
- * still hands the server everything it *can* narrow (see the comment there), so
- * this only ever trims an already-narrowed set.
+ * Result membership is intentionally backend/database-owned. The browser sends
+ * all selected stations, the radius and the optional directional arc upstream;
+ * count, pagination, deduplication and map/list membership must therefore never
+ * be changed again after the response arrives.
  *
  * Bearings are degrees clockwise from north, the convention the map's drag
  * handles and the `metroArc` query parameter both use.
@@ -107,42 +104,25 @@ export function sectorPolygon(
   return full ? arc : [{ lat: station.lat, lng: station.lng }, ...arc];
 }
 
-/** True when the filter is inert and every listing should pass untouched. */
+/** True when the overlay has no geometric restriction to draw. */
 export function metroProximityIsEmpty(proximity: MetroProximity): boolean {
   if (!proximity.stations.length) return true;
   const hasArc = proximity.bearingFrom != null && proximity.bearingTo != null;
   return proximity.maxM == null && !hasArc;
 }
 
-function matchesStation(
-  listing: { lat: number; lng: number },
-  station: MetroPoint,
-  proximity: MetroProximity,
-): boolean {
-  if (proximity.maxM != null && metresBetween(station, listing) > proximity.maxM) return false;
-  if (proximity.bearingFrom == null || proximity.bearingTo == null) return true;
-  return bearingWithinArc(bearingBetween(station, listing), proximity.bearingFrom, proximity.bearingTo);
-}
-
 /**
- * Keeps listings near *any* selected station — a union, not an intersection:
- * picking two stations means "either is fine", which is how a rider reads it.
+ * Compatibility shim for callers that have not yet removed their old
+ * post-processing call site. It deliberately does not change membership.
  *
- * Listings without coordinates are kept rather than dropped. The upstream feed
- * has its own `metro` field and geocodes better than the browser can, so a
- * missing lat/lng is a gap in the map data, not evidence the flat is far away.
+ * The backend applies the selected-station union, Haversine radius and bearing
+ * arc in PostgreSQL before count/deduplication/pagination/map projection.
  */
 export function applyMetroProximity<T extends Pick<FlatListing, "lat" | "lng">>(
   items: T[],
-  proximity: MetroProximity,
+  _proximity: MetroProximity,
 ): T[] {
-  if (metroProximityIsEmpty(proximity)) return items;
-  return items.filter((item) => {
-    if (item.lat == null || item.lng == null) return true;
-    const point = { lat: Number(item.lat), lng: Number(item.lng) };
-    if (!Number.isFinite(point.lat) || !Number.isFinite(point.lng)) return true;
-    return proximity.stations.some((station) => matchesStation(point, station, proximity));
-  });
+  return items;
 }
 
 /** The radius a freshly picked station starts at, before any drag. */
