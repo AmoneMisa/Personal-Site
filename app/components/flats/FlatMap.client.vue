@@ -915,15 +915,6 @@ function renderZoneShapes(layerGroup: any, zones: FlatMapZone[], kind: ZoneKind,
 function renderMicrodistricts() { if (showMicrodistricts.value) renderZoneShapes(microdistrictLayer, props.microdistrictMarkers || [], "microdistrict", { weight: 2, opacity: .9, fillOpacity: .18 }); else microdistrictLayer?.clearLayers(); }
 function renderQuartals() { if (showQuartals.value) renderZoneShapes(quartalLayer, props.quartalMarkers || [], "quartal", { weight: 1.5, dashArray: "3 4", opacity: .9, fillOpacity: .16 }); else quartalLayer?.clearLayers(); }
 
-function nearestMetroStation(point: { lat: number; lng: number }): FlatMapZone | null {
-  if (!map) return null;
-  let nearest: FlatMapZone | null = null; let nearestDistance = Number.POSITIVE_INFINITY;
-  for (const station of props.metroStations || []) {
-    const distance = map.distance([point.lat, point.lng], [station.lat, station.lng]);
-    if (distance <= 1000 && distance < nearestDistance) { nearest = station; nearestDistance = distance; }
-  }
-  return nearest;
-}
 function metroToggle(station: FlatMapZone) { closeRadial(); if (!isZoneSelected("metro", station.name)) focusZone(station); emit("metro-toggle", station.name); }
 function stationMeta(station: FlatMapZone) {
   const extra = metroMetaById.value.get(station.id);
@@ -1075,6 +1066,25 @@ function transportAvailable(mode: TransportMode): boolean {
   if (mode === "funicular") return false;
   return transportStopZones.value.some((zone) => zone.mode === mode);
 }
+function setTransportVisible(mode: TransportMode, visible: boolean) {
+  if (mode === "bus") showBus.value = visible;
+  else if (mode === "tram") showTram.value = visible;
+  else if (mode === "trolleybus") showTrolleybus.value = visible;
+  else if (mode === "minibus") showMinibus.value = visible;
+}
+function setTransportRadius(mode: TransportMode, radius: number) {
+  if (!Number.isFinite(radius) || radius <= 0) return;
+  if (mode === "bus") busRadiusM.value = radius;
+  else if (mode === "tram") tramRadiusM.value = radius;
+  else if (mode === "trolleybus") trolleybusRadiusM.value = radius;
+  else if (mode === "minibus") minibusRadiusM.value = radius;
+}
+function onTransportToggle(mode: TransportMode, event: Event) {
+  setTransportVisible(mode, (event.target as HTMLInputElement).checked);
+}
+function onTransportRadiusSelect(mode: TransportMode, event: Event) {
+  setTransportRadius(mode, Number((event.target as HTMLSelectElement).value));
+}
 function renderTransportStops() {
   const L = Leaflet; if (!transportStopLayer || !L) return; transportStopLayer.clearLayers();
   for (const stop of transportStopZones.value) {
@@ -1198,17 +1208,17 @@ onBeforeUnmount(() => {
               <label v-if="showMetro" class="flat-map__radius-select"><span>{{ ui.radius }}</span><select :value="Math.round(shapeRadiusM)" @change="onMetroRadiusSelect"><option v-for="radius in RADIUS_OPTIONS" :key="radius" :value="radius">{{ radius }} м</option></select></label>
             </div>
             <div v-for="item in [
-              { mode: 'bus', label: ui.bus, model: showBus, radius: busRadiusM },
-              { mode: 'tram', label: ui.tram, model: showTram, radius: tramRadiusM },
-              { mode: 'trolleybus', label: ui.trolleybus, model: showTrolleybus, radius: trolleybusRadiusM },
-              { mode: 'minibus', label: ui.minibus, model: showMinibus, radius: minibusRadiusM },
+              { mode: 'bus', label: ui.bus },
+              { mode: 'tram', label: ui.tram },
+              { mode: 'trolleybus', label: ui.trolleybus },
+              { mode: 'minibus', label: ui.minibus },
             ]" :key="item.mode" class="flat-map__filter-block">
               <label class="flat-map__menu-row" :class="{ 'flat-map__menu-row_disabled': !transportAvailable(item.mode as TransportMode) }">
-                <input v-model="item.model" type="checkbox" :disabled="!transportAvailable(item.mode as TransportMode)" />
+                <input :checked="modeVisible(item.mode)" type="checkbox" :disabled="!transportAvailable(item.mode as TransportMode)" @change="onTransportToggle(item.mode as TransportMode, $event)" />
                 <u-icon :name="item.mode === 'tram' ? 'i-lucide-tram-front' : 'i-lucide-bus-front'" class="flat-map__row-icon" />
                 <span>{{ item.label }}</span><small v-if="!transportAvailable(item.mode as TransportMode)">{{ ui.noData }}</small>
               </label>
-              <label v-if="item.model && transportAvailable(item.mode as TransportMode)" class="flat-map__radius-select"><span>{{ ui.radius }}</span><select v-model.number="item.radius"><option v-for="radius in RADIUS_OPTIONS" :key="radius" :value="radius">{{ radius }} м</option></select></label>
+              <label v-if="modeVisible(item.mode) && transportAvailable(item.mode as TransportMode)" class="flat-map__radius-select"><span>{{ ui.radius }}</span><select :value="modeRadius(item.mode)" @change="onTransportRadiusSelect(item.mode as TransportMode, $event)"><option v-for="radius in RADIUS_OPTIONS" :key="radius" :value="radius">{{ radius }} м</option></select></label>
             </div>
             <label class="flat-map__menu-row flat-map__menu-row_disabled"><input v-model="showFunicular" type="checkbox" disabled /><u-icon name="i-lucide-cable-car" class="flat-map__row-icon" /><span>{{ ui.funicular }}</span><small>{{ ui.noData }}</small></label>
           </div>
