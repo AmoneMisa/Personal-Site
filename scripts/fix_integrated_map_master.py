@@ -23,7 +23,7 @@ source = replace_once(
   }
 }''',
     '''  } catch {
-    // Keep the already-loaded page points (or the cached pins painted above)
+    // The already-loaded page points (or the cached pins painted above) remain
     // available when the compact map request fails; never blank a useful map.
   }
 }''',
