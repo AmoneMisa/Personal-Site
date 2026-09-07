@@ -22,7 +22,9 @@ jobs:
       - name: Fetch redesign source branch
         run: git fetch origin develop master
       - name: Integrate redesign onto current master
-        run: python scripts/integrate_map_redesign_master.py
+        run: |
+          python scripts/integrate_map_redesign_master.py
+          python scripts/fix_integrated_map_master.py
       - uses: actions/setup-node@v4
         with:
           node-version: 24
