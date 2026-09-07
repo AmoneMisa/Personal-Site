@@ -57,21 +57,24 @@ test('map watchers do not deep-traverse zone boundaries on every tick', async ()
   // These props are computeds that rebuild their arrays, so identity is already
   // the signal; deep traversal walked every boundary coordinate for nothing.
   assert.doesNotMatch(map, /\{ deep: true \}/);
-  // The map feed keys off what it actually sends, so listing-detail params in
-  // the URL cannot trigger a refetch at all.
-  assert.match(map, /watch\(\(\) => new URLSearchParams\(normalizedRouteQuery\(\)\)\.toString\(\), \(\) => \{ void loadFullMapFeed\(\); \}\)/);
+  // The map feed and canonical overlay feed key off the normalized query, so
+  // listing-detail params cannot trigger a refetch of either one.
+  assert.match(
+    map,
+    /watch\(\(\) => new URLSearchParams\(normalizedRouteQuery\(\)\)\.toString\(\), \(\) => \{ void loadFullMapFeed\(\); void loadExtraGeo\(\); \}\)/,
+  );
 });
 
 test('the map feed is cached client-side too, and revalidated behind the paint', async () => {
   const map = await readFile(new URL('../app/components/flats/FlatMap.client.vue', import.meta.url), 'utf8');
   assert.match(map, /const cached = readMapFeedCache\(key\);/);
-  assert.match(map, /remotePoints\.value = cached;/);
+  assert.match(map, /if \(cached\) remotePoints\.value = cached;/);
   // The fetch still runs after a cache hit -- this is stale-while-revalidate,
   // not stale-instead-of-fetching.
   assert.match(map, /const data = await \$fetch<FlatMapFeedResult>\("\/flats-map", \{ query \}\);/);
   assert.match(map, /writeMapFeedCache\(key, points\);/);
-  // A network failure must not wipe pins the cache already supplied.
-  assert.match(map, /the cached pins painted above\) remain/);
+  // A network failure must not clear pins supplied by the page or client cache.
+  assert.match(map, /Keep the already-loaded page points\/cached map feed as fallback/u);
 });
 
 test('the URL sync that drives the map does not lag an already-painted list', () => {
