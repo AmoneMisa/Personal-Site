@@ -39,6 +39,11 @@ rep(
     'drawn area tuples',
 )
 rep(
+    'function renderZoneShape(layerGroup: any, zone: FlatMapZone, kind: ZoneKind, style: Record<string, unknown>) {\n  const L = Leaflet;',
+    'function renderZoneShape(layerGroup: any, zone: FlatMapZone, kind: ZoneKind, style: Record<string, unknown>) {\n  const L = Leaflet;\n  if (!L || !layerGroup) return null;',
+    'canonical zone Leaflet guard',
+)
+rep(
     'function makeMetroHandle(station: FlatMapZone, kind: "radius" | "from" | "to") {\n  const L = Leaflet; const at = destinationPoint(station, handleBearing(kind), shapeRadiusM.value);',
     'function makeMetroHandle(station: FlatMapZone, kind: "radius" | "from" | "to") {\n  const L = Leaflet; if (!L) return null;\n  const at = destinationPoint(station, handleBearing(kind), shapeRadiusM.value);',
     'metro handle Leaflet guard',
@@ -55,8 +60,7 @@ rep(
 )
 
 # Narrowing a module-level nullable Leaflet variable does not survive nested
-# callbacks. Keep a stable local alias inside the two renderers that install
-# click handlers.
+# callbacks. Keep a stable local alias inside the transport renderer.
 s = s.replace(
     'function renderTransportStops() {\n  const L = Leaflet; if (!transportStopLayer || !L) return;',
     'function renderTransportStops() {\n  const L = Leaflet; if (!transportStopLayer || !L) return;\n  const leaflet = L;',
