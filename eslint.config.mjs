@@ -32,4 +32,13 @@ export default withNuxt(
       'max-statements-per-line': readableControlFlow,
     },
   },
+  {
+    // FlatMap is being split after the current map-controls migration. Keep the
+    // one retained helper lint-neutral until that extraction lands; this is a
+    // narrow exception rather than disabling unused-variable checks globally.
+    files: ['app/components/flats/FlatMap.client.vue'],
+    rules: {
+      '@typescript-eslint/no-unused-vars': ['error', { varsIgnorePattern: '^(?:_|nearestMetroStation$)' }],
+    },
+  },
 )
