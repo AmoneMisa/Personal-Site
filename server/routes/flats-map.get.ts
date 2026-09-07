@@ -1,6 +1,6 @@
 import { FLAT_API_URL } from '../flats/feedLookup'
 import { normalizedSearchKey } from '../flats/feedCache'
-import { CURRENT_ALL_SOURCE_TOKENS } from '../flats/feedListingShape'
+import { CURRENT_ALL_SOURCE_TOKENS, shapeMapResponse } from '../flats/feedListingShape'
 import { BoundedTtlCache } from '../utils/boundedTtlCache'
 
 const MAP_TIMEOUT_MS = 55_000
@@ -56,16 +56,16 @@ export default defineEventHandler(async (event) => {
   const params = normalizeUpstreamParams(getRequestURL(event))
   const key = normalizedSearchKey(params)
   const cached = cache.get(key)
-  if (cached && Date.now() - cached.at < MAP_CACHE_MS) return cached.data
+  if (cached && Date.now() - cached.at < MAP_CACHE_MS) return shapeMapResponse(cached.data)
 
   const url = `${FLAT_API_URL}/api/listings?${params}`
   try {
-    return await loadMap(key, url)
+    return shapeMapResponse(await loadMap(key, url))
   } catch (error: any) {
     setHeader(event, 'Cache-Control', 'no-store')
     // Recheck expiry after the request: it may have taken almost a minute.
     const fallback = cache.get(key)
-    if (fallback) return { ...fallback.data, stale: true }
+    if (fallback) return { ...shapeMapResponse(fallback.data), stale: true }
     setResponseStatus(event, Number(error?.statusCode || error?.response?.status || 503))
     return {
       count: 0,

@@ -147,7 +147,6 @@ const METRO_MARKER_HIT_RADIUS = 16;
 const METRO_MIN_RADIUS_M = 100;
 const METRO_MAX_RADIUS_M = 5000;
 const DETAIL_QUERY_KEYS = new Set(["adv", "flat", "flatSource", "flatCountry", "shared", "page"]);
-const RADIUS_OPTIONS = [200, 500, 1000] as const;
 
 const el = ref<HTMLElement | null>(null);
 const failed = ref(false);
@@ -1110,10 +1109,22 @@ function renderMetro() {
     if (stationSelected) marker.openTooltip?.(); marker.on("click", select); marker.addTo(metroLayer);
   }
 }
-function onMetroRadiusSelect(event: Event) {
-  const value = Number((event.target as HTMLSelectElement).value);
-  if (!Number.isFinite(value)) return;
+function metroRadiusFromEvent(event: Event): number | null {
+  const value = Number((event.target as HTMLInputElement).value);
+  if (!Number.isFinite(value)) return null;
+  return Math.max(METRO_MIN_RADIUS_M, Math.min(METRO_MAX_RADIUS_M, Math.round(value)));
+}
+function previewMetroRadius(event: Event) {
+  const value = metroRadiusFromEvent(event);
+  if (value == null) return;
+  draftRadiusM.value = value;
+  refreshMetroShape();
+}
+function commitMetroRadius(event: Event) {
+  const value = metroRadiusFromEvent(event);
+  if (value == null) return;
   emit("metro-shape", { radiusM: value, bearingFrom: shapeBearingFrom.value ?? undefined, bearingTo: shapeBearingTo.value ?? undefined });
+  draftRadiusM.value = null;
 }
 
 function markerSvg(kind: string): string {
@@ -1192,8 +1203,8 @@ function setTransportRadius(mode: TransportMode, radius: number) {
 function onTransportToggle(mode: TransportMode, event: Event) {
   setTransportVisible(mode, (event.target as HTMLInputElement).checked);
 }
-function onTransportRadiusSelect(mode: TransportMode, event: Event) {
-  setTransportRadius(mode, Number((event.target as HTMLSelectElement).value));
+function onTransportRadiusInput(mode: TransportMode, event: Event) {
+  setTransportRadius(mode, Number((event.target as HTMLInputElement).value));
 }
 function renderTransportStops() {
   const L = Leaflet; if (!transportStopLayer || !L) return;
@@ -1338,7 +1349,7 @@ function preserveUserCamera() {
             <strong class="flat-map__menu-title">{{ ui.transport }}</strong>
             <div v-if="metroStations?.length" class="flat-map__filter-block">
               <label class="flat-map__menu-row"><input v-model="showMetro" type="checkbox" /><span class="flat-map__row-icon flat-map__row-icon_metro">M</span><span>{{ props.metroLabel || ui.metro }}</span></label>
-              <label v-if="showMetro" class="flat-map__radius-select"><span>{{ ui.radius }}</span><select :value="Math.round(shapeRadiusM)" @change="onMetroRadiusSelect"><option v-for="radius in RADIUS_OPTIONS" :key="radius" :value="radius">{{ radius }} м</option></select></label>
+              <div v-if="showMetro" class="flat-map__radius-control"><input :value="Math.round(shapeRadiusM)" type="range" :min="METRO_MIN_RADIUS_M" :max="METRO_MAX_RADIUS_M" step="50" :aria-label="ui.radius" @input="previewMetroRadius" @change="commitMetroRadius" /><label><input :value="Math.round(shapeRadiusM)" type="number" :min="METRO_MIN_RADIUS_M" :max="METRO_MAX_RADIUS_M" step="50" :aria-label="ui.radius" @input="previewMetroRadius" @change="commitMetroRadius" /><span>м</span></label></div>
             </div>
             <div v-for="item in [
               { mode: 'bus', label: ui.bus },
@@ -1352,7 +1363,7 @@ function preserveUserCamera() {
                 <u-icon :name="item.mode === 'tram' ? 'i-lucide-tram-front' : item.mode === 'trolleybus' ? 'i-lucide-cable' : item.mode === 'minibus' ? 'i-lucide-van' : item.mode === 'funicular' ? 'i-lucide-cable-car' : 'i-lucide-bus-front'" class="flat-map__row-icon" />
                 <span>{{ item.label }}</span><small v-if="!transportAvailable(item.mode as TransportMode)">{{ ui.noData }}</small>
               </label>
-              <label v-if="modeVisible(item.mode) && transportAvailable(item.mode as TransportMode)" class="flat-map__radius-select"><span>{{ ui.radius }}</span><select :value="modeRadius(item.mode)" @change="onTransportRadiusSelect(item.mode as TransportMode, $event)"><option v-for="radius in RADIUS_OPTIONS" :key="radius" :value="radius">{{ radius }} м</option></select></label>
+              <div v-if="modeVisible(item.mode) && transportAvailable(item.mode as TransportMode)" class="flat-map__radius-control"><input :value="modeRadius(item.mode)" type="range" min="100" max="5000" step="50" :aria-label="ui.radius" @input="onTransportRadiusInput(item.mode as TransportMode, $event)" /><label><input :value="modeRadius(item.mode)" type="number" min="100" max="5000" step="50" :aria-label="ui.radius" @input="onTransportRadiusInput(item.mode as TransportMode, $event)" /><span>м</span></label></div>
             </div>
           </div>
         </div>
@@ -1470,8 +1481,10 @@ function preserveUserCamera() {
 
 <style scoped lang="scss">
 @use "../../assets/css/mixins/breakpoints" as *;
+/* Leaflet reserves up to 1000 for its controls. Keep app overlays above that,
+   while a full-screen map stays below the site's dialog layer (5000). */
 .flat-map-shell { position: relative; z-index: 0; isolation: isolate; scroll-margin-block: 24px; }
-.flat-map-shell_full { position: fixed; inset: 0; z-index: 3000; padding: 10px; background: var(--bg-primary, #0b0f2a); }
+.flat-map-shell_full { position: fixed; inset: 0; z-index: 4500; padding: 10px; background: var(--bg-primary, #0b0f2a); }
 .flat-map-shell_full .flat-map { height: 100%; border-radius: 8px; }
 .flat-map { width: 100%; height: 420px; border-radius: 10px; overflow: hidden; border: 1px solid var(--line); }
 .flat-map :deep(.leaflet-interactive) { outline: none; }
@@ -1480,7 +1493,7 @@ function preserveUserCamera() {
 .flat-map :deep(.flat-zone-shape_dim) { filter: grayscale(.85); }
 :deep(.flat-zone-label_dim) { opacity: .55; filter: grayscale(.85); }
 
-.flat-map__tools { position: absolute; z-index: 700; top: 10px; left: 52px; right: 10px; display: flex; align-items: flex-start; gap: 6px; pointer-events: none; }
+.flat-map__tools { position: absolute; z-index: 1300; top: 10px; left: 52px; right: 10px; display: flex; align-items: flex-start; gap: 6px; pointer-events: none; }
 .flat-map__tool-wrap { position: relative; pointer-events: auto; }
 .flat-map__tool { pointer-events: auto; display: inline-flex; align-items: center; justify-content: center; gap: 0; height: 36px; min-width: 36px; padding: 0 9px; border: 1px solid rgba(255,255,255,.12); border-radius: 8px; background: rgba(10,15,35,.94); color: var(--text-primary); cursor: pointer; box-shadow: 0 4px 14px rgba(0,0,0,.24); backdrop-filter: blur(10px); transition: border-color .15s ease, background .15s ease, color .15s ease; }
 .flat-map__tool:hover, .flat-map__tool:focus-visible { border-color: rgba(224,103,154,.55); color: #fff; outline: none; }
@@ -1507,16 +1520,14 @@ function preserveUserCamera() {
 .flat-map__row-icon_metro { display: grid; place-items: center; width: 19px; height: 19px; border: 2px solid #2563eb; border-radius: 50%; color: #fff; font-size: 10px; font-weight: 900; }
 :deep(.flat-map-tooltip) { white-space: pre-line; }
 .flat-map__filter-block + .flat-map__filter-block, .flat-map__filter-block + .flat-map__menu-row, .flat-map__menu-row + .flat-map__filter-block { border-top: 1px solid rgba(255,255,255,.06); }
-.flat-map__radius-select { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 1px 7px 8px 40px; color: var(--text-muted); font-size: 11px; }
-.flat-map__radius-select select, .flat-map__radius-control input[type="number"] { min-height: 28px; border: 1px solid rgba(255,255,255,.12); border-radius: 6px; background: #11172f; color: #fff; }
-.flat-map__radius-select select { padding: 0 7px; }
+.flat-map__radius-control input[type="number"] { min-height: 28px; border: 1px solid rgba(255,255,255,.12); border-radius: 6px; background: #11172f; color: #fff; }
 .flat-map__radius-control { display: grid; grid-template-columns: minmax(0,1fr) 86px; align-items: center; gap: 8px; padding: 0 7px 8px 40px; }
 .flat-map__radius-control > input[type="range"] { width: 100%; accent-color: var(--accent-pink); }
 .flat-map__radius-control label { display: flex; align-items: center; gap: 4px; color: var(--text-muted); font-size: 10px; }
 .flat-map__radius-control input[type="number"] { width: 64px; padding: 0 5px; }
 
-.flat-map__hint { position: absolute; z-index: 650; left: 50%; bottom: 12px; transform: translateX(-50%); padding: 7px 10px; border: 1px solid var(--line); border-radius: 6px; background: rgba(13,17,40,.94); color: var(--text-primary); font-size: 12px; }
-.flat-map__scroll-hint { position: absolute; z-index: 400; left: 50%; top: 56px; transform: translateX(-50%); padding: 6px 10px; border: 1px solid var(--line); border-radius: 6px; background: rgba(13,17,40,.88); color: var(--text-primary); font-size: 12px; pointer-events: none; opacity: 0; transition: opacity .18s ease; }
+.flat-map__hint { position: absolute; z-index: 1400; left: 50%; bottom: 12px; transform: translateX(-50%); padding: 7px 10px; border: 1px solid var(--line); border-radius: 6px; background: rgba(13,17,40,.94); color: var(--text-primary); font-size: 12px; }
+.flat-map__scroll-hint { position: absolute; z-index: 1200; left: 50%; top: 56px; transform: translateX(-50%); padding: 6px 10px; border: 1px solid var(--line); border-radius: 6px; background: rgba(13,17,40,.88); color: var(--text-primary); font-size: 12px; pointer-events: none; opacity: 0; transition: opacity .18s ease; }
 .flat-map-shell:hover .flat-map__scroll-hint { opacity: 1; }
 
 :deep(.flat-cluster) { display: flex; align-items: center; justify-content: center; width: 14px; height: 14px; border-radius: 50%; background: rgba(12,18,39,.94); border: 2px solid var(--cluster-tone, var(--flat-tone-pink)); box-sizing: border-box; box-shadow: 0 1px 3px rgba(0,0,0,.38), 0 0 0 1px rgba(255,255,255,.72); animation: flat-cluster-in .2s ease backwards; }
@@ -1540,13 +1551,13 @@ function preserveUserCamera() {
 :deep(.flat-amenity-marker), :deep(.flat-transport-marker) { display: grid; place-items: center; width: 25px; height: 25px; box-sizing: border-box; border: 2px solid #fff; border-radius: 50%; background: var(--amenity-color, var(--transport-color, #2563eb)); color: #fff; box-shadow: 0 2px 5px rgba(0,0,0,.42); }
 :deep(.flat-amenity-marker svg), :deep(.flat-transport-marker svg) { width: 13px; height: 13px; }
 
-.flat-map__price-legend { position: absolute; z-index: 620; left: 16px; bottom: 18px; display: grid; grid-template-columns: 1fr 1fr; gap: 7px 16px; width: 330px; padding: 13px 14px; border: 1px solid rgba(255,255,255,.1); border-radius: 10px; background: rgba(10,15,35,.94); color: var(--text-primary); box-shadow: 0 8px 24px rgba(0,0,0,.3); backdrop-filter: blur(12px); }
+.flat-map__price-legend { position: absolute; z-index: 1210; left: 16px; bottom: 18px; display: grid; grid-template-columns: 1fr 1fr; gap: 7px 16px; width: 330px; padding: 13px 14px; border: 1px solid rgba(10,15,35,.94); color: var(--text-primary); box-shadow: 0 8px 24px rgba(0,0,0,.3); backdrop-filter: blur(12px); }
 .flat-map__price-legend strong { grid-column: 1/-1; margin-bottom: 2px; font-size: 12px; }
 .flat-map__price-legend span { display: flex; align-items: center; gap: 7px; font-size: 11px; color: var(--text-soft); }
 .tone { width: 10px; height: 10px; border-radius: 50%; }
 .tone_red { background: var(--flat-tone-red); }.tone_yellow { background: var(--flat-tone-yellow); }.tone_orange { background: var(--flat-tone-orange); }.tone_pink { background: var(--flat-tone-pink); }.tone_blue { background: var(--flat-tone-blue); }.tone_green { background: var(--flat-tone-green); }
 
-.flat-map__district-card { position: absolute; z-index: 620; top: 62px; right: 16px; width: min(340px, calc(100vw - 32px)); padding: 14px; border: 1px solid rgba(255,255,255,.11); border-radius: 11px; background: rgba(10,15,35,.96); color: var(--text-primary); box-shadow: 0 10px 30px rgba(0,0,0,.34); backdrop-filter: blur(12px); }
+.flat-map__district-card { position: absolute; z-index: 1210; top: 62px; right: 16px; width: min(340px, calc(100vw - 32px)); padding: 14px; border: 1px solid rgba(255,255,255,.11); border-radius: 11px; background: rgba(10,15,35,.96); color: var(--text-primary); box-shadow: 0 10px 30px rgba(0,0,0,.34); backdrop-filter: blur(12px); }
 .flat-map__district-card header > div { display: grid; gap: 2px; }
 .flat-map__district-card header strong { font-size: 17px; }
 .flat-map__district-card header small { color: var(--text-muted); font-size: 11px; }
@@ -1559,7 +1570,7 @@ function preserveUserCamera() {
 .flat-map__best-thumb { width: 64px; height: 50px; overflow: hidden; border-radius: 6px; background: rgba(255,255,255,.05); }.flat-map__best-thumb img { width: 100%; height: 100%; object-fit: cover; }
 .flat-map__best-copy { display: grid; min-width: 0; gap: 2px; }.flat-map__best-copy b { font-size: 13px; }.flat-map__best-copy small { overflow: hidden; color: var(--text-muted); font-size: 10px; white-space: nowrap; text-overflow: ellipsis; }.flat-map__best-copy em { font-style: normal; font-size: 10px; font-weight: 700; }
 
-.flat-radial { position: fixed; inset: 0; z-index: 9000; }.flat-radial__anchor { position: absolute; width: 0; height: 0; }
+.flat-radial { position: fixed; inset: 0; z-index: 1500; }.flat-radial__anchor { position: absolute; width: 0; height: 0; }
 .flat-radial__hub { position: absolute; top: 50%; left: 50%; z-index: 3; transform: translate(-50%,-50%); display: grid; grid-template-columns: 19px 26px 19px; align-items: center; justify-content: center; width: 64px; height: 64px; border-radius: 50%; overflow: hidden; background: var(--accent-pink,#e0679a); color: #fff; border: 2px solid #fff; box-shadow: 0 3px 12px rgba(0,0,0,.5); }
 .flat-radial__hub-arrow { display: grid; place-items: center; align-self: stretch; width: 100%; padding: 0; border: 0; background: transparent; color: #fff; cursor: pointer; font-size: 27px; line-height: 1; }.flat-radial__hub-arrow:disabled { opacity: .35; cursor: default; }.flat-radial__hub-count { text-align: center; font-size: 10px; font-weight: 800; line-height: 1; pointer-events: none; }
 .flat-radial__slot { position: absolute; top: 0; left: 0; z-index: 1; animation: flat-radial-in .24s cubic-bezier(.34,1.56,.64,1) backwards; }@keyframes flat-radial-in { from { opacity: 0; transform: translate(-50%,-50%) scale(.3); } }

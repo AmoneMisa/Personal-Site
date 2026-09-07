@@ -26,10 +26,24 @@ const LIVE_REFRESH_FIELDS = new Set([
   'dealType',
 ])
 
+const TG_PHOTO_PATH_RE = /^\/api\/tg-photo\/[A-Za-z0-9_]{3,64}\/\d+$/
+
+/**
+ * Telegram media is served by Flat Finder over its private HTTP network. The
+ * browser must use the site's HTTPS proxy instead. Flat Finder has emitted
+ * both relative and absolute forms over time, so normalize either form while
+ * retaining a narrow, path-only allowlist for the proxy endpoint.
+ */
 function rewritePhoto(photo: unknown): unknown {
-  return typeof photo === 'string' && photo.startsWith('/api/tg-photo/')
-    ? `/flats-photo?path=${encodeURIComponent(photo)}`
-    : photo
+  if (typeof photo !== 'string') return photo
+
+  try {
+    const url = new URL(photo, 'https://flat-photo.invalid')
+    if (!TG_PHOTO_PATH_RE.test(url.pathname) || url.search || url.hash) return photo
+    return `/flats-photo?path=${encodeURIComponent(url.pathname)}`
+  } catch {
+    return photo
+  }
 }
 
 export function shapeListing(listing: any): any {
@@ -116,4 +130,18 @@ export function shapeResponse(raw: any, requestedSources: string[]): any {
     ? data.listings.length
     : typeof raw?.count === 'number' ? raw.count : data.listings.length
   return data
+}
+
+// Map points are fetched through a compact upstream response instead of the
+// regular listing feed. Keep their Telegram media on the exact same proxy path
+// as list cards and detail galleries.
+export function shapeMapResponse(raw: any): any {
+  return {
+    ...raw,
+    mapPoints: Array.isArray(raw?.mapPoints)
+      ? raw.mapPoints.map((point: any) => typeof point?.photo === 'string'
+        ? { ...point, photo: rewritePhoto(point.photo) }
+        : point)
+      : [],
+  }
 }

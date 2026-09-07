@@ -30,6 +30,23 @@ test("the radius and arc handles report one settled shape per drag", () => {
   assert.match(pageSource, /function onMetroShape\(/);
 });
 
+test("map radius controls use a slider plus a numeric input instead of preset selects", () => {
+  assert.doesNotMatch(mapSource, /flat-map__radius-select/);
+  assert.doesNotMatch(mapSource, /RADIUS_OPTIONS/);
+  assert.match(mapSource, /type="range" :min="METRO_MIN_RADIUS_M" :max="METRO_MAX_RADIUS_M"/);
+  assert.match(mapSource, /type="number" :min="METRO_MIN_RADIUS_M" :max="METRO_MAX_RADIUS_M"/);
+  assert.match(mapSource, /@input="onTransportRadiusInput\(item\.mode as TransportMode, \$event\)"/);
+});
+
+test("map UI overlays stack above Leaflet controls but below site dialogs", () => {
+  const fullMap = Number(mapSource.match(/\.flat-map-shell_full \{[^}]*z-index: (\d+)/)?.[1]);
+  const tools = Number(mapSource.match(/\.flat-map__tools \{[^}]*z-index: (\d+)/)?.[1]);
+  const radial = Number(mapSource.match(/\.flat-radial \{[^}]*z-index: (\d+)/)?.[1]);
+  assert.ok(fullMap > 4000 && fullMap < 5000);
+  assert.ok(tools > 1000, "tools must stay above Leaflet controls");
+  assert.ok(radial > tools, "cluster browser must stay above map controls");
+});
+
 test("a metro selection removes overlapping discovery rings but keeps every station tappable", () => {
   assert.doesNotMatch(mapSource, /renderMetroPresetRings/);
   assert.match(mapSource, /for \(const station of stations\)/);

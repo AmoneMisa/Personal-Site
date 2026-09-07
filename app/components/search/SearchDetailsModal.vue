@@ -47,7 +47,7 @@ const publicTitle = computed(() => {
 const effectiveTitle = computed(() => publicTitle.value || props.title);
 
 // Detail dialogs must sit above page-level fullscreen surfaces (the Flat Finder
-// map uses z-index 3000, and its cluster browser uses 9000). Keep this ownership
+// map uses z-index 4500, including its map-local cluster browser). Keep this ownership
 // in the shared modal instead of adding page-specific z-index overrides.
 const modalUi = computed(() => {
   const requestedContent = String(props.ui?.content || "");
