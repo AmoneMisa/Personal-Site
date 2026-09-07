@@ -8,6 +8,10 @@ on:
 permissions:
   contents: write
 
+concurrency:
+  group: map-redesign-integration
+  cancel-in-progress: true
+
 jobs:
   integrate:
     runs-on: ubuntu-latest
@@ -15,33 +19,36 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - name: Apply develop map patch onto current master
-        shell: bash
-        run: |
-          git fetch origin develop master
-          BASE=$(git merge-base origin/master origin/develop)
-          git diff "$BASE" origin/develop -- \
-            app/components/flats/FlatMap.client.vue \
-            server/routes/flats-geo-city.get.ts \
-            tests/flat-feed-client-cache.test.mjs \
-            tests/flat-map-interaction-modes.test.mjs \
-            tests/flat-map-selection-sync.test.mjs > /tmp/map-redesign.patch
-          if ! git apply --3way --index /tmp/map-redesign.patch; then
-            echo '--- conflicted files ---'
-            git status --short
-            echo '--- conflict diff ---'
-            git diff --cc || true
-            exit 1
-          fi
-      - name: Commit integrated sources
+      - name: Fetch redesign source branch
+        run: git fetch origin develop master
+      - name: Integrate redesign onto current master
+        run: python scripts/integrate_map_redesign_master.py
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Verify tests
+        run: npm test
+      - name: Verify types
+        run: npm run typecheck
+      - name: Verify production build
+        run: npm run build
+      - name: Commit verified integrated sources
         shell: bash
         run: |
           git config user.name "MARHARYTA KUBAI"
           git config user.email "44707323+AmoneMisa@users.noreply.github.com"
+          git add \
+            app/components/flats/FlatMap.client.vue \
+            tests/flat-map-interaction-modes.test.mjs \
+            tests/flat-map-selection-sync.test.mjs \
+            tests/flat-map-responsive-overlays.test.mjs
           git diff --cached --check
           if git diff --cached --quiet; then
-            echo 'No patch needed.'
+            echo 'No generated integration changes.'
             exit 0
           fi
-          git commit -m "feat(flats): integrate map redesign with current master"
+          git commit -m "feat(flats): integrate adaptive map redesign onto master"
           git push origin HEAD:integrate-map-redesign
