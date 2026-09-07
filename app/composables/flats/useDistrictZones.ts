@@ -14,8 +14,12 @@ export interface UseDistrictZonesOptions {
 export function useDistrictZones(options: UseDistrictZonesOptions) {
   const country = computed(() => toValue(options.countries)[0] || "");
   const city = computed(() => toValue(options.city));
-  const { districtZones, microdistrictMarkers, quartalMarkers, metroStations,
-    universityZones, shoppingMallZones, parkZones, areaZones, cityZone, allZones } = useGeoCityCatalog(
+  const {
+    districtZones, microdistrictMarkers, quartalMarkers, metroStations,
+    universityZones, shoppingMallZones, parkZones, schoolZones,
+    residentialComplexZones, airportZones, railwayStationZones, busStationZones,
+    transportStopZones, parkingZones, areaZones, cityZone, allZones,
+  } = useGeoCityCatalog(
     country,
     city,
     options.locale,
@@ -23,7 +27,9 @@ export function useDistrictZones(options: UseDistrictZonesOptions) {
 
   return {
     districtZones, microdistrictMarkers, quartalMarkers, metroStations,
-    universityZones, shoppingMallZones, parkZones, areaZones, cityZone,
+    universityZones, shoppingMallZones, parkZones, schoolZones,
+    residentialComplexZones, airportZones, railwayStationZones, busStationZones,
+    transportStopZones, parkingZones, areaZones, cityZone,
     allZones,
   };
 }
