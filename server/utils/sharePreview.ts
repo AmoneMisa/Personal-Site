@@ -1,4 +1,6 @@
-import { FLAT_API_URL } from '../flats/feedLookup'
+import { FLAT_API_URL, lookupPublicListing } from '../flats/feedLookup'
+import en from '../../i18n/locales/en.json' with { type: 'json' }
+import ru from '../../i18n/locales/ru.json' with { type: 'json' }
 
 export const SHARE_SITE_URL = (process.env.PUBLIC_SITE_URL || 'https://whiteslove.me').replace(/\/$/, '')
 const VALID_FLAT_SOURCES = new Set(['olx', 'telegram'])
@@ -60,6 +62,7 @@ export function escapeXml(value: unknown): string {
 
 export function wrapShareText(value: unknown, maxChars = 34, maxLines = 3): string[] {
   const words = cleanShareText(value, 260).split(/\s+/).filter(Boolean)
+    .flatMap(word => Array.from({ length: Math.ceil(word.length / maxChars) }, (_, index) => word.slice(index * maxChars, (index + 1) * maxChars)))
   const lines: string[] = []
   let current = ''
 
@@ -83,9 +86,13 @@ export function wrapShareText(value: unknown, maxChars = 34, maxLines = 3): stri
   return lines
 }
 
-export async function findSharedFlat(id: string, source = '', country = ''): Promise<any | null> {
+export async function findSharedFlat(id: string, source = '', country = '', byPublicId = false): Promise<any | null> {
   const wanted = String(id || '').trim()
   if (!wanted) return null
+  if (byPublicId) {
+    const result = await lookupPublicListing(wanted, SHARE_LOOKUP_TIMEOUT_MS)
+    return result.data?.listings?.[0] || null
+  }
 
   const params = new URLSearchParams({ listingId: wanted, limit: '1', offset: '0' })
   const normalizedSource = String(source || '').trim().toLowerCase()
@@ -152,14 +159,14 @@ function candidateSalaryLabel(profile: any): string {
 }
 
 function shareImageUrl(kind: 'job' | 'candidate' | 'flat', id: string, source = '', country = ''): string {
-  const params = new URLSearchParams({ kind, id })
+  const params = new URLSearchParams({ kind, id, v: '2' })
   if (source) params.set('source', source)
   if (country) params.set('country', country)
   return `${SHARE_SITE_URL}/share-og.png?${params}`
 }
 
 export function buildJobShareMeta(job: any, id: string, pathname = '/jobs'): ShareMeta {
-  const title = cleanShareText([job?.title, job?.company].filter(Boolean).join(' — '), 120) || 'Vacancy · Job Finder'
+  const title = cleanShareText([job?.title, job?.company, job?.location, salaryLabel(job)].filter(Boolean).join(' · '), 120) || 'Vacancy · Job Finder'
   const details = [
     cleanShareText(job?.location, 80),
     job?.remote ? 'Remote' : '',
@@ -186,7 +193,7 @@ export function buildCandidateShareMeta(
   pathname = '/hiring',
 ): ShareMeta {
   const title = cleanShareText(
-    [profile?.name, profile?.role].filter(Boolean).join(' — '),
+    [profile?.name, profile?.role, profile?.city, candidateSalaryLabel(profile)].filter(Boolean).join(' · '),
     120,
   ) || 'Candidate · Hiring Board'
   const experienceYears = finiteNumber(profile?.experienceYears)
@@ -224,7 +231,14 @@ export function buildFlatShareMeta(flat: any, id: string, source = '', country =
     flat?.propertyType === 'house' ? 'house' : 'apartment',
     cleanShareText(flat?.city, 50),
   ].filter(Boolean).join(' · ')
-  const title = cleanShareText(flat?.title, 120) || fallbackTitle || 'Property listing · Flat Finder'
+  const dealLabels: Record<string, string> = {
+    sale: 'dtSale', longRent: 'dtLongRent', shortRent: 'dtShortRent', roomRent: 'dtRoomRent',
+  }
+  const labels = pathname.startsWith('/en/') ? en.flats : ru.flats
+  const dealKey = dealLabels[flat?.dealType] as keyof typeof labels | undefined
+  const title = cleanShareText([
+    cleanShareText(flat?.city, 50), flatPriceLabel(flat), dealKey ? labels[dealKey] : '',
+  ].filter(Boolean).join(' · '), 120) || fallbackTitle || 'Property listing · Flat Finder'
   const floor = finiteNumber(flat?.floor) !== null
     ? finiteNumber(flat?.totalFloors) !== null ? `${flat.floor}/${flat.totalFloors} floor` : `${flat.floor} floor`
     : ''
@@ -243,7 +257,7 @@ export function buildFlatShareMeta(flat: any, id: string, source = '', country =
   return {
     title,
     description,
-    image: shareImageUrl('flat', id, source, country),
+    image: `${shareImageUrl('flat', id, source, country)}&lang=${pathname.startsWith('/en/') ? 'en' : 'ru'}`,
     imageType: 'image/png',
     url: `${SHARE_SITE_URL}${pathname}?${pageParams}`,
     type: 'website',

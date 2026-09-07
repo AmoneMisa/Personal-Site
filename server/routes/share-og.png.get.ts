@@ -11,6 +11,7 @@ import {
 import { renderShareOgPng, type ShareOgCard, type ShareOgKind } from '../utils/shareOgImage'
 
 const FALLBACK: Record<ShareOgKind, ShareOgCard> = {
+  quiz: { kind: 'quiz', title: 'Quizzes', description: 'Discover your interests, career and next destination.' },
   site: {
     kind: 'site',
     title: 'WhitesLove',
@@ -39,7 +40,7 @@ function queryText(value: unknown, max = 512): string {
 
 function shareKind(value: unknown): ShareOgKind {
   const kind = queryText(value, 20)
-  return kind === 'job' || kind === 'candidate' || kind === 'flat' ? kind : 'site'
+  return kind === 'job' || kind === 'candidate' || kind === 'flat' || kind === 'quiz' ? kind : 'site'
 }
 
 export default defineEventHandler(async (event) => {
@@ -49,6 +50,9 @@ export default defineEventHandler(async (event) => {
   const source = queryText(query.source, 80)
   const country = queryText(query.country, 8).toUpperCase()
   let card = FALLBACK[kind]
+  if (!id || kind === 'site' || kind === 'quiz') {
+    card = { kind, title: queryText(query.title, 150) || card.title, description: queryText(query.description, 210) || card.description }
+  }
 
   if (kind === 'job' && id) {
     const job = await findPlatformSharedJob(id)
@@ -63,14 +67,16 @@ export default defineEventHandler(async (event) => {
       card = { kind, title: meta.title, description: meta.description }
     }
   } else if (kind === 'flat' && id) {
-    const flat = await findSharedFlat(id, source, country)
+    const flat = await findSharedFlat(id, source, country, queryText(query.publicId) === '1')
     if (flat) {
-      const meta = buildFlatShareMeta(flat, id, source, country)
+      const meta = buildFlatShareMeta(flat, id, source, country, queryText(query.lang) === 'en' ? '/en/flat-finder' : '/flat-finder')
       card = { kind, title: meta.title, description: meta.description }
     }
   }
 
-  const png = await renderShareOgPng(card)
+  const artwork = await useStorage('assets:server').getItemRaw<Uint8Array>('og/ocean.jpg')
+  if (!artwork) throw createError({ statusCode: 500, statusMessage: 'Share artwork unavailable' })
+  const png = await renderShareOgPng(card, artwork)
   setResponseHeader(event, 'Content-Type', 'image/png')
   setResponseHeader(event, 'Content-Length', String(png.length))
   setResponseHeader(event, 'Cache-Control', 'public, max-age=300, s-maxage=600, stale-while-revalidate=86400')

@@ -10,7 +10,7 @@ import {
   findPlatformSharedCandidate,
   findPlatformSharedJob,
 } from '../utils/backendPlatformShareLookup'
-import { removeExistingSocialMeta } from '../utils/shareHead'
+import { removeExistingSocialMeta, withPageShareImage } from '../utils/shareHead'
 
 function queryValue(value: unknown): string {
   return Array.isArray(value) ? String(value[0] ?? '') : String(value ?? '')
@@ -25,21 +25,27 @@ export default defineNitroPlugin((nitroApp) => {
     const requestUrl = getRequestURL(event)
     const pathname = requestUrl.pathname.replace(/\/$/, '') || '/'
     const query = getQuery(event)
+    html.head = withPageShareImage(html.head, pathname, SHARE_SITE_URL)
 
     let meta = null
 
     if (pathname === '/flat-finder' || pathname === '/en/flat-finder') {
-      const id = queryValue(query.flat).trim()
+      const publicId = queryValue(query.adv).trim()
+      const id = publicId || queryValue(query.flat).trim()
       if (!id) return
 
       const source = queryValue(query.flatSource).trim().toLowerCase()
       const country = queryValue(query.flatCountry).trim().toUpperCase()
-      const flat = await findSharedFlat(id, source, country)
+      const flat = await findSharedFlat(id, source, country, Boolean(publicId))
 
       // Shared links must keep a valid card even after an item expires or while
       // its source snapshot is warming. The builders provide the same 1200x630
       // fallback renderer when item data is temporarily unavailable.
       meta = buildFlatShareMeta(flat || {}, id, source, country, pathname)
+      if (publicId) {
+        meta.url = cleanEntityUrl(pathname, publicId)
+        meta.image += '&publicId=1'
+      }
     } else if (pathname === '/jobs' || pathname === '/en/jobs') {
       const publicId = queryValue(query.adv).trim()
       const legacyId = queryValue(query.job).trim()

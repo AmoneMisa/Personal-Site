@@ -17,14 +17,14 @@ type PublicListingLookupResult = {
   upstreamFailed: boolean
 }
 
-export async function lookupPublicListing(publicId: string): Promise<PublicListingLookupResult> {
+export async function lookupPublicListing(publicId: string, timeout = EXACT_LOOKUP_TIMEOUT_MS): Promise<PublicListingLookupResult> {
   const cached = getCachedPublicId(publicId)
   if (cached) return { data: cached, upstreamFailed: false }
 
   try {
     const result = await $fetch<any>(
       `${FLAT_API_URL}/api/listing/by-public-id/${encodeURIComponent(publicId)}`,
-      { timeout: EXACT_LOOKUP_TIMEOUT_MS },
+      { timeout },
     )
     if (!result?.listing) {
       return { data: { count: 0, listings: [] }, upstreamFailed: false }
