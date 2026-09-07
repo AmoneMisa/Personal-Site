@@ -12,7 +12,12 @@ type BackendZone = {
   lat?: number
   lng?: number
   radiusM?: number
+  color?: string
   boundary?: unknown
+  mode?: string
+  routeRefs?: string[]
+  lineColor?: string
+  lineColors?: string[]
 }
 
 function asEntity(zone: BackendZone | null | undefined, country: string) {
@@ -27,6 +32,11 @@ function asEntity(zone: BackendZone | null | undefined, country: string) {
     center: { lat: Number(zone.lat), lng: Number(zone.lng) },
     accuracyM: Number.isFinite(zone.radiusM) ? Number(zone.radiusM) : 0,
     boundary: zone.boundary || undefined,
+    ...(zone.color ? { color: zone.color } : {}),
+    ...(zone.mode ? { mode: zone.mode } : {}),
+    ...(Array.isArray(zone.routeRefs) ? { routeRefs: zone.routeRefs } : {}),
+    ...(zone.lineColor ? { lineColor: zone.lineColor } : {}),
+    ...(Array.isArray(zone.lineColors) ? { lineColors: zone.lineColors } : {}),
   }
 }
 
@@ -64,6 +74,13 @@ export default defineEventHandler(async (event) => {
       zones?.parks,
       zones?.shoppingMalls,
       zones?.universities,
+      zones?.schools,
+      zones?.residentialComplexes,
+      zones?.airports,
+      zones?.railwayStations,
+      zones?.busStations,
+      zones?.transportStops,
+      zones?.parkings,
     ]
     const descendants = groups
       .flatMap((items) => Array.isArray(items) ? items : [])
