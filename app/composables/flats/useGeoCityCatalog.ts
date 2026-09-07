@@ -11,6 +11,13 @@ const EMPTY_RESPONSE: FlatGeoZonesResponse = {
   parks: [],
   shoppingMalls: [],
   universities: [],
+  schools: [],
+  residentialComplexes: [],
+  airports: [],
+  railwayStations: [],
+  busStations: [],
+  transportStops: [],
+  parkings: [],
   cityZone: null,
 };
 
@@ -29,6 +36,13 @@ function emptyResponse(): FlatGeoZonesResponse {
     parks: [],
     shoppingMalls: [],
     universities: [],
+    schools: [],
+    residentialComplexes: [],
+    airports: [],
+    railwayStations: [],
+    busStations: [],
+    transportStops: [],
+    parkings: [],
     cityZone: null,
   };
 }
@@ -47,6 +61,18 @@ function validBoundary(value: unknown): FlatGeoZone["boundary"] {
     : Array.isArray(boundary.coordinates) && boundary.coordinates.length > 0 && boundary.coordinates.every(validPolygon);
   if (!valid) return null;
   return { type: boundary.type, coordinates: boundary.coordinates };
+}
+
+function optionalColor(value: unknown): string | undefined {
+  return typeof value === "string" && /^#(?:[0-9a-f]{3}|[0-9a-f]{6}|[0-9a-f]{8})$/i.test(value)
+    ? value
+    : undefined;
+}
+
+function stringArray(value: unknown): string[] | undefined {
+  if (!Array.isArray(value)) return undefined;
+  const values = value.map((item) => String(item || "").trim()).filter(Boolean);
+  return values.length ? values : undefined;
 }
 
 function normalizeZone(value: unknown): FlatGeoZone | null {
@@ -68,6 +94,12 @@ function normalizeZone(value: unknown): FlatGeoZone | null {
     radiusM: typeof raw.radiusM === "number" && Number.isFinite(raw.radiusM) && raw.radiusM > 0 ? raw.radiusM : 400,
     color: mapColor(raw.color),
     boundary: validBoundary(raw.boundary),
+    ...(typeof raw.mode === "string" && raw.mode.trim() ? { mode: raw.mode.trim() } : {}),
+    ...(stringArray(raw.routeRefs) ? { routeRefs: stringArray(raw.routeRefs) } : {}),
+    ...(optionalColor(raw.lineColor) ? { lineColor: optionalColor(raw.lineColor) } : {}),
+    ...(stringArray(raw.lineColors)?.map(optionalColor).filter((color): color is string => Boolean(color)).length
+      ? { lineColors: stringArray(raw.lineColors)!.map(optionalColor).filter((color): color is string => Boolean(color)) }
+      : {}),
   };
 }
 
@@ -88,6 +120,13 @@ function normalizeResponse(value: unknown): FlatGeoZonesResponse {
     parks: normalizeGroup(raw.parks),
     shoppingMalls: normalizeGroup(raw.shoppingMalls),
     universities: normalizeGroup(raw.universities),
+    schools: normalizeGroup(raw.schools),
+    residentialComplexes: normalizeGroup(raw.residentialComplexes),
+    airports: normalizeGroup(raw.airports),
+    railwayStations: normalizeGroup(raw.railwayStations),
+    busStations: normalizeGroup(raw.busStations),
+    transportStops: normalizeGroup(raw.transportStops),
+    parkings: normalizeGroup(raw.parkings),
     cityZone: normalizeZone(raw.cityZone),
   };
 }
@@ -116,9 +155,6 @@ function getEntry(key: string) {
 function load(key: string, country: string, city: string, locale: string): void {
   const entry = getEntry(key);
   if (entry.pending || (entry.loadedAt > 0 && Date.now() - entry.loadedAt < CACHE_TTL_MS)) return;
-  // Unit consumers can use the filter state without a Nuxt runtime. In that
-  // context the backend fetch auto-import is absent, so leave the DTO empty
-  // instead of creating an unhandled asynchronous rejection.
   if (typeof $fetch !== "function") return;
 
   entry.pending = $fetch<FlatGeoZonesResponse>("/flats-geo-city", {
@@ -166,6 +202,13 @@ export function useGeoCityCatalog(
     ...data.value.parks,
     ...data.value.shoppingMalls,
     ...data.value.universities,
+    ...data.value.schools,
+    ...data.value.residentialComplexes,
+    ...data.value.airports,
+    ...data.value.railwayStations,
+    ...data.value.busStations,
+    ...data.value.transportStops,
+    ...data.value.parkings,
   ]);
 
   return {
@@ -179,6 +222,13 @@ export function useGeoCityCatalog(
     universityZones: computed(() => data.value.universities),
     shoppingMallZones: computed(() => data.value.shoppingMalls),
     parkZones: computed(() => data.value.parks),
+    schoolZones: computed(() => data.value.schools),
+    residentialComplexZones: computed(() => data.value.residentialComplexes),
+    airportZones: computed(() => data.value.airports),
+    railwayStationZones: computed(() => data.value.railwayStations),
+    busStationZones: computed(() => data.value.busStations),
+    transportStopZones: computed(() => data.value.transportStops),
+    parkingZones: computed(() => data.value.parkings),
     cityZone: computed(() => data.value.cityZone),
   };
 }
