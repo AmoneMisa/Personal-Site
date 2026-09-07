@@ -6,10 +6,10 @@ import {
 } from './feedCache'
 import { shapeListing, shapeLiveListing } from './feedListingShape'
 
-// Flat Finder is a separate internal service. Keep the Docker service name as
+// Flat Finder runs as flats-api in the backend platform. Keep its service name as
 // the local default; production deployments can override it explicitly, but
 // must never fall back to an embedded public HTTP address.
-export const FLAT_API_URL = process.env.FLAT_API_URL || 'http://flat-finder-backend:4000'
+export const FLAT_API_URL = process.env.FLAT_API_URL || 'http://flats-api:4000'
 export const EXACT_LOOKUP_TIMEOUT_MS = 8_000
 
 type PublicListingLookupResult = {
