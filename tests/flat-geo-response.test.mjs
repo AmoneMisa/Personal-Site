@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import {readFile} from 'node:fs/promises';
 import { effectScope, ref } from 'vue';
 import { useGeoCityCatalog } from '../app/composables/flats/useGeoCityCatalog.ts';
 
@@ -24,4 +25,15 @@ test('invalid backend geometry is rejected without reconstructing geographic dat
   assert.equal(fallback.boundary, null);
   assert.equal(fallback.color, '#8b5cf6');
   assert.equal(fallback.radiusM, 400);
+});
+
+test('expanded territory groups remain distinct across the shared map contract', async () => {
+  const files = await Promise.all([
+    readFile(new URL('../shared/contracts/flatGeo.ts', import.meta.url), 'utf8'),
+    readFile(new URL('../server/routes/flats-geo-city.get.ts', import.meta.url), 'utf8'),
+    readFile(new URL('../app/composables/flats/useGeoCityCatalog.ts', import.meta.url), 'utf8'),
+  ]);
+  for (const key of ['regionZones', 'mahallaMarkers', 'quarterMarkers', 'zoneMarkers']) {
+    for (const fileSource of files) assert.match(fileSource, new RegExp(`\\b${key}\\b`, 'u'));
+  }
 });

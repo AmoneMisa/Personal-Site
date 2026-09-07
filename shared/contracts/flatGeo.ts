@@ -22,9 +22,13 @@ export interface FlatGeoZone {
 
 export interface FlatGeoZonesResponse {
   districtZones: FlatGeoZone[];
+  regionZones: FlatGeoZone[];
   microdistrictMarkers: FlatGeoZone[];
+  mahallaMarkers: FlatGeoZone[];
+  quarterMarkers: FlatGeoZone[];
   quartalMarkers: FlatGeoZone[];
   areaZones: FlatGeoZone[];
+  zoneMarkers: FlatGeoZone[];
   metroStations: FlatGeoZone[];
   parks: FlatGeoZone[];
   shoppingMalls: FlatGeoZone[];

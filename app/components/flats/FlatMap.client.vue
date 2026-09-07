@@ -32,6 +32,7 @@ interface FlatPoint {
   source?: string;
   country?: string;
   district?: string | null;
+  residenceComplex?: string | null;
   price?: number | null;
   currency?: string;
   priceRatio?: number | null;
@@ -161,8 +162,10 @@ const menuOpen = ref<MenuKind | null>(null);
 const language = ref("ru");
 
 const showDistricts = ref(true);
+const showRegions = ref(true);
 const showMicrodistricts = ref(false);
 const showQuartals = ref(false);
+const showQuarters = ref(false);
 const showAreas = ref(true);
 const showCity = ref(true);
 
@@ -176,6 +179,7 @@ const busRadiusM = ref(500);
 const tramRadiusM = ref(500);
 const trolleybusRadiusM = ref(500);
 const minibusRadiusM = ref(500);
+const funicularRadiusM = ref(500);
 
 const showUniversities = ref(false);
 const showShoppingMalls = ref(false);
@@ -209,13 +213,19 @@ const ui = computed(() => {
   const ru = language.value.toLowerCase().startsWith("ru");
   return ru ? {
     territories: "Территории",
+    administrative: "Административные",
+    local: "Локальные",
+    other: "Прочее",
+    regions: "Области",
     transport: "Транспорт",
     poi: "Объекты и сервисы",
     city: "Граница города",
     districts: "Районы",
     microdistricts: "Микрорайоны",
-    mahallas: "Махалли / кварталы",
-    areas: "Области / зоны",
+    mahallas: "Махалли",
+    quarters: "Кварталы",
+    zones: "Зоны",
+    areas: "Зоны",
     metro: "Метро",
     bus: "Автобус",
     tram: "Трамвай",
@@ -242,13 +252,19 @@ const ui = computed(() => {
     medianPrice: "около медианы",
   } : {
     territories: "Territories",
+    administrative: "Administrative",
+    local: "Local",
+    other: "Other",
+    regions: "Regions",
     transport: "Transport",
     poi: "Places & services",
     city: "City boundary",
     districts: "Districts",
     microdistricts: "Microdistricts",
-    mahallas: "Mahallas / quarters",
-    areas: "Areas / zones",
+    mahallas: "Mahallas",
+    quarters: "Quarters",
+    zones: "Zones",
+    areas: "Areas",
     metro: "Metro",
     bus: "Bus",
     tram: "Tram",
@@ -300,7 +316,7 @@ function pointKey(point: Pick<FlatPoint, "id" | "source" | "country">): string {
   return `${point.source || ""}:${point.country || ""}:${point.id}`;
 }
 
-function fallbackPriceLabel(point: FlatMapPoint): string | undefined {
+function fallbackPriceLabel(point: Pick<FlatPoint, "price" | "currency">): string | undefined {
   if (point.price == null || !Number.isFinite(Number(point.price))) return undefined;
   const value = Number(point.price).toLocaleString(undefined, { maximumFractionDigits: 0 });
   return point.currency ? `${value} ${point.currency}` : value;
@@ -323,6 +339,7 @@ function shapeMapPoints(data: FlatMapFeedResult | undefined): FlatPoint[] {
     .map((point) => {
       const raw = point as FlatMapPoint & {
         district?: string | null;
+        residenceComplex?: string | null;
         photo?: string | null;
         priceRatio?: number | null;
         marketComparison?: { priceRatio?: number | null };
@@ -338,6 +355,7 @@ function shapeMapPoints(data: FlatMapFeedResult | undefined): FlatPoint[] {
         priceLabel: fallbackPriceLabel(point),
         photo: raw.photo || undefined,
         district: raw.district || null,
+        residenceComplex: raw.residenceComplex || null,
         price: point.price == null ? null : Number(point.price),
         currency: point.currency || undefined,
         priceRatio: Number.isFinite(ratio) && ratio > 0 ? ratio : null,
@@ -429,6 +447,11 @@ function extraByType(type: string, fallback: string): FlatMapZone[] {
 
 const schoolZones = computed(() => extraByType("poi.school", "#ec4899"));
 const residentialComplexZones = computed(() => extraByType("residential_complex", "#14b8a6"));
+const regionZones = computed(() => extraByType("region", "#8b5cf6"));
+const quarterZones = computed(() => [
+  ...extraByType("quarter", "#f59e0b"),
+  ...extraByType("quartal", "#f59e0b"),
+]);
 const airportZones = computed(() => extraByType("poi.airport", "#0ea5e9"));
 const railwayStationZones = computed(() => extraByType("poi.railway_station", "#64748b"));
 const busStationZones = computed(() => extraByType("poi.bus_station", "#2563eb"));
@@ -459,6 +482,21 @@ const renderedPoints = computed<FlatPoint[]>(() => {
     merged.set(remote ? pointKey(remote) : exactKey, { ...remote, ...point });
   }
   return [...merged.values()];
+});
+
+const residentialStatsByName = computed(() => {
+  const stats = new Map<string, { count: number; cheapest: FlatPoint | null }>();
+  for (const point of renderedPoints.value) {
+    const key = String(point.residenceComplex || "").trim().toLocaleLowerCase();
+    if (!key) continue;
+    const current = stats.get(key) || { count: 0, cheapest: null };
+    current.count += 1;
+    const price = Number(point.price);
+    const cheapestPrice = Number(current.cheapest?.price);
+    if (Number.isFinite(price) && price > 0 && (!current.cheapest || !Number.isFinite(cheapestPrice) || price < cheapestPrice)) current.cheapest = point;
+    stats.set(key, current);
+  }
+  return stats;
 });
 
 function median(values: number[]): number | null {
@@ -583,8 +621,10 @@ let layer: any = null;
 let areaLayer: any = null;
 let focusLayer: any = null;
 let districtLayer: any = null;
+let regionLayer: any = null;
 let microdistrictLayer: any = null;
 let quartalLayer: any = null;
+let quarterLayer: any = null;
 let metroLayer: any = null;
 let universityLayer: any = null;
 let shoppingMallLayer: any = null;
@@ -955,8 +995,24 @@ function renderZoneShapes(layerGroup: any, zones: FlatMapZone[], kind: ZoneKind,
   const L = Leaflet; if (!layerGroup || !L) return; layerGroup.clearLayers();
   for (const zone of zones) renderZoneShape(layerGroup, zone, kind, { ...style, color: zone.color, fillColor: zone.color, className: "flat-zone-shape" });
 }
+function renderPassiveZoneShapes(layerGroup: any, zones: FlatMapZone[], visible: boolean, style: Record<string, unknown>) {
+  const L = Leaflet; if (!layerGroup || !L) return; layerGroup.clearLayers(); if (!visible) return;
+  for (const zone of zones) {
+    const color = safeColor(zone.color, "#8b5cf6");
+    const onClick = (event: any) => handleLayerClick(event, () => focusZone(zone));
+    if (zone.boundary) {
+      const shape = L.geoJSON(zone.boundary as any, { style: () => ({ ...style, color, fillColor: color, className: "flat-zone-shape" }), bubblingMouseEvents: false }).addTo(layerGroup);
+      shape.bindTooltip(mapText(zone.label), { direction: "top" }); shape.on("click", onClick);
+    } else {
+      const circle = L.circle([zone.lat, zone.lng], { radius: zone.radiusM, ...style, color, fillColor: color, bubblingMouseEvents: false }).addTo(layerGroup);
+      circle.bindTooltip(mapText(zone.label), { direction: "top" }); circle.on("click", onClick);
+    }
+  }
+}
+function renderRegions() { renderPassiveZoneShapes(regionLayer, regionZones.value, showRegions.value, { weight: 3, opacity: .75, fillOpacity: .04, dashArray: "8 5" }); }
 function renderMicrodistricts() { if (showMicrodistricts.value) renderZoneShapes(microdistrictLayer, props.microdistrictMarkers || [], "microdistrict", { weight: 2, opacity: .9, fillOpacity: .18 }); else microdistrictLayer?.clearLayers(); }
 function renderQuartals() { if (showQuartals.value) renderZoneShapes(quartalLayer, props.quartalMarkers || [], "quartal", { weight: 1.5, dashArray: "3 4", opacity: .9, fillOpacity: .16 }); else quartalLayer?.clearLayers(); }
+function renderQuarters() { renderPassiveZoneShapes(quarterLayer, quarterZones.value, showQuarters.value, { weight: 1.5, dashArray: "2 4", opacity: .85, fillOpacity: .12 }); }
 
 function metroToggle(station: FlatMapZone) { closeRadial(); if (!isZoneSelected("metro", station.name)) focusZone(station); emit("metro-toggle", station.name); }
 function stationMeta(station: FlatMapZone) {
@@ -1073,6 +1129,9 @@ function markerSvg(kind: string): string {
     train: '<rect x="6" y="3" width="12" height="15" rx="3"/><path d="M8 21l2-3M16 18l2 3M8 8h8M9 13h.01M15 13h.01"/>',
     bus: '<rect x="5" y="3" width="14" height="16" rx="2"/><path d="M7 8h10M8 19v2M16 19v2M8 15h.01M16 15h.01"/>',
     tram: '<rect x="6" y="4" width="12" height="14" rx="2"/><path d="m9 2 3 2 3-2M8 9h8M9 14h.01M15 14h.01M9 21l3-3 3 3"/>',
+    trolleybus: '<rect x="5" y="5" width="14" height="14" rx="2"/><path d="M7 10h10M8 19v2M16 19v2M8 15h.01M16 15h.01M8 5l2-3M16 5l-2-3"/>',
+    minibus: '<rect x="4" y="6" width="16" height="12" rx="3"/><path d="M6 11h12M7 18v2M17 18v2M8 15h.01M16 15h.01"/>',
+    funicular: '<path d="M7 4h10l2 14H5L7 4Z"/><path d="M8 9h8M9 15h.01M15 15h.01M9 4l6-3"/>',
   };
   return `<svg ${common}>${paths[kind] ?? paths.building!}</svg>`;
 }
@@ -1088,7 +1147,10 @@ function renderAmenityLayer(layerGroup: any, zones: FlatMapZone[], visible: bool
     }
     const icon = L.divIcon({ className: "flat-amenity-marker-wrap", html: `<span class="flat-amenity-marker" style="--amenity-color:${color}">${markerSvg(iconKind)}</span>`, iconSize: [27, 27], iconAnchor: [13.5, 13.5] });
     const marker = L.marker([zone.lat, zone.lng], { icon, bubblingMouseEvents: false });
-    marker.bindTooltip(mapText(zone.label), { direction: "top", offset: [0, -12] }); marker.on("click", (event: any) => handleLayerClick(event, () => focusZone(zone))); marker.addTo(layerGroup);
+    const stats = iconKind === "building" ? residentialStatsByName.value.get(zone.name.trim().toLocaleLowerCase()) : null;
+    const cheapest = stats?.cheapest ? fallbackPriceLabel(stats.cheapest) : null;
+    const tooltip = stats ? [zone.label, `${stats.count} объявлений`, ...(cheapest ? [`от ${cheapest}`] : [])].join("\n") : zone.label;
+    marker.bindTooltip(mapText(tooltip, "flat-map-tooltip"), { direction: "top", offset: [0, -12] }); marker.on("click", (event: any) => handleLayerClick(event, () => focusZone(zone))); marker.addTo(layerGroup);
   }
 }
 
@@ -1097,6 +1159,7 @@ function modeVisible(mode: string): boolean {
   if (mode === "tram") return showTram.value;
   if (mode === "trolleybus") return showTrolleybus.value;
   if (mode === "minibus") return showMinibus.value;
+  if (mode === "funicular") return showFunicular.value;
   return false;
 }
 function modeRadius(mode: string): number {
@@ -1104,6 +1167,7 @@ function modeRadius(mode: string): number {
   if (mode === "tram") return tramRadiusM.value;
   if (mode === "trolleybus") return trolleybusRadiusM.value;
   if (mode === "minibus") return minibusRadiusM.value;
+  if (mode === "funicular") return funicularRadiusM.value;
   return 0;
 }
 function transportAvailable(mode: TransportMode): boolean {
@@ -1115,6 +1179,7 @@ function setTransportVisible(mode: TransportMode, visible: boolean) {
   else if (mode === "tram") showTram.value = visible;
   else if (mode === "trolleybus") showTrolleybus.value = visible;
   else if (mode === "minibus") showMinibus.value = visible;
+  else if (mode === "funicular") showFunicular.value = visible;
 }
 function setTransportRadius(mode: TransportMode, radius: number) {
   if (!Number.isFinite(radius) || radius <= 0) return;
@@ -1122,6 +1187,7 @@ function setTransportRadius(mode: TransportMode, radius: number) {
   else if (mode === "tram") tramRadiusM.value = radius;
   else if (mode === "trolleybus") trolleybusRadiusM.value = radius;
   else if (mode === "minibus") minibusRadiusM.value = radius;
+  else if (mode === "funicular") funicularRadiusM.value = radius;
 }
 function onTransportToggle(mode: TransportMode, event: Event) {
   setTransportVisible(mode, (event.target as HTMLInputElement).checked);
@@ -1136,7 +1202,7 @@ function renderTransportStops() {
     if (!modeVisible(stop.mode || "")) continue;
     const color = safeColor(stop.color, "#2563eb"); const radius = modeRadius(stop.mode || "");
     if (radius > 0) leaflet.circle([stop.lat, stop.lng], { radius, color, weight: 1.1, opacity: .45, fillColor: color, fillOpacity: .025, interactive: false }).addTo(transportStopLayer);
-    const kind = stop.mode === "tram" ? "tram" : "bus";
+    const kind = stop.mode === "tram" ? "tram" : stop.mode === "trolleybus" ? "trolleybus" : stop.mode === "minibus" ? "minibus" : stop.mode === "funicular" ? "funicular" : "bus";
     const icon = leaflet.divIcon({ className: "flat-transport-marker-wrap", html: `<span class="flat-transport-marker" style="--transport-color:${color}">${markerSvg(kind)}</span>`, iconSize: [25, 25], iconAnchor: [12.5, 12.5] });
     const marker = leaflet.marker([stop.lat, stop.lng], { icon, bubblingMouseEvents: false });
     const refs = stop.routeRefs?.length ? ` · ${stop.routeRefs.join(", ")}` : "";
@@ -1166,7 +1232,7 @@ function renderCityZone() {
   L.geoJSON(zone.boundary as any, { style: () => ({ color: zone.color, weight: 2, opacity: .55, dashArray: "4 6", fill: false, interactive: false }) }).addTo(cityLayer);
 }
 function renderAllZoneLayers() {
-  renderCityZone(); renderDistrictZones(); renderMicrodistricts(); renderQuartals(); renderMetro(); renderTransportStops(); renderAmenities(); renderAreaZones();
+  renderCityZone(); renderRegions(); renderDistrictZones(); renderMicrodistricts(); renderQuartals(); renderQuarters(); renderMetro(); renderTransportStops(); renderAmenities(); renderAreaZones();
 }
 function toggleDrawing() { drawing.value = !drawing.value; menuOpen.value = null; if (drawing.value) closeRadial(); }
 function clearArea() { area.value = []; renderArea(); emit("area-change", []); }
@@ -1188,7 +1254,7 @@ onMounted(async () => {
   } catch { failed.value = true; return; }
   L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", { attribution: "&copy; OpenStreetMap contributors", maxNativeZoom: 19, maxZoom: 19, detectRetina: true }).addTo(map);
   layer = L.layerGroup().addTo(map); areaLayer = L.layerGroup().addTo(map); focusLayer = L.layerGroup().addTo(map); cityLayer = L.layerGroup().addTo(map);
-  districtLayer = L.layerGroup().addTo(map); microdistrictLayer = L.layerGroup().addTo(map); quartalLayer = L.layerGroup().addTo(map); zoneAreaLayer = L.layerGroup().addTo(map);
+  regionLayer = L.layerGroup().addTo(map); districtLayer = L.layerGroup().addTo(map); microdistrictLayer = L.layerGroup().addTo(map); quartalLayer = L.layerGroup().addTo(map); quarterLayer = L.layerGroup().addTo(map); zoneAreaLayer = L.layerGroup().addTo(map);
   metroLayer = L.layerGroup().addTo(map); transportStopLayer = L.layerGroup().addTo(map);
   universityLayer = L.layerGroup().addTo(map); shoppingMallLayer = L.layerGroup().addTo(map); parkLayer = L.layerGroup().addTo(map); schoolLayer = L.layerGroup().addTo(map);
   residentialLayer = L.layerGroup().addTo(map); airportLayer = L.layerGroup().addTo(map); railwayLayer = L.layerGroup().addTo(map); busStationLayer = L.layerGroup().addTo(map); parkingLayer = L.layerGroup().addTo(map);
@@ -1214,10 +1280,11 @@ watch(() => [props.selectedDistrict, props.selectedMicrodistrict, props.selected
   const removedMetro = previousMetros.some((name) => !selectedMetros.value.includes(name));
   if (changed) syncSelectionFromProps(!removedMetro && Boolean(selectedZoneFromProps()));
 });
-watch([showDistricts, showMicrodistricts, showQuartals, showMetro, showBus, showTram, showTrolleybus, showMinibus, showUniversities, showShoppingMalls, showParks, showSchools, showResidentialComplexes, showParkings, showAirports, showRailwayStations, showBusStations, showAreas, showCity], renderAllZoneLayers);
-watch([busRadiusM, tramRadiusM, trolleybusRadiusM, minibusRadiusM], renderTransportStops);
+watch([showRegions, showDistricts, showMicrodistricts, showQuartals, showQuarters, showMetro, showBus, showTram, showTrolleybus, showMinibus, showFunicular, showUniversities, showShoppingMalls, showParks, showSchools, showResidentialComplexes, showParkings, showAirports, showRailwayStations, showBusStations, showAreas, showCity], renderAllZoneLayers);
+watch([busRadiusM, tramRadiusM, trolleybusRadiusM, minibusRadiusM, funicularRadiusM], renderTransportStops);
 watch([schoolRadiusM, mallRadiusM, parkRadiusM, universityRadiusM, parkingRadiusM, airportRadiusM, railwayRadiusM, busStationRadiusM], renderAmenities);
-watch(extraGeo, () => { renderMetro(); renderTransportStops(); renderAmenities(); });
+watch(extraGeo, () => { renderRegions(); renderQuarters(); renderMetro(); renderTransportStops(); renderAmenities(); });
+watch(residentialStatsByName, renderAmenities);
 watch(language, () => { void loadExtraGeo(); });
 watch(() => props.cityZone, (zone, previous) => { if (zone && zone.id !== previous?.id && map) focusZone(zone); });
 
@@ -1230,7 +1297,7 @@ onBeforeUnmount(() => {
   window.removeEventListener("keydown", onKeydown); window.removeEventListener("scroll", closeRadial); window.removeEventListener("flat-map-focus", onMapFocus as EventListener);
   document.removeEventListener("click", closeMenus); el.value?.removeEventListener("mouseleave", deactivateScroll); document.body.style.overflow = "";
   map?.remove?.(); map = null;
-  layer = areaLayer = focusLayer = districtLayer = microdistrictLayer = quartalLayer = metroLayer = universityLayer = shoppingMallLayer = parkLayer = schoolLayer = residentialLayer = airportLayer = railwayLayer = busStationLayer = parkingLayer = transportStopLayer = zoneAreaLayer = cityLayer = null;
+  layer = areaLayer = focusLayer = regionLayer = districtLayer = microdistrictLayer = quartalLayer = quarterLayer = metroLayer = universityLayer = shoppingMallLayer = parkLayer = schoolLayer = residentialLayer = airportLayer = railwayLayer = busStationLayer = parkingLayer = transportStopLayer = zoneAreaLayer = cityLayer = null;
 });
 
 function preserveUserCamera() {
@@ -1251,16 +1318,20 @@ function preserveUserCamera() {
           </button>
           <div v-if="menuOpen === 'territories'" class="flat-map__menu flat-map__menu_territories" @click.stop>
             <strong class="flat-map__menu-title">{{ ui.territories }}</strong>
-            <label v-if="cityZone?.boundary" class="flat-map__menu-row"><input v-model="showCity" type="checkbox" /><span>{{ props.cityLabel || ui.city }}</span></label>
+            <small class="flat-map__menu-section">{{ ui.administrative }}</small>
+            <label class="flat-map__menu-row" :class="{ 'flat-map__menu-row_disabled': !regionZones.length }"><input v-model="showRegions" type="checkbox" :disabled="!regionZones.length" /><span>{{ ui.regions }}</span><small v-if="!regionZones.length">{{ ui.noData }}</small></label>
             <label v-if="districtZones?.length" class="flat-map__menu-row"><input v-model="showDistricts" type="checkbox" /><span>{{ props.districtsLabel || ui.districts }}</span></label>
+            <small class="flat-map__menu-section">{{ ui.local }}</small>
             <label v-if="microdistrictMarkers?.length" class="flat-map__menu-row"><input v-model="showMicrodistricts" type="checkbox" /><span>{{ props.microdistrictsLabel || ui.microdistricts }}</span></label>
             <label v-if="quartalMarkers?.length" class="flat-map__menu-row"><input v-model="showQuartals" type="checkbox" /><span>{{ ui.mahallas }}</span></label>
-            <label v-if="areaZones?.length" class="flat-map__menu-row"><input v-model="showAreas" type="checkbox" /><span>{{ props.areasLabel || ui.areas }}</span></label>
+            <label class="flat-map__menu-row" :class="{ 'flat-map__menu-row_disabled': !quarterZones.length }"><input v-model="showQuarters" type="checkbox" :disabled="!quarterZones.length" /><span>{{ ui.quarters }}</span><small v-if="!quarterZones.length">{{ ui.noData }}</small></label>
+            <small class="flat-map__menu-section">{{ ui.other }}</small>
+            <label v-if="areaZones?.length" class="flat-map__menu-row"><input v-model="showAreas" type="checkbox" /><span>{{ ui.zones }}</span></label>
           </div>
         </div>
 
         <div class="flat-map__tool-wrap">
-          <button type="button" class="flat-map__tool" :class="{ 'flat-map__tool_active': menuOpen === 'transport' || showMetro || showBus || showTram || showTrolleybus || showMinibus }" :aria-label="ui.transport" @click="toggleMenu('transport')">
+          <button type="button" class="flat-map__tool" :class="{ 'flat-map__tool_active': menuOpen === 'transport' || showMetro || showBus || showTram || showTrolleybus || showMinibus || showFunicular }" :aria-label="ui.transport" @click="toggleMenu('transport')">
             <u-icon name="i-lucide-train-front" class="flat-map__tool-icon" /><span class="flat-map__tool-label">{{ ui.transport }}</span><u-icon name="i-lucide-chevron-down" class="flat-map__chevron" />
           </button>
           <div v-if="menuOpen === 'transport'" class="flat-map__menu flat-map__menu_transport" @click.stop>
@@ -1274,15 +1345,15 @@ function preserveUserCamera() {
               { mode: 'tram', label: ui.tram },
               { mode: 'trolleybus', label: ui.trolleybus },
               { mode: 'minibus', label: ui.minibus },
+              { mode: 'funicular', label: ui.funicular },
             ]" :key="item.mode" class="flat-map__filter-block">
               <label class="flat-map__menu-row" :class="{ 'flat-map__menu-row_disabled': !transportAvailable(item.mode as TransportMode) }">
                 <input :checked="modeVisible(item.mode)" type="checkbox" :disabled="!transportAvailable(item.mode as TransportMode)" @change="onTransportToggle(item.mode as TransportMode, $event)" />
-                <u-icon :name="item.mode === 'tram' ? 'i-lucide-tram-front' : 'i-lucide-bus-front'" class="flat-map__row-icon" />
+                <u-icon :name="item.mode === 'tram' ? 'i-lucide-tram-front' : item.mode === 'trolleybus' ? 'i-lucide-cable' : item.mode === 'minibus' ? 'i-lucide-van' : item.mode === 'funicular' ? 'i-lucide-cable-car' : 'i-lucide-bus-front'" class="flat-map__row-icon" />
                 <span>{{ item.label }}</span><small v-if="!transportAvailable(item.mode as TransportMode)">{{ ui.noData }}</small>
               </label>
               <label v-if="modeVisible(item.mode) && transportAvailable(item.mode as TransportMode)" class="flat-map__radius-select"><span>{{ ui.radius }}</span><select :value="modeRadius(item.mode)" @change="onTransportRadiusSelect(item.mode as TransportMode, $event)"><option v-for="radius in RADIUS_OPTIONS" :key="radius" :value="radius">{{ radius }} м</option></select></label>
             </div>
-            <label class="flat-map__menu-row flat-map__menu-row_disabled"><input v-model="showFunicular" type="checkbox" disabled /><u-icon name="i-lucide-cable-car" class="flat-map__row-icon" /><span>{{ ui.funicular }}</span><small>{{ ui.noData }}</small></label>
           </div>
         </div>
 
@@ -1426,6 +1497,7 @@ function preserveUserCamera() {
 .flat-map__menu { position: absolute; top: 43px; left: 0; width: 286px; max-width: calc(100vw - 16px); max-height: min(70vh, 590px); overflow: auto; padding: 11px; border: 1px solid rgba(255,255,255,.12); border-radius: 10px; background: rgba(10,15,35,.97); box-shadow: 0 14px 34px rgba(0,0,0,.38); color: var(--text-primary); backdrop-filter: blur(14px); }
 .flat-map__menu_poi { width: 318px; }
 .flat-map__menu-title { display: block; padding: 4px 7px 8px; font-size: 13px; }
+.flat-map__menu-section { display: block; padding: 9px 7px 3px; color: var(--text-muted); font-size: 9px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
 .flat-map__menu-row { display: flex; align-items: center; gap: 9px; min-height: 34px; padding: 6px 7px; border-radius: 7px; font-size: 13px; cursor: pointer; }
 .flat-map__menu-row:hover { background: rgba(255,255,255,.05); }
 .flat-map__menu-row input[type="checkbox"] { width: 15px; height: 15px; accent-color: var(--accent-pink); }
@@ -1433,6 +1505,7 @@ function preserveUserCamera() {
 .flat-map__menu-row_disabled { opacity: .48; cursor: default; }
 .flat-map__row-icon { width: 17px; height: 17px; color: #c9d3ef; }
 .flat-map__row-icon_metro { display: grid; place-items: center; width: 19px; height: 19px; border: 2px solid #2563eb; border-radius: 50%; color: #fff; font-size: 10px; font-weight: 900; }
+:deep(.flat-map-tooltip) { white-space: pre-line; }
 .flat-map__filter-block + .flat-map__filter-block, .flat-map__filter-block + .flat-map__menu-row, .flat-map__menu-row + .flat-map__filter-block { border-top: 1px solid rgba(255,255,255,.06); }
 .flat-map__radius-select { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 1px 7px 8px 40px; color: var(--text-muted); font-size: 11px; }
 .flat-map__radius-select select, .flat-map__radius-control input[type="number"] { min-height: 28px; border: 1px solid rgba(255,255,255,.12); border-radius: 6px; background: #11172f; color: #fff; }
