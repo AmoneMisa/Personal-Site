@@ -5,10 +5,14 @@ import vm from 'node:vm';
 import ts from 'typescript';
 
 const source = await readFile(new URL('../app/components/flats/FlatMap.client.vue', import.meta.url), 'utf8');
-const automatic = source.slice(source.indexOf('function fitToPoints()'), source.indexOf('/**', source.indexOf('function fitToPoints()')));
-const manual = source.slice(source.indexOf('function fitToPointsNow()'), source.indexOf('function renderArea()'));
-const filterWatchStart = source.indexOf('watch(() => stableQueryKey');
-const filterWatch = source.slice(filterWatchStart, source.indexOf('// NOT deep.', filterWatchStart));
+const automaticStart = source.indexOf('function fitToPoints()');
+const manualStart = source.indexOf('function fitToPointsNow()', automaticStart);
+const renderAreaStart = source.indexOf('function renderArea()', manualStart);
+const automatic = source.slice(automaticStart, source.lastIndexOf('/**', manualStart));
+const manual = source.slice(manualStart, renderAreaStart);
+const filterWatchStart = source.indexOf('watch(() => stableQueryKey(normalizedRouteQuery())');
+const secondFilterWatchStart = source.indexOf('watch(() => stableQueryKey(normalizedRouteQuery())', filterWatchStart + 1);
+const filterWatch = source.slice(filterWatchStart, secondFilterWatchStart);
 
 function cameraHarness() {
   const calls = [];
@@ -22,6 +26,8 @@ function cameraHarness() {
     pointKey: (p) => p.id,
     selectedZoneFromProps: () => null,
     renderFocusedPoint() {},
+    stableQueryKey: () => '',
+    normalizedRouteQuery: () => ({}),
     watch: (_key, callback) => { context.changeFilters = callback; },
     loadFullMapFeed() {},
   });

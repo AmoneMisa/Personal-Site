@@ -2,28 +2,20 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 
-const source = await readFile(
-  new URL('../app/components/flats/FlatMap.client.vue', import.meta.url),
-  'utf8',
-);
-const page = await readFile(
-  new URL('../app/pages/flat-finder/index.vue', import.meta.url),
-  'utf8',
-);
+const source = await readFile(new URL('../app/components/flats/FlatMap.client.vue', import.meta.url), 'utf8');
+const page = await readFile(new URL('../app/pages/flat-finder/index.vue', import.meta.url), 'utf8');
 
 test('map remains mounted when the active filters return no listings', () => {
   assert.match(page, /<section class="flats__map-wrap"><flat-map/u);
   assert.doesNotMatch(page, /<section v-if="listings\.length" class="flats__map-wrap"/u);
-  // The map keeps its own feed in step with the filters. Keyed off the params
-  // it actually sends, so opening a listing or paging does not refetch it.
   assert.match(source, /watch\(\(\) => stableQueryKey\(normalizedRouteQuery\(\)\), \(\) => \{\s+preserveCamera = true;\s+void loadFullMapFeed\(\);\s+\}\)/u);
 });
 
-test('metro proximity rings consume clicks instead of falling through to districts', () => {
-  assert.ok(source.includes('ring.on("click", (event: any) => handleLayerClick(event'));
-  assert.ok(source.includes('bubblingMouseEvents: false'));
-  assert.ok(source.includes('emit("metro-toggle", nearest.name);'));
-  assert.ok(source.includes('emit("metro-shape", { radiusM: radius });'));
+test('metro uses one selected proximity shape instead of three overlapping discovery rings', () => {
+  assert.doesNotMatch(source, /renderMetroPresetRings/u);
+  assert.match(source, /if \(anyChosen\) renderMetroSelection\(chosen\)/u);
+  assert.match(source, /sectorPolygon\(station, shapeRadiusM\.value/u);
+  assert.match(source, /outline\.on\("click", \(event: any\) => handleLayerClick\(event, \(\) => metroToggle\(station\)\)\)/u);
 });
 
 test('draw mode consumes clicks on interactive map overlays before their normal action', () => {
