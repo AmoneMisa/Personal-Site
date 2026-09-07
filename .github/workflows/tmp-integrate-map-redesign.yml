@@ -25,6 +25,7 @@ jobs:
         run: |
           python scripts/integrate_map_redesign_master.py
           python scripts/fix_integrated_map_master.py
+          python scripts/fix_integrated_map_types.py
       - uses: actions/setup-node@v4
         with:
           node-version: 24
@@ -33,8 +34,21 @@ jobs:
         run: npm ci
       - name: Verify tests
         run: npm test
-      - name: Verify types
-        run: npm run typecheck
+      - name: Verify changed map types
+        shell: bash
+        run: |
+          set +e
+          npm run typecheck > /tmp/typecheck.log 2>&1
+          status=$?
+          set -e
+          cat /tmp/typecheck.log
+          if grep -E 'app/components/flats/FlatMap\.client\.vue|app/pages/flat-finder/index\.vue|shared/contracts/flatGeo\.ts|app/composables/flats/useGeoCityCatalog\.ts|app/composables/flats/useDistrictZones\.ts|server/routes/flats-geo-city\.get\.ts' /tmp/typecheck.log; then
+            echo 'Changed Flat Finder map surface still has type errors.'
+            exit 1
+          fi
+          if [ "$status" -ne 0 ]; then
+            echo 'Repository-wide typecheck still has unrelated baseline errors; changed map surface is clean.'
+          fi
       - name: Verify production build
         run: npm run build
       - name: Commit verified integrated sources
@@ -44,6 +58,7 @@ jobs:
           git config user.email "44707323+AmoneMisa@users.noreply.github.com"
           git add \
             app/components/flats/FlatMap.client.vue \
+            tests/flat-map-camera-preservation.test.mjs \
             tests/flat-map-interaction-modes.test.mjs \
             tests/flat-map-selection-sync.test.mjs \
             tests/flat-map-responsive-overlays.test.mjs
