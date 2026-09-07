@@ -14,6 +14,10 @@ export interface FlatGeoZone {
   radiusM: number;
   color: string;
   boundary?: FlatGeoBoundary | null;
+  mode?: string;
+  routeRefs?: string[];
+  lineColor?: string;
+  lineColors?: string[];
 }
 
 export interface FlatGeoZonesResponse {
@@ -25,5 +29,12 @@ export interface FlatGeoZonesResponse {
   parks: FlatGeoZone[];
   shoppingMalls: FlatGeoZone[];
   universities: FlatGeoZone[];
+  schools: FlatGeoZone[];
+  residentialComplexes: FlatGeoZone[];
+  airports: FlatGeoZone[];
+  railwayStations: FlatGeoZone[];
+  busStations: FlatGeoZone[];
+  transportStops: FlatGeoZone[];
+  parkings: FlatGeoZone[];
   cityZone: FlatGeoZone | null;
 }
