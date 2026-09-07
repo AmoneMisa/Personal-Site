@@ -1,0 +1,47 @@
+name: Temporary map redesign integration
+
+on:
+  push:
+    branches:
+      - integrate-map-redesign
+
+permissions:
+  contents: write
+
+jobs:
+  integrate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Apply develop map patch onto current master
+        shell: bash
+        run: |
+          git fetch origin develop master
+          BASE=$(git merge-base origin/master origin/develop)
+          git diff "$BASE" origin/develop -- \
+            app/components/flats/FlatMap.client.vue \
+            server/routes/flats-geo-city.get.ts \
+            tests/flat-feed-client-cache.test.mjs \
+            tests/flat-map-interaction-modes.test.mjs \
+            tests/flat-map-selection-sync.test.mjs > /tmp/map-redesign.patch
+          if ! git apply --3way --index /tmp/map-redesign.patch; then
+            echo '--- conflicted files ---'
+            git status --short
+            echo '--- conflict diff ---'
+            git diff --cc || true
+            exit 1
+          fi
+      - name: Commit integrated sources
+        shell: bash
+        run: |
+          git config user.name "MARHARYTA KUBAI"
+          git config user.email "44707323+AmoneMisa@users.noreply.github.com"
+          git diff --cached --check
+          if git diff --cached --quiet; then
+            echo 'No patch needed.'
+            exit 0
+          fi
+          git commit -m "feat(flats): integrate map redesign with current master"
+          git push origin HEAD:integrate-map-redesign
