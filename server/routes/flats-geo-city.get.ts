@@ -15,6 +15,13 @@ const EMPTY_RESPONSE: FlatGeoZonesResponse = {
   parks: [],
   shoppingMalls: [],
   universities: [],
+  schools: [],
+  residentialComplexes: [],
+  airports: [],
+  railwayStations: [],
+  busStations: [],
+  transportStops: [],
+  parkings: [],
   cityZone: null,
 }
 
