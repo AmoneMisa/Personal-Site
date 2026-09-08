@@ -1,9 +1,8 @@
 import {
   buildCvProfile,
-  scoreJob as legacyScoreJob,
+  scoreJob as packageScoreJob,
   type CvProfile,
 } from '~~/shared/hiring/ats/scoreCore'
-import { isNoSponsorshipRequirement } from '@whiteslove/parsing-lexicon/hiring-requirements'
 
 // Linguistic evidence comes from parsing-lexicon; this adapter only applies site-specific ATS policy.
 export { buildCvProfile }
@@ -16,36 +15,4 @@ export function scoreColor(score: number): string {
   return '#f87171' // red: poor match or eligibility blocker
 }
 
-type AtsJob = Parameters<typeof legacyScoreJob>[1]
-type AtsResult = ReturnType<typeof legacyScoreJob>
-
-function isUsRole(job: AtsJob): boolean {
-  if (String(job.country || '').toUpperCase() === 'US') return true
-  return /(?:\bunited states\b|\busa\b|\bu\.s\.?\b|\bsan mateo\s*,?\s*ca\b)/i.test(
-    `${job.location || ''} ${job.title || ''} ${(job.description || '').slice(0, 1800)}`,
-  )
-}
-
-export function scoreJob(profile: CvProfile, job: AtsJob): AtsResult {
-  const result = legacyScoreJob(profile, job)
-  if (
-    !result.blockers.some((blocker) => blocker.code === 'visa_sponsorship')
-    && profile.requiresUsSponsorship === true
-    && isUsRole(job)
-    && isNoSponsorshipRequirement(`${job.description || ''} ${(job.tags || []).join(' ')}`)
-  ) {
-    const blocker = {
-      code: 'visa_sponsorship' as const,
-      label: 'Visa sponsorship unavailable',
-      critical: true as const,
-    }
-    return {
-      ...result,
-      score: Math.min(result.fitScore, 49),
-      eligible: false,
-      blockers: [...result.blockers, blocker],
-      missing: [blocker.label, ...result.missing.filter((item) => item !== blocker.label)].slice(0, 12),
-    }
-  }
-  return result
-}
+export const scoreJob = packageScoreJob

@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict'
+import { readFile } from 'node:fs/promises'
 import test from 'node:test'
 
 import { buildCvProfile, scoreColor, scoreJob } from '../app/utils/atsScore.ts'
@@ -111,4 +112,18 @@ test('score colors use red, orange, yellow and green thresholds', () => {
   assert.equal(scoreColor(59), '#fb923c')
   assert.equal(scoreColor(45), '#fb923c')
   assert.equal(scoreColor(44), '#f87171')
+})
+
+test('shared ATS fuzzy evidence stays discounted below exact skill evidence', () => {
+  const job = { title: 'Backend Engineer', skills: ['PostgreSQL'] }
+  const fuzzy = scoreJob(buildCvProfile('SKILLS\nPostgress', REFERENCE_DATE), job)
+  const exact = scoreJob(buildCvProfile('SKILLS\nPostgreSQL', REFERENCE_DATE), job)
+  assert.ok(fuzzy.breakdown.skills > 0)
+  assert.ok(fuzzy.breakdown.skills < exact.breakdown.skills)
+})
+
+test('Personal Site ATS core is a package facade, not a second parser', async () => {
+  const source = await readFile(new URL('../shared/hiring/ats/scoreCore.ts', import.meta.url), 'utf8')
+  assert.match(source, /@whiteslove\/parsing-lexicon\/hiring-ats/)
+  assert.doesNotMatch(source, /TERM_STOP_WORDS|function extractSkills|function scoreExperience/)
 })

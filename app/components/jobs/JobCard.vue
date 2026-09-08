@@ -83,7 +83,7 @@ const bylineTitle = computed(() => [props.job.company, officeLocationsLabel.valu
 const compactSalary = computed(() => props.salary ? compactSalaryText(props.salary) : null);
 const compactConvertedSalary = computed(() => props.convertedSalary ? compactSalaryText(props.convertedSalary) : null);
 
-const pills = (items: string[] | undefined, className: string, prefix = ""): DraggablePillItem[] =>
+const pills = (items: readonly string[] | undefined, className: string, prefix = ""): DraggablePillItem[] =>
   (items || []).map((label, index) => ({ key: `${prefix}${label}:${index}`, label: prefix ? `${prefix}${label}` : label, className }));
 const atsMatchedPills = computed(() => pills(props.ats?.matched, "job-card__tag job-card__tag_match"));
 const atsMissingPills = computed(() => pills(props.ats?.missing, "job-card__tag job-card__tag_miss"));
