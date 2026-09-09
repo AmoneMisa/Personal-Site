@@ -79,7 +79,7 @@ useSeoMeta({
 const defaultCountry = ref("UA");
 const flatFilters = useFlatFilters({ locale: () => String(locale.value) });
 const {
-  countries, city, district, microdistrict, quartal, mapArea, dealType, agency, petFriendly, roomOnlyFilter,
+  countries, city, region, district, microdistrict, quartal, mapArea, dealType, agency, petFriendly, roomOnlyFilter,
   onlyWithPhotos, childrenRequired, newBuildingOnly, dishwasherOnly, airConditionerOnly,
   parkingOnly, internetOnly, gasOnly, balconyOnly, terraceOnly, privateYardOnly,
   noElevatorOnly, noDepositOnly, communalIncludedOnly, noCommissionOnly,
@@ -217,11 +217,19 @@ const zoneLabel = (value: string | null | undefined, countryCode = countries.val
     || raw;
 };
 
-function onZoneSelect({ kind, name }: { kind: "district" | "microdistrict" | "quartal" | "area" | "metro"; name: string; radiusM?: number }) {
+function onZoneSelect({ kind, name }: { kind: "district" | "microdistrict" | "quartal" | "area" | "metro" | "region"; name: string; radiusM?: number }) {
   if (kind === "district") district.value = name;
   else if (kind === "microdistrict") microdistrict.value = name;
   else if (kind === "quartal") quartal.value = name;
   else if (kind === "area") mapArea.value = name;
+  else if (kind === "region") region.value = name;
+  scheduleLoad(0);
+}
+
+/** Zoom-driven auto city selection from FlatMap; clearing (name === "") only
+ *  ever undoes what the map itself set, never a manual dropdown pick. */
+function onCitySelect(name: string) {
+  citySel.value = name || ANY_SELECT_VALUE;
   scheduleLoad(0);
 }
 
@@ -973,8 +981,8 @@ watch(
       scheduleQuerySync(isFeedCached(currentFeedParams()) ? 0 : undefined);
     },
 );
-watch(city, () => { if (restoring.value) return; district.value = ""; microdistrict.value = ""; quartal.value = ""; mapArea.value = ""; metro.value = []; query.value = ""; });
-watch(countries, () => { if (restoring.value) return; district.value = ""; microdistrict.value = ""; quartal.value = ""; mapArea.value = ""; metro.value = []; city.value = ""; query.value = ""; });
+watch(city, () => { if (restoring.value) return; region.value = ""; district.value = ""; microdistrict.value = ""; quartal.value = ""; mapArea.value = ""; metro.value = []; query.value = ""; });
+watch(countries, () => { if (restoring.value) return; region.value = ""; district.value = ""; microdistrict.value = ""; quartal.value = ""; mapArea.value = ""; metro.value = []; city.value = ""; query.value = ""; });
 onBeforeUnmount(() => { modalOpen.value = false; lightboxOpen.value = false; releaseStuckScrollLock(); if (loadTimer) clearTimeout(loadTimer); if (sharedListingTimer) clearTimeout(sharedListingTimer); cancelTranslation(); });
 </script>
 
@@ -1058,6 +1066,7 @@ onBeforeUnmount(() => { modalOpen.value = false; lightboxOpen.value = false; rel
 
         <UiFilterFooter class="filter-actions-row" :reset-label="t('reset')" @reset="resetFilters">
           <div class="active-filter-chips">
+            <button v-if="region" type="button" class="filter-chip" @click="region = ''; scheduleLoad()">{{ t("region") }}: {{ zoneLabel(region) }} <span>×</span></button>
             <button v-if="district" type="button" class="filter-chip" @click="district = ''; scheduleLoad()">{{ t("district") }}: {{ locName(district, 'district') }} <span>×</span></button>
             <button v-if="microdistrict" type="button" class="filter-chip" @click="microdistrict = ''; scheduleLoad()">{{ t("microdistrictsLayer") }}: {{ zoneLabel(microdistrict) }} <span>×</span></button>
             <button v-if="quartal" type="button" class="filter-chip" @click="quartal = ''; scheduleLoad()">{{ t("quartalsLayer") }}: {{ zoneLabel(quartal) }} <span>×</span></button>
@@ -1097,7 +1106,7 @@ onBeforeUnmount(() => { modalOpen.value = false; lightboxOpen.value = false; rel
       <UiSortSelect class="flats__sort" v-model="sort" :items="sortItems" :label="extraLabels.sort" @update:model-value="scheduleLoad(0)" />
     </div>
     <FlatsStatsPanel v-if="view === 'active' && statistics" :statistics="statistics" :display-currency="displayCurrency" :convert="convert" :location-label="(value, kind) => labelFor(value, kind)" />
-<section class="flats__map-wrap"><flat-map :points="mapPoints" :draw-label="t('drawArea')" :done-label="t('done')" :clear-label="t('clearArea')" :draw-hint="t('drawHint')" :expand-label="t('mapExpand')" :collapse-label="t('mapCollapse')" :scroll-hint-label="t('mapScrollHint')" :district-zones="districtZones" :microdistrict-markers="microdistrictMarkers" :quartal-markers="quartalMarkers" :metro-stations="metroStations" :university-zones="universityZones" :shopping-mall-zones="shoppingMallZones" :park-zones="parkZones" :area-zones="areaZones" :city-zone="cityZone" :selected-district="district" :selected-microdistrict="microdistrict" :selected-quartal="quartal" :selected-area="mapArea" :selected-metros="metro" :selected-metro-radius-m="metroMaxM" :metro-bearing-from="metroBearingFrom" :metro-bearing-to="metroBearingTo" :metro-radius-handle-label="t('metroRadiusHandle')" :metro-arc-handle-label="t('metroArcHandle')" :fit-results-label="t('mapFitResults')" :districts-label="t('districtsLayer')" :microdistricts-label="t('microdistrictsLayer')" :quartals-label="t('quartalsLayer')" :metro-label="t('metro')" :universities-label="t('universitiesLayer')" :shopping-malls-label="t('shoppingMallsLayer')" :parks-label="t('parksLayer')" :areas-label="t('areasLayer')" :city-label="t('cityLayer')" @select="openById" @area-change="drawnArea = $event" @zone-select="onZoneSelect" @metro-toggle="onMetroToggle" @metro-shape="onMetroShape" /></section>
+<section class="flats__map-wrap"><flat-map :points="mapPoints" :draw-label="t('drawArea')" :done-label="t('done')" :clear-label="t('clearArea')" :draw-hint="t('drawHint')" :expand-label="t('mapExpand')" :collapse-label="t('mapCollapse')" :scroll-hint-label="t('mapScrollHint')" :district-zones="districtZones" :microdistrict-markers="microdistrictMarkers" :quartal-markers="quartalMarkers" :metro-stations="metroStations" :university-zones="universityZones" :shopping-mall-zones="shoppingMallZones" :park-zones="parkZones" :area-zones="areaZones" :city-zone="cityZone" :selected-region="region" :selected-district="district" :selected-microdistrict="microdistrict" :selected-quartal="quartal" :selected-area="mapArea" :selected-metros="metro" :selected-metro-radius-m="metroMaxM" :metro-bearing-from="metroBearingFrom" :metro-bearing-to="metroBearingTo" :metro-radius-handle-label="t('metroRadiusHandle')" :metro-arc-handle-label="t('metroArcHandle')" :fit-results-label="t('mapFitResults')" :districts-label="t('districtsLayer')" :microdistricts-label="t('microdistrictsLayer')" :quartals-label="t('quartalsLayer')" :metro-label="t('metro')" :universities-label="t('universitiesLayer')" :shopping-malls-label="t('shoppingMallsLayer')" :parks-label="t('parksLayer')" :areas-label="t('areasLayer')" :city-label="t('cityLayer')" @select="openById" @area-change="drawnArea = $event" @zone-select="onZoneSelect" @city-select="onCitySelect" @metro-toggle="onMetroToggle" @metro-shape="onMetroShape" /></section>
 
     <SearchResultGrid>
       <FlatCard

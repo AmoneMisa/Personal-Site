@@ -30,6 +30,7 @@ export function useFlatFilters(options: UseFlatFiltersOptions = {}) {
     },
   });
   const city = ref("");
+  const region = ref("");
   const district = ref("");
   const microdistrict = ref("");
   const quartal = ref("");
@@ -107,6 +108,7 @@ export function useFlatFilters(options: UseFlatFiltersOptions = {}) {
   }
 
   function clearCityLocationFilters() {
+    region.value = "";
     district.value = "";
     metro.value = [];
     metroMaxM.value = undefined;
@@ -207,6 +209,7 @@ export function useFlatFilters(options: UseFlatFiltersOptions = {}) {
     else params.offset = String(options.append ? options.loadedCount : 0);
     if (countries.value.length) params.countries = countries.value[0]!;
     if (city.value) params.city = city.value;
+    if (region.value) params.region = region.value;
     if (district.value) params.district = district.value;
     if (microdistrict.value) params.microdistrict = microdistrict.value;
     if (quartal.value) params.quartal = quartal.value;
@@ -285,6 +288,7 @@ export function useFlatFilters(options: UseFlatFiltersOptions = {}) {
   function resetValues(defaultCountry: string) {
     countries.value = [defaultCountry];
     city.value = "";
+    region.value = "";
     district.value = "";
     clearMapZones();
     metro.value = [];
@@ -348,7 +352,7 @@ export function useFlatFilters(options: UseFlatFiltersOptions = {}) {
   }
 
   return {
-    countries, city, district, microdistrict, quartal, mapArea, propertyType, dealType, agency,
+    countries, city, region, district, microdistrict, quartal, mapArea, propertyType, dealType, agency,
     petFriendly, roomOnlyFilter, onlyWithPhotos, childrenRequired, newBuildingOnly,
     dishwasherOnly, airConditionerOnly, parkingOnly, internetOnly, gasOnly, balconyOnly,
     terraceOnly, privateYardOnly, noElevatorOnly, noDepositOnly, communalIncludedOnly, noCommissionOnly,

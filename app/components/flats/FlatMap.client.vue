@@ -83,7 +83,7 @@ interface ExtraGeoResponse {
   descendants?: ExtraGeoEntity[];
 }
 
-type ZoneKind = "district" | "microdistrict" | "quartal" | "area" | "metro";
+type ZoneKind = "district" | "microdistrict" | "quartal" | "area" | "metro" | "region";
 type MenuKind = "territories" | "transport" | "poi";
 type TransportMode = "bus" | "tram" | "trolleybus" | "minibus" | "funicular";
 
@@ -105,6 +105,7 @@ const props = defineProps<{
   parkZones?: FlatMapZone[];
   areaZones?: FlatMapZone[];
   cityZone?: FlatMapZone | null;
+  selectedRegion?: string;
   selectedDistrict?: string;
   selectedMicrodistrict?: string;
   selectedQuartal?: string;
@@ -131,6 +132,7 @@ const emit = defineEmits<{
   (e: "select", identity: { id: string; source?: string }): void;
   (e: "area-change", points: Array<{ lat: number; lng: number }>): void;
   (e: "zone-select", payload: { kind: ZoneKind; name: string; radiusM?: number }): void;
+  (e: "city-select", name: string): void;
   (e: "metro-toggle", name: string): void;
   (e: "metro-shape", shape: { radiusM: number; bearingFrom?: number; bearingTo?: number }): void;
 }>();
@@ -908,6 +910,7 @@ function selectedName(kind: ZoneKind): string {
   if (kind === "microdistrict") return props.selectedMicrodistrict || "";
   if (kind === "quartal") return props.selectedQuartal || "";
   if (kind === "area") return props.selectedArea || "";
+  if (kind === "region") return props.selectedRegion || "";
   return selectedMetros.value[0] || "";
 }
 function isZoneSelected(kind: ZoneKind, name: string): boolean {
@@ -920,6 +923,101 @@ function emitZoneSelect(kind: ZoneKind, name: string, radiusM?: number) {
   const nextName = sameZone && sameRadius ? "" : name;
   if (kind === "district") { selectedDistrictName.value = nextName || null; renderDistrictZones(); }
   emit("zone-select", { kind, name: nextName, ...(kind === "metro" && nextName && radiusM != null ? { radiusM } : {}) });
+}
+
+const REGION_SELECT_RATIO = .5;
+const CITY_SELECT_RATIO = .65;
+
+interface LatLngBox { minLat: number; maxLat: number; minLng: number; maxLng: number }
+
+function geoBBox(boundary: FlatMapZone["boundary"]): LatLngBox | null {
+  if (!boundary) return null;
+  let minLat = Infinity, maxLat = -Infinity, minLng = Infinity, maxLng = -Infinity;
+  const walk = (node: unknown): void => {
+    if (!Array.isArray(node)) return;
+    if (typeof node[0] === "number") {
+      const lng = Number(node[0]); const lat = Number(node[1]);
+      if (!Number.isFinite(lat) || !Number.isFinite(lng)) return;
+      if (lat < minLat) minLat = lat; if (lat > maxLat) maxLat = lat;
+      if (lng < minLng) minLng = lng; if (lng > maxLng) maxLng = lng;
+      return;
+    }
+    for (const child of node) walk(child);
+  };
+  walk(boundary.coordinates);
+  return Number.isFinite(minLat) && Number.isFinite(maxLat) && Number.isFinite(minLng) && Number.isFinite(maxLng)
+    ? { minLat, maxLat, minLng, maxLng }
+    : null;
+}
+
+function bboxVisibleRatio(zoneBox: LatLngBox, viewBox: LatLngBox): number {
+  const zoneArea = (zoneBox.maxLat - zoneBox.minLat) * (zoneBox.maxLng - zoneBox.minLng);
+  if (zoneArea <= 0) return 0;
+  const interLat = Math.max(0, Math.min(zoneBox.maxLat, viewBox.maxLat) - Math.max(zoneBox.minLat, viewBox.minLat));
+  const interLng = Math.max(0, Math.min(zoneBox.maxLng, viewBox.maxLng) - Math.max(zoneBox.minLng, viewBox.minLng));
+  return (interLat * interLng) / zoneArea;
+}
+
+let regionAutoSet = false;
+let regionAboveThreshold = false;
+let lastAutoRegionName = "";
+let suppressRegionWatch = false;
+let cityAutoSet = false;
+let cityAboveThreshold = false;
+let suppressCityWatch = false;
+
+/** Bbox-ratio zoom heuristic, not true polygon clipping -- cheap and good enough
+ *  to decide when the viewport is "mostly" a region/city rather than exact area. */
+function evaluateAutoZoneFilters() {
+  if (!map) return;
+  const bounds = map.getBounds();
+  const viewBox: LatLngBox = {
+    minLat: bounds.getSouth(), maxLat: bounds.getNorth(),
+    minLng: bounds.getWest(), maxLng: bounds.getEast(),
+  };
+
+  let bestRegion: { zone: FlatMapZone; ratio: number } | null = null;
+  for (const zone of regionZones.value) {
+    const box = geoBBox(zone.boundary);
+    if (!box) continue;
+    const ratio = bboxVisibleRatio(box, viewBox);
+    if (!bestRegion || ratio > bestRegion.ratio) bestRegion = { zone, ratio };
+  }
+  if (bestRegion && bestRegion.ratio >= REGION_SELECT_RATIO) {
+    if (!regionAboveThreshold || bestRegion.zone.name !== lastAutoRegionName) {
+      lastAutoRegionName = bestRegion.zone.name;
+      regionAutoSet = true;
+      suppressRegionWatch = true;
+      emit("zone-select", { kind: "region", name: bestRegion.zone.name });
+    }
+    regionAboveThreshold = true;
+  } else {
+    if (regionAboveThreshold && regionAutoSet && props.selectedRegion) {
+      regionAutoSet = false;
+      suppressRegionWatch = true;
+      emit("zone-select", { kind: "region", name: "" });
+    }
+    regionAboveThreshold = false;
+  }
+
+  const city = props.cityZone;
+  const cityBox = city?.boundary ? geoBBox(city.boundary) : null;
+  const cityRatio = cityBox ? bboxVisibleRatio(cityBox, viewBox) : 0;
+  if (cityBox && cityRatio >= CITY_SELECT_RATIO) {
+    if (!cityAboveThreshold) {
+      cityAutoSet = true;
+      suppressCityWatch = true;
+      emit("city-select", city!.name);
+    }
+    cityAboveThreshold = true;
+  } else {
+    if (cityAboveThreshold && cityAutoSet) {
+      cityAutoSet = false;
+      suppressCityWatch = true;
+      emit("city-select", "");
+    }
+    cityAboveThreshold = false;
+  }
 }
 
 function selectedZoneFromProps(): { kind: ZoneKind; zone: FlatMapZone } | null {
@@ -1272,6 +1370,7 @@ onMounted(async () => {
   map.on("click", (event: any) => { activateScroll(); closeMenus(); if (addDrawPoint(event)) return; closeRadial(); });
   el.value.addEventListener("mouseleave", deactivateScroll);
   map.on("zoomend", renderMarkers); map.on("movestart", closeRadial); map.on("zoomstart", closeRadial);
+  map.on("zoomend", evaluateAutoZoneFilters); map.on("moveend", evaluateAutoZoneFilters);
   renderMarkers(); renderFocusedPoint(); renderAllZoneLayers();
   if (selectedZoneFromProps()) syncSelectionFromProps(true); else fitToPoints();
 });
@@ -1297,7 +1396,15 @@ watch([schoolRadiusM, mallRadiusM, parkRadiusM, universityRadiusM, parkingRadius
 watch(extraGeo, () => { renderRegions(); renderQuarters(); renderMetro(); renderTransportStops(); renderAmenities(); });
 watch(residentialStatsByName, renderAmenities);
 watch(language, () => { void loadExtraGeo(); });
-watch(() => props.cityZone, (zone, previous) => { if (zone && zone.id !== previous?.id && map) focusZone(zone); });
+watch(() => props.cityZone, (zone, previous) => {
+  if (zone && zone.id !== previous?.id && map) focusZone(zone);
+  if (!suppressCityWatch) { cityAutoSet = false; cityAboveThreshold = false; }
+  suppressCityWatch = false;
+});
+watch(() => props.selectedRegion, () => {
+  if (!suppressRegionWatch) { regionAutoSet = false; regionAboveThreshold = false; lastAutoRegionName = ""; }
+  suppressRegionWatch = false;
+});
 
 onBeforeUnmount(() => {
   mapFeedSequence += 1; extraGeoSequence += 1;

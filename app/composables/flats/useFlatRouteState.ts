@@ -19,7 +19,7 @@ export function useFlatRouteState(options: {
   function serialize(): Record<string, string> {
     const q: Record<string, string> = {};
     const {
-      countries, city, district, microdistrict, quartal, mapArea, metro, propertyType, dealType, agency, audience,
+      countries, city, region, district, microdistrict, quartal, mapArea, metro, propertyType, dealType, agency, audience,
       petFriendly, roomOnlyFilter, onlyWithPhotos, childrenRequired, newBuildingOnly,
       dishwasherOnly, airConditionerOnly, parkingOnly, internetOnly, gasOnly, balconyOnly,
       terraceOnly, privateYardOnly, noElevatorOnly, noDepositOnly, communalIncludedOnly, noCommissionOnly,
@@ -31,6 +31,7 @@ export function useFlatRouteState(options: {
     } = filters;
     if (countries.value.length) q.countries = countries.value[0]!;
     if (city.value) q.city = city.value;
+    if (region.value) q.region = region.value;
     if (district.value) q.district = district.value;
     if (microdistrict.value) q.microdistrict = microdistrict.value;
     if (quartal.value) q.quartal = quartal.value;
@@ -85,6 +86,7 @@ export function useFlatRouteState(options: {
     const countryParam = queryString(params.countries);
     if (countryParam) filters.countries.value = [countryParam.split(",").find(Boolean) || countryParam];
     filters.city.value = queryString(params.city);
+    filters.region.value = queryString(params.region);
     filters.district.value = queryString(params.district);
     filters.microdistrict.value = queryString(params.microdistrict);
     filters.quartal.value = queryString(params.quartal);
