@@ -757,7 +757,11 @@ function renderMarkers() {
       iconSize: [size, size],
       iconAnchor: [size / 2, size / 2],
     });
-    const marker = L.marker([c.lat, c.lng], { icon });
+    // Listing clusters are the map's primary actionable content. Without this
+    // offset, Leaflet's default y-position z-ordering lets a metro/amenity
+    // marker that happens to sit near a cluster win the stack and silently
+    // swallow clicks meant for the cluster underneath it.
+    const marker = L.marker([c.lat, c.lng], { icon, zIndexOffset: 1000 });
     marker.on("click", (event: any) => handleLayerClick(event, () => openCluster(c)));
     marker.addTo(layer);
   }
@@ -1600,7 +1604,7 @@ function preserveUserCamera() {
 .flat-map :deep(.flat-zone-shape_dim) { filter: grayscale(.85); }
 :deep(.flat-zone-label_dim) { opacity: .55; filter: grayscale(.85); }
 
-.flat-map__tools { position: absolute; z-index: 1300; top: 10px; left: 52px; right: 10px; display: flex; align-items: flex-start; gap: 6px; pointer-events: none; }
+.flat-map__tools { position: absolute; z-index: 1300; top: 10px; left: 62px; right: 10px; display: flex; flex-wrap: wrap; align-items: flex-start; gap: 6px; pointer-events: none; }
 .flat-map__tool-wrap { position: relative; pointer-events: auto; }
 .flat-map__tool { pointer-events: auto; display: inline-flex; align-items: center; justify-content: center; gap: 0; height: 36px; min-width: 36px; padding: 0 9px; border: 1px solid rgba(255,255,255,.12); border-radius: 8px; background: rgba(10,15,35,.94); color: var(--text-primary); cursor: pointer; box-shadow: 0 4px 14px rgba(0,0,0,.24); backdrop-filter: blur(10px); transition: border-color .15s ease, background .15s ease, color .15s ease; }
 .flat-map__tool:hover, .flat-map__tool:focus-visible { border-color: rgba(224,103,154,.55); color: #fff; outline: none; }
@@ -1658,7 +1662,7 @@ function preserveUserCamera() {
 :deep(.flat-amenity-marker), :deep(.flat-transport-marker) { display: grid; place-items: center; width: 25px; height: 25px; box-sizing: border-box; border: 2px solid #fff; border-radius: 50%; background: var(--amenity-color, var(--transport-color, #2563eb)); color: #fff; box-shadow: 0 2px 5px rgba(0,0,0,.42); }
 :deep(.flat-amenity-marker svg), :deep(.flat-transport-marker svg) { width: 13px; height: 13px; }
 
-.flat-map__price-legend { position: absolute; z-index: 1210; left: 16px; bottom: 18px; display: grid; grid-template-columns: 1fr 1fr; gap: 7px 16px; width: 330px; padding: 13px 14px; border: 1px solid rgba(10,15,35,.94); color: var(--text-primary); box-shadow: 0 8px 24px rgba(0,0,0,.3); backdrop-filter: blur(12px); }
+.flat-map__price-legend { position: absolute; z-index: 1210; left: 16px; bottom: 18px; display: grid; grid-template-columns: 1fr 1fr; gap: 7px 16px; width: 330px; padding: 13px 14px; border: 1px solid rgba(255,255,255,.11); border-radius: 11px; background: rgba(10,15,35,.96); color: var(--text-primary); box-shadow: 0 8px 24px rgba(0,0,0,.3); backdrop-filter: blur(12px); }
 .flat-map__price-legend strong { grid-column: 1/-1; margin-bottom: 2px; font-size: 12px; }
 .flat-map__price-legend span { display: flex; align-items: center; gap: 7px; font-size: 11px; color: var(--text-soft); }
 .tone { width: 10px; height: 10px; border-radius: 50%; }
@@ -1687,7 +1691,7 @@ function preserveUserCamera() {
 
 
 @media (max-width: 1024px) {
-  .flat-map__tools { left: 48px; right: 8px; gap: 4px; }
+  .flat-map__tools { left: 56px; right: 8px; gap: 4px; }
   .flat-map__tool { height: 34px; min-width: 34px; padding-inline: 8px; }
   .flat-map__tool-label,
   .flat-map__tool:hover .flat-map__tool-label,
@@ -1711,7 +1715,7 @@ function preserveUserCamera() {
 
 @include bp-down(sm) {
   .flat-map-shell_full { padding: 0; }.flat-map-shell_full .flat-map { border: 0; border-radius: 0; }
-  .flat-map__tools { top: max(8px, env(safe-area-inset-top)); left: 48px; right: 8px; gap: 4px; }
+  .flat-map__tools { top: max(8px, env(safe-area-inset-top)); left: 56px; right: 8px; gap: 4px; }
   .flat-map__tool { height: 34px; min-width: 34px; padding-inline: 8px; }
   .flat-map__menu { top: max(52px, calc(env(safe-area-inset-top) + 44px)); left: 8px; right: 8px; width: auto; max-height: min(68vh, calc(100dvh - 64px)); }
   .flat-map__scroll-hint { top: max(52px, calc(env(safe-area-inset-top) + 44px)); max-width: calc(100% - 24px); text-align: center; }

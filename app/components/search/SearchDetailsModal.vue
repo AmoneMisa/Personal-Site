@@ -175,7 +175,13 @@ const modalUi = computed(() => {
 }
 
 @include bp-down(sm) {
+  .search-details-public-title {
+    flex-wrap: wrap;
+  }
+
   .search-details-public-title__good-price {
+    flex-basis: 100%;
+    margin-top: 4px;
     padding-inline: 7px;
     font-size: 11px;
   }

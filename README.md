@@ -85,8 +85,8 @@ Copy `.env.example` to `.env` for server-side integrations. To exercise jobs or
 hiring locally, point `VACANCIES_API_URL` and `CV_API_URL` at a running backend
 platform.
 
-Flat Finder pages need the Flat Finder API reachable; without it the list and
-map render empty rather than failing loudly.
+Flat Finder pages need `FLAT_API_URL` pointed at a reachable flats-api;
+without it the list and map render empty rather than failing loudly.
 
 ## Docker
 
@@ -127,7 +127,9 @@ The important cross-service settings are:
 ```env
 VACANCIES_API_URL=http://vacancies-api:4010
 CV_API_URL=http://cv-api:4011
+FLAT_API_URL=http://flats-api:4000
 AI_WORKER_URL=http://ai-worker:4030
+AI_WORKER_KEY=
 SUBSCRIPTIONS_DATABASE_URL=postgresql://...
 SUBSCRIPTIONS_DB_SCHEMA=subscriptions
 TELEGRAM_SUBSCRIPTION_BOT_ENABLED=off
