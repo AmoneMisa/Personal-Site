@@ -176,12 +176,27 @@ const modalUi = computed(() => {
 
 @include bp-down(sm) {
   .search-details-public-title {
-    flex-wrap: wrap;
+    display: grid;
+    grid-template-columns: auto 1fr;
+    align-items: center;
+    row-gap: 4px;
+  }
+
+  .search-details-public-title__id {
+    grid-column: 1;
+    grid-row: 1;
+  }
+
+  .search-details-public-title__content {
+    grid-column: 2;
+    grid-row: 1;
   }
 
   .search-details-public-title__good-price {
-    flex-basis: 100%;
-    margin-top: 4px;
+    grid-column: 1 / -1;
+    grid-row: 2;
+    width: fit-content;
+    margin-top: 0;
     padding-inline: 7px;
     font-size: 11px;
   }
