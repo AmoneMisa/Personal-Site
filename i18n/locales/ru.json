@@ -338,6 +338,8 @@
     "nearbyKind_cinema": "Кинотеатр",
     "nearbyKind_landmark": "Крупный объект",
     "sourceFilter": "Источник",
+    "sourceCustomLabel": "Сайты",
+    "customSitesLabel": "Отдельные сайты",
     "specTram": "Трамвай",
     "specBus": "Автобус",
     "specTrolleybus": "Троллейбус"

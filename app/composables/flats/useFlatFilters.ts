@@ -99,6 +99,9 @@ export function useFlatFilters(options: UseFlatFiltersOptions = {}) {
   const displayCurrency = ref("USD");
   const query = ref("");
   const source = ref("");
+  // Narrows the curated "custom" (Sites) bucket to specific site domains
+  // (e.g. krisha.kz). Empty means "all curated sites".
+  const customSites = ref<string[]>([]);
   const showAdvanced = ref(false);
 
   function clearMapZones() {
@@ -128,6 +131,9 @@ export function useFlatFilters(options: UseFlatFiltersOptions = {}) {
   watch(city, clearMapZones, { flush: "sync" });
   watch(selectedCountries, clearCityLocationFilters, { flush: "sync" });
   watch(city, clearCityLocationFilters, { flush: "sync" });
+  // Selected sites don't necessarily apply to the new country -- drop them
+  // rather than silently filtering to sites with zero listings there.
+  watch(selectedCountries, () => { customSites.value = []; }, { flush: "sync" });
 
   watch(dealType, (value) => {
     if (value === "sale") {
@@ -281,6 +287,7 @@ export function useFlatFilters(options: UseFlatFiltersOptions = {}) {
     if (query.value.trim()) params.query = query.value.trim();
     const defaultSources = [...new Set([...options.sources, ...SOCIAL_FLAT_SOURCES])];
     params.sources = source.value || defaultSources.join(",");
+    if (customSites.value.length) params.customSites = customSites.value.join(",");
     if (!options.append) params.includeStats = "1";
     return params;
   }
@@ -349,6 +356,7 @@ export function useFlatFilters(options: UseFlatFiltersOptions = {}) {
     maxAgeDays.value = undefined;
     query.value = "";
     source.value = "";
+    customSites.value = [];
   }
 
   return {
@@ -360,7 +368,7 @@ export function useFlatFilters(options: UseFlatFiltersOptions = {}) {
     commissionPercentMin, commissionPercentMax, sort, audience, metro, priceMin, priceMax, roomsMin, roomsMax,
     bedroomsMin, bedroomsMax, areaMin, areaMax, pricePerSqmMin, pricePerSqmMax, metroMaxM,
     nearbyKind, nearbyMaxM, floorMin, floorMax, totalFloorsMin, totalFloorsMax, yearMin, yearMax,
-    maxAgeDays, displayCurrency, query, source, showAdvanced, metroBearingFrom, metroBearingTo,
+    maxAgeDays, displayCurrency, query, source, customSites, showAdvanced, metroBearingFrom, metroBearingTo,
     buildFeedParams, resetValues,
   };
 }

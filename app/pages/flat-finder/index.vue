@@ -86,7 +86,7 @@ const {
   tvOnly, microwaveOnly, ovenOnly, bidetOnly, walkInClosetOnly, bathtubOnly, showerOnly, euroLayoutOnly, sort,
   metro, priceMin, priceMax, roomsMin,
   metroMaxM, metroBearingFrom, metroBearingTo, nearbyKind,
-  displayCurrency, query, source, showAdvanced, buildFeedParams, resetValues: resetFilterValues,
+  displayCurrency, query, source, customSites, showAdvanced, buildFeedParams, resetValues: resetFilterValues,
 } = flatFilters;
 const rates = ref<Record<string, number>>({ USD: 1 });
 const { isFresh: isAvailabilityFresh, markFresh: markAvailabilityFresh, forget: forgetAvailability } = useFlatAvailabilityCache();
@@ -273,12 +273,22 @@ function clearMetroArc() {
   scheduleLoad();
 }
 
-const SOURCES = ["olx", "telegram"];
+const SOURCES = ["olx", "telegram", "custom"];
 const NEARBY_KINDS = [
   "supermarket", "mall", "market", "pharmacy", "clinic",
   "school", "kindergarten", "park", "transport", "historic", "cinema", "landmark",
 ] as const;
-const sourceOptions = computed(() => [{ value: "", label: t("all") }, ...SOURCES.map((s) => ({ value: s, label: s }))]);
+const sourceTabLabel = (s: string) => (s === "custom" ? t("sourceCustomLabel") : s === "olx" ? "OLX" : s === "telegram" ? "Telegram" : s);
+const sourceOptions = computed(() => [{ value: "", label: t("all") }, ...SOURCES.map((s) => ({ value: s, label: sourceTabLabel(s) }))]);
+
+type CustomSite = { domain: string; countries: string[] };
+const customSiteCatalog = ref<CustomSite[]>([]);
+async function loadCustomSites() { const { data } = await safeFetch<{ sites?: CustomSite[] }>("/flats-custom-sites"); if (data?.sites) customSiteCatalog.value = data.sites; }
+const availableCustomSites = computed(() => {
+  const country = countries.value[0];
+  if (!country) return customSiteCatalog.value;
+  return customSiteCatalog.value.filter((site) => site.countries.includes(country));
+});
 type Item = { label: string; value: string };
 const citySel = useNullableSelect(city);
 const nearbyKindItems = computed<Item[]>(() => [
@@ -567,6 +577,12 @@ function scheduleLoad(delay = FILTER_DEBOUNCE_MS) {
 }
 function clearSearch() { query.value = ""; scheduleLoad(0); }
 function selectSource(v: string) { if (source.value === v) return; source.value = v; scheduleLoad(); }
+function toggleCustomSite(domain: string) {
+  customSites.value = customSites.value.includes(domain)
+    ? customSites.value.filter((d) => d !== domain)
+    : [...customSites.value, domain];
+  scheduleLoad();
+}
 function resetFilters() {
   // Empty means "every country", so reset keeps the regional starting country.
   resetFilterValues(defaultCountry.value);
@@ -790,7 +806,7 @@ const transportListOr = (listing: Listing, mode: string) => {
 };
 const audienceLabel = (a?: Listing["audience"]) => a === "women" ? t("audWomen") : a === "men" ? t("audMen") : a === "family" ? t("audFamily") : t("audAny");
 const conditionLabel = (c?: Listing["condition"]) => c === "needs_renovation" ? t("condNeeds") : c === "basic" ? t("condBasic") : c === "good" ? t("condGood") : c === "modern" ? t("condModern") : c === "luxury" ? t("condLuxury") : t("notSpecified");
-const sourceLabel = (s?: string) => (s === "olx" ? "OLX" : s === "telegram" ? "Telegram" : strOr(s));
+const sourceLabel = (s?: string) => (s === "olx" ? "OLX" : s === "telegram" ? "Telegram" : s === "custom" ? t("sourceCustomLabel") : strOr(s));
 function floorLabel(l: Listing) { if (l.floor != null && l.totalFloors != null) return `${l.floor} / ${l.totalFloors}`; return l.floor != null || l.totalFloors != null ? String(l.floor ?? l.totalFloors) : t("nd"); }
 function depositLabel(l: Listing) { if (l.depositAmount != null) return `${l.depositAmount.toLocaleString()} ${l.depositCurrency || l.currency}`; return fmtBool(l.deposit); }
 function commissionLabel(l: Listing) {
@@ -935,7 +951,7 @@ onMounted(async () => {
   const requestedPage = Math.max(1, Math.trunc(Number(queryString(route.query.page))) || 1);
   defaultCountry.value = regionalSearchCountry();
   if (!queryString(route.query.countries)) countries.value = [defaultCountry.value];
-  loadPersonalState(); applyQueryParams(route.query); void loadRates();
+  loadPersonalState(); applyQueryParams(route.query); void loadRates(); void loadCustomSites();
   // The first feed request does not depend on /flats-meta: the country is
   // already resolved above, and meta only fills the select option lists (its
   // own default-country branch is a no-op once countries is non-empty). Running
@@ -1014,6 +1030,18 @@ onBeforeUnmount(() => { modalOpen.value = false; lightboxOpen.value = false; rel
           :aria-label="t('personalTabs')"
           @update:model-value="setView"
         />
+      </div>
+
+      <div v-if="source === 'custom' && availableCustomSites.length" class="flats__row flats__custom-sites" role="group" :aria-label="t('customSitesLabel')">
+        <u-button
+          v-for="site in availableCustomSites"
+          :key="site.domain"
+          type="button"
+          size="xs"
+          color="neutral"
+          :variant="customSites.includes(site.domain) ? 'solid' : 'outline'"
+          @click="toggleCustomSite(site.domain)"
+        >{{ site.domain }}</u-button>
       </div>
 
       <div class="filter-surface">
@@ -1204,6 +1232,7 @@ onBeforeUnmount(() => { modalOpen.value = false; lightboxOpen.value = false; rel
 .flats__controls_redesign { display: block; margin: 20px 0; }
 .flats__searchbar { display: grid; grid-template-columns: 1fr auto; gap: 10px; margin-bottom: 12px; }
 .flats__secondary-nav { margin-bottom: 12px; }
+.flats__custom-sites { margin-bottom: 12px; }
 .filter-surface {
   position: relative;
   isolation: isolate;

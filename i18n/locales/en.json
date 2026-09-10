@@ -338,6 +338,8 @@
     "nearbyKind_cinema": "Cinema",
     "nearbyKind_landmark": "Major destination",
     "sourceFilter": "Source",
+    "sourceCustomLabel": "Sites",
+    "customSitesLabel": "Individual sites",
     "specTram": "Tram",
     "specBus": "Bus",
     "specTrolleybus": "Trolleybus"

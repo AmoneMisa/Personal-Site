@@ -27,7 +27,7 @@ export function useFlatRouteState(options: {
       commissionPercentMin, commissionPercentMax, sort, priceMin, priceMax, displayCurrency, roomsMin,
       roomsMax, bedroomsMin, bedroomsMax, areaMin, areaMax, pricePerSqmMin, pricePerSqmMax,
       metroMaxM, nearbyKind, nearbyMaxM, floorMin, floorMax, totalFloorsMin, totalFloorsMax,
-      yearMin, yearMax, maxAgeDays, query, source, metroBearingFrom, metroBearingTo,
+      yearMin, yearMax, maxAgeDays, query, source, customSites, metroBearingFrom, metroBearingTo,
     } = filters;
     if (countries.value.length) q.countries = countries.value[0]!;
     if (city.value) q.city = city.value;
@@ -79,6 +79,7 @@ export function useFlatRouteState(options: {
     if (nearbyKind.value) q.nearbyKind = nearbyKind.value;
     if (query.value.trim()) q.query = query.value.trim();
     if (source.value) q.sources = source.value;
+    if (customSites.value.length) q.customSites = customSites.value.join(",");
     return q;
   }
 
@@ -141,6 +142,12 @@ export function useFlatRouteState(options: {
     const sourceParam = queryString(params.sources);
     const allowedSources = new Set([...options.sources, ...SOCIAL_FLAT_SOURCES]);
     filters.source.value = allowedSources.has(sourceParam) ? sourceParam : "";
+    // Unknown domains are silently dropped server-side, same as an unknown
+    // `sources` token above -- no local catalog to validate against here.
+    filters.customSites.value = queryString(params.customSites)
+      .split(",")
+      .map((domain) => domain.trim().toLowerCase())
+      .filter(Boolean);
   }
 
   const routeState = useSearchRouteState({
