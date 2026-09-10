@@ -2,6 +2,7 @@
 import type { FlatCardPresentation, FlatListing } from "~/types/flats";
 import type { DraggablePillItem } from "~/components/ui/DraggablePills.vue";
 import { flatPriceTone, type FlatPriceTone } from "~/utils/flats/priceTone";
+import { flatSourceLabel } from "~/utils/flats/sourceLabel";
 
 const props = defineProps<{
   listing: FlatListing;
@@ -16,7 +17,8 @@ const props = defineProps<{
   hideLabel: string;
 }>();
 
-const { locale } = useI18n();
+const { locale, t } = useI18n();
+const sourceLabel = computed(() => flatSourceLabel(props.listing.source, props.listing.customSourceUrl, t("flats.sourceCustomLabel")));
 const isEnglish = computed(() => String(locale.value).startsWith("en"));
 const aiVisionTitle = computed(() => isEnglish.value
   ? "Data from AI Vision"
@@ -123,7 +125,7 @@ const emit = defineEmits<{
       <UiDraggablePills v-if="pillItems.length" class="flat-card__badges" :items="pillItems" :visible-hint-count="3" />
       <div class="flat-card__meta text-muted">
         <span v-if="presentation.location" class="flat-card__location"><u-icon name="i-lucide-map-pin" />{{ presentation.location }}</span>
-        <span class="flat-card__meta-tail"><span class="flat-card__src">{{ listing.source }}</span><span v-if="presentation.dateLabel">· {{ presentation.dateLabel }}</span></span>
+        <span class="flat-card__meta-tail"><span class="flat-card__src">{{ sourceLabel }}</span><span v-if="presentation.dateLabel">· {{ presentation.dateLabel }}</span></span>
       </div>
     </div>
     <div v-if="checking" class="flat-card__checking" role="status" aria-live="polite"><u-icon name="i-lucide-loader-circle" class="flat-card__checking-icon" /><span>{{ checkingLabel }}</span></div>
@@ -160,7 +162,7 @@ const emit = defineEmits<{
 .flat-card__price-conv { flex: 0 1 auto; min-width: 0; font-size: 12px; font-weight: 500; line-height: 1.35; overflow: hidden; text-overflow: ellipsis; }
 .flat-card__title { min-height: 19px; margin-top: 2px; font-size: 14px; font-weight: 650; line-height: 1.36; display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical; overflow: hidden; text-overflow: ellipsis; white-space: normal; overflow-wrap: anywhere; }.flat-card__spec { min-height: 16px; font-size: 12px; line-height: 1.35; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .flat-card__badges { min-height: 27px; margin-top: 5px; }.flat-card__badges :deep(.flat-card__badge) { border-radius: 999px; padding: 4px 7px; font-size: 10.5px; font-weight: 600; line-height: 1.15; background: rgba(255,255,255,0.05); color: var(--text-primary); }.flat-card__badges :deep(.flat-card__badge_vision) { border-color: rgba(56,189,248,.36); color: #8bdcf7; background: rgba(56,189,248,.08); }.flat-card__badges :deep(.flat-card__badge_warning) { border-color: rgba(242,184,107,.52); color: #f2b86b; background: rgba(242,184,107,.1); }
-.flat-card__meta { display: flex; align-items: center; justify-content: space-between; gap: 6px 10px; margin-top: auto; padding-top: 8px; font-size: 11.5px; line-height: 1.35; }.flat-card__location { min-width: 0; display: inline-flex; align-items: center; gap: 5px; flex: 1 1 auto; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }.flat-card__meta-tail { display: inline-flex; flex: 0 0 auto; gap: 5px; white-space: nowrap; margin-left: auto; }.flat-card__src { text-transform: capitalize; opacity: 0.72; }
+.flat-card__meta { display: flex; align-items: center; justify-content: space-between; gap: 6px 10px; margin-top: auto; padding-top: 8px; font-size: 11.5px; line-height: 1.35; }.flat-card__location { min-width: 0; display: inline-flex; align-items: center; gap: 5px; flex: 1 1 auto; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }.flat-card__meta-tail { display: inline-flex; flex: 0 0 auto; gap: 5px; white-space: nowrap; margin-left: auto; }.flat-card__src { opacity: 0.72; }
 .flat-card_favorite { border-color: rgba(224,103,154,0.52); }.flat-card_hidden { opacity: 0.64; border-style: dashed; }
 
 @include bp-down(md) {

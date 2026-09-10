@@ -49,6 +49,9 @@ export interface FlatListing {
   id: string;
   publicId?: number | null;
   source: string;
+  // Only set when source === "custom": the exact curated-site catalogue URL
+  // the listing was scraped from (its domain is the actual site, e.g. lun.ua).
+  customSourceUrl?: string | null;
   country: string;
   title: string;
   propertyType: "flat" | "house";

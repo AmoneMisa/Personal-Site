@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { safeFetch } from "~/utils/safeFetch";
+import { flatSourceLabel } from "~/utils/flats/sourceLabel";
 import {
   applyMetroProximity,
   arcForCompassPoint,
@@ -806,7 +807,7 @@ const transportListOr = (listing: Listing, mode: string) => {
 };
 const audienceLabel = (a?: Listing["audience"]) => a === "women" ? t("audWomen") : a === "men" ? t("audMen") : a === "family" ? t("audFamily") : t("audAny");
 const conditionLabel = (c?: Listing["condition"]) => c === "needs_renovation" ? t("condNeeds") : c === "basic" ? t("condBasic") : c === "good" ? t("condGood") : c === "modern" ? t("condModern") : c === "luxury" ? t("condLuxury") : t("notSpecified");
-const sourceLabel = (s?: string) => (s === "olx" ? "OLX" : s === "telegram" ? "Telegram" : s === "custom" ? t("sourceCustomLabel") : strOr(s));
+const sourceLabel = (l: Listing) => strOr(flatSourceLabel(l.source, l.customSourceUrl, t("sourceCustomLabel")));
 function floorLabel(l: Listing) { if (l.floor != null && l.totalFloors != null) return `${l.floor} / ${l.totalFloors}`; return l.floor != null || l.totalFloors != null ? String(l.floor ?? l.totalFloors) : t("nd"); }
 function depositLabel(l: Listing) { if (l.depositAmount != null) return `${l.depositAmount.toLocaleString()} ${l.depositCurrency || l.currency}`; return fmtBool(l.deposit); }
 function commissionLabel(l: Listing) {
@@ -843,7 +844,7 @@ const specRows = computed<FlatSpecRow[]>(() => {
     row("advert", t("specDeal"), dealLabel(l.dealType) || t("notSpecified")),
     row("advert", t("specType"), ptLabel(l.propertyType)),
     row("advert", t("specListedBy"), l.byAgency ? t("agAgency") : t("agOwner")),
-    row("advert", t("specSource"), sourceLabel(l.source)),
+    row("advert", t("specSource"), sourceLabel(l)),
 
     row("property", t("specRooms"), numOr(l.rooms)),
     row("property", t("specBedrooms"), numOr(l.bedrooms)),
