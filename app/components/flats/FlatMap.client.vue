@@ -132,8 +132,7 @@ const emit = defineEmits<{
   (e: "select", identity: { id: string; source?: string }): void;
   (e: "area-change", points: Array<{ lat: number; lng: number }>): void;
   (e: "zone-select", payload: { kind: ZoneKind; name: string; radiusM?: number }): void;
-  (e: "city-select", name: string): void;
-  (e: "metro-toggle", name: string): void;
+  (e: "city-select" | "metro-toggle", name: string): void;
   (e: "metro-shape", shape: { radiusM: number; bearingFrom?: number; bearingTo?: number }): void;
 }>();
 

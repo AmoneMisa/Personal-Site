@@ -55,8 +55,7 @@ test('resetValues clears customSites', () => {
 })
 
 test('customSites round-trips through the shareable route state', () => {
-  let query = {}
-  const router = { replace: async (next) => { query = next.query } }
+  const router = { replace: async () => {} }
   const filters = useFlatFilters()
   const routeState = useFlatRouteState({
     router,
