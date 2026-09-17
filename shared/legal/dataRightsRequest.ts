@@ -1,11 +1,8 @@
 /**
- * Data-rights request shape shared by the form and the BFF route (§47, §48).
+ * Data-rights request shape for the /data-rights form (§47, §48).
  *
- * The backend (whiteslove.me-backend-platform, POST /api/privacy/requests)
- * owns validation and canonicalisation of identifiers; this module only
- * shapes what the form sends and rejects obviously unusable input early, so
- * the visitor gets an answer without a round trip. It deliberately has no
- * field for identity documents.
+ * Shapes what the form puts into the email and rejects obviously unusable
+ * input early. It deliberately has no field for identity documents.
  */
 
 export const REQUEST_TYPES = ['access', 'rectification', 'erasure', 'restriction', 'objection', 'portability', 'dispute'] as const
@@ -36,10 +33,29 @@ export type DataRightsPayload = {
 }
 
 const EMAIL = /^[^\s@<>"']+@[^\s@<>"']+\.[^\s@<>"']{2,}$/u
-const REFERENCE = /^PR-[A-Za-z0-9_-]{20}$/u
+const MAILTO_ADDRESS = /^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/u
 
-export function isRequestReference(value: unknown): value is string {
-  return typeof value === 'string' && REFERENCE.test(value)
+/**
+ * The request as an email to the operator's privacy address.
+ *
+ * Requests go to the operator's inbox rather than a database queue: there is
+ * no admin interface, and a queue nobody reads would miss the one-month
+ * deadline. Nothing is sent by the site; the visitor's own mail client opens
+ * with the text filled in, and they decide whether to send it.
+ */
+export function buildDataRightsMailto(to: string, payload: DataRightsPayload): string | null {
+  // Stricter than EMAIL: the address goes into a URL unencoded, so anything
+  // that could start a query (?cc=, &bcc=) or break out of it is refused.
+  if (!MAILTO_ADDRESS.test(to)) return null
+  const subject = `Data request: ${payload.requestType}`
+  const body = [
+    `Request type: ${payload.requestType}`,
+    `Reply to: ${payload.requesterEmail}`,
+    'Identifiers:',
+    ...payload.identifiers.map((item) => `- ${item.type}: ${item.value}`),
+    ...(payload.details ? ['', payload.details] : []),
+  ].join('\n')
+  return `mailto:${to}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`
 }
 
 /**

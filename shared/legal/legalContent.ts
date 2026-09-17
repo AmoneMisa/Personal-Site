@@ -134,7 +134,7 @@ const ru: Record<LegalDocumentKey, LegalDocument> = {
             ['Показ объявлений о жилье и кнопок связи', 'Текст и фото объявления, указанный контакт (телефон, Telegram и т. п.), ссылка на источник', 'Законный интерес (ст. 6(1)(f)): помочь людям найти жильё; контакт опубликован именно для связи'],
             ['Выявление копий, фиктивных и повторно публикуемых объявлений', 'История объявления, отпечатки фотографий, результаты проверок доступности', 'Законный интерес: защита от мошенничества'],
             ['Сопоставление одного рекламодателя в разных каналах', 'Телефоны, имена пользователей, отображаемые имена и их изменения, роль (собственник, агент)', 'Законный интерес: защита от мошенничества'],
-            ['Оценка достоверности (профилирование)', 'Коды причин, доказательства, решения модераторов', 'Законный интерес: защита от мошенничества'],
+            ['Оценка достоверности (профилирование)', 'Коды причин и доказательства', 'Законный интерес: защита от мошенничества'],
             ['Показ вакансий', 'Компания, должность, текст вакансии, контакт рекрутера', 'Законный интерес: помочь найти работу'],
             ['Показ резюме', 'Имя, роль, город, опыт, навыки, языки, ожидания по зарплате, пол и возраст (если указаны кандидатом), ссылка на источник', 'Законный интерес: помочь работодателям найти кандидатов, опубликовавших резюме'],
             ['Устранение дублей резюме', 'Email, телефон, Telegram ID, ссылка на профиль', 'Законный интерес; объединение только по совпадению этих данных, никогда по имени'],
@@ -152,7 +152,7 @@ const ru: Record<LegalDocumentKey, LegalDocument> = {
         title: '5. Законный интерес',
         paragraphs: [
           'Объявления и резюме публикуются, чтобы их увидели и откликнулись. Сводный поиск по ним — ожидаемое использование. Проверка на мошенничество защищает тех, кто ищет жильё, и честных рекламодателей, чьи объявления копируют.',
-          'Мы оценили, что эти интересы не перевешивают ваши права, с учётом мер защиты: сведения о риске и история идентичности не публикуются, решения с серьёзными последствиями принимает человек, данные хранятся ограниченное время, и вы можете возразить в любой момент (раздел 10).',
+          'Мы оценили, что эти интересы не перевешивают ваши права, с учётом мер защиты: сведения о риске и история идентичности не публикуются, решений о людях с серьёзными последствиями не принимается, данные хранятся ограниченное время, и вы можете возразить в любой момент (раздел 10).',
         ],
       },
       {
@@ -161,7 +161,7 @@ const ru: Record<LegalDocumentKey, LegalDocument> = {
         paragraphs: [
           'Система оценивает объявления и рекламодателей по нескольким отдельным признакам (реальность объекта, актуальность, происхождение объявления, согласованность данных, платёжные риски, поведение) и хранит причины каждой оценки.',
           'Публично могут отображаться только нейтральные сведения об объявлении: «доступность не подтверждена», «объявление публикуется повторно», «данные источников расходятся». Мы не публикуем обвинений в адрес людей.',
-          'Никакие решения с юридическими или сопоставимо значимыми последствиями — например, блокировка или скрытие всех объявлений человека — не принимаются только автоматически: их подтверждает модератор, и решение фиксируется. Вы можете оспорить любые сведения о себе (раздел 10).',
+          'Сервис не принимает решений о людях: не блокирует их, не скрывает все их объявления и не публикует о них выводов. Автоматические оценки используются только для нейтральных отметок об объявлении. Вы можете оспорить любые сведения о себе (раздел 10).',
         ],
       },
       {
@@ -176,7 +176,7 @@ const ru: Record<LegalDocumentKey, LegalDocument> = {
           'Google — только для чтения внутреннего реестра оператора.',
         ],
         paragraphs: [
-          'Сведения о рисках, история идентичности и внутренний реестр не передаются никому, кроме оператора и модераторов.',
+          'Сведения о рисках, история идентичности и внутренний реестр никому не передаются и не публикуются.',
         ],
       },
       {
@@ -194,7 +194,7 @@ const ru: Record<LegalDocumentKey, LegalDocument> = {
           'Активные объявления — пока объявление опубликовано в источнике; история объявлений — 12 месяцев.',
           'История имён пользователей и отображаемых имён — 12 месяцев.',
           'Контакты, не встречавшиеся в объявлениях, — 18 месяцев.',
-          'Сведения о рисках — от 6 месяцев (отклонённые) до 36 месяцев (подтверждённые модератором) с последнего наблюдения.',
+          'Сведения о рисках — 18 месяцев с последнего наблюдения.',
           'Резюме — пока активно в источнике и 6 месяцев после.',
           'Telegram-подписки — до отписки; неактивные — 12 месяцев.',
           'Запросы о данных и споры — 36 месяцев после закрытия.',
@@ -215,7 +215,7 @@ const ru: Record<LegalDocumentKey, LegalDocument> = {
           'Оспорить сведения о своей личности, роли, контактах или рисках.',
         ],
         paragraphs: [
-          'Подать запрос можно на странице «Мои данные» или по адресу {email}. Мы отвечаем в течение месяца; в сложных случаях срок может быть продлён ещё на два месяца с объяснением причин.',
+          'Отправить запрос можно со страницы «Мои данные» или напрямую на {email}. Мы отвечаем в течение месяца; в сложных случаях срок может быть продлён ещё на два месяца с объяснением причин.',
           'Чтобы не раскрыть чужие данные, мы проверяем, что указанный телефон, аккаунт или email принадлежит вам. Документы, удостоверяющие личность, мы не запрашиваем.',
           'Вы вправе подать жалобу в надзорный орган по защите данных по месту жительства, работы или предполагаемого нарушения.',
         ],
@@ -224,7 +224,7 @@ const ru: Record<LegalDocumentKey, LegalDocument> = {
         id: 'security',
         title: '11. Безопасность',
         paragraphs: [
-          'Соединения шифруются, внутренние сведения доступны только по отдельному ключу администратора, каждое решение модератора записывается в журнал, а журналы ошибок не содержат персональных данных.',
+          'Соединения шифруются, внутренние сведения не доступны через публичный сайт, а журналы ошибок не содержат персональных данных.',
         ],
       },
       {
@@ -439,7 +439,7 @@ const ru: Record<LegalDocumentKey, LegalDocument> = {
       {
         id: 'contact',
         title: 'Другой способ',
-        paragraphs: ['Если форма не подходит, напишите на {email}.'],
+        paragraphs: ['Форма лишь готовит письмо — можно написать на {email} и самостоятельно.'],
       },
     ],
   },
@@ -493,7 +493,7 @@ const en: Record<LegalDocumentKey, LegalDocument> = {
             ['Showing housing listings and contact buttons', 'Listing text and photos, the published contact (phone, Telegram, etc.), source link', 'Legitimate interests (Art 6(1)(f)): helping people find housing; the contact was published to be contacted'],
             ['Detecting copied, fake and repeatedly reposted listings', 'Listing history, photo fingerprints, availability check results', 'Legitimate interests: fraud prevention'],
             ['Recognising the same advertiser across channels', 'Phone numbers, usernames, display names and their changes, role (owner, agent)', 'Legitimate interests: fraud prevention'],
-            ['Integrity assessment (profiling)', 'Reason codes, evidence, reviewer decisions', 'Legitimate interests: fraud prevention'],
+            ['Integrity assessment (profiling)', 'Reason codes and evidence', 'Legitimate interests: fraud prevention'],
             ['Showing vacancies', 'Company, job title, vacancy text, recruiter contact', 'Legitimate interests: helping people find work'],
             ['Showing CVs', 'Name, role, city, experience, skills, languages, salary expectations, gender and age (where stated by the candidate), source link', 'Legitimate interests: helping employers find candidates who published a CV'],
             ['De-duplicating CVs', 'Email, phone, Telegram ID, profile link', 'Legitimate interests; merged only when these match, never on a name'],
@@ -511,7 +511,7 @@ const en: Record<LegalDocumentKey, LegalDocument> = {
         title: '5. Legitimate interests',
         paragraphs: [
           'Listings and CVs are published in order to be seen and answered; searching them in one place is an expected use. Fraud checks protect people looking for housing, and honest advertisers whose listings are copied.',
-          'We have assessed that these interests are not overridden by your rights, given the safeguards: risk information and identity history are never published, decisions with serious consequences are taken by a person, data is kept for limited periods, and you can object at any time (section 10).',
+          'We have assessed that these interests are not overridden by your rights, given the safeguards: risk information and identity history are never published, no decisions with serious consequences are taken about people, data is kept for limited periods, and you can object at any time (section 10).',
         ],
       },
       {
@@ -520,7 +520,7 @@ const en: Record<LegalDocumentKey, LegalDocument> = {
         paragraphs: [
           'The system assesses listings and advertisers on several separate dimensions (whether the property is real, availability, where the listing came from, consistency, payment risk, behaviour) and stores the reasons for each assessment.',
           'Only neutral statements about a listing may be shown publicly: "availability not confirmed", "listing appears repeatedly", "source information is inconsistent". We do not publish accusations about people.',
-          "No decision with legal or similarly significant effect — such as blocking a person or hiding all of their listings — is taken solely by automated means: a reviewer confirms it and the decision is recorded. You can contest anything we hold about you (section 10).",
+          'The service takes no decisions about people: it does not block anyone, hide all of their listings or publish conclusions about them. Automated assessments are used only for neutral notes about a listing. You can contest anything we hold about you (section 10).',
         ],
       },
       {
@@ -535,7 +535,7 @@ const en: Record<LegalDocumentKey, LegalDocument> = {
           "Google — only to read the operator's internal registry.",
         ],
         paragraphs: [
-          'Risk information, identity history and the internal registry are not shared with anyone other than the operator and reviewers.',
+          'Risk information, identity history and the internal registry are not shared with anyone or published.',
         ],
       },
       {
@@ -553,7 +553,7 @@ const en: Record<LegalDocumentKey, LegalDocument> = {
           'Active listings — while published at the source; listing history — 12 months.',
           'Username and display-name history — 12 months.',
           'Contacts no longer seen in listings — 18 months.',
-          'Risk information — from 6 months (dismissed) to 36 months (confirmed by a reviewer) after it was last observed.',
+          'Risk information — 18 months after it was last observed.',
           'CVs — while active at the source and 6 months after.',
           'Telegram subscriptions — until you unsubscribe; inactive ones 12 months.',
           'Data requests and disputes — 36 months after closure.',
@@ -574,7 +574,7 @@ const en: Record<LegalDocumentKey, LegalDocument> = {
           'Contest information about your identity, role, contacts or risk.',
         ],
         paragraphs: [
-          'Make a request on the "Your data" page or at {email}. We reply within one month; complex requests may take two further months, and we will tell you why.',
+          'Send a request from the "Your data" page or directly to {email}. We reply within one month; complex requests may take two further months, and we will tell you why.',
           'To avoid disclosing someone else\'s data, we check that the phone, account or email you give is yours. We do not ask for identity documents.',
           'You have the right to lodge a complaint with a data protection supervisory authority where you live, work, or where the alleged infringement took place.',
         ],
@@ -583,7 +583,7 @@ const en: Record<LegalDocumentKey, LegalDocument> = {
         id: 'security',
         title: '11. Security',
         paragraphs: [
-          'Connections are encrypted, internal information requires a separate administrator key, every reviewer decision is written to an audit log, and error logs contain no personal data.',
+          'Connections are encrypted, internal information is not reachable through the public site, and error logs contain no personal data.',
         ],
       },
       {
@@ -796,7 +796,7 @@ const en: Record<LegalDocumentKey, LegalDocument> = {
       {
         id: 'contact',
         title: 'Another way',
-        paragraphs: ['If the form does not suit you, write to {email}.'],
+        paragraphs: ['The form only prepares an email — you can also write to {email} yourself.'],
       },
     ],
   },

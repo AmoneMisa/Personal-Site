@@ -1,17 +1,20 @@
 <script setup lang="ts">
-// The /data-rights request form and status lookup (§48). Asks only for what a
-// request needs: a reply address and the identifiers the data is keyed on.
-// There is no upload and no document field by design.
+// The /data-rights request form (§48). Asks only for what a request needs: a
+// reply address and the identifiers the data is keyed on, with no upload and
+// no document field. Submitting opens the visitor's mail client with the
+// request addressed to the operator's privacy contact; the site stores and
+// sends nothing, because there is no admin interface to read a stored queue.
 import {
   DISPUTE_TYPES,
   IDENTIFIER_TYPES,
   MAX_DETAILS,
   MAX_IDENTIFIERS,
   REQUEST_TYPES,
+  buildDataRightsMailto,
   buildDataRightsPayload,
-  isRequestReference,
 } from "~~/shared/legal/dataRightsRequest";
 import { legalLocale } from "~~/shared/legal/legalContent";
+import type { LegalIdentity } from "~~/shared/legal/legalIdentity";
 
 const TEXT = {
   ru: {
@@ -46,34 +49,16 @@ const TEXT = {
     details: "Подробности (необязательно)",
     detailsHint: "Например, какие данные неверны и как правильно.",
     notice: "Мы проверим, что указанные телефоны и аккаунты ваши, прежде чем что-либо раскрыть или изменить. Документы не нужны.",
-    submit: "Отправить запрос",
-    sending: "Отправляем…",
+    submit: "Подготовить письмо",
     errors: {
       requestType: "Выберите тип запроса.",
       requesterEmail: "Укажите корректный email.",
       identifiers: "Укажите хотя бы один телефон или аккаунт.",
       disputeType: "Выберите, что именно неверно.",
       details: "Текст слишком длинный.",
-      generic: "Не удалось отправить запрос. Попробуйте позже или напишите нам на почту.",
-      rate: "Слишком много запросов. Попробуйте позже.",
+      unavailable: "Адрес для запросов пока не настроен.",
     },
-    doneTitle: "Запрос принят",
-    doneText: "Сохраните номер запроса — по нему можно узнать статус.",
-    reference: "Номер запроса",
-    due: "Ответим до",
-    statusTitle: "Статус запроса",
-    statusPlaceholder: "PR-…",
-    check: "Проверить",
-    statusNotFound: "Запрос не найден.",
-    statusInvalid: "Неверный номер запроса.",
-    statuses: {
-      received: "Получен",
-      identity_verification_required: "Нужно подтвердить, что идентификаторы ваши — мы напишем на указанный email",
-      in_review: "Рассматривается",
-      fulfilled: "Выполнен",
-      partially_fulfilled: "Выполнен частично",
-      rejected_with_reason: "Отклонён с объяснением причины",
-    } as Record<string, string>,
+    doneText: "Откроется ваша почтовая программа с готовым письмом — проверьте и отправьте его. Ответим в течение месяца.",
   },
   en: {
     formTitle: "Send a request",
@@ -107,34 +92,16 @@ const TEXT = {
     details: "Details (optional)",
     detailsHint: "For example, which data is wrong and what is correct.",
     notice: "We will check that these phone numbers and accounts are yours before disclosing or changing anything. No documents are needed.",
-    submit: "Send request",
-    sending: "Sending…",
+    submit: "Prepare email",
     errors: {
       requestType: "Choose a request type.",
       requesterEmail: "Enter a valid email address.",
       identifiers: "Enter at least one phone number or account.",
       disputeType: "Choose what exactly is wrong.",
       details: "The text is too long.",
-      generic: "The request could not be sent. Please try later or write to us by email.",
-      rate: "Too many requests. Please try later.",
+      unavailable: "The request address is not configured yet.",
     },
-    doneTitle: "Request received",
-    doneText: "Keep the request reference — you can use it to check the status.",
-    reference: "Request reference",
-    due: "We will reply by",
-    statusTitle: "Request status",
-    statusPlaceholder: "PR-…",
-    check: "Check",
-    statusNotFound: "Request not found.",
-    statusInvalid: "Invalid request reference.",
-    statuses: {
-      received: "Received",
-      identity_verification_required: "We need to confirm the identifiers are yours — we will write to the email you gave",
-      in_review: "In review",
-      fulfilled: "Fulfilled",
-      partially_fulfilled: "Partially fulfilled",
-      rejected_with_reason: "Rejected, with the reason explained",
-    } as Record<string, string>,
+    doneText: "Your mail app opens with the email ready — check it and send it. We reply within one month.",
   },
 };
 
@@ -148,8 +115,9 @@ const requesterEmail = ref("");
 const identifiers = ref<{ type: string; value: string }[]>([{ type: "phone", value: "" }]);
 const details = ref("");
 const errors = ref<string[]>([]);
-const sending = ref(false);
-const result = ref<{ reference: string; dueAt: string } | null>(null);
+const prepared = ref(false);
+
+const { data: identity } = await useFetch<LegalIdentity>("/legal-identity", { key: "legal-identity" });
 
 function addIdentifier() {
   if (identifiers.value.length < MAX_IDENTIFIERS) identifiers.value.push({ type: "phone", value: "" });
@@ -159,10 +127,9 @@ function removeIdentifier(index: number) {
   if (!identifiers.value.length) identifiers.value.push({ type: "phone", value: "" });
 }
 
-const formatDate = (value: string) => new Date(value).toLocaleDateString(lang.value === "ru" ? "ru-RU" : "en-GB", { year: "numeric", month: "long", day: "numeric" });
-
-async function submit() {
+function submit() {
   errors.value = [];
+  prepared.value = false;
   const built = buildDataRightsPayload({
     requestType: requestType.value,
     requesterEmail: requesterEmail.value,
@@ -174,52 +141,23 @@ async function submit() {
     errors.value = built.errors;
     return;
   }
-  sending.value = true;
-  try {
-    const response = await $fetch<{ ok: boolean; reference: string; dueAt: string }>("/privacy-request", { method: "POST", body: built.payload });
-    result.value = { reference: response.reference, dueAt: response.dueAt };
-  } catch (error) {
-    const status = (error as { statusCode?: number })?.statusCode;
-    const fields = (error as { data?: { errors?: string[] } })?.data?.errors;
-    errors.value = status === 429 ? ["rate"] : Array.isArray(fields) && fields.length ? fields : ["generic"];
-  } finally {
-    sending.value = false;
-  }
-}
-
-const statusReference = ref("");
-const statusText = ref("");
-async function checkStatus() {
-  statusText.value = "";
-  const reference = statusReference.value.trim();
-  if (!isRequestReference(reference)) {
-    statusText.value = t.value.statusInvalid;
+  const href = buildDataRightsMailto(identity.value?.contactEmail ?? "", built.payload);
+  if (!href) {
+    errors.value = ["unavailable"];
     return;
   }
-  try {
-    const response = await $fetch<{ status: string; dueAt: string }>("/privacy-request-status", { query: { reference } });
-    statusText.value = `${t.value.statuses[response.status] ?? response.status} · ${t.value.due}: ${formatDate(response.dueAt)}`;
-  } catch (error) {
-    const status = (error as { statusCode?: number })?.statusCode;
-    statusText.value = status === 404 ? t.value.statusNotFound : status === 429 ? t.value.errors.rate : t.value.errors.generic;
-  }
+  prepared.value = true;
+  window.location.href = href;
 }
 
-const errorMessages = computed(() => errors.value.map((key) => (t.value.errors as Record<string, string>)[key] ?? t.value.errors.generic));
+const errorMessages = computed(() => errors.value.map((key) => (t.value.errors as Record<string, string>)[key] ?? t.value.errors.unavailable));
 </script>
 
 <template>
   <section id="request" class="rights-form">
     <h2 class="rights-form__title">{{ t.formTitle }}</h2>
 
-    <div v-if="result" class="rights-form__done" role="status">
-      <h3>{{ t.doneTitle }}</h3>
-      <p>{{ t.doneText }}</p>
-      <p class="rights-form__reference"><span>{{ t.reference }}:</span> <code>{{ result.reference }}</code></p>
-      <p>{{ t.due }}: {{ formatDate(result.dueAt) }}</p>
-    </div>
-
-    <form v-else class="rights-form__form" novalidate @submit.prevent="submit">
+    <form class="rights-form__form" novalidate @submit.prevent="submit">
       <label class="rights-form__field">
         <span class="rights-form__label">{{ t.requestType }}</span>
         <select v-model="requestType" class="ui-control ui-focusable" name="requestType">
@@ -266,16 +204,8 @@ const errorMessages = computed(() => errors.value.map((key) => (t.value.errors a
         <li v-for="message in errorMessages" :key="message">{{ message }}</li>
       </ul>
 
-      <button type="submit" class="rights-form__submit ui-focusable" :disabled="sending">{{ sending ? t.sending : t.submit }}</button>
-    </form>
-
-    <form class="rights-form__status" @submit.prevent="checkStatus">
-      <h2 class="rights-form__title">{{ t.statusTitle }}</h2>
-      <div class="rights-form__identifier">
-        <input v-model="statusReference" class="ui-control ui-focusable" type="text" maxlength="40" :placeholder="t.statusPlaceholder" :aria-label="t.reference">
-        <button type="submit" class="rights-form__secondary ui-focusable">{{ t.check }}</button>
-      </div>
-      <p v-if="statusText" class="rights-form__hint" role="status">{{ statusText }}</p>
+      <button type="submit" class="rights-form__submit ui-focusable">{{ t.submit }}</button>
+      <p v-if="prepared" class="rights-form__hint" role="status">{{ t.doneText }}</p>
     </form>
   </section>
 </template>
@@ -292,8 +222,7 @@ const errorMessages = computed(() => errors.value.map((key) => (t.value.errors a
   font-weight: 500;
   margin-bottom: 4px;
 }
-.rights-form__form,
-.rights-form__status {
+.rights-form__form {
   display: grid;
   gap: 18px;
   padding: 22px;
@@ -328,9 +257,6 @@ const errorMessages = computed(() => errors.value.map((key) => (t.value.errors a
   gap: 8px;
   align-items: center;
 }
-.rights-form__status .rights-form__identifier {
-  grid-template-columns: minmax(0, 1fr) auto;
-}
 .rights-form__textarea {
   resize: vertical;
   min-height: 96px;
@@ -359,35 +285,14 @@ const errorMessages = computed(() => errors.value.map((key) => (t.value.errors a
   font-weight: 500;
   cursor: pointer;
 }
-.rights-form__submit:disabled {
-  opacity: 0.6;
-  cursor: progress;
-}
 .rights-form__errors {
   margin: 0;
   padding-left: 18px;
   color: var(--accent-pink);
   font-size: 14px;
 }
-.rights-form__done {
-  padding: 22px;
-  border: 1px solid var(--accent-pink);
-  border-radius: 10px;
-  display: grid;
-  gap: 8px;
-  h3 {
-    font-size: 18px;
-    font-weight: 500;
-  }
-}
-.rights-form__reference code {
-  font-size: 15px;
-  user-select: all;
-  overflow-wrap: anywhere;
-}
 @media (max-width: 600px) {
-  .rights-form__form,
-  .rights-form__status {
+  .rights-form__form {
     padding: 16px;
   }
   .rights-form__identifier {
