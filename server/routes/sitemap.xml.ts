@@ -40,6 +40,11 @@ const ROUTES: { path: string; changefreq: string; priority: number }[] = [
   { path: "/services/pdf-editor", changefreq: "monthly", priority: 0.7 },
   { path: "/services/svg-editor", changefreq: "monthly", priority: 0.7 },
   { path: "/services/workflow-validator", changefreq: "monthly", priority: 0.7 },
+  { path: "/privacy", changefreq: "monthly", priority: 0.3 },
+  { path: "/terms", changefreq: "monthly", priority: 0.3 },
+  { path: "/cookies", changefreq: "monthly", priority: 0.2 },
+  { path: "/legal", changefreq: "monthly", priority: 0.2 },
+  { path: "/data-rights", changefreq: "monthly", priority: 0.3 },
 ];
 
 // Build the absolute URL for a route in a given locale. The home path "/" must

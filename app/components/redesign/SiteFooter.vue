@@ -1,11 +1,24 @@
 <script setup lang="ts">
 import RedesignEmoji from "~/components/redesign/RedesignEmoji.vue";
 import { useHomeContent, CONTACTS } from "~/composables/useHomeContent";
+import { LEGAL_CHROME, LEGAL_ROUTES, legalLocale, type LegalDocumentKey } from "~~/shared/legal/legalContent";
 
 const content = useHomeContent();
 const f = computed(() => content.value.footer);
 
 const localePath = useLocalePath();
+const { locale } = useI18n();
+// Legal links on every page: the privacy notice is how people whose data comes
+// from public sources are informed (GDPR Art 14(5)(b)), so it must be reachable
+// from anywhere on the site.
+const legalChrome = computed(() => LEGAL_CHROME[legalLocale(locale.value)]);
+const legalLinks = computed(() =>
+  (Object.keys(LEGAL_ROUTES) as LegalDocumentKey[]).map((key) => ({
+    key,
+    label: legalChrome.value.nav[key],
+    href: localePath(LEGAL_ROUTES[key]),
+  }))
+);
 function resolveHref(href: string) {
   if (!href) return href;
   if (href.startsWith("#")) return `${localePath("/")}${href}`;
@@ -101,6 +114,9 @@ function isDownload(href: string) {
 
       <div class="site-footer__bottom mono">
         <span>{{ f.copyright }}</span>
+        <nav class="site-footer__legal" :aria-label="legalChrome.navTitle">
+          <a v-for="l in legalLinks" :key="l.key" class="site-footer__link" :href="l.href">{{ l.label }}</a>
+        </nav>
         <span class="site-footer__motto">
           <redesign-emoji cp="1f988" :size="15" alt="акула" />
           {{ f.motto }}
@@ -263,6 +279,16 @@ function isDownload(href: string) {
   align-items: center;
   gap: 16px;
   flex-wrap: wrap;
+}
+
+.site-footer__legal {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 18px;
+}
+
+.site-footer__legal .site-footer__link {
+  font-size: 12px;
 }
 
 .site-footer__motto {
