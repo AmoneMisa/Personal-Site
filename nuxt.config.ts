@@ -3,9 +3,8 @@ import svgLoader from 'vite-svg-loader';
 export default defineNuxtConfig({
     app: {
         head: {
-            htmlAttrs: {
-                lang: 'ru'
-            },
+            // <html lang/dir> and hreflang alternates follow the active i18n locale
+            // per request (useLocaleHead in app.vue). Don't hard-code lang here.
             script: [
                 {
                     // The site is dark-only. Lock the persisted preference before paint

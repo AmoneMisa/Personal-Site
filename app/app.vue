@@ -63,8 +63,16 @@ useHead(() => ({
   link: [{ rel: "canonical", href: canonicalUrl.value }]
 }));
 
+// useLocaleHead returns a ComputedRef. Spreading it into useHead copied the ref's
+// internals instead of htmlAttrs/link/meta, so every page kept a static lang="ru"
+// and no hreflang alternates. Unwrap it inside a reactive getter.
+useHead(() => ({
+  htmlAttrs: localeHead.value.htmlAttrs,
+  link: localeHead.value.link,
+  meta: localeHead.value.meta
+}));
+
 useHead({
-  ...localeHead,
   script: [
     {
       type: "application/ld+json",
