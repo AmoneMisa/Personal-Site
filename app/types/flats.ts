@@ -51,6 +51,8 @@ export interface FlatListing {
   contactActions?: import("~/utils/flats/contactActions").ContactAction[];
   // Card line decided by the backend; see utils/flats/listingLine.ts.
   listingLine?: string | null;
+  // Other properties the same contact advertises; drives the popup tab.
+  contactListingCount?: number | null;
   publicId?: number | null;
   source: string;
   // Only set when source === "custom": the exact curated-site catalogue URL

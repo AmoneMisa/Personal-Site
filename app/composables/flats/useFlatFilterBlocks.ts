@@ -34,7 +34,7 @@ export function useFlatFilterBlocks(options: {
     metroMaxM, nearbyMaxM, roomsMin, roomsMax, bedroomsMin, bedroomsMax,
     areaMin, areaMax, pricePerSqmMin, pricePerSqmMax, floorMin, floorMax,
     totalFloorsMin, totalFloorsMax, yearMin, yearMax, audience, propertyType, maxAgeDays,
-    dealType, petFriendly, childrenRequired, onlyWithPhotos, newBuildingOnly,
+    dealType, petFriendly, childrenRequired, onlyWithPhotos, trustedOnly, hideDanger, newBuildingOnly,
     noElevatorOnly, noDepositOnly, communalIncludedOnly, noCommissionOnly,
     commissionPercentMin, commissionPercentMax,
     euroLayoutOnly,
@@ -51,6 +51,9 @@ export function useFlatFilterBlocks(options: {
     {
       id: "quick", title: options.t("quickOptions"), icon: "i-lucide-sliders-horizontal", gridClass: "flat-filter-grid_single",
       fields: [
+        // Listing lines: green only, and hide red ones.
+        { id: "trusted-only", control: "checkbox", label: options.t("trustedOnly"), value: trustedOnly.value, onUpdate: update(trustedOnly), onCommit: commit },
+        { id: "hide-danger", control: "checkbox", label: options.t("hideDanger"), value: hideDanger.value, onUpdate: update(hideDanger), onCommit: commit },
         { id: "pets", control: "checkbox", label: options.t("pets"), value: petFriendly.value, hidden: rentOnlyHidden(), onUpdate: update(petFriendly), onCommit: commit },
         { id: "children", control: "checkbox", label: options.t("children"), value: childrenRequired.value, hidden: rentOnlyHidden(), onUpdate: update(childrenRequired), onCommit: commit },
         { id: "photos", control: "checkbox", label: options.t("onlyWithPhotos"), value: onlyWithPhotos.value, onUpdate: update(onlyWithPhotos), onCommit: commit },

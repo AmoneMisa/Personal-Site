@@ -20,7 +20,7 @@ export function useFlatRouteState(options: {
     const q: Record<string, string> = {};
     const {
       countries, city, region, district, microdistrict, quartal, mapArea, metro, propertyType, dealType, agency, audience,
-      petFriendly, roomOnlyFilter, onlyWithPhotos, childrenRequired, newBuildingOnly,
+      petFriendly, roomOnlyFilter, onlyWithPhotos, trustedOnly, hideDanger, childrenRequired, newBuildingOnly,
       dishwasherOnly, airConditionerOnly, parkingOnly, internetOnly, gasOnly, balconyOnly,
       terraceOnly, privateYardOnly, noElevatorOnly, noDepositOnly, communalIncludedOnly, noCommissionOnly,
       tvOnly, microwaveOnly, ovenOnly, bidetOnly, walkInClosetOnly, bathtubOnly, showerOnly, euroLayoutOnly,
@@ -49,6 +49,8 @@ export function useFlatRouteState(options: {
     if (petFriendly.value) q.pets = "1";
     if (roomOnlyFilter.value) q.roomOnly = "1";
     if (onlyWithPhotos.value) q.withPhotos = "1";
+    if (trustedOnly.value) q.trustedOnly = "1";
+    if (hideDanger.value) q.hideDanger = "1";
     if (childrenRequired.value) q.children = "1";
     if (newBuildingOnly.value) q.newBuilding = "1";
     if (dishwasherOnly.value) q.dishwasher = "1";
@@ -109,6 +111,8 @@ export function useFlatRouteState(options: {
     filters.petFriendly.value = queryBoolean(params.pets);
     filters.roomOnlyFilter.value = queryBoolean(params.roomOnly);
     filters.onlyWithPhotos.value = queryBoolean(params.withPhotos);
+    filters.trustedOnly.value = queryBoolean(params.trustedOnly);
+    filters.hideDanger.value = queryBoolean(params.hideDanger);
     filters.childrenRequired.value = queryBoolean(params.children);
     filters.newBuildingOnly.value = queryBoolean(params.newBuilding);
     filters.dishwasherOnly.value = queryBoolean(params.dishwasher);

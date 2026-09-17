@@ -41,6 +41,9 @@ export function useFlatFilters(options: UseFlatFiltersOptions = {}) {
   const petFriendly = ref(false);
   const roomOnlyFilter = ref(false);
   const onlyWithPhotos = ref(false);
+  // Listing-line toggles: only green listings, and hiding red ones.
+  const trustedOnly = ref(false);
+  const hideDanger = ref(false);
   const childrenRequired = ref(false);
   const newBuildingOnly = ref(false);
   const dishwasherOnly = ref(false);
@@ -257,6 +260,8 @@ export function useFlatFilters(options: UseFlatFiltersOptions = {}) {
     if (!saleOnly && petFriendly.value) params.pets = "1";
     if (!saleOnly && roomOnlyFilter.value) params.roomOnly = "1";
     if (onlyWithPhotos.value) params.withPhotos = "1";
+    if (trustedOnly.value) params.trustedOnly = "1";
+    if (hideDanger.value) params.hideDanger = "1";
     if (!saleOnly && childrenRequired.value) params.children = "1";
     if (newBuildingOnly.value) params.newBuilding = "1";
     if (dishwasherOnly.value) params.dishwasher = "1";
@@ -306,6 +311,8 @@ export function useFlatFilters(options: UseFlatFiltersOptions = {}) {
     petFriendly.value = false;
     roomOnlyFilter.value = false;
     onlyWithPhotos.value = false;
+    trustedOnly.value = false;
+    hideDanger.value = false;
     childrenRequired.value = false;
     newBuildingOnly.value = false;
     dishwasherOnly.value = false;
@@ -361,7 +368,7 @@ export function useFlatFilters(options: UseFlatFiltersOptions = {}) {
 
   return {
     countries, city, region, district, microdistrict, quartal, mapArea, propertyType, dealType, agency,
-    petFriendly, roomOnlyFilter, onlyWithPhotos, childrenRequired, newBuildingOnly,
+    petFriendly, roomOnlyFilter, onlyWithPhotos, trustedOnly, hideDanger, childrenRequired, newBuildingOnly,
     dishwasherOnly, airConditionerOnly, parkingOnly, internetOnly, gasOnly, balconyOnly,
     terraceOnly, privateYardOnly, noElevatorOnly, noDepositOnly, communalIncludedOnly, noCommissionOnly,
     tvOnly, microwaveOnly, ovenOnly, bidetOnly, walkInClosetOnly, bathtubOnly, showerOnly, euroLayoutOnly,
