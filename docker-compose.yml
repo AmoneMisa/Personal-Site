@@ -1,5 +1,15 @@
+# Container logs contain client IPs and request details (personal data), so
+# they are rotated rather than kept forever: at most 3 files of 10 MB per
+# container. See docs/privacy/RETENTION_POLICY_DRAFT.md ("technical logs").
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
 services:
   backend:
+    logging: *default-logging
     # Existing auxiliary Python services for the public website.
     image: ghcr.io/amonemisa/personal-site-backend:${BACKEND_IMAGE_TAG:-latest}
     restart: unless-stopped
@@ -20,6 +30,7 @@ services:
       start_period: 20s
 
   frontend:
+    logging: *default-logging
     # Nuxt owns UI/SSR and same-origin BFF routes. Domain reads and all workers
     # live in whiteslove.me-backend-platform.
     image: ghcr.io/amonemisa/personal-site:${FRONTEND_IMAGE_TAG:-latest}
