@@ -13,6 +13,7 @@ import {
 } from "~/composables/flats/useMetroProximity";
 import FlatMap from "~/components/flats/FlatMap.client.vue";
 import FlatCard from "~/components/flats/FlatCard.vue";
+import FlatLineLegend from "~/components/flats/FlatLineLegend.vue";
 import SearchResultGrid from "~/components/search/SearchResultGrid.vue";
 import FlatGallery from "~/components/flats/FlatGallery.vue";
 import SearchDetailsModal from "~/components/search/SearchDetailsModal.vue";
@@ -1157,6 +1158,7 @@ onBeforeUnmount(() => { modalOpen.value = false; lightboxOpen.value = false; rel
         @photo-error="markPhotoFailedFromEvent"
       />
     </SearchResultGrid>
+    <FlatLineLegend v-if="displayedListings.length" />
 <div ref="loadMoreSentinel" v-if="hasMore" class="flats__sentinel"><span v-if="loadingMore" class="text-muted">{{ t("loadingMore") }}</span></div>
     <SearchEmptyState v-if="!loading && !displayedListings.length && !failed" :message="t('empty')"><div v-if="drawnArea.length >= 3 && listings.length" class="text-muted">{{ t("emptyArea") }}</div></SearchEmptyState>
 

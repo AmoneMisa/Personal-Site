@@ -4,6 +4,7 @@ import type { DraggablePillItem } from "~/components/ui/DraggablePills.vue";
 import { flatPriceTone, type FlatPriceTone } from "~/utils/flats/priceTone";
 import { flatSourceLabel } from "~/utils/flats/sourceLabel";
 import FlatContactActions from "~/components/flats/FlatContactActions.vue";
+import { listingLineOf, listingLineTitle } from "~/utils/flats/listingLine";
 
 const props = defineProps<{
   listing: FlatListing;
@@ -95,6 +96,9 @@ function showOnMap() {
   }));
 }
 
+const line = computed(() => listingLineOf(props.listing.listingLine));
+const lineTitle = computed(() => listingLineTitle(line.value, locale.value));
+
 const emit = defineEmits<{
   open: [];
   toggleFavorite: [];
@@ -104,7 +108,7 @@ const emit = defineEmits<{
 </script>
 
 <template>
-  <article class="flat-card" :class="{ 'flat-card_favorite': favorite, 'flat-card_hidden': hidden, 'flat-card_checking': checking, 'flat-card_warning': unsafeListing }" :aria-busy="checking" @click="emit('open')">
+  <article class="flat-card" :class="{ 'flat-card_favorite': favorite, 'flat-card_hidden': hidden, 'flat-card_checking': checking, 'flat-card_warning': unsafeListing, [`flat-card_line_${line}`]: Boolean(line) }" :title="lineTitle" :aria-busy="checking" @click="emit('open')">
     <div class="flat-card__photo">
       <img v-if="photo" :src="photo" :alt="presentation.title" loading="lazy" decoding="async" referrerpolicy="no-referrer" @error="emit('photoError', $event)">
       <div v-else class="flat-card__no-photo"><u-icon name="i-lucide-image-off" class="flat-card__no-photo-icon" aria-hidden="true" /><span>{{ noPhotoLabel }}</span></div>
@@ -165,7 +169,14 @@ const emit = defineEmits<{
 .flat-card__title { min-height: 19px; margin-top: 2px; font-size: 14px; font-weight: 650; line-height: 1.36; display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical; overflow: hidden; text-overflow: ellipsis; white-space: normal; overflow-wrap: anywhere; }.flat-card__spec { min-height: 16px; font-size: 12px; line-height: 1.35; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .flat-card__badges { min-height: 27px; margin-top: 5px; }.flat-card__badges :deep(.flat-card__badge) { border-radius: 999px; padding: 4px 7px; font-size: 10.5px; font-weight: 600; line-height: 1.15; background: rgba(255,255,255,0.05); color: var(--text-primary); }.flat-card__badges :deep(.flat-card__badge_vision) { border-color: rgba(56,189,248,.36); color: #8bdcf7; background: rgba(56,189,248,.08); }.flat-card__badges :deep(.flat-card__badge_warning) { border-color: rgba(242,184,107,.52); color: #f2b86b; background: rgba(242,184,107,.1); }
 .flat-card__meta { display: flex; align-items: center; justify-content: space-between; gap: 6px 10px; margin-top: auto; padding-top: 8px; font-size: 11.5px; line-height: 1.35; }.flat-card__location { min-width: 0; display: inline-flex; align-items: center; gap: 5px; flex: 1 1 auto; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }.flat-card__meta-tail { display: inline-flex; flex: 0 0 auto; gap: 5px; white-space: nowrap; margin-left: auto; }.flat-card__src { opacity: 0.72; }
-.flat-card_favorite { border-color: rgba(224,103,154,0.52); }.flat-card_hidden { opacity: 0.64; border-style: dashed; }
+.flat-card_favorite { border-color: rgba(224,103,154,0.52); }
+/* Coloured lines: the whole card outline only, never a divider under the photo.
+   Doubled class so hover and favourite do not repaint the line. */
+.flat-card.flat-card_line_steady { --flat-card-line: var(--flat-line-steady); }
+.flat-card.flat-card_line_check { --flat-card-line: var(--flat-line-check); }
+.flat-card.flat-card_line_phantom_risk { --flat-card-line: var(--flat-line-phantom); }
+.flat-card.flat-card_line_multi_listing { --flat-card-line: var(--flat-line-multi); }
+.flat-card[class*="flat-card_line_"], .flat-card[class*="flat-card_line_"]:hover { border: 1.5px solid var(--flat-card-line); box-shadow: 0 0 0 1px color-mix(in srgb, var(--flat-card-line) 22%, transparent), 0 0 18px color-mix(in srgb, var(--flat-card-line) 28%, transparent); }.flat-card_hidden { opacity: 0.64; border-style: dashed; }
 
 @include bp-down(md) {
   .flat-card { display: grid; grid-template-columns: minmax(112px, 42%) minmax(0, 1fr); height: 148px; min-height: 148px; }

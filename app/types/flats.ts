@@ -49,6 +49,8 @@ export interface FlatListing {
   id: string;
   // Built by the backend from the published contact; see utils/flats/contactActions.ts.
   contactActions?: import("~/utils/flats/contactActions").ContactAction[];
+  // Card line decided by the backend; see utils/flats/listingLine.ts.
+  listingLine?: string | null;
   publicId?: number | null;
   source: string;
   // Only set when source === "custom": the exact curated-site catalogue URL

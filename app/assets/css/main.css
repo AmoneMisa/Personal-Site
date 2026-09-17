@@ -138,6 +138,12 @@ h1, h2, h3, h4, h5, h6 {
     --accent-pink: #e0679a;
     --accent-blue: #7189d9;
     --line: #252a4a;
+    /* Flat card lines (utils/flats/listingLine.ts), shared by card and legend. */
+    --flat-line-steady: #4ade80;
+    --flat-line-check: #facc15;
+    --flat-line-phantom: #f43f5e;
+    --flat-line-multi: #a855f7;
+    --flat-line-none: #6b7091;
     --text-primary: #eef0f7;
     --text-soft: #c8ccdf;
     --text-muted: #9ea4c1;
