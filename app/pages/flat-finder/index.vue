@@ -16,6 +16,9 @@ import FlatCard from "~/components/flats/FlatCard.vue";
 import FlatLineLegend from "~/components/flats/FlatLineLegend.vue";
 import FlatModalTabs from "~/components/flats/FlatModalTabs.vue";
 import FlatContactListings from "~/components/flats/FlatContactListings.vue";
+import FlatOwnersGrid from "~/components/flats/FlatOwnersGrid.vue";
+import FlatOwnerBreadcrumbs from "~/components/flats/FlatOwnerBreadcrumbs.vue";
+import type { FlatOwner } from "~/utils/flats/owners";
 import SearchResultGrid from "~/components/search/SearchResultGrid.vue";
 import FlatGallery from "~/components/flats/FlatGallery.vue";
 import SearchDetailsModal from "~/components/search/SearchDetailsModal.vue";
@@ -83,6 +86,7 @@ useSeoMeta({
 const defaultCountry = ref("UA");
 const flatFilters = useFlatFilters({ locale: () => String(locale.value) });
 const {
+  owner,
   countries, city, region, district, microdistrict, quartal, mapArea, dealType, agency, petFriendly, roomOnlyFilter,
   onlyWithPhotos, childrenRequired, newBuildingOnly, dishwasherOnly, airConditionerOnly,
   parkingOnly, internetOnly, gasOnly, balconyOnly, terraceOnly, privateYardOnly,
@@ -150,6 +154,8 @@ const {
 });
 const viewTabs = computed(() => [
   { value: "active", label: t("allListings") },
+  // Owner collections: advertisers with two or more properties.
+  { value: "owners", label: t("ownersTab") },
   { value: "favorites", label: t("favorites"), count: favorites.value.length },
   { value: "recent", label: t("recent"), count: recent.value.length },
   { value: "hidden", label: t("hidden"), count: hidden.value.length },
@@ -468,6 +474,7 @@ const displayedListings = computed(() => {
   if (view.value === "favorites") return narrowToArea(favorites.value);
   if (view.value === "recent") return narrowToArea(recent.value);
   if (view.value === "hidden") return narrowToArea(hidden.value);
+  if (view.value === "owners") return [];
   return activeListings.value;
 });
 const hasMore = computed(() => view.value === "active" && listings.value.length < total.value);
@@ -595,6 +602,18 @@ function resetFilters() {
   scheduleLoad();
 }
 function setView(next: string) { view.value = next as FlatView; }
+// Owners: the country the tab lists, and moving in and out of a collection.
+const ownersCountry = computed(() => countries.value[0] || defaultCountry.value);
+function openOwner(selected: FlatOwner) {
+  owner.value = selected.ownerKey;
+  view.value = "active";
+  scheduleLoad(0);
+}
+function leaveOwner(next: FlatView) {
+  owner.value = "";
+  view.value = next;
+  if (next === "active") scheduleLoad(0);
+}
 function mapCoordinateLooksSane(listing: Listing): boolean {
   if (listing.lat == null || listing.lng == null) return false;
   const lat = Number(listing.lat);
@@ -1138,6 +1157,7 @@ onBeforeUnmount(() => { modalOpen.value = false; lightboxOpen.value = false; rel
     <p v-if="failed" class="flats__error">{{ t("error") }}</p>
     <p v-else-if="source === 'telegram' && !loading && !listings.length && sourceErrors?.some((item) => item.source === 'telegram')" class="flats__source-warning">{{ t("telegramUnavailable") }}</p>
     <div v-else class="flats__results-toolbar">
+      <FlatOwnerBreadcrumbs v-if="owner && view === 'active'" :owner-key="owner" @all="leaveOwner('active')" @owners="leaveOwner('owners')" />
       <p class="flats__count text-muted">{{ t("found", { n: view === 'active' ? total : displayedListings.length }) }}</p>
       <UiSortSelect class="flats__sort" v-model="sort" :items="sortItems" :label="extraLabels.sort" @update:model-value="scheduleLoad(0)" />
     </div>
@@ -1166,7 +1186,8 @@ onBeforeUnmount(() => { modalOpen.value = false; lightboxOpen.value = false; rel
     </SearchResultGrid>
     <FlatLineLegend v-if="displayedListings.length" />
 <div ref="loadMoreSentinel" v-if="hasMore" class="flats__sentinel"><span v-if="loadingMore" class="text-muted">{{ t("loadingMore") }}</span></div>
-    <SearchEmptyState v-if="!loading && !displayedListings.length && !failed" :message="t('empty')"><div v-if="drawnArea.length >= 3 && listings.length" class="text-muted">{{ t("emptyArea") }}</div></SearchEmptyState>
+    <FlatOwnersGrid v-if="view === 'owners'" :country="ownersCountry" @select="openOwner" />
+    <SearchEmptyState v-if="view !== 'owners' && !loading && !displayedListings.length && !failed" :message="t('empty')"><div v-if="drawnArea.length >= 3 && listings.length" class="text-muted">{{ t("emptyArea") }}</div></SearchEmptyState>
 
     </UiResultsLoader>
 

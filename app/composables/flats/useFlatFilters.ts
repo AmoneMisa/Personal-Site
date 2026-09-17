@@ -44,6 +44,8 @@ export function useFlatFilters(options: UseFlatFiltersOptions = {}) {
   // Listing-line toggles: only green listings, and hiding red ones.
   const trustedOnly = ref(false);
   const hideDanger = ref(false);
+  // Owner collection: one advertiser's listings, by opaque owner key.
+  const owner = ref("");
   const childrenRequired = ref(false);
   const newBuildingOnly = ref(false);
   const dishwasherOnly = ref(false);
@@ -262,6 +264,7 @@ export function useFlatFilters(options: UseFlatFiltersOptions = {}) {
     if (onlyWithPhotos.value) params.withPhotos = "1";
     if (trustedOnly.value) params.trustedOnly = "1";
     if (hideDanger.value) params.hideDanger = "1";
+    if (owner.value) params.owner = owner.value;
     if (!saleOnly && childrenRequired.value) params.children = "1";
     if (newBuildingOnly.value) params.newBuilding = "1";
     if (dishwasherOnly.value) params.dishwasher = "1";
@@ -313,6 +316,7 @@ export function useFlatFilters(options: UseFlatFiltersOptions = {}) {
     onlyWithPhotos.value = false;
     trustedOnly.value = false;
     hideDanger.value = false;
+    owner.value = "";
     childrenRequired.value = false;
     newBuildingOnly.value = false;
     dishwasherOnly.value = false;
@@ -368,7 +372,7 @@ export function useFlatFilters(options: UseFlatFiltersOptions = {}) {
 
   return {
     countries, city, region, district, microdistrict, quartal, mapArea, propertyType, dealType, agency,
-    petFriendly, roomOnlyFilter, onlyWithPhotos, trustedOnly, hideDanger, childrenRequired, newBuildingOnly,
+    petFriendly, roomOnlyFilter, onlyWithPhotos, trustedOnly, hideDanger, owner, childrenRequired, newBuildingOnly,
     dishwasherOnly, airConditionerOnly, parkingOnly, internetOnly, gasOnly, balconyOnly,
     terraceOnly, privateYardOnly, noElevatorOnly, noDepositOnly, communalIncludedOnly, noCommissionOnly,
     tvOnly, microwaveOnly, ovenOnly, bidetOnly, walkInClosetOnly, bathtubOnly, showerOnly, euroLayoutOnly,

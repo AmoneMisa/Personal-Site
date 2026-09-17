@@ -280,5 +280,5 @@ export interface FlatCardPresentation {
   dateLabel: string;
 }
 
-export type FlatView = "active" | "favorites" | "recent" | "hidden";
+export type FlatView = "active" | "owners" | "favorites" | "recent" | "hidden";
 export type FlatSort = "newest" | "oldest" | "priceAsc" | "priceDesc" | "titleAsc" | "titleDesc";
