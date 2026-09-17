@@ -3,6 +3,7 @@ import type { FlatCardPresentation, FlatListing } from "~/types/flats";
 import type { DraggablePillItem } from "~/components/ui/DraggablePills.vue";
 import { flatPriceTone, type FlatPriceTone } from "~/utils/flats/priceTone";
 import { flatSourceLabel } from "~/utils/flats/sourceLabel";
+import FlatContactActions from "~/components/flats/FlatContactActions.vue";
 
 const props = defineProps<{
   listing: FlatListing;
@@ -127,6 +128,7 @@ const emit = defineEmits<{
         <span v-if="presentation.location" class="flat-card__location"><u-icon name="i-lucide-map-pin" />{{ presentation.location }}</span>
         <span class="flat-card__meta-tail"><span class="flat-card__src">{{ sourceLabel }}</span><span v-if="presentation.dateLabel">· {{ presentation.dateLabel }}</span></span>
       </div>
+      <flat-contact-actions :actions="listing.contactActions" />
     </div>
     <div v-if="checking" class="flat-card__checking" role="status" aria-live="polite"><u-icon name="i-lucide-loader-circle" class="flat-card__checking-icon" /><span>{{ checkingLabel }}</span></div>
   </article>
