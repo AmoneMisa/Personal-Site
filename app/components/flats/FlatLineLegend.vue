@@ -39,7 +39,7 @@ const label = computed(() => (String(locale.value).startsWith("en") ? "Card line
   margin: 0;
   padding: 0;
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 10px 14px;
 }
 .flat-line-legend__item {
@@ -56,13 +56,12 @@ const label = computed(() => (String(locale.value).startsWith("en") ? "Card line
   margin-bottom: 4px;
 }
 .flat-line-legend__swatch_steady { background: var(--flat-line-steady); }
-.flat-line-legend__swatch_check { background: var(--flat-line-check); }
 .flat-line-legend__swatch_phantom_risk { background: var(--flat-line-phantom); }
 .flat-line-legend__swatch_multi_listing { background: var(--flat-line-multi); }
 .flat-line-legend__swatch_none { background: var(--flat-line-none); }
 .flat-line-legend__title,
 .flat-line-legend__hint {
-  /* Five columns on a phone are ~57px wide; long Russian words must wrap. */
+  /* Four columns on a phone are ~75px wide; long Russian words must wrap. */
   hyphens: auto;
   overflow-wrap: anywhere;
 }

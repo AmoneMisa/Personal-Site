@@ -7,7 +7,8 @@
  * automatic, and nobody reviews them.
  */
 
-export const LISTING_LINES = ['steady', 'check', 'phantom_risk', 'multi_listing'] as const
+// No yellow line: the operator removed it as unnecessary.
+export const LISTING_LINES = ['steady', 'phantom_risk', 'multi_listing'] as const
 export type ListingLine = typeof LISTING_LINES[number]
 
 export function listingLineOf(value: unknown): ListingLine | null {
@@ -19,14 +20,12 @@ export type ListingLineLegendItem = { line: ListingLine | 'none'; title: string;
 const LEGEND: Record<'ru' | 'en', ListingLineLegendItem[]> = {
   ru: [
     { line: 'steady', title: 'Устойчивый рекламодатель', hint: 'Долгая история без расхождений' },
-    { line: 'check', title: 'Нужна проверка', hint: 'Есть расхождения' },
     { line: 'phantom_risk', title: 'Похоже на фантом', hint: 'Будьте осторожны' },
     { line: 'multi_listing', title: 'У контакта есть', hint: 'ещё объявления' },
     { line: 'none', title: 'Обычные', hint: 'без метки' },
   ],
   en: [
     { line: 'steady', title: 'Steady advertiser', hint: 'Long history, no inconsistencies' },
-    { line: 'check', title: 'Worth checking', hint: 'Some inconsistencies' },
     { line: 'phantom_risk', title: 'Looks like a phantom', hint: 'Be careful' },
     { line: 'multi_listing', title: 'Contact has', hint: 'other listings' },
     { line: 'none', title: 'Regular', hint: 'no line' },

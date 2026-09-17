@@ -173,7 +173,6 @@ const emit = defineEmits<{
 /* Coloured lines: the whole card outline only, never a divider under the photo.
    Doubled class so hover and favourite do not repaint the line. */
 .flat-card.flat-card_line_steady { --flat-card-line: var(--flat-line-steady); }
-.flat-card.flat-card_line_check { --flat-card-line: var(--flat-line-check); }
 .flat-card.flat-card_line_phantom_risk { --flat-card-line: var(--flat-line-phantom); }
 .flat-card.flat-card_line_multi_listing { --flat-card-line: var(--flat-line-multi); }
 .flat-card[class*="flat-card_line_"], .flat-card[class*="flat-card_line_"]:hover { border: 1.5px solid var(--flat-card-line); box-shadow: 0 0 0 1px color-mix(in srgb, var(--flat-card-line) 22%, transparent), 0 0 18px color-mix(in srgb, var(--flat-card-line) 28%, transparent); }.flat-card_hidden { opacity: 0.64; border-style: dashed; }

@@ -6,15 +6,16 @@ import { LISTING_LINES, listingLineOf, listingLineLegend, listingLineTitle } fro
 
 const read = (path) => readFile(new URL(`../${path}`, import.meta.url), 'utf8')
 
-test('only the four backend lines are accepted', () => {
-  assert.deepEqual([...LISTING_LINES], ['steady', 'check', 'phantom_risk', 'multi_listing'])
+test('only the three backend lines are accepted, with no yellow', () => {
+  assert.deepEqual([...LISTING_LINES], ['steady', 'phantom_risk', 'multi_listing'])
+  assert.equal(listingLineOf('check'), null)
   for (const line of LISTING_LINES) assert.equal(listingLineOf(line), line)
   for (const value of [null, undefined, '', 'fraud', 'red', '<script>', 42]) assert.equal(listingLineOf(value), null)
 })
 
-test('the legend has the five entries in design order, in both languages', () => {
+test('the legend has four entries in design order, in both languages', () => {
   for (const locale of ['ru', 'en']) {
-    assert.deepEqual(listingLineLegend(locale).map((item) => item.line), ['steady', 'check', 'phantom_risk', 'multi_listing', 'none'])
+    assert.deepEqual(listingLineLegend(locale).map((item) => item.line), ['steady', 'phantom_risk', 'multi_listing', 'none'])
   }
 })
 
@@ -40,5 +41,5 @@ test('the legend is shown with the results and colours come from shared tokens',
   const page = await read('app/pages/flat-finder/index.vue')
   const css = await read('app/assets/css/main.css')
   assert.match(page, /<FlatLineLegend v-if="displayedListings\.length" \/>/u)
-  for (const token of ['--flat-line-steady', '--flat-line-check', '--flat-line-phantom', '--flat-line-multi', '--flat-line-none']) assert.match(css, new RegExp(token, 'u'))
+  for (const token of ['--flat-line-steady', '--flat-line-phantom', '--flat-line-multi', '--flat-line-none']) assert.match(css, new RegExp(token, 'u'))
 })
