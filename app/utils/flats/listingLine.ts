@@ -36,10 +36,18 @@ export function listingLineLegend(locale: unknown): ListingLineLegendItem[] {
   return String(locale).startsWith('en') ? LEGEND.en : LEGEND.ru
 }
 
+/**
+ * The legend entry for one line. The legend is no longer a panel on the page;
+ * a card explains its own line on hover, so the lookup is per-card now.
+ */
+export function listingLineEntry(line: ListingLine | null, locale: unknown): ListingLineLegendItem | undefined {
+  if (!line) return undefined
+  return listingLineLegend(locale).find((entry) => entry.line === line)
+}
+
 /** Tooltip for a card's line, reusing the legend text. */
 export function listingLineTitle(line: ListingLine | null, locale: unknown): string | undefined {
-  if (!line) return undefined
-  const item = listingLineLegend(locale).find((entry) => entry.line === line)
+  const item = listingLineEntry(line, locale)
   if (!item) return undefined
   // The purple legend entry is one sentence split over two lines.
   return line === 'multi_listing' ? `${item.title} ${item.hint}` : `${item.title} — ${item.hint}`

@@ -139,9 +139,11 @@ const emit = defineEmits<{
 const route = useRoute();
 const router = useRouter();
 const CLUSTER_PX = 38;
-const ZOOM_CLUSTER_THRESHOLD = 1;
-const CLUSTER_ZOOM_MAX = 19;
 const RADIAL_PAGE_SIZE = 9;
+// A cluster that already fits one radial page fans out on the first click.
+// Only genuinely crowded clusters are worth a zoom step first.
+const ZOOM_CLUSTER_THRESHOLD = RADIAL_PAGE_SIZE;
+const CLUSTER_ZOOM_MAX = 19;
 const FOCUS_ZOOM = 18;
 const DEFAULT_METRO_RADIUS_M = 500;
 const METRO_MARKER_HIT_RADIUS = 16;
@@ -819,9 +821,19 @@ function openCluster(c: Cluster) {
   if (c.items.length === 1) { openPoint(c.items[0]!); return; }
   const bounds = L.latLngBounds(c.items.map((p) => [p.lat, p.lng]) as [number, number][]);
   const hasRealSpread = !bounds.getNorthEast().equals(bounds.getSouthWest());
-  if (c.items.length > ZOOM_CLUSTER_THRESHOLD && hasRealSpread && map.getZoom() < CLUSTER_ZOOM_MAX) {
-    map.fitBounds(bounds, { padding: [40, 40], maxZoom: CLUSTER_ZOOM_MAX });
-    return;
+  // Zoom in first only when that actually pulls the cluster apart. Asking
+  // Leaflet what zoom these bounds would land on catches the cases where a
+  // zoom step is a no-op -- points inside one building, or a map already at
+  // its max zoom -- which otherwise left a big cluster swallowing every click
+  // without ever opening the radial menu.
+  if (c.items.length > ZOOM_CLUSTER_THRESHOLD && hasRealSpread) {
+    const padding = L.point(40, 40);
+    const current = map.getZoom();
+    const target = Math.min(map.getBoundsZoom(bounds, false, padding), CLUSTER_ZOOM_MAX);
+    if (target >= current + 1) {
+      map.fitBounds(bounds, { padding: [40, 40], maxZoom: CLUSTER_ZOOM_MAX });
+      return;
+    }
   }
   const pt = map.latLngToContainerPoint([c.lat, c.lng]);
   const rect = el.value?.getBoundingClientRect();
@@ -1680,7 +1692,10 @@ function preserveUserCamera() {
 .flat-map__best-thumb { width: 64px; height: 50px; overflow: hidden; border-radius: 6px; background: rgba(255,255,255,.05); }.flat-map__best-thumb img { width: 100%; height: 100%; object-fit: cover; }
 .flat-map__best-copy { display: grid; min-width: 0; gap: 2px; }.flat-map__best-copy b { font-size: 13px; }.flat-map__best-copy small { overflow: hidden; color: var(--text-muted); font-size: 10px; white-space: nowrap; text-overflow: ellipsis; }.flat-map__best-copy em { font-style: normal; font-size: 10px; font-weight: 700; }
 
-.flat-radial { position: fixed; inset: 0; z-index: 1500; }.flat-radial__anchor { position: absolute; width: 0; height: 0; }
+/* Teleported to body, so it must clear the full-screen map shell (4500) that
+   is teleported there too -- at 1500 the menu opened behind an expanded map.
+   Still below the site's dialog layer (5000). */
+.flat-radial { position: fixed; inset: 0; z-index: 4700; }.flat-radial__anchor { position: absolute; width: 0; height: 0; }
 .flat-radial__hub { position: absolute; top: 50%; left: 50%; z-index: 3; transform: translate(-50%,-50%); display: grid; grid-template-columns: 19px 26px 19px; align-items: center; justify-content: center; width: 64px; height: 64px; border-radius: 50%; overflow: hidden; background: var(--accent-pink,#e0679a); color: #fff; border: 2px solid #fff; box-shadow: 0 3px 12px rgba(0,0,0,.5); }
 .flat-radial__hub-arrow { display: grid; place-items: center; align-self: stretch; width: 100%; padding: 0; border: 0; background: transparent; color: #fff; cursor: pointer; font-size: 27px; line-height: 1; }.flat-radial__hub-arrow:disabled { opacity: .35; cursor: default; }.flat-radial__hub-count { text-align: center; font-size: 10px; font-weight: 800; line-height: 1; pointer-events: none; }
 .flat-radial__slot { position: absolute; top: 0; left: 0; z-index: 1; animation: flat-radial-in .24s cubic-bezier(.34,1.56,.64,1) backwards; }@keyframes flat-radial-in { from { opacity: 0; transform: translate(-50%,-50%) scale(.3); } }

@@ -4,7 +4,7 @@ import type { DraggablePillItem } from "~/components/ui/DraggablePills.vue";
 import { flatPriceTone, type FlatPriceTone } from "~/utils/flats/priceTone";
 import { flatSourceLabel } from "~/utils/flats/sourceLabel";
 import FlatContactActions from "~/components/flats/FlatContactActions.vue";
-import { listingLineOf, listingLineTitle } from "~/utils/flats/listingLine";
+import { listingLineEntry, listingLineOf, listingLineTitle } from "~/utils/flats/listingLine";
 
 const props = defineProps<{
   listing: FlatListing;
@@ -98,6 +98,9 @@ function showOnMap() {
 
 const line = computed(() => listingLineOf(props.listing.listingLine));
 const lineTitle = computed(() => listingLineTitle(line.value, locale.value));
+// The standing legend panel was removed from the page; a card that carries a
+// coloured line explains it itself, on hover or keyboard focus.
+const lineEntry = computed(() => listingLineEntry(line.value, locale.value));
 
 const emit = defineEmits<{
   open: [];
@@ -114,6 +117,10 @@ const emit = defineEmits<{
       <div v-else class="flat-card__no-photo"><u-icon name="i-lucide-image-off" class="flat-card__no-photo-icon" aria-hidden="true" /><span>{{ noPhotoLabel }}</span></div>
       <span v-if="presentation.dealLabel" class="flat-card__deal" :class="`flat-card__deal_${presentation.dealTone}`">{{ presentation.dealLabel }}</span>
       <span v-if="presentation.goodPrice" class="flat-card__good-price" :title="goodPriceTitle"><u-icon name="i-lucide-trending-down" />{{ goodPriceLabel }}</span>
+      <div v-if="lineEntry" class="flat-card__line-note" aria-hidden="true">
+        <span class="flat-card__line-swatch" />
+        <span class="flat-card__line-text"><b>{{ lineEntry.title }}</b> {{ lineEntry.hint }}</span>
+      </div>
       <div class="flat-card__actions">
         <button v-if="canShowOnMap" type="button" class="flat-card__action" :aria-label="showOnMapLabel" :title="showOnMapLabel" @click.stop="showOnMap"><u-icon name="i-lucide-map-pinned" /></button>
         <button type="button" class="flat-card__action" :class="{ 'flat-card__action_active': favorite }" :aria-label="favoriteLabel" @click.stop="emit('toggleFavorite')"><u-icon name="i-lucide-heart" /></button>
@@ -176,6 +183,31 @@ const emit = defineEmits<{
 .flat-card.flat-card_line_phantom_risk { --flat-card-line: var(--flat-line-phantom); }
 .flat-card.flat-card_line_multi_listing { --flat-card-line: var(--flat-line-multi); }
 .flat-card[class*="flat-card_line_"], .flat-card[class*="flat-card_line_"]:hover { border: 1.5px solid var(--flat-card-line); box-shadow: 0 0 0 1px color-mix(in srgb, var(--flat-card-line) 22%, transparent), 0 0 18px color-mix(in srgb, var(--flat-card-line) 28%, transparent); }.flat-card_hidden { opacity: 0.64; border-style: dashed; }
+
+/* What the coloured line means. This replaces the standing legend panel, so it
+   lives on the card. It sits over the PHOTO, never over the body: the body ends
+   in the contact links, and covering those on hover would hide them exactly
+   when someone reaches for them. Hover-capable pointers only -- on touch there
+   is no hover, and the card's title attribute still carries the same text. */
+@media (hover: hover) {
+  .flat-card__line-note {
+    position: absolute; z-index: 4; left: 0; right: 0; bottom: 0;
+    display: flex; align-items: center; gap: 7px;
+    padding: 7px 10px;
+    background: rgba(7, 12, 34, .95);
+    border-top: 1px solid color-mix(in srgb, var(--flat-card-line, var(--line)) 45%, transparent);
+    color: var(--text-primary); font-size: 11px; line-height: 1.3;
+    pointer-events: none;
+    opacity: 0; transform: translateY(100%);
+    transition: opacity 140ms ease, transform 160ms ease;
+  }
+  .flat-card:hover .flat-card__line-note,
+  .flat-card:focus-within .flat-card__line-note { opacity: 1; transform: translateY(0); }
+  .flat-card__line-swatch { flex: 0 0 auto; width: 20px; height: 3px; border-radius: 3px; background: var(--flat-card-line, var(--line)); }
+  .flat-card__line-text { min-width: 0; overflow-wrap: anywhere; }
+  .flat-card__line-text b { font-weight: 700; }
+  @media (prefers-reduced-motion: reduce) { .flat-card__line-note { transition: none; } }
+}
 
 @include bp-down(md) {
   .flat-card { display: grid; grid-template-columns: minmax(112px, 42%) minmax(0, 1fr); height: 148px; min-height: 148px; }

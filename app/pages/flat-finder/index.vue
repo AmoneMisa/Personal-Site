@@ -13,7 +13,6 @@ import {
 } from "~/composables/flats/useMetroProximity";
 import FlatMap from "~/components/flats/FlatMap.client.vue";
 import FlatCard from "~/components/flats/FlatCard.vue";
-import FlatLineLegend from "~/components/flats/FlatLineLegend.vue";
 import FlatModalTabs from "~/components/flats/FlatModalTabs.vue";
 import FlatContactListings from "~/components/flats/FlatContactListings.vue";
 import FlatOwnersGrid from "~/components/flats/FlatOwnersGrid.vue";
@@ -1184,7 +1183,6 @@ onBeforeUnmount(() => { modalOpen.value = false; lightboxOpen.value = false; rel
         @photo-error="markPhotoFailedFromEvent"
       />
     </SearchResultGrid>
-    <FlatLineLegend v-if="displayedListings.length" />
 <div ref="loadMoreSentinel" v-if="hasMore" class="flats__sentinel"><span v-if="loadingMore" class="text-muted">{{ t("loadingMore") }}</span></div>
     <FlatOwnersGrid v-if="view === 'owners'" :country="ownersCountry" @select="openOwner" />
     <SearchEmptyState v-if="view !== 'owners' && !loading && !displayedListings.length && !failed" :message="t('empty')"><div v-if="drawnArea.length >= 3 && listings.length" class="text-muted">{{ t("emptyArea") }}</div></SearchEmptyState>
@@ -1237,11 +1235,15 @@ onBeforeUnmount(() => { modalOpen.value = false; lightboxOpen.value = false; rel
 .flats__count { font-size: 13px; margin: 0; }
 .flats__results-toolbar { display: flex; align-items: end; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
 .flats__sort { width: min(310px, 100%); }
-.flats__map-wrap { position: relative; z-index: 0; isolation: isolate; margin-bottom: 18px; scroll-margin-top: 90px; }
-.flat-modal__verification { display: inline-flex; align-items: center; gap: 8px; align-self: flex-start; margin-top: -2px; padding: 6px 10px; border: 1px solid rgba(224,103,154,.36); border-radius: 999px; background: rgba(224,103,154,.1); color: var(--text-secondary); font-size: 13px; }
+.flats__map-wrap { position: relative; z-index: 0; isolation: isolate; margin: 18px 0; scroll-margin-top: 90px; }
+.flat-modal__verification { display: inline-flex; align-items: center; gap: 8px; align-self: flex-start; padding: 6px 10px; border: 1px solid rgba(224,103,154,.36); border-radius: 999px; background: rgba(224,103,154,.1); color: var(--text-secondary); font-size: 13px; }
 .flat-modal__verification-icon { width: 16px; height: 16px; color: var(--accent-pink); animation: flat-card-spin .8s linear infinite; }
 .flats__sentinel { min-height: 44px; display: grid; place-items: center; }
 .flat-modal { display: flex; flex-direction: column; gap: 12px; }
+/* The gap above only reaches .flat-modal's own children, and everything the
+   details tab shows -- gallery, verification pill, spec table, description,
+   tags -- sits one level deeper, so it stacked with no spacing at all. */
+.flat-modal__details { display: flex; flex-direction: column; gap: 12px; }
 .flat-modal__title { display: -webkit-box; overflow: hidden; margin: 0; padding-right: 36px; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow-wrap: anywhere; font-size: 18px; font-weight: 700; line-height: 1.35; }
 .flat-modal__price { min-width: 0; font-weight: 700; font-size: 20px; line-height: 1.25; } .flat-modal__price-conv { font-weight: 500; font-size: 14px; color: var(--text-muted); } .flat-modal__deal { color: #e0679a; font-weight: 500; }
 /* The modal body is a flex column with its own gap, so this table must not add
@@ -1250,7 +1252,7 @@ onBeforeUnmount(() => { modalOpen.value = false; lightboxOpen.value = false; rel
    instead of a fixed 44%, which removes the large empty stripe between label and
    value; on narrow screens it wraps and takes a share of the width instead. */
 /* No own margins on flex children: .flat-modal already spaces them with gap. */
-.flat-modal__translation { display: flex; align-items: center; gap: 10px; margin-top: 14px; } .flat-modal__translation-error { color: #f29ab6; font-size: 12px; }
+.flat-modal__translation { display: flex; align-items: center; gap: 10px; } .flat-modal__translation-error { color: #f29ab6; font-size: 12px; }
 .flat-modal__translated { margin-top: 0; padding: 12px; border: 1px solid var(--line, #252a4a); border-radius: var(--radius, 10px); background: var(--bg-panel-2, #171c3a); } .flat-modal__translated-title { margin: 0 0 8px; color: var(--text-primary, #e4e5f0); font-size: 13px; font-weight: 600; }
 .flat-modal__descbox { margin-top: 0; } .flat-modal__descbox summary { cursor: pointer; font-size: 12px; font-weight: 600; opacity: 0.7; user-select: none; } .flat-modal__desc { font-size: 13.5px; line-height: 1.55; white-space: pre-wrap; color: var(--text-soft, inherit); margin-top: 8px; }
 .flat-modal__tags { display: flex; flex-wrap: wrap; gap: 6px; } .flat-modal__tag { font-size: 11px; padding: 2px 8px; border-radius: 6px; border: 1px solid var(--line); color: var(--ui-text-muted); }
