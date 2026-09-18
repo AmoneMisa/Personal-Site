@@ -37,9 +37,22 @@ test('the line is the card outline only, not a divider under the photo', async (
   assert.doesNotMatch(card, /flat-card__photo[^{]*\{[^}]*border-bottom/u)
 })
 
-test('the legend is shown with the results and colours come from shared tokens', async () => {
+test('the legend is not a panel on the page any more', async () => {
   const page = await read('app/pages/flat-finder/index.vue')
+  assert.doesNotMatch(page, /FlatLineLegend/u)
+  await assert.rejects(read('app/components/flats/FlatLineLegend.vue'))
+})
+
+test('a card explains its own line on hover, without covering the contact links', async () => {
+  const card = await read('app/components/flats/FlatCard.vue')
+  // The note belongs to the photo, not the body: the body ends in the contact
+  // links and a strip over them would hide them right when they are wanted.
+  assert.match(card, /flat-card__photo[\s\S]*flat-card__line-note[\s\S]*flat-card__body/u)
+  assert.match(card, /\.flat-card:hover \.flat-card__line-note/u)
+  assert.match(card, /@media \(hover: hover\)/u)
+})
+
+test('line colours come from shared tokens', async () => {
   const css = await read('app/assets/css/main.css')
-  assert.match(page, /<FlatLineLegend v-if="displayedListings\.length" \/>/u)
-  for (const token of ['--flat-line-steady', '--flat-line-phantom', '--flat-line-multi', '--flat-line-none']) assert.match(css, new RegExp(token, 'u'))
+  for (const token of ['--flat-line-steady', '--flat-line-phantom', '--flat-line-multi']) assert.match(css, new RegExp(token, 'u'))
 })
