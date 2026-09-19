@@ -274,25 +274,6 @@
     gap: 10px !important;
 }
 
-.converter .ui-pill-btn {
-    padding: 0 !important;
-    border: 0 !important;
-    border-radius: 8px !important;
-    background: transparent !important;
-    animation: none !important;
-}
-
-.converter .ui-pill-btn__inner {
-    min-height: var(--ui-control-h-lg) !important;
-    height: var(--ui-control-h-lg) !important;
-    padding: 0 12px !important;
-    border: 1px solid var(--line) !important;
-    border-radius: 8px !important;
-    background: var(--bg-panel-2) !important;
-    box-shadow: none !important;
-    backdrop-filter: none !important;
-}
-
 .converter .dropzone {
     border-radius: 10px !important;
     background: rgba(224, 103, 154, 0.05) !important;

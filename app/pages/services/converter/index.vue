@@ -4,7 +4,7 @@ import { useServiceSeo } from "~/composables/services/useServiceSeo";
 import {formatFileSize} from "~/utils/files";
 import {useConverterState} from "~/composables/converter/useConverterState";
 
-const {t} = useI18n();
+const {t, locale} = useI18n();
 
 useServiceSeo("converter");
 
@@ -31,15 +31,27 @@ const {
   modeCards,
   targetItems,
 } = useConverterState();
+
+// `accept` is the raw input attribute (".png,.jpg,..."); spaced for reading.
+const acceptLabel = computed(() => accept.value.split(",").join(", "));
+
+// "20 файлов" / "1 файл" instead of the old catch-all "файл(ов)".
+const FILE_FORMS = {one: "filesOne", few: "filesFew"} as Record<string, string>;
+function filesWord(n: number): string {
+  const category = new Intl.PluralRules(locale.value).select(n);
+  return t(`services.converter.dropzone.${FILE_FORMS[category] ?? "filesMany"}`);
+}
 </script>
 
 <template>
-  <u-page :ui="{ center: 'flex flex-col gap-[28px] lg:gap-[32px] xl:gap-[40px] py-12' }">
+  <u-page class="converter" :ui="{ center: 'flex flex-col gap-[28px] lg:gap-[32px] xl:gap-[40px] py-12' }">
+    <!-- `converter` is the root that assets/css/ui.css styles against (panel,
+         dropzone, tips); without it none of that applied. -->
     <service-page-header
         backdrop="reef"
         title="services.converter.hero.titleLine1"
-        headline="services.converter.headline"
-        description="services.emailEditor.subtitle"
+        headline="services.converter.subtitle"
+        description="services.converter.hero.description"
     />
     <u-page-body class="mt-4 pb-0 gap-16 flex flex-col justify-center">
       <u-container class="max-w-6xl mx-auto mb-0">
@@ -53,7 +65,7 @@ const {
               @click="mode = c.key"
           >
             <span class="mode-card__top">
-              <icon class="mode-card__icon" :name="c.icon"/>
+              <span class="mode-card__icon"><icon class="mode-card__glyph" :name="c.icon"/></span>
               <span class="mode-card__title">{{ c.title }}</span>
             </span>
             <span class="mode-card__desc">{{ c.desc }}</span>
@@ -89,18 +101,16 @@ const {
                   {{ t('services.converter.controls.targetFormat') }}
                 </span>
 
-                <div class="ui-pill-btn ui-pill-btn_animated">
-                  <div class="ui-pill-btn__inner w-fill-available">
-                    <u-select-menu
-                        v-model="target"
-                        :items="targetItems"
-                        value-key="value"
-                        label-key="label"
-                        class="format-select ui-locale"
-                        :ui="{ base: 'w-fill-available p-0 bg-transparent rounded-none ring-0 border-0' }"
-                    />
-                  </div>
-                </div>
+                <!-- The app's SelectMenu (components/U/SelectMenu.vue) is already a
+                     complete 44px field and ignores `ui`, so wrapping it in a
+                     pill drew a second field around it. -->
+                <u-select-menu
+                    v-model="target"
+                    :items="targetItems"
+                    value-key="value"
+                    label-key="label"
+                    class="format-select ui-locale"
+                />
               </div>
 
               <custom-button
@@ -136,11 +146,11 @@ const {
                 <div class="dropzone__meta">
                   <span>
                     {{ t('services.converter.dropzone.support') }}
-                    <b>{{ accept }}</b>
+                    <b>{{ acceptLabel }}</b>
                   </span>
                   <span>
                     {{ t('services.converter.dropzone.limit') }}
-                    <b>{{ maxFiles }}</b> {{ t('services.converter.dropzone.filesWord') }}
+                    <b>{{ maxFiles }}</b> {{ filesWord(maxFiles) }}
                   </span>
                 </div>
               </div>
@@ -268,6 +278,9 @@ const {
 
     .mode-card__icon {
       background: var(--color-primary-gradient);
+    }
+
+    .mode-card__glyph {
       color: #fff;
     }
   }
@@ -281,7 +294,12 @@ const {
   margin-bottom: 10px;
 }
 
+/* The box and the glyph are separate elements on purpose. Nuxt Icon draws a
+   glyph as a CSS mask filled with background-color: currentColor, so a box
+   background set on the icon element itself repainted the glyph: inactive
+   icons came out 14%-opacity pink on navy -- practically invisible. */
 .mode-card__icon {
+  flex: 0 0 auto;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -290,6 +308,12 @@ const {
   border-radius: 12px;
   background: rgba(224, 103, 154, 0.14);
   border: 1px solid var(--line);
+}
+
+.mode-card__glyph {
+  width: 22px;
+  height: 22px;
+  color: var(--accent-pink, #e0679a);
 }
 
 .mode-card__title {
@@ -352,30 +376,21 @@ const {
 }
 
 .format-select {
-  width: 200px;
+  width: 100%;
 }
 
-:deep(.format-select [data-slot="trigger"]) {
-  background: transparent !important;
-  border: none !important;
-  box-shadow: none !important;
-  padding: 0 !important;
-  min-height: unset !important;
-  height: 40px !important;
-  color: rgba(255, 255, 255, 0.9) !important;
-}
-
-:deep(.format-select [data-slot="content"]) {
-  /* keep your global .ui-locale styles; this is just a safety net */
-  border-radius: 8px;
-}
-
-.control__btn {
-  height: 48px;
+/* Same control metric as the format field beside it. From 640px the two share
+   a row, and UButton's default align-self:center floated the button above the
+   field's bottom edge, so it is pinned to the row's end instead. The extra
+   ancestor is for specificity: UButton's own scoped rule ties with a bare
+   `.control__btn`, and then load order decided -- against us. */
+.panel .panel__controls .control__btn {
+  height: var(--ui-control-h-lg, 44px);
   width: 100%;
 
   @media (min-width: 640px) {
     width: 180px;
+    align-self: flex-end;
   }
 }
 
@@ -429,9 +444,10 @@ const {
 
 }
 
+/* No margin: the template's own whitespace already separates the two halves,
+   and the extra 6px doubled the gap ("сюда  или"). */
 .dropzone__muted {
   font-weight: 600;
-  margin-left: 6px;
   color: var(--ui-text-muted);
 }
 
@@ -609,22 +625,5 @@ const {
   font-size: 18px;
   margin-top: 2px;
   color: rgba(224, 103, 154, 0.95);
-}
-
-:deep(.format-select [data-slot="trigger"]) {
-  background: transparent !important;
-  border: none !important;
-  box-shadow: none !important;
-  padding: 0 2px !important;
-  height: 40px !important;
-  min-height: 40px !important;
-}
-
-:deep(.format-select [data-slot="value"]) {
-  font-weight: 650;
-}
-
-:deep(.format-select [data-slot="trailing"]) {
-  opacity: .9;
 }
 </style>

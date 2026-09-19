@@ -1673,7 +1673,9 @@
       "description": "Upload a file, choose a format, and get the result. Images can be uploaded in batches of up to 20.",
       "dropzone": {
         "clear": "Clear",
-        "filesWord": "file(s)",
+        "filesOne": "file",
+        "filesFew": "files",
+        "filesMany": "files",
         "limit": "Limit:",
         "manual": "or choose manually",
         "orPick": "or select manually",
