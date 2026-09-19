@@ -679,8 +679,43 @@ function deactivateScroll() {
   map?.scrollWheelZoom?.disable();
 }
 function closeRadial() { radial.value = null; }
-function toggleMenu(kind: MenuKind) { menuOpen.value = menuOpen.value === kind ? null : kind; }
+// On phones the toolbar is a horizontal scroller (assets/css/flat-map-mobile.css),
+// and a scroller clips any absolutely positioned dropdown inside it. So there the
+// menu is position:fixed -- but fixed to the MAP, not the viewport: it is placed
+// from the toolbar's and map's live edges when it opens, and closed as soon as
+// the page scrolls. A viewport-pinned menu stayed at the top of the screen while
+// the page scrolled under it, floating over the filters with page content (the
+// stats title) painting through it.
+const menuAnchor = ref<Record<string, string>>({});
+function placeMenu() {
+  const shell = el.value?.closest(".flat-map-shell");
+  const tools = shell?.querySelector(".flat-map__tools");
+  if (!el.value || !tools) return;
+  const mapRect = el.value.getBoundingClientRect();
+  const top = tools.getBoundingClientRect().bottom + 6;
+  menuAnchor.value = {
+    "--flat-menu-top": `${Math.round(top)}px`,
+    "--flat-menu-left": `${Math.round(mapRect.left + 8)}px`,
+    "--flat-menu-right": `${Math.round(window.innerWidth - mapRect.right + 8)}px`,
+    "--flat-menu-max-height": `${Math.max(160, Math.round(mapRect.bottom - top - 8))}px`,
+  };
+}
+function toggleMenu(kind: MenuKind) {
+  menuOpen.value = menuOpen.value === kind ? null : kind;
+  if (menuOpen.value) placeMenu();
+}
 function closeMenus() { menuOpen.value = null; }
+// Both overlays are positioned from a one-off measurement, so any scroll or
+// resize invalidates them. Except while typing in a menu field (the radius
+// input): a phone keyboard opening scrolls or resizes the page, and closing the
+// menu then would yank the field away mid-edit.
+function onViewportChange() {
+  closeRadial();
+  // Only fields that raise a keyboard: a tapped checkbox keeps focus too, and
+  // exempting it would leave the menu floating after the page scrolls.
+  const typing = document.activeElement?.matches(".flat-map__menu input:not([type=checkbox]):not([type=radio]):not([type=range])");
+  if (!typing) closeMenus();
+}
 
 function changeRadialPage(direction: -1 | 1) {
   const current = radial.value;
@@ -1364,7 +1399,8 @@ function clearArea() { area.value = []; renderArea(); emit("area-change", []); }
 onMounted(async () => {
   language.value = document.documentElement.lang || navigator.language || "ru";
   window.addEventListener("keydown", onKeydown);
-  window.addEventListener("scroll", closeRadial, { passive: true });
+  window.addEventListener("scroll", onViewportChange, { passive: true });
+  window.addEventListener("resize", onViewportChange);
   window.addEventListener("flat-map-focus", onMapFocus as EventListener);
   document.addEventListener("click", closeMenus);
   void loadFullMapFeed();
@@ -1427,7 +1463,7 @@ onBeforeUnmount(() => {
   expandedSizeTimers = [];
   if (focusTimer) clearTimeout(focusTimer);
   focusTimer = undefined;
-  window.removeEventListener("keydown", onKeydown); window.removeEventListener("scroll", closeRadial); window.removeEventListener("flat-map-focus", onMapFocus as EventListener);
+  window.removeEventListener("keydown", onKeydown); window.removeEventListener("scroll", onViewportChange); window.removeEventListener("resize", onViewportChange); window.removeEventListener("flat-map-focus", onMapFocus as EventListener);
   document.removeEventListener("click", closeMenus); el.value?.removeEventListener("mouseleave", deactivateScroll); document.body.style.overflow = "";
   map?.remove?.(); map = null;
   layer = areaLayer = focusLayer = regionLayer = districtLayer = microdistrictLayer = quartalLayer = quarterLayer = metroLayer = universityLayer = shoppingMallLayer = parkLayer = schoolLayer = residentialLayer = airportLayer = railwayLayer = busStationLayer = parkingLayer = transportStopLayer = zoneAreaLayer = cityLayer = null;
@@ -1449,7 +1485,7 @@ function preserveUserCamera() {
           <button type="button" class="flat-map__tool" :class="{ 'flat-map__tool_active': menuOpen === 'territories' }" :aria-label="ui.territories" @click="toggleMenu('territories')">
             <u-icon name="i-lucide-layers-3" class="flat-map__tool-icon" /><span class="flat-map__tool-label">{{ ui.territories }}</span><u-icon name="i-lucide-chevron-down" class="flat-map__chevron" />
           </button>
-          <div v-if="menuOpen === 'territories'" class="flat-map__menu flat-map__menu_territories" @click.stop>
+          <div v-if="menuOpen === 'territories'" class="flat-map__menu flat-map__menu_territories" :style="menuAnchor" @click.stop>
             <strong class="flat-map__menu-title">{{ ui.territories }}</strong>
             <small class="flat-map__menu-section">{{ ui.administrative }}</small>
             <label class="flat-map__menu-row" :class="{ 'flat-map__menu-row_disabled': !regionZones.length }"><input v-model="showRegions" type="checkbox" :disabled="!regionZones.length" /><span>{{ ui.regions }}</span><small v-if="!regionZones.length">{{ ui.noData }}</small></label>
@@ -1467,7 +1503,7 @@ function preserveUserCamera() {
           <button type="button" class="flat-map__tool" :class="{ 'flat-map__tool_active': menuOpen === 'transport' || showMetro || showBus || showTram || showTrolleybus || showMinibus || showFunicular }" :aria-label="ui.transport" @click="toggleMenu('transport')">
             <u-icon name="i-lucide-train-front" class="flat-map__tool-icon" /><span class="flat-map__tool-label">{{ ui.transport }}</span><u-icon name="i-lucide-chevron-down" class="flat-map__chevron" />
           </button>
-          <div v-if="menuOpen === 'transport'" class="flat-map__menu flat-map__menu_transport" @click.stop>
+          <div v-if="menuOpen === 'transport'" class="flat-map__menu flat-map__menu_transport" :style="menuAnchor" @click.stop>
             <strong class="flat-map__menu-title">{{ ui.transport }}</strong>
             <div v-if="metroStations?.length" class="flat-map__filter-block">
               <label class="flat-map__menu-row"><input v-model="showMetro" type="checkbox" /><span class="flat-map__row-icon flat-map__row-icon_metro">M</span><span>{{ props.metroLabel || ui.metro }}</span></label>
@@ -1494,7 +1530,7 @@ function preserveUserCamera() {
           <button type="button" class="flat-map__tool" :class="{ 'flat-map__tool_active': menuOpen === 'poi' || showUniversities || showShoppingMalls || showParks || showSchools || showResidentialComplexes || showParkings || showAirports || showRailwayStations || showBusStations }" :aria-label="ui.poi" @click="toggleMenu('poi')">
             <u-icon name="i-lucide-map-pin" class="flat-map__tool-icon" /><span class="flat-map__tool-label">{{ ui.poi }}</span><u-icon name="i-lucide-chevron-down" class="flat-map__chevron" />
           </button>
-          <div v-if="menuOpen === 'poi'" class="flat-map__menu flat-map__menu_poi" @click.stop>
+          <div v-if="menuOpen === 'poi'" class="flat-map__menu flat-map__menu_poi" :style="menuAnchor" @click.stop>
             <strong class="flat-map__menu-title">{{ ui.poi }}</strong>
 
             <label class="flat-map__menu-row" :class="{ 'flat-map__menu-row_disabled': !residentialComplexZones.length }"><input v-model="showResidentialComplexes" type="checkbox" :disabled="!residentialComplexZones.length" /><u-icon name="i-lucide-building-2" class="flat-map__row-icon" /><span>{{ ui.residential }}</span><small v-if="!residentialComplexZones.length">{{ ui.noData }}</small></label>
@@ -1629,7 +1665,9 @@ function preserveUserCamera() {
 .flat-map__tool_close { width: 36px; padding: 0; color: #fff; }
 .flat-map__tool_close .flat-map__tool-label { display: none; }
 
-.flat-map__menu { position: absolute; top: 43px; left: 0; width: 286px; max-width: calc(100vw - 16px); max-height: min(70vh, 590px); overflow: auto; padding: 11px; border: 1px solid rgba(255,255,255,.12); border-radius: 10px; background: rgba(10,15,35,.97); box-shadow: 0 14px 34px rgba(0,0,0,.38); color: var(--text-primary); backdrop-filter: blur(14px); }
+/* Above the sibling tool buttons, which come later in the DOM and would
+   otherwise paint over an open menu. */
+.flat-map__menu { position: absolute; z-index: 2; top: 43px; left: 0; width: 286px; max-width: calc(100vw - 16px); max-height: min(70vh, 590px); overflow: auto; padding: 11px; border: 1px solid rgba(255,255,255,.12); border-radius: 10px; background: rgba(10,15,35,.97); box-shadow: 0 14px 34px rgba(0,0,0,.38); color: var(--text-primary); backdrop-filter: blur(14px); }
 .flat-map__menu_poi { width: 318px; }
 .flat-map__menu-title { display: block; padding: 4px 7px 8px; font-size: 13px; }
 .flat-map__menu-section { display: block; padding: 9px 7px 3px; color: var(--text-muted); font-size: 9px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
@@ -1715,13 +1753,18 @@ function preserveUserCamera() {
     margin-left: 0;
     opacity: 0;
   }
+  /* Fixed so the phone toolbar's horizontal scroller cannot clip it, but placed
+     from the map's live edges (placeMenu) and kept inside the map's height, so it
+     never spills over page content. See placeMenu for why it is not pinned to
+     the viewport any more. */
   .flat-map__menu {
     position: fixed;
-    top: max(52px, calc(env(safe-area-inset-top) + 44px));
-    left: 8px;
+    top: var(--flat-menu-top, max(52px, calc(env(safe-area-inset-top) + 44px)));
+    left: var(--flat-menu-left, 8px);
     right: auto;
     width: min(318px, calc(100vw - 16px));
     max-width: calc(100vw - 16px);
+    max-height: var(--flat-menu-max-height, min(68vh, calc(100dvh - 64px)));
   }
   .flat-map__scroll-hint { top: max(54px, calc(env(safe-area-inset-top) + 46px)); }
   .flat-map__district-card { top: max(58px, calc(env(safe-area-inset-top) + 50px)); }
@@ -1731,7 +1774,7 @@ function preserveUserCamera() {
   .flat-map-shell_full { padding: 0; }.flat-map-shell_full .flat-map { border: 0; border-radius: 0; }
   .flat-map__tools { top: max(8px, env(safe-area-inset-top)); left: 56px; right: 8px; gap: 4px; }
   .flat-map__tool { height: 34px; min-width: 34px; padding-inline: 8px; }
-  .flat-map__menu { top: max(52px, calc(env(safe-area-inset-top) + 44px)); left: 8px; right: 8px; width: auto; max-height: min(68vh, calc(100dvh - 64px)); }
+  .flat-map__menu { right: var(--flat-menu-right, 8px); width: auto; }
   .flat-map__scroll-hint { top: max(52px, calc(env(safe-area-inset-top) + 44px)); max-width: calc(100% - 24px); text-align: center; }
   .flat-map__price-legend { left: 8px; right: 8px; bottom: max(8px, env(safe-area-inset-bottom)); width: auto; max-height: 42vh; overflow: auto; }
   .flat-map__hint { left: 8px; right: 8px; width: auto; transform: none; text-align: center; }
