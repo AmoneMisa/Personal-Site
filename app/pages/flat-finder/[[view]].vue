@@ -70,10 +70,25 @@ const route = useRoute();
 const router = useRouter();
 const toast = useToast();
 
+// One page serves every personal tab, so an unknown segment is a 404 rather
+// than the default view sitting at a made-up URL. Literal list: definePageMeta
+// is hoisted and cannot read consts declared below.
+definePageMeta({
+  validate: (to) => {
+    const segment = to.params.view;
+    if (segment == null) return true;
+    const raw = Array.isArray(segment) ? segment[0] : segment;
+    return ["owners", "favorites", "recent", "hidden"].includes(String(raw));
+  },
+});
+
 useSeoMeta({
   title: () => t("seoTitle"),
   description: () => t("seoDescription"),
-  robots: () => "index, follow",
+  // Only the search itself is worth indexing. The personal tabs show whatever
+  // this browser saved, so they are thin and different for everyone. Read from
+  // the route, not `view`, which is declared further down.
+  robots: () => (route.params.view ? "noindex, follow" : "index, follow"),
   ogType: () => "website",
   ogTitle: () => t("seoTitle"),
   ogDescription: () => t("seoDescription"),
@@ -103,7 +118,43 @@ const {
   nextCursor, loadMoreSentinel, loadFeed, isFeedCached,
 } = useFlatFeed({ onAvailabilityChecked: markAvailabilityFresh });
 const { listingPhoto, visiblePhotos, markPhotoFailedFromEvent } = useFlatPhotos();
-const view = ref<FlatView>("active");
+// The personal tabs are routes, not local state: /flat-finder/favorites and the
+// rest are linkable, bookmarkable and survive a refresh or the back button.
+// "active" is the bare /flat-finder, so the default view keeps a clean URL.
+const VIEW_SEGMENTS: Record<Exclude<FlatView, "active">, string> = {
+  owners: "owners",
+  favorites: "favorites",
+  recent: "recent",
+  hidden: "hidden",
+};
+const SEGMENT_VIEWS = new Map<string, FlatView>(
+  Object.entries(VIEW_SEGMENTS).map(([key, segment]) => [segment, key as FlatView]),
+);
+function viewFromRoute(segment: unknown): FlatView {
+  const raw = Array.isArray(segment) ? segment[0] : segment;
+  return SEGMENT_VIEWS.get(String(raw ?? "")) ?? "active";
+}
+const localePath = useLocalePath();
+function viewPath(next: FlatView): string {
+  const segment = next === "active" ? "" : `/${VIEW_SEGMENTS[next]}`;
+  return localePath(`/flat-finder${segment}`);
+}
+const view = ref<FlatView>(viewFromRoute(route.params.view));
+/**
+ * Switch tab. The ref is set alongside the navigation rather than derived from
+ * it, because callers read `view` on the next line (openOwner loads straight
+ * after) and router.push only resolves a tick later.
+ */
+function goToView(next: FlatView) {
+  view.value = next;
+  const path = viewPath(next);
+  if (route.path !== path) void router.push({ path, query: route.query });
+}
+// Back/forward, or a pasted link, moves the tab.
+watch(() => route.params.view, (segment) => {
+  const next = viewFromRoute(segment);
+  if (next !== view.value) view.value = next;
+});
 const {
   favorites,
   hidden,
@@ -597,20 +648,20 @@ function resetFilters() {
   // Empty means "every country", so reset keeps the regional starting country.
   resetFilterValues(defaultCountry.value);
   drawnArea.value = [];
-  view.value = "active";
+  goToView("active");
   scheduleLoad();
 }
-function setView(next: string) { view.value = next as FlatView; }
+function setView(next: string) { goToView(next as FlatView); }
 // Owners: the country the tab lists, and moving in and out of a collection.
 const ownersCountry = computed(() => countries.value[0] || defaultCountry.value);
 function openOwner(selected: FlatOwner) {
   owner.value = selected.ownerKey;
-  view.value = "active";
+  goToView("active");
   scheduleLoad(0);
 }
 function leaveOwner(next: FlatView) {
   owner.value = "";
-  view.value = next;
+  goToView(next);
   if (next === "active") scheduleLoad(0);
 }
 function mapCoordinateLooksSane(listing: Listing): boolean {

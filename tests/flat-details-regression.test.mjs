@@ -7,7 +7,7 @@ const read = (path) => readFile(new URL(`../${path}`, import.meta.url), "utf8");
 test("flat details modal keeps public ID title and 960px width", async () => {
   const source = await read("app/components/search/SearchDetailsModal.vue");
   const modal = await read("app/components/U/Modal.vue");
-  const page = await read("app/pages/flat-finder/index.vue");
+  const page = await read("app/pages/flat-finder/[[view]].vue");
   assert.match(source, /#\{\{ displayPublicId \}\}/);
   assert.match(source, /activeFlatListing\.value\?\.publicId \?\? props\.publicId/);
   assert.match(source, /flatListing\?: FlatListing \| null/);
@@ -37,7 +37,7 @@ test("flat spec table does not parse listing description on the client", async (
 
 test("flat specs use three independent, logically grouped columns through 960px", async () => {
   const source = await read("app/components/ui/SpecTable.vue");
-  const page = await read("app/pages/flat-finder/index.vue");
+  const page = await read("app/pages/flat-finder/[[view]].vue");
   const fallback = await read("app/assets/css/flat-placeholder.css");
   assert.match(source, /grid-template-columns: repeat\(3, minmax\(0, 1fr\)\)/);
   assert.match(source, /align-items: start/);
@@ -91,7 +91,7 @@ test("full-screen photo zoom is click-driven", async () => {
 });
 
 test("flat price and empty-field toggle share the specification header row", async () => {
-  const page = await read("app/pages/flat-finder/index.vue");
+  const page = await read("app/pages/flat-finder/[[view]].vue");
   const specs = await read("app/components/ui/SpecTable.vue");
   assert.match(page, /<UiSpecTable[^>]*><template #header><div class="flat-modal__price">/);
   assert.match(specs, /class="spec-table__head"/);

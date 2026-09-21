@@ -17,7 +17,7 @@ test('hiring and flats share one UA/UZ regional default without selecting every 
   const helper = readFileSync(new URL('../app/utils/search/regionalCountry.ts', import.meta.url), 'utf8')
   const hiringMeta = readFileSync(new URL('../app/composables/hiring/useHiringMeta.ts', import.meta.url), 'utf8')
   const hiringPage = readFileSync(new URL('../app/pages/hiring/index.vue', import.meta.url), 'utf8')
-  const flatPage = readFileSync(new URL('../app/pages/flat-finder/index.vue', import.meta.url), 'utf8')
+  const flatPage = readFileSync(new URL('../app/pages/flat-finder/[[view]].vue', import.meta.url), 'utf8')
 
   assert.match(helper, /timeZone\.startsWith\("Asia\/"\) \? "UZ" : "UA"/u)
   assert.doesNotMatch(hiringMeta, /data\.map\(\(country\) => country\.code\)/u)

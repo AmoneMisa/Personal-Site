@@ -5,7 +5,7 @@ import test from 'node:test'
 const route = await readFile(new URL('../server/routes/flats-feed.get.ts', import.meta.url), 'utf8')
 const feedCache = await readFile(new URL('../server/flats/feedCache.ts', import.meta.url), 'utf8')
 const feedLookup = await readFile(new URL('../server/flats/feedLookup.ts', import.meta.url), 'utf8')
-const page = await readFile(new URL('../app/pages/flat-finder/index.vue', import.meta.url), 'utf8')
+const page = await readFile(new URL('../app/pages/flat-finder/[[view]].vue', import.meta.url), 'utf8')
 const routeState = await readFile(new URL('../app/composables/flats/useFlatRouteState.ts', import.meta.url), 'utf8')
 
 test('flats-feed resolves a clean ?publicId= link before the filtered search and delegates upstream IO', () => {

@@ -38,7 +38,7 @@ test('the line is the card outline only, not a divider under the photo', async (
 })
 
 test('the legend is not a panel on the page any more', async () => {
-  const page = await read('app/pages/flat-finder/index.vue')
+  const page = await read('app/pages/flat-finder/[[view]].vue')
   assert.doesNotMatch(page, /FlatLineLegend/u)
   await assert.rejects(read('app/components/flats/FlatLineLegend.vue'))
 })

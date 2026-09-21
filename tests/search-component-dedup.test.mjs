@@ -4,7 +4,7 @@ import { existsSync, readFileSync } from 'node:fs';
 
 const read = (path) => readFileSync(new URL('../' + path, import.meta.url), 'utf8');
 const pages = [
-  'app/pages/flat-finder/index.vue',
+  'app/pages/flat-finder/[[view]].vue',
   'app/pages/jobs/index.vue',
   'app/pages/hiring/index.vue',
 ];

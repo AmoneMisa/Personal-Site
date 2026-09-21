@@ -6,7 +6,7 @@ import { feedCacheKey } from '~/composables/flats/useFlatFeed.ts';
 
 const feed = await readFile(new URL('../app/composables/flats/useFlatFeed.ts', import.meta.url), 'utf8');
 const polling = await readFile(new URL('../app/composables/search/useFeedPolling.ts', import.meta.url), 'utf8');
-const page = await readFile(new URL('../app/pages/flat-finder/index.vue', import.meta.url), 'utf8');
+const page = await readFile(new URL('../app/pages/flat-finder/[[view]].vue', import.meta.url), 'utf8');
 
 test('the cache key does not depend on the order params were built in', () => {
   assert.equal(

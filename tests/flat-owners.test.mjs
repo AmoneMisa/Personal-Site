@@ -21,15 +21,17 @@ test('owner contacts are shown readably', () => {
 })
 
 test('the owners tab lists collections and opening one filters the feed', async () => {
-  const page = await read('app/pages/flat-finder/index.vue')
+  const page = await read('app/pages/flat-finder/[[view]].vue')
   assert.match(page, /\{ value: "owners", label: t\("ownersTab"\) \}/u)
   assert.match(page, /<FlatOwnersGrid v-if="view === 'owners'" :country="ownersCountry" @select="openOwner" \/>/u)
-  assert.match(page, /owner\.value = selected\.ownerKey;\s+view\.value = "active";\s+scheduleLoad\(0\);/u)
+  // Tabs are routes now, so switching goes through goToView (which navigates)
+  // rather than assigning the ref directly.
+  assert.match(page, /owner\.value = selected\.ownerKey;\s+goToView\("active"\);\s+scheduleLoad\(0\);/u)
   assert.match(page, /if \(view\.value === "owners"\) return \[\];/u, 'no listing cards under the owners tab')
 })
 
 test('an owner collection shows breadcrumbs back to all listings and to owners', async () => {
-  const page = await read('app/pages/flat-finder/index.vue')
+  const page = await read('app/pages/flat-finder/[[view]].vue')
   const crumbs = await read('app/components/flats/FlatOwnerBreadcrumbs.vue')
   assert.match(page, /<FlatOwnerBreadcrumbs v-if="owner && view === 'active'" :owner-key="owner" @all="leaveOwner\('active'\)" @owners="leaveOwner\('owners'\)" \/>/u)
   assert.match(crumbs, /aria-current="page"/u)
