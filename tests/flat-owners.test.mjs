@@ -27,7 +27,11 @@ test('the owners tab lists collections and opening one filters the feed', async 
   // Tabs are routes now, so switching goes through goToView (which navigates)
   // rather than assigning the ref directly.
   assert.match(page, /owner\.value = selected\.ownerKey;\s+goToView\("active"\);\s+scheduleLoad\(0\);/u)
-  assert.match(page, /if \(view\.value === "owners"\) return \[\];/u, 'no listing cards under the owners tab')
+  assert.match(
+    page,
+    /if \(view\.value === "owners" \|\| view\.value === "collections"\) return \[\];/u,
+    'no listing cards under the owners or collections tabs',
+  )
 })
 
 test('an owner collection shows breadcrumbs back to all listings and to owners', async () => {
