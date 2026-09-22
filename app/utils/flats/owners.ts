@@ -1,8 +1,10 @@
 /**
  * Owner collections: advertisers with two or more distinct active
- * properties, identified by an opaque owner key (never the phone number in
- * URLs). The backend builds them (whiteslove.me-backend-platform,
- * listingLineRepository.refreshListingOwners).
+ * properties, identified by an opaque owner key -- never the contact itself in
+ * URLs. The contact may be a phone number, an email or a Telegram nickname,
+ * and all three identify a person, which is why the key is a hash rather than
+ * something reversible. The backend builds them
+ * (whiteslove.me-backend-platform, listingLineRepository.refreshListingOwners).
  */
 
 export type FlatOwner = {
