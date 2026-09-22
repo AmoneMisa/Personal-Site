@@ -16,8 +16,6 @@ import FlatCard from "~/components/flats/FlatCard.vue";
 import FlatModalTabs from "~/components/flats/FlatModalTabs.vue";
 import FlatContactListings from "~/components/flats/FlatContactListings.vue";
 import FlatOwnersGrid from "~/components/flats/FlatOwnersGrid.vue";
-import FlatCollectionsGrid from "~/components/flats/FlatCollectionsGrid.vue";
-import FlatCollectionPicker from "~/components/flats/FlatCollectionPicker.vue";
 import FlatOwnerBreadcrumbs from "~/components/flats/FlatOwnerBreadcrumbs.vue";
 import type { FlatOwner } from "~/utils/flats/owners";
 import SearchResultGrid from "~/components/search/SearchResultGrid.vue";
@@ -47,7 +45,6 @@ import { useFlatMeta } from "~/composables/flats/useFlatMeta";
 import { useDistrictZones } from "~/composables/flats/useDistrictZones";
 import { useFlatAvailabilityCache } from "~/composables/flats/useFlatAvailabilityCache";
 import { useSavedCollections } from "~/composables/search/useSavedCollections";
-import { useFlatCollections } from "~/composables/flats/useFlatCollections";
 import { useInfiniteFeed } from "~/composables/search/useInfiniteFeed";
 import { useSearchScroll } from "~/composables/search/useSearchScroll";
 import { ANY_SELECT_VALUE, useNullableSelect } from "~/composables/search/useNullableSelect";
@@ -81,7 +78,7 @@ definePageMeta({
     const segment = to.params.view;
     if (segment == null) return true;
     const raw = Array.isArray(segment) ? segment[0] : segment;
-    return ["owners", "collections", "favorites", "recent", "hidden"].includes(String(raw));
+    return ["owners", "favorites", "recent", "hidden"].includes(String(raw));
   },
 });
 
@@ -126,7 +123,6 @@ const { listingPhoto, visiblePhotos, markPhotoFailedFromEvent } = useFlatPhotos(
 // "active" is the bare /flat-finder, so the default view keeps a clean URL.
 const VIEW_SEGMENTS: Record<Exclude<FlatView, "active">, string> = {
   owners: "owners",
-  collections: "collections",
   favorites: "favorites",
   recent: "recent",
   hidden: "hidden",
@@ -142,9 +138,6 @@ const localePath = useLocalePath();
 function viewPath(next: FlatView): string {
   const segment = next === "active" ? "" : `/${VIEW_SEGMENTS[next]}`;
   return localePath(`/flat-finder${segment}`);
-}
-function collectionPath(id: string): string {
-  return localePath(`/flat-finder/collections/${encodeURIComponent(id)}`);
 }
 const view = ref<FlatView>(viewFromRoute(route.params.view));
 /**
@@ -181,39 +174,6 @@ const {
   hiddenLimit: 200,
   recentLimit: 30,
 });
-// User-made collections. Browser-local for now, in the shape the app and the
-// backend already use, so this can sync later without a format change.
-const {
-  collections,
-  isFull: collectionsFull,
-  idsByListing: collectionIdsByListing,
-  load: loadCollections,
-  create: createCollection,
-  remove: removeCollection,
-  addItem: addToCollection,
-  removeItem: removeFromCollection,
-} = useFlatCollections();
-const collectionPickerFor = ref<Listing | null>(null);
-const newCollectionName = ref("");
-function untitledCollection() { return t("collectionUntitled"); }
-function openCollectionPicker(listing: Listing) {
-  newCollectionName.value = "";
-  collectionPickerFor.value = listing;
-}
-function toggleListingInCollection(collectionId: string, listing: Listing) {
-  if (collectionIdsByListing.value.get(listing.id)?.has(collectionId)) {
-    removeFromCollection(collectionId, listing.id);
-  } else {
-    addToCollection(collectionId, listing);
-  }
-}
-function createCollectionForPicker() {
-  const listing = collectionPickerFor.value;
-  const created = createCollection(newCollectionName.value, untitledCollection());
-  newCollectionName.value = "";
-  if (created && listing) addToCollection(created.id, listing);
-}
-
 const presetModalOpen = ref(false);
 const shareModalOpen = ref(false);
 const sharedLinkOpened = ref(false);
@@ -246,7 +206,6 @@ const viewTabs = computed(() => [
   { value: "active", label: t("allListings") },
   // Owner collections: advertisers with two or more properties.
   { value: "owners", label: t("ownersTab") },
-  { value: "collections", label: t("collectionsTab"), count: collections.value.length },
   { value: "favorites", label: t("favorites"), count: favorites.value.length },
   { value: "recent", label: t("recent"), count: recent.value.length },
   { value: "hidden", label: t("hidden"), count: hidden.value.length },
@@ -532,7 +491,6 @@ const flatAdvancedFilterBlocks = useFlatFilterBlocks({
 
 function loadPersonalState() {
   loadSavedCollections();
-  loadCollections();
   loadPresets();
   try { showAdvanced.value = localStorage.getItem("flats:showAdvanced") === "1"; } catch { /* noop */ }
 }
@@ -566,8 +524,7 @@ const displayedListings = computed(() => {
   if (view.value === "favorites") return narrowToArea(favorites.value);
   if (view.value === "recent") return narrowToArea(recent.value);
   if (view.value === "hidden") return narrowToArea(hidden.value);
-  // Both render their own grid below rather than the flat card list.
-  if (view.value === "owners" || view.value === "collections") return [];
+  if (view.value === "owners") return [];
   return activeListings.value;
 });
 const hasMore = computed(() => view.value === "active" && listings.value.length < total.value);
@@ -1279,20 +1236,6 @@ onBeforeUnmount(() => { modalOpen.value = false; lightboxOpen.value = false; rel
     </SearchResultGrid>
 <div ref="loadMoreSentinel" v-if="hasMore" class="flats__sentinel"><span v-if="loadingMore" class="text-muted">{{ t("loadingMore") }}</span></div>
     <FlatOwnersGrid v-if="view === 'owners'" :country="ownersCountry" @select="openOwner" />
-    <FlatCollectionsGrid
-      v-if="view === 'collections'"
-      :collections="collections"
-      :is-full="collectionsFull"
-      :empty-label="t('collectionsEmpty')"
-      :create-label="t('collectionCreate')"
-      :name-placeholder="t('collectionNamePlaceholder')"
-      :full-label="t('collectionsFull')"
-      :delete-label="t('collectionDelete')"
-      :count-label="(n) => t('collectionCount', { n })"
-      :href-for="(collection) => collectionPath(collection.id)"
-      @create="(name) => createCollection(name, untitledCollection())"
-      @remove="removeCollection"
-    />
     <SearchEmptyState v-if="view !== 'owners' && !loading && !displayedListings.length && !failed" :message="t('empty')"><div v-if="drawnArea.length >= 3 && listings.length" class="text-muted">{{ t("emptyArea") }}</div></SearchEmptyState>
 
     </UiResultsLoader>
@@ -1300,27 +1243,8 @@ onBeforeUnmount(() => { modalOpen.value = false; lightboxOpen.value = false; rel
     <SearchDetailsModal v-model:open="modalOpen" :title="modalTitle(active)" :flat-listing="active" :flat-location-label="labelFor" :flat-price-usd="activePriceUsd" :dismissible="!lightboxOpen">
       <template #title><h2 class="flat-modal__title">{{ modalTitle(active) }}</h2></template>
       <template #body><div v-if="active" class="flat-modal"><FlatModalTabs v-if="activeContactListingCount > 0" v-model="modalTab" :count="activeContactListingCount" /><FlatContactListings v-if="modalTab === 'contact' && activeContactListingCount > 0" :public-id="active.publicId" @open="openListing" /><div v-show="modalTab === 'details' || activeContactListingCount === 0" class="flat-modal__details"><FlatGallery v-model:lightbox-open="lightboxOpen" :photos="visiblePhotos(active)" :title="modalTitle(active)" :viewer-label="t('photoViewer')" :previous-label="t('previousPhoto')" :next-label="t('nextPhoto')" :close-label="t('closePhoto')" @photo-error="markPhotoFailedFromEvent" /><div v-if="checkingListingKey === listingKey(active)" class="flat-modal__verification" role="status" aria-live="polite"><u-icon name="i-lucide-loader-circle" class="flat-modal__verification-icon" /><span>{{ t("checkingListing") }}</span></div><UiSpecTable :rows="specRows" :hide-empty-label="t('hideEmpty')" :empty-value="t('notSpecified')"><template #header><div class="flat-modal__price">{{ priceLabel(active) }}<span v-if="convertedLabel(active)" class="flat-modal__price-conv"> ({{ convertedLabel(active) }})</span><span v-if="dealLabel(active.dealType)" class="flat-modal__deal"> · {{ dealLabel(active.dealType) }}</span><span v-if="active.roomOnly" class="flat-modal__deal"> · {{ t("roomShare") }}</span></div></template></UiSpecTable><div v-if="active.description && descriptionNeedsTranslation" class="flat-modal__translation"><u-button type="button" variant="outline" color="neutral" size="sm" icon="i-lucide-languages" :loading="translatingDescription" @click="translateActiveDescription">{{ translatingDescription ? t("translatingDescription") : t("translateDescription") }}</u-button><span v-if="translationFailed" class="flat-modal__translation-error">{{ t("translationFailed") }}</span></div><section v-if="translatedDescription" class="flat-modal__translated"><h4 class="flat-modal__translated-title">{{ t("translatedDescription") }}</h4><p class="flat-modal__desc">{{ translatedDescription }}</p></section><details v-if="active.description" class="flat-modal__descbox"><summary>{{ t("origDescription") }}</summary><p class="flat-modal__desc">{{ capitalizeFirst(active.description) }}</p></details><div v-if="active.tags && active.tags.length" class="flat-modal__tags"><span v-for="tag in active.tags" :key="tag" class="flat-modal__tag">{{ nearbyItemLabel(tag) }}</span></div></div></div></template>
-      <template #footer><UiModalFooter v-if="active"><u-button variant="outline" color="neutral" icon="i-lucide-heart" @click="toggleFavorite(active)">{{ isFavorite(active.id) ? t("removeFavorite") : t("addFavorite") }}</u-button><u-button variant="outline" color="neutral" :icon="isHidden(active.id) ? 'i-lucide-eye' : 'i-lucide-eye-off'" @click="toggleHidden(active)">{{ isHidden(active.id) ? t("restoreListing") : t("hideListing") }}</u-button><u-button variant="outline" color="neutral" icon="i-lucide-folder-plus" @click="openCollectionPicker(active)">{{ t("addToCollection") }}</u-button><u-button variant="outline" color="neutral" :icon="shareCopied ? 'i-lucide-check' : 'i-lucide-share-2'" @click="shareFlat(active)">{{ shareCopied ? t("shareCopied") : t("share") }}</u-button><a class="modal-footer__primary" :href="active.url" target="_blank" rel="noopener noreferrer">{{ t("open") }} →</a></UiModalFooter></template>
+      <template #footer><UiModalFooter v-if="active"><u-button variant="outline" color="neutral" icon="i-lucide-heart" @click="toggleFavorite(active)">{{ isFavorite(active.id) ? t("removeFavorite") : t("addFavorite") }}</u-button><u-button variant="outline" color="neutral" :icon="isHidden(active.id) ? 'i-lucide-eye' : 'i-lucide-eye-off'" @click="toggleHidden(active)">{{ isHidden(active.id) ? t("restoreListing") : t("hideListing") }}</u-button><u-button variant="outline" color="neutral" :icon="shareCopied ? 'i-lucide-check' : 'i-lucide-share-2'" @click="shareFlat(active)">{{ shareCopied ? t("shareCopied") : t("share") }}</u-button><a class="modal-footer__primary" :href="active.url" target="_blank" rel="noopener noreferrer">{{ t("open") }} →</a></UiModalFooter></template>
     </SearchDetailsModal>
-
-    <FlatCollectionPicker
-      v-if="collectionPickerFor"
-      :open="true"
-      v-model:name="newCollectionName"
-      :title="t('collectionPickerTitle')"
-      :collections="collections"
-      :selected-ids="collectionIdsByListing.get(collectionPickerFor.id) ?? new Set()"
-      :is-full="collectionsFull"
-      :full-label="t('collectionsFull')"
-      :empty-label="t('collectionsEmpty')"
-      :new-label="t('collectionPickerNew')"
-      :name-placeholder="t('collectionNamePlaceholder')"
-      :create-label="t('collectionCreate')"
-      :close-label="t('cancel')"
-      @update:open="(value) => { if (!value) collectionPickerFor = null; }"
-      @toggle="(id) => toggleListingInCollection(id, collectionPickerFor!)"
-      @create="createCollectionForPicker"
-    />
 
     <SearchPresetDialog v-model:open="presetModalOpen" v-model:name="presetName" :title="t('savePreset')" :name-label="t('presetName')" :cancel-label="t('cancel')" :save-label="t('save')" @save="savePreset" />
     <SearchShareDialog v-model:open="shareModalOpen" :title="sharedLinkOpened ? t('sharedSearchApplied') : t('shareSearch')" :hint="sharedLinkOpened ? t('sharedSearchHint') : t('shareSearchHint')" :url="shareUrl" :copy-label="t('copyLink')" @copy="copyShareLink" />
