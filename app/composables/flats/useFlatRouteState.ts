@@ -21,7 +21,7 @@ export function useFlatRouteState(options: {
     const q: Record<string, string> = {};
     const {
       countries, city, region, district, microdistrict, quartal, mapArea, metro, propertyType, dealType, agency, audience,
-      petFriendly, roomOnlyFilter, onlyWithPhotos, trustedOnly, hideDanger, owner, childrenRequired, newBuildingOnly,
+      petFriendly, roomOnlyFilter, onlyWithPhotos, trustedOnly, hideDanger, childrenRequired, newBuildingOnly,
       dishwasherOnly, airConditionerOnly, parkingOnly, internetOnly, gasOnly, balconyOnly,
       terraceOnly, privateYardOnly, noElevatorOnly, noDepositOnly, communalIncludedOnly, noCommissionOnly,
       tvOnly, microwaveOnly, ovenOnly, bidetOnly, walkInClosetOnly, bathtubOnly, showerOnly, euroLayoutOnly,
@@ -52,7 +52,10 @@ export function useFlatRouteState(options: {
     if (onlyWithPhotos.value) q.withPhotos = "1";
     if (trustedOnly.value) q.trustedOnly = "1";
     if (hideDanger.value) q.hideDanger = "1";
-    if (owner.value) q.owner = owner.value;
+    // `owner` is not a query param any more: an owner collection has its own
+    // page at /flat-finder/owners/<key>. Serialising it here too would give one
+    // collection two URLs and fight the router. Reading it back below stays,
+    // so old links keep working and get redirected to the path form.
     if (childrenRequired.value) q.children = "1";
     if (newBuildingOnly.value) q.newBuilding = "1";
     if (dishwasherOnly.value) q.dishwasher = "1";

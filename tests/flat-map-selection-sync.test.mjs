@@ -3,7 +3,7 @@ import { readFile } from "node:fs/promises";
 import test from "node:test";
 
 const mapSource = await readFile(new URL("../app/components/flats/FlatMap.client.vue", import.meta.url), "utf8");
-const pageSource = await readFile(new URL("../app/pages/flat-finder/[[view]].vue", import.meta.url), "utf8");
+const pageSource = await readFile(new URL("../app/pages/flat-finder/[...slug].vue", import.meta.url), "utf8");
 
 test("map selection is controlled by the same filter state as the selects", () => {
   assert.match(mapSource, /selectedMetros\?: string\[\]/);

@@ -15,7 +15,7 @@ test("Flat Finder web DTO keeps pedestrian routing metrics", async () => {
 });
 
 test("Flat Finder details prefer walking metro distance and retain straight-line fallback", async () => {
-  const page = await read("app/pages/flat-finder/[[view]].vue");
+  const page = await read("app/pages/flat-finder/[...slug].vue");
 
   assert.match(page, /const metroSpecValue = \(listing: Listing\) =>/);
   assert.match(page, /const distance = listing\.metroWalkingDistanceM/);

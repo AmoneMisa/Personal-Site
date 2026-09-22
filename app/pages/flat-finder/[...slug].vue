@@ -18,6 +18,7 @@ import FlatContactListings from "~/components/flats/FlatContactListings.vue";
 import FlatOwnersGrid from "~/components/flats/FlatOwnersGrid.vue";
 import FlatOwnerBreadcrumbs from "~/components/flats/FlatOwnerBreadcrumbs.vue";
 import type { FlatOwner } from "~/utils/flats/owners";
+import { isOwnerKey } from "~/utils/flats/owners";
 import SearchResultGrid from "~/components/search/SearchResultGrid.vue";
 import FlatGallery from "~/components/flats/FlatGallery.vue";
 import SearchDetailsModal from "~/components/search/SearchDetailsModal.vue";
@@ -75,10 +76,14 @@ const toast = useToast();
 // is hoisted and cannot read consts declared below.
 definePageMeta({
   validate: (to) => {
-    const segment = to.params.view;
-    if (segment == null) return true;
-    const raw = Array.isArray(segment) ? segment[0] : segment;
-    return ["owners", "favorites", "recent", "hidden"].includes(String(raw));
+    const raw = to.params.slug;
+    const segments = (Array.isArray(raw) ? raw : [raw]).filter(Boolean).map(String);
+    if (!segments.length) return true;
+    // Literal lists: definePageMeta is hoisted and cannot read consts below.
+    if (!["owners", "favorites", "recent", "hidden"].includes(segments[0]!)) return false;
+    if (segments.length === 1) return true;
+    // Only an owner collection goes a level deeper, and only with a real key.
+    return segments.length === 2 && segments[0] === "owners" && /^[0-9a-f]{24}$/.test(segments[1]!);
   },
 });
 
@@ -88,7 +93,11 @@ useSeoMeta({
   // Only the search itself is worth indexing. The personal tabs show whatever
   // this browser saved, so they are thin and different for everyone. Read from
   // the route, not `view`, which is declared further down.
-  robots: () => (route.params.view ? "noindex, follow" : "index, follow"),
+  robots: () => {
+    const raw = route.params.slug;
+    const depth = Array.isArray(raw) ? raw.filter(Boolean).length : raw ? 1 : 0;
+    return depth ? "noindex, follow" : "index, follow";
+  },
   ogType: () => "website",
   ogTitle: () => t("seoTitle"),
   ogDescription: () => t("seoDescription"),
@@ -130,16 +139,30 @@ const VIEW_SEGMENTS: Record<Exclude<FlatView, "active">, string> = {
 const SEGMENT_VIEWS = new Map<string, FlatView>(
   Object.entries(VIEW_SEGMENTS).map(([key, segment]) => [segment, key as FlatView]),
 );
-function viewFromRoute(segment: unknown): FlatView {
-  const raw = Array.isArray(segment) ? segment[0] : segment;
-  return SEGMENT_VIEWS.get(String(raw ?? "")) ?? "active";
+function routeSlug(): string[] {
+  const raw = route.params.slug;
+  return (Array.isArray(raw) ? raw : [raw]).filter(Boolean).map(String);
+}
+function viewFromRoute(segments: string[]): FlatView {
+  // An owner collection (/flat-finder/owners/<key>) lists that owner's ads, so
+  // it renders the normal listing view with the owner filter applied.
+  if (segments[0] === "owners" && segments[1]) return "active";
+  return SEGMENT_VIEWS.get(segments[0] ?? "") ?? "active";
+}
+/** The owner whose collection is open, or "" outside one. */
+function ownerFromRoute(segments: string[]): string {
+  return segments[0] === "owners" && isOwnerKey(segments[1]) ? segments[1]! : "";
 }
 const localePath = useLocalePath();
 function viewPath(next: FlatView): string {
   const segment = next === "active" ? "" : `/${VIEW_SEGMENTS[next]}`;
   return localePath(`/flat-finder${segment}`);
 }
-const view = ref<FlatView>(viewFromRoute(route.params.view));
+/** One owner = one collection; the key is opaque, never the phone number. */
+function ownerPath(ownerKey: string): string {
+  return localePath(`/flat-finder/owners/${ownerKey}`);
+}
+const view = ref<FlatView>(viewFromRoute(routeSlug()));
 /**
  * Switch tab. The ref is set alongside the navigation rather than derived from
  * it, because callers read `view` on the next line (openOwner loads straight
@@ -150,10 +173,16 @@ function goToView(next: FlatView) {
   const path = viewPath(next);
   if (route.path !== path) void router.push({ path, query: route.query });
 }
-// Back/forward, or a pasted link, moves the tab.
-watch(() => route.params.view, (segment) => {
-  const next = viewFromRoute(segment);
-  if (next !== view.value) view.value = next;
+// Back/forward, or a pasted link, moves the tab and the open collection.
+watch(() => route.params.slug, () => {
+  const segments = routeSlug();
+  const nextView = viewFromRoute(segments);
+  if (nextView !== view.value) view.value = nextView;
+  const nextOwner = ownerFromRoute(segments);
+  if (nextOwner !== owner.value) {
+    owner.value = nextOwner;
+    scheduleLoad(0);
+  }
 });
 const {
   favorites,
@@ -654,15 +683,17 @@ function resetFilters() {
 function setView(next: string) { goToView(next as FlatView); }
 // Owners: the country the tab lists, and moving in and out of a collection.
 const ownersCountry = computed(() => countries.value[0] || defaultCountry.value);
+// Entering and leaving a collection only navigates; the route watcher below
+// applies the owner and reloads. Setting the filter here too raced with the
+// filter sync's own router.replace, which captures the path as it runs and
+// would put the URL back on /flat-finder/owners while the feed showed one
+// owner's ads.
 function openOwner(selected: FlatOwner) {
-  owner.value = selected.ownerKey;
-  goToView("active");
-  scheduleLoad(0);
+  const path = ownerPath(selected.ownerKey);
+  if (route.path !== path) void router.push({ path, query: route.query });
 }
 function leaveOwner(next: FlatView) {
-  owner.value = "";
   goToView(next);
-  if (next === "active") scheduleLoad(0);
 }
 function mapCoordinateLooksSane(listing: Listing): boolean {
   if (listing.lat == null || listing.lng == null) return false;
@@ -1029,6 +1060,17 @@ onMounted(async () => {
   defaultCountry.value = regionalSearchCountry();
   if (!queryString(route.query.countries)) countries.value = [defaultCountry.value];
   loadPersonalState(); applyQueryParams(route.query); void loadRates(); void loadCustomSites();
+  // An owner collection is addressed by path now. Links that still carry the
+  // old ?owner= are moved to /flat-finder/owners/<key> so one collection has
+  // one URL; otherwise the path wins over whatever the query restored.
+  const legacyOwner = queryString(route.query.owner);
+  if (isOwnerKey(legacyOwner) && !ownerFromRoute(routeSlug())) {
+    const { owner: _dropped, ...rest } = route.query;
+    owner.value = legacyOwner;
+    void router.replace({ path: ownerPath(legacyOwner), query: rest });
+  } else {
+    owner.value = ownerFromRoute(routeSlug());
+  }
   // The first feed request does not depend on /flats-meta: the country is
   // already resolved above, and meta only fills the select option lists (its
   // own default-country branch is a no-op once countries is non-empty). Running

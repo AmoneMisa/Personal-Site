@@ -21,17 +21,27 @@ test('owner contacts are shown readably', () => {
 })
 
 test('the owners tab lists collections and opening one filters the feed', async () => {
-  const page = await read('app/pages/flat-finder/[[view]].vue')
+  const page = await read('app/pages/flat-finder/[...slug].vue')
   assert.match(page, /\{ value: "owners", label: t\("ownersTab"\) \}/u)
   assert.match(page, /<FlatOwnersGrid v-if="view === 'owners'" :country="ownersCountry" @select="openOwner" \/>/u)
-  // Tabs are routes now, so switching goes through goToView (which navigates)
-  // rather than assigning the ref directly.
-  assert.match(page, /owner\.value = selected\.ownerKey;\s+goToView\("active"\);\s+scheduleLoad\(0\);/u)
+  // One collection = one owner = one page. Opening one only navigates; the
+  // route watcher applies the owner filter and reloads.
+  assert.match(page, /function openOwner\(selected: FlatOwner\) \{\s+const path = ownerPath\(selected\.ownerKey\);/u)
+  assert.match(page, /function ownerPath\(ownerKey: string\)[\s\S]*?\/flat-finder\/owners\/\$\{ownerKey\}/u)
   assert.match(page, /if \(view\.value === "owners"\) return \[\];/u, 'no listing cards under the owners tab')
 })
 
+test('an owner collection has its own page, and a bad key is a 404', async () => {
+  const page = await read('app/pages/flat-finder/[...slug].vue')
+  // /flat-finder/owners/<key> renders the listing view filtered to that owner.
+  assert.match(page, /if \(segments\[0\] === "owners" && segments\[1\]\) return "active";/u)
+  assert.match(page, /segments\[0\] === "owners" && isOwnerKey\(segments\[1\]\)/u)
+  // Only an owner collection nests a second segment, and only a real key.
+  assert.match(page, /segments\.length === 2 && segments\[0\] === "owners" && \/\^\[0-9a-f\]\{24\}\$\/\.test\(segments\[1\]!\)/u)
+})
+
 test('an owner collection shows breadcrumbs back to all listings and to owners', async () => {
-  const page = await read('app/pages/flat-finder/[[view]].vue')
+  const page = await read('app/pages/flat-finder/[...slug].vue')
   const crumbs = await read('app/components/flats/FlatOwnerBreadcrumbs.vue')
   assert.match(page, /<FlatOwnerBreadcrumbs v-if="owner && view === 'active'" :owner-key="owner" @all="leaveOwner\('active'\)" @owners="leaveOwner\('owners'\)" \/>/u)
   assert.match(crumbs, /aria-current="page"/u)
@@ -43,8 +53,13 @@ test('the owner filter is sent, kept in the URL, validated and reset', async () 
   const route = await read('app/composables/flats/useFlatRouteState.ts')
   assert.match(filters, /if \(owner\.value\) params\.owner = owner\.value;/u)
   assert.match(filters, /owner\.value = "";/u)
-  assert.match(route, /if \(owner\.value\) q\.owner = owner\.value;/u)
+  // The owner lives in the path now, so it is no longer serialised into the
+  // query -- one collection, one URL. Reading it back stays, for old links.
+  assert.doesNotMatch(route, /q\.owner = owner\.value/u)
   assert.match(route, /filters\.owner\.value = isOwnerKey\(params\.owner\) \? params\.owner : "";/u)
+  // An old ?owner= link is moved to the page form instead of being dropped.
+  const page = await read('app/pages/flat-finder/[...slug].vue')
+  assert.match(page, /void router\.replace\(\{ path: ownerPath\(legacyOwner\), query: rest \}\)/u)
 })
 
 test('owner routes validate input before calling the backend', async () => {

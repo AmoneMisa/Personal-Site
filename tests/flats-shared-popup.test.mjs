@@ -4,7 +4,7 @@ import test from 'node:test'
 
 const route = await readFile(new URL('../server/routes/flats-feed.get.ts', import.meta.url), 'utf8')
 const feedLookup = await readFile(new URL('../server/flats/feedLookup.ts', import.meta.url), 'utf8')
-const page = await readFile(new URL('../app/pages/flat-finder/[[view]].vue', import.meta.url), 'utf8')
+const page = await readFile(new URL('../app/pages/flat-finder/[...slug].vue', import.meta.url), 'utf8')
 const safeFetch = await readFile(new URL('../app/utils/safeFetch.ts', import.meta.url), 'utf8')
 
 test('shared OLX lookup opens from PostgreSQL and reserves source waits for explicit verification', () => {

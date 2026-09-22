@@ -37,7 +37,7 @@ test('popup components use the flats message namespace', async () => {
 })
 
 test('the popup shows a contact tab only when the contact has other listings', async () => {
-  const page = await read('app/pages/flat-finder/[[view]].vue')
+  const page = await read('app/pages/flat-finder/[...slug].vue')
   assert.match(page, /<FlatModalTabs v-if="activeContactListingCount > 0" v-model="modalTab"/u)
   assert.match(page, /<FlatContactListings v-if="modalTab === 'contact' && activeContactListingCount > 0" :public-id="active\.publicId" @open="openListing" \/>/u)
   assert.match(page, /modalTab\.value = "details";/u, 'every newly opened listing starts on its own details')

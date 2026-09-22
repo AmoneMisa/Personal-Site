@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 
 const source = await readFile(new URL('../app/components/flats/FlatMap.client.vue', import.meta.url), 'utf8');
-const page = await readFile(new URL('../app/pages/flat-finder/[[view]].vue', import.meta.url), 'utf8');
+const page = await readFile(new URL('../app/pages/flat-finder/[...slug].vue', import.meta.url), 'utf8');
 
 test('map remains mounted when the active filters return no listings', () => {
   assert.match(page, /<section class="flats__map-wrap"><flat-map/u);
