@@ -46,6 +46,7 @@ import { useFlatMeta } from "~/composables/flats/useFlatMeta";
 import { useDistrictZones } from "~/composables/flats/useDistrictZones";
 import { useFlatAvailabilityCache } from "~/composables/flats/useFlatAvailabilityCache";
 import { useSavedCollections } from "~/composables/search/useSavedCollections";
+import { useFlatFavoriteSync } from "~/composables/flats/useFlatFavoriteSync";
 import { useInfiniteFeed } from "~/composables/search/useInfiniteFeed";
 import { useSearchScroll } from "~/composables/search/useSearchScroll";
 import { ANY_SELECT_VALUE, useNullableSelect } from "~/composables/search/useNullableSelect";
@@ -191,9 +192,10 @@ const {
   hiddenIds,
   isHidden,
   isFavorite,
-  toggleFavorite,
+  toggleFavorite: toggleFavoriteLocal,
   toggleHidden,
   addRecent,
+  mergeFavorites,
   removeWhere: removeSavedWhere,
   load: loadSavedCollections,
 } = useSavedCollections<Listing>({
@@ -518,8 +520,41 @@ const flatAdvancedFilterBlocks = useFlatFilterBlocks({
   scheduleLoad,
 });
 
+// Favourites also live on the server for this browser, so they survive a
+// cleared localStorage and stay consistent across tabs. Everything here is
+// best-effort: with sync unavailable the page is exactly as it was before.
+const favoriteSync = useFlatFavoriteSync();
+
+/** Local toggle first — the heart must never wait on the network. */
+function toggleFavorite(listing: Listing) {
+  const wasFavorite = isFavorite(listing.id);
+  toggleFavoriteLocal(listing);
+  void (wasFavorite ? favoriteSync.remove(listing) : favoriteSync.add(listing));
+}
+
+/**
+ * Union merge, never a takeover: a browser that already had favourites keeps
+ * them and gains the server's, and anything only this browser had is pushed
+ * up. Same rule that pairing a phone will use.
+ */
+async function syncFavorites() {
+  const before = favorites.value.slice();
+  const remote = await favoriteSync.pull();
+  if (!remote) return;
+  if (!remote.length) {
+    await favoriteSync.seed(before);
+    return;
+  }
+  mergeFavorites(remote);
+  const remoteIds = new Set(remote.map((listing) => listing.id));
+  for (const listing of before) {
+    if (!remoteIds.has(listing.id)) await favoriteSync.add(listing);
+  }
+}
+
 function loadPersonalState() {
   loadSavedCollections();
+  void syncFavorites();
   loadPresets();
   try { showAdvanced.value = localStorage.getItem("flats:showAdvanced") === "1"; } catch { /* noop */ }
 }

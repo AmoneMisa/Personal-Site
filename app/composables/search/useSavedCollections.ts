@@ -88,6 +88,20 @@ export function useSavedCollections<T>(options: SavedCollectionOptions<T>) {
     persistRecent();
   }
 
+  /**
+   * Union-merge items in, keeping what this browser already had first and
+   * dropping duplicates. Used when sync pulls a remote list: the two sides are
+   * combined rather than one overwriting the other.
+   */
+  function mergeFavorites(items: T[]): T[] {
+    const seen = new Set(favorites.value.map(options.getId));
+    const extras = items.filter((item) => !seen.has(options.getId(item)));
+    if (!extras.length) return [];
+    favorites.value = [...favorites.value, ...extras].slice(0, favoritesLimit);
+    persistFavorites();
+    return extras;
+  }
+
   function removeWhere(predicate: (item: T) => boolean) {
     favorites.value = favorites.value.filter((item) => !predicate(item));
     hidden.value = hidden.value.filter((item) => !predicate(item));
@@ -109,6 +123,7 @@ export function useSavedCollections<T>(options: SavedCollectionOptions<T>) {
     toggleFavorite,
     toggleHidden,
     addRecent,
+    mergeFavorites,
     removeWhere,
     load,
   };
