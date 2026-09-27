@@ -51,7 +51,10 @@ export function useFlatFavoriteSync() {
     return listingsFrom(data.state.favorites);
   }
 
-  /** Seed a fresh installation from what this browser already had. */
+  /**
+   * Push favourites the server does not have yet, in one request. The
+   * backend's import only adds, so this never overwrites the server side.
+   */
   async function seed(favorites: FlatListing[]): Promise<void> {
     if (!live.value || !favorites.length) return;
     const { error } = await safeFetch("/flats-sync-import", {

@@ -1,11 +1,12 @@
-// POST /flats-sync-import — seed this installation from what the browser
-// already had in localStorage, once.
+// POST /flats-sync-import — hand the server every favourite this browser has
+// that the server does not, in one request.
 //
-// Used the first time a browser syncs: everything saved before sync existed is
-// handed over in one request instead of a mutation per item. The backend's
-// import replaces the installation's state wholesale, so the client must only
-// call this when the remote side is empty.
-import { installationFor, savedStateHeaders, savedStateUrl } from '../flats/savedState'
+// The backend's import is additive (INSERT ... ON CONFLICT DO NOTHING, see
+// apps/flats/src/mobile/mobile-saved-state.js): it never removes or overwrites
+// what is already stored, so it is safe for a union merge. It is used instead
+// of one mutation per item because the backend allows one mutation per 100 ms
+// per client; a loop of mutations trips that and switches sync off.
+import { installationFor, savedStateFetch, savedStateHeaders } from '../flats/savedState'
 
 export default defineEventHandler(async (event) => {
   const body = await readBody<{ favorites?: unknown[]; sorted?: unknown[] }>(event)
@@ -17,9 +18,9 @@ export default defineEventHandler(async (event) => {
 
   const credentials = installationFor(event)
   try {
-    await $fetch(savedStateUrl('/import'), {
+    await savedStateFetch('/import', {
       method: 'POST',
-      headers: { ...savedStateHeaders(credentials), 'Content-Type': 'application/json' },
+      headers: { ...savedStateHeaders(credentials, event), 'Content-Type': 'application/json' },
       body: payload,
       timeout: 20_000,
     })

@@ -2,14 +2,14 @@
 //
 // Minting the installation on read means the first visit creates it and comes
 // back empty, which is exactly the "nothing saved yet" state the client wants.
-import { installationFor, savedStateHeaders, savedStateUrl } from '../flats/savedState'
+import { installationFor, savedStateFetch, savedStateHeaders } from '../flats/savedState'
 
 export default defineEventHandler(async (event) => {
   const credentials = installationFor(event)
   try {
-    const data = await $fetch<{ favorites?: unknown[]; sorted?: unknown[]; presets?: unknown[] }>(
-      savedStateUrl(''),
-      { headers: savedStateHeaders(credentials), timeout: 15_000 },
+    const data = await savedStateFetch<{ favorites?: unknown[]; sorted?: unknown[]; presets?: unknown[] }>(
+      '',
+      { headers: savedStateHeaders(credentials, event), timeout: 15_000 },
     )
     // Never cache: this is per-installation state.
     setResponseHeader(event, 'Cache-Control', 'no-store')

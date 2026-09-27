@@ -40,11 +40,29 @@ test('sync never deletes either side, and never blocks the UI', async () => {
   const page = await read('app/pages/flat-finder/[...slug].vue')
   // Union merge: keep what this browser had, add the server's, push the rest.
   assert.match(page, /mergeFavorites\(remote\)/u)
-  assert.match(page, /if \(!remoteIds\.has\(listing\.id\)\) await favoriteSync\.add\(listing\)/u)
-  // An empty server side is seeded rather than treated as "user cleared it".
-  assert.match(page, /if \(!remote\.length\) \{\s+await favoriteSync\.seed\(before\);/u)
+  // Local-only favourites go up in one additive import (an empty server side
+  // included), never a mutation per item: the backend allows one mutation per
+  // 100 ms per client, so a loop is rate-limited and switches sync off.
+  assert.match(page, /await favoriteSync\.seed\(before\.filter\(\(listing\) => !remoteIds\.has\(listing\.id\)\)\)/u)
+  assert.doesNotMatch(page, /for \(const listing of before\)/u)
   // The heart applies locally first; the network call is not awaited.
   assert.match(page, /toggleFavoriteLocal\(listing\);\s+void \(wasFavorite/u)
+})
+
+test('the proxy survives the backend per-client rate limit', async () => {
+  const shared = await read('server/flats/savedState.ts')
+  // One retry after the backend's Retry-After, capped, so two quick heart
+  // clicks do not switch sync off.
+  assert.match(shared, /if \(response\?\.status !== 429\) return null/u)
+  assert.match(shared, /Math\.min\(Math\.max\(wait, 0\), RATE_LIMIT_RETRY_CAP_MS\)/u)
+  // The browser's address is forwarded so browsers do not share one bucket.
+  assert.match(shared, /headers\['X-Forwarded-For'\] = ip/u)
+  for (const path of ['server/routes/flats-sync-state.get.ts', 'server/routes/flats-sync-mutate.post.ts', 'server/routes/flats-sync-import.post.ts']) {
+    const route = await read(path)
+    assert.match(route, /savedStateFetch/u, path)
+    assert.match(route, /savedStateHeaders\(credentials, event\)/u, path)
+    assert.doesNotMatch(route, /\$fetch\(/u, path)
+  }
 })
 
 test('a failed sync leaves the page working on local storage alone', async () => {

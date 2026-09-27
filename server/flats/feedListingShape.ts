@@ -34,7 +34,7 @@ const TG_PHOTO_PATH_RE = /^\/api\/tg-photo\/[A-Za-z0-9_]{3,64}\/\d+$/
  * both relative and absolute forms over time, so normalize either form while
  * retaining a narrow, path-only allowlist for the proxy endpoint.
  */
-function rewritePhoto(photo: unknown): unknown {
+export function rewritePhoto(photo: unknown): unknown {
   if (typeof photo !== 'string') return photo
 
   try {

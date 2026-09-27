@@ -4,7 +4,7 @@
 // deleteCollection, preset.put/delete). It is forwarded rather than rebuilt so
 // there is one definition of a mutation, but the op name is checked here so a
 // page bug cannot send arbitrary bodies to the API.
-import { installationFor, savedStateHeaders, savedStateUrl } from '../flats/savedState'
+import { installationFor, savedStateFetch, savedStateHeaders } from '../flats/savedState'
 
 const ALLOWED_OPS = new Set([
   'favorite.put',
@@ -24,9 +24,9 @@ export default defineEventHandler(async (event) => {
 
   const credentials = installationFor(event)
   try {
-    await $fetch(savedStateUrl('/mutate'), {
+    await savedStateFetch('/mutate', {
       method: 'POST',
-      headers: { ...savedStateHeaders(credentials), 'Content-Type': 'application/json' },
+      headers: { ...savedStateHeaders(credentials, event), 'Content-Type': 'application/json' },
       body,
       timeout: 15_000,
     })

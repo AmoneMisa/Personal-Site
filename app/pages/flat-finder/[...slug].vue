@@ -541,15 +541,13 @@ async function syncFavorites() {
   const before = favorites.value.slice();
   const remote = await favoriteSync.pull();
   if (!remote) return;
-  if (!remote.length) {
-    await favoriteSync.seed(before);
-    return;
-  }
   mergeFavorites(remote);
+  // One additive import, not a mutation per item: the backend allows one
+  // mutation per 100 ms per client, so a loop is rate-limited on its second
+  // item and switches sync off. An empty server side is just the case where
+  // every local favourite is missing there.
   const remoteIds = new Set(remote.map((listing) => listing.id));
-  for (const listing of before) {
-    if (!remoteIds.has(listing.id)) await favoriteSync.add(listing);
-  }
+  await favoriteSync.seed(before.filter((listing) => !remoteIds.has(listing.id)));
 }
 
 function loadPersonalState() {

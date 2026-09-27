@@ -13,6 +13,7 @@
 import { randomBytes } from 'node:crypto'
 import type { H3Event } from 'h3'
 import { FLAT_API_URL } from './feedLookup'
+import { requestClientIp } from '../utils/requestClientIp'
 
 export const DEVICE_COOKIE = 'ff_device'
 export const SECRET_COOKIE = 'ff_secret'
@@ -66,13 +67,51 @@ export function existingInstallation(event: H3Event): InstallationCredentials | 
   return DEVICE_RE.test(deviceId) && SECRET_RE.test(secret) ? { deviceId, secret } : null
 }
 
-export function savedStateHeaders(credentials: InstallationCredentials): Record<string, string> {
-  return {
+export function savedStateHeaders(
+  credentials: InstallationCredentials,
+  event?: H3Event,
+): Record<string, string> {
+  const headers: Record<string, string> = {
     'X-Flat-Finder-Device-Id': credentials.deviceId,
     'X-Flat-Finder-Device-Secret': credentials.secret,
   }
+  // The backend rate-limits saved state per client IP (trust proxy 1, so it
+  // reads the last X-Forwarded-For hop). Without this every browser arrives
+  // from this server's address and they all share one bucket.
+  const ip = event ? requestClientIp(event) : 'unknown'
+  if (ip !== 'unknown') headers['X-Forwarded-For'] = ip
+  return headers
 }
 
 export function savedStateUrl(path: string): string {
   return `${FLAT_API_URL}/api/mobile/saved-state${path}`
+}
+
+// The backend allows one saved-state request per 100-250 ms per client, so
+// two quick heart clicks can legitimately collide. Wait the Retry-After it
+// sends (capped) and try once more before calling it a failure; a failure
+// switches sync off for the rest of the page.
+const RATE_LIMIT_RETRY_CAP_MS = 1_000
+
+function retryAfterMs(error: unknown): number | null {
+  const response = (error as { response?: { status?: number; headers?: Headers; _data?: { retryAfterMs?: unknown } } })?.response
+  if (response?.status !== 429) return null
+  const fromBody = Number(response._data?.retryAfterMs)
+  const fromHeader = Number(response.headers?.get('retry-after')) * 1000
+  const wait = Number.isFinite(fromBody) && fromBody > 0 ? fromBody : Number.isFinite(fromHeader) ? fromHeader : 250
+  return Math.min(Math.max(wait, 0), RATE_LIMIT_RETRY_CAP_MS)
+}
+
+export async function savedStateFetch<T>(
+  path: string,
+  options: Parameters<typeof $fetch>[1],
+): Promise<T> {
+  try {
+    return await $fetch<T>(savedStateUrl(path), options)
+  } catch (error) {
+    const wait = retryAfterMs(error)
+    if (wait == null) throw error
+    await new Promise((resolve) => setTimeout(resolve, wait))
+    return await $fetch<T>(savedStateUrl(path), options)
+  }
 }
