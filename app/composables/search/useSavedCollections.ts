@@ -102,6 +102,12 @@ export function useSavedCollections<T>(options: SavedCollectionOptions<T>) {
     return extras;
   }
 
+  /** Drops every favourite, e.g. when they leave with a signed-out account. */
+  function clearFavorites() {
+    favorites.value = [];
+    persistFavorites();
+  }
+
   function removeWhere(predicate: (item: T) => boolean) {
     favorites.value = favorites.value.filter((item) => !predicate(item));
     hidden.value = hidden.value.filter((item) => !predicate(item));
@@ -124,6 +130,7 @@ export function useSavedCollections<T>(options: SavedCollectionOptions<T>) {
     toggleHidden,
     addRecent,
     mergeFavorites,
+    clearFavorites,
     removeWhere,
     load,
   };

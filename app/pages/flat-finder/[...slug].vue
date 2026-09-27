@@ -17,6 +17,7 @@ import FlatModalTabs from "~/components/flats/FlatModalTabs.vue";
 import FlatContactListings from "~/components/flats/FlatContactListings.vue";
 import FlatOwnersGrid from "~/components/flats/FlatOwnersGrid.vue";
 import FlatOwnerBreadcrumbs from "~/components/flats/FlatOwnerBreadcrumbs.vue";
+import FlatAccountBar from "~/components/flats/FlatAccountBar.vue";
 import type { FlatOwner } from "~/utils/flats/owners";
 import { isOwnerKey } from "~/utils/flats/owners";
 import SearchResultGrid from "~/components/search/SearchResultGrid.vue";
@@ -196,6 +197,7 @@ const {
   toggleHidden,
   addRecent,
   mergeFavorites,
+  clearFavorites,
   removeWhere: removeSavedWhere,
   load: loadSavedCollections,
 } = useSavedCollections<Listing>({
@@ -548,6 +550,15 @@ async function syncFavorites() {
   // every local favourite is missing there.
   const remoteIds = new Set(remote.map((listing) => listing.id));
   await favoriteSync.seed(before.filter((listing) => !remoteIds.has(listing.id)));
+}
+
+/**
+ * Signed out (or account deleted): the saved flats belong to the account, so
+ * this browser keeps no copy. Without this the next sync would push them back
+ * up into the now-anonymous installation.
+ */
+function onAccountSignedOut() {
+  clearFavorites();
 }
 
 function loadPersonalState() {
@@ -1279,6 +1290,7 @@ onBeforeUnmount(() => { modalOpen.value = false; lightboxOpen.value = false; rel
       </div>
     </form>
 
+    <FlatAccountBar v-if="view === 'favorites'" @signed-out="onAccountSignedOut" />
     <p v-if="failed" class="flats__error">{{ t("error") }}</p>
     <p v-else-if="source === 'telegram' && !loading && !listings.length && sourceErrors?.some((item) => item.source === 'telegram')" class="flats__source-warning">{{ t("telegramUnavailable") }}</p>
     <div v-else class="flats__results-toolbar">
