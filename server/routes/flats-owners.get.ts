@@ -1,4 +1,8 @@
 import { FLAT_API_URL } from '../flats/feedLookup'
+import { rewritePhoto } from '../flats/feedListingShape'
+import { requestClientIp } from '../utils/requestClientIp'
+
+type OwnerRow = { sample?: { photo?: unknown } | null } & Record<string, unknown>
 
 // Owner collections for the "Owners" tab: advertisers with two or more
 // distinct active properties in a country, largest first.
@@ -11,10 +15,24 @@ export default defineEventHandler(async (event) => {
 
   const params = new URLSearchParams({ country, limit: '24' })
   if (cursor) params.set('cursor', cursor)
+  // The backend rate-limits this per client IP; without the browser's address
+  // every visitor arrives from this server and they share one bucket.
+  const ip = requestClientIp(event)
+  const headers: Record<string, string> = ip !== 'unknown' ? { 'X-Forwarded-For': ip } : {}
   try {
-    const data = await $fetch<{ owners?: unknown[]; next?: string | null }>(`${FLAT_API_URL}/api/owners?${params}`, { timeout: 10_000, retry: 0 })
+    const data = await $fetch<{ owners?: OwnerRow[]; next?: string | null }>(`${FLAT_API_URL}/api/owners?${params}`, { headers, timeout: 10_000, retry: 0 })
     setResponseHeader(event, 'Cache-Control', 'public, max-age=60')
-    return { owners: Array.isArray(data?.owners) ? data.owners : [], next: data?.next ?? null }
+    const owners = Array.isArray(data?.owners) ? data.owners : []
+    return {
+      // The sample photo is a stored listing photo, so a Telegram one is a
+      // path on Flat Finder's private network (/api/tg-photo/...). Rewrite it
+      // through the site's photo proxy like every feed listing; left as is, the
+      // browser asks the site's /api/** proxy for it and gets a 404.
+      owners: owners.map((owner) =>
+        owner?.sample ? { ...owner, sample: { ...owner.sample, photo: rewritePhoto(owner.sample.photo) } } : owner,
+      ),
+      next: data?.next ?? null,
+    }
   } catch {
     throw createError({ statusCode: 502, statusMessage: 'Owners unavailable' })
   }

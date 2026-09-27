@@ -83,3 +83,14 @@ test('owner components use the flats namespace and both languages have the label
     }
   }
 })
+
+test('owner card photos go through the site photo proxy like feed listings', async () => {
+  const route = await readFile(new URL('../server/routes/flats-owners.get.ts', import.meta.url), 'utf8')
+  // A Telegram sample photo is /api/tg-photo/... on Flat Finder's private
+  // network; unrewritten, the browser asks the site's /api/** proxy and 404s.
+  assert.match(route, /import \{ rewritePhoto \} from '\.\.\/flats\/feedListingShape'/u)
+  assert.match(route, /photo: rewritePhoto\(owner\.sample\.photo\)/u)
+  const { rewritePhoto } = await import('../server/flats/feedListingShape.ts')
+  assert.equal(rewritePhoto('/api/tg-photo/rent_uz/42'), '/flats-photo?path=%2Fapi%2Ftg-photo%2Frent_uz%2F42')
+  assert.equal(rewritePhoto('https://cdn.example/p.jpg'), 'https://cdn.example/p.jpg')
+})
