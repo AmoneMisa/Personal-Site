@@ -3,7 +3,6 @@ import type { FlatCardPresentation, FlatListing } from "~/types/flats";
 import type { DraggablePillItem } from "~/components/ui/DraggablePills.vue";
 import { flatPriceTone, type FlatPriceTone } from "~/utils/flats/priceTone";
 import { flatSourceLabel } from "~/utils/flats/sourceLabel";
-import FlatContactActions from "~/components/flats/FlatContactActions.vue";
 import { listingLineEntry, listingLineOf, listingLineTitle } from "~/utils/flats/listingLine";
 
 const props = defineProps<{
@@ -139,7 +138,6 @@ const emit = defineEmits<{
         <span v-if="presentation.location" class="flat-card__location"><u-icon name="i-lucide-map-pin" />{{ presentation.location }}</span>
         <span class="flat-card__meta-tail"><span class="flat-card__src">{{ sourceLabel }}</span><span v-if="presentation.dateLabel">· {{ presentation.dateLabel }}</span></span>
       </div>
-      <flat-contact-actions :actions="listing.contactActions" />
     </div>
     <div v-if="checking" class="flat-card__checking" role="status" aria-live="polite"><u-icon name="i-lucide-loader-circle" class="flat-card__checking-icon" /><span>{{ checkingLabel }}</span></div>
   </article>
@@ -185,9 +183,8 @@ const emit = defineEmits<{
 .flat-card[class*="flat-card_line_"], .flat-card[class*="flat-card_line_"]:hover { border: 1.5px solid var(--flat-card-line); box-shadow: 0 0 0 1px color-mix(in srgb, var(--flat-card-line) 22%, transparent), 0 0 18px color-mix(in srgb, var(--flat-card-line) 28%, transparent); }.flat-card_hidden { opacity: 0.64; border-style: dashed; }
 
 /* What the coloured line means. This replaces the standing legend panel, so it
-   lives on the card. It sits over the PHOTO, never over the body: the body ends
-   in the contact links, and covering those on hover would hide them exactly
-   when someone reaches for them. Hover-capable pointers only -- on touch there
+   lives on the card. It sits over the PHOTO, never over the body, so the price
+   and meta stay readable on hover. Hover-capable pointers only -- on touch there
    is no hover, and the card's title attribute still carries the same text. */
 @media (hover: hover) {
   .flat-card__line-note {

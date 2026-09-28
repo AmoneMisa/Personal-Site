@@ -42,10 +42,12 @@ test('unsafe or unknown hrefs never reach an anchor', () => {
   assert.deepEqual(cardContactButtons(null), [])
 })
 
-test('the card renders contact buttons that never trigger the card click', async () => {
+test('contact buttons live in the listing popup, not on the card', async () => {
   const card = await read('app/components/flats/FlatCard.vue')
+  const page = await read('app/pages/flat-finder/[...slug].vue')
   const buttons = await read('app/components/flats/FlatContactActions.vue')
-  assert.match(card, /<flat-contact-actions :actions="listing\.contactActions" \/>/u)
+  assert.match(page, /<FlatContactActions :actions="active\.contactActions" \/>/u)
+  assert.doesNotMatch(card, /flat-contact-actions|FlatContactActions/u)
   assert.match(buttons, /@click\.stop/u)
   assert.match(buttons, /noopener noreferrer nofollow/u)
   assert.doesNotMatch(buttons, /v-html/u)

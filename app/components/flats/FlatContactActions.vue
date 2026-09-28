@@ -62,7 +62,7 @@ function title(button: CardContactButton): string {
 <style scoped lang="scss">
 .flat-contacts {
   list-style: none;
-  margin: 10px 0 0;
+  margin: 0;
   padding: 0;
   display: flex;
   flex-wrap: wrap;
