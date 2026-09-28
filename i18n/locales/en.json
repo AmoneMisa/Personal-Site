@@ -371,6 +371,10 @@
     "specBus": "Bus",
     "specTrolleybus": "Trolleybus"
   },
+  "account": {
+    "menu": "Google account",
+    "signedIn": "Signed in with Google"
+  },
   "common": {
     "add": "Add",
     "close": "Close",

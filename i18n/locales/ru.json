@@ -371,6 +371,10 @@
     "specBus": "Автобус",
     "specTrolleybus": "Троллейбус"
   },
+  "account": {
+    "menu": "Аккаунт Google",
+    "signedIn": "Вы вошли через Google"
+  },
   "common": {
     "add": "Добавить",
     "close": "Закрыть",

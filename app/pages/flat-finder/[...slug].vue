@@ -558,9 +558,9 @@ async function syncFavorites() {
  * this browser keeps no copy. Without this the next sync would push them back
  * up into the now-anonymous installation.
  */
-function onAccountSignedOut() {
-  clearFavorites();
-}
+// Signing out (here or from the header) leaves this browser empty.
+const { signedOutAt } = useSiteAccount();
+watch(signedOutAt, () => clearFavorites());
 
 function loadPersonalState() {
   loadSavedCollections();
@@ -1291,7 +1291,7 @@ onBeforeUnmount(() => { modalOpen.value = false; lightboxOpen.value = false; rel
       </div>
     </form>
 
-    <FlatAccountBar v-if="view === 'favorites'" @signed-out="onAccountSignedOut" />
+    <FlatAccountBar v-if="view === 'favorites'" />
     <p v-if="failed" class="flats__error">{{ t("error") }}</p>
     <p v-else-if="source === 'telegram' && !loading && !listings.length && sourceErrors?.some((item) => item.source === 'telegram')" class="flats__source-warning">{{ t("telegramUnavailable") }}</p>
     <div v-else class="flats__results-toolbar">

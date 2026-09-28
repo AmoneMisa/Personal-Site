@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import RedesignEmoji from "~/components/redesign/RedesignEmoji.vue";
+import HeaderAccount from "~/components/redesign/HeaderAccount.vue";
 import { useHomeContent } from "~/composables/useHomeContent";
 
 const content = useHomeContent();
@@ -64,6 +65,7 @@ const mobileOpen = ref(false);
         <button type="button" class="site-header__language mono" @click="toggleLocale" :aria-label="`Switch language (${locale})`">
           {{ String(locale).toUpperCase() }}
         </button>
+        <header-account />
         <a class="site-header__cta" :href="resolveHref('#contact')">{{ nav.contact }}</a>
       </div>
 
@@ -109,6 +111,7 @@ const mobileOpen = ref(false);
       <a class="site-header__mobile-link site-header__mobile-link_highlight" :href="resolveHref('/about')" @click="mobileOpen = false">{{ nav.aboutMe }}</a>
       <div class="site-header__mobile-actions">
         <button type="button" class="site-header__language mono" @click="toggleLocale">{{ String(locale).toUpperCase() }}</button>
+        <header-account mobile @done="mobileOpen = false" />
         <a class="site-header__cta" :href="resolveHref('#contact')" @click="mobileOpen = false">{{ nav.contact }}</a>
       </div>
     </div>

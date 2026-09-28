@@ -86,16 +86,31 @@ test('status, sign-out and delete never mint an installation', async () => {
 
 test('signing out leaves this browser without the account\'s favourites', async () => {
   const page = await read('app/pages/flat-finder/[...slug].vue')
-  assert.match(page, /<FlatAccountBar v-if="view === 'favorites'" @signed-out="onAccountSignedOut" \/>/u)
-  assert.match(page, /function onAccountSignedOut\(\) \{\s+clearFavorites\(\);/u)
-  const bar = await read('app/components/flats/FlatAccountBar.vue')
-  // No Google script on the page: sign-in is a redirect.
-  assert.doesNotMatch(bar, /accounts\.google\.com|gsi\/client/u)
-  assert.match(bar, /window\.location\.assign\(`\/flats-account-google-start\?return=/u)
+  assert.match(page, /<FlatAccountBar v-if="view === 'favorites'" \/>/u)
+  // Sign-out may come from the header too, so the page watches the shared state.
+  assert.match(page, /watch\(signedOutAt, \(\) => clearFavorites\(\)\)/u)
+  const account = await read('app/composables/useSiteAccount.ts')
+  assert.match(account, /signedOutAt\.value = Date\.now\(\)/u)
+  // No Google script on the site: sign-in is a redirect.
+  for (const path of ['app/composables/useSiteAccount.ts', 'app/components/flats/FlatAccountBar.vue', 'app/components/redesign/HeaderAccount.vue']) {
+    assert.doesNotMatch(await read(path), /accounts\.google\.com|gsi\/client/u, path)
+  }
+  assert.match(account, /window\.location\.assign\(`\/flats-account-google-start\?return=/u)
+})
+
+test('the header offers Google sign-in on every page', async () => {
+  const header = await read('app/components/redesign/HeaderNav.vue')
+  assert.match(header, /<header-account \/>/u)
+  assert.match(header, /<header-account mobile @done="mobileOpen = false" \/>/u)
+  const button = await read('app/components/redesign/HeaderAccount.vue')
+  assert.match(button, /useSiteAccount\(\)/u)
+  // Hidden when the server has no Google client configured.
+  assert.match(button, /v-if="loaded && enabled"/u)
   for (const locale of ['en', 'ru']) {
     const messages = JSON.parse(await read(`i18n/locales/${locale}.json`))
     for (const key of ['accountSignIn', 'accountSignOut', 'accountDelete', 'accountDeleteConfirm', 'accountLinked', 'accountFailed', 'accountPrivacy']) {
       assert.ok(messages.flats[key], `${locale}: flats.${key}`)
     }
+    assert.ok(messages.account?.menu && messages.account?.signedIn, `${locale}: account.*`)
   }
 })
