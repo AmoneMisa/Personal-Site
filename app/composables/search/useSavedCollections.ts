@@ -1,5 +1,6 @@
 import { computed, shallowRef } from "vue";
 import { readStoredList, writeStoredList } from "~/utils/browserStorage";
+import { useAccountLists, type AccountListDomain } from "~/composables/useAccountLists";
 
 interface SavedCollectionOptions<T> {
   namespace: string;
@@ -8,6 +9,11 @@ interface SavedCollectionOptions<T> {
   hiddenLimit?: number;
   recentLimit?: number;
   storageVersion?: number;
+  /**
+   * Keep these lists with the site's Google account while signed in
+   * (useAccountLists). Items are stored whole, keyed by getId.
+   */
+  accountSync?: { domain: AccountListDomain; lists: Array<"favorites" | "hidden" | "recent"> };
 }
 
 export function useSavedCollections<T>(options: SavedCollectionOptions<T>) {
@@ -44,10 +50,48 @@ export function useSavedCollections<T>(options: SavedCollectionOptions<T>) {
     return [item, ...list.filter((entry) => options.getId(entry) !== id)].slice(0, limit);
   }
 
+  const account = options.accountSync ? useAccountLists(options.accountSync.domain) : null;
+  const synced = (list: "favorites" | "hidden" | "recent") => Boolean(account && options.accountSync?.lists.includes(list));
+  const lists = {
+    favorites: { ref: favorites, limit: favoritesLimit, persist: persistFavorites },
+    hidden: { ref: hidden, limit: hiddenLimit, persist: persistHidden },
+    recent: { ref: recent, limit: recentLimit, persist: persistRecent },
+  };
+  let accountStarted = false;
+
+  /** Tells the account about one item's membership in a synced list. */
+  function pushMembership(list: "favorites" | "hidden" | "recent", item: T, member: boolean) {
+    if (!synced(list)) return;
+    const id = options.getId(item);
+    if (member) account!.put(list, id, item);
+    else account!.remove(list, id);
+  }
+
+  function startAccountSync() {
+    if (!account || accountStarted) return;
+    accountStarted = true;
+    for (const list of options.accountSync!.lists) {
+      const entry = lists[list];
+      account.syncList<T>(list, {
+        read: () => entry.ref.value,
+        write: (items) => {
+          entry.ref.value = items;
+          entry.persist();
+        },
+        keyOf: options.getId,
+        toPayload: (item) => item,
+        fromPayload: (row) => (row.payload && typeof row.payload === "object" ? row.payload as T : null),
+        limit: entry.limit,
+      });
+    }
+  }
+
   function load() {
     favorites.value = readStoredList<T>(keys.favorites, favoritesLimit);
     hidden.value = readStoredList<T>(keys.hidden, hiddenLimit);
     recent.value = readStoredList<T>(keys.recent, recentLimit);
+    // After the local copy is in place, so a first sync merges it.
+    startAccountSync();
   }
 
   function isFavorite(id: string) {
@@ -60,32 +104,39 @@ export function useSavedCollections<T>(options: SavedCollectionOptions<T>) {
 
   function toggleFavorite(item: T) {
     const id = options.getId(item);
-    favorites.value = isFavorite(id)
-      ? favorites.value.filter((entry) => options.getId(entry) !== id)
-      : upsert(favorites.value, item, favoritesLimit);
+    const adding = !isFavorite(id);
+    favorites.value = adding
+      ? upsert(favorites.value, item, favoritesLimit)
+      : favorites.value.filter((entry) => options.getId(entry) !== id);
     if (isHidden(id)) {
       hidden.value = hidden.value.filter((entry) => options.getId(entry) !== id);
       persistHidden();
+      pushMembership("hidden", item, false);
     }
     persistFavorites();
+    pushMembership("favorites", item, adding);
   }
 
   function toggleHidden(item: T) {
     const id = options.getId(item);
-    hidden.value = isHidden(id)
-      ? hidden.value.filter((entry) => options.getId(entry) !== id)
-      : upsert(hidden.value, item, hiddenLimit);
+    const hiding = !isHidden(id);
+    hidden.value = hiding
+      ? upsert(hidden.value, item, hiddenLimit)
+      : hidden.value.filter((entry) => options.getId(entry) !== id);
     if (isFavorite(id)) {
       favorites.value = favorites.value.filter((entry) => options.getId(entry) !== id);
       persistFavorites();
+      pushMembership("favorites", item, false);
     }
     persistHidden();
+    pushMembership("hidden", item, hiding);
   }
 
   function addRecent(item: T) {
     recent.value = upsert(recent.value, item, recentLimit);
     latestRecent.value = item;
     persistRecent();
+    pushMembership("recent", item, true);
   }
 
   /**
@@ -109,6 +160,9 @@ export function useSavedCollections<T>(options: SavedCollectionOptions<T>) {
   }
 
   function removeWhere(predicate: (item: T) => boolean) {
+    for (const list of ["favorites", "hidden", "recent"] as const) {
+      for (const item of lists[list].ref.value) if (predicate(item)) pushMembership(list, item, false);
+    }
     favorites.value = favorites.value.filter((item) => !predicate(item));
     hidden.value = hidden.value.filter((item) => !predicate(item));
     recent.value = recent.value.filter((item) => !predicate(item));

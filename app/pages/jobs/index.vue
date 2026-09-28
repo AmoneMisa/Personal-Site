@@ -23,6 +23,7 @@ import { useJobAts } from "~/composables/jobs/useJobAts";
 import { useJobMeta } from "~/composables/jobs/useJobMeta";
 import { useJobRouteState } from "~/composables/jobs/useJobRouteState";
 import { useSavedCollections } from "~/composables/search/useSavedCollections";
+import { useAccountLists } from "~/composables/useAccountLists";
 import { useInfiniteFeed } from "~/composables/search/useInfiniteFeed";
 import { ANY_SELECT_VALUE, useNullableSelect } from "~/composables/search/useNullableSelect";
 import { useShareLink } from "~/composables/search/useShareLink";
@@ -138,7 +139,7 @@ const {
   resetFeedback: resetShareFeedback,
 } = useShareLink();
 
-// ---- Personal vacancy lists (localStorage; no account or backend required) ----
+// ---- Personal vacancy lists (localStorage; with the Google account when signed in) ----
 type SavedJobsView = "active" | "favorites" | "hidden";
 const savedView = ref<SavedJobsView>("active");
 const {
@@ -154,6 +155,7 @@ const {
   getId: (job) => job.id,
   favoritesLimit: 200,
   hiddenLimit: 200,
+  accountSync: { domain: "jobs", lists: ["favorites", "hidden"] },
 });
 const savedViewTabs = computed(() => [
   { value: "active", label: t("activeVacancies") },
@@ -174,7 +176,7 @@ function selectSavedView(view: string) {
   savedView.value = view as SavedJobsView;
 }
 
-// ---- Seen / recently-viewed (localStorage) ----
+// ---- Seen / recently-viewed (localStorage; with the Google account when signed in) ----
 const SEEN_KEY = "jobs:seen:v1";
 const RECENT_KEY = "jobs:recent:v1";
 const MAX_SEEN = 500;
@@ -183,23 +185,59 @@ const seenIds = ref<Set<string>>(new Set());
 const recentlyViewed = ref<RecentJob[]>([]);
 const isSeen = (id: string) => seenIds.value.has(id);
 
-function loadSeen() {
-  if (!import.meta.client) return;
-  try { seenIds.value = new Set(JSON.parse(localStorage.getItem(SEEN_KEY) || "[]")); } catch { /* ignore */ }
-  try { recentlyViewed.value = JSON.parse(localStorage.getItem(RECENT_KEY) || "[]"); } catch { /* ignore */ }
-}
+const jobsAccount = useAccountLists("jobs");
 
-function markSeen(job: Job | RecentJob) {
-  const next = new Set(seenIds.value);
-  next.add(job.id);
-  seenIds.value = next.size > MAX_SEEN ? new Set([...next].slice(-MAX_SEEN)) : next;
-  const snap: RecentJob = { id: job.id, title: job.title, company: job.company, url: job.url, source: job.source };
-  recentlyViewed.value = [snap, ...recentlyViewed.value.filter((r) => r.id !== job.id)].slice(0, MAX_RECENT);
+function saveSeen() {
   if (!import.meta.client) return;
   try {
     localStorage.setItem(SEEN_KEY, JSON.stringify([...seenIds.value]));
     localStorage.setItem(RECENT_KEY, JSON.stringify(recentlyViewed.value));
   } catch { /* storage full/disabled */ }
+}
+
+function loadSeen() {
+  if (!import.meta.client) return;
+  try { seenIds.value = new Set(JSON.parse(localStorage.getItem(SEEN_KEY) || "[]")); } catch { /* ignore */ }
+  try { recentlyViewed.value = JSON.parse(localStorage.getItem(RECENT_KEY) || "[]"); } catch { /* ignore */ }
+  // seenIds keeps insertion order, oldest first.
+  jobsAccount.syncList<string>("seen", {
+    read: () => [...seenIds.value],
+    write: (ids) => {
+      seenIds.value = new Set(ids);
+      saveSeen();
+    },
+    keyOf: (id) => id,
+    toPayload: () => ({}),
+    fromPayload: (row) => row.key,
+    limit: MAX_SEEN,
+    oldestFirst: true,
+  });
+  jobsAccount.syncList<RecentJob>("recent", {
+    read: () => recentlyViewed.value,
+    write: (items) => {
+      recentlyViewed.value = items;
+      saveSeen();
+    },
+    keyOf: (item) => item.id,
+    toPayload: (item) => item,
+    fromPayload: (row) => {
+      const item = row.payload as Partial<RecentJob> | null;
+      return item && typeof item.id === "string" && typeof item.title === "string" ? item as RecentJob : null;
+    },
+    limit: MAX_RECENT,
+  });
+}
+
+function markSeen(job: Job | RecentJob) {
+  const firstView = !seenIds.value.has(job.id);
+  const next = new Set(seenIds.value);
+  next.add(job.id);
+  seenIds.value = next.size > MAX_SEEN ? new Set([...next].slice(-MAX_SEEN)) : next;
+  const snap: RecentJob = { id: job.id, title: job.title, company: job.company, url: job.url, source: job.source };
+  recentlyViewed.value = [snap, ...recentlyViewed.value.filter((r) => r.id !== job.id)].slice(0, MAX_RECENT);
+  saveSeen();
+  if (firstView) jobsAccount.put("seen", job.id);
+  jobsAccount.put("recent", job.id, snap);
 }
 
 /**

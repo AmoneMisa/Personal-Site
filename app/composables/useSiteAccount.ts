@@ -1,12 +1,14 @@
-// The site's Google account: one account for flats, jobs and CVs. Today only
-// saved flats are stored under it (whiteslove.me-backend-platform,
-// apps/flats mobile-account.js); the sign-in flow is server/flats/googleOAuth.ts.
+// The site's Google account: one account for flats, jobs and CVs
+// (whiteslove.me-backend-platform, apps/flats mobile-account.js and
+// mobile-lists.js); the sign-in flow is server/flats/googleOAuth.ts.
 //
 // State is shared (useState) so the header button and the Favourites bar show
-// the same thing. Pages that keep a local copy of account data watch
-// `signedOutAt` and clear it: after signing out the data belongs to the
-// account, not to whoever uses this browser next.
+// the same thing. Signing out clears this browser's copies of account data
+// (clearAccountLocalCopies), and open pages watch `signedOutAt` to empty what
+// they show: the data belongs to the account, not to whoever uses this
+// browser next. Jobs and CV lists sync through useAccountLists.
 import { safeFetch } from "~/utils/safeFetch";
+import { clearAccountLocalCopies } from "~/composables/useAccountLists";
 
 const OUTCOMES: Record<string, { key: string; color: "success" | "neutral" | "error" }> = {
   linked: { key: "flats.accountLinked", color: "success" },
@@ -62,6 +64,7 @@ export function useSiteAccount() {
       return false;
     }
     signedIn.value = false;
+    clearAccountLocalCopies();
     signedOutAt.value = Date.now();
     toast.add({ title: t(doneKey), color: "neutral" });
     return true;

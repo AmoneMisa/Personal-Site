@@ -102,16 +102,29 @@ function retryAfterMs(error: unknown): number | null {
   return Math.min(Math.max(wait, 0), RATE_LIMIT_RETRY_CAP_MS)
 }
 
-export async function savedStateFetch<T>(
-  path: string,
+/** A request to the backend's installation-authenticated API, retried once on 429. */
+export async function installationFetch<T>(
+  url: string,
   options: Parameters<typeof $fetch>[1],
 ): Promise<T> {
   try {
-    return await $fetch<T>(savedStateUrl(path), options)
+    return await $fetch<T>(url, options)
   } catch (error) {
     const wait = retryAfterMs(error)
     if (wait == null) throw error
     await new Promise((resolve) => setTimeout(resolve, wait))
-    return await $fetch<T>(savedStateUrl(path), options)
+    return await $fetch<T>(url, options)
   }
+}
+
+export function savedStateFetch<T>(
+  path: string,
+  options: Parameters<typeof $fetch>[1],
+): Promise<T> {
+  return installationFetch<T>(savedStateUrl(path), options)
+}
+
+/** The account's jobs / CV lists (apps/flats mobile-lists.js). */
+export function accountListsUrl(domain: string): string {
+  return `${FLAT_API_URL}/api/mobile/lists/${domain}`
 }

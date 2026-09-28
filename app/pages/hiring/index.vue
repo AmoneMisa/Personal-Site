@@ -100,6 +100,7 @@ const {
   favoritesLimit: 200,
   hiddenLimit: 200,
   recentLimit: 30,
+  accountSync: { domain: "cv", lists: ["favorites", "hidden", "recent"] },
 });
 const presetModalOpen = ref(false);
 const shareModalOpen = ref(false);
@@ -121,6 +122,7 @@ const {
   getQuery: currentFilterQuery,
   applyQuery: applyQueryParams,
   afterApply: () => scheduleLoad(0),
+  accountSync: { domain: "cv" },
 });
 const viewTabs = computed(() => [
   { value: "active", label: t("allListings") },
