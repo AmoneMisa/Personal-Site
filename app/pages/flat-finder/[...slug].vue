@@ -936,12 +936,21 @@ const metroSpecValue = (listing: Listing) => {
   const name = zoneLabel(listing.metro, listing.country || countries.value[0] || "", listing.city || city.value);
   if (!name) return t("notSpecified");
   const distance = listing.metroWalkingDistanceM;
-  if (distance == null) return name;
-  const parts = [name, `🚶 ${walkingDistanceLabel(distance)}`];
-  if (listing.metroWalkingDurationMin != null) {
-    parts.push(`${Math.round(listing.metroWalkingDurationMin)} ${String(locale.value).startsWith("ru") ? "мин" : "min"}`);
+  const parts = [name];
+  if (distance != null) {
+    parts.push(`🚶 ${walkingDistanceLabel(distance)}`);
+    if (listing.metroWalkingDurationMin != null) {
+      parts.push(`${Math.round(listing.metroWalkingDurationMin)} ${String(locale.value).startsWith("ru") ? "мин" : "min"}`);
+    }
   }
-  return parts.join(" · ");
+  // A flat between two stations names both; the walking figures belong to the
+  // primary one, the others are listed after it.
+  const others = (listing.metros || [])
+    .filter((station) => station && station !== listing.metro)
+    .map((station) => zoneLabel(station, listing.country || countries.value[0] || "", listing.city || city.value))
+    .filter((label): label is string => Boolean(label) && label !== name);
+  const primary = parts.join(" · ");
+  return others.length ? [primary, ...new Set(others)].join(", ") : primary;
 };
 const transportListOr = (listing: Listing, mode: string) => {
   const stops = listing.nearbyTransport?.filter((stop) => stop.mode === mode) || [];

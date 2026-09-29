@@ -71,6 +71,8 @@ export interface FlatListing {
   region?: string | null;
   microdistrict?: string | null;
   metro?: string | null;
+  /** Every station the listing names, primary (`metro`) first. */
+  metros?: string[] | null;
   metroWalkingDistanceM?: number | null;
   metroWalkingDurationMin?: number | null;
   nearbyMetro?: FlatTransportStop[];
