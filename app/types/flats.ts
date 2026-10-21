@@ -181,6 +181,12 @@ export interface FlatStatsPriceBand {
   count: number;
 }
 
+export interface FlatStatsPriceBucket {
+  fromUsd: number;
+  toUsd: number;
+  count: number;
+}
+
 export interface FlatStatsPriceGroup {
   key: FlatStatsDealKey;
   count: number;
@@ -211,6 +217,7 @@ export interface FlatStatistics {
   geographiesByDeal?: Partial<Record<FlatStatsDealKey, Partial<Record<FlatStatsGeoDimension, FlatStatsGeoRow[]>>>>;
   priceBandsByDeal?: Partial<Record<FlatStatsDealKey, FlatStatsPriceBand[]>>;
   priceBandSamplesByDeal?: Partial<Record<FlatStatsDealKey, number>>;
+  priceDistributionByDeal?: Partial<Record<FlatStatsDealKey, FlatStatsPriceBucket[]>>;
   ownership: {
     owners: number;
     agencies: number;

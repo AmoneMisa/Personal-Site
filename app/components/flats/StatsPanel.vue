@@ -7,6 +7,8 @@ const props = defineProps<{
   displayCurrency: string;
   convert: (amount: number, from: string, to: string) => number | undefined;
   locationLabel: FlatLocationLabeler;
+  /** Active city filter: the geography block then breaks that city down by district. */
+  selectedCity?: string;
 }>();
 const { t: translate, locale } = useI18n();
 const t = (key: string, params: Record<string, unknown> = {}) => translate(`flats.${key}`, params);
@@ -59,7 +61,10 @@ const geography = computed(() => {
       maxUsd: maxValues.length ? Math.max(...maxValues) : null,
     });
   }
-  return [...merged.values()].sort((a, b) => b.count - a.count).slice(0, 8);
+  // Countries and cities are a top list; district-level dimensions are the
+  // breakdown of the selected place, so they show everything the API returns.
+  const limit = geoDimension.value === "country" || geoDimension.value === "city" ? 8 : 60;
+  return [...merged.values()].sort((a, b) => b.count - a.count).slice(0, limit);
 });
 const geographyPriceRanges = computed(() => geography.value.flatMap((row) => {
   if (row.minUsd == null || row.maxUsd == null) return [];
@@ -68,6 +73,22 @@ const geographyPriceRanges = computed(() => geography.value.flatMap((row) => {
   if (min == null || max == null || !Number.isFinite(min) || !Number.isFinite(max)) return [];
   return [{ label: row.label, min, max, color: "#24a7d6" }];
 }));
+const isRu = computed(() => String(locale.value).toLowerCase().startsWith("ru"));
+const priceDistribution = computed(() => {
+  const buckets = (props.statistics.priceDistributionByDeal?.[dealScope.value] ?? []).flatMap((bucket) => {
+    const from = convertUsd(bucket.fromUsd);
+    const to = convertUsd(bucket.toUsd);
+    return from == null || to == null ? [] : [{ from, to, count: bucket.count }];
+  });
+  return {
+    labels: buckets.map((bucket) => `${number(bucket.from)}–${number(bucket.to)}`),
+    series: [{ label: isRu.value ? "Объявлений" : "Listings", color: "#e0679a", values: buckets.map((bucket) => bucket.count) }],
+    hasData: buckets.some((bucket) => bucket.count > 0),
+  };
+});
+const priceDistributionTitle = computed(() => isRu.value
+  ? `Цена · количество объявлений (${props.displayCurrency})`
+  : `Price · number of listings (${props.displayCurrency})`);
 const priceRangeTitle = computed(() => String(locale.value).toLowerCase().startsWith("ru")
   ? "Стоимость жилья · мин / макс"
   : "Housing price · min / max");
@@ -111,6 +132,10 @@ const ownership = computed(() => [
   { key: "noCommission", label: t("statsNoCommission"), value: props.statistics.ownership.noCommission },
   { key: "commission", label: t("statsCommission"), value: props.statistics.ownership.commission },
 ]);
+
+watch(() => props.selectedCity, (city) => {
+  geoDimension.value = city ? "district" : "city";
+}, { immediate: true });
 
 watch(deals, (rows) => {
   if (rows.some((row) => row.key === dealScope.value && row.count > 0)) return;
@@ -159,7 +184,11 @@ function displayGeoLabel(value: string, dimension: FlatStatsGeoDimension): strin
         <p v-else class="flat-stats__empty">{{ t("statsNoGeo") }}</p>
         <div v-if="geographyPriceRanges.length" class="flat-stats__range">
           <h3>{{ priceRangeTitle }}</h3>
-          <UiAnalyticsBars :items="geographyPriceRanges" :format="(value) => money(value)" />
+          <UiAnalyticsBars :items="geographyPriceRanges" :format="(value) => money(value)" :row-height="26" />
+        </div>
+        <div v-if="priceDistribution.hasData" class="flat-stats__range">
+          <h3>{{ priceDistributionTitle }}</h3>
+          <UiAnalyticsLine :series="priceDistribution.series" :labels="priceDistribution.labels" />
         </div>
       </article>
       <article class="flat-stats__card"><h3>{{ t("statsOwnership") }}</h3><div class="flat-stats__metrics"><div v-for="item in ownership" :key="item.key"><span>{{ item.label }}</span><strong>{{ percent(item.value) }}</strong><small>{{ number(item.value) }}</small></div></div></article>

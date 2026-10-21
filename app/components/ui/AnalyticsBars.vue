@@ -15,9 +15,14 @@ interface BarItem {
 const props = withDefaults(defineProps<{
   items: BarItem[];
   format?: (value: number) => string;
+  /** Grow the chart with the number of rows instead of squeezing them into the default height. */
+  rowHeight?: number;
 }>(), {
   format: (value: number) => Math.round(value).toLocaleString(),
+  rowHeight: 0,
 });
+
+const chartHeight = computed(() => props.rowHeight ? `${Math.max(205, props.items.length * props.rowHeight + 48)}px` : undefined);
 
 const hasRanges = computed(() => props.items.some((item) => Number.isFinite(item.min) && Number.isFinite(item.max)));
 
@@ -75,7 +80,7 @@ const options = computed<ChartOptions<"bar">>(() => ({
 </script>
 
 <template>
-  <div class="analytics-bars">
+  <div class="analytics-bars" :style="chartHeight ? { height: chartHeight } : undefined">
     <ClientOnly><Bar :data="data" :options="options" /></ClientOnly>
   </div>
 </template>

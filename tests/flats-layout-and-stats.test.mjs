@@ -71,6 +71,14 @@ test('flat geography statistics stay populated when a scoped country slice is em
   assert.match(stats, /<SearchSourceTabs v-model="dealScope"/u)
 })
 
+test('selected city breaks statistics down by district and a price line shows listings per price', () => {
+  assert.match(stats, /selectedCity\?: string/u)
+  assert.match(stats, /geoDimension\.value = city \? "district" : "city"/u)
+  assert.match(stats, /priceDistributionByDeal\?\.\[dealScope\.value\]/u)
+  assert.match(stats, /<UiAnalyticsLine :series="priceDistribution\.series" :labels="priceDistribution\.labels" \/>/u)
+  assert.match(page, /<FlatsStatsPanel[^>]*:selected-city="city"/u)
+})
+
 test('location geography delegates exact and cross-kind rendering to the shared geography package', () => {
   assert.match(locations, /LocationKind = 'country' \| 'city' \| 'district' \| 'metro' \| 'any'/u)
   assert.match(locations, /@whiteslove\/parsing-lexicon\/geography-display/u)
