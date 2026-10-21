@@ -94,6 +94,25 @@ services:
     security_opt:
       - no-new-privileges:true
 
+  umami-retention:
+    logging: *default-logging
+    # Enforces the privacy policy's 90-day retention for visit statistics:
+    # runs scripts/umami-retention.sql once a day against Umami's database.
+    profiles: ["analytics"]
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: ${UMAMI_DATABASE_URL:-}
+    volumes:
+      - ./scripts/umami-retention.sql:/retention.sql:ro
+    entrypoint: ["sh", "-c", "while true; do psql \"$$DATABASE_URL\" -v ON_ERROR_STOP=1 -f /retention.sql || echo 'umami retention failed'; sleep 86400; done"]
+    networks:
+      - backend-platform
+    mem_limit: 64m
+    cpus: 0.25
+    security_opt:
+      - no-new-privileges:true
+
 volumes:
   site_state:
 

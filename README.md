@@ -152,7 +152,7 @@ Nuxt runtime, and only for the website ↔ Telegram handoff/status contract.
   (compose profile `analytics`). The tracker and its collector go through the
   same-origin `/stats/*` proxy. Product events use `useAnalytics().trackEvent`
   with a closed list of event names, and must never carry personal data or free
-  text. See `.env.example` for setup.
+  text. See `.env.example` for setup. Visit data older than 90 days is deleted daily by the `umami-retention` service (`scripts/umami-retention.sql`).
 
 Any change to what is collected must also update the privacy and cookie
 policies in `shared/legal/legalContent.ts`.

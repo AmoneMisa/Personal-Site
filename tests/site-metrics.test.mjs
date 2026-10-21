@@ -48,3 +48,13 @@ test('legal pages disclose the cookieless visit statistics', () => {
     assert.match(privacy, locale === 'ru' ? /Статистика посещаемости/u : /Visit and site-speed statistics/u)
   }
 })
+
+test('the 90-day visit statistics retention is both promised and enforced', async () => {
+  const [sql, compose] = await Promise.all([read('../scripts/umami-retention.sql'), read('../docker-compose.yml')])
+  assert.match(JSON.stringify(LEGAL_CONTENT.ru.privacy), /Статистика посещений — 90 дней/u)
+  assert.match(JSON.stringify(LEGAL_CONTENT.en.privacy), /Visit statistics — 90 days/u)
+  for (const table of ['event_data', 'website_event', 'session_data']) {
+    assert.ok(sql.includes(`DELETE FROM ${table} WHERE created_at < now() - interval '90 days'`), table)
+  }
+  assert.match(compose, /umami-retention\.sql:\/retention\.sql:ro/)
+})

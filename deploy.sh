@@ -71,8 +71,8 @@ case "$target" in
     "${compose[@]}" up -d --no-build --remove-orphans frontend backend
     # Analytics is opt-in: start Umami only once its database is configured.
     if grep -Eq '^UMAMI_DATABASE_URL=.+' db.env; then
-      "${compose[@]}" --profile analytics pull umami
-      "${compose[@]}" --profile analytics up -d --no-build umami
+      "${compose[@]}" --profile analytics pull umami umami-retention
+      "${compose[@]}" --profile analytics up -d --no-build umami umami-retention
     fi
     ;;
   frontend)
