@@ -8,6 +8,10 @@ const { trackEvent } = useAnalytics()
 const available = ref(false)
 const busy = ref(false)
 const failed = ref(false)
+// Deep link of the last handoff. While set, a hint reminds the visitor to tap
+// Start: a bot cannot message anyone who has not started it.
+const handoffUrl = ref('')
+const handoffEditing = ref(false)
 const editToken = ref('')
 const editPath = ref('')
 const showBackToFilters = ref(false)
@@ -101,12 +105,38 @@ const backLabel = computed(() => isEnglish.value ? 'Top' : 'Наверх')
 const errorText = computed(() => isEnglish.value
   ? 'Could not create the Telegram subscription link.'
   : 'Не удалось создать ссылку подписки в Telegram.')
-const showStack = computed(() => showBackToFilters.value || (!!searchKind.value && available.value))
+const hint = computed(() => {
+  if (isEnglish.value) {
+    return {
+      title: 'Almost done',
+      text: handoffEditing.value
+        ? 'In Telegram, tap Start to apply the new filters.'
+        : 'In Telegram, tap Start. The bot can only send you new matches after that.',
+      link: 'Open Telegram',
+      note: 'The link works for 30 minutes.',
+      close: 'Close',
+    }
+  }
+  return {
+    title: 'Почти готово',
+    text: handoffEditing.value
+      ? 'В Telegram нажмите «Запустить» (Start), чтобы применить новые фильтры.'
+      : 'В Telegram нажмите «Запустить» (Start). Только после этого бот сможет присылать вам новые совпадения.',
+    link: 'Открыть Telegram',
+    note: 'Ссылка действует 30 минут.',
+    close: 'Закрыть',
+  }
+})
+const showStack = computed(() => showBackToFilters.value || (!!searchKind.value && available.value) || !!handoffUrl.value)
 
 async function subscribe() {
   if (!searchKind.value || busy.value) return
   busy.value = true
   failed.value = false
+  handoffUrl.value = ''
+  // Open the tab inside the click so popup blockers allow it; the deep link is
+  // filled in once the server has created the handoff.
+  const tab = window.open('', '_blank')
   try {
     const searchUrl = new URL(window.location.href)
     if (editing.value) searchUrl.searchParams.set('_tgEdit', editToken.value)
@@ -117,8 +147,14 @@ async function subscribe() {
       body: { searchUrl: searchUrl.toString() },
     })
     trackEvent('subscription_start', { kind: searchKind.value ?? 'unknown', editing: editing.value })
-    window.location.assign(data.url)
+    handoffEditing.value = editing.value
+    handoffUrl.value = data.url
+    if (tab) {
+      tab.opener = null
+      tab.location.href = data.url
+    }
   } catch (error) {
+    tab?.close()
     console.warn('[telegram-subscription] handoff failed:', error)
     failed.value = true
   } finally {
@@ -130,6 +166,19 @@ async function subscribe() {
 <template>
   <div v-if="showStack" class="search-actions">
     <p v-if="failed" class="search-actions__error">{{ errorText }}</p>
+
+    <div v-if="handoffUrl" class="search-actions__hint" role="status">
+      <button type="button" class="search-actions__hint-close" :aria-label="hint.close" @click="handoffUrl = ''">
+        <u-icon name="i-lucide-x" aria-hidden="true" />
+      </button>
+      <p class="search-actions__hint-title">{{ hint.title }}</p>
+      <p class="search-actions__hint-text">{{ hint.text }}</p>
+      <a class="search-actions__hint-link" :href="handoffUrl" target="_blank" rel="noopener">
+        <u-icon name="i-lucide-send" aria-hidden="true" />
+        {{ hint.link }}
+      </a>
+      <p class="search-actions__hint-note">{{ hint.note }}</p>
+    </div>
 
     <div class="search-actions__stack">
       <button
@@ -302,6 +351,77 @@ async function subscribe() {
   line-height: 1.35;
   box-shadow: 0 8px 30px rgba(0, 0, 0, .28);
   pointer-events: auto;
+}
+
+.search-actions__hint {
+  position: relative;
+  max-width: min(320px, calc(100vw - 36px));
+  padding: 12px 34px 12px 14px;
+  border: 1px solid rgba(224, 103, 154, .45);
+  border-radius: 14px;
+  background: rgba(16, 20, 48, .97);
+  color: var(--text-primary);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, .3);
+  pointer-events: auto;
+}
+
+.search-actions__hint p {
+  margin: 0;
+}
+
+.search-actions__hint-title {
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.search-actions__hint-text {
+  margin-top: 4px !important;
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.search-actions__hint-link {
+  margin-top: 10px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 12px;
+  border-radius: 999px;
+  background: var(--accent-pink);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.search-actions__hint-link:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: 2px;
+}
+
+.search-actions__hint-note {
+  margin-top: 8px !important;
+  font-size: 11px;
+  opacity: .7;
+}
+
+.search-actions__hint-close {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  display: inline-flex;
+  padding: 4px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  opacity: .7;
+}
+
+.search-actions__hint-close:hover,
+.search-actions__hint-close:focus-visible {
+  opacity: 1;
 }
 
 @media (hover: hover) and (pointer: fine) {
