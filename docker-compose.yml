@@ -147,9 +147,60 @@ services:
     security_opt:
       - no-new-privileges:true
 
+  alertmanager:
+    logging: *default-logging
+    # Sends Prometheus alerts (monitoring/alerts.yml) to Telegram through the
+    # subscription bot. Alertmanager cannot read env vars, so the entrypoint
+    # writes the token file and fills in the chat id before starting.
+    # Opt-in: deploy.sh starts it only when TELEGRAM_METRICS_CHAT_ID is set.
+    profiles: ["monitoring"]
+    image: prom/alertmanager:${ALERTMANAGER_IMAGE_TAG:-v0.28.1}
+    restart: unless-stopped
+    environment:
+      TELEGRAM_SUBSCRIPTION_BOT_TOKEN: ${TELEGRAM_SUBSCRIPTION_BOT_TOKEN:-}
+      TELEGRAM_METRICS_CHAT_ID: ${TELEGRAM_METRICS_CHAT_ID:-}
+    entrypoint:
+      - sh
+      - -c
+      - >-
+        umask 077 && printf %s "$$TELEGRAM_SUBSCRIPTION_BOT_TOKEN" > /tmp/bot_token &&
+        sed "s/__CHAT_ID__/$$TELEGRAM_METRICS_CHAT_ID/" /etc/prometheus-site/alertmanager.yml > /tmp/alertmanager.yml &&
+        exec /bin/alertmanager
+        --config.file=/tmp/alertmanager.yml
+        --storage.path=/alertmanager
+    volumes:
+      - ./monitoring:/etc/prometheus-site:ro
+      - alertmanager_data:/alertmanager
+    mem_limit: 128m
+    cpus: 0.25
+    security_opt:
+      - no-new-privileges:true
+
+  metrics-digest:
+    logging: *default-logging
+    # Daily digest (Umami traffic + Prometheus vitals/errors) sent to Telegram
+    # at METRICS_DIGEST_HOUR_UTC. Same image as the frontend; see
+    # monitoring/digest.mjs. Started together with alertmanager.
+    profiles: ["monitoring"]
+    image: ghcr.io/amonemisa/personal-site:${FRONTEND_IMAGE_TAG:-latest}
+    restart: unless-stopped
+    command: ["node", "monitoring/digest.mjs"]
+    env_file:
+      - ${SITE_ENV_FILE:-./db.env}
+    environment:
+      PROMETHEUS_URL: http://prometheus:9090
+    networks:
+      - default
+      - backend-platform
+    mem_limit: 128m
+    cpus: 0.25
+    security_opt:
+      - no-new-privileges:true
+
 volumes:
   site_state:
   prometheus_data:
+  alertmanager_data:
 
 networks:
   ai-net:

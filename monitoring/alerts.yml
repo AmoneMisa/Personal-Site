@@ -1,0 +1,49 @@
+# Alert rules for the Personal Site frontend. Alertmanager sends them to
+# Telegram through the subscription bot (monitoring/alertmanager.yml).
+# Every alert fires once when it starts and once when it resolves.
+groups:
+  - name: personal-site
+    rules:
+      - alert: SiteDown
+        expr: up{job="personal-site-frontend"} == 0
+        for: 3m
+        labels:
+          severity: critical
+        annotations:
+          summary: The site frontend is not answering /metrics.
+
+      - alert: ServerErrors
+        expr: sum by (route) (rate(site_http_request_duration_seconds_count{status="5xx"}[5m])) * 300 > 10
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: 'Route {{ $labels.route }} returned {{ $value | printf "%.0f" }} 5xx responses in the last 5 minutes.'
+
+      - alert: UpstreamUnreachable
+        expr: sum by (upstream) (rate(site_upstream_request_errors_total{upstream!="external"}[5m])) * 300 > 5
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: '{{ $labels.upstream }}: {{ $value | printf "%.0f" }} requests failed without a response in 5 minutes (timeout, refused, DNS).'
+
+      - alert: UpstreamServerErrors
+        expr: sum by (upstream) (rate(site_upstream_request_duration_seconds_count{status="5xx", upstream!="external"}[5m])) * 300 > 10
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: '{{ $labels.upstream }} answered {{ $value | printf "%.0f" }} requests with 5xx in 5 minutes.'
+
+      - alert: SlowLargestContentfulPaint
+        # Needs at least ~20 page loads in the hour so a single slow visit
+        # cannot trigger it.
+        expr: |
+          histogram_quantile(0.75, sum by (le) (rate(site_web_vitals_milliseconds_bucket{metric="LCP"}[1h]))) > 4000
+          and sum(increase(site_web_vitals_milliseconds_count{metric="LCP"}[1h])) > 20
+        for: 30m
+        labels:
+          severity: warning
+        annotations:
+          summary: 'Real-user LCP p75 is {{ $value | printf "%.0f" }} ms over the last hour (poor is above 4000 ms).'

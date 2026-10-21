@@ -70,3 +70,24 @@ test('Prometheus scrapes the frontend with METRICS_KEY and stays on loopback', a
   assert.match(compose, /"127\.0\.0\.1:\$\{PROMETHEUS_PORT:-9090\}:9090"/)
   assert.match(deploy, /grep -Eq '\^METRICS_KEY=\.\+' db\.env/)
 })
+
+test('Telegram alerts and digest go through the subscription bot to one configured chat', async () => {
+  const [alertmanager, prometheus, compose, deploy, dockerfile, digest] = await Promise.all([
+    read('../monitoring/alertmanager.yml'),
+    read('../monitoring/prometheus.yml'),
+    read('../docker-compose.yml'),
+    read('../deploy.sh'),
+    read('../Dockerfile'),
+    read('../monitoring/digest.mjs'),
+  ])
+  assert.match(alertmanager, /bot_token_file: \/tmp\/bot_token/)
+  assert.match(alertmanager, /chat_id: __CHAT_ID__/)
+  assert.match(alertmanager, /send_resolved: true/)
+  assert.match(prometheus, /alertmanager:9093/)
+  assert.match(compose, /s\/__CHAT_ID__\/\$\$TELEGRAM_METRICS_CHAT_ID\//)
+  assert.match(deploy, /TELEGRAM_METRICS_CHAT_ID=\.\+/)
+  assert.match(dockerfile, /COPY --from=build \/app\/monitoring\/digest\.mjs/)
+  // Paths and referrers come from visitors; they must be escaped for HTML mode.
+  assert.match(digest, /escapeHtml\(r\.url_path\)/)
+  assert.match(digest, /escapeHtml\(r\.referrer_domain\)/)
+})

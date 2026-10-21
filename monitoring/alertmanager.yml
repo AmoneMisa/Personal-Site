@@ -1,0 +1,22 @@
+# Alertmanager for the Personal Site stack (docker-compose `alertmanager`).
+# Alertmanager cannot read env vars, so the service entrypoint writes
+# TELEGRAM_SUBSCRIPTION_BOT_TOKEN to /tmp/bot_token and replaces
+# __CHAT_ID__ with TELEGRAM_METRICS_CHAT_ID before starting.
+route:
+  receiver: telegram
+  group_by: [alertname]
+  group_wait: 30s
+  group_interval: 5m
+  repeat_interval: 12h
+
+receivers:
+  - name: telegram
+    telegram_configs:
+      - bot_token_file: /tmp/bot_token
+        chat_id: __CHAT_ID__
+        parse_mode: HTML
+        send_resolved: true
+        message: |-
+          {{ if eq .Status "firing" }}🔴{{ else }}✅{{ end }} <b>{{ .CommonLabels.alertname }}</b> {{ if eq .Status "firing" }}started{{ else }}resolved{{ end }}
+          {{ range .Alerts }}• {{ .Annotations.summary }}
+          {{ end }}

@@ -149,6 +149,12 @@ Nuxt runtime, and only for the website ↔ Telegram handoff/status contract.
   `monitoring/prometheus.yml`) scrapes it every 30 s and keeps 30 days. Its UI
   is only on the server's loopback: `plink -L 9090:127.0.0.1:9090 ...`, then
   open http://localhost:9090.
+- **Telegram reports:** Alertmanager sends the alerts in
+  `monitoring/alerts.yml` (site down, 5xx bursts, failing upstreams, slow LCP)
+  through the subscription bot, and `metrics-digest` sends a daily summary of
+  traffic, Web Vitals and errors (`monitoring/digest.mjs`). Both need
+  `TELEGRAM_METRICS_CHAT_ID`. To send a digest right away, run
+  `docker compose --env-file db.env --profile monitoring run --rm metrics-digest node monitoring/digest.mjs --now`.
 - **Web Vitals:** `app/plugins/web-vitals.client.ts` sends real-user LCP, INP,
   CLS, FCP and TTFB to `POST /rum`. That route only aggregates them into the
   `site_web_vitals_*` histograms, labelled by route name.

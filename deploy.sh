@@ -80,6 +80,11 @@ case "$target" in
       "${compose[@]}" --profile monitoring pull prometheus
       "${compose[@]}" --profile monitoring up -d --no-build --force-recreate prometheus
     fi
+    # Telegram alerts and the daily digest need the chat to send to.
+    if grep -Eq '^METRICS_KEY=.+' db.env && grep -Eq '^TELEGRAM_METRICS_CHAT_ID=.+' db.env; then
+      "${compose[@]}" --profile monitoring pull alertmanager
+      "${compose[@]}" --profile monitoring up -d --no-build --force-recreate alertmanager metrics-digest
+    fi
     ;;
   frontend)
     pull_if_needed frontend

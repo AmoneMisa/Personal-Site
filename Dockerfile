@@ -29,6 +29,8 @@ ENV HOST=0.0.0.0
 ENV PORT=3000
 
 COPY --from=build /app/.output ./.output
+# Daily Telegram metrics digest, run by the `metrics-digest` compose service.
+COPY --from=build /app/monitoring/digest.mjs ./monitoring/digest.mjs
 
 EXPOSE 3000
 
