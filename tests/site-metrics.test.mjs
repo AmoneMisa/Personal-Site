@@ -56,5 +56,5 @@ test('the 90-day visit statistics retention is both promised and enforced', asyn
   for (const table of ['event_data', 'website_event', 'session_data']) {
     assert.ok(sql.includes(`DELETE FROM ${table} WHERE created_at < now() - interval '90 days'`), table)
   }
-  assert.match(compose, /umami-retention\.sql:\/retention\.sql:ro/)
+  assert.match(compose, /-f \/scripts\/umami-retention\.sql/)
 })

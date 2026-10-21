@@ -73,7 +73,8 @@ services:
     logging: *default-logging
     # Cookieless, self-hosted visitor analytics. Browsers reach only the tracker
     # script and collector through the frontend's /stats/* proxy; the dashboard
-    # is bound to loopback (open it over an SSH tunnel to 127.0.0.1:3001).
+    # is bound to loopback (open it over an SSH tunnel to 127.0.0.1:3101; 3001
+    # is taken by backend-platform).
     # Opt-in: deploy.sh starts it only when UMAMI_DATABASE_URL is set. Umami
     # needs its own database (not a schema of an existing one) in the shared
     # Postgres.
@@ -85,7 +86,7 @@ services:
       APP_SECRET: ${UMAMI_APP_SECRET:-}
       DISABLE_TELEMETRY: "1"
     ports:
-      - "127.0.0.1:3001:3000"
+      - "127.0.0.1:${UMAMI_DASHBOARD_PORT:-3101}:3000"
     networks:
       - default
       - backend-platform
@@ -104,8 +105,9 @@ services:
     environment:
       DATABASE_URL: ${UMAMI_DATABASE_URL:-}
     volumes:
-      - ./scripts/umami-retention.sql:/retention.sql:ro
-    entrypoint: ["sh", "-c", "while true; do psql \"$$DATABASE_URL\" -v ON_ERROR_STOP=1 -f /retention.sql || echo 'umami retention failed'; sleep 86400; done"]
+      # Directory mount: a single-file bind would keep the pre-deploy inode.
+      - ./scripts:/scripts:ro
+    entrypoint: ["sh", "-c", "while true; do psql \"$$DATABASE_URL\" -v ON_ERROR_STOP=1 -f /scripts/umami-retention.sql || echo 'umami retention failed'; sleep 86400; done"]
     networks:
       - backend-platform
     mem_limit: 64m
