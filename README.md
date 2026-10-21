@@ -139,6 +139,24 @@ TELEGRAM_SUBSCRIPTION_BOT_USERNAME=
 `SUBSCRIPTIONS_DATABASE_URL` is the only database connection retained by the
 Nuxt runtime, and only for the website ↔ Telegram handoff/status contract.
 
+## Metrics
+
+- **Server metrics:** `GET /metrics` serves Prometheus metrics for the Nuxt
+  process. These cover request latency by matched route, upstream fetch latency
+  and errors per configured service, and Node process stats. It returns 404
+  until `METRICS_KEY` is set and then needs `Authorization: Bearer <key>`.
+- **Web Vitals:** `app/plugins/web-vitals.client.ts` sends real-user LCP, INP,
+  CLS, FCP and TTFB to `POST /rum`. That route only aggregates them into the
+  `site_web_vitals_*` histograms, labelled by route name.
+- **Visitor analytics and product events:** self-hosted, cookieless Umami
+  (compose profile `analytics`). The tracker and its collector go through the
+  same-origin `/stats/*` proxy. Product events use `useAnalytics().trackEvent`
+  with a closed list of event names, and must never carry personal data or free
+  text. See `.env.example` for setup.
+
+Any change to what is collected must also update the privacy and cookie
+policies in `shared/legal/legalContent.ts`.
+
 ## License
 
 Personal project, shared for demonstration purposes.

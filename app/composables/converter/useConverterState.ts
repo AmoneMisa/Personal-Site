@@ -1,5 +1,6 @@
 import {downloadBlob} from "~/utils/files";
 import {useFileCollection} from "~/composables/ui/useFileCollection";
+import {useAnalytics} from "~/composables/useAnalytics";
 
 export type ConverterMode = "media" | "data" | "document";
 
@@ -67,6 +68,7 @@ function filenameFromContentDisposition(value: string | null) {
 export function useConverterState() {
   const {t} = useI18n();
   const runtime = useRuntimeConfig();
+  const {trackEvent} = useAnalytics();
   const mode = ref<ConverterMode>("media");
   const currentMode = computed(() => MODE_CONFIG[mode.value]);
   const target = ref<string>(MODE_CONFIG.media.defaultTarget);
@@ -191,6 +193,7 @@ export function useConverterState() {
         filenameFromContentDisposition(response.headers.get("content-disposition")) || fallback,
       );
       successMessage.value = t("services.converter.messages.success");
+      trackEvent("converter_run", {mode: mode.value, target: normalizedTarget, files: files.value.length});
     } catch (error: any) {
       errorMessage.value = error?.message || t("services.converter.messages.failed");
     } finally {

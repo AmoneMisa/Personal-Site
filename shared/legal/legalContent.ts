@@ -123,6 +123,7 @@ const ru: Record<LegalDocumentKey, LegalDocument> = {
           'Производные сведения: признаки достоверности, которые система вычисляет из перечисленного выше.',
           'Данные, которые вы передаёте сами: Telegram-подписка на поиск, запрос о персональных данных.',
           'Технические данные посетителей сайта: IP-адрес и выбранные настройки (см. Политику cookies).',
+          'Статистика посещений: просмотренные страницы без параметров поиска, источник перехода, язык браузера, размер экрана, тип устройства и страна, а также обезличенные показатели скорости загрузки страниц.',
         ],
       },
       {
@@ -141,6 +142,7 @@ const ru: Record<LegalDocumentKey, LegalDocument> = {
             ['Telegram-подписки', 'Telegram ID и чат, имя пользователя, имя, язык, сохранённые поиски', 'Договор (ст. 6(1)(b))'],
             ['Обработка запросов о данных и споров', 'Ваш email, указанные идентификаторы, текст запроса, решение', 'Юридическая обязанность (ст. 6(1)(c))'],
             ['Безопасность и защита от злоупотреблений', 'IP-адрес', 'Законный интерес'],
+            ['Статистика посещаемости и скорости сайта', 'Страница, источник перехода, язык, размер экрана, тип устройства, страна, использованные функции (например, запуск конвертера); IP-адрес используется только для определения страны и не сохраняется', 'Законный интерес: понимать, какие разделы полезны, и находить медленные страницы'],
           ],
         },
         paragraphs: [
@@ -327,7 +329,8 @@ const ru: Record<LegalDocumentKey, LegalDocument> = {
         id: 'summary',
         title: 'Коротко',
         paragraphs: [
-          'Мы не используем аналитику, рекламные или отслеживающие cookies. Сайт сохраняет только ваши собственные настройки, поэтому баннер согласия не нужен.',
+          'Мы не используем аналитические, рекламные или отслеживающие cookies. Сайт сохраняет только ваши собственные настройки, поэтому баннер согласия не нужен.',
+          'Статистику посещений собирает Umami, размещённый на нашем сервере. Он не использует cookies и не сохраняет IP-адрес, а браузеры с включённым «Do Not Track» не учитываются. Показатели скорости загрузки сохраняются только в виде сводных значений.',
         ],
       },
       {
@@ -482,6 +485,7 @@ const en: Record<LegalDocumentKey, LegalDocument> = {
           'Derived information: integrity signals the system computes from the sources above.',
           'Data you give us yourself: a Telegram search subscription, a data request.',
           'Technical data from site visitors: IP address and chosen settings (see the Cookie policy).',
+          'Visit statistics: pages viewed without search parameters, referrer, browser language, screen size, device type and country, plus anonymous page-load speed measurements.',
         ],
       },
       {
@@ -500,6 +504,7 @@ const en: Record<LegalDocumentKey, LegalDocument> = {
             ['Telegram subscriptions', 'Telegram ID and chat, username, first name, language, saved searches', 'Contract (Art 6(1)(b))'],
             ['Handling data requests and disputes', 'Your email, the identifiers you give, request text, outcome', 'Legal obligation (Art 6(1)(c))'],
             ['Security and abuse prevention', 'IP address', 'Legitimate interests'],
+            ['Visit and site-speed statistics', 'Page, referrer, language, screen size, device type, country, features used (for example running the converter); the IP address is used only to derive the country and is not stored', 'Legitimate interests: learn which sections are useful and find slow pages'],
           ],
         },
         paragraphs: [
@@ -687,6 +692,7 @@ const en: Record<LegalDocumentKey, LegalDocument> = {
         title: 'In short',
         paragraphs: [
           'We use no analytics, advertising or tracking cookies. The site stores only your own settings, so no consent banner is needed.',
+          'Visit statistics are collected by Umami, hosted on our own server. It sets no cookies and does not store your IP address, and browsers sending "Do Not Track" are not counted. Page-load speed measurements are kept only as aggregate values.',
         ],
       },
       {

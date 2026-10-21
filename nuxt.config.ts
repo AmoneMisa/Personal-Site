@@ -100,7 +100,9 @@ export default defineNuxtConfig({
     runtimeConfig: {
         apiBase: 'http://backend:8000', //http://backend:8000/** - prod
         public: {
-            apiBase: '/api'
+            apiBase: '/api',
+            // NUXT_PUBLIC_UMAMI_WEBSITE_ID; empty = no tracker (app/plugins/umami.ts).
+            umamiWebsiteId: ''
         }
     },
     nitro: {

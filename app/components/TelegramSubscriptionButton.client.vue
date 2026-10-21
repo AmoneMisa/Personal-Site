@@ -1,6 +1,9 @@
 <script setup lang="ts">
+import { useAnalytics } from '~/composables/useAnalytics'
+
 const route = useRoute()
 const { locale } = useI18n()
+const { trackEvent } = useAnalytics()
 
 const available = ref(false)
 const busy = ref(false)
@@ -113,6 +116,7 @@ async function subscribe() {
       method: 'POST',
       body: { searchUrl: searchUrl.toString() },
     })
+    trackEvent('subscription_start', { kind: searchKind.value ?? 'unknown', editing: editing.value })
     window.location.assign(data.url)
   } catch (error) {
     console.warn('[telegram-subscription] handoff failed:', error)

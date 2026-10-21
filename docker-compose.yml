@@ -48,6 +48,7 @@ services:
       SUBSCRIPTIONS_DB_SCHEMA: ${SUBSCRIPTIONS_DB_SCHEMA:-subscriptions}
       TELEGRAM_SUBSCRIPTION_BOT_USERNAME: ${TELEGRAM_SUBSCRIPTION_BOT_USERNAME:-}
       SITE_PUBLIC_URL: ${SITE_PUBLIC_URL:-https://whiteslove.me}
+      UMAMI_URL: ${UMAMI_URL:-http://umami:3000}
     volumes:
       - site_state:/var/app/state
     ports:
@@ -67,6 +68,31 @@ services:
       timeout: 5s
       retries: 3
       start_period: 30s
+
+  umami:
+    logging: *default-logging
+    # Cookieless, self-hosted visitor analytics. Browsers reach only the tracker
+    # script and collector through the frontend's /stats/* proxy; the dashboard
+    # is bound to loopback (open it over an SSH tunnel to 127.0.0.1:3001).
+    # Opt-in: deploy.sh starts it only when UMAMI_DATABASE_URL is set. Umami
+    # needs its own database (not a schema of an existing one) in the shared
+    # Postgres.
+    profiles: ["analytics"]
+    image: ghcr.io/umami-software/umami:${UMAMI_IMAGE_TAG:-postgresql-latest}
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: ${UMAMI_DATABASE_URL:-}
+      APP_SECRET: ${UMAMI_APP_SECRET:-}
+      DISABLE_TELEMETRY: "1"
+    ports:
+      - "127.0.0.1:3001:3000"
+    networks:
+      - default
+      - backend-platform
+    mem_limit: ${UMAMI_MEMORY_LIMIT:-512m}
+    cpus: ${UMAMI_CPU_LIMIT:-0.5}
+    security_opt:
+      - no-new-privileges:true
 
 volumes:
   site_state:
