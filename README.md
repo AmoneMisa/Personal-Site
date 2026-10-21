@@ -145,6 +145,10 @@ Nuxt runtime, and only for the website ↔ Telegram handoff/status contract.
   process. These cover request latency by matched route, upstream fetch latency
   and errors per configured service, and Node process stats. It returns 404
   until `METRICS_KEY` is set and then needs `Authorization: Bearer <key>`.
+  Prometheus (compose profile `monitoring`, config in
+  `monitoring/prometheus.yml`) scrapes it every 30 s and keeps 30 days. Its UI
+  is only on the server's loopback: `plink -L 9090:127.0.0.1:9090 ...`, then
+  open http://localhost:9090.
 - **Web Vitals:** `app/plugins/web-vitals.client.ts` sends real-user LCP, INP,
   CLS, FCP and TTFB to `POST /rum`. That route only aggregates them into the
   `site_web_vitals_*` histograms, labelled by route name.

@@ -74,6 +74,12 @@ case "$target" in
       "${compose[@]}" --profile analytics pull umami umami-retention
       "${compose[@]}" --profile analytics up -d --no-build umami umami-retention
     fi
+    # Monitoring is opt-in: Prometheus needs METRICS_KEY to scrape /metrics.
+    # --force-recreate re-reads monitoring/prometheus.yml on every deploy.
+    if grep -Eq '^METRICS_KEY=.+' db.env; then
+      "${compose[@]}" --profile monitoring pull prometheus
+      "${compose[@]}" --profile monitoring up -d --no-build --force-recreate prometheus
+    fi
     ;;
   frontend)
     pull_if_needed frontend

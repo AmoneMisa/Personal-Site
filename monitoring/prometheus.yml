@@ -1,0 +1,19 @@
+# Prometheus for the Personal Site stack (docker-compose `prometheus`).
+# The bearer token is METRICS_KEY, written to /tmp/metrics_key by the
+# service entrypoint, because Prometheus config cannot read env vars.
+global:
+  scrape_interval: 30s
+  scrape_timeout: 10s
+
+scrape_configs:
+  - job_name: personal-site-frontend
+    metrics_path: /metrics
+    authorization:
+      type: Bearer
+      credentials_file: /tmp/metrics_key
+    static_configs:
+      - targets: ['frontend:3000']
+
+  - job_name: prometheus
+    static_configs:
+      - targets: ['localhost:9090']

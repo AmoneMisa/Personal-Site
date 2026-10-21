@@ -115,8 +115,41 @@ services:
     security_opt:
       - no-new-privileges:true
 
+  prometheus:
+    logging: *default-logging
+    # Scrapes the frontend's /metrics (server/routes/metrics.get.ts) with
+    # METRICS_KEY. Opt-in: deploy.sh starts it only when METRICS_KEY is set.
+    # The UI is bound to loopback (SSH tunnel to 127.0.0.1:9090); data is kept
+    # for PROMETHEUS_RETENTION (default 30d).
+    profiles: ["monitoring"]
+    image: prom/prometheus:${PROMETHEUS_IMAGE_TAG:-v3.5.0}
+    restart: unless-stopped
+    environment:
+      METRICS_KEY: ${METRICS_KEY:-}
+    entrypoint:
+      - sh
+      - -c
+      - >-
+        umask 077 && printf %s "$$METRICS_KEY" > /tmp/metrics_key &&
+        exec /bin/prometheus
+        --config.file=/etc/prometheus-site/prometheus.yml
+        --storage.tsdb.path=/prometheus
+        --storage.tsdb.retention.time=${PROMETHEUS_RETENTION:-30d}
+        --web.listen-address=:9090
+    volumes:
+      # Directory mount so a deploy's updated config is visible after restart.
+      - ./monitoring:/etc/prometheus-site:ro
+      - prometheus_data:/prometheus
+    ports:
+      - "127.0.0.1:${PROMETHEUS_PORT:-9090}:9090"
+    mem_limit: ${PROMETHEUS_MEMORY_LIMIT:-512m}
+    cpus: ${PROMETHEUS_CPU_LIMIT:-0.5}
+    security_opt:
+      - no-new-privileges:true
+
 volumes:
   site_state:
+  prometheus_data:
 
 networks:
   ai-net:

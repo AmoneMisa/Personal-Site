@@ -58,3 +58,15 @@ test('the 90-day visit statistics retention is both promised and enforced', asyn
   }
   assert.match(compose, /-f \/scripts\/umami-retention\.sql/)
 })
+
+test('Prometheus scrapes the frontend with METRICS_KEY and stays on loopback', async () => {
+  const [config, compose, deploy] = await Promise.all([
+    read('../monitoring/prometheus.yml'),
+    read('../docker-compose.yml'),
+    read('../deploy.sh'),
+  ])
+  assert.match(config, /credentials_file: \/tmp\/metrics_key/)
+  assert.match(config, /targets: \['frontend:3000'\]/)
+  assert.match(compose, /"127\.0\.0\.1:\$\{PROMETHEUS_PORT:-9090\}:9090"/)
+  assert.match(deploy, /grep -Eq '\^METRICS_KEY=\.\+' db\.env/)
+})
