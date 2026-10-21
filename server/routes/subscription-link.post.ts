@@ -5,7 +5,6 @@ const SCHEMA_RE = /^[a-z_][a-z0-9_]*$/i
 const HANDOFF_TTL_MINUTES = 30
 
 let pool: Pool | undefined
-let schemaPromise: Promise<void> | undefined
 
 function schema(): string {
   const value = String(process.env.SUBSCRIPTIONS_DB_SCHEMA || 'subscriptions').trim()
@@ -29,39 +28,9 @@ function db(): Pool {
   return pool
 }
 
-async function ensureSchema(): Promise<void> {
-  if (schemaPromise) return schemaPromise
-  const name = schema()
-  schemaPromise = (async () => {
-    await db().query(`CREATE SCHEMA IF NOT EXISTS ${name};`)
-    await db().query(`
-      CREATE TABLE IF NOT EXISTS ${name}.edit_sessions (
-        token VARCHAR(48) PRIMARY KEY,
-        subscription_id BIGINT NOT NULL,
-        telegram_user_id BIGINT NOT NULL,
-        expires_at TIMESTAMPTZ NOT NULL,
-        consumed_at TIMESTAMPTZ,
-        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-      );
-    `)
-    await db().query(`
-      CREATE TABLE IF NOT EXISTS ${name}.handoffs (
-        token VARCHAR(48) PRIMARY KEY,
-        search_url TEXT NOT NULL,
-        edit_token VARCHAR(48),
-        expires_at TIMESTAMPTZ NOT NULL,
-        consumed_at TIMESTAMPTZ,
-        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-      );
-    `)
-    await db().query(`CREATE INDEX IF NOT EXISTS handoffs_expiry_idx ON ${name}.handoffs(expires_at);`)
-    await db().query(`CREATE INDEX IF NOT EXISTS edit_sessions_expiry_idx ON ${name}.edit_sessions(expires_at);`)
-  })().catch((error) => {
-    schemaPromise = undefined
-    throw error
-  })
-  return schemaPromise
-}
+// The subscriptions schema (handoffs, edit_sessions) is created and migrated by
+// the subscription bot in whiteslove.me-backend-platform. The site only reads
+// and writes handoff rows, so its database role needs no DDL rights.
 
 function cleanPath(pathname: string): string {
   return pathname.replace(/^\/(?:ru|en|kk)(?=\/)/, '') || '/'
@@ -103,8 +72,6 @@ export default defineEventHandler(async (event) => {
 
   const body = await readBody<{ searchUrl?: string }>(event)
   const { url, editToken } = sanitizeSearchUrl(String(body?.searchUrl || ''))
-  await ensureSchema()
-
   if (editToken) {
     const edit = await db().query(
       `SELECT 1 FROM ${schema()}.edit_sessions
