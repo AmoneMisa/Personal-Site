@@ -58,7 +58,7 @@ https://github.com/AmoneMisa/Personal-Site
 Production checkout:
 
 ```text
-~/opt/myproject
+/opt/myproject
 ```
 
 Important paths:

@@ -115,7 +115,7 @@ GitHub Actions builds two immutable images from the same commit:
 workforce database migrations and never deploys workforce workers.
 
 ```bash
-bash ~/opt/myproject/deploy.sh
+bash /opt/myproject/deploy.sh
 ```
 
 Rollback manifests likewise contain only the frontend/backend image revisions.
