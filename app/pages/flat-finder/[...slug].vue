@@ -1445,7 +1445,7 @@ onBeforeUnmount(() => { modalOpen.value = false; lightboxOpen.value = false; rel
 .flats__controls_redesign { display: block; margin: 20px 0; }
 .flats__searchbar { display: grid; grid-template-columns: 1fr auto; gap: 10px; margin-bottom: 12px; }
 .flats__secondary-nav { margin-bottom: 12px; }
-.flats__custom-sites { margin-bottom: 12px; }
+.flats__custom-sites { margin-bottom: 12px; justify-content: flex-start; }
 .filter-surface {
   position: relative;
   isolation: isolate;
