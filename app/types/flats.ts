@@ -231,6 +231,13 @@ export interface FlatStatistics {
   };
 }
 
+export interface FlatPriceRange {
+  currency: string;
+  min: number;
+  max: number;
+  priceCount: number;
+}
+
 export interface FlatFeedResult {
   count: number;
   listings: FlatListing[];
@@ -242,6 +249,8 @@ export interface FlatFeedResult {
   error?: string;
   exactListingFallback?: "source" | "source-inactive" | string;
   statistics?: FlatStatistics;
+  /** Only on `priceRangeOnly=1` requests: bounds under every filter but price. */
+  priceRange?: FlatPriceRange | null;
   availabilityFiltered?: number;
   availabilityChecked?: string[];
 }

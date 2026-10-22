@@ -82,6 +82,9 @@ export default defineEventHandler(async (event) => {
     const shaped = shapeResponse(raw, requestedSources)
     if (
       raw?.warming
+      // A price-range answer never carries listings, so an empty page there
+      // says nothing about the source being empty.
+      || upstreamParams.get('priceRangeOnly') === '1'
       || requestedSources.length !== 1
       || shaped.listings.length
       || Number(raw?.sourceCounts?.[requestedSources[0]!]) > 0

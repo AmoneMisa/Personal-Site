@@ -39,6 +39,7 @@ import { regionalSearchCountry } from "~/utils/search/regionalCountry";
 import { useFlatFilters } from "~/composables/flats/useFlatFilters";
 import { useFlatFilterBlocks } from "~/composables/flats/useFlatFilterBlocks";
 import { useFlatFeed } from "~/composables/flats/useFlatFeed";
+import { useFlatPriceRange } from "~/composables/flats/useFlatPriceRange";
 import { useFlatPhotos } from "~/composables/flats/useFlatPhotos";
 import { useFlatMap } from "~/composables/flats/useFlatMap";
 import { useFlatRouteState } from "~/composables/flats/useFlatRouteState";
@@ -129,6 +130,22 @@ const {
   listings, total, loading, loadingMore, failed, sourceErrors, statistics,
   nextCursor, loadMoreSentinel, loadFeed, isFeedCached,
 } = useFlatFeed({ onAvailabilityChecked: markAvailabilityFresh });
+const { priceRange, refreshPriceRange } = useFlatPriceRange();
+// About a hundred slider positions across whatever the range is, on a round
+// step (1, 2 or 5 times a power of ten) so dragged values read naturally.
+const priceStep = computed(() => {
+  const range = priceRange.value;
+  if (!range) return 1;
+  const raw = (range.max - range.min) / 100;
+  if (raw <= 1) return 1;
+  const power = 10 ** Math.floor(Math.log10(raw));
+  return [1, 2, 5, 10].map((m) => m * power).find((step) => step >= raw)!;
+});
+const formatPriceBound = (value: number) => Math.round(value).toLocaleString(String(locale.value));
+function onDisplayCurrencyChange() {
+  void refreshPriceRange(currentFeedParams(), displayCurrency.value);
+  if (priceMin.value != null || priceMax.value != null) scheduleLoad();
+}
 const { listingPhoto, visiblePhotos, markPhotoFailedFromEvent } = useFlatPhotos();
 // The personal tabs are routes, not local state: /flat-finder/favorites and the
 // rest are linkable, bookmarkable and survive a refresh or the back button.
@@ -668,6 +685,9 @@ async function load(append = false, background = false, limit = PAGE_SIZE) {
     nextCursor: nextCursor.value,
     sources: SOURCES,
   });
+  // In parallel with the feed: the bounds only depend on the non-price filters,
+  // so a price-only change is answered from the composable's cache.
+  if (!append && !background) void refreshPriceRange(params, displayCurrency.value);
   const data = await loadFeed(params, { append, background });
   if (!data || background) return;
   if (!append && import.meta.client) lastPaginationScrollY = window.scrollY;
@@ -1240,10 +1260,23 @@ onBeforeUnmount(() => { modalOpen.value = false; lightboxOpen.value = false; rel
 
         <div class="filter-price-row">
           <span class="flats__field-label filter-price-row__label">{{ t('price') }}</span>
-          <u-input v-model.number="priceMin" class="price-input" type="number" inputmode="numeric" min="1" max="1000000000" :label="t('rangeFrom')" @change="scheduleLoad()" />
+          <u-input v-model.number="priceMin" class="price-input" type="number" inputmode="numeric" :min="priceRange?.min ?? 1" :max="priceRange?.max ?? 1000000000" :step="priceStep" :label="t('rangeFrom')" @change="scheduleLoad()" />
           <span class="price-separator">—</span>
-          <u-input v-model.number="priceMax" class="price-input" type="number" inputmode="numeric" min="1" max="1000000000" :label="t('rangeTo')" @change="scheduleLoad()" />
-          <label class="currency-select"><span class="sr-only">{{ t("currency") }}</span><u-select-menu v-model="displayCurrency" :items="currencyItems" value-key="value" label-key="label" class="flats__select currency-select__control" @update:model-value="(priceMin != null || priceMax != null) && scheduleLoad()" /></label>
+          <u-input v-model.number="priceMax" class="price-input" type="number" inputmode="numeric" :min="priceRange?.min ?? 1" :max="priceRange?.max ?? 1000000000" :step="priceStep" :label="t('rangeTo')" @change="scheduleLoad()" />
+          <label class="currency-select"><span class="sr-only">{{ t("currency") }}</span><u-select-menu v-model="displayCurrency" :items="currencyItems" value-key="value" label-key="label" class="flats__select currency-select__control" @update:model-value="onDisplayCurrencyChange" /></label>
+          <UiRangeSlider
+              v-if="priceRange"
+              v-model:from="priceMin"
+              v-model:to="priceMax"
+              class="filter-price-row__slider"
+              :min="priceRange.min"
+              :max="priceRange.max"
+              :step="priceStep"
+              :from-label="`${t('price')} ${t('rangeFrom')}`"
+              :to-label="`${t('price')} ${t('rangeTo')}`"
+              :format="formatPriceBound"
+              @change="scheduleLoad()"
+          />
         </div>
 
         <div class="filter-amenities-row">
@@ -1434,6 +1467,7 @@ onBeforeUnmount(() => { modalOpen.value = false; lightboxOpen.value = false; rel
    column-gap does the spacing now instead of a per-element margin. */
 .filter-price-row { display: grid; grid-template-columns: auto minmax(130px,190px) auto minmax(130px,190px) minmax(120px,145px); justify-content: start; align-items: center; column-gap: 8px; row-gap: 10px; margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--line); }
 .filter-price-row__label { margin: 0; }
+.filter-price-row__slider { grid-column: 2 / 5; }
 /* "от" / "до" are floating labels on the fields themselves now. The wrapper that
    used to draw a box around a caption plus a de-bordered input — and all the
    !important needed to stop that drawing two borders — is gone with it. */
@@ -1455,7 +1489,7 @@ onBeforeUnmount(() => { modalOpen.value = false; lightboxOpen.value = false; rel
 .flats__filter-blocks :deep(.flat-filter-grid_single) { grid-template-columns: 1fr; }
 .quick-options { display: grid; gap: 8px; }
 .quick-options :deep(button) { width: 100%; min-height: var(--ui-control-h-md); justify-content: flex-start; height: auto; padding-block: 8px; white-space: normal; text-align: left; line-height: 1.25; }
-.flats__controls_redesign :deep(input), .flats__controls_redesign :deep(button[role="combobox"]) { background-color: var(--bg-panel-2) !important; }
+.flats__controls_redesign :deep(input:not([type="range"])), .flats__controls_redesign :deep(button[role="combobox"]) { background-color: var(--bg-panel-2) !important; }
 
 @media (max-width: 1100px) {
   .flats__filter-blocks { grid-template-columns: repeat(2,minmax(0,1fr)); gap: 20px 0; }
@@ -1471,6 +1505,7 @@ onBeforeUnmount(() => { modalOpen.value = false; lightboxOpen.value = false; rel
   .filter-primary-grid { grid-template-columns: 1fr; gap: 12px; }
   .filter-price-row { grid-template-columns: minmax(0,1fr) 10px minmax(0,1fr); column-gap: 4px; row-gap: 8px; }
   .filter-price-row__label { grid-column: 1 / -1; }
+  .filter-price-row__slider { grid-column: 1 / -1; }
   .currency-select { grid-column: 1 / -1; }
   .price-input { min-width: 0; padding-left: 7px; gap: 3px; }
   .price-input :deep(.price-number-input) { font-size: 12px; }
