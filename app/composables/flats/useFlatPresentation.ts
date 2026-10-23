@@ -36,6 +36,24 @@ const nearbyTranslationKeys: Record<string, string> = {
   Towels: "amenityTowels",
   courtyard: "amenityCourtyard",
   gazebo: "amenityGazebo",
+  // Canonical amenity codes from parsing-lexicon's parseHousingAmenities.
+  separateRooms: "amenitySeparateRooms",
+  bed: "amenityBed",
+  washingMachine: "amenityWashingMachine",
+  refrigerator: "amenityRefrigerator",
+  television: "amenityTelevision",
+  airConditioner: "amenityAirConditioner",
+  internet: "amenityInternet",
+  stove: "amenityStove",
+  wardrobe: "amenityWardrobe",
+  furniture: "amenityFurniture",
+  kitchenEquipment: "amenityKitchenEquipment",
+  plasticWindows: "amenityPlasticWindows",
+  heatedFloor: "amenityHeatedFloor",
+  freeParking: "amenityFreeParking",
+  moveInReady: "amenityMoveInReady",
+  bedLinen: "amenityBedLinen",
+  towels: "amenityTowels",
 };
 
 const semanticListingTags = new Set([

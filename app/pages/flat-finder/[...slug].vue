@@ -1057,7 +1057,7 @@ const specRows = computed<FlatSpecRow[]>(() => {
     row("amenities", t("specHeating"), fmtBool(l.heating)),
     row("amenities", t("specHotWater"), fmtBool(l.hotWater)),
     row("amenities", t("specInternet"), fmtBool(l.internet)),
-    row("amenities", t("specAmenities"), amenitiesListOr(l.amenities)),
+    row("amenities", t("specAmenities"), amenitiesListOr(l.amenities), true),
 
     row("terms", t("specPets"), fmtBool(l.petsAllowed)),
     row("terms", t("specChildren"), fmtBool(l.childrenAllowed)),
