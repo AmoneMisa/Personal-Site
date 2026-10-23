@@ -41,6 +41,7 @@ import { useFlatFilterBlocks } from "~/composables/flats/useFlatFilterBlocks";
 import { useFlatFeed } from "~/composables/flats/useFlatFeed";
 import { useFlatPriceRange } from "~/composables/flats/useFlatPriceRange";
 import { useFlatPhotos } from "~/composables/flats/useFlatPhotos";
+import { useFlatFilterChips } from "~/composables/flats/useFlatFilterChips";
 import { useFlatMap } from "~/composables/flats/useFlatMap";
 import { useFlatRouteState } from "~/composables/flats/useFlatRouteState";
 import { useFlatTranslation } from "~/composables/flats/useFlatTranslation";
@@ -124,6 +125,9 @@ const {
   metroMaxM, metroBearingFrom, metroBearingTo, nearbyKind,
   displayCurrency, query, source, customSites, showAdvanced, buildFeedParams, resetValues: resetFilterValues,
 } = flatFilters;
+// Optional "list only what the map shows" filter; null means off.
+const viewFilter = ref(false);
+const viewBounds = ref<{ south: number; west: number; north: number; east: number } | null>(null);
 const rates = ref<Record<string, number>>({ USD: 1 });
 const { isFresh: isAvailabilityFresh, markFresh: markAvailabilityFresh, forget: forgetAvailability } = useFlatAvailabilityCache();
 
@@ -514,6 +518,24 @@ const agencyItems = computed<Item[]>(() => [
   { label: t("agAny"), value: "any" }, { label: t("agOwner"), value: "owner" }, { label: t("agAgency"), value: "agency" },
 ]);
 
+const activeFilterChips = useFlatFilterChips({
+  t,
+  filters: flatFilters,
+  zoneLabel: (value) => zoneLabel(value),
+  itemLabel: (group, value) => {
+    const items = { dealType: dealTypeItems, propertyType: propertyTypeItems, agency: agencyItems, audience: audienceItems, nearbyKind: nearbyKindItems }[group].value;
+    return items.find((item) => item.value === value)?.label ?? value;
+  },
+  sourceLabel: (value) => sourceOptions.value.find((item) => item.value === value)?.label ?? value,
+  metroArcLabel: () => metroArcLabel.value,
+  clearMetroArc: () => clearMetroArc(),
+  clearMetro: () => clearMetroFilter(),
+  viewFilter,
+  drawnAreaPoints: () => drawnArea.value.length,
+  clearDrawnArea: () => { drawnArea.value = []; },
+  onChange: () => scheduleLoad(0),
+});
+
 const flatAdvancedFilterBlocks = useFlatFilterBlocks({
   t,
   filters: flatFilters,
@@ -538,6 +560,7 @@ const flatAdvancedFilterBlocks = useFlatFilterBlocks({
   hasMicrodistricts: () => microdistrictMarkers.value.length > 0,
   hasQuartals: () => quartalMarkers.value.length > 0,
   hasAreas: () => areaZones.value.length > 0,
+  viewFilter,
   scheduleLoad,
 });
 
@@ -610,7 +633,13 @@ const metroProximity = computed<MetroProximity>(() => ({
 // The radius is only re-checked here when several stations are selected --
 // with one station the server already applied metroMaxM, and re-filtering on
 // coordinates the feed may not carry would drop listings the server kept.
-const narrowToArea = (items: Listing[]) => applyMetroProximity(applyDrawnArea(items), metroProximity.value);
+const narrowToView = (items: Listing[]) => {
+  const b = viewFilter.value ? viewBounds.value : null;
+  if (!b) return items;
+  return items.filter((l) => l.lat != null && l.lng != null
+    && l.lat >= b.south && l.lat <= b.north && l.lng >= b.west && l.lng <= b.east);
+};
+const narrowToArea = (items: Listing[]) => narrowToView(applyMetroProximity(applyDrawnArea(items), metroProximity.value));
 const activeListings = computed(() => narrowToArea(listings.value.filter((item) => !hiddenIds.value.has(item.id))));
 const displayedListings = computed(() => {
   if (view.value === "favorites") return narrowToArea(favorites.value);
@@ -743,6 +772,7 @@ function resetFilters() {
   // Empty means "every country", so reset keeps the regional starting country.
   resetFilterValues(defaultCountry.value);
   drawnArea.value = [];
+  viewFilter.value = false;
   goToView("active");
   scheduleLoad();
 }
@@ -1307,22 +1337,6 @@ onBeforeUnmount(() => { modalOpen.value = false; lightboxOpen.value = false; rel
         </div>
 
         <UiFilterFooter class="filter-actions-row" :reset-label="t('reset')" @reset="resetFilters">
-          <div class="active-filter-chips">
-            <button v-if="region" type="button" class="filter-chip" @click="region = ''; scheduleLoad()">{{ t("region") }}: {{ zoneLabel(region) }} <span>×</span></button>
-            <button v-if="district" type="button" class="filter-chip" @click="district = ''; scheduleLoad()">{{ t("district") }}: {{ locName(district, 'district') }} <span>×</span></button>
-            <button v-if="microdistrict" type="button" class="filter-chip" @click="microdistrict = ''; scheduleLoad()">{{ t("microdistrictsLayer") }}: {{ zoneLabel(microdistrict) }} <span>×</span></button>
-            <button v-if="quartal" type="button" class="filter-chip" @click="quartal = ''; scheduleLoad()">{{ t("quartalsLayer") }}: {{ zoneLabel(quartal) }} <span>×</span></button>
-            <button v-if="mapArea" type="button" class="filter-chip" @click="mapArea = ''; scheduleLoad()">{{ t("areasLayer") }}: {{ zoneLabel(mapArea) }} <span>×</span></button>
-            <button v-if="metro.length" type="button" class="filter-chip" @click="clearMetroFilter()">{{ t("metro") }}: {{ metroChipLabel }} <span>×</span></button>
-            <button v-if="metroArcLabel" type="button" class="filter-chip" @click="clearMetroArc()">{{ t("metroDirection") }}: {{ metroArcLabel }} <span>×</span></button>
-            <button v-if="roomsMin != null" type="button" class="filter-chip" @click="roomsMin = undefined; scheduleLoad()">{{ roomsMin }}+ {{ t('roomsChip') }} <span>×</span></button>
-            <button v-if="petFriendly" type="button" class="filter-chip" @click="petFriendly = false; scheduleLoad()"><u-icon name="i-lucide-paw-print" /> {{ t('pets') }} <span>×</span></button>
-            <button v-if="noElevatorOnly" type="button" class="filter-chip" @click="noElevatorOnly = false; scheduleLoad()">{{ t('noElevator') }} <span>×</span></button>
-            <button v-if="noDepositOnly" type="button" class="filter-chip" @click="noDepositOnly = false; scheduleLoad()">{{ t('noDeposit') }} <span>×</span></button>
-            <button v-if="communalIncludedOnly" type="button" class="filter-chip" @click="communalIncludedOnly = false; scheduleLoad()">{{ t('communalIncluded') }} <span>×</span></button>
-            <button v-if="noCommissionOnly" type="button" class="filter-chip" @click="noCommissionOnly = false; scheduleLoad()">{{ t('noCommission') }} <span>×</span></button>
-            <button v-if="euroLayoutOnly" type="button" class="filter-chip" @click="euroLayoutOnly = false; scheduleLoad()">{{ t('euroLayout') }} <span>×</span></button>
-          </div>
         </UiFilterFooter>
       </section>
 
@@ -1344,13 +1358,20 @@ onBeforeUnmount(() => { modalOpen.value = false; lightboxOpen.value = false; rel
     <FlatAccountBar v-if="view === 'favorites'" />
     <p v-if="failed" class="flats__error">{{ t("error") }}</p>
     <p v-else-if="source === 'telegram' && !loading && !listings.length && sourceErrors?.some((item) => item.source === 'telegram')" class="flats__source-warning">{{ t("telegramUnavailable") }}</p>
-    <div v-else class="flats__results-toolbar">
-      <FlatOwnerBreadcrumbs v-if="owner && view === 'active'" :owner-key="owner" @all="leaveOwner('active')" @owners="leaveOwner('owners')" />
-      <p class="flats__count text-muted">{{ t("found", { n: view === 'active' ? total : displayedListings.length }) }}</p>
-      <UiSortSelect class="flats__sort" v-model="sort" :items="sortItems" :label="extraLabels.sort" @update:model-value="scheduleLoad(0)" />
-    </div>
     <FlatsStatsPanel v-if="view === 'active' && statistics" :statistics="statistics" :selected-city="city" :display-currency="displayCurrency" :convert="convert" :location-label="(value, kind) => labelFor(value, kind)" />
-<section class="flats__map-wrap"><flat-map :points="mapPoints" :draw-label="t('drawArea')" :done-label="t('done')" :clear-label="t('clearArea')" :draw-hint="t('drawHint')" :expand-label="t('mapExpand')" :collapse-label="t('mapCollapse')" :scroll-hint-label="t('mapScrollHint')" :district-zones="districtZones" :microdistrict-markers="microdistrictMarkers" :quartal-markers="quartalMarkers" :metro-stations="metroStations" :university-zones="universityZones" :shopping-mall-zones="shoppingMallZones" :park-zones="parkZones" :area-zones="areaZones" :city-zone="cityZone" :selected-region="region" :selected-district="district" :selected-microdistrict="microdistrict" :selected-quartal="quartal" :selected-area="mapArea" :selected-metros="metro" :selected-metro-radius-m="metroMaxM" :metro-bearing-from="metroBearingFrom" :metro-bearing-to="metroBearingTo" :metro-radius-handle-label="t('metroRadiusHandle')" :metro-arc-handle-label="t('metroArcHandle')" :fit-results-label="t('mapFitResults')" :districts-label="t('districtsLayer')" :microdistricts-label="t('microdistrictsLayer')" :quartals-label="t('quartalsLayer')" :metro-label="t('metro')" :universities-label="t('universitiesLayer')" :shopping-malls-label="t('shoppingMallsLayer')" :parks-label="t('parksLayer')" :areas-label="t('areasLayer')" :city-label="t('cityLayer')" @select="openById" @area-change="drawnArea = $event" @zone-select="onZoneSelect" @city-select="onCitySelect" @metro-toggle="onMetroToggle" @metro-shape="onMetroShape" /></section>
+<section class="flats__map-wrap"><flat-map :points="mapPoints" :draw-label="t('drawArea')" :done-label="t('done')" :clear-label="t('clearArea')" :draw-hint="t('drawHint')" :expand-label="t('mapExpand')" :collapse-label="t('mapCollapse')" :scroll-hint-label="t('mapScrollHint')" :district-zones="districtZones" :microdistrict-markers="microdistrictMarkers" :quartal-markers="quartalMarkers" :metro-stations="metroStations" :university-zones="universityZones" :shopping-mall-zones="shoppingMallZones" :park-zones="parkZones" :area-zones="areaZones" :city-zone="cityZone" :selected-region="region" :selected-district="district" :selected-microdistrict="microdistrict" :selected-quartal="quartal" :selected-area="mapArea" :selected-metros="metro" :selected-metro-radius-m="metroMaxM" :metro-bearing-from="metroBearingFrom" :metro-bearing-to="metroBearingTo" :metro-radius-handle-label="t('metroRadiusHandle')" :metro-arc-handle-label="t('metroArcHandle')" :fit-results-label="t('mapFitResults')" :view-filter="viewFilter" :districts-label="t('districtsLayer')" :microdistricts-label="t('microdistrictsLayer')" :quartals-label="t('quartalsLayer')" :metro-label="t('metro')" :universities-label="t('universitiesLayer')" :shopping-malls-label="t('shoppingMallsLayer')" :parks-label="t('parksLayer')" :areas-label="t('areasLayer')" :city-label="t('cityLayer')" @select="openById" @area-change="drawnArea = $event" @bounds-change="viewBounds = $event" @zone-select="onZoneSelect" @city-select="onCitySelect" @metro-toggle="onMetroToggle" @metro-shape="onMetroShape" /></section>
+
+    <div v-if="!failed" class="flats__results-head">
+      <FlatOwnerBreadcrumbs v-if="owner && view === 'active'" :owner-key="owner" @all="leaveOwner('active')" @owners="leaveOwner('owners')" />
+      <div class="flats__results-toolbar">
+        <p class="flats__count text-muted">{{ t("found", { n: view === 'active' && !(viewFilter && viewBounds) ? total : displayedListings.length }) }}</p>
+        <UiSortSelect class="flats__sort" v-model="sort" :items="sortItems" :label="extraLabels.sort" @update:model-value="scheduleLoad(0)" />
+      </div>
+      <div v-if="activeFilterChips.length" class="active-filter-chips">
+        <button v-for="chip in activeFilterChips" :key="chip.key" type="button" class="filter-chip" @click="chip.clear()"><u-icon v-if="chip.icon" :name="chip.icon" />{{ chip.label }} <span>×</span></button>
+        <button v-if="activeFilterChips.length > 1" type="button" class="filter-chip filter-chip_reset" @click="resetFilters">{{ t("reset") }}</button>
+      </div>
+    </div>
 
     <SearchResultGrid>
       <FlatCard
@@ -1489,6 +1510,9 @@ onBeforeUnmount(() => { modalOpen.value = false; lightboxOpen.value = false; rel
 .filter-actions-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--line); }
 .active-filter-chips { display: flex; flex: 1 1 300px; gap: 8px; flex-wrap: wrap; min-width: 0; }
 .filter-chip { display: inline-flex; align-items: center; gap: 7px; max-width: 100%; min-height: 34px; padding: 6px 11px; border: 1px solid var(--line); border-radius: 7px; background: var(--bg-panel-2); color: var(--text-primary); white-space: normal; text-align: left; line-height: 1.25; }
+.filter-chip_reset { background: transparent; color: var(--ui-text-muted); }
+.flats__results-head { display: grid; gap: 10px; margin-bottom: 12px; }
+.flats__results-head .flats__results-toolbar { margin-bottom: 0; }
 .filter-chip span { color: var(--ui-text-muted); flex: 0 0 auto; }
 .flats__filter-blocks { grid-template-columns: 1.15fr .95fr 1.1fr 1.1fr 1fr; gap: 0; padding: 16px; }
 .flats__filter-blocks :deep(.filter-section) { min-width: 0; padding: 0 16px; border: 0; border-left: 1px solid var(--line); border-radius: 0; background: transparent; }

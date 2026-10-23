@@ -29,6 +29,8 @@ export function useFlatFilterBlocks(options: {
   hasQuartals: () => boolean;
   hasAreas: () => boolean;
   scheduleLoad: () => void;
+  /** Client-side "list only what the map shows" toggle; needs no feed reload. */
+  viewFilter: Model<boolean>;
 }) {
   const {
     metroMaxM, nearbyMaxM, roomsMin, roomsMax, bedroomsMin, bedroomsMax,
@@ -61,6 +63,7 @@ export function useFlatFilterBlocks(options: {
         { id: "no-elevator", control: "checkbox", label: options.t("noElevator"), value: noElevatorOnly.value, onUpdate: update(noElevatorOnly), onCommit: commit },
         { id: "no-deposit", control: "checkbox", label: options.t("noDeposit"), value: noDepositOnly.value, onUpdate: update(noDepositOnly), onCommit: commit },
         { id: "communal-included", control: "checkbox", label: options.t("communalIncluded"), value: communalIncludedOnly.value, hidden: rentOnlyHidden(), onUpdate: update(communalIncludedOnly), onCommit: commit },
+        { id: "in-view", control: "checkbox", label: options.t("mapFilterByView"), value: options.viewFilter.value, onUpdate: update(options.viewFilter) },
         { id: "euro-layout", control: "checkbox", label: options.t("euroLayout"), value: euroLayoutOnly.value, hidden: longRentHidden(), onUpdate: update(euroLayoutOnly), onCommit: commit },
       ],
     },

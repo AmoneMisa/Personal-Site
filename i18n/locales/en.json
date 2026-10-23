@@ -176,6 +176,7 @@
     "metro": "Metro",
     "metroAny": "Any metro",
     "mapFitResults": "Frame all results",
+    "mapFilterByView": "List only what is in view",
     "metroDirection": "Direction from metro",
     "metroDirectionAny": "Any direction",
     "metroRadiusHandle": "Drag to set the distance",

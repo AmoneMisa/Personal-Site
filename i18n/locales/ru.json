@@ -176,6 +176,7 @@
     "metro": "Метро",
     "metroAny": "Любое метро",
     "mapFitResults": "Показать все результаты",
+    "mapFilterByView": "Только видимое на карте",
     "metroDirection": "Сторона от метро",
     "metroDirectionAny": "Любая сторона",
     "metroRadiusHandle": "Потяните, чтобы задать расстояние",

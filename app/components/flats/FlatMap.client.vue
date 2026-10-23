@@ -126,11 +126,13 @@ const props = defineProps<{
   metroRadiusHandleLabel?: string;
   metroArcHandleLabel?: string;
   fitResultsLabel?: string;
+  viewFilter?: boolean;
 }>();
 
 const emit = defineEmits<{
   (e: "select", identity: { id: string; source?: string }): void;
   (e: "area-change", points: Array<{ lat: number; lng: number }>): void;
+  (e: "bounds-change", bounds: { south: number; west: number; north: number; east: number } | null): void;
   (e: "zone-select", payload: { kind: ZoneKind; name: string; radiusM?: number }): void;
   (e: "city-select" | "metro-toggle", name: string): void;
   (e: "metro-shape", shape: { radiusM: number; bearingFrom?: number; bearingTo?: number }): void;
@@ -1393,6 +1395,11 @@ function renderCityZone() {
 function renderAllZoneLayers() {
   renderCityZone(); renderRegions(); renderDistrictZones(); renderMicrodistricts(); renderQuartals(); renderQuarters(); renderMetro(); renderTransportStops(); renderAmenities(); renderAreaZones();
 }
+function emitViewBounds() {
+  if (!props.viewFilter || !map) { emit("bounds-change", null); return; }
+  const b = map.getBounds();
+  emit("bounds-change", { south: b.getSouth(), west: b.getWest(), north: b.getNorth(), east: b.getEast() });
+}
 function toggleDrawing() { drawing.value = !drawing.value; menuOpen.value = null; if (drawing.value) closeRadial(); }
 function clearArea() { area.value = []; renderArea(); emit("area-change", []); }
 
@@ -1422,11 +1429,13 @@ onMounted(async () => {
   el.value.addEventListener("mouseleave", deactivateScroll);
   map.on("zoomend", renderMarkers); map.on("movestart", closeRadial); map.on("zoomstart", closeRadial);
   map.on("zoomend", evaluateAutoZoneFilters); map.on("moveend", evaluateAutoZoneFilters);
+  map.on("moveend", emitViewBounds);
   renderMarkers(); renderFocusedPoint(); renderAllZoneLayers();
   if (selectedZoneFromProps()) syncSelectionFromProps(true); else fitToPoints();
 });
 
 watch(renderedPoints, () => { renderMarkers(); fitToPoints(); });
+watch(() => props.viewFilter, emitViewBounds);
 watch(() => stableQueryKey(normalizedRouteQuery()), () => {
   preserveCamera = true;
   void loadFullMapFeed();
