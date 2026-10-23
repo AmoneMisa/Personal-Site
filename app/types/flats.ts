@@ -145,11 +145,16 @@ export interface FlatListing {
   smokingAllowed?: boolean | null;
   negotiable?: boolean | null;
   utilitiesAmount?: FlatMoneyAmount | null;
-  minLeaseTerm?: string | null;
+  minLeaseTerm?: FlatLeaseTerm | string | null;
   availableFrom?: string | null;
   tags?: string[];
   vision?: FlatVisionResult;
   marketComparison?: FlatMarketComparison;
+}
+
+export interface FlatLeaseTerm {
+  unit: "day" | "week" | "month" | "year";
+  value: number;
 }
 
 export interface FlatMapPoint {

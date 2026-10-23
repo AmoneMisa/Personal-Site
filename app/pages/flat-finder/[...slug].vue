@@ -56,6 +56,7 @@ import { ANY_SELECT_VALUE, useNullableSelect } from "~/composables/search/useNul
 import { useShareLink } from "~/composables/search/useShareLink";
 import type {
   FlatFeedResult as FeedResult,
+  FlatLeaseTerm,
   FlatListing as Listing,
   FlatView,
 } from "~/types/flats";
@@ -943,6 +944,13 @@ const fmtBool = (v?: boolean | null) => (v === true ? t("yes") : v === false ? t
 const numOr = (v?: number | null, unit = "") => (v != null ? `${v}${unit ? " " + unit : ""}` : t("notSpecified"));
 const strOr = (v?: string | null) => (v ? v : t("notSpecified"));
 const listOr = (v?: string[] | null) => (v && v.length ? v.join(", ") : t("notSpecified"));
+const leaseUnitKeys: Record<string, string> = { day: "leaseUnitDay", week: "leaseUnitWeek", month: "leaseUnitMonth", year: "leaseUnitYear" };
+const leaseTermLabel = (v?: FlatLeaseTerm | string | null) => {
+  if (!v) return t("notSpecified");
+  if (typeof v === "string") return v;
+  const key = leaseUnitKeys[String(v.unit)];
+  return key && Number.isFinite(Number(v.value)) ? `${v.value} ${t(key)}` : t("notSpecified");
+};
 const nearbyListOr = (values?: string[] | null) => values?.length
   ? values.map((value) => nearbyItemLabel(value, active.value || undefined)).join(", ") : t("notSpecified");
 const amenitiesListOr = nearbyListOr;
@@ -1064,7 +1072,7 @@ const specRows = computed<FlatSpecRow[]>(() => {
     row("terms", t("specSmoking"), fmtBool(l.smokingAllowed)),
     row("terms", t("specAudience"), audienceLabel(l.audience)),
     row("terms", t("specRoomShare"), fmtBool(l.roomOnly)),
-    row("terms", t("specMinLease"), strOr(l.minLeaseTerm)),
+    row("terms", t("specMinLease"), leaseTermLabel(l.minLeaseTerm)),
     row("terms", t("specAvailable"), strOr(l.availableFrom)),
 
     row("costs", t("specNegotiable"), fmtBool(l.negotiable)),
