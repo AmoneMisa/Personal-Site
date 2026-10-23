@@ -87,12 +87,12 @@ const education = [
   {
     "id": "karazin",
     "school": "V. N. Karazin Kharkiv National University",
-    "period": "2015 — 2019"
+    "period": "2019 — 2020"
   },
   {
     "id": "nlu",
     "school": "National Law University — Institute of Criminal Investigation and Forensics",
-    "period": "2019 — 2020"
+    "period": "2015 — 2019"
   }
 ];
 
