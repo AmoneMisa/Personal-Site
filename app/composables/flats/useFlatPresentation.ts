@@ -69,6 +69,23 @@ const nearbyTranslationKeys: Record<string, string> = {
   moveInReady: "amenityMoveInReady",
   bedLinen: "amenityBedLinen",
   towels: "amenityTowels",
+  // Canonical codes from parsing-lexicon APPLIANCE_TERMS / AMENITY_TERMS and Flat Finder structured flags.
+  gas: "gas",
+  privateYard: "privateYard",
+  terrace: "terrace",
+  balcony: "balcony",
+  security: "amenitySecurity",
+  parking: "amenityParking",
+  elevator: "amenityElevator",
+  furnished: "amenityFurnished",
+  unfurnished: "amenityUnfurnished",
+  microwave: "amenityMicrowave",
+  oven: "amenityOven",
+  kettle: "amenityKettle",
+  boiler: "amenityBoiler",
+  vacuumCleaner: "amenityVacuumCleaner",
+  router: "amenityRouter",
+  iron: "amenityIron",
 };
 
 const semanticListingTags = new Set([
