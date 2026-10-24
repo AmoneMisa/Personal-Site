@@ -119,9 +119,8 @@ const {
   countries, city, region, district, microdistrict, quartal, mapArea, dealType, agency, petFriendly, roomOnlyFilter,
   onlyWithPhotos, childrenRequired, newBuildingOnly, dishwasherOnly, airConditionerOnly,
   parkingOnly, internetOnly, gasOnly, balconyOnly, terraceOnly, privateYardOnly,
-  noElevatorOnly, noDepositOnly, communalIncludedOnly, noCommissionOnly,
-  tvOnly, microwaveOnly, ovenOnly, bidetOnly, walkInClosetOnly, bathtubOnly, showerOnly, euroLayoutOnly, sort,
-  metro, priceMin, priceMax, roomsMin,
+  tvOnly, microwaveOnly, ovenOnly, bidetOnly, walkInClosetOnly, bathtubOnly, showerOnly, sort,
+  metro, priceMin, priceMax,
   metroMaxM, metroBearingFrom, metroBearingTo, nearbyKind,
   displayCurrency, query, source, customSites, showAdvanced, buildFeedParams, resetValues: resetFilterValues,
 } = flatFilters;
@@ -284,8 +283,6 @@ const {
   preferredCountry: () => defaultCountry.value,
 });
 
-const locName = (value: string | null | undefined, kind: "country" | "city" | "district" | "metro" | "any" = "any") =>
-  labelFor(value, kind);
 const {
   presentCard,
   displayListingTitle,
@@ -416,7 +413,6 @@ const nearbyKindItems = computed<Item[]>(() => [
 // never selectable back into -- you get a custom arc by dragging, not by picking.
 const METRO_CUSTOM_ARC_VALUE = "__custom__";
 const nearbyKindSel = useNullableSelect(nearbyKind);
-const metroChipLabel = computed(() => metro.value.map((name) => zoneLabel(name)).join(", "));
 // The arc is normally set by dragging the wedge handles. This mirror of it keeps
 // the filter reachable without a pointer, and gives the chip something readable:
 // a dragged arc that is not one of the eight slices still shows its degrees.
