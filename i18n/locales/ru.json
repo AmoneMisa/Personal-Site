@@ -1611,6 +1611,8 @@
       "ogType": "website",
       "robots": "index, follow",
       "siteName": "WhitesLove - Кубай Маргарита Разработчик",
+      "breadcrumbHome": "Главная",
+      "breadcrumbServices": "Сервисы",
       "twitterCard": "summary_large_image"
     },
     "pages": {

@@ -356,6 +356,7 @@ watch(user, (v) => lsSet(LS_KEYS.user, v), {deep: true});
     <page-header
         title="quizzes.countryFit.title"
         headline="quizzes.countryFit.headline"
+        :is-main-header="true"
         class="mb-4"
     />
 

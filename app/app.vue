@@ -97,6 +97,7 @@ useHead({
       innerHTML: JSON.stringify({
         "@context": "https://schema.org",
         "@type": "Person",
+        "@id": `${SITE_URL}/#person`,
         name: "Marharyta Kubai",
         alternateName: "Маргарита Кубай",
         url: SITE_URL,

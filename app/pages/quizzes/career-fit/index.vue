@@ -48,6 +48,7 @@ const hasAnswers = computed(() => answeredCount.value > 0);
     <page-header
         title="quizzes.careerFit.title"
         headline="quizzes.careerFit.headline"
+        :is-main-header="true"
         class="mb-4"
     />
 

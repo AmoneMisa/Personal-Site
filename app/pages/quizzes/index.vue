@@ -96,6 +96,7 @@ const howSteps = [
       <page-header
           title="quizzes.title"
           headline="quizzes.headline"
+          :is-main-header="true"
           class="mb-6"
       />
 

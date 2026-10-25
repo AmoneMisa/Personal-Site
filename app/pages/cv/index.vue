@@ -163,6 +163,7 @@ const personLd = computed(() => {
   const knowsAbout = [...skills.core, ...skills.frameworks, ...skills.platform];
   const person: Record<string, unknown> = {
     "@type": "Person",
+    "@id": `${SITE_URL}/#person`,
     name: translate("cv.name", {}, { locale: "en" }),
     givenName: "Marharyta",
     familyName: "Kubai",

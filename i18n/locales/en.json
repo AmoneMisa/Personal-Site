@@ -1611,6 +1611,8 @@
       "ogType": "website",
       "robots": "index, follow",
       "siteName": "WhitesLove - Kubai Marharyta Developer",
+      "breadcrumbHome": "Home",
+      "breadcrumbServices": "Services",
       "twitterCard": "summary_large_image"
     },
     "pages": {
@@ -2996,7 +2998,7 @@
       "month": "mo",
       "lessThanMonth": "<1 mo"
     },
-    "seoTitle": "Margarita — Frontend Developer (Vue.js · Nuxt.js · TypeScript)"
+    "seoTitle": "Marharyta — Frontend Developer (Vue.js · Nuxt.js · TypeScript)"
   },
   "about": {
     "heroEyebrow": "more about me",

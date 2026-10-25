@@ -58,6 +58,7 @@ const suggestCareerFit = computed(() =>
     <page-header
         title="quizzes.lifeValues.title"
         headline="quizzes.lifeValues.headline"
+        :is-main-header="true"
         class="mb-4"
     />
 

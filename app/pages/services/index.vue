@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import PageHeader from "~/components/common/PageHeader.vue";
 import { useServiceSeo } from "~/composables/services/useServiceSeo";
 
 const { t } = useI18n();
@@ -37,7 +38,7 @@ const howSteps = [
   <u-container class="services">
     <ocean-page-backdrop variant="treasure" />
     <div class="services__header text-center space-y-3">
-      <page-header title="services.title" headline="services.headline" class="mb-6" />
+      <page-header title="services.title" headline="services.headline" :is-main-header="true" class="mb-6" />
       <p class="services__subtitle mx-auto">{{ t("services.subtitle") }}</p>
     </div>
 
