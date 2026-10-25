@@ -1401,6 +1401,8 @@ onBeforeUnmount(() => { modalOpen.value = false; lightboxOpen.value = false; rel
       <template #footer><UiModalFooter v-if="active"><u-button variant="outline" color="neutral" icon="i-lucide-heart" @click="toggleFavorite(active)">{{ isFavorite(active.id) ? t("removeFavorite") : t("addFavorite") }}</u-button><u-button variant="outline" color="neutral" :icon="isHidden(active.id) ? 'i-lucide-eye' : 'i-lucide-eye-off'" @click="toggleHidden(active)">{{ isHidden(active.id) ? t("restoreListing") : t("hideListing") }}</u-button><u-button variant="outline" color="neutral" :icon="shareCopied ? 'i-lucide-check' : 'i-lucide-share-2'" @click="shareFlat(active)">{{ shareCopied ? t("shareCopied") : t("share") }}</u-button><a class="modal-footer__primary" :href="active.url" target="_blank" rel="noopener noreferrer">{{ t("open") }} →</a></UiModalFooter></template>
     </SearchDetailsModal>
 
+    <tool-seo-content v-if="routeSlug().length === 0" i18n-key="flats.about" />
+
     <SearchPresetDialog v-model:open="presetModalOpen" v-model:name="presetName" :title="t('savePreset')" :name-label="t('presetName')" :cancel-label="t('cancel')" :save-label="t('save')" @save="savePreset" />
     <SearchShareDialog v-model:open="shareModalOpen" :title="sharedLinkOpened ? t('sharedSearchApplied') : t('shareSearch')" :hint="sharedLinkOpened ? t('sharedSearchHint') : t('shareSearchHint')" :url="shareUrl" :copy-label="t('copyLink')" @copy="copyShareLink" />
     <button v-if="showBackToTop" type="button" class="flats__back-top" :aria-label="t('backToTop')" @click="scrollToFilters"><u-icon name="i-lucide-arrow-up" /><span>{{ t('backToTop') }}</span></button>

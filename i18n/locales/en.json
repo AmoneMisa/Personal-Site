@@ -1,5 +1,20 @@
 {
   "flats": {
+    "about": {
+      "title": "Search flats and houses from many sources",
+      "p1": "Flat Finder brings together rental and sale listings from OLX and Telegram channels across several countries and shows them as a list and on a map.",
+      "p2": "Filter listings by price, number of rooms, deal type, and whether the host is an owner or an agency. Save the ones you like to favorites and hide the ones you do not.",
+      "p3": "Every listing links to the original post, where you can contact the author.",
+      "faqTitle": "Frequently asked questions",
+      "faq": {
+        "q1": "Where do the listings come from?",
+        "a1": "From OLX and from Telegram channels with housing listings.",
+        "q2": "Can I search without agencies?",
+        "a2": "Yes, the filters let you choose listings from owners or from agencies.",
+        "q3": "Is there a map?",
+        "a3": "Yes, you can browse results on the map and narrow them to the visible area."
+      }
+    },
     "addFavorite": "Add to favorites",
     "amenities": "Amenities",
     "airConditioner": "A/C",
@@ -613,6 +628,21 @@
     "sourceFilter": "Source"
   },
   "jobs": {
+    "about": {
+      "title": "Search job vacancies from many sources",
+      "p1": "Job Finder collects vacancies from several boards into one feed and shows only fresh postings, no older than 14 days. You do not waste time on positions that are already closed.",
+      "p2": "Filter vacancies by country, skills, and language, sort the results, and see statistics on salaries, countries, sources, and in-demand skills.",
+      "p3": "Every vacancy gets an ATS match score against your CV. Your CV stays in the browser and is not uploaded anywhere.",
+      "faqTitle": "Frequently asked questions",
+      "faq": {
+        "q1": "How fresh are the vacancies?",
+        "a1": "The feed is limited to vacancies no older than 14 days; older postings are not shown.",
+        "q2": "What is an ATS score?",
+        "a2": "It estimates how well your CV matches a vacancy's keywords and skills, roughly the way applicant tracking systems screen candidates.",
+        "q3": "Is my CV uploaded to a server?",
+        "a3": "No, your CV is processed in the browser."
+      }
+    },
     "filterCoverage": "Exclusions & coverage",
     "filterLocation": "Location",
     "filterSalary": "Salary",
@@ -1710,7 +1740,7 @@
         "description": "Edit SVG: live preview, minify, replace colors, manage stroke.",
         "ogDescription": "Edit SVG: live preview, minify, replace colors, manage stroke.",
         "ogTitle": "SVG Editor",
-        "title": "SVG Editor",
+        "title": "SVG Editor Online — minify, recolor and edit SVG",
         "twitterDescription": "Edit SVG: live preview, minify, replace colors, manage stroke.",
         "twitterTitle": "SVG Editor"
       },
@@ -2098,6 +2128,23 @@
     },
     "howTitle": "How it works",
     "markdownEditor": {
+      "about": {
+        "title": "Format text for Telegram, WhatsApp and TikTok",
+        "p1": "Every messenger reads markup differently: Telegram and WhatsApp use different characters for bold, italic, and strikethrough, and TikTok accepts plain text only. The editor shows how your message will look on the chosen platform before you send it.",
+        "p2": "Select text and apply bold, italic, underline, strikethrough, spoiler, quote, code, and links with buttons or keyboard shortcuts. Lists can be formatted in one click, and emoji can be inserted from the picker.",
+        "p3": "Copy the finished result with one button. Your draft is saved in the browser, so the text survives a page reload. Built-in spellcheck helps catch typos.",
+        "faqTitle": "Frequently asked questions",
+        "faq": {
+          "q1": "How do I make text bold or strikethrough in Telegram?",
+          "a1": "Select the text and press the button or shortcut. On the Telegram tab the editor adds the right markup and the preview shows the result.",
+          "q2": "How is WhatsApp formatting different from Telegram?",
+          "a2": "WhatsApp uses its own markup characters rather than Markdown. Pick the WhatsApp tab and the text is formatted by its rules.",
+          "q3": "Does TikTok support formatting?",
+          "a3": "No, TikTok accepts plain text only, so no markup is added on that tab.",
+          "q4": "Is there a length limit?",
+          "a4": "Yes, the editor limits text to 8000 characters and warns you when it is exceeded."
+        }
+      },
       "actions": {
         "cancel": "Cancel",
         "check": "Check text",
@@ -2179,6 +2226,23 @@
       "title": "Markdown Editor"
     },
     "mergeJson": {
+      "about": {
+        "title": "How to merge two JSON files online",
+        "p1": "Upload two JSON files, such as translation files for different languages or app versions. The tool compares them key by key, highlights differences, and shows keys that exist on only one side.",
+        "p2": "For every key you can pick the source of the value: take it from file A, from file B, or leave the automatic choice. The result is built in the middle column, where you can edit it by hand, validate it, and download it.",
+        "p3": "Files are processed in your browser. View modes include tree, flat keys, and plain JSON, with an \"only differences\" filter and search by keys and values.",
+        "faqTitle": "Frequently asked questions",
+        "faq": {
+          "q1": "How do I compare two JSON files?",
+          "a1": "Choose file A and file B. Turn on \"Only differences\" to see keys with different values and keys present in just one file.",
+          "q2": "Can I merge i18n translation files?",
+          "a2": "Yes, the tool is built for localization files. Pick a base file and missing keys are pulled from the other one; you resolve conflicting values yourself.",
+          "q3": "What if my JSON is invalid?",
+          "a3": "Click \"Validate JSON\" to see the error, or \"Fix JSON\" to replace typographic and single quotes with standard double quotes.",
+          "q4": "Is my data sent to a server?",
+          "a4": "No, comparing and merging happen in your browser."
+        }
+      },
       "actions": {
         "addKey": "Add key",
         "downloadJson": "Download JSON",
@@ -2412,6 +2476,23 @@
     "searchPlaceholder": "Search services…",
     "subtitle": "Pick a category, use search, and open the service that gets the job done faster and easier.",
     "svgEditor": {
+      "about": {
+        "title": "Online tool to edit and minify SVG",
+        "p1": "Paste SVG code or upload a file and see changes instantly in the preview. It suits icons and simple illustrations you need to prepare for a website quickly.",
+        "p2": "Available tools are minify, remove fixed dimensions, replace colors (including with currentColor), a stroke editor (stroke and stroke-width), and move, scale, and rotate for elements.",
+        "p3": "Everything runs in your browser and the file is not uploaded anywhere. You can copy or download the result.",
+        "faqTitle": "Frequently asked questions",
+        "faq": {
+          "q1": "How do I reduce the size of an SVG file?",
+          "a1": "Click \"Minify\" to remove comments, metadata, title and desc tags, and empty defs. If the icon should scale with its container, also use \"Remove size\".",
+          "q2": "How do I recolor an SVG icon?",
+          "a2": "Open \"Replace colors\", pick a color from the detected list, and set the new one. Use currentColor if the icon should inherit the text color.",
+          "q3": "Can I change stroke width and color?",
+          "a3": "Yes, in the stroke editor select an element and set stroke and stroke-width.",
+          "q4": "Is my file uploaded to a server?",
+          "a4": "No, the SVG is processed right in your browser."
+        }
+      },
       "actions": {
         "apply": "Apply",
         "editStroke": "Edit stroke",

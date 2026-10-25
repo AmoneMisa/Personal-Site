@@ -401,6 +401,8 @@ onBeforeUnmount(() => {
       </template>
     </modal>
 
+
+    <tool-seo-content i18n-key="services.markdownEditor.about" />
   </u-container>
 </template>
 

@@ -14,6 +14,8 @@ useServiceSeo("svgEditor");
     />
 
     <svg-editor-shell />
+
+    <tool-seo-content i18n-key="services.svgEditor.about" />
   </u-container>
 </template>
 

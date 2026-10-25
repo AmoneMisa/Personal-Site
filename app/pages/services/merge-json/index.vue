@@ -79,6 +79,8 @@ const monacoMode = computed(() => (ui.viewMode === "flat" ? "flat" : "json"));
         @confirm="(payload) => { ui.modal.onConfirm(payload); ui.closeModal(); }"
     />
 
+
+    <tool-seo-content i18n-key="services.mergeJson.about" />
   </u-container>
 </template>
 

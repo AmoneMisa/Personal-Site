@@ -9,6 +9,8 @@
 // hreflang alternates (+ x-default -> the default/ru URL) so search engines pick
 // the right language per user. Keep this list in sync with actual pages.
 
+import { INDEXABLE_ROUTES } from "../utils/indexableRoutes";
+
 const SITE_URL = "https://whiteslove.me";
 
 // Locales in priority order. The first entry is the default and stays unprefixed.
@@ -18,34 +20,8 @@ const LOCALES: { code: string; prefix: string }[] = [
 ];
 const DEFAULT_LOCALE = LOCALES[0];
 
-// Indexable routes with a rough change frequency / priority.
-const ROUTES: { path: string; changefreq: string; priority: number }[] = [
-  { path: "/", changefreq: "weekly", priority: 1.0 },
-  { path: "/about", changefreq: "monthly", priority: 0.8 },
-  { path: "/projects", changefreq: "monthly", priority: 0.8 },
-  { path: "/cv", changefreq: "monthly", priority: 0.9 },
-  { path: "/services", changefreq: "weekly", priority: 0.9 },
-  { path: "/jobs", changefreq: "daily", priority: 0.8 },
-  { path: "/hiring", changefreq: "daily", priority: 0.8 },
-  { path: "/flat-finder", changefreq: "daily", priority: 0.8 },
-  { path: "/quizzes", changefreq: "monthly", priority: 0.6 },
-  { path: "/quizzes/country-fit", changefreq: "monthly", priority: 0.6 },
-  { path: "/quizzes/career-fit", changefreq: "monthly", priority: 0.6 },
-  { path: "/quizzes/life-values", changefreq: "monthly", priority: 0.6 },
-  { path: "/services/converter", changefreq: "monthly", priority: 0.7 },
-  { path: "/services/dockerhub", changefreq: "monthly", priority: 0.7 },
-  { path: "/services/email-editor", changefreq: "monthly", priority: 0.7 },
-  { path: "/services/markdown-editor", changefreq: "monthly", priority: 0.7 },
-  { path: "/services/merge-json", changefreq: "monthly", priority: 0.7 },
-  { path: "/services/pdf-editor", changefreq: "monthly", priority: 0.7 },
-  { path: "/services/svg-editor", changefreq: "monthly", priority: 0.7 },
-  { path: "/services/workflow-validator", changefreq: "monthly", priority: 0.7 },
-  { path: "/privacy", changefreq: "monthly", priority: 0.3 },
-  { path: "/terms", changefreq: "monthly", priority: 0.3 },
-  { path: "/cookies", changefreq: "monthly", priority: 0.2 },
-  { path: "/legal", changefreq: "monthly", priority: 0.2 },
-  { path: "/data-rights", changefreq: "monthly", priority: 0.3 },
-];
+// Shared with the canonical-path redirect (server/utils/indexableRoutes.ts).
+const ROUTES = INDEXABLE_ROUTES;
 
 // Build the absolute URL for a route in a given locale. The home path "/" must
 // not become "/en/" — the prefixed home is just "/en".

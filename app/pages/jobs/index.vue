@@ -918,6 +918,8 @@ onBeforeUnmount(() => {
         </UiModalFooter>
       </template>
     </SearchDetailsModal>
+
+    <tool-seo-content i18n-key="jobs.about" />
   </SearchPageShell>
 </template>
 

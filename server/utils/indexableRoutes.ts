@@ -1,0 +1,30 @@
+// Static, indexable top-level routes. Single source for the sitemap and for the
+// canonical-path redirect, so the two cannot drift apart. Per-document editor
+// URLs (/services/pdf-editor/[docId]) are intentionally absent — they are noindex.
+export const INDEXABLE_ROUTES: { path: string; changefreq: string; priority: number }[] = [
+  { path: "/", changefreq: "weekly", priority: 1.0 },
+  { path: "/about", changefreq: "monthly", priority: 0.8 },
+  { path: "/projects", changefreq: "monthly", priority: 0.8 },
+  { path: "/cv", changefreq: "monthly", priority: 0.9 },
+  { path: "/services", changefreq: "weekly", priority: 0.9 },
+  { path: "/jobs", changefreq: "daily", priority: 0.8 },
+  { path: "/hiring", changefreq: "daily", priority: 0.8 },
+  { path: "/flat-finder", changefreq: "daily", priority: 0.8 },
+  { path: "/quizzes", changefreq: "monthly", priority: 0.6 },
+  { path: "/quizzes/country-fit", changefreq: "monthly", priority: 0.6 },
+  { path: "/quizzes/career-fit", changefreq: "monthly", priority: 0.6 },
+  { path: "/quizzes/life-values", changefreq: "monthly", priority: 0.6 },
+  { path: "/services/converter", changefreq: "monthly", priority: 0.7 },
+  { path: "/services/dockerhub", changefreq: "monthly", priority: 0.7 },
+  { path: "/services/email-editor", changefreq: "monthly", priority: 0.7 },
+  { path: "/services/markdown-editor", changefreq: "monthly", priority: 0.7 },
+  { path: "/services/merge-json", changefreq: "monthly", priority: 0.7 },
+  { path: "/services/pdf-editor", changefreq: "monthly", priority: 0.7 },
+  { path: "/services/svg-editor", changefreq: "monthly", priority: 0.7 },
+  { path: "/services/workflow-validator", changefreq: "monthly", priority: 0.7 },
+  { path: "/privacy", changefreq: "monthly", priority: 0.3 },
+  { path: "/terms", changefreq: "monthly", priority: 0.3 },
+  { path: "/cookies", changefreq: "monthly", priority: 0.2 },
+  { path: "/legal", changefreq: "monthly", priority: 0.2 },
+  { path: "/data-rights", changefreq: "monthly", priority: 0.3 },
+];
