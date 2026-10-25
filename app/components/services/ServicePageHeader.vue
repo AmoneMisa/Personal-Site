@@ -20,6 +20,7 @@ withDefaults(defineProps<{
         :headline="headline"
         :description="description"
         :is-centered="true"
+        :is-main-header="true"
     />
   </div>
 </template>

@@ -50,8 +50,7 @@ useHead(() => ({
         "@type": "ItemList",
         name: chrome.value.title,
         description: chrome.value.subtitle,
-        itemListElement: groups.value.flatMap((group) =>
-          group.items.map((p, i) => ({
+        itemListElement: groups.value.flatMap((group) => group.items).map((p, i) => ({
             "@type": "ListItem",
             position: i + 1,
             item: {
@@ -59,11 +58,10 @@ useHead(() => ({
               name: p.name,
               description: p.description,
               programmingLanguage: p.stack,
-              ...(p.href ? {codeRepository: p.href} : {}),
+              ...(p.href ? {codeRepository: p.href.startsWith("/") ? `${SITE_URL}${p.href}` : p.href} : {}),
               ...(p.downloadHref ? {downloadUrl: `${SITE_URL}${p.downloadHref}`} : {}),
             },
-          }))
-        ),
+          })),
       }),
     },
   ],

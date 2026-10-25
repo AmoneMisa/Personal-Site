@@ -3025,7 +3025,7 @@
     "backend": {
       "kind": "Backend · Python",
       "title": "Personal Site Backend",
-      "description": "The backend for this site's own services: Python, PostgreSQL, Redis, WebSockets. It powers the tools in the catalog."
+      "description": "The backend for this site's own services: Python, PostgreSQL, WebSockets. It powers the tools in the catalog."
     },
     "modsTitle": "Game mods & patchers (C#)",
     "hobbiesEyebrow": "away from the code",
@@ -3082,7 +3082,7 @@
     },
     "descriptions": {
       "whiteslove": "A personal platform of online tools: PDF editor, JSON merge, DockerHub tag search, email/markdown/SVG editors. The same stack as my main work — Nuxt with SSR, multi-language, a custom REST backend.",
-      "personal-site-backend": "The backend for the site's own services: a FastAPI REST API, file processing (PDF, conversion), Redis caching. It powers the tools in the catalog.",
+      "personal-site-backend": "The backend for the site's own services: a FastAPI REST API, file processing (PDF, conversion). It powers the tools in the catalog.",
       "account-status-api-lost-ark": "The API behind the online module of the Account Status (Lost Ark) app.",
       "i18n-properties-manager": "A localization-files manager, including .ftlh (Freemarker) — the same tech I use at BPC. Compare, merge and edit translation keys.",
       "lost-ark": "Automatically pulls character data by parsing HTML, and tracks in-game activities with a scheduled auto-reset.",

@@ -54,9 +54,11 @@ function localeUrl(prefix: string, path: string): string {
   return `${SITE_URL}${prefix}${path}`;
 }
 
-export default defineEventHandler((event) => {
-  const lastmod = new Date().toISOString().slice(0, 10);
+// Fixed at process start (= last deploy), not per request: claiming every URL
+// changed "today" on each crawl teaches crawlers to ignore <lastmod>.
+const lastmod = new Date().toISOString().slice(0, 10);
 
+export default defineEventHandler((event) => {
   const urls: string[] = [];
 
   for (const route of ROUTES) {

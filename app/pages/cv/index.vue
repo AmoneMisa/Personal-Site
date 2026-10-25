@@ -16,7 +16,6 @@ const SITE_URL = "https://whiteslove.me";
 
 const links = {
   github: "https://github.com/AmoneMisa",
-  portfolio: "https://amonemisa.github.io/personal/",
   site: SITE_URL,
   linkedin: "https://www.linkedin.com/in/whiteslove-marharyta-kubai",
   telegram: "https://t.me/WhitesLove",
@@ -160,7 +159,7 @@ useSeoMeta({
 // Person / ProfilePage structured data — helps you surface for name/skill
 // searches and gives Google a Knowledge-Panel-eligible entity.
 const personLd = computed(() => {
-  const sameAs = [links.github, links.portfolio, links.linkedin, links.telegram].filter(Boolean);
+  const sameAs = [links.github, links.linkedin, links.telegram].filter(Boolean);
   const knowsAbout = [...skills.core, ...skills.frameworks, ...skills.platform];
   const person: Record<string, unknown> = {
     "@type": "Person",
@@ -213,9 +212,6 @@ useHead({
         </a>
         <a :href="links.github" target="_blank" rel="noopener noreferrer" class="cv__btn">
           {{ t('cta.github') }}
-        </a>
-        <a :href="links.portfolio" target="_blank" rel="noopener noreferrer" class="cv__btn">
-          {{ t('cta.portfolio') }}
         </a>
         <a v-if="links.email" :href="`mailto:${links.email}`" class="cv__btn">
           {{ t('cta.email') }}

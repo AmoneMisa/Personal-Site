@@ -46,7 +46,7 @@ const GROUPS: RawGroup[] = [
       {
         "id": "personal-site-backend",
         "name": "Personal Site Backend",
-        "stack": "Python · FastAPI · PostgreSQL · Redis",
+        "stack": "Python · FastAPI · PostgreSQL",
         "href": "https://github.com/AmoneMisa/Personal-Site/tree/master/backend"
       },
       {
