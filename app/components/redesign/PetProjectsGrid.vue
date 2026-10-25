@@ -26,7 +26,7 @@ function isExternal(href: string | null) {
         <article v-for="proj in p.items" :key="proj.title" class="pet-projects__card" :class="{ 'pet-projects__card_wide': proj.span2 }">
           <div>
             <div class="pet-projects__kind mono">{{ proj.kind }}</div>
-            <h4 class="pet-projects__card-title">{{ proj.title }}</h4>
+            <h3 class="pet-projects__card-title">{{ proj.title }}</h3>
             <p class="pet-projects__description">{{ proj.description }}</p>
           </div>
           <a
@@ -111,7 +111,7 @@ a.pet-projects__link:hover {
   color: var(--accent-pink);
 }
 .pet-projects__link_muted {
-  opacity: 0.7;
+  opacity: 1;
 }
 .pet-projects__all-link {
   display: inline-block;

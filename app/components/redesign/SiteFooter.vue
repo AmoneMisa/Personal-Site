@@ -63,7 +63,7 @@ function isDownload(href: string) {
 
         <div class="site-footer__content">
           <nav class="site-footer__nav" :aria-label="f.navTitle">
-            <h6 class="site-footer__column-title mono">{{ f.navTitle }}</h6>
+            <h3 class="site-footer__column-title mono">{{ f.navTitle }}</h3>
             <div class="site-footer__nav-grid">
               <a
                 v-for="l in f.navLinks"
@@ -75,7 +75,7 @@ function isDownload(href: string) {
           </nav>
 
           <div class="site-footer__apps">
-            <h6 class="site-footer__column-title mono">{{ f.appsTitle }}</h6>
+            <h3 class="site-footer__column-title mono">{{ f.appsTitle }}</h3>
             <div class="site-footer__apps-row">
               <a
                 v-for="app in f.apps"
@@ -94,7 +94,7 @@ function isDownload(href: string) {
           </div>
 
           <div class="site-footer__contacts">
-            <h6 class="site-footer__column-title mono">{{ f.contactsTitle }}</h6>
+            <h3 class="site-footer__column-title mono">{{ f.contactsTitle }}</h3>
             <div class="site-footer__contacts-row">
               <a
                 v-for="c in contactLinks"

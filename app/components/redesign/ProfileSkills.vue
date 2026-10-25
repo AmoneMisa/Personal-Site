@@ -19,7 +19,7 @@ const languages = computed(() => s.value.cards[s.value.cards.length - 1]);
 
       <div class="profile-skills__grid">
         <article v-for="card in topical" :key="card.title" class="profile-skills__card">
-          <h4 class="profile-skills__card-title mono">{{ card.title }}</h4>
+          <h3 class="profile-skills__card-title mono">{{ card.title }}</h3>
           <ul class="profile-skills__list">
             <li v-for="item in card.items" :key="item" class="profile-skills__list-item">{{ item }}</li>
           </ul>
@@ -27,7 +27,7 @@ const languages = computed(() => s.value.cards[s.value.cards.length - 1]);
       </div>
 
       <div class="profile-skills__languages">
-        <h4 class="profile-skills__languages-title mono">{{ languages.title }}</h4>
+        <h3 class="profile-skills__languages-title mono">{{ languages.title }}</h3>
         <ul class="profile-skills__language-list">
           <li v-for="item in languages.items" :key="item" class="profile-skills__language">{{ item }}</li>
         </ul>
