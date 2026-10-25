@@ -8,7 +8,7 @@ const routeState = await readFile(new URL('../app/composables/hiring/useHiringRo
 const preview = await readFile(new URL('../server/plugins/share-preview.ts', import.meta.url), 'utf8')
 
 test('hiring-feed delegates publicId/profileId filtering to backend-platform', () => {
-  assert.match(route, /requirePlatformGet\(event, 'cv', '\/hiring-feed'\)/)
+  assert.match(route, /requirePlatformGet\(event, 'cv', '\/hiring-feed'[,)]/)
   assert.doesNotMatch(route, /hiringSnapshot|matchesFilters|publicEntityId/)
 })
 

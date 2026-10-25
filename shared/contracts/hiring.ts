@@ -22,6 +22,8 @@ export type CandidateGender = 'male' | 'female' | 'unknown'
 export interface HiringStatisticsItem {
   label: string
   value: number
+  /** Localized label added by the server for location rows. */
+  display?: string
 }
 
 export interface HiringProfessionSalaryRange {

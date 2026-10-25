@@ -142,7 +142,7 @@ function stopMetaDrag(event: PointerEvent) {
     @keydown.enter.self="emit('open', job)"
   >
     <div class="job-card__head">
-      <h3 class="job-card__title">{{ job.title }}</h3>
+      <h2 class="job-card__title">{{ job.title }}</h2>
       <div class="job-card__head-side">
         <SearchMatchBadge
           v-if="ats"

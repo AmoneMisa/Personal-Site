@@ -10,12 +10,12 @@ const pasteModel = computed({ get: () => props.paste, set: (value: string) => em
   <section class="ats">
     <div class="ats__head"><u-icon name="i-lucide-file-check-2" class="ats__icon" /><div><div class="ats__title">{{ t("atsTitle") }}</div><div class="ats__intro text-muted">{{ t("atsIntro") }}</div></div></div>
     <div class="ats__body">
-      <label class="ats__upload"><input type="file" accept=".pdf,.docx,.txt,.md" class="hidden" @change="emit('upload', $event)" /><u-icon name="i-lucide-upload" /> {{ t("atsUpload") }}</label>
+      <label class="ats__upload" :class="{ ats__upload_busy: loading }" :aria-busy="loading"><input type="file" accept=".pdf,.docx,.txt,.md" class="hidden" :disabled="loading" @change="emit('upload', $event)" /><u-icon :name="loading ? 'i-lucide-loader-circle' : 'i-lucide-upload'" :class="{ ats__spin: loading }" /> {{ loading ? t("atsReading") : t("atsUpload") }}</label>
       <u-textarea v-model="pasteModel" :rows="3" :placeholder="t('atsPaste')" class="ats__paste" @blur="emit('apply')" />
       <div class="ats__actions"><u-button v-if="ready" variant="soft" color="neutral" icon="i-lucide-x" @click="emit('clear')">{{ t("atsClear") }}</u-button></div>
     </div>
     <p v-if="error" class="ats__error">{{ error }}</p>
-    <p v-else-if="loading" class="text-muted ats__status">…</p>
+    <p v-else-if="loading" class="text-muted ats__status" role="status" aria-live="polite">{{ t("atsReadingHint") }}</p>
     <p v-else-if="ready" class="ats__status ats__status_ready">{{ t("atsReady") }}</p>
   </section>
 </template>
@@ -32,6 +32,10 @@ const pasteModel = computed({ get: () => props.paste, set: (value: string) => em
 .ats__actions { display: flex; justify-content: flex-end; }
 .ats__status, .ats__error { margin-top: 10px; font-size: 13px; }
 .ats__status_ready { color: #34d399; }
+.ats__upload_busy { opacity: .7; cursor: progress; pointer-events: none; }
+.ats__spin { animation: ats-spin 1s linear infinite; }
+@keyframes ats-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .ats__spin { animation: none; } }
 .ats__error { color: var(--ui-error, #f87171); }
 .hidden { display: none; }
 @media (min-width: 800px) { .ats__body { grid-template-columns: auto 1fr auto; } }

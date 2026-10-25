@@ -663,6 +663,8 @@
     "atsPaste": "…or paste CV text here",
     "atsPasteTooShort": "Please paste a little more CV text.",
     "atsReadError": "Could not read the CV file.",
+    "atsReading": "Reading your CV…",
+    "atsReadingHint": "This can take a few seconds, especially for PDFs. Please keep the page open.",
     "atsReady": "CV loaded — scores shown on each vacancy.",
     "atsTitle": "ATS match",
     "atsUpload": "Upload CV (.pdf .docx .txt)",

@@ -2,9 +2,7 @@
 import type { HiringCvProfile } from '~/types/hiring'
 import { formatRelativeDate } from '~/utils/search/relativeDate'
 import SearchMatchBadge from '~/components/search/SearchMatchBadge.vue'
-import { locationLabel } from '~/utils/locationLabels'
 import { capitalizeFirst } from '~/utils/text'
-import { canonicalCityValue } from '~~/shared/locationCatalog'
 import {
   scoreHiringCandidate,
   tagMatchesHiringFilters,
@@ -117,7 +115,7 @@ const metadata = computed(() => {
     items.push({
       key: 'city',
       icon: 'i-lucide-map-pin',
-      value: locationLabel(canonicalCityValue(props.profile.city), String(locale.value), 'city'),
+      value: props.profile.cityLabel || props.profile.city,
       title: t('filterLocation'),
     })
   }
@@ -197,7 +195,7 @@ function openCard() {
     </div>
 
     <header class="hiring-card__header">
-      <h3 class="hiring-card__title">{{ profile.name || profile.role }}</h3>
+      <h2 class="hiring-card__title">{{ profile.name || profile.role }}</h2>
       <p v-if="profile.name && profile.role" class="hiring-card__role">{{ profile.role }}</p>
     </header>
 

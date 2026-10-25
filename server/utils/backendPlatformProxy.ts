@@ -16,6 +16,7 @@ export async function requirePlatformGet(
   event: Parameters<typeof getRequestURL>[0],
   domain: PlatformDomain,
   path: string,
+  options: { dropParams?: string[] } = {},
 ): Promise<unknown> {
   const baseUrl = platformBaseUrl(domain)
   if (!baseUrl) {
@@ -28,6 +29,7 @@ export async function requirePlatformGet(
   const incoming = getRequestURL(event)
   const upstream = new URL(path, `${baseUrl}/`)
   upstream.search = incoming.search
+  for (const name of options.dropParams ?? []) upstream.searchParams.delete(name)
 
   try {
     const response = await fetch(upstream, {

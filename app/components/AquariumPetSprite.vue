@@ -2,6 +2,7 @@
 import type { CreaturePreset } from "~/utils/aquariumCreatures";
 
 defineProps<{ creature: CreaturePreset }>();
+const expressionsReady = useExpressionSprites();
 defineEmits<{ loaded: [] }>();
 
 function handleImageError(event: Event) {
@@ -23,33 +24,33 @@ function jellyMoodSrc(creature: CreaturePreset, mood: "sleep" | "play" | "angry"
   <div class="aquarium-pet-sprite" :class="`aquarium-pet-sprite_${creature.kind}`" @error.capture="handleImageError">
     <template v-if="creature.kind === 'puffer'">
       <img class="aquarium-pet-sprite__image aquarium-pet-sprite__puffer aquarium-pet-sprite__puffer_normal" :src="creature.src" alt="" draggable="false" @load="$emit('loaded')">
-      <img class="aquarium-pet-sprite__image aquarium-pet-sprite__puffer aquarium-pet-sprite__puffer_ball" src="/images/ocean-creatures/puffer-clean-animated.webp" alt="" draggable="false">
+      <img v-if="expressionsReady" class="aquarium-pet-sprite__image aquarium-pet-sprite__puffer aquarium-pet-sprite__puffer_ball" src="/images/ocean-creatures/puffer-clean-animated.webp" alt="" draggable="false">
     </template>
 
     <template v-else-if="creature.kind === 'shark'">
       <img class="aquarium-pet-sprite__image aquarium-pet-sprite__expression aquarium-pet-sprite__expression_default" :src="creature.src" alt="" draggable="false" @load="$emit('loaded')">
-      <img class="aquarium-pet-sprite__image aquarium-pet-sprite__expression aquarium-pet-sprite__expression_hunt" src="/images/ocean-creatures/shark-hunt.webp" alt="" draggable="false">
-      <img class="aquarium-pet-sprite__image aquarium-pet-sprite__expression aquarium-pet-sprite__expression_interest" src="/images/ocean-creatures/shark-curious-animated.webp" alt="" draggable="false">
-      <img class="aquarium-pet-sprite__image aquarium-pet-sprite__expression aquarium-pet-sprite__expression_panic" src="/images/ocean-creatures/shark-annoyed-animated.webp" alt="" draggable="false">
+      <img v-if="expressionsReady" class="aquarium-pet-sprite__image aquarium-pet-sprite__expression aquarium-pet-sprite__expression_hunt" src="/images/ocean-creatures/shark-hunt.webp" alt="" draggable="false">
+      <img v-if="expressionsReady" class="aquarium-pet-sprite__image aquarium-pet-sprite__expression aquarium-pet-sprite__expression_interest" src="/images/ocean-creatures/shark-curious-animated.webp" alt="" draggable="false">
+      <img v-if="expressionsReady" class="aquarium-pet-sprite__image aquarium-pet-sprite__expression aquarium-pet-sprite__expression_panic" src="/images/ocean-creatures/shark-annoyed-animated.webp" alt="" draggable="false">
     </template>
 
     <template v-else-if="creature.kind === 'seahorse'">
       <img class="aquarium-pet-sprite__image aquarium-pet-sprite__expression aquarium-pet-sprite__expression_default" :src="creature.src" alt="" draggable="false" @load="$emit('loaded')">
-      <img class="aquarium-pet-sprite__image aquarium-pet-sprite__expression aquarium-pet-sprite__expression_interest" src="/images/ocean-creatures/seahorse-heart-animated.webp" alt="" draggable="false">
-      <img class="aquarium-pet-sprite__image aquarium-pet-sprite__expression aquarium-pet-sprite__expression_panic" src="/images/ocean-creatures/seahorse-tired-animated.webp" alt="" draggable="false">
+      <img v-if="expressionsReady" class="aquarium-pet-sprite__image aquarium-pet-sprite__expression aquarium-pet-sprite__expression_interest" src="/images/ocean-creatures/seahorse-heart-animated.webp" alt="" draggable="false">
+      <img v-if="expressionsReady" class="aquarium-pet-sprite__image aquarium-pet-sprite__expression aquarium-pet-sprite__expression_panic" src="/images/ocean-creatures/seahorse-tired-animated.webp" alt="" draggable="false">
     </template>
 
     <template v-else-if="creature.id === 'blue-fish' || creature.id === 'clownfish'">
       <img class="aquarium-pet-sprite__image aquarium-pet-sprite__expression aquarium-pet-sprite__expression_default" :src="creature.src" alt="" draggable="false" @load="$emit('loaded')">
-      <img class="aquarium-pet-sprite__image aquarium-pet-sprite__expression aquarium-pet-sprite__expression_interest" :src="fishExpressionSrc(creature, 'interest')" alt="" draggable="false">
-      <img class="aquarium-pet-sprite__image aquarium-pet-sprite__expression aquarium-pet-sprite__expression_panic" :src="fishExpressionSrc(creature, 'panic')" alt="" draggable="false">
+      <img v-if="expressionsReady" class="aquarium-pet-sprite__image aquarium-pet-sprite__expression aquarium-pet-sprite__expression_interest" :src="fishExpressionSrc(creature, 'interest')" alt="" draggable="false">
+      <img v-if="expressionsReady" class="aquarium-pet-sprite__image aquarium-pet-sprite__expression aquarium-pet-sprite__expression_panic" :src="fishExpressionSrc(creature, 'panic')" alt="" draggable="false">
     </template>
 
     <template v-else-if="creature.kind === 'jelly'">
       <img class="aquarium-pet-sprite__image aquarium-pet-sprite__jelly-base" :src="creature.src" alt="" draggable="false" @load="$emit('loaded')">
-      <img class="aquarium-pet-sprite__image aquarium-pet-sprite__jelly-mood aquarium-pet-sprite__jelly-mood_sleep" :src="jellyMoodSrc(creature, 'sleep')" alt="" draggable="false">
-      <img class="aquarium-pet-sprite__image aquarium-pet-sprite__jelly-mood aquarium-pet-sprite__jelly-mood_play" :src="jellyMoodSrc(creature, 'play')" alt="" draggable="false">
-      <img class="aquarium-pet-sprite__image aquarium-pet-sprite__jelly-mood aquarium-pet-sprite__jelly-mood_angry" :src="jellyMoodSrc(creature, 'angry')" alt="" draggable="false">
+      <img v-if="expressionsReady" class="aquarium-pet-sprite__image aquarium-pet-sprite__jelly-mood aquarium-pet-sprite__jelly-mood_sleep" :src="jellyMoodSrc(creature, 'sleep')" alt="" draggable="false">
+      <img v-if="expressionsReady" class="aquarium-pet-sprite__image aquarium-pet-sprite__jelly-mood aquarium-pet-sprite__jelly-mood_play" :src="jellyMoodSrc(creature, 'play')" alt="" draggable="false">
+      <img v-if="expressionsReady" class="aquarium-pet-sprite__image aquarium-pet-sprite__jelly-mood aquarium-pet-sprite__jelly-mood_angry" :src="jellyMoodSrc(creature, 'angry')" alt="" draggable="false">
     </template>
 
     <img v-else class="aquarium-pet-sprite__image" :src="creature.src" alt="" draggable="false" @load="$emit('loaded')">

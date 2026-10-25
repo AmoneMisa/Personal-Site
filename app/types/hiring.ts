@@ -20,6 +20,9 @@ export interface HiringCvProfile {
   salaryMax?: number | null
   currency?: string | null
   city?: string | null
+  /** Localized by the server (hiring-feed); falls back to the raw value. */
+  cityLabel?: string
+  countryLabel?: string
   district?: string | null
   remote?: boolean | null
   url: string
@@ -55,6 +58,8 @@ export interface HiringCountryMeta {
   name: string
   currency: string
   cities?: string[]
+  /** canonical city -> localized label, added by the server (hiring-meta). */
+  cityLabels?: Record<string, string>
 }
 
 export interface HiringSourceOption {

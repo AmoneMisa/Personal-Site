@@ -13,8 +13,8 @@ test('jobs and hiring public routes delegate to isolated platform domains', asyn
   ])
   assert.match(jobs, /requirePlatformGet\(event, 'vacancies', '\/jobs-feed'\)/)
   assert.match(vacancy, /requirePlatformGet\(event, 'vacancies', '\/jobs-vacancy'\)/)
-  assert.match(hiring, /requirePlatformGet\(event, 'cv', '\/hiring-feed'\)/)
-  assert.match(meta, /requirePlatformGet\(event, 'cv', '\/hiring-meta'\)/)
+  assert.match(hiring, /requirePlatformGet\(event, 'cv', '\/hiring-feed'[,)]/)
+  assert.match(meta, /requirePlatformGet\(event, 'cv', '\/hiring-meta'[,)]/)
 })
 
 test('platform proxy preserves query parameters and fails closed without configuration', async () => {

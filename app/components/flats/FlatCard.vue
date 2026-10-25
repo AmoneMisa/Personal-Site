@@ -131,7 +131,7 @@ const emit = defineEmits<{
         <div class="flat-card__price" :class="`flat-card__price_${priceTone}`">{{ presentation.price }}</div>
         <div v-if="presentation.convertedPrice" class="flat-card__price-conv text-muted">{{ presentation.convertedPrice }}</div>
       </div>
-      <h3 class="flat-card__title" :title="presentation.title">{{ presentation.title }}</h3>
+      <h2 class="flat-card__title" :title="presentation.title">{{ presentation.title }}</h2>
       <div v-if="presentation.specification" class="flat-card__spec text-muted">{{ presentation.specification }}</div>
       <UiDraggablePills v-if="pillItems.length" class="flat-card__badges" :items="pillItems" :visible-hint-count="3" />
       <div class="flat-card__meta text-muted">

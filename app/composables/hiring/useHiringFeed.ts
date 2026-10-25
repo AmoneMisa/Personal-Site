@@ -5,6 +5,7 @@ import { useLatestRequest } from "~/composables/search/useLatestRequest";
 import { useFeedPolling } from "~/composables/search/useFeedPolling";
 
 export function useHiringFeed() {
+  const { locale } = useI18n();
   const profiles = ref<HiringCvProfile[]>([]);
   const total = ref(0);
   const statistics = ref<HiringStatistics | null>(null);
@@ -34,7 +35,7 @@ export function useHiringFeed() {
       failed.value = false;
     }
 
-    const { data, error } = await safeFetch<HiringFeedResult>("/hiring-feed", { params, signal: requests.signal() });
+    const { data, error } = await safeFetch<HiringFeedResult>("/hiring-feed", { params: { ...params, locale: String(locale.value) }, signal: requests.signal() });
     if (!requests.isLatest(requestId)) return undefined;
     if (error || !data || data.error) {
       if (!background) {

@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { safeFetch } from "~/utils/safeFetch";
-import { locationLabel } from "~/utils/locationLabels";
 import { capitalizeFirst } from "~/utils/text";
 import CandidateCard from "~/components/hiring/CandidateCard.vue";
 import SearchResultGrid from "~/components/search/SearchResultGrid.vue";
@@ -38,7 +37,6 @@ import {
   hiringProfessionFilterLabel,
 } from "~~/shared/hiringProfessionGroups";
 import { publicEntityId } from "~~/shared/publicEntityId";
-import { canonicalCityValue } from "~~/shared/locationCatalog";
 
 // Hiring board — CV/resume profiles from candidates looking for work.
 // Auto-routed at /hiring. UI follows /flat-finder; data from /hiring-feed.
@@ -54,10 +52,6 @@ const route = useRoute();
 const router = useRouter();
 const defaultCountry = ref("UA");
 const professionLocale = computed(() => hiringProfessionLocale(locale.value));
-const cityLabel = (value?: string | null) => value
-  ? locationLabel(canonicalCityValue(value), String(locale.value), "city")
-  : "";
-const countryLabel = (value?: string | null) => locationLabel(value, String(locale.value), "country");
 const candidatePublicId = (profile: CvProfile | null) => profile
   ? profile.publicId ?? publicEntityId("candidate", profile.sourceKey || profile.source, profile.country, profile.id)
   : null;
@@ -157,7 +151,6 @@ const { meta, countryItems, cityItems, salaryCurrencyItems, loadMeta } = useHiri
   city,
   locale,
   t,
-  cityLabel,
   preferredCountry: () => defaultCountry.value,
 });
 
@@ -413,7 +406,7 @@ function specLine(profile: CvProfile): string {
   const parts: string[] = [];
   if (profile.age != null) parts.push(`${profile.age}`);
   if (profile.experienceYears != null) parts.push(experienceLabel(profile.experienceYears));
-  if (profile.city) parts.push(cityLabel(profile.city));
+  if (profile.city) parts.push(profile.cityLabel || profile.city);
   if (profile.remote) parts.push(t("remoteBadge"));
   return parts.join(" · ");
 }
@@ -472,8 +465,8 @@ const specRows = computed<CandidateSpecRow[]>(() => {
     row("identity", t("gender"), genderLabel(profile.gender), !profile.gender, "i-lucide-users-round"),
     row("identity", t("specExperience"), profile.experienceYears != null ? experienceLabel(profile.experienceYears) : t("notSpecified"), profile.experienceYears == null, "i-lucide-history"),
 
-    row("location", t("specCity"), profile.city ? cityLabel(profile.city) : t("notSpecified"), !profile.city, "i-lucide-map-pinned"),
-    row("location", t("specCountry"), profile.country ? countryLabel(profile.country) : t("notSpecified"), !profile.country, "i-lucide-map"),
+    row("location", t("specCity"), profile.city ? (profile.cityLabel || profile.city) : t("notSpecified"), !profile.city, "i-lucide-map-pinned"),
+    row("location", t("specCountry"), profile.country ? (profile.countryLabel || profile.country) : t("notSpecified"), !profile.country, "i-lucide-map"),
 
     row("preferences", t("specSalary"), salaryLabel(profile) || t("notSpecified"), profile.salaryMin == null && profile.salaryMax == null, "i-lucide-banknote"),
     row("preferences", t("specRemote"), fmtBool(profile.remote), profile.remote == null, "i-lucide-laptop"),
@@ -517,7 +510,7 @@ async function openSharedCv(id: string, sourceName = "", countryCode = "", attem
   const params: Record<string, string> = { profileId: id, limit: "1", offset: "0" };
   if (sourceName) params.sources = sourceName;
   if (/^[A-Za-z]{2}$/.test(countryCode)) params.countries = countryCode.toUpperCase();
-  const { data } = await safeFetch<FeedResult>("/hiring-feed", { params });
+  const { data } = await safeFetch<FeedResult>("/hiring-feed", { params: { ...params, locale: String(locale.value) } });
   const exact = data?.profiles?.find((profile) => profile.id === id);
   if (exact) { openCv(exact); return; }
   if (data?.warming && attempt < 20) {
@@ -531,7 +524,7 @@ async function openSharedCv(id: string, sourceName = "", countryCode = "", attem
 async function openSharedCvByPublicId(publicId: string, attempt = 0) {
   const local = profiles.value.find((profile) => String(candidatePublicId(profile)) === publicId);
   if (local) { openCv(local); return; }
-  const { data } = await safeFetch<FeedResult>("/hiring-feed", { params: { publicId, limit: "1", offset: "0" } });
+  const { data } = await safeFetch<FeedResult>("/hiring-feed", { params: { publicId, limit: "1", offset: "0", locale: String(locale.value) } });
   const exact = data?.profiles?.find((profile) => String(candidatePublicId(profile)) === publicId);
   if (exact) { openCv(exact); return; }
   if (data?.warming && attempt < 20) {

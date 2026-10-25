@@ -1,6 +1,18 @@
 import svgLoader from 'vite-svg-loader';
 
 export default defineNuxtConfig({
+    hooks: {
+        // pdf.js (+ its 300 KB worker) is only needed after a visitor uploads a PDF CV.
+        // Nuxt emitted <link rel="prefetch"> for it on every /jobs load.
+        'build:manifest': (manifest) => {
+            for (const entry of Object.values(manifest)) {
+                if (/pdf\.worker|pdfjs/.test(entry.file ?? '')) {
+                    entry.prefetch = false;
+                    entry.preload = false;
+                }
+            }
+        },
+    },
     app: {
         head: {
             // <html lang/dir> and hreflang alternates follow the active i18n locale

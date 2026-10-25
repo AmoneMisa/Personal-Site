@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import type { HiringCvProfile, HiringStatistics } from "~/types/hiring";
-import { locationLabel } from "~/utils/locationLabels";
 import { buildHiringStatistics } from "~~/shared/hiringStatistics";
 import { hiringStatisticGroupLabel } from "~~/shared/hiringStatisticGroups";
 import { hiringProfessionLabel, hiringProfessionLocale } from "~~/shared/hiringProfessionLabels";
@@ -26,7 +25,7 @@ const professionLocale = computed(() => hiringProfessionLocale(locale.value));
 const genderItems = computed(() => {
   return (["female", "male", "unknown"] as const).map((key, index) => ({ label: t(`gender${key.charAt(0).toUpperCase()}${key.slice(1)}`), value: currentStatistics.value.genders[key], color: palette[index] }));
 });
-const locationBars = computed(() => currentStatistics.value.locations.slice(0, 6).map((item, index) => ({ label: item.label === "__unknown__" ? t("statsUnknown") : locationLabel(item.label, locale.value, "city"), value: item.value, color: palette[index % palette.length] })));
+const locationBars = computed(() => currentStatistics.value.locations.slice(0, 6).map((item, index) => ({ label: item.label === "__unknown__" ? t("statsUnknown") : item.display ?? item.label, value: item.value, color: palette[index % palette.length] })));
 const platformBars = computed(() => currentStatistics.value.platforms.slice(0, 6).map((item, index) => ({ label: item.label === "__unknown__" ? t("statsUnknown") : item.label, value: item.value, color: palette[index % palette.length] })));
 const ageBars = computed(() => currentStatistics.value.ages.filter((item) => item.value > 0).map((item, index) => ({ label: item.label === "__unknown__" ? t("statsUnknown") : item.label, value: item.value, color: palette[index % palette.length] })));
 const sectorBars = computed(() => currentStatistics.value.sectors.slice(0, 8).map((item, index) => ({ label: hiringStatisticGroupLabel(item.label, professionLocale.value), value: item.value, color: palette[index % palette.length] })));

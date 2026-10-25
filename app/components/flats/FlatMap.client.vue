@@ -367,6 +367,13 @@ function shapeMapPoints(data: FlatMapFeedResult | undefined): FlatPoint[] {
     });
 }
 
+// Leaflet gives interactive div-icon markers role="button" but no accessible
+// name; label them once the DOM element exists.
+function nameMarker(marker: { on: (type: string, fn: () => void) => unknown; getElement: () => HTMLElement | undefined }, label: string) {
+  if (!label) return;
+  marker.on("add", () => marker.getElement()?.setAttribute("aria-label", label));
+}
+
 async function loadFullMapFeed() {
   if (!import.meta.client) return;
   const query = normalizedRouteQuery();
@@ -800,6 +807,7 @@ function renderMarkers() {
     // marker that happens to sit near a cluster win the stack and silently
     // swallow clicks meant for the cluster underneath it.
     const marker = L.marker([c.lat, c.lng], { icon, zIndexOffset: 1000 });
+    nameMarker(marker, multi ? String(count) : String(c.items[0]?.title || ""));
     marker.on("click", (event: any) => handleLayerClick(event, () => openCluster(c)));
     marker.addTo(layer);
   }
@@ -1254,6 +1262,7 @@ function renderMetro() {
       iconSize: [30, 30], iconAnchor: [15, 15],
     });
     const marker = L.marker([station.lat, station.lng], { icon, bubblingMouseEvents: false });
+    nameMarker(marker, String(station.name || ""));
     const line = meta.routeRefs.length ? ` · ${meta.routeRefs.join(" / ")}` : "";
     marker.bindTooltip(mapText(`${ui.value.metro} · ${station.label}${line}${stationSelected ? ` · ${metroShapeTooltip()}` : ""}`), { direction: "top", offset: [0, -13] });
     if (stationSelected) marker.openTooltip?.(); marker.on("click", select); marker.addTo(metroLayer);
@@ -1308,6 +1317,7 @@ function renderAmenityLayer(layerGroup: any, zones: FlatMapZone[], visible: bool
     }
     const icon = L.divIcon({ className: "flat-amenity-marker-wrap", html: `<span class="flat-amenity-marker" style="--amenity-color:${color}">${markerSvg(iconKind)}</span>`, iconSize: [27, 27], iconAnchor: [13.5, 13.5] });
     const marker = L.marker([zone.lat, zone.lng], { icon, bubblingMouseEvents: false });
+    nameMarker(marker, String(zone.label || ""));
     const stats = iconKind === "building" ? residentialStatsByName.value.get(zone.name.trim().toLocaleLowerCase()) : null;
     const cheapest = stats?.cheapest ? fallbackPriceLabel(stats.cheapest) : null;
     const tooltip = stats ? [zone.label, `${stats.count} объявлений`, ...(cheapest ? [`от ${cheapest}`] : [])].join("\n") : zone.label;
@@ -1366,6 +1376,7 @@ function renderTransportStops() {
     const kind = stop.mode === "tram" ? "tram" : stop.mode === "trolleybus" ? "trolleybus" : stop.mode === "minibus" ? "minibus" : stop.mode === "funicular" ? "funicular" : "bus";
     const icon = leaflet.divIcon({ className: "flat-transport-marker-wrap", html: `<span class="flat-transport-marker" style="--transport-color:${color}">${markerSvg(kind)}</span>`, iconSize: [25, 25], iconAnchor: [12.5, 12.5] });
     const marker = leaflet.marker([stop.lat, stop.lng], { icon, bubblingMouseEvents: false });
+    nameMarker(marker, String((stop as { name?: string; label?: string }).name || (stop as { label?: string }).label || ""));
     const refs = stop.routeRefs?.length ? ` · ${stop.routeRefs.join(", ")}` : "";
     marker.bindTooltip(mapText(`${stop.label}${refs}`), { direction: "top", offset: [0, -11] }); marker.addTo(transportStopLayer);
   }
@@ -1410,7 +1421,12 @@ onMounted(async () => {
   window.addEventListener("resize", onViewportChange);
   window.addEventListener("flat-map-focus", onMapFocus as EventListener);
   document.addEventListener("click", closeMenus);
-  void loadFullMapFeed();
+  // The page resolves the last-used/default country after this child mounts, so
+  // an unfiltered request here pulled every country (~2.7 MB) only to be replaced
+  // by the filtered one a moment later. With a country already in the URL load
+  // now; otherwise the query watcher loads once the page has set it.
+  const initialQuery = normalizedRouteQuery();
+  if (initialQuery.countries || initialQuery.country) void loadFullMapFeed();
   void loadExtraGeo();
   if (!el.value) return;
   let L: typeof LeafletNS;
