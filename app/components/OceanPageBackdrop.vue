@@ -10,6 +10,10 @@ const hasUnderwaterLife = computed(() => (
   || props.variant === "treasure"
   || props.variant === "home"
 ));
+
+// The scene is decorative and its sprites are heavy; mount it after the first
+// interaction (or a short idle) so it never competes with the page's own content.
+const lifeReady = useAquariumLife();
 </script>
 
 <template>
@@ -23,8 +27,8 @@ const hasUnderwaterLife = computed(() => (
   >
     <div class="ocean-page-backdrop__image" />
     <ocean-bubbles v-if="hasUnderwaterLife" />
-    <underwater-ambient2d v-if="hasUnderwaterLife" />
-    <header-crab v-if="hasUnderwaterLife" />
+    <underwater-ambient2d v-if="hasUnderwaterLife && lifeReady" />
+    <header-crab v-if="hasUnderwaterLife && lifeReady" />
     <div v-if="hasUnderwaterLife" class="ocean-page-backdrop__vignette" />
   </div>
 </template>
