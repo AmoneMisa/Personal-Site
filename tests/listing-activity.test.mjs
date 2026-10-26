@@ -113,3 +113,32 @@ test('jobs show publisher groups, salary ranges, source dates and safe applicati
   assert.equal(applyLinks.length, 1)
   assert.equal(applyLinks[0].href, 'https://acme.example/apply')
 })
+
+test('probable origin is explained and highlighted without marking ownership verified', async () => {
+  const props = mount()
+  requests[0].resolve(history())
+  requests[1].resolve({duplicateCount: 1, origin: {
+    status: 'candidate', candidatePublicId: 2, confidence: 'moderate',
+    evidence: ['matching_photos', 'different_contacts'], comparedPublicIds: [1], ownershipVerified: false,
+  }, groups: [{key: 'publisher', contact: '+380991234567', sameAdvertiser: false, listings: [
+    {publicId: 2, source: 'olx', title: 'Apartment', current: false, active: false, advertiserType: 'owner_claim', matchKind: 'fingerprint', url: 'https://example.com/original'},
+  ]}]}); await tick()
+  props.modelValue = 'duplicates'; await tick()
+  const explanation = document.querySelector('.listing-activity__origin')
+  assert.ok(explanation.textContent.includes('confidenceModerate'))
+  assert.ok(explanation.textContent.includes('matching_photos'))
+  assert.ok(explanation.textContent.includes('ownerLimit'))
+  assert.equal(document.querySelectorAll('.listing-activity__duplicate_origin').length, 1)
+  assert.equal(explanation.querySelector('a').href, 'https://example.com/original')
+})
+
+test('conflicting provenance explicitly abstains and does not mark an arbitrary posting', async () => {
+  const props = mount()
+  requests[0].resolve(history())
+  requests[1].resolve({duplicateCount: 2, groups: [], origin: {
+    status: 'ambiguous', candidatePublicId: null, confidence: null, evidence: [], comparedPublicIds: [], ownershipVerified: false,
+  }}); await tick()
+  props.modelValue = 'duplicates'; await tick()
+  assert.ok(document.querySelector('.listing-activity__origin').textContent.includes('origin.ambiguous'))
+  assert.equal(document.querySelectorAll('.listing-activity__duplicate_origin').length, 0)
+})

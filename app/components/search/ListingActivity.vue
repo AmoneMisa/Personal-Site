@@ -7,6 +7,9 @@ const instanceId = useId();
 const { t, locale } = useI18n();
 const history = ref<ActivityHistory | null>(null);
 const duplicates = ref<ActivityDuplicates | null>(null);
+const originalListing = computed(() => duplicates.value?.origin?.status === "candidate"
+  ? duplicates.value.groups.flatMap((group) => group.listings).find((listing) => listing.publicId === duplicates.value?.origin?.candidatePublicId)
+  : undefined);
 const loading = reactive({ history: false, duplicates: false });
 const failed = reactive({ history: false, duplicates: false });
 let generation = 0;
@@ -139,14 +142,28 @@ function onTabKey(event: KeyboardEvent) {
       <template v-if="duplicates">
         <p v-if="!duplicates.duplicateCount">{{ t("listingActivity.noDuplicates") }}</p>
         <template v-else>
+          <section v-if="duplicates.origin" class="listing-activity__origin">
+            <template v-if="duplicates.origin.status === 'candidate' && originalListing">
+              <h4>{{ t("listingActivity.origin.title") }} · #{{ originalListing.publicId }}</h4>
+              <p class="listing-activity__note">{{ t("listingActivity.origin.confidenceModerate") }}</p>
+              <ul><li v-for="reason in duplicates.origin.evidence" :key="reason">{{ t(`listingActivity.origin.evidence.${reason}`) }}</li></ul>
+              <a v-if="sourceUrl(originalListing.url)" :href="sourceUrl(originalListing.url)" target="_blank" rel="noopener noreferrer" class="listing-activity__link">{{ t("listingActivity.origin.openCandidate") }} ↗</a>
+              <p class="listing-activity__note">{{ t(domain === 'jobs' ? "listingActivity.origin.jobLimit" : "listingActivity.origin.ownerLimit") }}</p>
+            </template>
+            <template v-else>
+              <h4>{{ t("listingActivity.origin.undetermined") }}</h4>
+              <p class="listing-activity__note">{{ t(duplicates.origin.status === 'ambiguous' ? "listingActivity.origin.ambiguous" : "listingActivity.origin.insufficient") }}</p>
+            </template>
+          </section>
           <p class="listing-activity__note">{{ t(domain === 'jobs' ? "listingActivity.roleNote" : "listingActivity.ownerNote") }}</p>
           <section v-for="(group, index) in duplicates.groups" :key="group.key" class="listing-activity__group">
             <h4>{{ domain === 'jobs' ? (group.company || group.listings[0]?.company || t("listingActivity.advertiser")) : group.contact || t("listingActivity.unknownAdvertiser", { n: index + 1 }) }}</h4>
             <p v-if="domain === 'jobs'" class="listing-activity__note">{{ t(`listingActivity.advertisers.${group.advertiserType || 'unknown'}`) }} · {{ t("listingActivity.postings", { n: group.listings.length }) }}</p>
             <p v-if="domain === 'flats'" class="listing-activity__note">{{ t(group.sameAdvertiser ? "listingActivity.sameContact" : group.contact ? "listingActivity.otherContact" : "listingActivity.contactUnknown") }} · {{ t("listingActivity.postings", { n: group.listings.length }) }}</p>
             <FlatContactActions v-if="domain === 'flats' && group.listings[0]?.contactActions" :actions="group.listings[0].contactActions" />
-            <article v-for="listing in group.listings" :key="listing.publicId" class="listing-activity__duplicate">
+            <article v-for="listing in group.listings" :key="listing.publicId" class="listing-activity__duplicate" :class="{ 'listing-activity__duplicate_origin': originalListing?.publicId === listing.publicId }">
               <div class="listing-activity__duplicate-head"><b>{{ sourceLabel(listing) }} · #{{ listing.publicId }}</b><span v-if="listing.current" class="listing-activity__tag">{{ t("listingActivity.current") }}</span><span v-if="!listing.active" class="listing-activity__tag">{{ t("listingActivity.inactive") }}</span></div>
+              <span v-if="originalListing?.publicId === listing.publicId" class="listing-activity__origin-tag">{{ t("listingActivity.origin.title") }}</span>
               <p>{{ listing.title }}</p>
               <p v-if="domain === 'jobs'" class="listing-activity__salary"><b>{{ salaryLabel(listing) }}</b><span v-if="listing.salary?.gross != null"> · {{ t(listing.salary.gross ? "jobs.salaryGross" : "jobs.salaryNet") }}</span></p>
               <div class="listing-activity__facts"><span>{{ t(`listingActivity.advertisers.${listing.advertiserType}`) }}</span><b v-if="listing.price != null">{{ Number(listing.price).toLocaleString(locale) }} {{ listing.currency }}</b><span v-if="domain === 'flats'">{{ t(listing.commission === true ? "listingActivity.commissionYes" : listing.commission === false ? "listingActivity.commissionNo" : "listingActivity.commissionUnknown") }}<template v-if="listing.commissionPercent != null"> · {{ listing.commissionPercent }}%</template></span></div>
@@ -191,5 +208,10 @@ function onTabKey(event: KeyboardEvent) {
 .listing-activity__salary { color: var(--text-primary); }
 .listing-activity__salary span { color: var(--text-muted); font-size: 12px; }
 .listing-activity__apply { margin-left: 16px; }
+.listing-activity__origin { border: 1px solid var(--line); background: var(--bg-panel-2); border-radius: 10px; padding: 14px; margin-bottom: 16px; }
+.listing-activity__origin h4 { margin: 0; font-size: 14px; font-weight: 600; }
+.listing-activity__origin ul { padding-left: 18px; margin: 8px 0; color: var(--text-soft); font-size: 12px; }
+.listing-activity__duplicate_origin { border-color: var(--accent-pink); }
+.listing-activity__origin-tag { display: inline-block; color: var(--accent-pink); font-size: 11px; margin-top: 6px; }
 @media (pointer: coarse) { .listing-activity__tabs button, .listing-activity__link { min-height: 44px; } }
 </style>

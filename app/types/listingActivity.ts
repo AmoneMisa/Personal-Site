@@ -47,6 +47,14 @@ export interface DuplicateListing {
   contactActions?: unknown;
 }
 export interface ActivityDuplicates {
+  origin?: {
+    status: "candidate" | "insufficient_evidence" | "ambiguous";
+    candidatePublicId: number | null;
+    confidence: "moderate" | null;
+    evidence: string[];
+    comparedPublicIds: number[];
+    ownershipVerified: false;
+  };
   duplicateCount: number;
   groups: {key: string; contact: string | null; sameAdvertiser: boolean; company?: string; advertiserType?: string; listings: DuplicateListing[]}[];
 }
