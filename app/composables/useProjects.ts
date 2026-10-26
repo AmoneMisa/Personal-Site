@@ -96,7 +96,6 @@ const GROUPS: RawGroup[] = [
         "href": "https://github.com/AmoneMisa/i18nPropertiesManager"
       },
       {
-      {
         "id": "account-status-lost-ark",
         "name": "Account Status (Lost Ark)",
         "stack": "Electron.js · Vue.js",
