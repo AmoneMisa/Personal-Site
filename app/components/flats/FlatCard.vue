@@ -133,7 +133,7 @@ const emit = defineEmits<{
         <div class="flat-card__price" :class="`flat-card__price_${priceTone}`">{{ presentation.price }}</div>
         <div v-if="presentation.convertedPrice" class="flat-card__price-conv text-muted">{{ presentation.convertedPrice }}</div>
       </div>
-      <h2 class="flat-card__title" :title="presentation.title">{{ presentation.title }}</h2>
+      <h2 class="flat-card__title" :title="presentation.title"><button type="button" class="flat-card__open ui-focusable" @click.stop="emit('open')">{{ presentation.title }}</button></h2>
       <div v-if="presentation.specification" class="flat-card__spec text-muted">{{ presentation.specification }}</div>
       <UiDraggablePills v-if="pillItems.length" class="flat-card__badges" :items="pillItems" :visible-hint-count="3" />
       <div class="flat-card__meta text-muted">
@@ -150,6 +150,7 @@ const emit = defineEmits<{
 @use "../../assets/css/mixins/breakpoints" as *;
 @use "../../assets/css/mixins/flat-tone" as *;
 .flat-card { position: relative; min-width: 0; height: 100%; align-self: stretch; border: 1px solid var(--line); border-radius: 12px; overflow: hidden; background: var(--bg-panel); cursor: pointer; transition: transform 140ms ease, border-color 180ms ease, box-shadow 180ms ease; display: flex; flex-direction: column; }
+.flat-card__open { width: 100%; padding: 0; border: 0; background: none; color: inherit; font: inherit; text-align: inherit; cursor: pointer; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .flat-card:hover { transform: translateY(-2px); border-color: rgba(224,103,154,0.4); box-shadow: 0 12px 30px rgba(0,0,0,.16); }
 .flat-card_warning { border-color: rgba(242,184,107,.56); box-shadow: inset 0 0 0 1px rgba(242,184,107,.08); }
 .flat-card_checking { pointer-events: none; }

@@ -49,8 +49,11 @@ useSeoMeta({
   ogLocaleAlternate: () => activeCodes.value
       .filter((c) => c !== locale.value)
       .map((c) => OG_LOCALE[c])
-      .filter(Boolean),
-  twitterCard: () => t('seo.common.twitterCard'),
+      .filter((value): value is string => Boolean(value)),
+  twitterCard: () => {
+    const value = t('seo.common.twitterCard');
+    return value === 'summary' || value === 'app' || value === 'player' ? value : 'summary_large_image';
+  },
   twitterImage: DEFAULT_OG_IMAGE,
   twitterImageAlt: "WhitesLove — portfolio, services and search tools"
 });

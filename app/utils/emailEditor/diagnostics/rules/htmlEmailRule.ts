@@ -16,6 +16,7 @@ export const htmlEmailRule = {
 
         while ((match = tagRegex.exec(text))) {
             const raw = match[0];
+            if (!match[1]) continue;
             const name = match[1].toLowerCase();
             const isClosing = raw.startsWith("</");
             const isSelfClosing = raw.endsWith("/>") || VOID_TAGS.has(name);

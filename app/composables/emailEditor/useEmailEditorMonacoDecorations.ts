@@ -8,6 +8,7 @@ onRequestColorPicker: (p: { clientX: number; clientY: number; startOffset: numbe
 };
 
 export function useEmailEditorMonacoDecorations(ctx: Ctx) {
+const { t } = useI18n();
 let diagnosticCollection: E.IEditorDecorationsCollection | null = null;
 let colorCollection: E.IEditorDecorationsCollection | null = null;
 
@@ -54,7 +55,7 @@ isWholeLine: true,
 className: [classForSeverity(d.severity), isActive ? "email-editor-monaco__line_active" : ""]
 .filter(Boolean)
 .join(" "),
-hoverMessage: { value: `${d.severity.toUpperCase()}: ${d.message}` },
+hoverMessage: { value: `${d.severity.toUpperCase()}: ${d.messageKey ? t(d.messageKey, d.messageParams || {}) : d.message}` },
 },
 };
 })

@@ -87,7 +87,7 @@ function balanceVelocityBlocks(text: string, openNeedle: string, closeNeedle: st
 
     if (opens.length > closes && opens.length) {
         const lastOpen = opens[opens.length - 1];
-        list.push(make("error", message, lastOpen, Math.min(text.length, lastOpen + openNeedle.length)));
+        if (lastOpen !== undefined) list.push(make("error", message, lastOpen, Math.min(text.length, lastOpen + openNeedle.length)));
     }
 
     return list;

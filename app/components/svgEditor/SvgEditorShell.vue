@@ -172,8 +172,8 @@ function extractColorsFromStyle(style: string) {
   const source = String(style || "");
   const fill = source.match(/(?:^|;)\s*fill\s*:\s*([^;]+)/i);
   const stroke = source.match(/(?:^|;)\s*stroke\s*:\s*([^;]+)/i);
-  if (fill) out.push({ prop: "fill", value: safeTrim(fill[1]) });
-  if (stroke) out.push({ prop: "stroke", value: safeTrim(stroke[1]) });
+  if (fill?.[1]) out.push({ prop: "fill", value: safeTrim(fill[1]) });
+  if (stroke?.[1]) out.push({ prop: "stroke", value: safeTrim(stroke[1]) });
   return out;
 }
 
@@ -231,11 +231,11 @@ function replaceColors(
     const fill = nextStyle.match(/(?:^|;)\s*fill\s*:\s*([^;]+)/i);
     const stroke = nextStyle.match(/(?:^|;)\s*stroke\s*:\s*([^;]+)/i);
 
-    if (fill) {
+    if (fill?.[1]) {
       const next = mapValue(safeTrim(fill[1]));
       if (next) nextStyle = nextStyle.replace(fill[0], fill[0].replace(fill[1], ` ${next}`));
     }
-    if (stroke) {
+    if (stroke?.[1]) {
       const next = mapValue(safeTrim(stroke[1]));
       if (next) nextStyle = nextStyle.replace(stroke[0], stroke[0].replace(stroke[1], ` ${next}`));
     }

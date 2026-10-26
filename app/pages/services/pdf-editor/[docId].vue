@@ -186,7 +186,7 @@ const {
   pageJson,
   deletedImages,
   api,
-  getCurrentPageJson: () => c?.toJSON(PDF_SERIALIZED_PROPERTIES) ?? null,
+  getCurrentPageJson: () => c?.toObject(PDF_SERIALIZED_PROPERTIES) ?? null,
 });
 
 const {

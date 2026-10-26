@@ -88,7 +88,7 @@ test('signing out leaves this browser without the account\'s favourites', async 
   const page = await read('app/pages/flat-finder/[...slug].vue')
   assert.match(page, /<FlatAccountBar v-if="view === 'favorites'" \/>/u)
   // Sign-out may come from the header too, so the page watches the shared state.
-  assert.match(page, /watch\(signedOutAt, \(\) => clearFavorites\(\)\)/u)
+  assert.match(page, /watch\(signedOutAt, \(\) => \{\s*favoriteSync\.cancelPending\(\);\s*clearFavorites\(\);/u)
   const account = await read('app/composables/useSiteAccount.ts')
   assert.match(account, /signedOutAt\.value = Date\.now\(\)/u)
   // No Google script on the site: sign-in is a redirect.

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { safeFetch } from "~/utils/safeFetch";
+import { hasOpenModalDialogs } from "~/utils/modalDialog";
 import { flatSourceLabel } from "~/utils/flats/sourceLabel";
 import {
   applyMetroProximity,
@@ -588,16 +589,7 @@ function toggleFavorite(listing: Listing) {
  * up. Same rule that pairing a phone will use.
  */
 async function syncFavorites() {
-  const before = favorites.value.slice();
-  const remote = await favoriteSync.pull();
-  if (!remote) return;
-  mergeFavorites(remote);
-  // One additive import, not a mutation per item: the backend allows one
-  // mutation per 100 ms per client, so a loop is rate-limited on its second
-  // item and switches sync off. An empty server side is just the case where
-  // every local favourite is missing there.
-  const remoteIds = new Set(remote.map((listing) => listing.id));
-  await favoriteSync.seed(before.filter((listing) => !remoteIds.has(listing.id)));
+  await favoriteSync.synchronize(favorites.value, mergeFavorites);
 }
 
 /**
@@ -607,7 +599,10 @@ async function syncFavorites() {
  */
 // Signing out (here or from the header) leaves this browser empty.
 const { signedOutAt } = useSiteAccount();
-watch(signedOutAt, () => clearFavorites());
+watch(signedOutAt, () => {
+  favoriteSync.cancelPending();
+  clearFavorites();
+}, { flush: "sync" });
 
 function loadPersonalState() {
   loadSavedCollections();
@@ -957,7 +952,7 @@ function modalTitle(listing: Listing | null): string {
   return humanTitle.length > 140 ? `${humanTitle.slice(0, 137).trimEnd()}…` : humanTitle;
 }
 function releaseStuckScrollLock() {
-  if (import.meta.server || modalOpen.value || lightboxOpen.value) return;
+  if (import.meta.server || modalOpen.value || lightboxOpen.value || hasOpenModalDialogs()) return;
   const body = document.body;
   if (body.style.overflow === "hidden") body.style.removeProperty("overflow");
   if (body.style.position === "fixed") { const top = body.style.top; body.style.removeProperty("position"); body.style.removeProperty("top"); body.style.removeProperty("width"); const offset = Math.abs(parseInt(top || "0", 10)) || 0; if (offset) window.scrollTo(0, offset); }
@@ -1256,7 +1251,6 @@ onBeforeUnmount(() => { modalOpen.value = false; lightboxOpen.value = false; rel
       </div>
     </template>
 
-    <UiResultsLoader :loading="loading" :label="t('searching')" min-height="420px">
     <form ref="filtersEl" class="flats__controls flats__controls_redesign" @submit.prevent="load()">
       <div class="flats__searchbar">
         <u-input v-model="query" clearable icon="i-lucide-search" :label="t('search')" :placeholder="t('searchPlaceholder')" @clear="clearSearch" />
@@ -1369,7 +1363,7 @@ onBeforeUnmount(() => { modalOpen.value = false; lightboxOpen.value = false; rel
     <p v-if="failed" class="flats__error">{{ t("error") }}</p>
     <p v-else-if="source === 'telegram' && !loading && !listings.length && sourceErrors?.some((item) => item.source === 'telegram')" class="flats__source-warning">{{ t("telegramUnavailable") }}</p>
     <FlatsStatsPanel v-if="view === 'active' && statistics" :statistics="statistics" :selected-city="city" :display-currency="displayCurrency" :convert="convert" :location-label="(value, kind) => labelFor(value, kind)" />
-<section class="flats__map-wrap"><flat-map :points="mapPoints" :radius-center="radiusCenter" :radius-m="radiusM" @radius-center-change="onWorkPointChange" @radius-change="onWorkRadiusChange" :draw-label="t('drawArea')" :done-label="t('done')" :clear-label="t('clearArea')" :draw-hint="t('drawHint')" :expand-label="t('mapExpand')" :collapse-label="t('mapCollapse')" :scroll-hint-label="t('mapScrollHint')" :district-zones="districtZones" :microdistrict-markers="microdistrictMarkers" :quartal-markers="quartalMarkers" :metro-stations="metroStations" :university-zones="universityZones" :shopping-mall-zones="shoppingMallZones" :park-zones="parkZones" :area-zones="areaZones" :city-zone="cityZone" :selected-region="region" :selected-district="district" :selected-microdistrict="microdistrict" :selected-quartal="quartal" :selected-area="mapArea" :selected-metros="metro" :selected-metro-radius-m="metroMaxM" :metro-bearing-from="metroBearingFrom" :metro-bearing-to="metroBearingTo" :metro-radius-handle-label="t('metroRadiusHandle')" :metro-arc-handle-label="t('metroArcHandle')" :fit-results-label="t('mapFitResults')" :view-filter="viewFilter" :districts-label="t('districtsLayer')" :microdistricts-label="t('microdistrictsLayer')" :quartals-label="t('quartalsLayer')" :metro-label="t('metro')" :universities-label="t('universitiesLayer')" :shopping-malls-label="t('shoppingMallsLayer')" :parks-label="t('parksLayer')" :areas-label="t('areasLayer')" :city-label="t('cityLayer')" @select="openById" @area-change="drawnArea = $event" @bounds-change="viewBounds = $event" @zone-select="onZoneSelect" @city-select="onCitySelect" @metro-toggle="onMetroToggle" @metro-shape="onMetroShape" /></section>
+<section class="flats__map-wrap"><flat-map :points="mapPoints" :feed-mode="view === 'active' ? 'search' : 'collection'" :excluded-ids="view === 'active' ? [...hiddenIds] : []" :radius-center="radiusCenter" :radius-m="radiusM" @radius-center-change="onWorkPointChange" @radius-change="onWorkRadiusChange" :draw-label="t('drawArea')" :done-label="t('done')" :clear-label="t('clearArea')" :draw-hint="t('drawHint')" :expand-label="t('mapExpand')" :collapse-label="t('mapCollapse')" :scroll-hint-label="t('mapScrollHint')" :district-zones="districtZones" :microdistrict-markers="microdistrictMarkers" :quartal-markers="quartalMarkers" :metro-stations="metroStations" :university-zones="universityZones" :shopping-mall-zones="shoppingMallZones" :park-zones="parkZones" :area-zones="areaZones" :city-zone="cityZone" :selected-region="region" :selected-district="district" :selected-microdistrict="microdistrict" :selected-quartal="quartal" :selected-area="mapArea" :selected-metros="metro" :selected-metro-radius-m="metroMaxM" :metro-bearing-from="metroBearingFrom" :metro-bearing-to="metroBearingTo" :metro-radius-handle-label="t('metroRadiusHandle')" :metro-arc-handle-label="t('metroArcHandle')" :fit-results-label="t('mapFitResults')" :view-filter="viewFilter" :districts-label="t('districtsLayer')" :microdistricts-label="t('microdistrictsLayer')" :quartals-label="t('quartalsLayer')" :metro-label="t('metro')" :universities-label="t('universitiesLayer')" :shopping-malls-label="t('shoppingMallsLayer')" :parks-label="t('parksLayer')" :areas-label="t('areasLayer')" :city-label="t('cityLayer')" @select="openById" @area-change="drawnArea = $event" @bounds-change="viewBounds = $event" @zone-select="onZoneSelect" @city-select="onCitySelect" @metro-toggle="onMetroToggle" @metro-shape="onMetroShape" /></section>
 
     <div v-if="!failed" class="flats__results-head">
       <FlatOwnerBreadcrumbs v-if="owner && view === 'active'" :owner-key="owner" @all="leaveOwner('active')" @owners="leaveOwner('owners')" />
@@ -1383,6 +1377,7 @@ onBeforeUnmount(() => { modalOpen.value = false; lightboxOpen.value = false; rel
       </div>
     </div>
 
+    <UiResultsLoader :loading="loading" :label="t('searching')" min-height="420px">
     <SearchResultGrid>
       <FlatCard
         v-for="l in displayedListings"

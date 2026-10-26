@@ -65,7 +65,7 @@ export function useJobFeed(usdRates: Ref<Record<string, number>>) {
       loadingMore.value = false;
     }
     polling.scheduleWarmPoll(warming.value);
-    return !error ? data : undefined;
+    return !error ? data ?? undefined : undefined;
   }
 
   onBeforeUnmount(() => {

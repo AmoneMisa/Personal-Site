@@ -14,10 +14,10 @@ import { INDEXABLE_ROUTES } from "../utils/indexableRoutes";
 const SITE_URL = "https://whiteslove.me";
 
 // Locales in priority order. The first entry is the default and stays unprefixed.
-const LOCALES: { code: string; prefix: string }[] = [
+const LOCALES = [
   { code: "ru", prefix: "" },       // default -> unprefixed at "/"
   { code: "en", prefix: "/en" },
-];
+] as const;
 const DEFAULT_LOCALE = LOCALES[0];
 
 // Shared with the canonical-path redirect (server/utils/indexableRoutes.ts).

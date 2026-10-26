@@ -36,6 +36,7 @@ export function useFlatFeed(feedOptions: { onAvailabilityChecked?: (keys: string
   const loadMoreSentinel = ref<HTMLElement | null>(null);
   const requests = useLatestRequest();
   let statisticsRequestId = 0;
+  let appendedListings: FlatListing[] = [];
   const responseCache = new Map<string, { at: number; data: FlatFeedResult }>();
 
   function readFeedCache(params: Record<string, string>): FlatFeedResult | undefined {
@@ -73,9 +74,19 @@ export function useFlatFeed(feedOptions: { onAvailabilityChecked?: (keys: string
   }
 
   /** Paints a cached first page. Mirrors the non-append branch of loadFeed. */
-  function applyFirstPage(data: FlatFeedResult) {
-    nextCursor.value = data.nextCursor || null;
-    listings.value = Array.isArray(data.listings) ? data.listings : [];
+  function applyFirstPage(data: FlatFeedResult, preserveAppended = false) {
+    const firstPage = Array.isArray(data.listings) ? data.listings : [];
+    if (!preserveAppended) {
+      appendedListings = [];
+      nextCursor.value = data.nextCursor || null;
+    }
+    const seen = new Set(firstPage.map((item) => `${item.source}:${item.country}:${item.id}`));
+    listings.value = [...firstPage, ...appendedListings.filter((item) => {
+      const key = `${item.source}:${item.country}:${item.id}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    })];
     total.value = data.count ?? listings.value.length;
     sourceErrors.value = data.sourceErrors || [];
     warming.value = !!data.warming;
@@ -93,6 +104,7 @@ export function useFlatFeed(feedOptions: { onAvailabilityChecked?: (keys: string
   });
 
   function resetFirstPageState() {
+    appendedListings = [];
     listings.value = [];
     total.value = 0;
     nextCursor.value = null;
@@ -226,8 +238,10 @@ export function useFlatFeed(feedOptions: { onAvailabilityChecked?: (keys: string
     }
 
     if (background) {
-      if (!append) {
-        total.value = data.count ?? total.value;
+      if (!append && !data.warming) {
+        // A revalidated first page updates the visible cards, while previously
+        // appended pages retain their cursor and position in the result set.
+        applyFirstPage(data, appendedListings.length > 0);
         writeFeedCache(params, data);
       }
       sourceErrors.value = data.sourceErrors || [];
@@ -235,6 +249,8 @@ export function useFlatFeed(feedOptions: { onAvailabilityChecked?: (keys: string
         void setStatisticsWithoutViewportJump(data.statistics);
       }
       warming.value = !!data.warming;
+      loading.value = false;
+      loadingMore.value = false;
       if (wantsStatistics && !warmPoll) {
         void loadStatistics(params, currentStatisticsRequestId);
       }
@@ -256,7 +272,9 @@ export function useFlatFeed(feedOptions: { onAvailabilityChecked?: (keys: string
         return true;
       });
       listings.value = [...listings.value, ...unique];
+      appendedListings = [...appendedListings, ...unique];
     } else {
+      appendedListings = [];
       listings.value = nextListings;
     }
 

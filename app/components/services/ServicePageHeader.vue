@@ -2,7 +2,7 @@
 import PageHeader from "~/components/common/PageHeader.vue";
 
 withDefaults(defineProps<{
-  backdrop: string;
+  backdrop: "reef" | "treasure" | "home" | "ambient";
   title: string;
   headline?: string;
   description?: string;

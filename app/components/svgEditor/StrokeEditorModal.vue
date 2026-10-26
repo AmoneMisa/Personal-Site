@@ -75,7 +75,7 @@ function computeNodePath(root: Element, target: Element) {
   let cur: Element | null = target;
 
   while (cur && cur !== root) {
-    const parent = cur.parentElement;
+    const parent: Element | null = cur.parentElement;
     if (!parent) break;
     const siblings = Array.from(parent.children);
     const idx = siblings.indexOf(cur);
@@ -105,8 +105,7 @@ function collectStrokeItems(svgCode: string): StrokeItem[] {
   const els = Array.from(svg.querySelectorAll(tags.join(","))) as Element[];
 
   const out: StrokeItem[] = [];
-  for (let i = 0; i < els.length; i++) {
-    const el = els[i];
+  for (const [i, el] of els.entries()) {
     const stroke = el.getAttribute("stroke") || "";
     const strokeWidth = el.getAttribute("stroke-width") || "";
     out.push({
@@ -229,7 +228,7 @@ const strokeColorError = ref<string | null>(null)
 function parseColorString(raw: string) {
   const s = String(raw || "").trim();
   const hex = s.match(/^#([0-9a-fA-F]{6})$/);
-  if (hex) return {hex: `#${hex[1].toUpperCase()}`};
+  if (hex?.[1]) return {hex: `#${hex[1].toUpperCase()}`};
 
   const rgb = s.match(/^rgb\(\s*([0-9]{1,3})\s*,\s*([0-9]{1,3})\s*,\s*([0-9]{1,3})\s*\)$/i);
   if (rgb) {

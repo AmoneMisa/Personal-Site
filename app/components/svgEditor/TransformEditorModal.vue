@@ -74,7 +74,7 @@ function computeNodePath(root: Element, target: Element) {
   let current: Element | null = target;
 
   while (current && current !== root) {
-    const parent = current.parentElement;
+    const parent: Element | null = current.parentElement;
     if (!parent) break;
     const siblings = Array.from(parent.children);
     path.unshift(siblings.indexOf(current));

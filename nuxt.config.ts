@@ -83,7 +83,6 @@ export default defineNuxtConfig({
         // Messages are now static JSON in i18n/locales (was DB-driven). Lazy-loaded
         // per locale; missing keys fall back to ru (see i18n.config.ts).
         langDir: 'locales',
-        lazy: true,
         vueI18n: './i18n.config.ts',
         // Some messages legitimately contain literal HTML tags as text (email-editor
         // diagnostics mention <style>, <{tag}>, ...). They're trusted and rendered

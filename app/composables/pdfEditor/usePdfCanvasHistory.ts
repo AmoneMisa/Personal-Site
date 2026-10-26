@@ -24,7 +24,7 @@ export function usePdfCanvasHistory(options: PdfCanvasHistoryOptions) {
     const canvas = options.getCanvas();
     if (!canvas || history.lock) return;
 
-    const snapshot = canvas.toJSON(PDF_SERIALIZED_PROPERTIES);
+    const snapshot = canvas.toObject(PDF_SERIALIZED_PROPERTIES);
     history.stack = history.stack.slice(0, history.idx + 1);
     history.stack.push(snapshot);
     history.idx = history.stack.length - 1;

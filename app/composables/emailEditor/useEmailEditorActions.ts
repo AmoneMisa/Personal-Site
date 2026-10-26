@@ -1,5 +1,4 @@
 import { computed, watch, watchEffect } from "vue";
-import type { ReturnType } from "./useEmailEditorState";
 import { collectDiagnostics } from "~/utils/emailEditor/diagnostics/collectDiagnostics";
 import { inlineStyleToStyleTag } from "~/utils/emailEditor/transform/inlineStyleToStyleTag";
 import { extractVariablePaths } from "~/utils/emailEditor/fakeData/extractVariablePaths";
@@ -205,7 +204,7 @@ function toHex(n: number) {
 
 function hexToRgbaLike(hex: string, original: string) {
     const m = hex.match(/^#([0-9a-fA-F]{6})$/);
-    if (!m) return hex;
+    if (!m?.[1]) return hex;
 
     const r = parseInt(m[1].slice(0, 2), 16);
     const g = parseInt(m[1].slice(2, 4), 16);

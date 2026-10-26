@@ -38,12 +38,13 @@ test('the proxy only forwards known ops', async () => {
 
 test('sync never deletes either side, and never blocks the UI', async () => {
   const page = await read('app/pages/flat-finder/[...slug].vue')
+  const sync = await read('app/composables/flats/useFlatFavoriteSync.ts')
   // Union merge: keep what this browser had, add the server's, push the rest.
-  assert.match(page, /mergeFavorites\(remote\)/u)
+  assert.match(page, /favoriteSync\.synchronize\(favorites\.value, mergeFavorites\)/u)
   // Local-only favourites go up in one additive import (an empty server side
   // included), never a mutation per item: the backend allows one mutation per
   // 100 ms per client, so a loop is rate-limited and switches sync off.
-  assert.match(page, /await favoriteSync\.seed\(before\.filter\(\(listing\) => !remoteIds\.has\(listing\.id\)\)\)/u)
+  assert.match(sync, /await seed\(before\.filter\(\(listing\) => !remoteIds\.has\(listing\.id\)\)\)/u)
   assert.doesNotMatch(page, /for \(const listing of before\)/u)
   // The heart applies locally first; the network call is not awaited.
   assert.match(page, /toggleFavoriteLocal\(listing\);\s+void \(wasFavorite/u)

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import CustomButton from "~/components/common/CustomButton.vue";
 import { useServiceSeo } from "~/composables/services/useServiceSeo";
-import type {TabsItem} from "#ui/components/Tabs.vue";
+import type {TabsItem} from "~/types/tabs";
 import {nextTick, onBeforeUnmount, onMounted, watch} from "vue";
 import Modal from "~/components/common/Modal.vue";
 import {checkTextWithLanguageTool} from "~/composables/useLanguageTool";
@@ -61,7 +61,7 @@ const {load: loadDraft} = useMarkdownDraft({
 const plainLen = computed(() => input.value.length);
 const isTooLong = computed(() => plainLen.value > MAX);
 
-const platformTabs = computed<TabsItem[]>(() => ([
+const platformTabs = computed<TabsItem<PlatformId>[]>(() => ([
   {label: "services.markdownEditor.platforms.telegram", value: "telegram"},
   {label: "services.markdownEditor.platforms.whatsapp", value: "whatsapp"},
   {label: "services.markdownEditor.platforms.tiktok", value: "tiktok"}
@@ -73,7 +73,7 @@ const outputText = computed(() => {
   return formatPlatformText(input.value, activePlatform.value);
 });
 const checking = ref(false);
-const checkResult = ref(null);
+const checkResult = ref<{ matches: Parameters<typeof highlightLanguageMatches>[1] } | null>(null);
 let checkRequestId = 0;
 let checkController: AbortController | undefined;
 
@@ -128,12 +128,14 @@ function clearAll() {
 }
 
 const platformTabIndex = computed(() => {
-  const idx = platformTabs.value.findIndex((x: any) => x.value === activePlatform.value);
+  const idx = platformTabs.value.findIndex((item) => item.value === activePlatform.value);
   return Math.max(0, idx);
 });
 const {scrollRef: platformTabsScroll, select: selectPlatformTab} = useScrollableTabs();
 
-async function onPlatformTabChange(value: PlatformId) {
+async function onPlatformTabChange(index: number) {
+  const value = platformTabs.value[index]?.value;
+  if (!value) return;
   activePlatform.value = value;
   await selectPlatformTab(platformTabIndex.value);
 }
@@ -330,7 +332,7 @@ onBeforeUnmount(() => {
           <div class="tabs-head">
             <u-tabs
                 :items="platformTabs"
-                :model-value="activePlatform"
+                :model-value="platformTabIndex"
                 @update:modelValue="onPlatformTabChange"
                 :ui="{ trigger: 'tabs__trigger', list: 'tabs__list mt-4', indicator: 'hidden' }"
             >

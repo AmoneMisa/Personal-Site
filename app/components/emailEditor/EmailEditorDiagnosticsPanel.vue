@@ -58,7 +58,7 @@ function metaText(d: any) {
           <u-icon :name="iconFor(d.severity)" />
           <div class="email-editor-diagnostics__item-body">
             <div class="email-editor-diagnostics__item-message">
-              {{ t(d.messageKey, d.messageParams || {}) }}
+              {{ d.messageKey ? t(d.messageKey, d.messageParams || {}) : d.message }}
             </div>
             <div class="email-editor-diagnostics__item-meta text-muted">
               {{ metaText(d) }}

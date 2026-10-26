@@ -38,6 +38,7 @@ export function setByPath(root: any, path: string, value: any) {
     let cur = root;
     for (let i = 0; i < parts.length; i++) {
         const p = parts[i];
+        if (p === undefined) continue;
         const last = i === parts.length - 1;
         if (last) cur[p] = value;
         else {
@@ -105,6 +106,7 @@ export function buildTreeFromFlat(obj: Record<string, any>) {
         let cur = root;
         for (let i = 0; i < parts.length; i++) {
             const p = parts[i];
+            if (p === undefined) continue;
             const last = i === parts.length - 1;
             if (last) cur[p] = v;
             else {

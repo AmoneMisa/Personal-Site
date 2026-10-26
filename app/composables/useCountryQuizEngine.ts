@@ -452,7 +452,7 @@ export function matchCountries(
     quiz: QuizConfig,
     answers: AnswerMap,
     user: UserProfile,
-    indicesMap: Record<string, CountryIndicesBundle | null>,
+    indicesMap: Record<string, Pick<CountryIndicesBundle, "normalized"> | null | undefined>,
     limit = 10,
     opts: MatchOptions = {}
 ): MatchGroup[] {

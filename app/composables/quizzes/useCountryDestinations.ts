@@ -5,7 +5,7 @@ import { safeFetch } from "~/utils/safeFetch";
 
 // Country codes the jobs board actually searches. Reused rather than restated so
 // the quiz can never offer a link the jobs page would reject.
-const JOB_COUNTRY_CODES = new Set(
+const JOB_COUNTRY_CODES = new Set<string>(
   JOB_COUNTRY_OPTIONS.map((option) => option.value).filter(Boolean),
 );
 

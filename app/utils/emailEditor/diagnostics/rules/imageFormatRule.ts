@@ -14,7 +14,7 @@ export const imageFormatRule = {
 
         while ((match = imgRegex.exec(text))) {
             const src = (match[1] ?? "").toLowerCase();
-            const ext = src.split("?")[0].split("#")[0].split(".").pop() ?? "";
+            const ext = src.split(/[?#]/, 1)[0]?.split(".").pop() ?? "";
             if (POOR_FORMATS.includes(ext)) {
                 list.push(make("warning", `Image format .${ext} may be poorly supported in email clients`, match.index, match.index + match[0].length));
             }

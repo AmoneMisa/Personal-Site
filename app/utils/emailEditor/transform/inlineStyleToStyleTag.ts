@@ -145,12 +145,15 @@ function detectNthPattern(indices: number[]) {
     if (uniq.length < 3) return null;
 
     const diffs: number[] = [];
-    for (let i = 1; i < uniq.length; i++) diffs.push(uniq[i] - uniq[i - 1]);
+    uniq.forEach((value, index) => {
+        const previous = uniq[index - 1];
+        if (previous !== undefined) diffs.push(value - previous);
+    });
     const step = diffs[0];
     if (!step || diffs.some((d) => d !== step)) return null;
 
     const offset = uniq[0];
-    if (offset < 1) return null;
+    if (offset === undefined || offset < 1) return null;
 
     return { step, offset };
 }

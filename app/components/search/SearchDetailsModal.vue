@@ -19,8 +19,8 @@ const props = withDefaults(defineProps<{
 const open = defineModel<boolean>("open", { required: true });
 const route = useRoute();
 const { locale } = useI18n();
-const isFlatFinder = computed(() => route.path.endsWith("/flat-finder"));
-const isSearchBoard = computed(() => ["/flat-finder", "/jobs", "/hiring"].some((path) => route.path.endsWith(path)));
+const isFlatFinder = computed(() => /(?:^|\/)flat-finder(?:\/|$)/.test(route.path));
+const isSearchBoard = computed(() => /(?:^|\/)(?:flat-finder|jobs|hiring)(?:\/|$)/.test(route.path));
 
 const activeFlatListing = computed(() => isFlatFinder.value ? props.flatListing || null : null);
 const { text: flatTitleText, idTone: flatIdTone } = useFlatDetailsTitle({

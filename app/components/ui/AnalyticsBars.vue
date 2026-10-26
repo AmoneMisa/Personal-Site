@@ -29,7 +29,7 @@ const hasRanges = computed(() => props.items.some((item) => Number.isFinite(item
 const data = computed(() => ({
   labels: props.items.map((item) => item.label),
   datasets: [{
-    data: props.items.map((item) => {
+    data: props.items.map((item): number | [number, number] => {
       if (Number.isFinite(item.min) && Number.isFinite(item.max)) return [Number(item.min), Number(item.max)];
       return Number(item.value || 0);
     }),

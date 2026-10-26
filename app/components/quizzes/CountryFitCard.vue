@@ -146,7 +146,7 @@ const availableIndices = computed(() => {
 
   return INDEX_DEFS
       .map(def => ({def, value: n[def.key]}))
-      .filter(x => isNum(x.value));
+      .filter((x): x is { def: IndexDef; value: number } => isNum(x.value));
 });
 
 const indexColumns = computed(() => {
@@ -157,7 +157,7 @@ const indexColumns = computed(() => {
   const cols = Math.min(3, Math.max(1, Math.ceil(items.length / 4)));
 
   const out: Array<typeof items> = Array.from({length: cols}, () => []);
-  for (let i = 0; i < items.length; i++) out[i % cols].push(items[i]);
+  items.forEach((item, index) => out[index % cols]?.push(item));
   return out;
 });
 
@@ -264,7 +264,7 @@ const priceColumns = computed(() => {
   const items = availablePrices.value;
   const cols = Math.min(2, Math.max(1, Math.ceil(items.length / 4))); // цены лучше в 1–2 колонки
   const out: Array<typeof items> = Array.from({length: cols}, () => []);
-  for (let i = 0; i < items.length; i++) out[i % cols].push(items[i]);
+  items.forEach((item, index) => out[index % cols]?.push(item));
   return out;
 });
 </script>

@@ -169,7 +169,7 @@ export function usePdfCanvasController(options: PdfCanvasControllerOptions) {
     const json = pageJson[pageNo];
     if (!json) {
       history.lock = false;
-      history.stack = [canvas.toJSON(PDF_SERIALIZED_PROPERTIES)];
+      history.stack = [canvas.toObject(PDF_SERIALIZED_PROPERTIES)];
       history.idx = 0;
       canvas.requestRenderAll();
       return;
@@ -177,7 +177,7 @@ export function usePdfCanvasController(options: PdfCanvasControllerOptions) {
 
     canvas.loadFromJSON(json, () => {
       history.lock = false;
-      history.stack = [canvas.toJSON(PDF_SERIALIZED_PROPERTIES)];
+      history.stack = [canvas.toObject(PDF_SERIALIZED_PROPERTIES)];
       history.idx = 0;
       recoverPhotoFrame(pageNo);
       canvas.requestRenderAll();

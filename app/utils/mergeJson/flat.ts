@@ -19,7 +19,7 @@ export function parseFlatValueSmart(raw: string) {
     const s = normalizeQuotes(raw.trim());
 
     const m = s.match(/^\[(string|number|boolean|null)\]$/i);
-    if (m) {
+    if (m?.[1]) {
         const t = m[1].toLowerCase();
         if (t === "string") return "";
         if (t === "number") return 0;
@@ -38,7 +38,7 @@ export function parseFlatTextToTree(text: string): { ok: true; value: JsonValue 
     const lines = text.split(/\r?\n/);
 
     for (let i = 0; i < lines.length; i++) {
-        const raw = lines[i].trim();
+        const raw = lines[i]?.trim();
         if (!raw) continue;
 
         const idx = raw.indexOf("=");

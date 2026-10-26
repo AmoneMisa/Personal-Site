@@ -3,6 +3,9 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue"
 import type { FlatMapFeedResult, FlatMapPoint } from "~/types/flats";
 import { primaryBoundaryGeometry } from "~/utils/mapBoundaryFocus";
 import { stableQueryKey } from "~/utils/stableQueryKey";
+import { useFlatMapFeed } from "~/composables/flats/useFlatMapFeed";
+import { hasOpenModalDialogs } from "~/utils/modalDialog";
+import { selectFlatMapPoints } from "~/utils/flats/mapPoints";
 import { mapText, districtLabel } from "~/utils/flats/mapContent";
 import { priceToneFromRatio, type FlatPriceTone } from "~/utils/flats/priceTone";
 import { MIN_SEARCH_RADIUS_M, MAX_SEARCH_RADIUS_M, normalizeSearchCenter, normalizeSearchRadius, type SearchRadiusCenter } from "~/utils/flats/searchRadius";
@@ -130,6 +133,8 @@ const props = defineProps<{
   viewFilter?: boolean;
   radiusCenter?: SearchRadiusCenter | null;
   radiusM?: number;
+  feedMode?: "search" | "collection";
+  excludedIds?: string[];
 }>();
 
 const emit = defineEmits<{
@@ -168,7 +173,6 @@ const scrollActive = ref(false);
 const area = ref<Array<{ lat: number; lng: number }>>([]);
 const radial = ref<{ x: number; y: number; items: FlatPoint[]; page: number } | null>(null);
 const expanded = ref(false);
-const remotePoints = ref<FlatPoint[]>([]);
 const focusedPoint = ref<MapFocusDetail | null>(null);
 const menuOpen = ref<MenuKind | null>(null);
 const language = ref("ru");
@@ -215,11 +219,6 @@ const selectedDistrictName = ref<string | null>(null);
 const extraGeo = ref<ExtraGeoEntity[]>([]);
 let extraGeoSequence = 0;
 let lastExtraGeoKey = "";
-let mapFeedSequence = 0;
-let lastMapFeedKey = "";
-const MAP_FEED_CACHE_TTL_MS = 60_000;
-const MAP_FEED_CACHE_MAX_ENTRIES = 40;
-const mapFeedCache = new Map<string, { at: number; points: FlatPoint[] }>();
 
 const ui = computed(() => {
   const ru = language.value.toLowerCase().startsWith("ru");
@@ -316,26 +315,6 @@ const ui = computed(() => {
   };
 });
 
-function readMapFeedCache(key: string): FlatPoint[] | undefined {
-  const entry = mapFeedCache.get(key);
-  if (!entry) return undefined;
-  if (Date.now() - entry.at > MAP_FEED_CACHE_TTL_MS) {
-    mapFeedCache.delete(key);
-    return undefined;
-  }
-  return entry.points;
-}
-
-function writeMapFeedCache(key: string, points: FlatPoint[]) {
-  mapFeedCache.delete(key);
-  mapFeedCache.set(key, { at: Date.now(), points });
-  while (mapFeedCache.size > MAP_FEED_CACHE_MAX_ENTRIES) {
-    const oldest = mapFeedCache.keys().next().value;
-    if (oldest === undefined) break;
-    mapFeedCache.delete(oldest);
-  }
-}
-
 function pointKey(point: Pick<FlatPoint, "id" | "source" | "country">): string {
   return `${point.source || ""}:${point.country || ""}:${point.id}`;
 }
@@ -394,26 +373,11 @@ function nameMarker(marker: { on: (type: string, fn: () => void) => unknown; get
   marker.on("add", () => marker.getElement()?.setAttribute("aria-label", label));
 }
 
-async function loadFullMapFeed() {
-  if (!import.meta.client) return;
-  const query = normalizedRouteQuery();
-  const key = stableQueryKey(query);
-  if (key === lastMapFeedKey && remotePoints.value.length) return;
-  lastMapFeedKey = key;
-  const sequence = ++mapFeedSequence;
-  const cached = readMapFeedCache(key);
-  if (cached) remotePoints.value = cached;
-  try {
-    const data = await $fetch<FlatMapFeedResult>("/flats-map", { query });
-    if (sequence !== mapFeedSequence) return;
-    const points = shapeMapPoints(data);
-    remotePoints.value = points;
-    writeMapFeedCache(key, points);
-  } catch {
-    // The already-loaded page points (or the cached pins painted above) remain
-    // available when the compact map request fails; never blank a useful map.
-  }
-}
+const { points: remotePoints, failed: mapFeedFailed, loading: mapFeedLoading, load: loadFullMapFeed } = useFlatMapFeed<FlatPoint>({
+  query: normalizedRouteQuery,
+  enabled: () => props.feedMode !== "collection",
+  shape: shapeMapPoints,
+});
 
 function geoScope() {
   const query = normalizedRouteQuery();
@@ -426,6 +390,7 @@ async function loadExtraGeo() {
   if (!import.meta.client) return;
   const { country, city } = geoScope();
   if (!country || !city) {
+    extraGeoSequence += 1;
     extraGeo.value = [];
     lastExtraGeoKey = "";
     return;
@@ -494,26 +459,10 @@ const metroMetaById = computed(() => new Map(
     .map((entity) => [entity.id, entity] as const),
 ));
 
-const renderedPoints = computed<FlatPoint[]>(() => {
-  const merged = new Map<string, FlatPoint>();
-  const remoteByIdentity = new Map<string, FlatPoint>();
-  for (const point of remotePoints.value) {
-    merged.set(pointKey(point), point);
-    remoteByIdentity.set(`${point.source || ""}:${point.id}`, point);
-  }
-  // Loaded cards win: they carry localized titles, converted price labels and
-  // photos, while the compact map feed fills in district/price analytics.
-  for (const point of props.points) {
-    const exactKey = pointKey(point);
-    if (point.country || !point.source) {
-      merged.set(exactKey, point);
-      continue;
-    }
-    const remote = remoteByIdentity.get(`${point.source || ""}:${point.id}`);
-    merged.set(remote ? pointKey(remote) : exactKey, { ...remote, ...point });
-  }
-  return [...merged.values()];
-});
+const renderedPoints = computed(() => selectFlatMapPoints(remotePoints.value, props.points, {
+  mode: props.feedMode ?? "search",
+  excludedIds: new Set(props.excludedIds),
+}));
 
 const residentialStatsByName = computed(() => {
   const stats = new Map<string, { count: number; cheapest: FlatPoint | null }>();
@@ -755,6 +704,7 @@ function changeRadialPage(direction: -1 | 1) {
 }
 
 function onKeydown(event: KeyboardEvent) {
+  if (event.defaultPrevented || hasOpenModalDialogs()) return;
   if (placingWorkPoint.value && event.key === "Escape") {
     placingWorkPoint.value = false;
     event.preventDefault();
@@ -1542,6 +1492,7 @@ watch(() => stableQueryKey(normalizedRouteQuery()), () => {
 watch(() => stableQueryKey(normalizedRouteQuery()), () => {
   void loadExtraGeo();
 });
+watch(() => props.feedMode, () => { void loadFullMapFeed(); });
 watch(() => [props.districtZones, props.microdistrictMarkers, props.quartalMarkers, props.metroStations, props.universityZones, props.shoppingMallZones, props.parkZones, props.areaZones, props.cityZone], () => syncSelectionFromProps(false));
 watch(() => [props.selectedDistrict, props.selectedMicrodistrict, props.selectedQuartal, props.selectedArea, selectedMetros.value.join(","), props.selectedMetroRadiusM, props.metroBearingFrom, props.metroBearingTo], (next, previous) => {
   const changed = next.some((value, index) => value !== previous?.[index]);
@@ -1567,13 +1518,14 @@ watch(() => props.selectedRegion, () => {
 
 onBeforeUnmount(() => {
   workRadiusLayer = null;
-  mapFeedSequence += 1; extraGeoSequence += 1;
+  extraGeoSequence += 1;
   expandedSizeTimers.forEach((timer) => clearTimeout(timer));
   expandedSizeTimers = [];
   if (focusTimer) clearTimeout(focusTimer);
   focusTimer = undefined;
   window.removeEventListener("keydown", onKeydown); window.removeEventListener("scroll", onViewportChange); window.removeEventListener("resize", onViewportChange); window.removeEventListener("flat-map-focus", onMapFocus as EventListener);
-  document.removeEventListener("click", closeMenus); el.value?.removeEventListener("mouseleave", deactivateScroll); document.body.style.overflow = "";
+  document.removeEventListener("click", closeMenus); el.value?.removeEventListener("mouseleave", deactivateScroll);
+  if (!hasOpenModalDialogs()) document.body.style.overflow = "";
   map?.remove?.(); map = null;
   layer = areaLayer = focusLayer = regionLayer = districtLayer = microdistrictLayer = quartalLayer = quarterLayer = metroLayer = universityLayer = shoppingMallLayer = parkLayer = schoolLayer = residentialLayer = airportLayer = railwayLayer = busStationLayer = parkingLayer = transportStopLayer = zoneAreaLayer = cityLayer = null;
 });
@@ -1587,6 +1539,10 @@ function preserveUserCamera() {
   <Teleport to="body" :disabled="!expanded">
     <div v-show="!failed" class="flat-map-shell" :class="{ 'flat-map-shell_full': expanded }" @click.stop @pointerdown.capture="preserveUserCamera" @wheel.capture.passive="preserveUserCamera" @keydown.capture="preserveUserCamera">
       <div ref="el" class="flat-map" />
+      <div v-if="mapFeedFailed" class="flat-map__feed-error" role="status">
+        <span>{{ language.startsWith('ru') ? 'Не удалось обновить объявления на карте.' : 'Could not update map listings.' }}</span>
+        <button type="button" :disabled="mapFeedLoading" @click="loadFullMapFeed({ force: true })">{{ language.startsWith('ru') ? 'Повторить' : 'Retry' }}</button>
+      </div>
       <div v-if="!expanded" v-show="!scrollActive" class="flat-map__scroll-hint">{{ props.scrollHintLabel || "Click the map to zoom" }}</div>
 
       <div class="flat-map__tools" @click.stop>
@@ -1808,6 +1764,7 @@ function preserveUserCamera() {
 .flat-map__radius-control label { display: flex; align-items: center; gap: 4px; color: var(--text-muted); font-size: 10px; }
 .flat-map__radius-control input[type="number"] { width: 64px; padding: 0 5px; }
 
+.flat-map__feed-error { position: absolute; z-index: 1200; bottom: 12px; left: 12px; right: 12px; display: flex; gap: 12px; justify-content: center; padding: 10px; border-radius: 8px; background: var(--bg-panel); font-size: 13px; }
 .flat-map__hint { position: absolute; z-index: 1400; left: 50%; bottom: 12px; transform: translateX(-50%); padding: 7px 10px; border: 1px solid var(--line); border-radius: 6px; background: rgba(13,17,40,.94); color: var(--text-primary); font-size: 12px; }
 .flat-map__scroll-hint { position: absolute; z-index: 1200; left: 50%; top: 56px; transform: translateX(-50%); padding: 6px 10px; border: 1px solid var(--line); border-radius: 6px; background: rgba(13,17,40,.88); color: var(--text-primary); font-size: 12px; pointer-events: none; opacity: 0; transition: opacity .18s ease; }
 .flat-map-shell:hover .flat-map__scroll-hint { opacity: 1; }

@@ -56,7 +56,7 @@ useSeoMeta({
 });
 
 const { sourceOptions, countryOptions, languageOptions, levelOptions } = useJobMeta();
-const localizedSourceLabels = computed(() => new Map(sourceOptions.map((item) => [
+const localizedSourceLabels = computed(() => new Map<string, string>(sourceOptions.map((item) => [
   item.value,
   "label" in item ? item.label : t(item.labelKey),
 ])));
@@ -392,8 +392,10 @@ const {
   translate: (key) => t(key),
 });
 
-const countryLabel = (code: string) =>
-  countryOptions.find((c) => c.value === code)?.label ?? code;
+const countryLabel = (code: string) => {
+  const item = countryOptions.find((option) => option.value === code);
+  return item && "label" in item ? item.label : code;
+};
 
 // Jobs already paginate by real page numbers server-side (unlike flats'
 // offset/cursor feed), so the ?page= URL bookmark just mirrors page.value
@@ -651,7 +653,7 @@ const sortItems = computed<Item[]>(() => {
 });
 // Multi-select: drop the "any" pseudo-option (empty selection already means any).
 const countryItems = computed<Item[]>(() =>
-  countryOptions.filter((c) => c.value).map((c) => ({ value: c.value, label: c.label! })),
+  countryOptions.flatMap((item) => "label" in item ? [{ value: item.value, label: item.label }] : []),
 );
 const currencyItems = computed<Item[]>(() => currencyOptions.value.map((c) => ({ label: c, value: c })));
 const periodItems = computed<Item[]>(() => JOB_SALARY_PERIODS.map((p) => ({ label: periodLabel(p), value: p })));

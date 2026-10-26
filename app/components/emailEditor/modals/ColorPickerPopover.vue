@@ -106,7 +106,7 @@ function parseColorString(raw: string) {
   const s = String(raw || "").trim();
 
   const hex = s.match(/^#([0-9a-fA-F]{6})$/);
-  if (hex) {
+  if (hex?.[1]) {
     const v = hex[1];
     return {
       r: parseInt(v.slice(0, 2), 16),

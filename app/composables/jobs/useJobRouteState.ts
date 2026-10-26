@@ -1,6 +1,5 @@
 import type { LocationQuery, Router } from "vue-router";
 import { JOB_SALARY_PERIODS, type useJobFilters } from "~/composables/jobs/useJobFilters";
-import type { SalaryPeriod } from "~/utils/search/money";
 import { queryBoolean, queryString } from "~/utils/queryParams";
 import { useSearchRouteState } from "../search/useSearchRouteState";
 
@@ -57,8 +56,8 @@ export function useJobRouteState(options: JobRouteStateOptions) {
     const salaryMinRaw = queryString(params.salaryMin);
     salaryMin.value = salaryMinRaw ? Number(salaryMinRaw) : undefined;
     displayCurrency.value = queryString(params.currency) || "USD";
-    const periodParam = queryString(params.period) as SalaryPeriod;
-    displayPeriod.value = JOB_SALARY_PERIODS.includes(periodParam) ? periodParam : "month";
+    const periodParam = queryString(params.period);
+    displayPeriod.value = JOB_SALARY_PERIODS.find((period) => period === periodParam) ?? "month";
     sort.value = queryString(params.sort) || "date";
     const countryParam = queryString(params.country);
     countries.value = countryParam ? countryParam.split(",").filter(Boolean) : [];

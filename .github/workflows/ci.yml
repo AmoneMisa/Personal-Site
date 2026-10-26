@@ -44,6 +44,9 @@ jobs:
       - name: Run application tests
         run: npm test
 
+      - name: Check TypeScript types
+        run: npm run typecheck
+
       - name: Build Nuxt application
         run: npm run build
 

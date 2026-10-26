@@ -1,4 +1,4 @@
-import { computed, ref, type Ref } from "vue";
+import { computed, onScopeDispose, ref, watch, type Ref } from "vue";
 import type { FlatListing, FlatTranslationResult } from "~/types/flats";
 import { housingTextIsInLanguage } from "@whiteslove/parsing-lexicon/housing-language";
 import { safeFetch } from "~/utils/safeFetch";
@@ -10,6 +10,7 @@ export function useFlatTranslation(active: Ref<FlatListing | null>, locale: Ref<
   const cache = new Map<string, string>();
   let pollTimer: ReturnType<typeof setTimeout> | undefined;
   let requestId = 0;
+  let controller: AbortController | undefined;
   const maxPollAttempts = 159;
 
   const targetLanguage = () => locale.value.startsWith("en") ? "en" as const : "ru" as const;
@@ -28,6 +29,8 @@ export function useFlatTranslation(active: Ref<FlatListing | null>, locale: Ref<
   function cancelTranslation() {
     stopPoll();
     requestId += 1;
+    controller?.abort();
+    controller = undefined;
     translatingDescription.value = false;
   }
 
@@ -55,7 +58,7 @@ export function useFlatTranslation(active: Ref<FlatListing | null>, locale: Ref<
 
   async function poll(key: string, listing: FlatListing, id: number, listingCacheKey: string, attempt = 0) {
     if (id !== requestId || active.value?.id !== listing.id) return;
-    const { data, error } = await safeFetch<FlatTranslationResult>("/flats-translate", { params: { key } });
+    const { data, error } = await safeFetch<FlatTranslationResult>("/flats-translate", { params: { key }, signal: controller?.signal });
     if (id !== requestId || active.value?.id !== listing.id) return;
     if (!error && data && accept(data, listing, id, listingCacheKey)) return;
     if (error || data?.status === "failed" || data?.status === "disabled" || data?.status === "not_found" || attempt >= maxPollAttempts) {
@@ -78,11 +81,13 @@ export function useFlatTranslation(active: Ref<FlatListing | null>, locale: Ref<
     }
     stopPoll();
     const id = ++requestId;
+    controller = new AbortController();
     translatingDescription.value = true;
     translationFailed.value = false;
     const { data, error } = await safeFetch<FlatTranslationResult>("/flats-translate", {
       method: "POST",
       body: { text: listing.description, targetLanguage: target },
+      signal: controller.signal,
     });
     if (id !== requestId || active.value?.id !== listing.id) return;
     if (error || !data) {
@@ -98,6 +103,16 @@ export function useFlatTranslation(active: Ref<FlatListing | null>, locale: Ref<
     translatingDescription.value = false;
     translationFailed.value = true;
   }
+
+  watch(targetLanguage, () => {
+    if (active.value) prepareTranslation(active.value);
+    else {
+      cancelTranslation();
+      translatedDescription.value = "";
+      translationFailed.value = false;
+    }
+  }, { flush: "sync" });
+  onScopeDispose(cancelTranslation);
 
   return {
     translatedDescription,

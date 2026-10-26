@@ -180,7 +180,7 @@ export function usePdfEditorSession(options: PdfEditorSessionOptions) {
 
     const canvas = getCanvas();
     if (canvas) {
-      pageJson[page.value] = canvas.toJSON(PDF_SERIALIZED_PROPERTIES);
+      pageJson[page.value] = canvas.toObject(PDF_SERIALIZED_PROPERTIES);
       saveDraftNow();
     }
     disposeCanvas();

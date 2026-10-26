@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { activateModalDialog, isTopModalDialog } from "~/utils/modalDialog";
 const props = defineProps<{
   photos: string[];
   title: string;
@@ -13,6 +14,13 @@ const emit = defineEmits<{
 }>();
 
 const lightboxOpen = defineModel<boolean>("lightboxOpen", { default: false });
+const dialog = ref<HTMLElement | null>(null);
+let releaseDialog: (() => void) | undefined;
+watch(dialog, (element) => {
+  releaseDialog?.();
+  releaseDialog = element ? activateModalDialog(element) : undefined;
+}, { flush: "post" });
+onBeforeUnmount(() => releaseDialog?.());
 const currentIndex = ref<number | null>(null);
 const zoom = ref(1);
 const stageElement = ref<HTMLDivElement | null>(null);
@@ -139,7 +147,7 @@ function onPointerCancel() {
 }
 
 function onKeydown(event: KeyboardEvent) {
-  if (currentIndex.value == null) return;
+  if (currentIndex.value == null || !isTopModalDialog(dialog.value)) return;
   if (event.key === "Escape") close();
   else if (event.key === "ArrowLeft") move(-1);
   else if (event.key === "ArrowRight") move(1);
@@ -217,7 +225,7 @@ onBeforeUnmount(() => window.removeEventListener("keydown", onKeydown));
   </div>
 
   <teleport to="body">
-    <div v-if="currentPhoto" class="flat-lightbox" role="dialog" aria-modal="true" :aria-label="viewerLabel" @click="close">
+    <div v-if="currentPhoto" ref="dialog" class="flat-lightbox" role="dialog" aria-modal="true" :aria-label="viewerLabel" @click="close">
       <div ref="stageElement" class="flat-lightbox__stage" :class="{ 'flat-lightbox__stage_pannable': zoom > MIN_ZOOM, 'flat-lightbox__stage_dragging': dragging }" @click.stop @pointerdown="onPointerDown" @pointermove="onPointerMove" @pointerup="onPointerUp" @pointercancel="onPointerCancel" @wheel.prevent.stop="onWheel">
         <img
           ref="imageElement"

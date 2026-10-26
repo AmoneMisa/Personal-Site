@@ -16,7 +16,9 @@ export const cssDuplicateClassRule = {
             let match: RegExpExecArray | null;
             while ((match = ruleRegex.exec(withoutMedia))) {
                 const selector = match[2]; // ".button"
-                const declarations = normalizeDeclarations(match[3]);
+                const rawDeclarations = match[3];
+                if (!selector || rawDeclarations === undefined) continue;
+                const declarations = normalizeDeclarations(rawDeclarations);
 
                 if (selector.includes(":") || selector.includes("::")) continue;
 

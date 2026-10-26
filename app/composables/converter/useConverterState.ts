@@ -154,15 +154,18 @@ export function useConverterState() {
 
   async function convert() {
     if (!validate()) return;
+    const selectedFiles = [...files.value];
+    const firstFile = selectedFiles[0];
+    if (!firstFile) return;
     isLoading.value = true;
     clearMessages();
 
     try {
       const form = new FormData();
       if (currentMode.value.multiple) {
-        files.value.forEach(file => form.append("files", file));
+        selectedFiles.forEach(file => form.append("files", file));
       } else {
-        form.append("file", files.value[0]);
+        form.append("file", firstFile);
       }
       form.append("target", target.value);
 
@@ -185,9 +188,9 @@ export function useConverterState() {
       }
 
       const normalizedTarget = target.value === "jpeg" ? "jpg" : target.value;
-      const fallback = currentMode.value.multiple && files.value.length > 1
+      const fallback = currentMode.value.multiple && selectedFiles.length > 1
         ? "converted_media.zip"
-        : `${files.value[0].name.replace(/\.[^.]+$/, "")}.${normalizedTarget}`;
+        : `${firstFile.name.replace(/\.[^.]+$/, "")}.${normalizedTarget}`;
       downloadBlob(
         await response.blob(),
         filenameFromContentDisposition(response.headers.get("content-disposition")) || fallback,

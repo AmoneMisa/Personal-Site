@@ -23,7 +23,7 @@ const currentStatistics = computed(() => props.statistics || localStatistics.val
 const professionLocale = computed(() => hiringProfessionLocale(locale.value));
 
 const genderItems = computed(() => {
-  return (["female", "male", "unknown"] as const).map((key, index) => ({ label: t(`gender${key.charAt(0).toUpperCase()}${key.slice(1)}`), value: currentStatistics.value.genders[key], color: palette[index] }));
+  return (["female", "male", "unknown"] as const).map((key, index) => ({ label: t(`gender${key.charAt(0).toUpperCase()}${key.slice(1)}`), value: currentStatistics.value.genders[key], color: palette[index] ?? "#24a7d6" }));
 });
 const locationBars = computed(() => currentStatistics.value.locations.slice(0, 6).map((item, index) => ({ label: item.label === "__unknown__" ? t("statsUnknown") : item.display ?? item.label, value: item.value, color: palette[index % palette.length] })));
 const platformBars = computed(() => currentStatistics.value.platforms.slice(0, 6).map((item, index) => ({ label: item.label === "__unknown__" ? t("statsUnknown") : item.label, value: item.value, color: palette[index % palette.length] })));
@@ -54,7 +54,12 @@ const professionSalaryRangeTitle = computed(() => String(locale.value).toLowerCa
 const activity = computed(() => {
   const count = activityDays.value === 7 ? 7 : activityDays.value === 30 ? 10 : 12;
   const end = Date.now(); const start = end - activityDays.value * 86_400_000; const bucket = (end - start) / count; const values = Array.from({ length: count }, () => 0);
-  for (const point of currentStatistics.value.activity) { const at = new Date(`${point.date}T00:00:00.000Z`).getTime(); if (!Number.isFinite(at) || at < start || at > end) continue; values[Math.min(count - 1, Math.floor((at - start) / bucket))] += point.value; }
+  for (const point of currentStatistics.value.activity) {
+    const at = new Date(`${point.date}T00:00:00.000Z`).getTime();
+    if (!Number.isFinite(at) || at < start || at > end) continue;
+    const index = Math.min(count - 1, Math.floor((at - start) / bucket));
+    values[index] = (values[index] ?? 0) + point.value;
+  }
   const labels = Array.from({ length: count }, (_, index) => new Date(start + index * bucket).toLocaleDateString([], { day: "2-digit", month: "2-digit" }));
   return { labels, series: [{ label: t("statsCandidates"), color: "#24a7d6", values }] };
 });

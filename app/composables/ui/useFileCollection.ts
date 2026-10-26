@@ -26,7 +26,7 @@ export function useFileCollection(options: FileCollectionOptions = {}) {
     if (!accepted.length) return;
 
     if (!toValue(options.multiple ?? false)) {
-      files.value = [accepted[0]];
+      files.value = accepted.slice(0, 1);
       return;
     }
 

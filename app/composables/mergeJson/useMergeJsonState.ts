@@ -1,4 +1,4 @@
-import {ref, reactive, computed, watch, type Component, type ShallowUnwrapRef} from "vue";
+import {ref, shallowRef, reactive, computed, watch, type Component, type ShallowUnwrapRef} from "vue";
 import type {Truth} from "~/utils/mergeJson/pick";
 import {
     safeParseJson,
@@ -44,11 +44,11 @@ export function useMergeJsonState() {
     const errorB = ref<string | null>(null);
     const errorR = ref<string | null>(null);
 
-    const jsonA = ref<JsonValue>({});
-    const jsonB = ref<JsonValue>({});
+    const jsonA = shallowRef<JsonValue>({});
+    const jsonB = shallowRef<JsonValue>({});
 
     const resultTextJson = ref<string>("{}");
-    const resultObj = ref<JsonValue>({});
+    const resultObj = shallowRef<JsonValue>({});
     const isDirty = ref(false);
 
     const pickByKey = reactive<Partial<Record<string, Pick>>>({});
@@ -169,6 +169,7 @@ export function useMergeJsonState() {
         matchIndex.value = (matchIndex.value + dir + n) % n;
 
         const k = list[matchIndex.value];
+        if (k === undefined) return;
         selectedKey.value = k;
         revealKey.value = k;
     }
@@ -398,7 +399,7 @@ export function useMergeJsonState() {
             const hasB = getByPath(jsonB.value as any, k) !== undefined;
 
             const conflictPicked =
-                isDiffLocal(k) && (pickByKey[k] === "A" || pickByKey[k] === "B" || pickByKey[k] === "EDITED");
+                isDiffLocal(k) && (pickByKey[k] === "A" || pickByKey[k] === "B");
             if (conflictPicked) {
                 out.push({path: k, kind: "conflict"});
                 continue;
@@ -522,8 +523,9 @@ export function useMergeJsonState() {
     async function onFilesA(files: File[]) {
         errorA.value = null;
         try {
-            if (!files.length) return;
-            const {obj} = await loadJsonFromFile(files[0]);
+            const file = files[0];
+            if (!file) return;
+            const {obj} = await loadJsonFromFile(file);
             jsonA.value = normalizeLoadedJson(obj) as JsonValue;
         } catch (e: any) {
             errorA.value = e?.message || "Invalid file";
@@ -533,8 +535,9 @@ export function useMergeJsonState() {
     async function onFilesB(files: File[]) {
         errorB.value = null;
         try {
-            if (!files.length) return;
-            const {obj} = await loadJsonFromFile(files[0]);
+            const file = files[0];
+            if (!file) return;
+            const {obj} = await loadJsonFromFile(file);
             jsonB.value = normalizeLoadedJson(obj) as JsonValue;
         } catch (e: any) {
             errorB.value = e?.message || "Invalid file";

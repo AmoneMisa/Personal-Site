@@ -31,7 +31,6 @@ const SITE_URL = "https://whiteslove.me";
 useSeoMeta({
   title: () => t("projects.seoTitle"),
   description: () => chrome.value.subtitle,
-  keywords: () => Array.from(new Set(groups.value.flatMap((g) => g.items.flatMap((p) => tagsFor(p.stack))))).join(", "),
   ogType: "website",
   ogTitle: () => chrome.value.title,
   ogDescription: () => chrome.value.subtitle,
@@ -42,6 +41,7 @@ useSeoMeta({
 // ItemList schema so search engines can index the catalog as a structured
 // list of creative works, not just a wall of anchor tags.
 useHead(() => ({
+  meta: [{ name: "keywords", content: Array.from(new Set(groups.value.flatMap((g) => g.items.flatMap((p) => tagsFor(p.stack))))).join(", ") }],
   script: [
     {
       type: "application/ld+json",

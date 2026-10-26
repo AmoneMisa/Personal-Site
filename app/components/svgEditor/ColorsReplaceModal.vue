@@ -48,7 +48,7 @@ function parseColorString(raw: string) {
   const s = String(raw || "").trim();
 
   const hex = s.match(/^#([0-9a-fA-F]{6})$/);
-  if (hex) return { hex: `#${hex[1].toUpperCase()}` };
+  if (hex?.[1]) return { hex: `#${hex[1].toUpperCase()}` };
 
   const rgb = s.match(/^rgb\(\s*([0-9]{1,3})\s*,\s*([0-9]{1,3})\s*,\s*([0-9]{1,3})\s*\)$/i);
   if (rgb) {

@@ -6,6 +6,7 @@
 // a listbox built on a native button + popup rather than a native <select>,
 // because the call sites rely on multi-select and on rendering a custom label.
 import { computed, nextTick, onBeforeUnmount, ref, watch } from "vue";
+import { registerModalBranch } from "~/utils/modalDialog";
 
 defineOptions({ inheritAttrs: false });
 
@@ -38,6 +39,8 @@ const search = ref("");
 const root = ref<HTMLElement | null>(null);
 const searchEl = ref<HTMLInputElement | null>(null);
 const activeIndex = ref(0);
+let releaseBranch: (() => void) | undefined;
+onBeforeUnmount(() => releaseBranch?.());
 
 const searchable = computed(() => props.searchInput !== false && (props.items?.length ?? 0) > 7);
 
@@ -95,16 +98,25 @@ function choose(item: any) {
 async function toggle() {
   if (props.disabled) return;
   open.value = !open.value;
-  if (!open.value) return;
+  if (!open.value) {
+    releaseBranch?.();
+    releaseBranch = undefined;
+    return;
+  }
   search.value = "";
   activeIndex.value = Math.max(0, filtered.value.findIndex(isSelected));
   await nextTick();
+  if (root.value && popupEl.value) releaseBranch = registerModalBranch(root.value, popupEl.value);
   searchEl.value?.focus();
 }
 
 function close() {
+  const restoreFocus = popupEl.value?.contains(document.activeElement);
+  releaseBranch?.();
+  releaseBranch = undefined;
   open.value = false;
   search.value = "";
+  if (restoreFocus) (root.value?.firstElementChild as HTMLElement | null)?.focus();
 }
 
 function onKeydown(event: KeyboardEvent) {
@@ -115,7 +127,7 @@ function onKeydown(event: KeyboardEvent) {
     }
     return;
   }
-  if (event.key === "Escape") { close(); return; }
+  if (event.key === "Escape") { event.preventDefault(); event.stopPropagation(); close(); return; }
   if (event.key === "ArrowDown") { event.preventDefault(); activeIndex.value = Math.min(activeIndex.value + 1, filtered.value.length - 1); }
   else if (event.key === "ArrowUp") { event.preventDefault(); activeIndex.value = Math.max(activeIndex.value - 1, 0); }
   else if (event.key === "Enter") {

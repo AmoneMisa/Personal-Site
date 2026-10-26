@@ -110,6 +110,7 @@ const skillGroupKeys = ["core", "frameworks", "ui", "platform", "tooling"] as co
 // Whole months between "YYYY-MM" and an end ("YYYY-MM" or null = now).
 function monthsBetween(start: string, end: string | null): number {
   const [sy, sm] = start.split("-").map(Number);
+  if (sy === undefined || sm === undefined || !Number.isFinite(sy) || !Number.isFinite(sm)) return 0;
   const now = new Date();
   const ey = end ? Number(end.split("-")[0]) : now.getFullYear();
   const em = end ? Number(end.split("-")[1]) : now.getMonth() + 1;
@@ -119,7 +120,7 @@ function monthsBetween(start: string, end: string | null): number {
 // Total years of experience, measured from the earliest role start to today, so
 // the number ticks up on its own and never goes stale.
 const careerStart = computed(() =>
-  experience.reduce((min, j) => (j.start < min ? j.start : min), experience[0].start)
+  experience.reduce((min, j) => (j.start < min ? j.start : min), experience[0]?.start ?? new Date().toISOString().slice(0, 7))
 );
 const yearsExperience = computed(() => Math.floor(monthsBetween(careerStart.value, null) / 12));
 

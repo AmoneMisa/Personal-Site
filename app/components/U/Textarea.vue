@@ -1,6 +1,6 @@
 <script setup lang="ts">
 // Drop-in replacement for Nuxt UI's <UTextarea>.
-import { computed, ref, useId } from "vue";
+import { computed, ref, useAttrs, useId } from "vue";
 
 defineOptions({ inheritAttrs: false });
 
@@ -25,6 +25,10 @@ function onInput(event: Event) {
 }
 
 const inputId = useId();
+const attrs = useAttrs();
+function floatingAttrs() {
+  return Object.fromEntries(Object.entries(attrs).filter(([key]) => key !== "id" && key !== "class"));
+}
 const focused = ref(false);
 const floating = computed(() => Boolean(props.label));
 const floated = computed(() => floating.value && (focused.value || (props.modelValue ?? "") !== ""));
@@ -54,7 +58,7 @@ const floated = computed(() => floating.value && (focused.value || (props.modelV
         :value="modelValue ?? ''"
         :rows="rows"
         :disabled="disabled"
-        v-bind="{ ...$attrs, class: undefined, id: undefined }"
+        v-bind="floatingAttrs()"
         @input="onInput"
         @focus="focused = true"
         @blur="focused = false"

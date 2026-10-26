@@ -1,5 +1,6 @@
 import type { SelectOption, SearchFilterBlock, SearchFilterValue } from "~/types/search";
 import type { useJobFilters } from "~/composables/jobs/useJobFilters";
+import type { DisplaySalaryPeriod } from "~/utils/search/money";
 
 type Model<T = SearchFilterValue> = { value: T };
 type OptionSource = { readonly value: Array<SelectOption | string> };
@@ -21,7 +22,7 @@ export function useJobFilterBlocks(options: {
   languageItems: OptionSource;
   levelItems: OptionSource;
   excludeLanguageItems: OptionSource;
-  periodLabel: (period: string) => string;
+  periodLabel: (period: DisplaySalaryPeriod) => string;
   scheduleLoad: () => void;
   submit: () => void;
 }) {

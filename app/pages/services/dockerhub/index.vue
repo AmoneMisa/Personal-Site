@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import {ref} from "vue";
 import { useServiceSeo } from "~/composables/services/useServiceSeo";
-import type {TabsItem} from "#ui/components/Tabs.vue";
+import type {TabsItem} from "~/types/tabs";
 import {useScrollableTabs} from "~/composables/ui/useScrollableTabs";
 import {useDockerAliases} from "~/composables/dockerHub/useDockerAliases";
 import {useDockerSimpleSearch} from "~/composables/dockerHub/useDockerSimpleSearch";

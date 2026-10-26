@@ -230,7 +230,7 @@ export function usePdfImageTools(options: PdfImageToolsOptions) {
     canvas.getObjects().forEach(trackDeletedImage);
     canvas.clear();
     canvas.requestRenderAll();
-    options.pageJson[options.page.value] = canvas.toJSON(PDF_SERIALIZED_PROPERTIES);
+    options.pageJson[options.page.value] = canvas.toObject(PDF_SERIALIZED_PROPERTIES);
     options.scheduleSave();
   }
 

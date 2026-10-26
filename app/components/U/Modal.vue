@@ -5,7 +5,8 @@
 // #content / #default slots the app uses. Scroll locking is done here and
 // always released on close or unmount — the previous implementation could
 // strand a locked page on mobile when a nested overlay closed out of order.
-import { computed, onBeforeUnmount, watch } from "vue";
+import { computed, onBeforeUnmount, ref, watch } from "vue";
+import { activateModalDialog, isTopModalDialog } from "~/utils/modalDialog";
 
 const props = withDefaults(defineProps<{
   open?: boolean;
@@ -39,27 +40,8 @@ const panelStyle = computed(() => {
   return undefined;
 });
 
-let restoreScroll: (() => void) | null = null;
-
-function lockScroll() {
-  if (import.meta.server || restoreScroll) return;
-  const { body } = document;
-  const previousOverflow = body.style.overflow;
-  const previousPadding = body.style.paddingRight;
-  // Compensate for the scrollbar so the page doesn't shift when it disappears.
-  const gap = window.innerWidth - document.documentElement.clientWidth;
-  body.style.overflow = "hidden";
-  if (gap > 0) body.style.paddingRight = `${gap}px`;
-  restoreScroll = () => {
-    body.style.overflow = previousOverflow;
-    body.style.paddingRight = previousPadding;
-  };
-}
-
-function unlockScroll() {
-  restoreScroll?.();
-  restoreScroll = null;
-}
+const dialog = ref<HTMLElement | null>(null);
+let releaseDialog: (() => void) | undefined;
 
 function close() {
   if (!props.dismissible) return;
@@ -67,23 +49,24 @@ function close() {
 }
 
 function onKeydown(event: KeyboardEvent) {
-  if (event.key === "Escape") close();
+  if (event.key === "Escape" && !event.defaultPrevented && isTopModalDialog(dialog.value)) close();
 }
 
-watch(() => props.open, (isOpen) => {
+watch([() => props.open, dialog], ([isOpen, element]) => {
   if (import.meta.server) return;
-  if (isOpen) {
-    lockScroll();
+  releaseDialog?.();
+  releaseDialog = undefined;
+  if (isOpen && element) {
+    releaseDialog = activateModalDialog(element);
     document.addEventListener("keydown", onKeydown);
   } else {
-    unlockScroll();
     document.removeEventListener("keydown", onKeydown);
   }
-}, { immediate: true });
+}, { immediate: true, flush: "post" });
 
 // Leaving the page with the modal open must never strand a locked document.
 onBeforeUnmount(() => {
-  unlockScroll();
+  releaseDialog?.();
   if (!import.meta.server) document.removeEventListener("keydown", onKeydown);
 });
 </script>
@@ -91,7 +74,7 @@ onBeforeUnmount(() => {
 <template>
   <slot />
   <Teleport v-if="open" to="body">
-    <div class="u-modal" role="dialog" aria-modal="true" :aria-label="title || undefined" :style="props.zIndex != null ? { zIndex: props.zIndex } : undefined">
+    <div ref="dialog" class="u-modal" role="dialog" aria-modal="true" :aria-label="title || undefined" :style="props.zIndex != null ? { zIndex: props.zIndex } : undefined">
       <div class="u-modal__backdrop" @click="close" />
       <div class="u-modal__panel" :class="[props.ui?.content, $attrs.class]" :style="panelStyle">
         <!-- #content replaces the whole panel, matching Nuxt UI. -->

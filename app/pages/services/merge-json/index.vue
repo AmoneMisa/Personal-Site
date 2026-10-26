@@ -74,9 +74,9 @@ const monacoMode = computed(() => (ui.viewMode === "flat" ? "flat" : "json"));
         :is="ui.modal.component"
         :model-value="ui.modal.open"
         v-bind="ui.modal.props"
-        @update:modelValue="(v) => (v ? (ui.modal.open = true) : ui.closeModal())"
+        @update:modelValue="(v: boolean) => (v ? (ui.modal.open = true) : ui.closeModal())"
         @close="ui.closeModal"
-        @confirm="(payload) => { ui.modal.onConfirm(payload); ui.closeModal(); }"
+        @confirm="(payload: unknown) => { ui.modal.onConfirm(payload); ui.closeModal(); }"
     />
 
 

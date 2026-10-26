@@ -78,7 +78,7 @@ export default defineEventHandler(async (event) => {
   if (!artwork) throw createError({ statusCode: 500, statusMessage: 'Share artwork unavailable' })
   const png = await renderShareOgPng(card, artwork)
   setResponseHeader(event, 'Content-Type', 'image/png')
-  setResponseHeader(event, 'Content-Length', String(png.length))
+  setResponseHeader(event, 'Content-Length', png.length)
   setResponseHeader(event, 'Cache-Control', 'public, max-age=300, s-maxage=600, stale-while-revalidate=86400')
   return png
 })

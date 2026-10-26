@@ -26,7 +26,7 @@ const languages = computed(() => s.value.cards[s.value.cards.length - 1]);
         </article>
       </div>
 
-      <div class="profile-skills__languages">
+      <div v-if="languages" class="profile-skills__languages">
         <h3 class="profile-skills__languages-title mono">{{ languages.title }}</h3>
         <ul class="profile-skills__language-list">
           <li v-for="item in languages.items" :key="item" class="profile-skills__language">{{ item }}</li>

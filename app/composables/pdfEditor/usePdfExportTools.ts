@@ -67,13 +67,13 @@ export function usePdfExportTools(options: PdfExportToolsOptions) {
     const canvas = getCanvas();
     if (!canvas) return { overlays: {}, textEdits: {}, imageEdits: {} };
 
-    pageJson[page.value] = canvas.toJSON(PDF_SERIALIZED_PROPERTIES);
+    pageJson[page.value] = canvas.toObject(PDF_SERIALIZED_PROPERTIES);
 
     const overlays: Record<number, string> = {};
     const textEdits: Record<number, PdfTextEditBlock[]> = {};
     const imageEdits: Record<number, PdfImageEdit[]> = {};
     const currentPage = page.value;
-    const currentJson = canvas.toJSON(PDF_SERIALIZED_PROPERTIES);
+    const currentJson = canvas.toObject(PDF_SERIALIZED_PROPERTIES);
 
     for (let pageNo = 1; pageNo <= pages.value; pageNo++) {
       const json = pageJson[pageNo];

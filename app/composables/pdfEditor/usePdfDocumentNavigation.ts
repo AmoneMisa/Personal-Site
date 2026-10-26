@@ -54,7 +54,7 @@ export function usePdfDocumentNavigation(options: PdfDocumentNavigationOptions) 
     const target = clampInt(nextPage, 1, pages.value);
     if (target === page.value) return;
 
-    pageJson[page.value] = canvas.toJSON(PDF_SERIALIZED_PROPERTIES);
+    pageJson[page.value] = canvas.toObject(PDF_SERIALIZED_PROPERTIES);
     page.value = target;
     await nextTick();
     loadCanvasForPage(page.value);
