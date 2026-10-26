@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { safeFetch } from "~/utils/safeFetch";
 import { capitalizeFirst } from "~/utils/text";
+import ListingActivity from "~/components/search/ListingActivity.vue";
+import type { ActivityTab } from "~/types/listingActivity";
 import JobCard from "~/components/jobs/JobCard.vue";
 import SearchResultGrid from "~/components/search/SearchResultGrid.vue";
 import SearchDetailsModal from "~/components/search/SearchDetailsModal.vue";
@@ -123,6 +125,7 @@ const {
   loadedSourceCount, pendingSourceCount, loadMoreSentinel, loadFeed,
 } = useJobFeed(usdRates);
 const activeJob = ref<Job | null>(null);
+const jobModalTab = ref<ActivityTab>("details");
 const jobModalOpen = ref(false);
 const {
   translatedText: translatedJobDescription,
@@ -261,7 +264,12 @@ function syncJobInUrl(job: Job | null) {
   }
   void router.replace({ query });
 }
+function openJobHistory(job: Job) {
+  openJob(job);
+  jobModalTab.value = "history";
+}
 function openJob(job: Job) {
+  jobModalTab.value = "details";
   activeJob.value = job;
   jobModalOpen.value = true;
   resetShareFeedback();
@@ -825,6 +833,7 @@ onBeforeUnmount(() => {
           :salary="formatSalary(job)"
           :converted-salary="convertedSalary(job)"
           @open="openJob"
+          @activity="openJobHistory"
           @share="shareJob"
           @seen="markSeen"
           @favorite="toggleFavorite"
@@ -850,7 +859,8 @@ onBeforeUnmount(() => {
 
     <SearchDetailsModal v-model:open="jobModalOpen" :title="activeJob?.title || ''" :public-id="jobPublicId(activeJob)">
       <template #body>
-        <div v-if="activeJob" class="job-modal">
+        <ListingActivity v-if="activeJob" v-model="jobModalTab" domain="jobs" :public-id="jobPublicId(activeJob)">
+        <div class="job-modal">
           <div class="job-modal__badges">
             <span v-if="isToday(activeJob.postedAt)" class="job-card__badge job-card__badge_new">{{ t("newToday") }}</span>
             <span v-if="activeJob.suspicious" class="job-card__badge job-card__badge_suspicious" :title="suspicionHint(activeJob)">⚠ {{ t("suspicious") }}</span>
@@ -876,6 +886,7 @@ onBeforeUnmount(() => {
             <span v-for="s in (activeJob.niceToHave || [])" :key="'plus-' + s" class="job-modal__tag job-modal__tag_plus">+{{ s }}</span>
           </div>
         </div>
+        </ListingActivity>
       </template>
       <template #footer>
         <UiModalFooter>

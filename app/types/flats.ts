@@ -46,6 +46,7 @@ export interface FlatPerPersonPrice extends FlatMoneyAmount {
 }
 
 export interface FlatListing {
+  activitySummary?: import("./listingActivity").ActivitySummary;
   id: string;
   // Built by the backend from the published contact; see utils/flats/contactActions.ts.
   contactActions?: import("~/utils/flats/contactActions").ContactAction[];

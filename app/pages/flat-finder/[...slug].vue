@@ -13,7 +13,8 @@ import {
 } from "~/composables/flats/useMetroProximity";
 import FlatMap from "~/components/flats/FlatMap.client.vue";
 import FlatCard from "~/components/flats/FlatCard.vue";
-import FlatModalTabs from "~/components/flats/FlatModalTabs.vue";
+import ListingActivity from "~/components/search/ListingActivity.vue";
+import type { ActivityTab } from "~/types/listingActivity";
 import FlatContactListings from "~/components/flats/FlatContactListings.vue";
 import FlatContactActions from "~/components/flats/FlatContactActions.vue";
 import FlatOwnersGrid from "~/components/flats/FlatOwnersGrid.vue";
@@ -925,7 +926,7 @@ async function verifyOpenOlxListing(l: Listing, key: string) {
   }
 }
 // Popup tab: the listing itself, or the same contact's other listings.
-const modalTab = ref<"details" | "contact">("details");
+const modalTab = ref<ActivityTab>("details");
 const activeContactListingCount = computed(() => Number(active.value?.contactListingCount) || 0);
 async function openListing(l: Listing) {
   const key = listingKey(l);
@@ -935,6 +936,10 @@ async function openListing(l: Listing) {
   addRecent(l);
   syncListingInUrl(l);
   if (l.source === "olx" && !isAvailabilityFresh(key)) void verifyOpenOlxListing(l, key);
+}
+async function openListingHistory(listing: Listing) {
+  await openListing(listing);
+  modalTab.value = "history";
 }
 function modalTitle(listing: Listing | null): string {
   if (!listing) return "";
@@ -1384,6 +1389,7 @@ onBeforeUnmount(() => { modalOpen.value = false; lightboxOpen.value = false; rel
         :favorite-label="isFavorite(l.id) ? t('removeFavorite') : t('addFavorite')"
         :hide-label="isHidden(l.id) ? t('restoreListing') : t('hideListing')"
         @open="openListing(l)"
+        @activity="openListingHistory(l)"
         @toggle-favorite="toggleFavorite(l)"
         @toggle-hidden="toggleHidden(l)"
         @photo-error="markPhotoFailedFromEvent"
@@ -1397,7 +1403,7 @@ onBeforeUnmount(() => { modalOpen.value = false; lightboxOpen.value = false; rel
 
     <SearchDetailsModal v-model:open="modalOpen" :title="modalTitle(active)" :flat-listing="active" :flat-location-label="labelFor" :flat-price-usd="activePriceUsd" :dismissible="!lightboxOpen">
       <template #title><h2 class="flat-modal__title">{{ modalTitle(active) }}</h2></template>
-      <template #body><div v-if="active" class="flat-modal"><FlatModalTabs v-if="activeContactListingCount > 0" v-model="modalTab" :count="activeContactListingCount" /><FlatContactListings v-if="modalTab === 'contact' && activeContactListingCount > 0" :public-id="active.publicId" @open="openListing" /><div v-show="modalTab === 'details' || activeContactListingCount === 0" class="flat-modal__details"><FlatGallery v-model:lightbox-open="lightboxOpen" :photos="visiblePhotos(active)" :title="modalTitle(active)" :viewer-label="t('photoViewer')" :previous-label="t('previousPhoto')" :next-label="t('nextPhoto')" :close-label="t('closePhoto')" @photo-error="markPhotoFailedFromEvent" /><div v-if="checkingListingKey === listingKey(active)" class="flat-modal__verification" role="status" aria-live="polite"><u-icon name="i-lucide-loader-circle" class="flat-modal__verification-icon" /><span>{{ t("checkingListing") }}</span></div><UiSpecTable :rows="specRows" :hide-empty-label="t('hideEmpty')" :empty-value="t('notSpecified')"><template #header><div class="flat-modal__price">{{ priceLabel(active) }}<span v-if="convertedLabel(active)" class="flat-modal__price-conv"> ({{ convertedLabel(active) }})</span><span v-if="dealLabel(active.dealType)" class="flat-modal__deal"> · {{ dealLabel(active.dealType) }}</span><span v-if="active.roomOnly" class="flat-modal__deal"> · {{ t("roomShare") }}</span></div></template></UiSpecTable><FlatContactActions :actions="active.contactActions" /><div v-if="active.description && descriptionNeedsTranslation" class="flat-modal__translation"><u-button type="button" variant="outline" color="neutral" size="sm" icon="i-lucide-languages" :loading="translatingDescription" @click="translateActiveDescription">{{ translatingDescription ? t("translatingDescription") : t("translateDescription") }}</u-button><span v-if="translationFailed" class="flat-modal__translation-error">{{ t("translationFailed") }}</span></div><section v-if="translatedDescription" class="flat-modal__translated"><h4 class="flat-modal__translated-title">{{ t("translatedDescription") }}</h4><p class="flat-modal__desc">{{ translatedDescription }}</p></section><details v-if="active.description" class="flat-modal__descbox"><summary>{{ t("origDescription") }}</summary><p class="flat-modal__desc">{{ capitalizeFirst(active.description) }}</p></details><div v-if="active.tags && active.tags.length" class="flat-modal__tags"><span v-for="tag in active.tags" :key="tag" class="flat-modal__tag">{{ nearbyItemLabel(tag) }}</span></div></div></div></template>
+      <template #body><div v-if="active" class="flat-modal"><ListingActivity v-model="modalTab" domain="flats" :public-id="active.publicId" :contact-count="activeContactListingCount"><template #contact><FlatContactListings v-if="modalTab === 'contact' && activeContactListingCount > 0" :public-id="active.publicId" @open="openListing" /></template><div class="flat-modal__details"><FlatGallery v-model:lightbox-open="lightboxOpen" :photos="visiblePhotos(active)" :title="modalTitle(active)" :viewer-label="t('photoViewer')" :previous-label="t('previousPhoto')" :next-label="t('nextPhoto')" :close-label="t('closePhoto')" @photo-error="markPhotoFailedFromEvent" /><div v-if="checkingListingKey === listingKey(active)" class="flat-modal__verification" role="status" aria-live="polite"><u-icon name="i-lucide-loader-circle" class="flat-modal__verification-icon" /><span>{{ t("checkingListing") }}</span></div><UiSpecTable :rows="specRows" :hide-empty-label="t('hideEmpty')" :empty-value="t('notSpecified')"><template #header><div class="flat-modal__price">{{ priceLabel(active) }}<span v-if="convertedLabel(active)" class="flat-modal__price-conv"> ({{ convertedLabel(active) }})</span><span v-if="dealLabel(active.dealType)" class="flat-modal__deal"> · {{ dealLabel(active.dealType) }}</span><span v-if="active.roomOnly" class="flat-modal__deal"> · {{ t("roomShare") }}</span></div></template></UiSpecTable><FlatContactActions :actions="active.contactActions" /><div v-if="active.description && descriptionNeedsTranslation" class="flat-modal__translation"><u-button type="button" variant="outline" color="neutral" size="sm" icon="i-lucide-languages" :loading="translatingDescription" @click="translateActiveDescription">{{ translatingDescription ? t("translatingDescription") : t("translateDescription") }}</u-button><span v-if="translationFailed" class="flat-modal__translation-error">{{ t("translationFailed") }}</span></div><section v-if="translatedDescription" class="flat-modal__translated"><h4 class="flat-modal__translated-title">{{ t("translatedDescription") }}</h4><p class="flat-modal__desc">{{ translatedDescription }}</p></section><details v-if="active.description" class="flat-modal__descbox"><summary>{{ t("origDescription") }}</summary><p class="flat-modal__desc">{{ capitalizeFirst(active.description) }}</p></details><div v-if="active.tags && active.tags.length" class="flat-modal__tags"><span v-for="tag in active.tags" :key="tag" class="flat-modal__tag">{{ nearbyItemLabel(tag) }}</span></div></div></ListingActivity></div></template>
       <template #footer><UiModalFooter v-if="active"><u-button variant="outline" color="neutral" icon="i-lucide-heart" @click="toggleFavorite(active)">{{ isFavorite(active.id) ? t("removeFavorite") : t("addFavorite") }}</u-button><u-button variant="outline" color="neutral" :icon="isHidden(active.id) ? 'i-lucide-eye' : 'i-lucide-eye-off'" @click="toggleHidden(active)">{{ isHidden(active.id) ? t("restoreListing") : t("hideListing") }}</u-button><u-button variant="outline" color="neutral" :icon="shareCopied ? 'i-lucide-check' : 'i-lucide-share-2'" @click="shareFlat(active)">{{ shareCopied ? t("shareCopied") : t("share") }}</u-button><a class="modal-footer__primary" :href="active.url" target="_blank" rel="noopener noreferrer">{{ t("open") }} →</a></UiModalFooter></template>
     </SearchDetailsModal>
 

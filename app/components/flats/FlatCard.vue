@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import ListingActivityLine from "~/components/search/ListingActivityLine.vue";
 import type { FlatCardPresentation, FlatListing } from "~/types/flats";
 import type { DraggablePillItem } from "~/components/ui/DraggablePills.vue";
 import { flatPriceTone, type FlatPriceTone } from "~/utils/flats/priceTone";
@@ -103,6 +104,7 @@ const lineEntry = computed(() => listingLineEntry(line.value, locale.value));
 
 const emit = defineEmits<{
   open: [];
+  activity: [];
   toggleFavorite: [];
   toggleHidden: [];
   photoError: [event: Event];
@@ -110,7 +112,7 @@ const emit = defineEmits<{
 </script>
 
 <template>
-  <article class="flat-card" :class="{ 'flat-card_favorite': favorite, 'flat-card_hidden': hidden, 'flat-card_checking': checking, 'flat-card_warning': unsafeListing, [`flat-card_line_${line}`]: Boolean(line) }" :title="lineTitle" :aria-busy="checking" @click="emit('open')">
+  <article class="flat-card" :class="{ 'flat-card_activity': Boolean(listing.activitySummary?.firstSeenAt), 'flat-card_favorite': favorite, 'flat-card_hidden': hidden, 'flat-card_checking': checking, 'flat-card_warning': unsafeListing, [`flat-card_line_${line}`]: Boolean(line) }" :title="lineTitle" :aria-busy="checking" @click="emit('open')">
     <div class="flat-card__photo">
       <img v-if="photo" :src="photo" :alt="presentation.title" loading="lazy" decoding="async" referrerpolicy="no-referrer" @error="emit('photoError', $event)">
       <div v-else class="flat-card__no-photo"><u-icon name="i-lucide-image-off" class="flat-card__no-photo-icon" aria-hidden="true" /><span>{{ noPhotoLabel }}</span></div>
@@ -138,6 +140,7 @@ const emit = defineEmits<{
         <span v-if="presentation.location" class="flat-card__location"><u-icon name="i-lucide-map-pin" />{{ presentation.location }}</span>
         <span class="flat-card__meta-tail"><span class="flat-card__src">{{ sourceLabel }}</span><span v-if="presentation.dateLabel">· {{ presentation.dateLabel }}</span></span>
       </div>
+      <ListingActivityLine :summary="listing.activitySummary" @open="emit('activity')" />
     </div>
     <div v-if="checking" class="flat-card__checking" role="status" aria-live="polite"><u-icon name="i-lucide-loader-circle" class="flat-card__checking-icon" /><span>{{ checkingLabel }}</span></div>
   </article>
@@ -209,6 +212,8 @@ const emit = defineEmits<{
 @include bp-down(md) {
   .flat-card { display: grid; grid-template-columns: minmax(112px, 42%) minmax(0, 1fr); height: 148px; min-height: 148px; }
   .flat-card__photo { width: 100%; height: 148px; min-height: 0; aspect-ratio: auto; overflow: hidden; }
+  .flat-card_activity { height: auto; min-height: 192px; }
+  .flat-card_activity .flat-card__photo { height: 100%; min-height: 192px; }
   .flat-card__photo::before { inset: 0 0 0 auto; width: 48%; height: auto; background: linear-gradient(90deg, rgba(11,16,42,0) 0%, rgba(11,16,42,.1) 24%, rgba(11,16,42,.42) 54%, rgba(11,16,42,.8) 80%, var(--bg-panel) 100%); }
   .flat-card__photo::after { inset: 0 0 0 auto; width: 36%; height: auto; background: linear-gradient(90deg, rgba(11,16,42,0) 0%, rgba(11,16,42,.16) 34%, rgba(11,16,42,.58) 72%, var(--bg-panel) 100%); }
   .flat-card__body { min-width: 0; margin-top: 0; padding: 7px 8px 7px 6px; gap: 1px; overflow: hidden; }

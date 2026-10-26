@@ -142,6 +142,7 @@ onBeforeUnmount(() => {
 }
 
 .u-modal__header {
+  flex: 0 0 auto;
   display: flex;
   /* Centred: the 32px close button against a ~22px title line box left the
      title sitting above the button's centre. */
@@ -180,6 +181,8 @@ onBeforeUnmount(() => {
   flex: 1 1 auto;
   min-height: 0;
   overflow-y: auto;
+  overflow-x: hidden;
+  scrollbar-gutter: stable;
   /* Momentum scrolling inside the panel, and the scroll chain stops here so a
      flick at the end of the list does not scroll the page behind the modal. */
   -webkit-overflow-scrolling: touch;
@@ -187,6 +190,7 @@ onBeforeUnmount(() => {
   padding: 20px;
 }
 .u-modal__footer {
+  flex: 0 0 auto;
   display: flex;
   flex-wrap: wrap;
   align-items: center;

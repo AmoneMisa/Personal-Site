@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import ListingActivityLine from "~/components/search/ListingActivityLine.vue";
 import { scoreColor } from "~/utils/atsScore";
 import { capitalizeFirst } from "~/utils/text";
 import type { Job, JobAtsResult } from "~/types/jobs";
@@ -20,6 +21,7 @@ const props = defineProps<{
 }>();
 
 const emit = defineEmits<{
+  activity: [job: Job];
   open: [job: Job];
   share: [job: Job];
   seen: [job: Job];
@@ -221,6 +223,7 @@ function stopMetaDrag(event: PointerEvent) {
         </div>
       </div>
     </div>
+    <ListingActivityLine :summary="job.activitySummary" @open="emit('activity', job)" />
   </article>
 </template>
 

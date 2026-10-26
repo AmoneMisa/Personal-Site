@@ -57,6 +57,7 @@ export interface JobSkillDetail {
 }
 
 export interface Job {
+  activitySummary?: { firstSeenAt?: string | null; dateUpdateCount?: number; reappearanceCount?: number; duplicateCount?: number; latestSourcePublishedAt?: string | null; repostCount?: number };
   id: string
   publicId?: number
   title: string
