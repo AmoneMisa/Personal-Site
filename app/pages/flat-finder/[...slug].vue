@@ -12,6 +12,7 @@ import {
   type MetroProximity,
 } from "~/composables/flats/useMetroProximity";
 import FlatMap from "~/components/flats/FlatMap.client.vue";
+import { normalizeSearchCenter, type SearchRadiusCenter } from "~/utils/flats/searchRadius";
 import FlatCard from "~/components/flats/FlatCard.vue";
 import ListingActivity from "~/components/search/ListingActivity.vue";
 import type { ActivityTab } from "~/types/listingActivity";
@@ -122,7 +123,7 @@ const {
   parkingOnly, internetOnly, gasOnly, balconyOnly, terraceOnly, privateYardOnly,
   tvOnly, microwaveOnly, ovenOnly, bidetOnly, walkInClosetOnly, bathtubOnly, showerOnly, sort,
   metro, priceMin, priceMax,
-  metroMaxM, metroBearingFrom, metroBearingTo, nearbyKind,
+  metroMaxM, metroBearingFrom, metroBearingTo, nearbyKind, radiusCenter, radiusM,
   displayCurrency, query, source, customSites, showAdvanced, buildFeedParams, resetValues: resetFilterValues,
 } = flatFilters;
 // Optional "list only what the map shows" filter; null means off.
@@ -365,6 +366,14 @@ function onMetroToggle(name: string) {
   scheduleLoad(0);
 }
 
+function onWorkPointChange(point: SearchRadiusCenter | null) {
+  radiusCenter.value = normalizeSearchCenter(point);
+  scheduleLoad(0);
+}
+function onWorkRadiusChange(radius: number) {
+  radiusM.value = radius;
+  scheduleLoad();
+}
 /** One settled drag of the radius or arc handles. */
 function onMetroShape({ radiusM, bearingFrom, bearingTo }: { radiusM: number; bearingFrom?: number; bearingTo?: number }) {
   metroMaxM.value = Math.round(radiusM);
@@ -1360,7 +1369,7 @@ onBeforeUnmount(() => { modalOpen.value = false; lightboxOpen.value = false; rel
     <p v-if="failed" class="flats__error">{{ t("error") }}</p>
     <p v-else-if="source === 'telegram' && !loading && !listings.length && sourceErrors?.some((item) => item.source === 'telegram')" class="flats__source-warning">{{ t("telegramUnavailable") }}</p>
     <FlatsStatsPanel v-if="view === 'active' && statistics" :statistics="statistics" :selected-city="city" :display-currency="displayCurrency" :convert="convert" :location-label="(value, kind) => labelFor(value, kind)" />
-<section class="flats__map-wrap"><flat-map :points="mapPoints" :draw-label="t('drawArea')" :done-label="t('done')" :clear-label="t('clearArea')" :draw-hint="t('drawHint')" :expand-label="t('mapExpand')" :collapse-label="t('mapCollapse')" :scroll-hint-label="t('mapScrollHint')" :district-zones="districtZones" :microdistrict-markers="microdistrictMarkers" :quartal-markers="quartalMarkers" :metro-stations="metroStations" :university-zones="universityZones" :shopping-mall-zones="shoppingMallZones" :park-zones="parkZones" :area-zones="areaZones" :city-zone="cityZone" :selected-region="region" :selected-district="district" :selected-microdistrict="microdistrict" :selected-quartal="quartal" :selected-area="mapArea" :selected-metros="metro" :selected-metro-radius-m="metroMaxM" :metro-bearing-from="metroBearingFrom" :metro-bearing-to="metroBearingTo" :metro-radius-handle-label="t('metroRadiusHandle')" :metro-arc-handle-label="t('metroArcHandle')" :fit-results-label="t('mapFitResults')" :view-filter="viewFilter" :districts-label="t('districtsLayer')" :microdistricts-label="t('microdistrictsLayer')" :quartals-label="t('quartalsLayer')" :metro-label="t('metro')" :universities-label="t('universitiesLayer')" :shopping-malls-label="t('shoppingMallsLayer')" :parks-label="t('parksLayer')" :areas-label="t('areasLayer')" :city-label="t('cityLayer')" @select="openById" @area-change="drawnArea = $event" @bounds-change="viewBounds = $event" @zone-select="onZoneSelect" @city-select="onCitySelect" @metro-toggle="onMetroToggle" @metro-shape="onMetroShape" /></section>
+<section class="flats__map-wrap"><flat-map :points="mapPoints" :radius-center="radiusCenter" :radius-m="radiusM" @radius-center-change="onWorkPointChange" @radius-change="onWorkRadiusChange" :draw-label="t('drawArea')" :done-label="t('done')" :clear-label="t('clearArea')" :draw-hint="t('drawHint')" :expand-label="t('mapExpand')" :collapse-label="t('mapCollapse')" :scroll-hint-label="t('mapScrollHint')" :district-zones="districtZones" :microdistrict-markers="microdistrictMarkers" :quartal-markers="quartalMarkers" :metro-stations="metroStations" :university-zones="universityZones" :shopping-mall-zones="shoppingMallZones" :park-zones="parkZones" :area-zones="areaZones" :city-zone="cityZone" :selected-region="region" :selected-district="district" :selected-microdistrict="microdistrict" :selected-quartal="quartal" :selected-area="mapArea" :selected-metros="metro" :selected-metro-radius-m="metroMaxM" :metro-bearing-from="metroBearingFrom" :metro-bearing-to="metroBearingTo" :metro-radius-handle-label="t('metroRadiusHandle')" :metro-arc-handle-label="t('metroArcHandle')" :fit-results-label="t('mapFitResults')" :view-filter="viewFilter" :districts-label="t('districtsLayer')" :microdistricts-label="t('microdistrictsLayer')" :quartals-label="t('quartalsLayer')" :metro-label="t('metro')" :universities-label="t('universitiesLayer')" :shopping-malls-label="t('shoppingMallsLayer')" :parks-label="t('parksLayer')" :areas-label="t('areasLayer')" :city-label="t('cityLayer')" @select="openById" @area-change="drawnArea = $event" @bounds-change="viewBounds = $event" @zone-select="onZoneSelect" @city-select="onCitySelect" @metro-toggle="onMetroToggle" @metro-shape="onMetroShape" /></section>
 
     <div v-if="!failed" class="flats__results-head">
       <FlatOwnerBreadcrumbs v-if="owner && view === 'active'" :owner-key="owner" @all="leaveOwner('active')" @owners="leaveOwner('owners')" />

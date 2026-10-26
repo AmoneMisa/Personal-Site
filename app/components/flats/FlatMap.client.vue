@@ -5,6 +5,7 @@ import { primaryBoundaryGeometry } from "~/utils/mapBoundaryFocus";
 import { stableQueryKey } from "~/utils/stableQueryKey";
 import { mapText, districtLabel } from "~/utils/flats/mapContent";
 import { priceToneFromRatio, type FlatPriceTone } from "~/utils/flats/priceTone";
+import { MIN_SEARCH_RADIUS_M, MAX_SEARCH_RADIUS_M, normalizeSearchCenter, normalizeSearchRadius, type SearchRadiusCenter } from "~/utils/flats/searchRadius";
 import {
   bearingBetween,
   destinationPoint,
@@ -84,7 +85,7 @@ interface ExtraGeoResponse {
 }
 
 type ZoneKind = "district" | "microdistrict" | "quartal" | "area" | "metro" | "region";
-type MenuKind = "territories" | "transport" | "poi";
+type MenuKind = "territories" | "transport" | "poi" | "work";
 type TransportMode = "bus" | "tram" | "trolleybus" | "minibus" | "funicular";
 
 const props = defineProps<{
@@ -127,6 +128,8 @@ const props = defineProps<{
   metroArcHandleLabel?: string;
   fitResultsLabel?: string;
   viewFilter?: boolean;
+  radiusCenter?: SearchRadiusCenter | null;
+  radiusM?: number;
 }>();
 
 const emit = defineEmits<{
@@ -136,6 +139,8 @@ const emit = defineEmits<{
   (e: "zone-select", payload: { kind: ZoneKind; name: string; radiusM?: number }): void;
   (e: "city-select" | "metro-toggle", name: string): void;
   (e: "metro-shape", shape: { radiusM: number; bearingFrom?: number; bearingTo?: number }): void;
+  (e: "radius-center-change", point: SearchRadiusCenter | null): void;
+  (e: "radius-change", radiusM: number): void;
 }>();
 
 const route = useRoute();
@@ -156,6 +161,9 @@ const DETAIL_QUERY_KEYS = new Set(["adv", "flat", "flatSource", "flatCountry", "
 const el = ref<HTMLElement | null>(null);
 const failed = ref(false);
 const drawing = ref(false);
+const placingWorkPoint = ref(false);
+const draftWorkRadiusM = ref<number | null>(null);
+const workRadiusM = computed(() => normalizeSearchRadius(draftWorkRadiusM.value ?? props.radiusM));
 const scrollActive = ref(false);
 const area = ref<Array<{ lat: number; lng: number }>>([]);
 const radial = ref<{ x: number; y: number; items: FlatPoint[]; page: number } | null>(null);
@@ -217,6 +225,12 @@ const ui = computed(() => {
   const ru = language.value.toLowerCase().startsWith("ru");
   return ru ? {
     territories: "Территории",
+    workPoint: "Работа",
+    workPointHint: "Укажите место работы на карте. Выдача ограничится выбранным радиусом.",
+    moveWorkPoint: "Перенести точку",
+    clearWorkPoint: "Убрать точку и радиус",
+    workRadius: "Радиус от места работы",
+    metres: "м",
     administrative: "Административные",
     local: "Локальные",
     other: "Прочее",
@@ -256,6 +270,12 @@ const ui = computed(() => {
     medianPrice: "около медианы",
   } : {
     territories: "Territories",
+    workPoint: "Workplace",
+    workPointHint: "Choose your workplace on the map. Results will be limited to this radius.",
+    moveWorkPoint: "Move point",
+    clearWorkPoint: "Remove point and radius",
+    workRadius: "Radius from workplace",
+    metres: "m",
     administrative: "Administrative",
     local: "Local",
     other: "Other",
@@ -630,6 +650,7 @@ function bestDeltaLabel(ratio: number | null): string {
 let map: any = null;
 let layer: any = null;
 let areaLayer: any = null;
+let workRadiusLayer: any = null;
 let focusLayer: any = null;
 let districtLayer: any = null;
 let regionLayer: any = null;
@@ -734,6 +755,11 @@ function changeRadialPage(direction: -1 | 1) {
 }
 
 function onKeydown(event: KeyboardEvent) {
+  if (placingWorkPoint.value && event.key === "Escape") {
+    placingWorkPoint.value = false;
+    event.preventDefault();
+    return;
+  }
   if (menuOpen.value && event.key === "Escape") {
     menuOpen.value = null;
     event.preventDefault();
@@ -962,7 +988,56 @@ function stopLayerClick(event: any) {
   if (L && original) L.DomEvent.stopPropagation(original);
 }
 function handleLayerClick(event: any, action: () => void) {
-  activateScroll(); stopLayerClick(event); if (addDrawPoint(event)) return; action();
+  activateScroll(); stopLayerClick(event); if (placeWorkPoint(event)) return; if (addDrawPoint(event)) return; action();
+}
+
+function startWorkPointPlacement() {
+  placingWorkPoint.value = true;
+  drawing.value = false;
+  menuOpen.value = null;
+  closeRadial();
+}
+function toggleWorkPoint() {
+  if (placingWorkPoint.value) placingWorkPoint.value = false;
+  else if (props.radiusCenter) toggleMenu("work");
+  else startWorkPointPlacement();
+}
+function placeWorkPoint(event: any): boolean {
+  if (!placingWorkPoint.value) return false;
+  const point = eventLatLng(event);
+  const center = point ? normalizeSearchCenter({lat: point.lat, lng: ((point.lng + 180) % 360 + 360) % 360 - 180}) : null;
+  if (center) {
+    placingWorkPoint.value = false;
+    emit("radius-center-change", center);
+    menuOpen.value = "work";
+    void nextTick(placeMenu);
+  }
+  return true;
+}
+function renderWorkRadius() {
+  const L = Leaflet;
+  if (!workRadiusLayer || !L) return;
+  workRadiusLayer.clearLayers();
+  const center = normalizeSearchCenter(props.radiusCenter);
+  if (!center) return;
+  L.circle([center.lat, center.lng], {radius: workRadiusM.value, color: "#e0679a", weight: 2,
+    fillColor: "#e0679a", fillOpacity: .10, interactive: false}).addTo(workRadiusLayer);
+  L.circleMarker([center.lat, center.lng], {radius: 7, color: "#eef0f7", weight: 2,
+    fillColor: "#e0679a", fillOpacity: 1, interactive: false})
+    .bindTooltip(ui.value.workPoint, {permanent: true, direction: "top"}).addTo(workRadiusLayer);
+}
+function previewWorkRadius(event: Event) {
+  draftWorkRadiusM.value = normalizeSearchRadius((event.target as HTMLInputElement).value);
+}
+function commitWorkRadius(event: Event) {
+  const radius = normalizeSearchRadius((event.target as HTMLInputElement).value);
+  draftWorkRadiusM.value = radius;
+  emit("radius-change", radius);
+}
+function clearWorkPoint() {
+  placingWorkPoint.value = false;
+  menuOpen.value = null;
+  emit("radius-center-change", null);
 }
 
 function selectedName(kind: ZoneKind): string {
@@ -1411,7 +1486,7 @@ function emitViewBounds() {
   const b = map.getBounds();
   emit("bounds-change", { south: b.getSouth(), west: b.getWest(), north: b.getNorth(), east: b.getEast() });
 }
-function toggleDrawing() { drawing.value = !drawing.value; menuOpen.value = null; if (drawing.value) closeRadial(); }
+function toggleDrawing() { drawing.value = !drawing.value; placingWorkPoint.value = false; menuOpen.value = null; if (drawing.value) closeRadial(); }
 function clearArea() { area.value = []; renderArea(); emit("area-change", []); }
 
 onMounted(async () => {
@@ -1437,20 +1512,28 @@ onMounted(async () => {
   } catch { failed.value = true; return; }
   L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", { attribution: "&copy; OpenStreetMap contributors", maxNativeZoom: 19, maxZoom: 19, detectRetina: true }).addTo(map);
   layer = L.layerGroup().addTo(map); areaLayer = L.layerGroup().addTo(map); focusLayer = L.layerGroup().addTo(map); cityLayer = L.layerGroup().addTo(map);
+  workRadiusLayer = L.layerGroup().addTo(map);
   regionLayer = L.layerGroup().addTo(map); districtLayer = L.layerGroup().addTo(map); microdistrictLayer = L.layerGroup().addTo(map); quartalLayer = L.layerGroup().addTo(map); quarterLayer = L.layerGroup().addTo(map); zoneAreaLayer = L.layerGroup().addTo(map);
   metroLayer = L.layerGroup().addTo(map); transportStopLayer = L.layerGroup().addTo(map);
   universityLayer = L.layerGroup().addTo(map); shoppingMallLayer = L.layerGroup().addTo(map); parkLayer = L.layerGroup().addTo(map); schoolLayer = L.layerGroup().addTo(map);
   residentialLayer = L.layerGroup().addTo(map); airportLayer = L.layerGroup().addTo(map); railwayLayer = L.layerGroup().addTo(map); busStationLayer = L.layerGroup().addTo(map); parkingLayer = L.layerGroup().addTo(map);
-  map.on("click", (event: any) => { activateScroll(); closeMenus(); if (addDrawPoint(event)) return; closeRadial(); });
+  map.on("click", (event: any) => { activateScroll(); closeMenus(); if (placeWorkPoint(event)) return; if (addDrawPoint(event)) return; closeRadial(); });
   el.value.addEventListener("mouseleave", deactivateScroll);
   map.on("zoomend", renderMarkers); map.on("movestart", closeRadial); map.on("zoomstart", closeRadial);
   map.on("zoomend", evaluateAutoZoneFilters); map.on("moveend", evaluateAutoZoneFilters);
   map.on("moveend", emitViewBounds);
   renderMarkers(); renderFocusedPoint(); renderAllZoneLayers();
+  renderWorkRadius();
   if (selectedZoneFromProps()) syncSelectionFromProps(true); else fitToPoints();
 });
 
 watch(renderedPoints, () => { renderMarkers(); fitToPoints(); });
+watch(() => props.radiusM, () => { draftWorkRadiusM.value = null; });
+watch(() => [props.radiusCenter?.lat, props.radiusCenter?.lng, workRadiusM.value], renderWorkRadius);
+watch(() => [route.query.city, route.query.countries ?? route.query.country], () => {
+  placingWorkPoint.value = false;
+  if (menuOpen.value === "work") menuOpen.value = null;
+});
 watch(() => props.viewFilter, emitViewBounds);
 watch(() => stableQueryKey(normalizedRouteQuery()), () => {
   preserveCamera = true;
@@ -1483,6 +1566,7 @@ watch(() => props.selectedRegion, () => {
 });
 
 onBeforeUnmount(() => {
+  workRadiusLayer = null;
   mapFeedSequence += 1; extraGeoSequence += 1;
   expandedSizeTimers.forEach((timer) => clearTimeout(timer));
   expandedSizeTimers = [];
@@ -1602,6 +1686,17 @@ function preserveUserCamera() {
           </div>
         </div>
 
+        <div class="flat-map__tool-wrap">
+          <button type="button" class="flat-map__tool" :class="{ 'flat-map__tool_active': placingWorkPoint || radiusCenter || menuOpen === 'work' }" :aria-label="ui.workPoint" :aria-pressed="placingWorkPoint" @click="toggleWorkPoint">
+            <u-icon name="i-lucide-briefcase-business" class="flat-map__tool-icon" /><span class="flat-map__tool-label">{{ ui.workPoint }}</span>
+          </button>
+          <div v-if="menuOpen === 'work'" class="flat-map__menu flat-map__menu_work" :style="menuAnchor" @click.stop>
+            <strong class="flat-map__menu-title">{{ ui.workRadius }}</strong>
+            <div class="flat-map__radius-control"><input :value="workRadiusM" type="range" :min="MIN_SEARCH_RADIUS_M" :max="MAX_SEARCH_RADIUS_M" step="500" :aria-label="ui.workRadius" @input="previewWorkRadius" @change="commitWorkRadius" /><label><input :value="workRadiusM" type="number" :min="MIN_SEARCH_RADIUS_M" :max="MAX_SEARCH_RADIUS_M" step="500" :aria-label="ui.workRadius" @change="commitWorkRadius" /><span>{{ ui.metres }}</span></label></div>
+            <button type="button" class="flat-map__work-action" @click="startWorkPointPlacement">{{ ui.moveWorkPoint }}</button>
+            <button type="button" class="flat-map__work-action" @click="clearWorkPoint">{{ ui.clearWorkPoint }}</button>
+          </div>
+        </div>
         <button type="button" class="flat-map__tool" :class="{ 'flat-map__tool_active': drawing }" :aria-label="drawing ? (props.doneLabel || 'Done') : (props.drawLabel || 'Draw area')" @click="toggleDrawing">
           <u-icon :name="drawing ? 'i-lucide-check' : 'i-lucide-scan'" class="flat-map__tool-icon" /><span class="flat-map__tool-label">{{ drawing ? (props.doneLabel || "Done") : (props.drawLabel || "Draw area") }}</span>
         </button>
@@ -1640,6 +1735,7 @@ function preserveUserCamera() {
       </aside>
 
       <div v-if="drawing" class="flat-map__hint">{{ props.drawHint || "Click points on the map to outline an area." }}</div>
+      <div v-if="placingWorkPoint" class="flat-map__hint" role="status">{{ ui.workPointHint }}</div>
     </div>
   </Teleport>
 
@@ -1678,6 +1774,7 @@ function preserveUserCamera() {
 
 .flat-map__tools { position: absolute; z-index: 1300; top: 10px; left: 62px; right: 10px; display: flex; flex-wrap: wrap; align-items: flex-start; gap: 6px; pointer-events: none; }
 .flat-map__tool-wrap { position: relative; pointer-events: auto; }
+.flat-map__work-action { display: block; width: 100%; min-height: 36px; padding: 6px 0; border: 0; background: transparent; color: var(--accent-pink); text-align: left; cursor: pointer; font: inherit; font-size: 12px; }
 .flat-map__tool { pointer-events: auto; display: inline-flex; align-items: center; justify-content: center; gap: 0; height: 36px; min-width: 36px; padding: 0 9px; border: 1px solid rgba(255,255,255,.12); border-radius: 8px; background: rgba(10,15,35,.94); color: var(--text-primary); cursor: pointer; box-shadow: 0 4px 14px rgba(0,0,0,.24); backdrop-filter: blur(10px); transition: border-color .15s ease, background .15s ease, color .15s ease; }
 .flat-map__tool:hover, .flat-map__tool:focus-visible { border-color: rgba(224,103,154,.55); color: #fff; outline: none; }
 .flat-map__tool_active { color: var(--accent-pink); border-color: rgba(224,103,154,.65); background: rgba(27,20,49,.96); }

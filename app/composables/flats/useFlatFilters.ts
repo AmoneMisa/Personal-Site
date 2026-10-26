@@ -3,6 +3,7 @@ import type { FlatSort } from "~/types/flats";
 import { useGeoCityCatalog } from "./useGeoCityCatalog";
 import { SOCIAL_FLAT_SOURCES } from "./flatSources";
 import { districtForZone } from "~/utils/flats/zoneHierarchy";
+import { DEFAULT_SEARCH_RADIUS_M, normalizeSearchCenter, normalizeSearchRadius, type SearchRadiusCenter } from "~/utils/flats/searchRadius";
 
 const MAP_ZONE_TYPES = new Set(["microdistrict", "mahalla", "local_area", "development_area"]);
 
@@ -94,6 +95,12 @@ export function useFlatFilters(options: UseFlatFiltersOptions = {}) {
   const metroMaxM = ref<number>();
   const nearbyKind = ref("");
   const nearbyMaxM = ref<number>();
+  const radiusCenter = ref<SearchRadiusCenter | null>(null);
+  const selectedRadiusM = ref(DEFAULT_SEARCH_RADIUS_M);
+  const radiusM = computed({
+    get: () => selectedRadiusM.value,
+    set: (value: number) => { selectedRadiusM.value = normalizeSearchRadius(value); },
+  });
   const floorMin = ref<number>();
   const floorMax = ref<number>();
   const totalFloorsMin = ref<number>();
@@ -116,6 +123,8 @@ export function useFlatFilters(options: UseFlatFiltersOptions = {}) {
   }
 
   function clearCityLocationFilters() {
+    radiusCenter.value = null;
+    radiusM.value = DEFAULT_SEARCH_RADIUS_M;
     region.value = "";
     district.value = "";
     metro.value = [];
@@ -220,6 +229,12 @@ export function useFlatFilters(options: UseFlatFiltersOptions = {}) {
     else params.offset = String(options.append ? options.loadedCount : 0);
     if (countries.value.length) params.countries = countries.value[0]!;
     if (city.value) params.city = city.value;
+    const center = normalizeSearchCenter(radiusCenter.value);
+    if (center) {
+      params.centerLat = String(center.lat);
+      params.centerLng = String(center.lng);
+      params.radiusM = String(radiusM.value);
+    }
     if (region.value) params.region = region.value;
     if (district.value) params.district = district.value;
     if (microdistrict.value) params.microdistrict = microdistrict.value;
@@ -358,6 +373,8 @@ export function useFlatFilters(options: UseFlatFiltersOptions = {}) {
     metroBearingTo.value = undefined;
     nearbyKind.value = "";
     nearbyMaxM.value = undefined;
+    radiusCenter.value = null;
+    radiusM.value = DEFAULT_SEARCH_RADIUS_M;
     floorMin.value = undefined;
     floorMax.value = undefined;
     totalFloorsMin.value = undefined;
@@ -378,7 +395,7 @@ export function useFlatFilters(options: UseFlatFiltersOptions = {}) {
     tvOnly, microwaveOnly, ovenOnly, bidetOnly, walkInClosetOnly, bathtubOnly, showerOnly, euroLayoutOnly,
     commissionPercentMin, commissionPercentMax, sort, audience, metro, priceMin, priceMax, roomsMin, roomsMax,
     bedroomsMin, bedroomsMax, areaMin, areaMax, pricePerSqmMin, pricePerSqmMax, metroMaxM,
-    nearbyKind, nearbyMaxM, floorMin, floorMax, totalFloorsMin, totalFloorsMax, yearMin, yearMax,
+    nearbyKind, nearbyMaxM, radiusCenter, radiusM, floorMin, floorMax, totalFloorsMin, totalFloorsMax, yearMin, yearMax,
     maxAgeDays, displayCurrency, query, source, customSites, showAdvanced, metroBearingFrom, metroBearingTo,
     buildFeedParams, resetValues,
   };

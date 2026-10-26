@@ -6,6 +6,7 @@ import { queryBoolean, queryString } from "~/utils/queryParams";
 import { useSearchRouteState } from "../search/useSearchRouteState";
 import { normalizeBearing } from "~/composables/flats/useMetroProximity";
 import { SOCIAL_FLAT_SOURCES } from "~/composables/flats/flatSources";
+import { normalizeSearchCenter, normalizeSearchRadius } from "~/utils/flats/searchRadius";
 
 const FLAT_SORTS: FlatSort[] = ["newest", "oldest", "priceAsc", "priceDesc", "titleAsc", "titleDesc"];
 
@@ -84,6 +85,12 @@ export function useFlatRouteState(options: {
     }
     if (displayCurrency.value !== "USD") q.currency = displayCurrency.value;
     if (nearbyKind.value) q.nearbyKind = nearbyKind.value;
+    const center = normalizeSearchCenter(filters.radiusCenter.value);
+    if (center) {
+      q.centerLat = String(center.lat);
+      q.centerLng = String(center.lng);
+      q.radiusM = String(filters.radiusM.value);
+    }
     if (query.value.trim()) q.query = query.value.trim();
     if (source.value) q.sources = source.value;
     if (customSites.value.length) q.customSites = customSites.value.join(",");
@@ -148,6 +155,10 @@ export function useFlatRouteState(options: {
     }
     if (queryString(params.currency)) filters.displayCurrency.value = queryString(params.currency);
     filters.nearbyKind.value = queryString(params.nearbyKind);
+    filters.radiusCenter.value = normalizeSearchCenter({
+      lat: queryString(params.centerLat), lng: queryString(params.centerLng),
+    });
+    filters.radiusM.value = normalizeSearchRadius(queryString(params.radiusM));
     filters.query.value = queryString(params.query);
     const sourceParam = queryString(params.sources);
     const allowedSources = new Set([...options.sources, ...SOCIAL_FLAT_SOURCES]);
