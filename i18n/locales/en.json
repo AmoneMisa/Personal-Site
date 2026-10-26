@@ -1,5 +1,26 @@
 {
   "listingActivity": {
+    "origin": {
+      "title": "Likely original posting",
+      "confidenceModerate": "Confidence: moderate · based on available postings",
+      "openCandidate": "Open likely original posting",
+      "undetermined": "Original posting undetermined",
+      "insufficient": "There is not enough independent evidence. An early date or matching text alone does not establish the original posting.",
+      "ambiguous": "Evidence conflicts or several original postings are possible. Compare the postings and contacts below.",
+      "ownerLimit": "This is a likely publication source. Ownership and advertiser identity are unverified; earlier postings may be missing from our database.",
+      "jobLimit": "This is a likely original vacancy posting based on available evidence. Recruiter identity is unverified; earlier postings may be unknown.",
+      "evidence": {
+        "matching_photos": "At least two distinct photos match and remain in both galleries.",
+        "matching_property_facts": "Room count and area agree, with no conflicts in known location data.",
+        "earlier_source_date": "The date on the source predates related postings, independently of when we discovered them.",
+        "different_contacts": "Related postings name different contacts.",
+        "owner_to_agency": "The earlier posting claims an owner; the later one indicates an intermediary.",
+        "later_price_markup": "The later posting costs at least 15% more in the same currency.",
+        "company_source": "The posting comes from a company source marked as a direct employer.",
+        "shared_application_page": "Other boards direct applicants to this page.",
+        "matching_job_content": "The company, full position title and vacancy description match."
+      }
+    },
     "jobDuplicates": "Duplicates and similar",
     "salaryUnknown": "Salary not specified",
     "salaryPeriods": { "hour": "hour", "day": "day", "shift": "shift", "week": "week", "month": "month", "year": "year", "project": "project", "piece": "piece" },
@@ -35,7 +56,7 @@
     "postings": "Postings: {n}",
     "current": "Current",
     "inactive": "Inactive",
-    "original": "Open original",
+    "original": "Open posting",
     "commissionYes": "Commission charged",
     "commissionNo": "No commission claimed",
     "commissionUnknown": "Commission not specified",
@@ -790,7 +811,7 @@
     "details": "Details",
     "viewVacancy": "View vacancy",
     "apply": "Apply",
-    "openSource": "Open original",
+    "openSource": "Open on source",
     "management": "Management",
     "newToday": "New today",
     "salaryDisclosed": "Salary disclosed",
@@ -3082,9 +3103,9 @@
     "name": "Marharyta Kubai",
     "role": "Frontend Developer",
     "tagline": "Vue.js · Nuxt.js · TypeScript",
-    "availability": "Looking for a Middle Frontend Developer role · remote, or relocation with visa sponsorship (incl. spouse)",
-    "relocation": "Relocation: Tashkent (Uzbekistan); USA — New York, Miami, San Francisco, Los Angeles, New Orleans",
-    "summary": "Frontend developer specializing in e-commerce and marketplace projects, with %years%+ years of hands-on experience. My preferred stack is Vue and Nuxt. I design and consume APIs with Node.js, build Electron desktop apps, and integrate Telegram and Discord bots.",
+    "availability": "Looking for a Middle / Middle+ Frontend Developer role · also considering fullstack",
+    "relocation": "Remote in the USA or Uzbekistan; hybrid in Tashkent or the USA. Hybrid / office in the USA requires visa sponsorship. US cities: New York, Miami, San Francisco, Los Angeles, New Orleans",
+    "summary": "Frontend developer, %years%+ years of experience, mainly e-commerce and marketplaces (Shopify, Freemarker templates, high-load storefronts). I work in Vue and Nuxt, write APIs in Node.js and FastAPI, and run Docker and CI/CD as part of the job. Side projects: a Nuxt SSR platform, Electron desktop apps, Telegram and Discord bots.",
     "location": "Bucharest, Romania · Ukrainian citizenship",
     "languagesTitle": "Languages",
     "languages": [
@@ -3127,7 +3148,7 @@
         "Creating and maintaining production email templates.",
         "Docker and CI/CD day to day; deploys and releases alongside development.",
         "Working with an existing codebase and business-driven UI changes.",
-        "Close work with the backend, testers and the designer."
+        "Working in a team with DevOps, backend, frontend, QA, a project manager and a designer."
       ],
       "itsua": [
         "Development of a Vue-based application for Shopify.",
@@ -3221,6 +3242,7 @@
   },
   "projects": {
     "groups": {
+      "current": "Current work",
       "web-tools": "Web & tools",
       "backend": "Backend",
       "desktop-electron": "Desktop (Electron)",
@@ -3229,6 +3251,10 @@
       "game-mods-patchers-c": "Game mods & patchers (C#)"
     },
     "descriptions": {
+      "parsing-lexicon": "Shared npm package for parsing free text (jobs, housing, geography): rules, dictionaries and tests. Published from CI.",
+      "geo-catalog": "Shared npm package with canonical geo data: cities, districts, coordinates, hierarchy and bounds.",
+      "ai-worker": "AI enrichment service used by several apps: one API for extraction, translation and vision requests, with provider fallback.",
+      "telegram-worker-userbot": "MTProto transport service that reads public Telegram channels and media. It fetches raw data only, with no domain logic.",
       "whiteslove": "A personal platform of online tools: PDF editor, JSON merge, DockerHub tag search, email/markdown/SVG editors. The same stack as my main work — Nuxt with SSR, multi-language, a custom REST backend.",
       "personal-site-backend": "The backend for the site's own services: a FastAPI REST API, file processing (PDF, conversion). It powers the tools in the catalog.",
       "account-status-api-lost-ark": "The API behind the online module of the Account Status (Lost Ark) app.",
@@ -3251,7 +3277,7 @@
     },
     "eyebrow": "everything I've built",
     "title": "Projects",
-    "subtitle": "The full list — from my work stack to desktop apps, bots and game mods. Grouped by type, most-relevant first.",
+    "subtitle": "What I'm working on right now comes first, on GitHub. Below are older and personal projects: desktop apps, bots and game mods.",
     "open": "Open",
     "download": "Download APK",
     "soon": "Coming soon",

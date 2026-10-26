@@ -30,6 +30,35 @@ interface RawGroup {
 
 const GROUPS: RawGroup[] = [
   {
+    "id": "current",
+    "items": [
+      {
+        "id": "parsing-lexicon",
+        "name": "parsing-lexicon",
+        "stack": "JavaScript · npm package",
+        "href": "https://github.com/AmoneMisa/parsing-lexicon"
+      },
+      {
+        "id": "geo-catalog",
+        "name": "geo-catalog",
+        "stack": "JavaScript · npm package",
+        "href": "https://github.com/AmoneMisa/geo-catalog"
+      },
+      {
+        "id": "ai-worker",
+        "name": "ai-worker",
+        "stack": "JavaScript · Node.js · LLM",
+        "href": "https://github.com/AmoneMisa/ai-worker"
+      },
+      {
+        "id": "telegram-worker-userbot",
+        "name": "Telegram-Worker-Userbot",
+        "stack": "JavaScript · Telegram MTProto",
+        "href": "https://github.com/AmoneMisa/Telegram-Worker-Userbot"
+      }
+    ]
+  },
+  {
     "id": "web-tools",
     "items": [
       {
@@ -67,11 +96,6 @@ const GROUPS: RawGroup[] = [
         "href": "https://github.com/AmoneMisa/i18nPropertiesManager"
       },
       {
-        "id": "lost-ark",
-        "name": "Lost Ark character manager",
-        "stack": "Electron.js · Vue.js",
-        "href": null
-      },
       {
         "id": "account-status-lost-ark",
         "name": "Account Status (Lost Ark)",

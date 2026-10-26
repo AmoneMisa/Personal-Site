@@ -7,10 +7,9 @@
 // with correct SEO — no DB keys to seed — and you edit your resume in ONE place.
 //
 // Content below is populated from your real CV (Kubai_Marharyta_Frontend). To
-// tweak: verify the BPC/ITSUA bullet split (see note above `experience`), and
-// consider adding a metric or two to the bullets ("cut X by 40%") — recruiters
-// weight quantified impact. Everything else (contacts, skills, education,
-// languages, projects) is your real data.
+// tweak: verify the BPC/ITSUA bullet split (see note above `experience`).
+// Bullets stay qualitative: no invented metrics. Everything else (contacts,
+// skills, education, languages, projects) is your real data.
 
 const SITE_URL = "https://whiteslove.me";
 
@@ -20,14 +19,14 @@ const links = {
   linkedin: "https://www.linkedin.com/in/whiteslove-marharyta-kubai",
   telegram: "https://t.me/WhitesLove",
   email: "kubai.rita5@gmail.com",
-  pdfUrl: "/files/Marharyta_Kubai_Frontend_Developer_CV.pdf",
+  pdfUrl: "/files/Kubai_Marharyta_Frontend_Platform_CV.pdf",
 };
 
 // Language-neutral: tech keywords double as ATS + SEO signal. Order = relevance.
 const skills = {
   core: ["JavaScript", "TypeScript", "HTML", "CSS / SCSS", "Responsive layout", "React"],
   frameworks: ["Vue", "Nuxt", "Vite", "Pinia", "Vuex"],
-  ui: ["Tailwind", "Nuxt UI", "Vuetify", "Email template coding", "Liquid (Shopify)", "Freemarker", "Velocity"],
+  ui: ["Tailwind", "Nuxt UI", "Vuetify", "Email template coding", "Liquid (Shopify)", "Freemarker", "Velocity", "Nunjucks"],
   platform: ["Node.js", "Python", "FastAPI", "REST APIs", "Cron jobs", "HTML parsing", "Electron", "Telegram / Discord Bot API"],
   tooling: ["Git", "Docker", "CI/CD", "Swagger", "PostgreSQL", "MySQL", "MongoDB", "Redis", "Jira", "Figma"],
 };
