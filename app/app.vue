@@ -81,12 +81,7 @@ useHead({
         "@type": "WebSite",
         name: "WhitesLove",
         url: SITE_URL,
-        inLanguage: ["ru", "en"],
-        potentialAction: {
-          "@type": "SearchAction",
-          target: `${SITE_URL}/services?q={search_term_string}`,
-          "query-input": "required name=search_term_string"
-        }
+        inLanguage: ["ru", "en"]
       })
     },
     {

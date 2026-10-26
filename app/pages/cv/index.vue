@@ -181,7 +181,7 @@ const personLd = computed(() => {
   return {
     "@context": "https://schema.org",
     "@type": "ProfilePage",
-    dateModified: new Date().toISOString().slice(0, 10),
+    dateModified: new Date().toISOString(),
     mainEntity: person,
   };
 });
