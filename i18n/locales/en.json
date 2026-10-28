@@ -2955,7 +2955,7 @@
           "items": [
             "Russian — native",
             "Ukrainian — native",
-            "English — B2",
+            "English — fluent",
             "Turkish — A1"
           ]
         }
@@ -3111,7 +3111,7 @@
     "languages": [
       "Russian — native",
       "Ukrainian — native",
-      "English — B2",
+      "English — fluent",
       "Turkish — A1"
     ],
     "sections": {
@@ -3194,7 +3194,7 @@
     "backend": {
       "kind": "Backend · Python",
       "title": "Personal Site Backend",
-      "description": "The backend for this site's own services: Python, PostgreSQL, WebSockets. It powers the tools in the catalog."
+      "description": "The backend for this site's own tools: a stateless FastAPI service for PDF processing and file conversion. It powers the tools in the catalog."
     },
     "modsTitle": "Game mods & patchers (C#)",
     "hobbiesEyebrow": "away from the code",
