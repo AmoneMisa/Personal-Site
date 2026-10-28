@@ -19,7 +19,6 @@ const links = {
   linkedin: "https://www.linkedin.com/in/whiteslove-marharyta-kubai",
   telegram: "https://t.me/WhitesLove",
   email: "kubai.rita5@gmail.com",
-  pdfUrl: "/files/Kubai_Marharyta_Frontend_Platform_CV.pdf",
 };
 
 // Language-neutral: tech keywords double as ATS + SEO signal. Order = relevance.
@@ -95,7 +94,13 @@ const education = [
 ];
 
 // Bilingual prose. `L` picks the current language.
-const { t: translate, tm, rt } = useI18n();
+const { t: translate, tm, rt, locale } = useI18n();
+// One CV file per language: Russian for /cv (ru), English for every other locale.
+const pdfUrl = computed(() =>
+  locale.value === "ru"
+    ? "/files/Kubai_Marharyta_Frontend_CV_RU.pdf"
+    : "/files/Kubai_Marharyta_Frontend_CV_EN.pdf",
+);
 // Copy lives in i18n/locales/*.json under `cv`.
 const t = (key: string) => translate(`cv.${key}`);
 // Arrays (language list, job bullets) come back as message nodes, so each
@@ -208,7 +213,7 @@ useHead({
       <p class="cv__summary">{{ summary }}</p>
 
       <div class="cv__cta">
-        <a v-if="links.pdfUrl" :href="links.pdfUrl" class="cv__btn cv__btn_primary" download>
+        <a :href="pdfUrl" class="cv__btn cv__btn_primary" download>
           {{ t('cta.download') }}
         </a>
         <a :href="links.github" target="_blank" rel="noopener noreferrer" class="cv__btn">
