@@ -54,6 +54,9 @@ export interface FlatListing {
   listingLine?: string | null;
   // Other properties the same contact advertises; drives the popup tab.
   contactListingCount?: number | null;
+  // The contact is in the realtor registry; see utils/flats/registrySignal.ts. Public source links, at most three.
+  registrySignal?: string | null;
+  registrySources?: string[] | null;
   publicId?: number | null;
   source: string;
   // Only set when source === "custom": the exact curated-site catalogue URL
