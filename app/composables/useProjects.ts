@@ -130,7 +130,7 @@ const GROUPS: RawGroup[] = [
         "name": "Flat Finder",
         "stack": "Dart · Flutter",
         "href": "https://github.com/AmoneMisa/flat-finder",
-        "downloadHref": "/files/FlatFinder_v1.1_WhitesLove.apk"
+        "downloadHref": "/files/FlatFinder_v1.0.0_WhitesLove.apk"
       }
     ]
   },
