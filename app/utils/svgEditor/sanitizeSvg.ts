@@ -27,6 +27,8 @@ const URL_BEARING_ATTRIBUTES = new Set([
   'cursor',
 ])
 
+const ANIMATION_TAGS = new Set(['set', 'animate', 'animatetransform', 'animatemotion'])
+
 const SAFE_RASTER_DATA_URL = /^data:image\/(?:png|jpe?g|gif|webp);base64,[a-z0-9+/=\s]+$/i
 const FRAGMENT_REFERENCE = /^#[A-Za-z_][\w:.-]*$/
 const CSS_URL_RE = /url\(\s*(['"]?)(.*?)\1\s*\)/gi
@@ -60,6 +62,15 @@ function sanitizeElement(element: Element) {
   if (FORBIDDEN_TAGS.has(tag)) {
     element.remove()
     return
+  }
+
+  // SMIL can write an attribute after sanitising: `<set attributeName="href" to="javascript:...">` under an <a>.
+  if (ANIMATION_TAGS.has(tag)) {
+    const target = (element.getAttribute('attributeName') || '').toLowerCase().replace(/^.*:/, '')
+    if (target === 'href' || target.startsWith('on')) {
+      element.remove()
+      return
+    }
   }
 
   if (tag === 'style') {

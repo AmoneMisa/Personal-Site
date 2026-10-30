@@ -28,3 +28,8 @@ test('transform editor never mounts raw SVG input through innerHTML', () => {
   assert.doesNotMatch(transform, /container\.innerHTML = svgCode/)
   assert.match(transform, /sanitizeSvgMarkup\(serialize\(result\.svg\)\)/)
 })
+
+test('SVG sanitizer drops SMIL animations that write href or event handlers', () => {
+  assert.match(sanitizer, /ANIMATION_TAGS/)
+  assert.match(sanitizer, /target === 'href' \|\| target\.startsWith\('on'\)/)
+})

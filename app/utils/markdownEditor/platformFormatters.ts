@@ -67,7 +67,7 @@ function escapeHtml(value: string) {
 
 function renderTelegram(markdown: string) {
   return escapeHtml(markdown)
-    .replace(/```([\s\S]*?)```/g, (_match, code) => `<pre class="pv-pre"><code>${escapeHtml(code)}</code></pre>`)
+    .replace(/```([\s\S]*?)```/g, (_match, code) => `<pre class="pv-pre"><code>${code}</code></pre>`)
     .replace(/`([^`]+)`/g, `<code class="pv-code">$1</code>`)
     .replace(/\[([^\]]+)\]\(([^)]+)\)/g, (_match, label, href) => {
       const safeHref = sanitizeMarkdownUrl(href);
@@ -86,7 +86,7 @@ function renderTelegram(markdown: string) {
 
 function renderWhatsApp(markdown: string) {
   return escapeHtml(markdown)
-    .replace(/```([\s\S]*?)```/g, (_match, code) => `<pre class="pv-pre"><code>${escapeHtml(code)}</code></pre>`)
+    .replace(/```([\s\S]*?)```/g, (_match, code) => `<pre class="pv-pre"><code>${code}</code></pre>`)
     .replace(/\*([^*\n]+)\*/g, "<b>$1</b>")
     .replace(/_([^_\n]+)_/g, "<i>$1</i>")
     .replace(/~([^~\n]+)~/g, "<s>$1</s>")

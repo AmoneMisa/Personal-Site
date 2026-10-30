@@ -22,3 +22,9 @@ test('unsafe Markdown URLs stay text instead of becoming executable anchors', ()
   assert.match(unsafe, /run \(javascript:alert%281%29\)/);
   assert.match(safe, /<a[^>]+href="https:\/\/example\.com"/i);
 });
+
+test('code blocks are escaped once, not twice', () => {
+  const html = renderPlatformPreview('```\na < b && c\n```', 'telegram');
+  assert.match(html, /a &lt; b &amp;&amp; c/);
+  assert.doesNotMatch(html, /&amp;lt;|&amp;amp;/);
+});

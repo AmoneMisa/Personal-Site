@@ -1,8 +1,13 @@
 import { randomBytes } from 'node:crypto'
 import { Pool } from 'pg'
+import { FixedWindowRateLimiter } from '../utils/fixedWindowRateLimiter'
+import { requestClientIp } from '../utils/requestClientIp'
 
 const SCHEMA_RE = /^[a-z_][a-z0-9_]*$/i
 const HANDOFF_TTL_MINUTES = 30
+
+// Every call writes a row, so an anonymous loop would flood the table.
+const limiter = new FixedWindowRateLimiter({ limit: 10, windowMs: 60_000, maxEntries: 5_000 })
 
 let pool: Pool | undefined
 
@@ -68,6 +73,10 @@ export default defineEventHandler(async (event) => {
   const botUsername = String(process.env.TELEGRAM_SUBSCRIPTION_BOT_USERNAME || '').trim().replace(/^@/, '')
   if (!enabled || !botUsername || !databaseUrl()) {
     throw createError({ statusCode: 503, statusMessage: 'Telegram subscriptions are not configured' })
+  }
+
+  if (!limiter.consume(requestClientIp(event))) {
+    throw createError({ statusCode: 429, statusMessage: 'Too many subscription requests' })
   }
 
   const body = await readBody<{ searchUrl?: string }>(event)

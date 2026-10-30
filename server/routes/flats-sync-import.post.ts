@@ -8,11 +8,17 @@
 // per client; a loop of mutations trips that and switches sync off.
 import { installationFor, savedStateFetch, savedStateHeaders } from '../flats/savedState'
 
+const MAX_IMPORT_ITEMS = 5_000
+
 export default defineEventHandler(async (event) => {
   const body = await readBody<{ favorites?: unknown[]; sorted?: unknown[] }>(event)
   const payload = {
     favorites: Array.isArray(body?.favorites) ? body.favorites : [],
     sorted: Array.isArray(body?.sorted) ? body.sorted : [],
+  }
+  if (payload.favorites.length > MAX_IMPORT_ITEMS || payload.sorted.length > MAX_IMPORT_ITEMS) {
+    setResponseStatus(event, 413)
+    return { ok: false, error: 'too many items' }
   }
   if (!payload.favorites.length && !payload.sorted.length) return { ok: true, skipped: true }
 
