@@ -51,7 +51,7 @@ export function useFlatFilterBlocks(options: {
 
   return computed<SearchFilterBlock[]>(() => [
     {
-      id: "quick", title: options.t("quickOptions"), icon: "i-lucide-sliders-horizontal", gridClass: "flat-filter-grid_single",
+      id: "quick", title: options.t("quickOptions"), icon: "i-lucide-sliders-horizontal", gridClass: "flat-filter-grid_switches",
       fields: [
         // Listing lines: green only, and hide red ones.
         { id: "trusted-only", control: "checkbox", label: options.t("trustedOnly"), value: trustedOnly.value, onUpdate: update(trustedOnly), onCommit: commit },

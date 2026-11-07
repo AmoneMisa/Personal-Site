@@ -1,46 +1,23 @@
 <script setup lang="ts">
+import SearchAdvancedToggle from "~/components/search/SearchAdvancedToggle.vue";
+
 const open = defineModel<boolean>({ default: false });
 
 withDefaults(defineProps<{
   label: string;
   hideLabel?: string;
+  /** The page renders SearchAdvancedToggle itself (e.g. in its filter footer). */
+  externalToggle?: boolean;
 }>(), {
   hideLabel: "",
-});
-
-const route = useRoute();
-const mounted = ref(false);
-const useFlatFinderFooter = computed(() => mounted.value && route.path.endsWith("/flat-finder"));
-
-onMounted(() => {
-  mounted.value = true;
+  externalToggle: false,
 });
 </script>
 
 <template>
   <div class="search-advanced-filters">
-    <teleport v-if="useFlatFinderFooter" to=".filter-actions-row">
-      <button
-        type="button"
-        class="search-advanced-filters__button search-advanced-filters__button_footer"
-        :aria-expanded="open"
-        @click="open = !open"
-      >
-        <u-icon :name="open ? 'i-lucide-chevron-up' : 'i-lucide-chevron-right'" />
-        <span>{{ open ? (hideLabel || label) : label }}</span>
-      </button>
-    </teleport>
-
-    <div v-else class="search-advanced-filters__toggle">
-      <button
-        type="button"
-        class="search-advanced-filters__button"
-        :aria-expanded="open"
-        @click="open = !open"
-      >
-        <u-icon :name="open ? 'i-lucide-chevron-up' : 'i-lucide-chevron-right'" />
-        <span>{{ open ? (hideLabel || label) : label }}</span>
-      </button>
+    <div v-if="!externalToggle" class="search-advanced-filters__toggle">
+      <SearchAdvancedToggle v-model="open" :label="label" :hide-label="hideLabel" />
     </div>
 
     <div v-if="open" class="search-advanced-filters__panel">
@@ -62,26 +39,6 @@ onMounted(() => {
   align-items: center;
   width: 100%;
   min-width: 0;
-}
-.search-advanced-filters__button {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  min-width: 0;
-  padding: 0;
-  border: 0;
-  background: transparent;
-  color: var(--ui-text-muted);
-  font-size: 13px;
-  font-weight: 650;
-  line-height: 1.25;
-  cursor: pointer;
-}
-.search-advanced-filters__button:hover { color: var(--text-white); }
-.search-advanced-filters__button_footer {
-  order: -1;
-  flex: 0 0 auto;
-  min-height: 32px;
 }
 .search-advanced-filters__panel {
   position: relative;
@@ -136,17 +93,12 @@ onMounted(() => {
     border-top: 1px solid var(--line);
   }
 
-  .search-advanced-filters__button {
+  .search-advanced-filters__toggle :deep(.search-advanced-toggle) {
     width: 100%;
     min-height: 44px;
     padding: 0 2px;
     justify-content: flex-start;
     font-size: 14px;
-  }
-
-  .search-advanced-filters__button_footer {
-    width: auto;
-    min-height: 36px;
   }
 }
 

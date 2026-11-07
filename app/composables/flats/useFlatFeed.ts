@@ -25,7 +25,11 @@ export function feedCacheKey(params: Record<string, string>): string {
 export function useFlatFeed(feedOptions: { onAvailabilityChecked?: (keys: string[]) => void } = {}) {
   const listings = ref<FlatListing[]>([]);
   const total = ref(0);
-  const loading = ref(false);
+  // Nothing is fetched during SSR, so until the first client load lands the
+  // honest state is "loading", not "no results". Starting at false rendered
+  // "Nothing found" on the server and then swapped it for a spinner and cards,
+  // which is the flash-and-jump visitors saw on every page load.
+  const loading = ref(true);
   const loadingMore = ref(false);
   const warming = ref(false);
   const failed = ref(false);
