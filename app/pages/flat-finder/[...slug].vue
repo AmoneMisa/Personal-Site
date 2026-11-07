@@ -32,6 +32,7 @@ import SearchPageShell from "~/components/search/SearchPageShell.vue";
 import SearchSavedTabs from "~/components/search/SearchSavedTabs.vue";
 import SearchFilterBlocks from "~/components/search/SearchFilterBlocks.vue";
 import SearchAdvancedFilters from "~/components/search/SearchAdvancedFilters.vue";
+import SearchAdvancedToggle from "~/components/search/SearchAdvancedToggle.vue";
 import SearchPresetDialog from "~/components/search/SearchPresetDialog.vue";
 import SearchShareDialog from "~/components/search/SearchShareDialog.vue";
 import SearchSourceTabs from "~/components/search/SearchSourceTabs.vue";
@@ -120,8 +121,8 @@ const defaultCountry = ref("UA");
 const flatFilters = useFlatFilters({ locale: () => String(locale.value) });
 const {
   owner,
-  countries, city, region, district, microdistrict, quartal, mapArea, dealType, agency, petFriendly, roomOnlyFilter,
-  onlyWithPhotos, childrenRequired, newBuildingOnly, dishwasherOnly, airConditionerOnly,
+  countries, city, region, district, microdistrict, quartal, mapArea, dealType, agency, roomOnlyFilter,
+  dishwasherOnly, airConditionerOnly,
   parkingOnly, internetOnly, gasOnly, balconyOnly, terraceOnly, privateYardOnly,
   tvOnly, microwaveOnly, ovenOnly, bidetOnly, walkInClosetOnly, bathtubOnly, showerOnly, sort,
   metro, priceMin, priceMax,
@@ -1307,19 +1308,23 @@ onBeforeUnmount(() => { modalOpen.value = false; lightboxOpen.value = false; rel
           <span class="price-separator">—</span>
           <u-input v-model.number="priceMax" class="price-input" type="number" inputmode="numeric" :min="priceRange?.min ?? 1" :max="priceRange?.max ?? 1000000000" :step="priceStep" :label="t('rangeTo')" @change="scheduleLoad()" />
           <label class="currency-select"><span class="sr-only">{{ t("currency") }}</span><u-select-menu v-model="displayCurrency" :items="currencyItems" value-key="value" label-key="label" class="flats__select currency-select__control" @update:model-value="onDisplayCurrencyChange" /></label>
-          <UiRangeSlider
-              v-if="priceRange"
-              v-model:from="priceMin"
-              v-model:to="priceMax"
-              class="filter-price-row__slider"
-              :min="priceRange.min"
-              :max="priceRange.max"
-              :step="priceStep"
-              :from-label="`${t('price')} ${t('rangeFrom')}`"
-              :to-label="`${t('price')} ${t('rangeTo')}`"
-              :format="formatPriceBound"
-              @change="scheduleLoad()"
-          />
+          <!-- The slot is always rendered at a fixed height: the bounds arrive in a
+               separate request, and mounting the slider then used to push
+               everything below the filters down. -->
+          <div class="filter-price-row__slider">
+            <UiRangeSlider
+                v-if="priceRange"
+                v-model:from="priceMin"
+                v-model:to="priceMax"
+                :min="priceRange.min"
+                :max="priceRange.max"
+                :step="priceStep"
+                :from-label="`${t('price')} ${t('rangeFrom')}`"
+                :to-label="`${t('price')} ${t('rangeTo')}`"
+                :format="formatPriceBound"
+                @change="scheduleLoad()"
+            />
+          </div>
         </div>
 
         <div class="filter-amenities-row">
@@ -1342,20 +1347,12 @@ onBeforeUnmount(() => { modalOpen.value = false; lightboxOpen.value = false; rel
         </div>
 
         <UiFilterFooter class="filter-actions-row" :reset-label="t('reset')" @reset="resetFilters">
+          <SearchAdvancedToggle v-model="showAdvanced" :label="t('moreFilters')" :hide-label="t('hideFilters')" />
         </UiFilterFooter>
       </section>
 
-      <SearchAdvancedFilters v-model="showAdvanced" :label="t('moreFilters')" :hide-label="t('hideFilters')">
-        <SearchFilterBlocks :blocks="flatAdvancedFilterBlocks" class="flats__filter-blocks">
-          <template #field-quick-options>
-            <div class="quick-options">
-              <u-button type="button" :variant="petFriendly ? 'solid' : 'outline'" color="neutral" icon="i-lucide-paw-print" @click="petFriendly = !petFriendly; scheduleLoad()">{{ t('pets') }}</u-button>
-              <u-button type="button" :variant="childrenRequired ? 'solid' : 'outline'" color="neutral" icon="i-lucide-baby" @click="childrenRequired = !childrenRequired; scheduleLoad()">{{ t('children') }}</u-button>
-              <u-button type="button" :variant="onlyWithPhotos ? 'solid' : 'outline'" color="neutral" icon="i-lucide-images" @click="onlyWithPhotos = !onlyWithPhotos; scheduleLoad()">{{ t('onlyWithPhotos') }}</u-button>
-              <u-button type="button" :variant="newBuildingOnly ? 'solid' : 'outline'" color="neutral" icon="i-lucide-building-2" @click="newBuildingOnly = !newBuildingOnly; scheduleLoad()">{{ t('newBuilding') }}</u-button>
-            </div>
-          </template>
-        </SearchFilterBlocks>
+      <SearchAdvancedFilters v-model="showAdvanced" external-toggle :label="t('moreFilters')" :hide-label="t('hideFilters')">
+        <SearchFilterBlocks :blocks="flatAdvancedFilterBlocks" class="flats__filter-blocks" />
       </SearchAdvancedFilters>
       </div>
     </form>
@@ -1363,7 +1360,12 @@ onBeforeUnmount(() => { modalOpen.value = false; lightboxOpen.value = false; rel
     <FlatAccountBar v-if="view === 'favorites'" />
     <p v-if="failed" class="flats__error">{{ t("error") }}</p>
     <p v-else-if="source === 'telegram' && !loading && !listings.length && sourceErrors?.some((item) => item.source === 'telegram')" class="flats__source-warning">{{ t("telegramUnavailable") }}</p>
-    <FlatsStatsPanel v-if="view === 'active' && statistics" :statistics="statistics" :selected-city="city" :display-currency="displayCurrency" :convert="convert" :location-label="(value, kind) => labelFor(value, kind)" />
+    <!-- Statistics come from a second request after the listings. Holding the
+         collapsed panel's height until then keeps the map and the results from
+         being shoved down when it lands. -->
+    <div v-if="view === 'active' && !failed" class="flats__stats-slot">
+      <FlatsStatsPanel v-if="statistics" :statistics="statistics" :selected-city="city" :display-currency="displayCurrency" :convert="convert" :location-label="(value, kind) => labelFor(value, kind)" />
+    </div>
 <section class="flats__map-wrap"><flat-map :points="mapPoints" :feed-mode="view === 'active' ? 'search' : 'collection'" :excluded-ids="view === 'active' ? [...hiddenIds] : []" :radius-center="radiusCenter" :radius-m="radiusM" @radius-center-change="onWorkPointChange" @radius-change="onWorkRadiusChange" :draw-label="t('drawArea')" :done-label="t('done')" :clear-label="t('clearArea')" :draw-hint="t('drawHint')" :expand-label="t('mapExpand')" :collapse-label="t('mapCollapse')" :scroll-hint-label="t('mapScrollHint')" :district-zones="districtZones" :microdistrict-markers="microdistrictMarkers" :quartal-markers="quartalMarkers" :metro-stations="metroStations" :university-zones="universityZones" :shopping-mall-zones="shoppingMallZones" :park-zones="parkZones" :area-zones="areaZones" :city-zone="cityZone" :selected-region="region" :selected-district="district" :selected-microdistrict="microdistrict" :selected-quartal="quartal" :selected-area="mapArea" :selected-metros="metro" :selected-metro-radius-m="metroMaxM" :metro-bearing-from="metroBearingFrom" :metro-bearing-to="metroBearingTo" :metro-radius-handle-label="t('metroRadiusHandle')" :metro-arc-handle-label="t('metroArcHandle')" :fit-results-label="t('mapFitResults')" :view-filter="viewFilter" :districts-label="t('districtsLayer')" :microdistricts-label="t('microdistrictsLayer')" :quartals-label="t('quartalsLayer')" :metro-label="t('metro')" :universities-label="t('universitiesLayer')" :shopping-malls-label="t('shoppingMallsLayer')" :parks-label="t('parksLayer')" :areas-label="t('areasLayer')" :city-label="t('cityLayer')" @select="openById" @area-change="drawnArea = $event" @bounds-change="viewBounds = $event" @zone-select="onZoneSelect" @city-select="onCitySelect" @metro-toggle="onMetroToggle" @metro-shape="onMetroShape" /></section>
 
     <div v-if="!failed" class="flats__results-head">
@@ -1378,7 +1380,7 @@ onBeforeUnmount(() => { modalOpen.value = false; lightboxOpen.value = false; rel
       </div>
     </div>
 
-    <UiResultsLoader :loading="loading" :label="t('searching')" min-height="420px">
+    <UiResultsLoader :loading="loading" :label="t('searching')" min-height="100vh">
     <SearchResultGrid>
       <FlatCard
         v-for="l in displayedListings"
@@ -1451,10 +1453,13 @@ onBeforeUnmount(() => { modalOpen.value = false; lightboxOpen.value = false; rel
 .flats__back-top:hover { color: var(--accent-pink); border-color: rgba(224,103,154,.48); }
 .flats__error { color: var(--ui-error, #f87171); }
 .flats__source-warning { color: #f6c177; font-size: 13px; margin-bottom: 12px; }
-.flats__count { font-size: 13px; margin: 0; }
+.flats__count { flex: 0 0 auto; font-size: 13px; margin: 0; white-space: nowrap; }
 .flats__results-toolbar { display: flex; align-items: end; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
 .flats__sort { width: min(310px, 100%); }
-.flats__map-wrap { position: relative; z-index: 0; isolation: isolate; margin: 18px 0; scroll-margin-top: 90px; }
+/* FlatMap is client-only and 420px tall; holding that height from SSR on stops
+   it from shoving the results down when it mounts, and keeps the page still
+   when the map is expanded (teleported to <body>). */
+.flats__map-wrap { position: relative; z-index: 0; isolation: isolate; min-height: 420px; margin: 18px 0; scroll-margin-top: 90px; }
 .flat-modal__verification { display: inline-flex; align-items: center; gap: 8px; align-self: flex-start; padding: 6px 10px; border: 1px solid rgba(224,103,154,.36); border-radius: 999px; background: rgba(224,103,154,.1); color: var(--text-secondary); font-size: 13px; }
 .flat-modal__verification-icon { width: 16px; height: 16px; color: var(--accent-pink); animation: flat-card-spin .8s linear infinite; }
 .flats__sentinel { min-height: 44px; display: grid; place-items: center; }
@@ -1503,9 +1508,12 @@ onBeforeUnmount(() => { modalOpen.value = false; lightboxOpen.value = false; rel
    so without it every pixel of leftover width inflated the label column and
    threw the label to the far left with the inputs stranded on the right.
    column-gap does the spacing now instead of a per-element margin. */
-.filter-price-row { display: grid; grid-template-columns: auto minmax(130px,190px) auto minmax(130px,190px) minmax(120px,145px); justify-content: start; align-items: center; column-gap: 8px; row-gap: 10px; margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--line); }
+/* One row on desktop: label, from — to, currency, then the slider filling the
+   rest. The slider cell has a fixed height whether or not the bounds have
+   arrived, so the row never changes height after hydration. */
+.filter-price-row { display: grid; grid-template-columns: auto minmax(110px,170px) auto minmax(110px,170px) minmax(100px,130px) minmax(200px,1fr); align-items: center; column-gap: 8px; row-gap: 10px; margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--line); }
 .filter-price-row__label { margin: 0; }
-.filter-price-row__slider { grid-column: 2 / 5; }
+.filter-price-row__slider { min-width: 0; height: 40px; display: flex; flex-direction: column; justify-content: center; padding-left: 12px; }
 /* "от" / "до" are floating labels on the fields themselves now. The wrapper that
    used to draw a box around a caption plus a de-bordered input — and all the
    !important needed to stop that drawing two borders — is gone with it. */
@@ -1516,27 +1524,38 @@ onBeforeUnmount(() => { modalOpen.value = false; lightboxOpen.value = false; rel
 .filter-amenities-row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--line); }
 .filter-amenities-row__label { margin-right: 4px; white-space: nowrap; }
 .filter-amenities-row :deep(button) { min-height: 30px; height: auto; padding-inline: 9px; white-space: nowrap; }
-.filter-actions-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--line); }
+.filter-actions-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--line); }
+.flats__stats-slot:empty { height: 60px; margin: 8px 0 24px; border: 1px solid rgba(85,111,174,.22); border-radius: 14px; background: rgba(5,10,31,.45); }
 .active-filter-chips { display: flex; flex: 1 1 300px; gap: 8px; flex-wrap: wrap; min-width: 0; }
 .filter-chip { display: inline-flex; align-items: center; gap: 7px; max-width: 100%; min-height: 34px; padding: 6px 11px; border: 1px solid var(--line); border-radius: 7px; background: var(--bg-panel-2); color: var(--text-primary); white-space: normal; text-align: left; line-height: 1.25; }
 .filter-chip_reset { background: transparent; color: var(--ui-text-muted); }
 .flats__results-head { display: grid; gap: 10px; margin-bottom: 12px; }
 .flats__results-head .flats__results-toolbar { margin-bottom: 0; }
 .filter-chip span { color: var(--ui-text-muted); flex: 0 0 auto; }
-.flats__filter-blocks { grid-template-columns: 1.15fr .95fr 1.1fr 1.1fr 1fr; gap: 0; padding: 16px; }
-.flats__filter-blocks :deep(.filter-section) { min-width: 0; padding: 0 16px; border: 0; border-left: 1px solid var(--line); border-radius: 0; background: transparent; }
-.flats__filter-blocks :deep(.filter-section:first-child) { padding-left: 0; border-left: 0; }
+/* Advanced filters sit inside the same surface as the main card, so the panel
+   loses its own box and becomes a continuation of it. Quick options are a
+   full-width strip of switches; the four field groups share one row below.
+   `.filter-surface` raises specificity over SearchFilterBlocks' own 2-column
+   default, which used to win depending on stylesheet order. */
+.filter-surface :deep(.search-advanced-filters__panel) { padding: 0; border: 0; border-top: 1px solid var(--line); border-radius: 0; background: transparent; box-shadow: none; }
+.filter-surface .flats__filter-blocks { grid-template-columns: minmax(0, .9fr) minmax(0, 1.1fr) minmax(0, 1.15fr) minmax(0, .9fr); gap: 0; padding: 14px 16px 16px; }
+.flats__filter-blocks :deep(.filter-section) { min-width: 0; padding: 0 14px; border: 0; border-left: 1px solid var(--line); border-radius: 0; background: transparent; }
+.flats__filter-blocks :deep(.filter-section:nth-child(2)) { padding-left: 0; border-left: 0; }
 .flats__filter-blocks :deep(.filter-section:last-child) { padding-right: 0; }
+.flats__filter-blocks :deep(.filter-section:first-child) { grid-column: 1 / -1; padding: 0 0 12px; margin-bottom: 14px; border-left: 0; border-bottom: 1px solid var(--line); }
+.flats__filter-blocks :deep(.filter-section__title) { margin-bottom: 10px; }
+.flats__filter-blocks :deep(.search-filter-blocks__grid) { gap: 8px; }
 .flats__filter-blocks :deep(.flat-filter-grid_single) { grid-template-columns: 1fr; }
-.quick-options { display: grid; gap: 8px; }
-.quick-options :deep(button) { width: 100%; min-height: var(--ui-control-h-md); justify-content: flex-start; height: auto; padding-block: 8px; white-space: normal; text-align: left; line-height: 1.25; }
+.flats__filter-blocks :deep(.flat-filter-grid_switches) { grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 2px 16px; }
+.flats__filter-blocks :deep(.search-filter-control__switch) { min-height: 32px; font-size: 13px; }
 .flats__controls_redesign :deep(input:not([type="range"])), .flats__controls_redesign :deep(button[role="combobox"]) { background-color: var(--bg-panel-2) !important; }
 
 @media (max-width: 1100px) {
-  .flats__filter-blocks { grid-template-columns: repeat(2,minmax(0,1fr)); gap: 20px 0; }
-  .flats__filter-blocks :deep(.filter-section), .flats__filter-blocks :deep(.filter-section:first-child) { padding: 0 16px; border-left: 1px solid var(--line); }
-  .flats__filter-blocks :deep(.filter-section:nth-child(odd)) { border-left: 0; padding-left: 0; }
-  .flats__filter-blocks :deep(.filter-section:nth-child(even)) { padding-right: 0; }
+  .filter-surface .flats__filter-blocks { grid-template-columns: repeat(2,minmax(0,1fr)); row-gap: 18px; }
+  .flats__filter-blocks :deep(.filter-section:nth-child(even)) { padding-left: 0; border-left: 0; }
+  .flats__filter-blocks :deep(.filter-section:nth-child(odd):not(:first-child)) { padding-right: 0; }
+  .filter-price-row { grid-template-columns: auto minmax(110px,170px) auto minmax(110px,170px) minmax(100px,130px); }
+  .filter-price-row__slider { grid-column: 2 / -1; padding-left: 0; }
 }
 @include bp-down(md) {
   .flats__controls_redesign { margin-inline: -4px; }
@@ -1546,7 +1565,7 @@ onBeforeUnmount(() => { modalOpen.value = false; lightboxOpen.value = false; rel
   .filter-primary-grid { grid-template-columns: 1fr; gap: 12px; }
   .filter-price-row { grid-template-columns: minmax(0,1fr) 10px minmax(0,1fr); column-gap: 4px; row-gap: 8px; }
   .filter-price-row__label { grid-column: 1 / -1; }
-  .filter-price-row__slider { grid-column: 1 / -1; }
+  .filter-price-row__slider { grid-column: 1 / -1; padding-left: 0; }
   .currency-select { grid-column: 1 / -1; }
   .price-input { min-width: 0; padding-left: 7px; gap: 3px; }
   .price-input :deep(.price-number-input) { font-size: 12px; }
@@ -1554,10 +1573,13 @@ onBeforeUnmount(() => { modalOpen.value = false; lightboxOpen.value = false; rel
   .filter-amenities-row :deep(button) { flex: 1 1 auto; justify-content: center; }
   .filter-actions-row { align-items: stretch; }
   .active-filter-chips { flex: 1 1 100%; }
-  .flats__filter-blocks { grid-template-columns: 1fr; padding: 14px 12px; gap: 0; }
-  .flats__filter-blocks :deep(.filter-section), .flats__filter-blocks :deep(.filter-section:first-child), .flats__filter-blocks :deep(.filter-section:nth-child(odd)), .flats__filter-blocks :deep(.filter-section:nth-child(even)) { padding: 16px 0; border-left: 0; border-top: 1px solid var(--line); }
+  .filter-surface .flats__filter-blocks { grid-template-columns: 1fr; padding: 12px; row-gap: 0; }
+  .flats__filter-blocks :deep(.filter-section), .flats__filter-blocks :deep(.filter-section:nth-child(n)) { padding: 14px 0; margin: 0; border-left: 0; border-bottom: 0; border-top: 1px solid var(--line); }
   .flats__filter-blocks :deep(.filter-section:first-child) { padding-top: 0; border-top: 0; }
   .flats__filter-blocks :deep(.filter-section:last-child) { padding-bottom: 0; }
+  .flats__filter-blocks :deep(.flat-filter-grid_switches) { grid-template-columns: 1fr; }
+  /* From/to pairs stay side by side: one per row doubled the panel's length. */
+  .flats__filter-blocks :deep(.search-filter-blocks__grid:not(.flat-filter-grid_single):not(.flat-filter-grid_switches)) { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .flats__results-toolbar { align-items: stretch; flex-direction: column; }
   .flats__sort { width: 100%; }
   .flats__back-top span { display: none; }

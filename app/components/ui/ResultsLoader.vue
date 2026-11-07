@@ -55,9 +55,11 @@ withDefaults(defineProps<{
   inset: 0;
   z-index: 1000;
   display: grid;
-  place-items: center;
+  /* Pinned near the top and kept in view while scrolling: centring it in a
+     tall results area put the spinner below the fold. */
+  place-items: start center;
   min-height: var(--results-loader-min-height);
-  padding: 24px;
+  padding: 72px 24px 24px;
   background: color-mix(in srgb, var(--bg-primary, #0b0f2a) 54%, transparent);
   backdrop-filter: blur(2px);
   pointer-events: auto;
@@ -65,6 +67,8 @@ withDefaults(defineProps<{
 }
 
 .results-loader__card {
+  position: sticky;
+  top: 40vh;
   display: inline-flex;
   align-items: center;
   gap: 11px;

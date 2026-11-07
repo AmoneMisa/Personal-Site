@@ -16,6 +16,8 @@ const jobStats = await readFile(new URL('../app/components/jobs/StatsPanel.vue',
 const jobPage = await readFile(new URL('../app/pages/jobs/index.vue', import.meta.url), 'utf8')
 const hiringPage = await readFile(new URL('../app/pages/hiring/index.vue', import.meta.url), 'utf8')
 const advancedFilters = await readFile(new URL('../app/components/search/SearchAdvancedFilters.vue', import.meta.url), 'utf8')
+const advancedToggle = await readFile(new URL('../app/components/search/SearchAdvancedToggle.vue', import.meta.url), 'utf8')
+const resultsLoader = await readFile(new URL('../app/components/ui/ResultsLoader.vue', import.meta.url), 'utf8')
 
 test('flat cards stay equal within a row and use the target compact desktop/mobile geometry', () => {
   assert.match(grid, /align-items: stretch/u)
@@ -101,8 +103,9 @@ test('advanced filters share one collapsed shell on all three search boards', ()
   assert.match(jobPage, /<SearchAdvancedFilters v-model="showAdvanced"/u)
   assert.match(hiringPage, /<SearchAdvancedFilters v-model="showAdvanced" :label="t\('advanced'\)" :hide-label="t\('hideFilters'\)"/u)
   assert.match(advancedFilters, /const open = defineModel<boolean>\(\{ default: false \}\)/u)
-  assert.match(advancedFilters, /:aria-expanded="open"/u)
-  assert.match(advancedFilters, /:name="open \? 'i-lucide-chevron-up' : 'i-lucide-chevron-right'"/u)
+  assert.match(advancedFilters, /<SearchAdvancedToggle v-model="open"/u)
+  assert.match(advancedToggle, /:aria-expanded="open"/u)
+  assert.match(advancedToggle, /:name="open \? 'i-lucide-chevron-up' : 'i-lucide-chevron-right'"/u)
   assert.doesNotMatch(advancedFilters, /search-advanced-filters__toggle_open/u)
   assert.doesNotMatch(jobPage, /showAdvanced = !showAdvanced/u)
   assert.doesNotMatch(hiringPage, /v-if="showAdvanced" class="hiring__advanced"/u)
@@ -119,4 +122,22 @@ test('vacancy graphs do not render the redundant sparse salary line', () => {
 test('room rent remains a deal type but is not duplicated in quick filters', () => {
   assert.match(page, /t\("dtRoomRent"\), value: "roomRent"/u)
   assert.doesNotMatch(page, /icon="i-lucide-bed-single"/u)
+})
+
+test('flat finder layout does not shift after hydration', () => {
+  // The toggle is rendered in place by the page, not teleported after mount by
+  // a component that sniffs the route.
+  assert.doesNotMatch(advancedFilters, /teleport|useRoute/iu)
+  assert.match(page, /<SearchAdvancedFilters v-model="showAdvanced" external-toggle/u)
+  assert.match(page, /<UiFilterFooter[^>]*>\s*<SearchAdvancedToggle v-model="showAdvanced"/u)
+  // The price slider's cell exists before the bounds arrive.
+  assert.match(page, /<div class="filter-price-row__slider">\s*<UiRangeSlider\s+v-if="priceRange"/u)
+  assert.match(page, /\.filter-price-row__slider \{[^}]*height: 40px/u)
+  // Client-only map and late statistics keep their space from SSR on.
+  assert.match(page, /\.flats__map-wrap \{[^}]*min-height: 420px/u)
+  assert.match(page, /<div v-if="view === 'active' && !failed" class="flats__stats-slot">/u)
+  // SSR has no listings: it must render "loading", never "nothing found".
+  assert.match(feed, /const loading = ref\(true\)/u)
+  assert.match(page, /<UiResultsLoader :loading="loading" :label="t\('searching'\)" min-height="100vh">/u)
+  assert.match(resultsLoader, /position: sticky/u)
 })
