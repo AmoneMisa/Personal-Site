@@ -77,7 +77,7 @@ test('selected city breaks statistics down by district and a price line shows li
   assert.match(stats, /selectedCity\?: string/u)
   assert.match(stats, /geoDimension\.value = city \? "district" : "city"/u)
   assert.match(stats, /priceDistributionByDeal\?\.\[dealScope\.value\]/u)
-  assert.match(stats, /<UiAnalyticsLine :series="priceDistribution\.series" :labels="priceDistribution\.labels" \/>/u)
+  assert.match(stats, /<LazyUiAnalyticsLine :series="priceDistribution\.series" :labels="priceDistribution\.labels" \/>/u)
   assert.match(page, /<FlatsStatsPanel[^>]*:selected-city="city"/u)
 })
 
@@ -140,4 +140,9 @@ test('flat finder layout does not shift after hydration', () => {
   assert.match(feed, /const loading = ref\(true\)/u)
   assert.match(page, /<UiResultsLoader :loading="loading" :label="t\('searching'\)" min-height="100vh">/u)
   assert.match(resultsLoader, /position: sticky/u)
+})
+
+test('flat statistics charts are lazy so chart.js stays out of the page bundle', () => {
+  assert.doesNotMatch(stats, /<UiAnalytics(Line|Bars|Donut|Bubble)\b/u)
+  assert.match(stats, /<LazyUiAnalyticsBars\b/u)
 })

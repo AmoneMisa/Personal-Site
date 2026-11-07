@@ -160,7 +160,7 @@ function displayGeoLabel(value: string, dimension: FlatStatsGeoDimension): strin
     <div class="flat-stats__body">
       <article class="flat-stats__card flat-stats__card_wide">
         <div class="flat-stats__head"><h3>{{ t("statsActivity") }}</h3><div class="flat-stats__segments"><button v-for="days in activityOptions" :key="days" type="button" :class="{ active: activityDays === days }" @click="activityDays = days">{{ t("statsDays", { n: days }) }}</button></div></div>
-        <UiAnalyticsLine :series="activity.series" :labels="activity.labels" />
+        <LazyUiAnalyticsLine :series="activity.series" :labels="activity.labels" />
       </article>
       <article class="flat-stats__card flat-stats__card_wide">
         <h3>{{ t("statsDeals") }}</h3>
@@ -168,7 +168,7 @@ function displayGeoLabel(value: string, dimension: FlatStatsGeoDimension): strin
       </article>
       <article v-if="priceBandSamples" class="flat-stats__card flat-stats__card_wide">
         <div class="flat-stats__head"><div><h3>{{ priceBandTitle }}</h3><small class="flat-stats__hint">{{ priceBandHint }} · {{ number(priceBandSamples) }}</small></div><SearchSourceTabs v-model="dealScope" :items="dealScopeOptions" /></div>
-        <UiAnalyticsBars :items="priceBandBars" />
+        <LazyUiAnalyticsBars :items="priceBandBars" />
         <div class="flat-stats__legend" :aria-label="priceLegendTitle">
           <span class="flat-stats__legend-title">{{ priceLegendTitle }}:</span>
           <span v-for="item in priceLegend" :key="item.key" class="flat-stats__legend-item"><i :style="{ background: item.color }" />{{ item.label }}</span>
@@ -184,11 +184,11 @@ function displayGeoLabel(value: string, dimension: FlatStatsGeoDimension): strin
         <p v-else class="flat-stats__empty">{{ t("statsNoGeo") }}</p>
         <div v-if="geographyPriceRanges.length" class="flat-stats__range">
           <h3>{{ priceRangeTitle }}</h3>
-          <UiAnalyticsBars :items="geographyPriceRanges" :format="(value) => money(value)" :row-height="26" />
+          <LazyUiAnalyticsBars :items="geographyPriceRanges" :format="(value) => money(value)" :row-height="26" />
         </div>
         <div v-if="priceDistribution.hasData" class="flat-stats__range">
           <h3>{{ priceDistributionTitle }}</h3>
-          <UiAnalyticsLine :series="priceDistribution.series" :labels="priceDistribution.labels" />
+          <LazyUiAnalyticsLine :series="priceDistribution.series" :labels="priceDistribution.labels" />
         </div>
       </article>
       <article class="flat-stats__card"><h3>{{ t("statsOwnership") }}</h3><div class="flat-stats__metrics"><div v-for="item in ownership" :key="item.key"><span>{{ item.label }}</span><strong>{{ percent(item.value) }}</strong><small>{{ number(item.value) }}</small></div></div></article>
