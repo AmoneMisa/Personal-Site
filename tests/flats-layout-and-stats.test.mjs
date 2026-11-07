@@ -146,3 +146,9 @@ test('flat statistics charts are lazy so chart.js stays out of the page bundle',
   assert.doesNotMatch(stats, /<UiAnalytics(Line|Bars|Donut|Bubble)\b/u)
   assert.match(stats, /<LazyUiAnalyticsBars\b/u)
 })
+
+test('flat-finder renders real listings in the server HTML for crawlers', async () => {
+  const latest = await readFile(new URL('../app/components/flats/LatestListings.vue', import.meta.url), 'utf8')
+  assert.match(latest, /useAsyncData\("flat-finder-latest-listings"[\s\S]*server: true/u)
+  assert.match(page, /<FlatsLatestListings v-if="routeSlug\(\)\.length === 0" \/>/u)
+})
