@@ -152,3 +152,12 @@ test('flat-finder renders real listings in the server HTML for crawlers', async 
   assert.match(latest, /useAsyncData\("flat-finder-latest-listings"[\s\S]*server: true/u)
   assert.match(page, /<FlatsLatestListings v-if="routeSlug\(\)\.length === 0" \/>/u)
 })
+
+test('currency selector offers only USD, EUR, RUB and the supported countries’ national currencies', async () => {
+  const { FLAT_DISPLAY_CURRENCIES, isFlatDisplayCurrency } = await import('../app/utils/flats/displayCurrencies.ts')
+  assert.deepEqual([...FLAT_DISPLAY_CURRENCIES], ['USD', 'EUR', 'RUB', 'UZS', 'KZT', 'UAH', 'RON', 'KGS'])
+  assert.equal(isFlatDisplayCurrency('GBP'), false)
+  assert.equal(isFlatDisplayCurrency('KGS'), true)
+  assert.match(page, /FLAT_DISPLAY_CURRENCIES/u)
+  assert.doesNotMatch(page, /CURRENCY_PRIORITY/u)
+})

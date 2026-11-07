@@ -41,6 +41,7 @@ import { queryString } from "~/utils/queryParams";
 import { capitalizeFirst } from "~/utils/text";
 import { convertCurrency, formatMoneyAmount } from "~/utils/search/money";
 import { regionalSearchCountry } from "~/utils/search/regionalCountry";
+import { FLAT_DISPLAY_CURRENCIES } from "~/utils/flats/displayCurrencies";
 import { useFlatFilters } from "~/composables/flats/useFlatFilters";
 import { useFlatFilterBlocks } from "~/composables/flats/useFlatFilterBlocks";
 import { useFlatFeed } from "~/composables/flats/useFlatFeed";
@@ -471,13 +472,11 @@ const metroDirectionItems = computed<Item[]>(() => [
     ? [{ value: METRO_CUSTOM_ARC_VALUE, label: metroArcLabel.value }]
     : []),
 ]);
-const CURRENCY_PRIORITY = ["USD", "EUR", "UZS", "KZT", "UAH", "RON", "GBP", "KGS", "TJS", "TMT", "PLN"];
-const currencyItems = computed<Item[]>(() => {
-  const keys = Object.keys(rates.value).filter((c) => /^[A-Z]{3}$/.test(c) && rates.value[c]! > 0);
-  const preferred = CURRENCY_PRIORITY.filter((c) => keys.includes(c));
-  const rest = keys.filter((c) => !CURRENCY_PRIORITY.includes(c)).sort();
-  return [...preferred, ...rest].map((c) => ({ label: c, value: c }));
-});
+const currencyItems = computed<Item[]>(() =>
+  FLAT_DISPLAY_CURRENCIES
+    .filter((c) => c === "USD" || (rates.value[c] ?? 0) > 0)
+    .map((c) => ({ label: c, value: c })),
+);
 const extraLabels = computed(() => ({
   amenities: t("amenities"), dishwasher: t("dishwasher"), ac: t("airConditioner"),
   parking: t("parking"), internet: t("internet"), gas: t("gas"), balcony: t("balcony"),

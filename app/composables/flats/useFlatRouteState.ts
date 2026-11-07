@@ -1,3 +1,4 @@
+import { isFlatDisplayCurrency } from "~/utils/flats/displayCurrencies";
 import { isOwnerKey } from "~/utils/flats/owners";
 import type { LocationQuery, Router } from "vue-router";
 import type { useFlatFilters } from "~/composables/flats/useFlatFilters";
@@ -153,7 +154,7 @@ export function useFlatRouteState(options: {
     for (const key of ["priceMin", "priceMax", "roomsMin", "roomsMax", "bedroomsMin", "bedroomsMax", "areaMin", "areaMax", "pricePerSqmMin", "pricePerSqmMax", "metroMaxM", "nearbyMaxM", "floorMin", "floorMax", "totalFloorsMin", "totalFloorsMax", "yearMin", "yearMax", "maxAgeDays", "commissionPercentMin", "commissionPercentMax"] as const) {
       filters[key].value = Number(queryString(params[key])) || undefined;
     }
-    if (queryString(params.currency)) filters.displayCurrency.value = queryString(params.currency);
+    if (isFlatDisplayCurrency(queryString(params.currency))) filters.displayCurrency.value = queryString(params.currency);
     filters.nearbyKind.value = queryString(params.nearbyKind);
     filters.radiusCenter.value = normalizeSearchCenter({
       lat: queryString(params.centerLat), lng: queryString(params.centerLng),
