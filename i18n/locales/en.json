@@ -3018,18 +3018,19 @@
           "href": "https://github.com/AmoneMisa/i18nPropertiesManager"
         },
         {
-          "kind": "Desktop · Electron.js + Vue.js",
-          "title": "Lost Ark Character Manager",
-          "description": "Pulls character data from the web and keeps track of recurring in-game activities with automatic resets.",
-          "linkLabel": "Details",
-          "href": null
-        },
-        {
           "kind": "Mobile · React Native + TypeScript",
           "title": "MediKit",
           "description": "A shared home medicine-cabinet tracker for expiry dates, remaining stock and family access.",
           "linkLabel": "GitHub",
           "href": "https://github.com/AmoneMisa/MediKit"
+        },
+        {
+          "kind": "Game mod · C# · published on Thunderstore",
+          "title": "Increase Difficulty Mod for R.E.P.O.",
+          "span2": true,
+          "description": "Configurable difficulty, custom weapons and drones, map-specific valuables, Black Market and round stats. Live on Thunderstore for real players.",
+          "linkLabel": "View on Thunderstore",
+          "href": "https://thunderstore.io/c/repo/p/WhitesLove/IncreaseDifficultyMod/"
         },
         {
           "kind": "Mobile · React Native + TypeScript",
@@ -3044,13 +3045,6 @@
           "description": "A group bot with mini-games, XP, loot, equipment and administration tools.",
           "linkLabel": "GitHub",
           "href": "https://github.com/AmoneMisa/Genshin-Impact-tg-bot"
-        },
-        {
-          "kind": "Android · Kotlin",
-          "title": "Rustic Price Converter",
-          "description": "A native Android app for currency conversion and quick price comparison.",
-          "linkLabel": "GitHub",
-          "href": "https://github.com/AmoneMisa/RusticPriceConvertor"
         }
       ]
     },
@@ -3272,7 +3266,6 @@
       "amorality-discord-bot": "A Discord community bot.",
       "lost-ark-trading-discord-bot": "A Discord bot for Lost Ark trading.",
       "file-telegram-bot": "A Telegram bot for handling files.",
-      "increase-hard-mod-r-e-p-o": "A difficulty mod for a co-op game: scales enemies by run progress, adds random per-level modifiers and a team ping system over Photon.",
       "autotranslatetexts": "A Skyrim patcher: auto-translates mod strings using already-existing translations (not a machine translator).",
       "freefasttravel": "A Synthesis patcher for Skyrim: removes the fast-travel lock from exterior locations without touching quest ones.",
       "allbookshaveperks": "A Skyrim patcher: adds a random perk to every book in the game.",
@@ -3286,6 +3279,22 @@
     "soon": "Coming soon",
     "seoTitle": "Projects — Marharyta Kubai",
     "backHome": "Back to home",
+    "featured": {
+      "eyebrow": "published · shipped to players",
+      "title": "Increase Difficulty Mod",
+      "game": "for R.E.P.O.",
+      "lead": "A mod for the co-op horror game R.E.P.O. that I built and published on Thunderstore, where players install it through mod managers. Not a demo — real users, real versions, real bug reports.",
+      "points": [
+        "Configurable difficulty with enemy scaling by run progress",
+        "Spritz tranquilizer, custom weapons and drones, upgrades",
+        "Map-specific valuables with physics and explosions",
+        "Black Market and round statistics",
+        "Full English and Russian localisation"
+      ],
+      "store": "View on Thunderstore",
+      "source": "Source on GitHub",
+      "badge": "Live on Thunderstore"
+    },
     "names": {
       "whiteslove": "WhitesLove — services",
       "lost-ark": "Lost Ark character manager"

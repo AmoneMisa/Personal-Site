@@ -3018,18 +3018,19 @@
           "href": "https://github.com/AmoneMisa/i18nPropertiesManager"
         },
         {
-          "kind": "Desktop · Electron.js + Vue.js",
-          "title": "Менеджер персонажей Lost Ark",
-          "description": "Подтягивает данные персонажей из веба и отслеживает повторяющиеся игровые активности с автосбросом.",
-          "linkLabel": "Подробнее",
-          "href": null
-        },
-        {
           "kind": "Mobile · React Native + TypeScript",
           "title": "MediKit",
           "description": "Общий трекер домашней аптечки: сроки годности, остатки лекарств и доступ для семьи.",
           "linkLabel": "GitHub",
           "href": "https://github.com/AmoneMisa/MediKit"
+        },
+        {
+          "kind": "Игровой мод · C# · опубликован на Thunderstore",
+          "title": "Increase Difficulty Mod для R.E.P.O.",
+          "span2": true,
+          "description": "Настраиваемая сложность, своё оружие и дроны, ценности для карт, Чёрный рынок и статистика раундов. Опубликован на Thunderstore для реальных игроков.",
+          "linkLabel": "Открыть на Thunderstore",
+          "href": "https://thunderstore.io/c/repo/p/WhitesLove/IncreaseDifficultyMod/"
         },
         {
           "kind": "Mobile · React Native + TypeScript",
@@ -3044,13 +3045,6 @@
           "description": "Групповой бот с мини-играми, системой опыта, лута, снаряжения и админ-инструментами.",
           "linkLabel": "GitHub",
           "href": "https://github.com/AmoneMisa/Genshin-Impact-tg-bot"
-        },
-        {
-          "kind": "Android · Kotlin",
-          "title": "Rustic Price Converter",
-          "description": "Нативное Android-приложение для конвертации валют и быстрого сравнения цен.",
-          "linkLabel": "GitHub",
-          "href": "https://github.com/AmoneMisa/RusticPriceConvertor"
         }
       ]
     },
@@ -3272,7 +3266,6 @@
       "amorality-discord-bot": "Discord-бот для сообщества.",
       "lost-ark-trading-discord-bot": "Discord-бот для торговли в Lost Ark.",
       "file-telegram-bot": "Telegram-бот для работы с файлами.",
-      "increase-hard-mod-r-e-p-o": "Мод сложности для кооп-игры: масштабирует врагов по прогрессу забега, добавляет случайные модификаторы за уровень и командную систему пинга поверх Photon.",
       "autotranslatetexts": "Патчер для Skyrim: автоперевод строк модов через уже существующие переводы (не машинный переводчик).",
       "freefasttravel": "Synthesis-патчер для Skyrim: снимает блокировку быстрого перемещения с внешних локаций, не трогая квестовые.",
       "allbookshaveperks": "Патчер для Skyrim: добавляет случайный перк к каждой книге в игре.",
@@ -3286,6 +3279,22 @@
     "soon": "Скоро",
     "seoTitle": "Проекты — Маргарита Кубай",
     "backHome": "На главную",
+    "featured": {
+      "eyebrow": "опубликован · им пользуются игроки",
+      "title": "Increase Difficulty Mod",
+      "game": "для R.E.P.O.",
+      "lead": "Мод для кооперативной хоррор-игры R.E.P.O., который я написала и опубликовала на Thunderstore — игроки ставят его через менеджеры модов. Не демо: настоящие пользователи, версии и баг-репорты.",
+      "points": [
+        "Настраиваемая сложность с масштабированием врагов по прогрессу забега",
+        "Транквилизатор Spritz, свои оружие и дроны, улучшения",
+        "Ценности для конкретных карт с физикой и взрывами",
+        "Чёрный рынок и статистика раундов",
+        "Полная локализация на английский и русский"
+      ],
+      "store": "Открыть на Thunderstore",
+      "source": "Исходники на GitHub",
+      "badge": "Опубликован на Thunderstore"
+    },
     "names": {
       "whiteslove": "WhitesLove — каталог инструментов",
       "lost-ark": "Менеджер персонажей для Lost Ark"

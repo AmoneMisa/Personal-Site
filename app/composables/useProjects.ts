@@ -167,12 +167,6 @@ const GROUPS: RawGroup[] = [
     "id": "game-mods-patchers-c",
     "items": [
       {
-        "id": "increase-hard-mod-r-e-p-o",
-        "name": "Increase Hard Mod — R.E.P.O.",
-        "stack": "C# · BepInEx / HarmonyLib",
-        "href": "https://github.com/AmoneMisa/Repo-Increase-Difficulty-Mod"
-      },
-      {
         "id": "autotranslatetexts",
         "name": "AutoTranslateTexts",
         "stack": "C# · Skyrim SE/AE",
@@ -199,6 +193,17 @@ const GROUPS: RawGroup[] = [
     ]
   }
 ];
+
+// The one project that is published to a public mod store and shown above the
+// catalog. Facts that never change per language live here; copy is in i18n
+// under `projects.featured`. Version/download counts are deliberately not
+// hard-coded — they would go stale; the Thunderstore page is the live source.
+export const FEATURED_MOD = {
+  icon: "/images/projects/increase-difficulty-mod.png",
+  stack: ["C#", "BepInEx", "HarmonyLib", "R.E.P.O."],
+  storeHref: "https://thunderstore.io/c/repo/p/WhitesLove/IncreaseDifficultyMod/",
+  githubHref: "https://github.com/AmoneMisa/Repo-Increase-Difficulty-Mod",
+} as const;
 
 // Most project names are the same in every language, so they live with the
 // rest of the structure. The few that are not get a `projects.names.<id>`

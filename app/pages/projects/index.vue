@@ -1,7 +1,19 @@
 <script setup lang="ts">
-import { useProjects } from "~/composables/useProjects";
+import { useProjects, FEATURED_MOD } from "~/composables/useProjects";
 
-const { t } = useI18n();
+const { t, tm, rt } = useI18n();
+
+const featured = computed(() => ({
+  ...FEATURED_MOD,
+  eyebrow: t("projects.featured.eyebrow"),
+  title: t("projects.featured.title"),
+  game: t("projects.featured.game"),
+  lead: t("projects.featured.lead"),
+  store: t("projects.featured.store"),
+  source: t("projects.featured.source"),
+  badge: t("projects.featured.badge"),
+  points: (tm("projects.featured.points") as unknown[]).map((p) => rt(p as string)),
+}));
 const localePath = useLocalePath();
 const groups = useProjects();
 
@@ -50,9 +62,27 @@ useHead(() => ({
         "@type": "ItemList",
         name: chrome.value.title,
         description: chrome.value.subtitle,
-        itemListElement: groups.value.flatMap((group) => group.items).map((p, i) => ({
+        itemListElement: [
+          {
             "@type": "ListItem",
-            position: i + 1,
+            position: 1,
+            item: {
+              "@type": "SoftwareApplication",
+              name: `${featured.value.title} ${featured.value.game}`,
+              description: featured.value.lead,
+              applicationCategory: "GameApplication",
+              operatingSystem: "Windows",
+              url: featured.value.storeHref,
+              downloadUrl: featured.value.storeHref,
+              sameAs: featured.value.githubHref,
+              image: `${SITE_URL}${featured.value.icon}`,
+              author: { "@type": "Person", name: "Marharyta Kubai" },
+              offers: { "@type": "Offer", price: 0, priceCurrency: "USD" },
+            },
+          },
+          ...groups.value.flatMap((group) => group.items).map((p, i) => ({
+            "@type": "ListItem",
+            position: i + 2,
             item: {
               "@type": "SoftwareSourceCode",
               name: p.name,
@@ -62,6 +92,7 @@ useHead(() => ({
               ...(p.downloadHref ? {downloadUrl: `${SITE_URL}${p.downloadHref}`} : {}),
             },
           })),
+        ],
       }),
     },
   ],
@@ -75,6 +106,51 @@ useHead(() => ({
         <div class="projects-page__eyebrow mono">{{ chrome.eyebrow }}</div>
         <h1 class="projects-page__title">{{ chrome.title }}</h1>
         <p class="projects-page__lead">{{ chrome.subtitle }}</p>
+      </div>
+    </section>
+
+    <div class="rd-divider" />
+    <section class="rd-section projects-page__section">
+      <div class="rd-wrap">
+        <article class="projects-page__featured">
+          <img
+              class="projects-page__featured-icon"
+              :src="featured.icon"
+              :alt="`${featured.title} ${featured.game}`"
+              width="128"
+              height="128"
+              loading="eager"
+          />
+          <div class="projects-page__featured-body">
+            <div class="projects-page__featured-badge mono">
+              <span class="projects-page__featured-dot" />{{ featured.badge }}
+            </div>
+            <h2 class="projects-page__featured-title">
+              {{ featured.title }} <span class="projects-page__featured-game">{{ featured.game }}</span>
+            </h2>
+            <div class="projects-page__tags">
+              <span v-for="tag in featured.stack" :key="tag" class="projects-page__tag mono">{{ tag }}</span>
+            </div>
+            <p class="projects-page__featured-lead">{{ featured.lead }}</p>
+            <ul class="projects-page__featured-points">
+              <li v-for="point in featured.points" :key="point">{{ point }}</li>
+            </ul>
+            <div class="projects-page__actions">
+              <a
+                  class="projects-page__link projects-page__link_accent mono"
+                  :href="featured.storeHref"
+                  target="_blank"
+                  rel="noopener noreferrer"
+              >{{ featured.store }} →</a>
+              <a
+                  class="projects-page__link mono"
+                  :href="featured.githubHref"
+                  target="_blank"
+                  rel="noopener noreferrer"
+              >{{ featured.source }} →</a>
+            </div>
+          </div>
+        </article>
       </div>
     </section>
 
@@ -143,6 +219,62 @@ useHead(() => ({
   font-size: 16px;
   max-width: 640px;
   line-height: 1.65;
+}
+.projects-page__featured {
+  display: flex;
+  gap: 32px;
+  align-items: flex-start;
+  padding: 32px;
+  background: var(--bg-deep);
+  border: 1px solid var(--accent-pink);
+  border-radius: 4px;
+}
+.projects-page__featured-icon {
+  width: 128px;
+  height: 128px;
+  flex: none;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+}
+.projects-page__featured-body {
+  min-width: 0;
+}
+.projects-page__featured-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11.5px;
+  color: var(--accent-pink);
+  margin-bottom: 12px;
+}
+.projects-page__featured-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--accent-pink);
+}
+.projects-page__featured-title {
+  font-size: clamp(22px, 3.5vw, 30px);
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  margin-bottom: 12px;
+}
+.projects-page__featured-game {
+  color: var(--text-muted);
+  font-weight: 400;
+}
+.projects-page__featured-lead {
+  color: var(--text-muted);
+  font-size: 14.5px;
+  line-height: 1.65;
+  max-width: 680px;
+}
+.projects-page__featured-points {
+  margin: 14px 0 0;
+  padding-left: 18px;
+  color: var(--text-muted);
+  font-size: 13.5px;
+  line-height: 1.7;
 }
 .projects-page__group-title {
   font-size: 22px;
@@ -221,6 +353,15 @@ a.projects-page__link:hover {
 @media (max-width: 760px) {
   .projects-page__grid {
     grid-template-columns: 1fr;
+  }
+  .projects-page__featured {
+    flex-direction: column;
+    padding: 22px;
+    gap: 20px;
+  }
+  .projects-page__featured-icon {
+    width: 96px;
+    height: 96px;
   }
 }
 </style>
